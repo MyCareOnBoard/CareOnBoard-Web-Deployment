@@ -2,6 +2,11 @@ import { render as rtlRender, RenderOptions } from '@testing-library/react';
 import { ReactElement } from 'react';
 import { RouterProvider, createMemoryRouter } from 'react-router';
 import { router } from './routes';
+import { vi } from 'vitest';
+
+// Mock the router
+const mockNavigate = vi.fn();
+
 
 const TestWrapper = () => {
   // Create a test router with the app's routes
