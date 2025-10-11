@@ -1,73 +1,86 @@
-# React + TypeScript + Vite
+# Care On Board
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern React application built with TypeScript, Vite, and React Router. This application provides a platform for managing care services with a clean, responsive UI.
 
-Currently, two official plugins are available:
+## 🚀 Getting Started
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Prerequisites
 
-## React Compiler
+- Node.js (v18 or later)
+- pnpm (recommended) or npm
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Installation
 
-## Expanding the ESLint configuration
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/care-on-board.git
+   cd care-on-board
+   ```
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+2. **Install dependencies**
+   ```bash
+   pnpm install
+   # or
+   npm install
+   ```
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+3. **Set up environment variables**
+   - Copy `.env.example` to `.env`
+   - Update the environment variables as needed
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+4. **Start the development server**
+   ```bash
+   pnpm dev
+   # or
+   npm run dev
+   ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+5. **Build for production**
+   ```bash
+   pnpm build
+   pnpm preview
+   ```
+
+## 🏗️ Project Structure
+
+```
+src/
+├── assets/           # Static assets (images, fonts, etc.)
+├── components/       # Reusable UI components
+│   └── ui/           # Base UI components (buttons, inputs, etc.)
+├── features/         # Feature-based modules
+│   └── splash/       # Example feature module
+├── layouts/          # Layout components
+├── lib/              # Utility functions and helpers
+├── routes/           # Application routes configuration
+├── store/            # State management (Redux)
+├── types/            # TypeScript type definitions
+├── App.tsx           # Root component
+└── main.tsx          # Application entry point
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🛠️ Tech Stack
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- ⚡ [Vite](https://vitejs.dev/) - Next Generation Frontend Tooling
+- ⚛️ [React 19](https://react.dev/) - A JavaScript library for building user interfaces
+- 🎨 [Tailwind CSS](https://tailwindcss.com/) - A utility-first CSS framework
+- 🚀 [TypeScript](https://www.typescriptlang.org/) - Type-safe JavaScript
+- 🔄 [React Router](https://reactrouter.com/) - Declarative routing for React
+- 🛠️ [Redux Toolkit](https://redux-toolkit.js.org/) - State management
+- 🎭 [Radix UI](https://www.radix-ui.com/) - Unstyled, accessible components
+- 📦 [pnpm](https://pnpm.io/) - Fast, disk space efficient package manager
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 📝 Scripts
+
+- `dev` - Start development server
+- `build` - Build for production
+- `preview` - Preview production build
+- `lint` - Run ESLint
+
+## 🔧 Editor Setup
+
+We recommend using [VS Code](https://code.visualstudio.com/) with the following extensions:
+
+- [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
+- [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+- [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss)
