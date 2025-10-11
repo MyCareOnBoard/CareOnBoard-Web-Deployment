@@ -1,11 +1,11 @@
-import {defineConfig, loadEnv} from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
 import path from "path";
 import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
-export default defineConfig(({mode}) => {
+export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
 
   return {
@@ -25,6 +25,22 @@ export default defineConfig(({mode}) => {
         "@store": path.resolve(__dirname, "./src/store"),
         "@layouts": path.resolve(__dirname, "./src/layouts"),
         "@routes": path.resolve(__dirname, "./src/routes"),
+      },
+    },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './src/setupTests.ts',
+      coverage: {
+        reporter: ['text', 'json', 'html'],
+        exclude: [
+          'node_modules/',
+          'src/setupTests.ts',
+          '**/*.d.ts',
+          '**/vite-env.d.ts',
+          '**/main.tsx',
+          '**/App.tsx',
+        ],
       },
     },
     build: {
