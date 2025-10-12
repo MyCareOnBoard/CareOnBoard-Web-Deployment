@@ -1,2 +1,64 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
+
+:root {
+  /* Primary Colors from Figma */
+  --main-color: #00b4b8;
+  --white: #ffffff;
+  --black: #000000;
+  
+  /* Semantic Colors from Figma */
+  --red: #d53411;
+  --blue: #2b82ff;
+  --green: #0eaf52;
+  
+  /* Grey Scale from Figma */
+  --grey-200: #b2b2b3;
+  --grey-800: #565656;
+  
+  /* Application Tokens */
+  --background: #eef4f5;
+  --foreground: #10141a;
+  --card: var(--white);
+  --card-foreground: #10141a;
+  --border: rgba(16, 20, 26, 0.08);
+  
+  /* Input Tokens */
+  --input-bg: var(--white);
+  --input-border: #cccccd;
+  --input-text: #10141a;
+  --input-placeholder: var(--grey-200);
+  --input-error-border: var(--red);
+  --input-error-text: var(--red);
+  
+  /* Component Tokens */
+  --ring: var(--main-color);
+  --primary: var(--main-color);
+  --primary-foreground: var(--white);
+  --secondary: rgba(255, 255, 255, 0.5);
+  --secondary-foreground: #10141a;
+  --muted: rgba(255, 255, 255, 0.32);
+  --muted-foreground: var(--grey-800);
+  --accent: rgba(255, 255, 255, 0.32);
+  --accent-foreground: #10141a;
+  --destructive: var(--red);
+  --destructive-foreground: var(--white);
+  --success: var(--green);
+  --success-foreground: var(--white);
+  --info: var(--blue);
+  --info-foreground: var(--white);
+  
+  /* Border Radius */
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --radius-sm: 10px;
+  
+  font-family: "Urbanist", system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
