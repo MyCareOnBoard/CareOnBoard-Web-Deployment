@@ -31,7 +31,7 @@ export default function ApplicationStepper({ steps }: ApplicationStepperProps) {
               "text-center",
               step.status === "complete" ? "font-medium text-[#10141a]" : "font-normal text-[#808081]"
             )}
-            style={{ width: step.title === "Official Hire & Orientation" ? "157px" : "auto" }}
+            style={{ width: "auto" }}
           >
             {step.title}
           </span>

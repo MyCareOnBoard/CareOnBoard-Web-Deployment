@@ -1,150 +1,362 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Radio } from "@/components/ui/radio";
 import { Calendar } from "@/components/ui/calendar";
+import { FileUpload } from "@/components/ui/file-upload";
 import ApplicationStepper from "./ApplicationStepper";
 import type { Step } from "../types";
-import UploadIcon from "@/assets/icons/upload.svg?react";
 import CalendarDaysIcon from "@/assets/icons/calendar-days.svg?react";
 import { format } from "date-fns";
 
-const DEFAULT_DOB = new Date(2025, 10, 14);
+const DEFAULT_DOB = new Date();
 
-const boolQuestions = [
-  "Are you at least 18 years old?",
-  "Do you have a High School Diploma or GED?",
-  "Are you legally eligible to work in the U.S.?",
-  "Have you ever been convicted of a disqualifying offense under NJ law?",
-  "Do you have reliable transportation?",
-];
+const BOOLEAN_QUESTIONS = [
+  { name: "isAdult", label: "Are you at least 18 years old?" },
+  { name: "hasDiploma", label: "Do you have a High School Diploma or GED?" },
+  { name: "eligibleToWork", label: "Are you legally eligible to work in the U.S.?" },
+  { name: "hasDisqualifyingOffense", label: "Have you ever been convicted of a disqualifying offense under NJ law?" },
+  { name: "hasTransportation", label: "Do you have reliable transportation?" },
+] as const;
+
+type BooleanQuestionName = (typeof BOOLEAN_QUESTIONS)[number]["name"];
+
+const yesNoSchema = z.enum(["Yes", "No"], {
+  message: "Please select Yes or No",
+});
+
+const booleanQuestionsSchemaShape = (() => {
+  const shape = {} as Record<BooleanQuestionName, typeof yesNoSchema>;
+  for (const question of BOOLEAN_QUESTIONS) {
+    shape[question.name] = yesNoSchema;
+  }
+  return shape;
+})();
+
+const fileListSchema = z.custom<FileList>((value) => {
+  if (typeof FileList === "undefined") {
+    return true;
+  }
+  return value instanceof FileList;
+});
+
+const profilePreScreeningSchema = z.object({
+  fullName: z.string().min(1, "Full name is required"),
+  email: z.string().email("Enter a valid email address"),
+  dateOfBirth: z.date({ message: "Date of birth is required" }),
+  address: z.string().min(1, "Address is required"),
+  gender: z.enum(["Male", "Female"], {
+    message: "Please select a gender",
+  }),
+  booleanQuestions: z.object(booleanQuestionsSchemaShape),
+  resume: fileListSchema.optional(),
+  declaration: z.literal(true, {
+    message: "You must confirm the information is correct",
+  }),
+});
+
+export type ProfilePreScreeningFormValues = z.infer<typeof profilePreScreeningSchema>;
+
+const booleanQuestionsDefaults = BOOLEAN_QUESTIONS.reduce(
+  (acc, question) => {
+    acc[question.name] = undefined;
+    return acc;
+  },
+  {} as Record<BooleanQuestionName, "Yes" | "No" | undefined>
+);
 
 interface ProfilePreScreeningStepProps {
   steps: Step[];
-  onNext: () => void;
+  onNext: (data: ProfilePreScreeningFormValues) => void;
 }
 
 export default function ProfilePreScreeningStep({ steps, onNext }: ProfilePreScreeningStepProps) {
-  const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>();
   const [isDobOpen, setIsDobOpen] = useState(false);
 
-  const formattedDob = useMemo(() => (dateOfBirth ? format(dateOfBirth, "MMMM d, yyyy") : ""), [dateOfBirth]);
+  const form = useForm<ProfilePreScreeningFormValues>({
+    resolver: zodResolver(profilePreScreeningSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      dateOfBirth: undefined,
+      address: "",
+      gender: undefined,
+      booleanQuestions: booleanQuestionsDefaults,
+      resume: undefined,
+      declaration: true,
+    },
+  });
+
+  const handleSubmit = (values: ProfilePreScreeningFormValues) => {
+    onNext(values);
+  };
 
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[1161px] pe-4">
         <ApplicationStepper steps={steps} />
 
-        <div className="space-y-[33px]">
-          <div className="flex gap-[50px]">
-            <Field label="Full Name" width="353px">
-              <Input placeholder="Enter full name" />
-            </Field>
-            <Field label="Email" width="354px">
-              <Input placeholder="Enter your email" />
-            </Field>
-            <Field label="Date of birth" width="353px">
-              <Popover open={isDobOpen} onOpenChange={setIsDobOpen}>
-                <PopoverTrigger asChild>
-                  <button type="button" className="w-full focus:outline-none">
-                    <InputGroup className="px-4">
-                      <InputGroupInput
-                        value={formattedDob}
-                        placeholder="November 14, 2025"
-                        readOnly
-                        className="text-[#10141a]"
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <CalendarDaysIcon className="h-5 w-5 text-[#808081]" />
-                      </InputGroupAddon>
-                    </InputGroup>
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="mt-3 w-[353px] border-none p-0 shadow-none bg-white">
-                  <Calendar
-                    mode="single"
-                    className="bg-white"
-                    selected={dateOfBirth ?? DEFAULT_DOB}
-                    onSelect={(date) => {
-                      if (date) {
-                        setDateOfBirth(date);
-                        setIsDobOpen(false);
-                      }
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </Field>
-          </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-[33px]">
+            <div className="flex gap-[50px]">
+              <FormField
+                control={form.control}
+                name="fullName"
+                render={({ field }) => (
+                  <div className="w-[353px]">
+                    <FormItem className="space-y-2">
+                      <FormLabel className="text-xs font-normal text-[#10141a]">Full Name</FormLabel>
+                      <FormControl className="mb-0">
+                        <Input placeholder="Enter full name" {...field} />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  </div>
+                )}
+              />
 
-          <Field label="Address" width="353px">
-            <Input placeholder="Enter Address" />
-          </Field>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <div className="w-[354px]">
+                    <FormItem className="space-y-2">
+                      <FormLabel className="text-xs font-normal text-[#10141a]">Email</FormLabel>
+                      <FormControl className="mb-0">
+                        <Input placeholder="Enter your email" type="email" {...field} />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  </div>
+                )}
+              />
 
-          <fieldset className="w-[450px]">
-            <legend className="mb-1 text-xs font-normal text-[#10141a]">Gender</legend>
-            <div className="flex gap-[9px]">
-              <Radio name="gender" value="Male" label="Male" />
-              <Radio name="gender" value="Female" label="Female" />
+              <FormField
+                control={form.control}
+                name="dateOfBirth"
+                render={({ field }) => {
+                  const formattedDob = field.value ? format(field.value, "MMMM d, yyyy") : "";
+
+                  return (
+                    <div className="w-[353px]">
+                      <FormItem className="space-y-2">
+                        <FormLabel className="text-xs font-normal text-[#10141a]">Date of birth</FormLabel>
+                        <Popover open={isDobOpen} onOpenChange={setIsDobOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl className="mb-0">
+                              <button type="button" className="w-full focus:outline-none">
+                                <InputGroup className="px-4">
+                                  <InputGroupInput
+                                    value={formattedDob}
+                                    placeholder="November 14, 2025"
+                                    readOnly
+                                    className="text-[#10141a]"
+                                  />
+                                  <InputGroupAddon align="inline-end">
+                                    <CalendarDaysIcon className="h-5 w-5 text-[#808081]" />
+                                  </InputGroupAddon>
+                                </InputGroup>
+                              </button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="mt-3 w-[353px] border-none bg-white p-0 shadow-none">
+                            <Calendar
+                              mode="single"
+                              className="bg-white"
+                              selected={field.value}
+                              defaultMonth={field.value ?? DEFAULT_DOB}
+                              onSelect={(date) => {
+                                if (!date) {
+                                  return;
+                                }
+                                field.onChange(date);
+                                field.onBlur();
+                                setIsDobOpen(false);
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    </div>
+                  );
+                }}
+              />
             </div>
-          </fieldset>
 
-          <div className="space-y-[30px]">
-            {boolQuestions.map((question, index) => (
-              <fieldset key={question} className="w-[450px]">
-                <legend className="mb-1 text-xs font-normal text-[#10141a]">{question}</legend>
-                <div className="flex gap-[9px]">
-                  <Radio name={`question-${index}`} value="Yes" label="Yes" />
-                  <Radio name={`question-${index}`} value="No" label="No" />
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <div className="w-[353px]">
+                  <FormItem className="space-y-2">
+                    <FormLabel className="text-xs font-normal text-[#10141a]">Address</FormLabel>
+                    <FormControl className="mb-0">
+                      <Input placeholder="Enter Address" {...field} />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
                 </div>
-              </fieldset>
-            ))}
-          </div>
+              )}
+            />
 
-          <div className="w-[1152px]">
-            <Label className="mb-3 block text-xs font-normal text-[#10141a]">Upload Resume (Optional)</Label>
-            <button
-              type="button"
-              className="flex h-[101px] w-full flex-col items-center justify-center gap-[6px] rounded-[12px] border border-[#cccccd] bg-white text-sm text-[#b2b2b3] transition hover:border-[#00b4b8] hover:text-[#00b4b8]"
-            >
-              <UploadIcon className="h-5 w-5" />
-              Upload your resume
-            </button>
-          </div>
+            <FormField
+              control={form.control}
+              name="gender"
+              render={({ field }) => (
+                <FormItem className="w-[450px] space-y-2">
+                  <FormLabel className="text-xs font-normal text-[#10141a]">Gender</FormLabel>
+                  <div className="flex gap-[9px]">
+                    <Radio
+                      id="gender-male"
+                      name={field.name}
+                      value="Male"
+                      label="Male"
+                      checked={field.value === "Male"}
+                      onChange={() => {
+                        field.onChange("Male");
+                      }}
+                      onBlur={field.onBlur}
+                    />
+                    <Radio
+                      id="gender-female"
+                      name={field.name}
+                      value="Female"
+                      label="Female"
+                      checked={field.value === "Female"}
+                      onChange={() => {
+                        field.onChange("Female");
+                      }}
+                      onBlur={field.onBlur}
+                    />
+                  </div>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
 
-          <Checkbox defaultChecked label="I hereby declared that all the information are correct" />
-
-          <div className="pb-12">
-            <Button onClick={onNext}>
-              <span>Next</span>
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
-                <path
-                  d="M4 10H16M16 10L10 4M16 10L10 16"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+            <div className="space-y-[30px]">
+              {BOOLEAN_QUESTIONS.map((question) => (
+                <FormField
+                  key={question.name}
+                  control={form.control}
+                  name={`booleanQuestions.${question.name}`}
+                  render={({ field, fieldState }) => (
+                    <div className="w-[450px]">
+                      <fieldset className="border-0 p-0">
+                        <legend className="mb-1 text-xs font-normal text-[#10141a]">{question.label}</legend>
+                        <div className="flex gap-[9px]">
+                          <Radio
+                            id={`${question.name}-yes`}
+                            name={field.name}
+                            value="Yes"
+                            label="Yes"
+                            checked={field.value === "Yes"}
+                            onChange={() => {
+                              field.onChange("Yes");
+                              field.onBlur();
+                            }}
+                          />
+                          <Radio
+                            id={`${question.name}-no`}
+                            name={field.name}
+                            value="No"
+                            label="No"
+                            checked={field.value === "No"}
+                            onChange={() => {
+                              field.onChange("No");
+                              field.onBlur();
+                            }}
+                          />
+                        </div>
+                      </fieldset>
+                      {fieldState.error ? (
+                        <p className="mt-1 text-xs text-destructive">{fieldState.error.message}</p>
+                      ) : null}
+                    </div>
+                  )}
                 />
-              </svg>
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+              ))}
+            </div>
 
-function Field({ label, width, children }: { label: string; width: string; children: ReactNode }) {
-  return (
-    <div style={{ width }}>
-      <Label className="mb-1 block text-xs font-normal text-[#10141a]">{label}</Label>
-      {children}
+            <FormField
+              control={form.control}
+              name="resume"
+              render={({ field }) => {
+                const { ref, name, onBlur, onChange, value } = field;
+                const selectedFileName = value && value.length > 0 ? value[0]?.name : undefined;
+
+                return (
+                  <FormItem className="w-[1152px] space-y-3">
+                    <FormLabel className="block text-xs font-normal text-[#10141a]">Upload Resume (Optional)</FormLabel>
+                    <FormControl className="mb-0">
+                      <FileUpload
+                        ref={ref}
+                        name={name}
+                        className="h-[101px]"
+                        label={selectedFileName ?? "Upload your resume"}
+                        accept=".pdf,.doc,.docx"
+                        onBlur={onBlur}
+                        onChange={(event) => {
+                          onChange(event.target.files ?? undefined);
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                );
+              }}
+            />
+
+            <FormField
+              control={form.control}
+              name="declaration"
+              render={({ field }) => {
+                const { ref, name, onBlur, value, onChange } = field;
+                return (
+                  <FormItem className="space-y-2">
+                    <FormControl className="mb-0">
+                      <Checkbox
+                        ref={ref}
+                        name={name}
+                        onBlur={onBlur}
+                        checked={value}
+                        onChange={(event) => onChange(event.target.checked)}
+                        label="I hereby declared that all the information are correct"
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                );
+              }}
+            />
+
+            <div className="pb-12">
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                <span>Next</span>
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
+                  <path
+                    d="M4 10H16M16 10L10 4M16 10L10 16"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </div>
     </div>
   );
 }
