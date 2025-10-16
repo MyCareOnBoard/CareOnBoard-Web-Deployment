@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { X } from "lucide-react";
 
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export default function ApplicationDashboard() {
       <div className="mb-[24px] flex items-center justify-between">
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">Application</h1>
         <Button type="button" variant="destructive" className="gap-[13px] px-4">
+          <X className="h-5 w-5" />
           <span>Cancel Application Form</span>
         </Button>
       </div>
