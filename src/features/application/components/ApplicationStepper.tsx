@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -9,9 +9,10 @@ import type { Step } from "../types";
 
 interface ApplicationStepperProps {
   steps: Step[];
+  children: ReactNode;
 }
 
-export default function ApplicationStepper({ steps }: ApplicationStepperProps) {
+export default function ApplicationStepper({ steps, children }: ApplicationStepperProps) {
   const progressValue = useMemo(() => {
     const firstPendingIndex = steps.findIndex((step) => step.status !== "complete");
 
@@ -22,22 +23,27 @@ export default function ApplicationStepper({ steps }: ApplicationStepperProps) {
   }, [steps]);
 
   return (
-    <div className="mb-[44px] min-w-[1161px]">
-      <div className="mb-5 flex items-center justify-between text-sm leading-[1.4]">
-        {steps.map((step) => (
-          <span
-            key={step.title}
-            className={cn(
-              "text-center",
-              step.status === "complete" ? "font-medium text-[#10141a]" : "font-normal text-[#808081]"
-            )}
-            style={{ width: "auto" }}
-          >
-            {step.title}
-          </span>
-        ))}
+    <div className="overflow-x-auto">
+      <div className="min-w-[1161px] pe-4">
+        <div className="mb-[44px]">
+          <div className="mb-5 flex items-center justify-between text-sm leading-[1.4]">
+            {steps.map((step) => (
+              <span
+                key={step.title}
+                className={cn(
+                  "text-center",
+                  step.status === "complete" ? "font-medium text-[#10141a]" : "font-normal text-[#808081]"
+                )}
+                style={{ width: "auto" }}
+              >
+                {step.title}
+              </span>
+            ))}
+          </div>
+          <Slider value={[progressValue]} max={100} icon={<UserIcon className="h-4 w-4 text-[#00b4b8]" />} />
+        </div>
+        {children}
       </div>
-      <Slider value={[5]} max={100} icon={<UserIcon className="h-4 w-4 text-[#00b4b8]" />} />
     </div>
   );
 }

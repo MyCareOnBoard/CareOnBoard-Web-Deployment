@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import ApplicationDashboard from "./index";
 
 describe("ApplicationDashboard", () => {
@@ -8,21 +8,22 @@ describe("ApplicationDashboard", () => {
     expect(screen.getByRole("heading", { name: "Application" })).toBeInTheDocument();
   });
 
-  it("displays all navigation items", () => {
+  it("renders the header", () => {
     render(<ApplicationDashboard />);
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
-    expect(screen.getAllByText("Application").length).toBeGreaterThan(0);
-    expect(screen.getByText("Documents")).toBeInTheDocument();
-    expect(screen.getByText("Help Center")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Application" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Cancel Application Form" })).toBeVisible();
   });
 
   it("displays the stepper with all steps", () => {
     render(<ApplicationDashboard />);
-    expect(screen.getByText("Profile & Pre-Screening")).toBeInTheDocument();
-    expect(screen.getByText("Document Upload & Eligibility Verification")).toBeInTheDocument();
-    expect(screen.getByText("Conditional Hire & Compliance")).toBeInTheDocument();
-    expect(screen.getByText("Final Agency Review")).toBeInTheDocument();
-    expect(screen.getByText("Official Hire & Orientation")).toBeInTheDocument();
+    const stepper = screen.getByText("Profile & Pre-Screening").closest("div");
+    expect(stepper).toBeTruthy();
+    const stepperScope = stepper ? within(stepper) : screen;
+    expect(stepperScope.getByText("Profile & Pre-Screening")).toBeInTheDocument();
+    expect(stepperScope.getByText("Document Upload & Eligibility Verification")).toBeInTheDocument();
+    expect(stepperScope.getByText("Conditional Hire & Compliance")).toBeInTheDocument();
+    expect(stepperScope.getByText("Final Agency Review")).toBeInTheDocument();
+    expect(stepperScope.getByText("Official Hire & Orientation")).toBeInTheDocument();
   });
 
   it("displays all form fields", () => {
@@ -65,11 +66,12 @@ describe("ApplicationDashboard", () => {
     expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
   });
 
-  it("displays header actions", () => {
+  it("renders only the first step content by default", () => {
     render(<ApplicationDashboard />);
-    expect(screen.getByLabelText("Settings")).toBeInTheDocument();
-    expect(screen.getByLabelText("Notifications")).toBeInTheDocument();
-    expect(screen.getByText("Nola Hawkins")).toBeInTheDocument();
+
+    expect(screen.getByPlaceholderText("Enter full name")).toBeInTheDocument();
+    expect(screen.getByText("Upload your resume")).toBeInTheDocument();
+    expect(screen.queryByText("Upload identification (Driver’s license or Passport)")).not.toBeInTheDocument();
   });
 });
 

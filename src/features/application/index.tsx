@@ -1,25 +1,63 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
 import { Button } from "@/components/ui/button";
 
 import ProfilePreScreeningStep, { type ProfilePreScreeningFormValues } from "./components/ProfilePreScreeningStep";
+import ApplicationStepper from "./components/ApplicationStepper";
+import DocumentUploadStep from "./components/DocumentUploadStep";
+import ConditionalHireStep from "./components/ConditionalHireStep";
+import FinalReviewStep from "./components/FinalReviewStep";
+import OrientationStep from "./components/OrientationStep";
 import type { Step } from "./types";
 
-const steps: Step[] = [
-  { title: "Profile & Pre-Screening", status: "complete" },
-  { title: "Document Upload & Eligibility Verification", status: "pending" },
-  { title: "Conditional Hire & Compliance", status: "pending" },
-  { title: "Final Agency Review", status: "pending" },
-  { title: "Official Hire & Orientation", status: "pending" },
-];
+const STEP_TITLES = [
+  "Profile & Pre-Screening",
+  "Document Upload & Eligibility Verification",
+  "Conditional Hire & Compliance",
+  "Final Agency Review",
+  "Official Hire & Orientation",
+] as const;
 
 export default function ApplicationDashboard() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [activeStep, setActiveStep] = useState(3);
 
   const handleNext = (_data: ProfilePreScreeningFormValues) => {
     setShowSuccessDialog(true);
   };
+
+  const goToStep = (index: number) => {
+    setActiveStep((previous) => {
+      const clampedIndex = Math.max(0, Math.min(index, STEP_TITLES.length - 1));
+      if (clampedIndex === previous) {
+        return previous;
+      }
+      return clampedIndex;
+    });
+  };
+
+  const handleSuccessDialogContinue = () => {
+    setShowSuccessDialog(false);
+    goToStep(1);
+  };
+
+  const steps = useMemo<Step[]>(
+    () =>
+      STEP_TITLES.map((title, index) => ({
+        title,
+        status: index <= activeStep ? "complete" : "pending",
+      })),
+    [activeStep]
+  );
+
+  const stepComponents = [
+    <ProfilePreScreeningStep key="profile" onNext={handleNext} />,
+    <DocumentUploadStep key="documents" onBack={() => goToStep(0)} onNext={() => goToStep(2)} />,
+    <ConditionalHireStep key="conditional" onBack={() => goToStep(1)} onNext={() => goToStep(3)} />,
+    <FinalReviewStep key="review" onBack={() => goToStep(2)} onNext={() => goToStep(4)} />,
+    <OrientationStep key="orientation" onBack={() => goToStep(3)} onNext={() => goToStep(4)} />,
+  ];
 
   return (
     <>
@@ -30,14 +68,16 @@ export default function ApplicationDashboard() {
         </Button>
       </div>
 
-      <ProfilePreScreeningStep steps={steps} onNext={handleNext} />
+      <ApplicationStepper steps={steps}>
+        {stepComponents[activeStep]}
+      </ApplicationStepper>
 
       <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <SuccessDialogContent
           title="Title"
           description="You have successfully completed Profile & Pre-Screening. Click 'next' to go to the next phase."
           buttonText="Appointment"
-          onButtonClick={() => setShowSuccessDialog(false)}
+          onButtonClick={handleSuccessDialogContinue}
         />
       </SuccessDialog>
     </>
