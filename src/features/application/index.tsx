@@ -22,7 +22,7 @@ const STEP_TITLES = [
 
 export default function ApplicationDashboard() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [activeStep, setActiveStep] = useState(3);
+  const [activeStep, setActiveStep] = useState(0);
 
   const handleNext = (_data: ProfilePreScreeningFormValues) => {
     setShowSuccessDialog(true);
