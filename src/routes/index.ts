@@ -1,14 +1,14 @@
 import { createBrowserRouter } from "react-router";
 
 import AppLayout from "@/layouts/AppLayout";
-import ApplicationDashboard from "@/features/application";
-import DashboardPage from "@/features/dashboard";
-import DocumentsPage from "@/features/documents";
-import HelpCenterPage from "@/features/help-center";
-import LoginPage from "@/features/login";
-import SignupPage from "@/features/signup";
-import OnboardingPage from "@/features/onboarding";
-import SplashScreen from "@/features/splash";
+import ApplicationDashboard from "@/pages/application";
+import DashboardPage from "@/pages/dashboard";
+import DocumentsPage from "@/pages/documents";
+import HelpCenterPage from "@/pages/help-center";
+import LoginPage from "@/pages/login";
+import SignupPage from "@/pages/signup";
+import OnboardingPage from "@/pages/onboarding";
+import SplashScreen from "@/pages/splash";
 import { Routes } from "@/routes/constants";
 import AuthLayout from "@/layouts/AuthLayout";
 
