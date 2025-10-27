@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { Suspense, useMemo, useState, useEffect } from "react";
 
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ import type { Step } from "./types";
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getApplicationStatus, type ApplicationStatus } from "@/lib/api/job-application";
 
 const STEP_TITLES = [
   "Profile & Pre-Screening",
@@ -25,10 +26,49 @@ const STEP_TITLES = [
 
 const STEP_POINT = [5, 30, 56, 76, 95];
 
-export default function ApplicationStepper() {
+// Loading component
+function ApplicationLoading() {
+  return (
+    <div className="flex min-h-[400px] items-center justify-center">
+      <div className="text-center">
+        <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
+        <p className="text-sm text-[#808081]">Loading application status...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main application content
+function ApplicationContent() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
   const progressValue = useMemo(() => STEP_POINT[activeStep], [activeStep]);
+
+  // Fetch application status on component mount
+  useEffect(() => {
+    const fetchApplicationStatus = async () => {
+      try {
+        setIsLoading(true);
+        const response = await getApplicationStatus();
+        console.log('Application status:', response);
+        setApplicationStatus(response.data);
+        
+        // Set active step based on current step from API
+        if (response.data.currentStep !== undefined) {
+          setActiveStep(response.data.currentStep);
+        }
+      } catch (error) {
+        console.error('Error fetching application status:', error);
+        // Continue with default state if fetch fails
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchApplicationStatus();
+  }, []);
 
   const steps = useMemo<Step[]>(
     () =>
@@ -66,7 +106,10 @@ export default function ApplicationStepper() {
     goToStep(1);
   };
 
-  
+  // Show loading state while fetching application status
+  if (isLoading) {
+    return <ApplicationLoading />;
+  }
 
   return (
     <>
@@ -108,6 +151,15 @@ export default function ApplicationStepper() {
         />
       </SuccessDialog>
     </>
+  );
+}
+
+// Wrapper component with Suspense
+export default function ApplicationStepper() {
+  return (
+    <Suspense fallback={<ApplicationLoading />}>
+      <ApplicationContent />
+    </Suspense>
   );
 }
 

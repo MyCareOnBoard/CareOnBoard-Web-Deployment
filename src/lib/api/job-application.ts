@@ -78,6 +78,34 @@ export const submitPreScreening = async (data: PreScreeningData): Promise<ApiRes
 };
 
 /**
+ * Application status response structure
+ */
+export interface ApplicationStatus {
+    applicationId?: string;
+    status: 'not_started' | 'in_progress' | 'submitted' | 'under_review' | 'approved' | 'rejected';
+    currentStep?: number;
+    completedSteps?: string[];
+    lastUpdated?: string;
+}
+
+/**
+ * Get current application status
+ * @returns Promise with application status data
+ */
+export const getApplicationStatus = async (): Promise<ApiResponse<ApplicationStatus>> => {
+    try {
+        const response = await axiosClient.get<ApiResponse<ApplicationStatus>>(
+            '/job-application/status'
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch application status:', error);
+        throw error;
+    }
+};
+
+/**
  * Submit job application with all required data
  * @param applicationData - The application form data
  * @returns Promise with submission response
