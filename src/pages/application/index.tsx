@@ -27,7 +27,7 @@ const STEP_POINT = [5, 30, 56, 76, 95];
 
 export default function ApplicationStepper() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState(3);
   const progressValue = useMemo(() => STEP_POINT[activeStep], [activeStep]);
 
   const steps = useMemo<Step[]>(
