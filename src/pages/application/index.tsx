@@ -1,16 +1,24 @@
-import { useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 
-import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
-import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
+import UserIcon from "@/assets/icons/user.svg?react";
 
 import ProfilePreScreeningStep, { type ProfilePreScreeningFormValues } from "./components/ProfilePreScreeningStep";
-import ApplicationStepper from "./components/ApplicationStepper";
 import DocumentUploadStep from "./components/DocumentUploadStep";
 import ConditionalHireStep from "./components/ConditionalHireStep";
 import FinalReviewStep from "./components/FinalReviewStep";
 import OrientationStep from "./components/OrientationStep";
+
 import type { Step } from "./types";
+import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+interface ApplicationStepperProps {
+  steps: Step[];
+  children: ReactNode;
+}
 
 const STEP_TITLES = [
   "Profile & Pre-Screening",
@@ -20,9 +28,21 @@ const STEP_TITLES = [
   "Official Hire & Orientation",
 ];
 
-export default function ApplicationDashboard() {
+const STEP_POINT = [5, 30, 56, 76, 95];
+
+export default function ApplicationStepper() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+  const progressValue = useMemo(() => STEP_POINT[activeStep], [activeStep]);
+
+  const steps = useMemo<Step[]>(
+    () =>
+      STEP_TITLES.map((title, index) => ({
+        title,
+        status: index <= activeStep ? "complete" : "pending",
+      })),
+    [activeStep]
+  );
 
   const handleNext = (_data: ProfilePreScreeningFormValues) => {
     setShowSuccessDialog(true);
@@ -38,20 +58,6 @@ export default function ApplicationDashboard() {
     });
   };
 
-  const handleSuccessDialogContinue = () => {
-    setShowSuccessDialog(false);
-    goToStep(1);
-  };
-
-  const steps = useMemo<Step[]>(
-    () =>
-      STEP_TITLES.map((title, index) => ({
-        title,
-        status: index <= activeStep ? "complete" : "pending",
-      })),
-    [activeStep]
-  );
-
   const stepComponents = [
     <ProfilePreScreeningStep key="profile" onNext={handleNext} />,
     <DocumentUploadStep key="documents" onBack={() => goToStep(0)} onNext={() => goToStep(2)} />,
@@ -59,6 +65,15 @@ export default function ApplicationDashboard() {
     <FinalReviewStep key="review" onBack={() => goToStep(2)} onNext={() => goToStep(4)} />,
     <OrientationStep key="orientation" onBack={() => goToStep(3)} onNext={() => goToStep(4)} />,
   ];
+
+  
+
+  const handleSuccessDialogContinue = () => {
+    setShowSuccessDialog(false);
+    goToStep(1);
+  };
+
+  
 
   return (
     <>
@@ -69,11 +84,28 @@ export default function ApplicationDashboard() {
           <span>Cancel Application Form</span>
         </Button>
       </div>
-
-      <ApplicationStepper steps={steps}>
-        {stepComponents[activeStep]}
-      </ApplicationStepper>
-
+      <div className="overflow-x-auto">
+        <div className="min-w-[1161px] pe-4">
+          <div className="mb-[44px]">
+            <div className="mb-5 flex items-center justify-between text-sm leading-[1.4]">
+              {steps.map((step) => (
+                <span
+                  key={step.title}
+                  className={cn(
+                    "text-center",
+                    step.status === "complete" ? "font-medium text-[#10141a]" : "font-normal text-[#808081]"
+                  )}
+                  style={{ width: "auto" }}
+                >
+                  {step.title}
+                </span>
+              ))}
+            </div>
+            <Slider value={[progressValue]} max={100} icon={<UserIcon className="h-4 w-4 text-[#00b4b8]" />} />
+          </div>
+          {stepComponents[activeStep]}
+        </div>
+      </div>
       <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <SuccessDialogContent
           title="Title"
@@ -85,3 +117,4 @@ export default function ApplicationDashboard() {
     </>
   );
 }
+
