@@ -18,7 +18,7 @@ const STEP_TITLES = [
   "Conditional Hire & Compliance",
   "Final Agency Review",
   "Official Hire & Orientation",
-] as const;
+];
 
 export default function ApplicationDashboard() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
