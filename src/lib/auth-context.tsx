@@ -8,6 +8,7 @@ import {
   getCurrentUser,
   saveUserSession,
   clearUserSession,
+  getIdToken,
   type User,
 } from "./auth"
 
@@ -18,6 +19,7 @@ interface AuthContextType {
   signup: (email: string, password: string, fullName: string) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  getToken: (forceRefresh?: boolean) => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType)
@@ -97,6 +99,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  /**
+   * Get Firebase ID token for backend authentication
+   */
+  const getToken = async (forceRefresh = false) => {
+    return await getIdToken(forceRefresh)
+  }
+
   const value = {
     user,
     loading,
@@ -104,6 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signup,
     logout,
     resetPassword,
+    getToken,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

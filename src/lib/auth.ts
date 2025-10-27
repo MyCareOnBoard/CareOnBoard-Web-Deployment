@@ -1,9 +1,18 @@
 /**
- * Authentication Utilities
+ * Authentication Utilities with Firebase
  *
- * This file contains dummy authentication functions for development.
- * Replace with real Firebase or backend authentication in production.
+ * Handles all authentication operations using Firebase Auth
  */
+
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
+  signOut,
+  updateProfile,
+  type User as FirebaseUser,
+} from 'firebase/auth';
+import { auth } from './firebase';
 
 export interface User {
   id: string
@@ -18,163 +27,219 @@ export interface AuthResponse {
   error?: string
 }
 
-// Dummy user database (in-memory)
-const DUMMY_USERS: User[] = [
-  {
-    id: "1",
-    email: "user@example.com",
-    name: "John Doe",
-    createdAt: new Date("2024-01-01"),
-  },
-]
+/**
+ * Convert Firebase User to our User type
+ */
+function mapFirebaseUser(firebaseUser: FirebaseUser): User {
+  return {
+    id: firebaseUser.uid,
+    email: firebaseUser.email || '',
+    name: firebaseUser.displayName || '',
+    createdAt: firebaseUser.metadata.creationTime 
+      ? new Date(firebaseUser.metadata.creationTime)
+      : new Date(),
+  };
+}
 
 /**
- * Simulate login with email and password
- * @param email - User email
- * @param password - User password
- * @returns Authentication response with user data or error
+ * Login with email and password using Firebase
  */
 export async function loginWithEmail(email: string, password: string): Promise<AuthResponse> {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 1000))
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = mapFirebaseUser(userCredential.user);
 
-  // Check if user exists
-  const user = DUMMY_USERS.find((u) => u.email === email)
+    return {
+      success: true,
+      user,
+    };
+  } catch (error: any) {
+    console.error('Login error:', error);
+    
+    let errorMessage = 'Failed to login';
+    
+    // Handle Firebase auth errors
+    switch (error.code) {
+      case 'auth/invalid-email':
+        errorMessage = 'Invalid email address';
+        break;
+      case 'auth/user-disabled':
+        errorMessage = 'This account has been disabled';
+        break;
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+        errorMessage = 'Invalid email or password';
+        break;
+      case 'auth/too-many-requests':
+        errorMessage = 'Too many failed attempts. Please try again later';
+        break;
+      default:
+        errorMessage = error.message || 'Failed to login';
+    }
 
-  if (!user) {
     return {
       success: false,
-      error: "Invalid email or password",
-    }
-  }
-
-  // In real implementation, verify password hash
-  if (password.length < 6) {
-    return {
-      success: false,
-      error: "Invalid email or password",
-    }
-  }
-
-  return {
-    success: true,
-    user,
+      error: errorMessage,
+    };
   }
 }
 
 /**
- * Simulate user registration
- * @param name - User full name
- * @param email - User email
- * @param password - User password
- * @returns Authentication response with user data or error
+ * Register new user with Firebase
  */
 export async function registerWithEmail(name: string, email: string, password: string): Promise<AuthResponse> {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 1000))
+  try {
+    // Validate password
+    if (password.length < 6) {
+      return {
+        success: false,
+        error: 'Password must be at least 6 characters',
+      };
+    }
 
-  // Check if user already exists
-  const existingUser = DUMMY_USERS.find((u) => u.email === email)
+    // Create user account
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    
+    // Update user profile with display name
+    await updateProfile(userCredential.user, {
+      displayName: name,
+    });
 
-  if (existingUser) {
+    const user = mapFirebaseUser(userCredential.user);
+    // Update name since we just set it
+    user.name = name;
+
+    return {
+      success: true,
+      user,
+    };
+  } catch (error: any) {
+    console.error('Registration error:', error);
+    
+    let errorMessage = 'Failed to create account';
+    
+    // Handle Firebase auth errors
+    switch (error.code) {
+      case 'auth/email-already-in-use':
+        errorMessage = 'Email already registered';
+        break;
+      case 'auth/invalid-email':
+        errorMessage = 'Invalid email address';
+        break;
+      case 'auth/weak-password':
+        errorMessage = 'Password is too weak';
+        break;
+      default:
+        errorMessage = error.message || 'Failed to create account';
+    }
+
     return {
       success: false,
-      error: "Email already registered",
-    }
-  }
-
-  // Validate password
-  if (password.length < 6) {
-    return {
-      success: false,
-      error: "Password must be at least 6 characters",
-    }
-  }
-
-  // Create new user
-  const newUser: User = {
-    id: String(DUMMY_USERS.length + 1),
-    email,
-    name,
-    createdAt: new Date(),
-  }
-
-  DUMMY_USERS.push(newUser)
-
-  return {
-    success: true,
-    user: newUser,
+      error: errorMessage,
+    };
   }
 }
 
 /**
- * Simulate password reset email
- * @param email - User email
- * @returns Success status
+ * Send password reset email using Firebase
  */
 export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 1000))
+  try {
+    await firebaseSendPasswordResetEmail(auth, email);
+    
+    return {
+      success: true,
+    };
+  } catch (error: any) {
+    console.error('Password reset error:', error);
+    
+    let errorMessage = 'Failed to send reset email';
+    
+    // Handle Firebase auth errors
+    switch (error.code) {
+      case 'auth/invalid-email':
+        errorMessage = 'Invalid email address';
+        break;
+      case 'auth/user-not-found':
+        errorMessage = 'No account found with this email';
+        break;
+      default:
+        errorMessage = error.message || 'Failed to send reset email';
+    }
 
-  // Check if user exists
-  const user = DUMMY_USERS.find((u) => u.email === email)
-
-  if (!user) {
     return {
       success: false,
-      error: "No account found with this email",
-    }
-  }
-
-  // In real implementation, send actual email
-  console.log(`[DUMMY] Password reset email sent to: ${email}`)
-
-  return {
-    success: true,
+      error: errorMessage,
+    };
   }
 }
 
 /**
- * Simulate logout
+ * Logout current user
  */
 export async function logout(): Promise<void> {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 500))
-
-  // In real implementation, clear tokens/sessions
-  console.log("[DUMMY] User logged out")
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error('Logout error:', error);
+    throw error;
+  }
 }
 
 /**
- * Get current user from session/token
- * In real implementation, verify JWT or session token
+ * Get current authenticated user
  */
 export async function getCurrentUser(): Promise<User | null> {
-  // Check localStorage for dummy session
-  if (typeof window !== "undefined") {
-    const userJson = localStorage.getItem("currentUser")
-    if (userJson) {
-      return JSON.parse(userJson)
-    }
-  }
-
-  return null
+  return new Promise((resolve) => {
+    // Use Firebase auth state observer
+    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+      unsubscribe();
+      
+      if (firebaseUser) {
+        resolve(mapFirebaseUser(firebaseUser));
+      } else {
+        resolve(null);
+      }
+    });
+  });
 }
 
 /**
- * Save user session (dummy implementation)
+ * Get Firebase ID token for the current user
+ * Use this to send authenticated requests to your backend
+ * 
+ * @param forceRefresh - Force token refresh even if not expired
+ * @returns Firebase ID token or null if not authenticated
+ */
+export async function getIdToken(forceRefresh = false): Promise<string | null> {
+  const user = auth.currentUser;
+  
+  if (!user) {
+    return null;
+  }
+
+  try {
+    return await user.getIdToken(forceRefresh);
+  } catch (error) {
+    console.error('Error getting ID token:', error);
+    return null;
+  }
+}
+
+/**
+ * Save user session - Firebase handles this automatically
+ * Kept for backward compatibility
  */
 export function saveUserSession(user: User): void {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("currentUser", JSON.stringify(user))
-  }
+  // Firebase handles session persistence automatically
+  // This function is kept for backward compatibility
 }
 
 /**
- * Clear user session (dummy implementation)
+ * Clear user session - Firebase handles this automatically
+ * Kept for backward compatibility
  */
 export function clearUserSession(): void {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("currentUser")
-  }
+  // Firebase handles session clearing automatically via signOut
+  // This function is kept for backward compatibility
 }
