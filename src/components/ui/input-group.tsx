@@ -12,10 +12,10 @@ function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="input-group"
       role="group"
       className={cn(
-        "group/input-group flex w-full items-center rounded-[12px] border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-2 gap-3 transition-colors duration-200",
+        "group/input-group flex w-full items-center rounded-xl border border-(--input-border) bg-(--input-bg) px-4 py-2 gap-3 transition-colors duration-200",
         "has-[>textarea]:flex-col",
         "has-[[data-slot=input-group-control]:focus-visible]:border-primary has-[[data-slot=input-group-control]:focus-visible]:ring-2 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/25",
-        "has-[[data-slot][aria-invalid=true]]:border-[var(--input-error-border)] has-[[data-slot][aria-invalid=true]]:ring-[var(--input-error-border)]/25",
+        "has-[[data-slot][aria-invalid=true]]:border-(--input-error-border) has-[[data-slot][aria-invalid=true]]:ring-(--input-error-border)/25",
         className
       )}
       {...props}
@@ -24,7 +24,7 @@ function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 const inputGroupAddonVariants = cva(
-  "text-[var(--input-placeholder)] flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium select-none [&>svg:not([class*='size-'])]:size-4 [&>kbd]:rounded-[calc(var(--radius)-5px)] group-data-[disabled=true]/input-group:opacity-50",
+  "text-(--input-placeholder) flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium select-none [&>svg:not([class*='size-'])]:size-4 [&>kbd]:rounded-[calc(var(--radius)-5px)] group-data-[disabled=true]/input-group:opacity-50",
   {
     variants: {
       align: {
@@ -106,7 +106,7 @@ function InputGroupText({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       className={cn(
-        "text-[var(--input-placeholder)] flex items-center gap-2 text-sm [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
+        "text-(--input-placeholder) flex items-center gap-2 text-sm [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}

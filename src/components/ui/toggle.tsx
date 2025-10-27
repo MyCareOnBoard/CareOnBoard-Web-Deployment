@@ -1,25 +1,29 @@
-import * as React from "react"
-import * as TogglePrimitive from "@radix-ui/react-toggle"
-import { cva, type VariantProps } from "class-variance-authority"
+import * as React from 'react'
+import * as TogglePrimitive from '@radix-ui/react-toggle'
+import { cva, type VariantProps } from 'class-variance-authority'
 
-import { cn } from "src/lib/utils"
+import { cn } from '@/lib/utils'
 
 const toggleVariants = cva(
-  "relative inline-flex h-8 w-14 shrink-0 cursor-pointer items-center justify-start rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-50 data-[state=off]:bg-[rgba(0,0,0,0.08)] data-[state=on]:bg-[rgba(0,180,184,0.22)] after:content-[''] after:absolute after:left-1 after:top-1 after:size-6 after:rounded-full after:bg-[var(--color-grey-200)] after:shadow-[0px_3px_4px_rgba(0,0,0,0.08)] after:transition-all after:duration-200 data-[state=on]:after:translate-x-6 data-[state=on]:after:bg-[var(--color-main)] data-[state=on]:after:shadow-[0px_3px_8px_rgba(0,0,0,0.15),0px_3px_1px_rgba(0,0,0,0.06)]",
+  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium hover:bg-muted hover:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none transition-[color,box-shadow] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive whitespace-nowrap",
   {
     variants: {
       variant: {
-        default: "",
+        default: 'bg-transparent',
+        outline:
+          'border border-input bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground',
       },
       size: {
-        default: "",
+        default: 'h-9 px-2 min-w-9',
+        sm: 'h-8 px-1.5 min-w-8',
+        lg: 'h-10 px-2.5 min-w-10',
       },
     },
     defaultVariants: {
-      variant: "default",
-      size: "default",
+      variant: 'default',
+      size: 'default',
     },
-  }
+  },
 )
 
 function Toggle({

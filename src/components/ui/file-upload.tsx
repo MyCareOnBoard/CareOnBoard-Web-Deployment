@@ -12,18 +12,18 @@ const FileUpload = React.forwardRef<
   return (
     <label
       className={cn(
-        "group relative flex w-full max-w-[496px] cursor-pointer items-center justify-center rounded-[12px] border border-[var(--input-border)] bg-[var(--input-bg)] px-6 py-8 transition-colors duration-200",
+        "group relative flex w-full max-w-[496px] cursor-pointer items-center justify-center rounded-xl border border-(--input-border) bg-(--input-bg) px-6 py-8 transition-colors duration-200",
         "hover:border-primary/70 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/20",
         className
       )}
     >
-      <span className="pointer-events-none flex items-center gap-3 text-sm font-normal leading-[1.4] text-[var(--input-placeholder)]">
+      <span className="pointer-events-none flex items-center gap-3 text-sm font-normal leading-[1.4] text-(--input-placeholder)">
         {icon ?? (
           <svg
             viewBox="0 0 24 24"
             fill="none"
             aria-hidden="true"
-            className="size-5 text-[var(--input-placeholder)]"
+            className="size-5 text-(--input-placeholder)"
           >
             <path
               d="M12 16V4m0 0 3 3m-3-3-3 3"
