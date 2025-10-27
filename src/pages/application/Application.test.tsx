@@ -52,7 +52,7 @@ describe("ApplicationDashboard", () => {
 
   it("displays resume upload section", () => {
     render(<ApplicationDashboard />);
-    expect(screen.getByText("Upload Resume (Optional)")).toBeInTheDocument();
+    expect(screen.getByText("Upload Resume")).toBeInTheDocument();
     expect(screen.getByText("Upload your resume")).toBeInTheDocument();
   });
 

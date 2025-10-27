@@ -14,6 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { FileUpload } from "@/components/ui/file-upload";
 import CalendarDaysIcon from "@/assets/icons/calendar-days.svg?react";
 import { format } from "date-fns";
+import { uploadResume, submitPreScreening, type PreScreeningData } from "@/lib/api/job-application";
 
 const DEFAULT_DOB = new Date();
 
@@ -39,12 +40,17 @@ const booleanQuestionsSchemaShape = (() => {
   return shape;
 })();
 
-const fileListSchema = z.custom<FileList>((value) => {
-  if (typeof FileList === "undefined") {
-    return true;
+const fileListSchema = z.custom<FileList>(
+  (value) => {
+    if (typeof FileList === "undefined") {
+      return true;
+    }
+    return value instanceof FileList && value.length > 0;
+  },
+  {
+    message: "Resume file is required",
   }
-  return value instanceof FileList;
-});
+);
 
 const profilePreScreeningSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
@@ -55,7 +61,7 @@ const profilePreScreeningSchema = z.object({
     message: "Please select a gender",
   }),
   booleanQuestions: z.object(booleanQuestionsSchemaShape),
-  resume: fileListSchema.optional(),
+  resume: fileListSchema,
   declaration: z.literal(true, {
     message: "You must confirm the information is correct",
   }),
@@ -77,9 +83,13 @@ interface ProfilePreScreeningStepProps {
 
 export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningStepProps) {
   const [isDobOpen, setIsDobOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const form = useForm<ProfilePreScreeningFormValues>({
     resolver: zodResolver(profilePreScreeningSchema),
+    mode: "onChange", // Enable validation on change to track form validity
     defaultValues: {
       fullName: "",
       email: "",
@@ -92,8 +102,64 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
     },
   });
 
-  const handleSubmit = (values: ProfilePreScreeningFormValues) => {
-    onNext(values);
+  const handleSubmit = async (values: ProfilePreScreeningFormValues) => {
+    try {
+      setUploadError(null);
+      let resumeUrl: string | undefined;
+      
+      // If a resume file is provided, upload it first
+      if (values.resume && values.resume.length > 0) {
+        setIsUploading(true);
+        const file = values.resume[0];
+        
+        try {
+          const uploadResponse = await uploadResume(file);
+          console.log('Resume uploaded successfully:', uploadResponse);
+          resumeUrl = uploadResponse.data.fileUrl;
+        } catch (error) {
+          setUploadError('Failed to upload resume. Please try again.');
+          return; // Don't proceed if upload fails
+        } finally {
+          setIsUploading(false);
+        }
+      }
+      
+      // Transform form data to match backend API structure
+      const preScreeningData: PreScreeningData = {
+        fullName: values.fullName,
+        email: values.email,
+        dateOfBirth: format(values.dateOfBirth, 'yyyy-MM-dd'),
+        address: values.address,
+        gender: values.gender,
+        isAtLeast18: values.booleanQuestions.isAdult === 'Yes',
+        hasHighSchoolDiploma: values.booleanQuestions.hasDiploma === 'Yes',
+        isLegallyEligible: values.booleanQuestions.eligibleToWork === 'Yes',
+        hasBeenConvicted: values.booleanQuestions.hasDisqualifyingOffense === 'Yes',
+        hasReliableTransportation: values.booleanQuestions.hasTransportation === 'Yes',
+        resumeUrl: resumeUrl,
+        declarationAgreed: values.declaration,
+      };
+
+      // Submit pre-screening data to backend
+      setIsSubmitting(true);
+      try {
+        const response = await submitPreScreening(preScreeningData);
+        console.log('Pre-screening submitted successfully:', response);
+        
+        // Proceed to next step with form data
+        onNext(values);
+      } catch (error) {
+        setUploadError('Failed to submit application. Please try again.');
+        console.error('Error submitting pre-screening:', error);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setUploadError('An unexpected error occurred. Please try again.');
+      setIsUploading(false);
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -290,7 +356,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
 
             return (
               <FormItem className="w-[1152px] space-y-3">
-                <FormLabel className="block text-xs font-normal text-[#10141a]">Upload Resume (Optional)</FormLabel>
+                <FormLabel className="block text-xs font-normal text-[#10141a]">Upload Resume</FormLabel>
                 <FormControl className="mb-0">
                   <FileUpload
                     ref={ref}
@@ -301,9 +367,11 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                     onBlur={onBlur}
                     onChange={(event) => {
                       onChange(event.target.files ?? undefined);
+                      setUploadError(null); // Clear any previous upload errors
                     }}
                   />
                 </FormControl>
+                {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
                 <FormMessage className="text-xs" />
               </FormItem>
             );
@@ -334,8 +402,14 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         />
 
         <div className="pb-12">
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            <span>Next</span>
+          <Button 
+            type="submit" 
+            disabled={!form.formState.isValid || form.formState.isSubmitting || isUploading || isSubmitting}
+            className={!form.formState.isValid ? 'bg-[#b2b2b3] backdrop-blur-[22px] hover:bg-[#b2b2b3] active:bg-[#b2b2b3]' : ''}
+          >
+            <span>
+              {isUploading ? 'Uploading...' : isSubmitting ? 'Submitting...' : 'Next'}
+            </span>
             <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
               <path
                 d="M4 10H16M16 10L10 4M16 10L10 16"

@@ -15,11 +15,6 @@ import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dia
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface ApplicationStepperProps {
-  steps: Step[];
-  children: ReactNode;
-}
-
 const STEP_TITLES = [
   "Profile & Pre-Screening",
   "Document Upload & Eligibility Verification",
@@ -65,8 +60,6 @@ export default function ApplicationStepper() {
     <FinalReviewStep key="review" onBack={() => goToStep(2)} onNext={() => goToStep(4)} />,
     <OrientationStep key="orientation" onBack={() => goToStep(3)} onNext={() => goToStep(4)} />,
   ];
-
-  
 
   const handleSuccessDialogContinue = () => {
     setShowSuccessDialog(false);
