@@ -41,7 +41,7 @@ const booleanQuestionsSchemaShape = (() => {
 })();
 
 const fileListSchema = z.custom<FileList>(
-  (value) => {
+  (value: unknown) => {
     if (typeof FileList === "undefined") {
       return true;
     }
