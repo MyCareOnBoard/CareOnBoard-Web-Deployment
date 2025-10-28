@@ -15,6 +15,7 @@ import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dia
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getApplicationStatus, type ApplicationStatus } from "@/lib/api/job-application";
+import { useAuth } from "@/utils/auth";
 
 const STEP_TITLES = [
   "Profile & Pre-Screening",
@@ -40,14 +41,21 @@ function ApplicationLoading() {
 
 // Main application content
 function ApplicationContent() {
+  const { user } = useAuth();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
   const progressValue = useMemo(() => STEP_POINT[activeStep], [activeStep]);
 
-  // Fetch application status on component mount
+  // Fetch application status only when user is authenticated
   useEffect(() => {
+    // Don't fetch if user is not loaded yet
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     const fetchApplicationStatus = async () => {
       try {
         setIsLoading(true);
@@ -68,7 +76,7 @@ function ApplicationContent() {
     };
 
     fetchApplicationStatus();
-  }, []);
+  }, [user]);
 
   const steps = useMemo<Step[]>(
     () =>
