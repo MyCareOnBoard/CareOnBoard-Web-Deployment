@@ -137,7 +137,7 @@ function ApplicationContent() {
                 </span>
               ))}
             </div>
-            <Slider value={[progressValue]} max={100} icon={<UserIcon className="h-4 w-4 text-[#00b4b8]" />} />
+            <Slider value={[progressValue]} max={100} icon={<UserIcon className="h-4 w-4 text-[#00b4b8] fill-[#00b4b8] stroke-[#00b4b8]" />} />
           </div>
           {stepComponents[activeStep]}
         </div>
