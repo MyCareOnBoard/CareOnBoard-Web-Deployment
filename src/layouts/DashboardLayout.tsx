@@ -148,26 +148,26 @@ export function Sidebar({ footer }: { footer?: ReactNode }) {
 }
 
 export default function DashboardLayout({ children }: { children?: ReactNode }) {
-  // const { user, loading } = useAuth();
-  // const reduxUser = useSelector((state: RootState) => state.auth?.user);
+  const { user, loading } = useAuth();
+  const reduxUser = useSelector((state: RootState) => state.auth?.user);
 
-  // useEffect(() => {
-  //   console.log('[DashboardLayout] Auth check:', { 
-  //     user: user?.email, 
-  //     loading,
-  //     reduxUser: reduxUser?.email 
-  //   });
-  // }, [user, loading, reduxUser]);
+  useEffect(() => {
+    console.log('[DashboardLayout] Auth check:', { 
+      user: user?.email, 
+      loading,
+      reduxUser: reduxUser?.email 
+    });
+  }, [user, loading, reduxUser]);
 
-  // if (loading) {
-  //   console.log('[DashboardLayout] Still loading...');
-  //   return <PageLoader text="Checking authentication..." />;
-  // }
+  if (loading) {
+    console.log('[DashboardLayout] Still loading...');
+    return <PageLoader text="Checking authentication..." />;
+  }
 
-  // if (!user) {
-  //   console.log('[DashboardLayout] No user, redirecting to login');
-  //   return <Navigate to={Routes.login} replace />;
-  // }
+  if (!user) {
+    console.log('[DashboardLayout] No user, redirecting to login');
+    return <Navigate to={Routes.login} replace />;
+  }
 
   console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
   return (
