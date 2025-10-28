@@ -31,7 +31,7 @@ src/**/*.jsx
 *.njsproj
 *.sln
 *.sw?
-
+.cursor/*
 # Firebase Emulator Data
 emulator-data/
 .firebase/

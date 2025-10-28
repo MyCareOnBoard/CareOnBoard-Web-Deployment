@@ -1,35 +1,63 @@
 import { lazy } from "react";
-import { createBrowserRouter, RouteObject } from "react-router";
-import SplashScreen from "@/features/splash";
-import {Routes} from "@/routes/constants";
+import { createBrowserRouter } from "react-router";
+import { Routes } from "@/routes/constants";
 
-// Lazy load pages for better performance
-const LoginPage = lazy(() => import("@/layouts/login/page"));
-const SignUpPage = lazy(() => import("@/layouts/signup/page"));
-const ForgotPasswordPage = lazy(() => import("@/layouts/forgot-password/page"));
-const DashboardPage = lazy(() => import("@/layouts/dashboard/page"));
+// Lazy load all components for better performance and code splitting
+const SplashScreen = lazy(() => import("@/pages/splash"));
+const AuthLayout = lazy(() => import("@/layouts/AuthLayout"));
+const LoginPage = lazy(() => import("@/pages/login"));
+const SignupPage = lazy(() => import("@/pages/signup"));
+const OnboardingPage = lazy(() => import("@/pages/onboarding"));
+const AppLayout = lazy(() => import("@/layouts/AppLayout"));
+const DashboardPage = lazy(() => import("@/pages/dashboard"));
+const ApplicationDashboard = lazy(() => import("@/pages/application"));
+const DocumentsPage = lazy(() => import("@/pages/documents"));
+const HelpCenterPage = lazy(() => import("@/pages/help-center"));
 
-const routerRoutes: RouteObject[] = [
+export const router = createBrowserRouter([
   {
     path: Routes.splash,
-    Component: SplashScreen
+    index: true,
+    Component: SplashScreen,
   },
   {
-    path: "/login",
-    Component: LoginPage
+    path: Routes.auth,
+    Component: AuthLayout,
+    children: [
+      {
+        path: Routes.login,
+        Component: LoginPage,
+      },
+      {
+        path: Routes.signup,
+        Component: SignupPage,
+      },
+      {
+        path: Routes.onboarding,
+        Component: OnboardingPage,
+      },
+    ],
   },
   {
-    path: "/signup",
-    Component: SignUpPage
+    path: Routes.app,
+    Component: AppLayout,
+    children: [
+      {
+        index: true,
+        Component: DashboardPage,
+      },
+      {
+        path: Routes.application,
+        Component: ApplicationDashboard,
+      },
+      {
+        path: Routes.documents,
+        Component: DocumentsPage,
+      },
+      {
+        path: Routes.helpCenter,
+        Component: HelpCenterPage,
+      },
+    ],
   },
-  {
-    path: "/forgot-password",
-    Component: ForgotPasswordPage
-  },
-  {
-    path: "/dashboard",
-    Component: DashboardPage
-  },
-]
-
-export const router = createBrowserRouter(routerRoutes);
+]);

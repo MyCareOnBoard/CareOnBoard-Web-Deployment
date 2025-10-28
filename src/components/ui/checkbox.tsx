@@ -1,30 +1,47 @@
-import * as React from 'react'
-import * as CheckboxPrimitive from '@radix-ui/react-checkbox'
-import { CheckIcon } from 'lucide-react'
+import * as React from "react"
+import { Check } from "lucide-react"
+import { cn } from "@/lib/utils"
 
-import { cn } from '@/lib/utils'
-
-function Checkbox({
-  className,
-  ...props
-}: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
-  return (
-    <CheckboxPrimitive.Root
-      data-slot="checkbox"
-      className={cn(
-        'peer border-input dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive size-4 shrink-0 rounded-sm border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
-        className,
-      )}
-      {...props}
-    >
-      <CheckboxPrimitive.Indicator
-        data-slot="checkbox-indicator"
-        className="flex items-center justify-center text-current transition-none"
-      >
-        <CheckIcon className="size-3.5" />
-      </CheckboxPrimitive.Indicator>
-    </CheckboxPrimitive.Root>
-  )
+interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
 }
 
-export { Checkbox }
+const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
+  ({ className, label, ...props }, ref) => {
+    const id = React.useId();
+    const inputId = props.id || id;
+
+    return (
+      <label htmlFor={inputId} className="inline-flex cursor-pointer items-center gap-1">
+        <input
+          type="checkbox"
+          id={inputId}
+          ref={ref}
+          className="peer sr-only"
+          {...props}
+        />
+        <span className={cn(
+          "relative flex size-[24px] items-center justify-center rounded-none border transition-colors",
+          "border-[#cccccd] bg-white",
+          "peer-checked:border-[#00b4b8] peer-checked:bg-[#00b4b8]",
+          "peer-checked:[&>svg]:opacity-100",
+          "peer-focus-visible:ring-2 peer-focus-visible:ring-[#00b4b8]/25",
+          "peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
+          className
+        )}>
+          <Check className="h-3.5 w-3.5 text-white opacity-0 transition-opacity" />
+        </span>
+        {label && (
+          <span className="text-sm font-medium leading-[1.4] text-[#10141a] peer-disabled:opacity-50">
+            {label}
+          </span>
+        )}
+      </label>
+    );
+  }
+);
+
+Checkbox.displayName = "Checkbox";
+
+export { Checkbox };
+
