@@ -7,11 +7,12 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "noEmit": true,
     "baseUrl": "./",
-    "types": ["@tailwindcss/vite"],
+    "types": ["vite/client", "@tailwindcss/vite"],
     "paths": {
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "vite-env.d.ts"]
+  "include": ["src"]
 }
