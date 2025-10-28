@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useAuth } from "@/features/auth"
 import { useToast } from "@/hooks/use-toast"
+import { ButtonLoader } from "@/components/ui/loader"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -120,7 +121,14 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full h-14 bg-[#00B4B8] hover:bg-[#148a9c] text-white rounded-full text-base font-semibold mt-6"
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <ButtonLoader />
+                Logging in...
+              </span>
+            ) : (
+              "Login"
+            )}
           </Button>
         </form>
 

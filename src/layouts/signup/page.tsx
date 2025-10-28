@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/features/auth"
 import { useToast } from "@/hooks/use-toast"
+import { ButtonLoader } from "@/components/ui/loader"
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState("")
@@ -131,7 +132,14 @@ export default function SignUpPage() {
             disabled={loading}
             className="w-full h-14 bg-[#17a2b8] hover:bg-[#148a9c] text-white rounded-full text-base font-semibold"
           >
-            {loading ? "Creating account..." : "Sign Up"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <ButtonLoader />
+                Creating account...
+              </span>
+            ) : (
+              "Sign Up"
+            )}
           </Button>
         </form>
 

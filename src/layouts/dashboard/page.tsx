@@ -3,11 +3,11 @@ import { useNavigate } from "react-router"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { LogOut } from "lucide-react"
-import { selectUser } from "@/features/auth"
 
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
   const navigate = useNavigate()
+
 
 
   useEffect(() => {
@@ -15,6 +15,7 @@ export default function DashboardPage() {
       navigate("/login")
     }
   }, [user, loading, navigate])
+  console.log("Current User:", user);
 
   const handleLogout = async () => {
     await logout()

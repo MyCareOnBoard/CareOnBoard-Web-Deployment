@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/features/auth"
 import { useToast } from "@/hooks/use-toast"
+import { ButtonLoader } from "@/components/ui/loader"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -96,7 +97,14 @@ export default function ForgotPasswordPage() {
               disabled={loading || !email}
               className="w-full h-14 bg-gray-400 hover:bg-[#00B4B8] text-white rounded-full text-base font-semibold mt-6 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {loading ? "Sending..." : "Sent OTP"}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <ButtonLoader />
+                  Sending...
+                </span>
+              ) : (
+                "Sent OTP"
+              )}
             </Button>
           </form>
         )}

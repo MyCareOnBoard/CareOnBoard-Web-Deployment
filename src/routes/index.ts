@@ -1,10 +1,13 @@
+import { lazy } from "react";
 import { createBrowserRouter, RouteObject } from "react-router";
 import SplashScreen from "@/features/splash";
-import LoginPage from "@/layouts/login/page";
-import SignUpPage from "@/layouts/signup/page";
-import ForgotPasswordPage from "@/layouts/forgot-password/page";
-import DashboardPage from "@/layouts/dashboard/page";
 import {Routes} from "@/routes/constants";
+
+// Lazy load pages for better performance
+const LoginPage = lazy(() => import("@/layouts/login/page"));
+const SignUpPage = lazy(() => import("@/layouts/signup/page"));
+const ForgotPasswordPage = lazy(() => import("@/layouts/forgot-password/page"));
+const DashboardPage = lazy(() => import("@/layouts/dashboard/page"));
 
 const routerRoutes: RouteObject[] = [
   {
