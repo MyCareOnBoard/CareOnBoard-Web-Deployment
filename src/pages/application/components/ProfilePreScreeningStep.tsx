@@ -230,6 +230,9 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                         <Calendar
                           mode="single"
                           className="bg-white"
+                          captionLayout="dropdown"
+                          startMonth={new Date(1924, 0)}
+                          endMonth={new Date()}
                           selected={field.value}
                           defaultMonth={field.value ?? DEFAULT_DOB}
                           onSelect={(date) => {
@@ -239,6 +242,14 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                             field.onChange(date);
                             field.onBlur();
                             setIsDobOpen(false);
+                          }}
+                          formatters={{
+                            formatMonthDropdown: (date) =>
+                              date.toLocaleString("default", { month: "long" }),
+                          }}
+                          classNames={{
+                            dropdown_root: "relative border-none shadow-none has-focus:ring-0",
+                            caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
                           }}
                           initialFocus
                         />
