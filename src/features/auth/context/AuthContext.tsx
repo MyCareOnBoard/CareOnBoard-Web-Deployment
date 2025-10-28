@@ -1,13 +1,16 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
+import { useDispatch, useSelector } from "react-redux"
+import { loginUser, signupUser, logoutUser as logoutRedux, setUser } from "../store/authSlice"
+import type { AppDispatch, RootState } from "@/store/redux/store"
 import {
   loginWithEmail,
   registerWithEmail,
   sendPasswordResetEmail,
   logout as logoutUser,
   getCurrentUser,
-  saveUserSession,
-  clearUserSession,
+  // saveUserSession,
+  // clearUserSession,
   getIdToken,
   type AuthResponse,
 } from "../services/authService"
@@ -37,21 +40,32 @@ export const useAuth = () => useContext(AuthContext)
 /**
  * Authentication Provider Component
  * Wraps the app to provide auth state to all components
+ * Syncs with Redux for state persistence
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const dispatch = useDispatch<AppDispatch>()
+  const reduxUser = useSelector((state: RootState) => state.auth.user)
+  const [user, setUserState] = useState<User | null>(reduxUser)
   const [loading, setLoading] = useState(true)
 
-  // Check for existing session on mount
+  // Check for existing session on mount and sync with Redux
   useEffect(() => {
     const checkAuth = async () => {
       const currentUser = await getCurrentUser()
-      setUser(currentUser)
+      if (currentUser) {
+        setUserState(currentUser)
+        dispatch(setUser(currentUser))
+      }
       setLoading(false)
     }
 
     checkAuth()
-  }, [])
+  }, [dispatch])
+
+  // Sync local state with Redux state
+  useEffect(() => {
+    setUserState(reduxUser)
+  }, [reduxUser])
 
   /**
    * Login user with email and password
@@ -64,8 +78,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Save session and update state
-    saveUserSession(response.user)
-    setUser(response.user)
+    // saveUserSession(response.user)
+    setUserState(response.user)
+    dispatch(setUser(response.user))
   }
 
   /**
@@ -79,8 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Save session and update state
-    saveUserSession(response.user)
-    setUser(response.user)
+    // saveUserSession(response.user)
+    setUserState(response.user)
+    dispatch(setUser(response.user))
     
     // Create user in backend
     try {
@@ -110,8 +126,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const logout = async () => {
     await logoutUser()
-    clearUserSession()
-    setUser(null)
+    // clearUserSession()
+    setUserState(null)
+    dispatch(setUser(null))
   }
 
   /**

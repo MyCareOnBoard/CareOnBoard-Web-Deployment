@@ -229,21 +229,21 @@ export async function getIdToken(forceRefresh = false): Promise<string | null> {
  * Save user session - Firebase handles this automatically
  * Kept for backward compatibility
  */
-export function saveUserSession(user: User): void {
-  // Firebase handles session persistence automatically
-  // This function is kept for backward compatibility
-  console.log('User session saved (handled by Firebase)', user.uid)
-}
+// export function saveUserSession(user: User): void {
+//   // Firebase handles session persistence automatically
+//   // This function is kept for backward compatibility
+//   console.log('User session saved (handled by Firebase)', user.uid)
+// }
 
 /**
  * Clear user session - Firebase handles this automatically
  * Kept for backward compatibility
  */
-export function clearUserSession(): void {
-  // Firebase handles session clearing automatically via signOut
-  // This function is kept for backward compatibility
-  console.log('User session cleared (handled by Firebase)')
-}
+// export function clearUserSession(): void {
+// //   // Firebase handles session clearing automatically via signOut
+// //   // This function is kept for backward compatibility
+// //   console.log('User session cleared (handled by Firebase)')
+// }
 
 /**
  * Store user data in localStorage

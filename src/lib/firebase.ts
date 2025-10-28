@@ -2,17 +2,11 @@
  * Firebase Configuration
  *
  * Initializes Firebase app with environment variables.
- * This file is ready for Firebase integration but not currently used
- * since the app uses dummy authentication.
- *
- * To enable Firebase:
- * 1. Add your Firebase credentials to .env.local
- * 2. Update lib/auth-context.tsx to use Firebase auth methods
- * 3. Remove dummy auth from lib/auth.ts
+ * Connects to Firebase Emulators in development mode.
  */
 
 import { initializeApp, getApps, getApp } from "firebase/app"
-import { getAuth } from "firebase/auth"
+import { getAuth, connectAuthEmulator } from "firebase/auth"
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -29,5 +23,16 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 
 // Export auth instance for use in authentication
 export const auth = getAuth(app)
+
+// Connect to Firebase Emulators in development mode
+if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {
+  console.log('🔥 Firebase Emulators enabled')
+  try {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
+    console.log('✅ Connected to Auth Emulator on port 9099')
+  } catch (error) {
+    console.warn('⚠️ Auth emulator connection may already be established')
+  }
+}
 
 export default app

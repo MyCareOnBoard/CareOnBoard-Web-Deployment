@@ -15,7 +15,6 @@ export default function DashboardPage() {
       navigate("/login")
     }
   }, [user, loading, navigate])
-  console.log("Current User:", user);
 
   const handleLogout = async () => {
     await logout()

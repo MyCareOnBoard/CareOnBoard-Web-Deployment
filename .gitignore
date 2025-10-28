@@ -31,3 +31,7 @@ src/**/*.jsx
 *.njsproj
 *.sln
 *.sw?
+
+# Firebase Emulator Data
+emulator-data/
+.firebase/
