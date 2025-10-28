@@ -12,7 +12,7 @@
 import type React from "react"
 import { useState } from "react"
 import { Link } from "react-router"
-import { AuthLayout } from "@/components/auth-layout"
+import { AuthLayout } from "@/features/auth/components/AuthLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -134,8 +134,8 @@ export default function ForgotPasswordPage() {
                 }`}
               />
               {error && (
-                <p className="text-sm text-red-600 flex items-center gap-1">
-                  <span className="text-red-500">⚠</span> {error}
+                <p className="text-sm text-red-600">
+                  {error}
                 </p>
               )}
             </div>

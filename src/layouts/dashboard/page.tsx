@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/features/auth"
 import { Button } from "@/components/ui/button"
 import { LogOut } from "lucide-react"
 

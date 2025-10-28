@@ -39,16 +39,16 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-[#f5f5f5]">
       {/* Left Panel - Teal branding section */}
       <div 
-        className="hidden lg:flex lg:w-[40%] m-4 rounded-2xl relative overflow-hidden"
+        className="hidden lg:flex lg:w-[40%] m-4 rounded-3xl relative overflow-hidden"
         style={{
           background: 'linear-gradient(180deg, #02acaf 0%, #00B4B8 100%)'
         }}
       >
         <div
-          className="absolute inset-0 bg-cover bg-center"
+          className="absolute inset-0 bg-cover bg-center bg-[#f5f5f5]"
           style={{
             backgroundImage: "url(/login-bg-main.jpg?height=1080&width=960&query=healthcare+professional+caring+smiling)",
             opacity: 0.3,
@@ -64,8 +64,8 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="my-6">
-              <h1 className="text-[2.30rem] font-bold leading-tight py-4">Welcome to [Agency <br /> Name] Application <br /> Portal</h1>
-              <p className="text-md text-white/95 leading-relaxed">
+              <h1 className="text-[2rem] font-bold leading-tight py-4">Welcome to [Agency <br /> Name] Application <br /> Portal</h1>
+              <p className="text-md text-white/95 leading-relaxed w-[80%]">
                 Helping adults with developmental disabilities live full and meaningful lives.
               </p>
             </div>
@@ -73,13 +73,11 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
 
           {/* Quote Container with Dark Gradient */}
           <div 
-            className="rounded-2xl p-6 mt-4 space-y-3 shadow-2xl border border-white/10"
-            style={{
-              background: 'linear-gradient(135deg, #0f172a 0%, #134e4a 50%, #0f172a 100%)'
-            }}
+            className="rounded-2xl bg-[#2B7A7C] p-6 mt-4 space-y-3 shadow-2xl border  border-white/10"
+            
           >
             {/* Quote mark */}
-            <div className="text-6xl font-serif leading-none text-teal-300/80">"</div>
+            <div className="text-6xl font-serif leading-none text-white/95">"</div>
 
             {/* Quote text */}
             <p className="text-lg leading-relaxed min-h-20 text-white/95">{quotes[currentQuote].text}</p>

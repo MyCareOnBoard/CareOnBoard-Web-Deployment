@@ -9,8 +9,9 @@ import {
   saveUserSession,
   clearUserSession,
   getIdToken,
-  type User,
-} from "./auth"
+  type AuthResponse,
+} from "@/features/auth/services/authService"
+import type { User } from "@/features/auth/types"
 import { createUser } from "./api"
 import { PageLoader } from "@/components/ui/loader"
 

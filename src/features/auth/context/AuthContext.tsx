@@ -9,8 +9,11 @@ import {
   saveUserSession,
   clearUserSession,
   getIdToken,
-  type User,
-} from "../services/firebase-auth"
+  type AuthResponse,
+} from "../services/authService"
+import type { User } from "../types"
+import { createUser as createBackendUser } from "../api/client"
+import { PageLoader } from "@/components/ui/loader"
 
 interface AuthContextType {
   user: User | null
@@ -19,6 +22,7 @@ interface AuthContextType {
   signup: (email: string, password: string, fullName: string) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  createUser: (fullName: string) => Promise<void>
   getToken: (forceRefresh?: boolean) => Promise<string | null>
 }
 
@@ -77,6 +81,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Save session and update state
     saveUserSession(response.user)
     setUser(response.user)
+    
+    // Create user in backend
+    try {
+      await createBackendUser(fullName)
+      console.log('[signup] User created in backend successfully')
+    } catch (error: any) {
+      console.error('[signup] Failed to create user in backend:', error)
+      // Don't throw - Firebase account is already created, just log the error
+    }
+  }
+
+  /**
+   * Create user in backend
+   */
+  const createUser = async (fullName: string) => {
+    try {
+      await createBackendUser(fullName)
+      console.log('[createUser] User created in backend successfully')
+    } catch (error: any) {
+      console.error('[createUser] Failed to create user in backend:', error)
+      throw error
+    }
   }
 
   /**
@@ -114,6 +140,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     resetPassword,
     getToken,
+    createUser,
+  }
+
+  // Show loader while checking auth state
+  if (loading) {
+    return <PageLoader text="Checking authentication..." />
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

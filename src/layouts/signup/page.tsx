@@ -14,7 +14,7 @@ import type React from "react"
 import { useState } from "react"
 import { useNavigate, Link } from "react-router"
 import { Eye, EyeOff } from "lucide-react"
-import { AuthLayout } from "@/components/auth-layout"
+import { AuthLayout } from "@/features/auth/components/AuthLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -152,7 +152,7 @@ export default function SignUpPage() {
         title: "Success",
         description: "Account created successfully",
       })
-      navigate("/dashboard")
+      navigate("/login")
     } catch (error: any) {
       toast({
         title: "Error",
@@ -195,8 +195,8 @@ export default function SignUpPage() {
               }`}
             />
             {errors.fullName && (
-              <p className="text-sm text-red-600 flex items-center gap-1">
-                <span className="text-red-500">⚠</span> {errors.fullName}
+              <p className="text-sm text-red-600">
+                {errors.fullName}
               </p>
             )}
           </div>
@@ -219,8 +219,8 @@ export default function SignUpPage() {
               }`}
             />
             {errors.email && (
-              <p className="text-sm text-red-600 flex items-center gap-1">
-                <span className="text-red-500">⚠</span> {errors.email}
+              <p className="text-sm text-red-600">
+                {errors.email}
               </p>
             )}
           </div>
@@ -254,8 +254,8 @@ export default function SignUpPage() {
               </button>
             </div>
             {errors.password && (
-              <p className="text-sm text-red-600 flex items-center gap-1">
-                <span className="text-red-500">⚠</span> {errors.password}
+              <p className="text-sm text-red-600">
+                {errors.password}
               </p>
             )}
             {/* Password strength indicator */}

@@ -1,4 +1,5 @@
 import { auth } from '@/lib/firebase';
+import { getAuth } from 'firebase/auth';
 
 // Backend API base URL from environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
@@ -144,6 +145,34 @@ export async function uploadFile(
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || `Upload failed: ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+export async function createUser(fullName: string): Promise<any> {
+  const auth = getAuth();
+  const token = await auth.currentUser?.getIdToken();
+
+  if (!token) {
+    throw new Error("Not authenticated");
+  }
+
+  const url = `${API_BASE_URL}/users/create`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      'x-environment': 'staging',
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ fullName }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `Request failed: ${response.status}`);
   }
 
   return await response.json();

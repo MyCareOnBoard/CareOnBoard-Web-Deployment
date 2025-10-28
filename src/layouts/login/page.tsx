@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import { useNavigate, Link } from "react-router"
 import { Eye, EyeOff } from "lucide-react"
-import { AuthLayout } from "@/components/auth-layout"
+import { AuthLayout } from "@/features/auth/components/AuthLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -146,8 +146,8 @@ export default function LoginPage() {
               }`}
             />
             {errors.email && (
-              <p className="text-sm text-red-600 flex items-center gap-1">
-                <span className="text-red-500">⚠</span> {errors.email}
+              <p className="text-sm text-red-600">
+                {errors.email}
               </p>
             )}
           </div>
@@ -180,8 +180,8 @@ export default function LoginPage() {
               </button>
             </div>
             {errors.password && (
-              <p className="text-sm text-red-600 flex items-center gap-1">
-                <span className="text-red-500">⚠</span> {errors.password}
+              <p className="text-sm text-red-600">
+                {errors.password}
               </p>
             )}
           </div>
