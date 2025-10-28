@@ -4,15 +4,16 @@ import { Routes } from "@/routes/constants";
 
 // Lazy load all components for better performance and code splitting
 const SplashScreen = lazy(() => import("@/pages/splash"));
-const AuthLayout = lazy(() => import("@/layouts/AuthLayout"));
+const AppLayout = lazy(() => import("@/layouts/AppLayout"));
 const LoginPage = lazy(() => import("@/pages/login"));
 const SignupPage = lazy(() => import("@/pages/signup"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding"));
-const AppLayout = lazy(() => import("@/layouts/AppLayout"));
+const DashboardLayout = lazy(() => import("@/layouts/DashboardLayout"));
 const DashboardPage = lazy(() => import("@/pages/dashboard"));
 const ApplicationDashboard = lazy(() => import("@/pages/application"));
 const DocumentsPage = lazy(() => import("@/pages/documents"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
+const ForgotPasswordPage = lazy(() => import("@/pages/forgot-password"));
 
 export const router = createBrowserRouter([
   {
@@ -21,8 +22,8 @@ export const router = createBrowserRouter([
     Component: SplashScreen,
   },
   {
-    path: Routes.auth,
-    Component: AuthLayout,
+    path: Routes.root,
+    Component: AppLayout,
     children: [
       {
         path: Routes.login,
@@ -33,6 +34,10 @@ export const router = createBrowserRouter([
         Component: SignupPage,
       },
       {
+        path: Routes.forgotPassword,
+        Component: ForgotPasswordPage,
+      },
+      {
         path: Routes.onboarding,
         Component: OnboardingPage,
       },
@@ -40,7 +45,7 @@ export const router = createBrowserRouter([
   },
   {
     path: Routes.app,
-    Component: AppLayout,
+    Component: DashboardLayout,
     children: [
       {
         index: true,
@@ -49,6 +54,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.application,
         Component: ApplicationDashboard,
+      },
+      {
+        path: Routes.dashboard,
+        Component: DashboardPage,
       },
       {
         path: Routes.documents,

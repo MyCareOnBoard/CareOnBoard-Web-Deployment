@@ -1,4 +1,4 @@
-import {combineReducers, configureStore} from "@reduxjs/toolkit";
+import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import {
   persistStore,
   persistReducer,
@@ -11,8 +11,8 @@ import {
   createTransform,
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
-import authReducer from "@/features/auth/store/authSlice";
-import type { User } from "@/features/auth/types";
+import authReducer from "@/utils/auth/store/authSlice";
+import type { User } from "@/utils/auth/types";
 
 // Transform to handle Date serialization
 const dateTransform = createTransform(
@@ -23,11 +23,11 @@ const dateTransform = createTransform(
         ...inboundState,
         user: inboundState.user ? {
           ...inboundState.user,
-          createdAt: inboundState.user.createdAt instanceof Date 
-            ? inboundState.user.createdAt.toISOString() 
+          createdAt: inboundState.user.createdAt instanceof Date
+            ? inboundState.user.createdAt.toISOString()
             : inboundState.user.createdAt,
-          updatedAt: inboundState.user.updatedAt instanceof Date 
-            ? inboundState.user.updatedAt.toISOString() 
+          updatedAt: inboundState.user.updatedAt instanceof Date
+            ? inboundState.user.updatedAt.toISOString()
             : inboundState.user.updatedAt,
         } : null,
       }

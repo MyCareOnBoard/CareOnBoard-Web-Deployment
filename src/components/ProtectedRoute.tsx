@@ -1,5 +1,5 @@
 import { Navigate } from "react-router"
-import { useAuth } from "@/features/auth"
+import { useAuth } from "@/utils/auth"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store/redux/store"
 import { PageLoader } from "./ui/loader"

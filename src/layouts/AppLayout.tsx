@@ -1,157 +1,152 @@
-import type { ComponentType, ReactNode } from "react";
-import { useMemo, useState } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router";
-import { ChevronDown, ChevronUp, User, Settings, LogOut } from "lucide-react";
+import { Outlet } from "react-router";
 
-import { cn } from "@/lib/utils";
+import type React from "react"
+import { useState, useEffect } from "react"
 
-import BellIcon from "@/assets/icons/bell.svg?react";
-import CogIcon from "@/assets/icons/cog.svg?react";
-import FileIcon from "@/assets/icons/file.svg?react";
-import HomeIcon from "@/assets/icons/home.svg?react";
-import LogoNameIcon from "@/assets/icons/logo-name.svg?react";
-import QuestionIcon from "@/assets/icons/question-mark-circle.svg?react";
-import UserIcon from "@/assets/icons/user.svg?react";
-import { Routes } from "@/routes/constants";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-type NavItem = {
-  label: string;
-  path: string;
-  icon: ComponentType<{ className?: string }>;
-};
-
-const navItems: NavItem[] = [
-  { label: "Dashboard", path: Routes.dashboard, icon: HomeIcon },
-  { label: "Application", path: Routes.application, icon: UserIcon },
-  { label: "Documents", path: Routes.documents, icon: FileIcon },
-  { label: "Help Center", path: Routes.helpCenter, icon: QuestionIcon },
-];
-
-function HeaderActionButton({ icon: Icon, ariaLabel }: { icon: ComponentType<{ className?: string }>; ariaLabel: string }) {
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      className="grid h-[42px] w-[42px] place-items-center rounded-[50px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] text-[#808081] backdrop-blur-[22px] cursor-pointer hover:bg-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.5)] transition-all duration-200"
-    >
-      <Icon className="h-5 w-5" />
-    </button>
-  );
+interface Quote {
+  text: string
+  author: string
 }
 
-export function Header({ actions }: { actions?: ReactNode }) {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+const quotes: Quote[] = [
+  {
+    text: "To know even one life has breathed easier because you have lived — that is to have succeeded.",
+    author: "Ralph Waldo Emerson",
+  },
+  {
+    text: "Behind every great hospital is a team that works together, cares deeply, and manages wisely.",
+    author: "Unknown",
+  },
+  {
+    text: "The best way to find yourself is to lose yourself in the service of others.",
+    author: "Mahatma Gandhi",
+  },
+  {
+    text: "Caring for others is an expression of what it means to be fully human.",
+    author: "Hillary Clinton",
+  },
+]
+
+export default function AppLayout() {
+  const [currentQuote, setCurrentQuote] = useState(0)
+
+  // Auto-rotate quotes every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentQuote((prev) => (prev + 1) % quotes.length)
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-background">
-      <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between px-8">
-        <div className="flex items-center gap-3">
-          <LogoNameIcon className="w-[226px]" />
+    <div className="flex items-center justify-between p-[30px] min-h-screen bg-white">
+      {/* Left Banner - Teal branding section */}
+      <div 
+        className="hidden lg:flex bg-[#00b4b8] flex-col h-[calc(100vh-60px)] justify-between p-[60px] rounded-[8px] w-[528px] relative overflow-hidden"
+      >
+        {/* Background Image with Overlay */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 opacity-40 overflow-hidden">
+            <img 
+              alt="" 
+              className="absolute h-full left-[-14.67%] max-w-none top-[-8.3%] w-[121.76%] object-cover"
+              src="/login-bg-main.jpg"
+            />
+          </div>
+          <div 
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(180deg, rgba(0, 180, 184, 0) 18.309%, #00b4b8 88.547%, #00b4b8 113.69%)'
+            }}
+          />
         </div>
 
-        {actions ?? (
-          <div className="flex items-center gap-[10px]">
-            <HeaderActionButton icon={CogIcon} ariaLabel="Settings" />
-            <div className="relative">
-              <HeaderActionButton icon={BellIcon} ariaLabel="Notifications" />
-              {/* <span className="absolute right-[9px] top-[9px] block h-[10px] w-[10px] rounded-full bg-[#d53411]" /> */}
-            </div>
-            <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-              <DropdownMenuTrigger asChild>
-                <div className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer">
-                  <img src="/src/assets/icons/images/user-profile-image.png" alt="User profile" className="h-[34px] w-[34px] rounded-full object-cover" />
-                  <p className="pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a]">Nola Hawkins</p>
-                  {isDropdownOpen ? (
-                    <ChevronUp className="h-4 w-4 text-[#808081] mr-2" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-[#808081] mr-2" />
-                  )}
-                </div>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 z-[100] bg-white">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
-      </div>
-    </header>
-  );
-}
-
-export function Sidebar({ footer }: { footer?: ReactNode }) {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  const activePath = useMemo(() => {
-    const match = navItems.find(({ path }) => location.pathname === path);
-    return match?.path ?? Routes.dashboard;
-  }, [location.pathname]);
-
-  return (
-    <aside className="fixed left-[42.5px] top-[130px] z-40 w-[156px] space-y-3 bg-background">
-      <nav className="space-y-1">
-        {navItems.map(({ icon: Icon, label, path }) => {
-          const isActive = activePath === path;
-          return (
-            <button
-              key={label}
-              type="button"
-              onClick={() => navigate(path)}
-              className={cn(
-                "flex h-[52px] w-full items-center gap-3 rounded-[60px] px-4 text-sm font-semibold backdrop-blur-[22px] transition cursor-pointer",
-                isActive ? "bg-[#00b4b8] font-medium text-white" : "font-medium text-[#808081] hover:bg-white/40"
-              )}
-            >
-              <Icon
-                className={cn(
-                  "h-5 w-5",
-                  isActive
-                    ? "[&_*]:stroke-white [&_*]:fill-transparent [&_path]:stroke-white [&_path]:fill-transparent [&_circle]:stroke-white [&_circle]:fill-transparent [&_rect]:stroke-white [&_rect]:fill-transparent"
-                    : "[&_*]:stroke-[#808081] [&_*]:fill-transparent [&_path]:stroke-[#808081] [&_path]:fill-transparent [&_circle]:stroke-[#808081] [&_circle]:fill-transparent [&_rect]:stroke-[#808081] [&_rect]:fill-transparent"
-                )}
+        {/* Content */}
+        <div className="relative z-10 flex flex-col h-full justify-between">
+          {/* Logo */}
+          <div className="flex gap-[11.563px] items-center">
+            <div className="w-[37px] h-[37px] flex items-center justify-center">
+              <img 
+                src="/logo.svg" 
+                alt="Care on Board" 
+                className="w-full h-full"
               />
-              {label}
-            </button>
-          );
-        })}
-      </nav>
-      {footer}
-    </aside>
-  );
-}
+            </div>
+            <p className="font-bold text-[27.75px] text-white tracking-[0.2775px]" style={{ fontFamily: 'Urbanist, sans-serif' }}>
+              Care on Board
+            </p>
+          </div>
 
-export default function AppLayout({ children }: { children?: ReactNode }) {
-  return (
-    <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
-      <Header />
-      <Sidebar />
-      <main className="ml-[240px] pt-[130px] pb-10">
-        <div className="px-8">{children ?? <Outlet />}</div>
-      </main>
+          {/* Heading */}
+          <div className="flex flex-col gap-[24px] w-full">
+            <h1 
+              className="font-bold text-[40px] leading-[1.4] text-white w-full" 
+              style={{ fontFamily: 'Urbanist, sans-serif' }}
+            >
+              Welcome to [Agency Name] Application Portal
+            </h1>
+            <p 
+              className="font-normal text-[20px] leading-[1.6] text-[#f3f6f7] w-full"
+              style={{ fontFamily: 'Urbanist, sans-serif' }}
+            >
+              Helping adults with developmental disabilities live full and meaningful lives.
+            </p>
+          </div>
+
+          {/* Quotes Section */}
+          <div className="flex flex-col gap-[24px] items-center w-full">
+            <div className="bg-[#2b7a7c] flex flex-col gap-[20px] p-[16px] rounded-[6px] w-full">
+              <div className="flex flex-col gap-[14px] w-full">
+                {/* Quote Mark */}
+                <div className="h-[17px] w-[20px]">
+                  <svg width="20" height="17" viewBox="0 0 20 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0 16.5V8.5C0 3.8 2.4 0 8 0V3C5.2 3 3.6 4.6 3.2 7.5C3.8 7.3 4.4 7.2 5 7.2C7.2 7.2 9 9 9 11.2V16.5H0ZM11 16.5V8.5C11 3.8 13.4 0 19 0V3C16.2 3 14.6 4.6 14.2 7.5C14.8 7.3 15.4 7.2 16 7.2C18.2 7.2 20 9 20 11.2V16.5H11Z" fill="white"/>
+                  </svg>
+                </div>
+                {/* Quote Text */}
+                <p 
+                  className="font-semibold text-[20px] leading-[1.6] text-white"
+                  style={{ fontFamily: 'Urbanist, sans-serif' }}
+                >
+                  {quotes[currentQuote].text}
+                </p>
+              </div>
+              {/* Author Badge */}
+              <div className="inline-flex bg-[rgba(213,230,255,0.1)] border border-[#e5effa] items-center justify-center px-[18px] py-[8px] rounded-[99px] self-start">
+                <p 
+                  className="font-medium text-[14px] leading-[1.4] text-white"
+                  style={{ fontFamily: 'Urbanist, sans-serif' }}
+                >
+                  {quotes[currentQuote].author}
+                </p>
+              </div>
+            </div>
+
+            {/* Indicator Dots */}
+            <div className="flex gap-2 h-[8px] w-[50px] justify-center items-center">
+              {quotes.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentQuote(index)}
+                  className={`h-2 rounded-full transition-all ${
+                    index === currentQuote ? "bg-white w-8" : "bg-white/30 w-2"
+                  }`}
+                  aria-label={`Go to quote ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Content - Form area */}
+      <div className="flex flex-1 flex-col gap-[10px] h-[calc(100vh-60px)] items-center justify-center min-w-0">
+        <div className="flex flex-col gap-[48px] items-start justify-center rounded-[16px] w-full max-w-[496px]">
+          <Outlet />
+        </div>
+      </div>
     </div>
-  );
+  )
 }
 

@@ -36,86 +36,92 @@ src/features/auth/
 ### Import Everything from One Place
 
 ```typescript
-import { 
+import {
   // Context & Hooks
   AuthProvider,
   useAuth,
   useAuthUser,
-  
+
   // Components
   AuthLayout,
-  
+
   // Redux
   authReducer,
   setUser,
   clearUser,
   selectUser,
   selectIsAuthenticated,
-  
+
   // API
   api,
   createUser,
-  
+
   // Services
   loginWithEmail,
   registerWithEmail,
   getCurrentUser,
-  
+
   // Types
-  User
-} from '@/features/auth'
+  User,
+} from "@/utils/auth";
 ```
 
 ## 📦 What's Included
 
 ### 1. Context (`context/`)
+
 **AuthContext** provides authentication state to your entire app:
 
 ```typescript
-const { user, loading, login, signup, logout, resetPassword, getToken } = useAuth()
+const { user, loading, login, signup, logout, resetPassword, getToken } =
+  useAuth();
 ```
 
 ### 2. Redux Store (`store/`)
+
 **Redux Toolkit** for global state management with persistence:
 
 ```typescript
-import { useAppDispatch, useAppSelector } from '@/store/redux/hooks'
-import { setUser, selectUser, selectIsAuthenticated } from '@/features/auth'
+import { useAppDispatch, useAppSelector } from "@/store/redux/hooks";
+import { setUser, selectUser, selectIsAuthenticated } from "@/utils/auth";
 
 function MyComponent() {
-  const dispatch = useAppDispatch()
-  const user = useAppSelector(selectUser)
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const dispatch = useAppDispatch();
+  const user = useAppSelector(selectUser);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
 }
 ```
 
 ### 3. Firebase Auth (`services/firebase-auth.ts`)
+
 Core authentication functions:
 
 - `loginWithEmail(email, password)` - User login
-- `registerWithEmail(name, email, password)` - User registration  
+- `registerWithEmail(name, email, password)` - User registration
 - `sendPasswordResetEmail(email)` - Password reset
 - `logout()` - Sign out user
 - `getCurrentUser()` - Get current user
 - `getIdToken()` - Get Firebase ID token
 
 ### 4. API Client (`api/client.ts`)
+
 Authenticated HTTP requests:
 
 ```typescript
-import { api, createUser } from '@/features/auth'
+import { api, createUser } from "@/utils/auth";
 
 // RESTful methods
-const data = await api.get('/endpoint')
-await api.post('/endpoint', { data })
-await api.put('/endpoint', { data })
-await api.delete('/endpoint')
+const data = await api.get("/endpoint");
+await api.post("/endpoint", { data });
+await api.put("/endpoint", { data });
+await api.delete("/endpoint");
 
 // Create user in backend
-await createUser('John Doe')
+await createUser("John Doe");
 ```
 
 ### 5. Components (`components/`)
+
 - **AuthLayout** - Shared layout for login/signup/forgot-password pages
 - **AuthTestComponent** - Testing component for development
 
@@ -125,7 +131,7 @@ await createUser('John Doe')
 
 ```typescript
 // src/main.tsx
-import { AuthProvider } from '@/features/auth'
+import { AuthProvider } from '@/utils/auth'
 
 <Provider store={store}>
   <PersistGate persistor={persistor}>
@@ -139,11 +145,11 @@ import { AuthProvider } from '@/features/auth'
 ### Login Page
 
 ```typescript
-import { useAuth, AuthLayout } from '@/features/auth'
+import { useAuth, AuthLayout } from '@/utils/auth'
 
 export default function LoginPage() {
   const { login } = useAuth()
-  
+
   const handleLogin = async (email, password) => {
     try {
       await login(email, password)
@@ -152,7 +158,7 @@ export default function LoginPage() {
       toast.error(error.message)
     }
   }
-  
+
   return (
     <AuthLayout>
       {/* Your form here */}
@@ -164,18 +170,18 @@ export default function LoginPage() {
 ### Protected Route
 
 ```typescript
-import { useAuth } from '@/features/auth'
+import { useAuth } from '@/utils/auth'
 
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
   const navigate = useNavigate()
-  
+
   useEffect(() => {
     if (!loading && !user) {
       navigate('/login')
     }
   }, [user, loading])
-  
+
   return <div>Welcome {user?.name}!</div>
 }
 ```
@@ -184,16 +190,16 @@ export default function DashboardPage() {
 
 ```typescript
 import { useAppSelector } from '@/store/redux/hooks'
-import { selectUser, selectIsAuthenticated, selectAuthLoading } from '@/features/auth'
+import { selectUser, selectIsAuthenticated, selectAuthLoading } from '@/utils/auth'
 
 function Profile() {
   const user = useAppSelector(selectUser)
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const loading = useAppSelector(selectAuthLoading)
-  
+
   if (loading) return <Spinner />
   if (!isAuthenticated) return <LoginPrompt />
-  
+
   return <div>{user.fullName}</div>
 }
 ```
@@ -212,11 +218,13 @@ function Profile() {
 The auth feature uses **dual state management**:
 
 ### Context State (Local)
+
 - Fast, synchronous access
 - Used by components directly via `useAuth()`
 - Ideal for UI state and auth methods
 
 ### Redux State (Global)
+
 - Centralized, persisted state
 - Accessible anywhere in the app
 - Survives page reloads via redux-persist
@@ -230,44 +238,46 @@ Both states stay in sync automatically!
 All API requests automatically include the Firebase auth token:
 
 ```typescript
-import { api } from '@/features/auth'
+import { api } from "@/utils/auth";
 
 // Token is automatically added to headers
-const userData = await api.get('/users/me')
+const userData = await api.get("/users/me");
 ```
 
 ### Manual Token Access
 
 ```typescript
-import { useAuth } from '@/features/auth'
+import { useAuth } from "@/utils/auth";
 
-const { getToken } = useAuth()
-const token = await getToken() // Get Firebase ID token
+const { getToken } = useAuth();
+const token = await getToken(); // Get Firebase ID token
 ```
 
 ## 📝 Type Definitions
 
 ### User Type (Redux)
+
 ```typescript
 interface User {
-  uid: string
-  email: string
-  fullName: string
-  emailVerified: boolean
-  createdAt: Date
-  updatedAt: Date
-  photoURL?: string
-  phoneNumber?: string
+  uid: string;
+  email: string;
+  fullName: string;
+  emailVerified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  photoURL?: string;
+  phoneNumber?: string;
 }
 ```
 
 ### Auth State (Redux)
+
 ```typescript
 interface AuthState {
-  user: User | null
-  isAuthenticated: boolean
-  loading: boolean
-  error: string | null
+  user: User | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  error: string | null;
 }
 ```
 
@@ -276,7 +286,7 @@ interface AuthState {
 Use the included test component:
 
 ```typescript
-import { AuthTestComponent } from '@/features/auth'
+import { AuthTestComponent } from '@/utils/auth'
 
 // In your dev environment
 <AuthTestComponent />
@@ -304,13 +314,15 @@ import { AuthTestComponent } from '@/features/auth'
 ## 📚 Related Files
 
 ### Page Components (Outside Feature)
+
 Auth page components remain in their original locations:
+
 - `/src/layouts/login/page.tsx` - Login page
 - `/src/layouts/signup/page.tsx` - Signup page
 - `/src/layouts/forgot-password/page.tsx` - Password reset page
 - `/src/layouts/dashboard/page.tsx` - Protected dashboard
 
-These pages import from `@/features/auth` for all auth functionality.
+These pages import from `@/utils/auth` for all auth functionality.
 
 ## 🎨 Key Benefits
 
