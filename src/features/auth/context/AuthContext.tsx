@@ -44,59 +44,93 @@ export const useAuth = () => useContext(AuthContext)
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const dispatch = useDispatch<AppDispatch>()
-  const reduxUser = useSelector((state: RootState) => state.auth.user)
-  const [user, setUserState] = useState<User | null>(reduxUser)
+  const reduxUser = useSelector((state: RootState) => state.auth?.user)
+  const [user, setUserState] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isInitialized, setIsInitialized] = useState(false)
 
-  // Check for existing session on mount and sync with Redux
+  // Initialize auth state - check both Redux (persisted) and Firebase
   useEffect(() => {
-    const checkAuth = async () => {
+    const initAuth = async () => {
+      console.log('[AuthContext] Initializing auth...')
+      console.log('[AuthContext] Redux user:', reduxUser)
+      
+      // First, check if we have a persisted user in Redux
+      if (reduxUser) {
+        console.log('[AuthContext] Found persisted user in Redux:', reduxUser.email)
+        setUserState(reduxUser)
+        setIsInitialized(true)
+        setLoading(false)
+        return
+      }
+      
+      // If no Redux user, check Firebase auth state
       const currentUser = await getCurrentUser()
+      console.log('[AuthContext] Firebase current user:', currentUser?.email || 'null')
+      
       if (currentUser) {
+        console.log('[AuthContext] Syncing Firebase user to Redux')
         setUserState(currentUser)
         dispatch(setUser(currentUser))
       }
+      
+      setIsInitialized(true)
       setLoading(false)
     }
 
-    checkAuth()
-  }, [dispatch])
+    initAuth()
+  }, []) // Only run once on mount
 
-  // Sync local state with Redux state
+  // Sync local state when Redux state changes (after login/signup)
   useEffect(() => {
-    setUserState(reduxUser)
-  }, [reduxUser])
+    if (isInitialized) {
+      console.log('[AuthContext] Redux user changed:', reduxUser?.email || 'null')
+      setUserState(reduxUser ?? null)
+    }
+  }, [reduxUser, isInitialized])
 
   /**
    * Login user with email and password
    */
   const login = async (email: string, password: string) => {
+    console.log('[AuthContext] Login attempt for:', email)
     const response = await loginWithEmail(email, password)
 
     if (!response.success || !response.user) {
+      console.error('[AuthContext] Login failed:', response.error)
       throw new Error(response.error || "Login failed")
     }
 
-    // Save session and update state
-    // saveUserSession(response.user)
+    console.log('[AuthContext] Login successful, updating state and Redux')
+    console.log('[AuthContext] User object:', response.user)
+    
+    // Update local state and Redux
     setUserState(response.user)
     dispatch(setUser(response.user))
+    
+    console.log('[AuthContext] User dispatched to Redux')
   }
 
   /**
    * Register new user
    */
   const signup = async (email: string, password: string, fullName: string) => {
+    console.log('[AuthContext] Signup attempt for:', email)
     const response = await registerWithEmail(fullName, email, password)
 
     if (!response.success || !response.user) {
+      console.error('[AuthContext] Signup failed:', response.error)
       throw new Error(response.error || "Registration failed")
     }
 
-    // Save session and update state
-    // saveUserSession(response.user)
+    console.log('[AuthContext] Signup successful, updating state and Redux')
+    console.log('[AuthContext] User object:', response.user)
+    
+    // Update local state and Redux
     setUserState(response.user)
     dispatch(setUser(response.user))
+    
+    console.log('[AuthContext] User dispatched to Redux')
     
     // Create user in backend
     try {
@@ -125,10 +159,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Logout current user
    */
   const logout = async () => {
+    console.log('[AuthContext] Logging out user')
     await logoutUser()
-    // clearUserSession()
     setUserState(null)
     dispatch(setUser(null))
+    console.log('[AuthContext] User logged out, Redux cleared')
   }
 
   /**

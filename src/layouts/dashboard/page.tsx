@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router"
 import { useAuth } from "@/features/auth"
+import { useSelector } from "react-redux"
+import type { RootState } from "@/store/redux/store"
 import { Button } from "@/components/ui/button"
 import { LogOut } from "lucide-react"
 
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
+  const reduxUser = useSelector((state: RootState) => state.auth?.user)
   const navigate = useNavigate()
 
-
+  useEffect(() => {
+    console.log('[Dashboard] Auth state:', { user: user?.email, loading })
+    console.log('[Dashboard] Redux user:', reduxUser?.email)
+  }, [user, loading, reduxUser])
 
   useEffect(() => {
     if (!loading && !user) {
+      console.log('[Dashboard] No user found, redirecting to login')
       navigate("/login")
     }
   }, [user, loading, navigate])
