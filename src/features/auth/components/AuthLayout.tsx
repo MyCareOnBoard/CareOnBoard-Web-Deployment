@@ -41,7 +41,12 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       {/* Left Panel - Teal branding section */}
-      <div className="hidden lg:flex lg:w-[40%] m-4 rounded-md bg-linear-to-b from-[#02acaf] to-[#00B4B8] relative overflow-hidden">
+      <div 
+        className="hidden lg:flex lg:w-[40%] m-4 rounded-2xl relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(180deg, #02acaf 0%, #00B4B8 100%)'
+        }}
+      >
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
@@ -58,7 +63,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
               <span className="text-2xl font-semibold">Care on Board</span>
             </div>
 
-            <div className=" my-6">
+            <div className="my-6">
               <h1 className="text-[2.30rem] font-bold leading-tight py-4">Welcome to [Agency <br /> Name] Application <br /> Portal</h1>
               <p className="text-md text-white/95 leading-relaxed">
                 Helping adults with developmental disabilities live full and meaningful lives.
@@ -66,25 +71,32 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="bg-[#2B7A7C] rounded-lg p-4 mt-4 space-y-2">
+          {/* Quote Container with Dark Gradient */}
+          <div 
+            className="rounded-2xl p-6 mt-4 space-y-3 shadow-2xl border border-white/10"
+            style={{
+              background: 'linear-gradient(135deg, #0f172a 0%, #134e4a 50%, #0f172a 100%)'
+            }}
+          >
             {/* Quote mark */}
-            <div className="text-6xl font-serif leading-none">"</div>
+            <div className="text-6xl font-serif leading-none text-teal-300/80">"</div>
 
             {/* Quote text */}
-            <p className="text-lg leading-relaxed min-h-10">{quotes[currentQuote].text}</p>
+            <p className="text-lg leading-relaxed min-h-20 text-white/95">{quotes[currentQuote].text}</p>
 
             {/* Author badge */}
-            <div className="inline-block px-5 py-1 border border-white/30 rounded-full">
+            <div className="inline-block px-5 py-1.5 border border-white/30 rounded-full bg-white/5 backdrop-blur-sm">
               <span className="text-sm font-medium">{quotes[currentQuote].author}</span>
             </div>
 
+            {/* Quote indicators */}
             <div className="flex gap-2 justify-center pt-2">
               {quotes.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => setCurrentQuote(index)}
                   className={`h-2 rounded-full transition-all ${
-                    index === currentQuote ? "bg-white w-8" : "bg-white/40 w-2"
+                    index === currentQuote ? "bg-teal-300 w-8" : "bg-white/30 w-2"
                   }`}
                   aria-label={`Go to quote ${index + 1}`}
                 />
@@ -96,7 +108,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
 
       {/* Right Panel - Form area */}
       <div className="flex-1 flex items-center justify-center p-8 lg:p-12 bg-[#f5f5f5]">
-        <div className="w-full max-w-[480px]">{children}</div>
+        <div className="w-full max-w-[420px]">{children}</div>
       </div>
     </div>
   )

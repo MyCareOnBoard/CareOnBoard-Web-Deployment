@@ -28,13 +28,122 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<{
+    fullName?: string
+    email?: string
+    password?: string
+  }>({})
 
   const { signup } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
 
+  // Validate full name
+  const validateFullName = (name: string) => {
+    if (!name) {
+      return "Full name is required"
+    }
+    if (name.trim().length < 2) {
+      return "Full name must be at least 2 characters"
+    }
+    if (!/^[a-zA-Z\s]+$/.test(name)) {
+      return "Full name should only contain letters"
+    }
+    return ""
+  }
+
+  // Validate email format
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email) {
+      return "Email is required"
+    }
+    if (!emailRegex.test(email)) {
+      return "Please enter a valid email address"
+    }
+    return ""
+  }
+
+  // Validate password
+  const validatePassword = (password: string) => {
+    if (!password) {
+      return "Password is required"
+    }
+    if (password.length < 6) {
+      return "Password must be at least 6 characters"
+    }
+    if (!/(?=.*[a-z])/.test(password)) {
+      return "Password must contain at least one lowercase letter"
+    }
+    if (!/(?=.*[A-Z])/.test(password)) {
+      return "Password must contain at least one uppercase letter"
+    }
+    if (!/(?=.*\d)/.test(password)) {
+      return "Password must contain at least one number"
+    }
+    return ""
+  }
+
+  // Real-time validation on blur
+  const handleFullNameBlur = () => {
+    const nameError = validateFullName(fullName)
+    setErrors(prev => ({ ...prev, fullName: nameError }))
+  }
+
+  const handleEmailBlur = () => {
+    const emailError = validateEmail(email)
+    setErrors(prev => ({ ...prev, email: emailError }))
+  }
+
+  const handlePasswordBlur = () => {
+    const passwordError = validatePassword(password)
+    setErrors(prev => ({ ...prev, password: passwordError }))
+  }
+
+  // Clear errors on input
+  const handleFullNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFullName(e.target.value)
+    if (errors.fullName) {
+      setErrors(prev => ({ ...prev, fullName: "" }))
+    }
+  }
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value)
+    if (errors.email) {
+      setErrors(prev => ({ ...prev, email: "" }))
+    }
+  }
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value)
+    if (errors.password) {
+      setErrors(prev => ({ ...prev, password: "" }))
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate all fields
+    const nameError = validateFullName(fullName)
+    const emailError = validateEmail(email)
+    const passwordError = validatePassword(password)
+
+    if (nameError || emailError || passwordError) {
+      setErrors({
+        fullName: nameError,
+        email: emailError,
+        password: passwordError,
+      })
+      toast({
+        title: "Validation Error",
+        description: "Please fix the errors in the form",
+        variant: "destructive",
+      })
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -57,17 +166,17 @@ export default function SignUpPage() {
 
   return (
     <AuthLayout>
-      <div className="space-y-8">
+      <div className="space-y-6">
         {/* Page Header */}
         <div className="space-y-2">
-          <h2 className="text-[2rem] font-bold text-gray-900">Create an account</h2>
-          <p className="text-gray-500 text-base">
+          <h2 className="text-3xl font-bold text-gray-900">Create an account</h2>
+          <p className="text-gray-500 text-sm">
             Set up your access to manage users, data, and healthcare operations.
           </p>
         </div>
 
         {/* Registration Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Full Name Field */}
           <div className="space-y-2">
             <Label htmlFor="fullName" className="text-sm font-medium text-gray-900">
@@ -78,10 +187,18 @@ export default function SignUpPage() {
               type="text"
               placeholder="Enter full name"
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              onChange={handleFullNameChange}
+              onBlur={handleFullNameBlur}
               required
-              className="h-14 rounded-xl border-gray-200 bg-white text-base placeholder:text-gray-400"
+              className={`h-12 rounded-2xl border-gray-200 bg-white text-base placeholder:text-gray-400 ${
+                errors.fullName ? 'border-red-500 focus-visible:ring-red-500' : ''
+              }`}
             />
+            {errors.fullName && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <span className="text-red-500">⚠</span> {errors.fullName}
+              </p>
+            )}
           </div>
 
           {/* Email Field */}
@@ -94,10 +211,18 @@ export default function SignUpPage() {
               type="email"
               placeholder="Enter email address"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={handleEmailChange}
+              onBlur={handleEmailBlur}
               required
-              className="h-14 rounded-xl border-gray-200 bg-white text-base placeholder:text-gray-400"
+              className={`h-12 rounded-2xl border-gray-200 bg-white text-base placeholder:text-gray-400 ${
+                errors.email ? 'border-red-500 focus-visible:ring-red-500' : ''
+              }`}
             />
+            {errors.email && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <span className="text-red-500">⚠</span> {errors.email}
+              </p>
+            )}
           </div>
 
           {/* Password Field with Toggle */}
@@ -111,10 +236,13 @@ export default function SignUpPage() {
                 type={showPassword ? "text" : "password"}
                 placeholder="Enter password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={handlePasswordChange}
+                onBlur={handlePasswordBlur}
                 required
                 minLength={6}
-                className="h-14 rounded-xl border-gray-200 bg-white text-base placeholder:text-gray-400 pr-12"
+                className={`h-12 rounded-2xl border-gray-200 bg-white text-base placeholder:text-gray-400 pr-12 ${
+                  errors.password ? 'border-red-500 focus-visible:ring-red-500' : ''
+                }`}
               />
               <button
                 type="button"
@@ -125,12 +253,42 @@ export default function SignUpPage() {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
+            {errors.password && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <span className="text-red-500">⚠</span> {errors.password}
+              </p>
+            )}
+            {/* Password strength indicator */}
+            {password && !errors.password && (
+              <div className="space-y-1">
+                <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all ${
+                      password.length >= 8 && /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)
+                        ? 'bg-green-500 w-full'
+                        : password.length >= 6
+                        ? 'bg-yellow-500 w-2/3'
+                        : 'bg-red-500 w-1/3'
+                    }`}
+                  />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Password strength: {
+                    password.length >= 8 && /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)
+                      ? 'Strong'
+                      : password.length >= 6
+                      ? 'Medium'
+                      : 'Weak'
+                  }
+                </p>
+              </div>
+            )}
           </div>
 
           <Button
             type="submit"
             disabled={loading}
-            className="w-full h-14 bg-[#17a2b8] hover:bg-[#148a9c] text-white rounded-full text-base font-semibold"
+            className="w-full h-12 bg-[#17a2b8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold mt-4 transition-all"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -143,7 +301,7 @@ export default function SignUpPage() {
           </Button>
         </form>
 
-        <div className="space-y-4">
+        <div className="space-y-3 pt-2">
           <p className="text-center text-sm text-gray-600">
             Already have an account?{" "}
             <Link to="/login" className="text-[#17a2b8] hover:text-[#148a9c] font-semibold">
