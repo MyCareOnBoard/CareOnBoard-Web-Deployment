@@ -1,25 +1,79 @@
-import StepPlaceholder from "./StepPlaceholder";
+import {FileUpload} from "@/components/ui/file-upload";
+import {useRef, useState} from "react";
 
 interface DocumentUploadStepProps {
   onBack?: () => void;
   onNext?: () => void;
 }
 
-export default function DocumentUploadStep({ onBack, onNext }: DocumentUploadStepProps) {
+export default function DocumentUploadStep({onBack, onNext}: DocumentUploadStepProps) {
+  const [name, setName] = useState('');
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const ref = useRef<HTMLInputElement>(null);
+
+  const onBlur = () => {
+    if (!selectedFileName) {
+      setUploadError('Please select a file');
+    }
+  };
+
+  const onChange = (files: FileList | null) => {
+    if (files && files.length > 0) {
+      setSelectedFileName(files[0].name);
+    }
+  };
+
+  const files = [
+    {
+      id: "photo-id",
+      label: "Photo ID (Driver’s License, State ID, Passport)",
+    },
+    {
+      id: "social-security",
+      label: "Social Security Card or valid work permit.",
+    },
+    {
+      id: "high-school",
+      label: "High School Diploma/GED certificate.",
+    },
+    {
+      id: "relevant-certificate",
+      label: "Any relevant certifications (e.g., CPR, First Aid — optional at this stage).",
+    },
+    {
+      id: "hepatitis-b-vaccination",
+      label: "Hepatitis B vaccination series documents.",
+    },
+    {
+      id: "hepatitis-b-immunity",
+      label: "Hepatitis B immunity (titer result)",
+    },
+    {
+      id: "tb-test",
+      label: "TB test result.",
+    }
+  ]
+
   return (
-    <StepPlaceholder
-      title="Document Upload & Eligibility Verification"
-      description="We will gather verification documents, licenses, and proof of eligibility before continuing."
-      bulletPoints={[
-        "Upload identification (Driver’s license or Passport)",
-        "Provide certifications or license numbers",
-        "Submit proof of eligibility to work",
-      ]}
-      onBack={onBack}
-      onNext={onNext}
-      backLabel="Return to Profile"
-      nextLabel="Continue to Conditional Hire"
-    />
+    <div className={"w-full"}>
+      {files.map((file) =>
+        <div className={"mb-6"}>
+          <p className={"text-sm mb-2"}>{file.label}</p>
+          <FileUpload
+            name={file.id}
+            className="h-[90px] w-full max-w-[100vw]"
+            label={selectedFileName ?? "Upload your resume"}
+            accept=".pdf,.doc,.docx"
+            onBlur={onBlur}
+            onChange={(event) => {
+              onChange(event.target.files ?? null);
+              setUploadError(null);
+            }}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

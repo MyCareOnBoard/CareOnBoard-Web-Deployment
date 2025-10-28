@@ -164,10 +164,10 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
     return <PageLoader text="Checking authentication..." />;
   }
 
-  if (!user) {
-    console.log('[DashboardLayout] No user, redirecting to login');
-    return <Navigate to={Routes.login} replace />;
-  }
+  // if (!user) {
+  //   console.log('[DashboardLayout] No user, redirecting to login');
+  //   return <Navigate to={Routes.login} replace />;
+  // }
 
   console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
   return (

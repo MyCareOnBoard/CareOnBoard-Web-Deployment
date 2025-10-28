@@ -43,7 +43,7 @@ function ApplicationLoading() {
 function ApplicationContent() {
   const { user } = useAuth();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
   const progressValue = useMemo(() => STEP_POINT[activeStep], [activeStep]);
@@ -62,7 +62,7 @@ function ApplicationContent() {
         const response = await getApplicationStatus();
         console.log('Application status:', response);
         setApplicationStatus(response.data);
-        
+
         // Set active step based on current step from API
         if (response.data.currentStep !== undefined) {
           setActiveStep(response.data.currentStep);
@@ -128,10 +128,10 @@ function ApplicationContent() {
           <span>Cancel Application Form</span>
         </Button>
       </div>
-      <div className="overflow-x-auto">
-        <div className="min-w-[1161px] pe-4">
-          <div className="mb-[44px]">
-            <div className="mb-5 flex items-center justify-between text-sm leading-[1.4]">
+      <div>
+        <div className="pe-4">
+          <div className="mb-[44px] pb-3 scrollbar-hide overflow-x-auto">
+            <div className="min-w-[100vw] mb-5 flex items-center justify-between text-sm leading-[1.4]">
               {steps.map((step) => (
                 <span
                   key={step.title}
