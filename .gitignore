@@ -9,12 +9,17 @@ lerna-debug.log*
 
 node_modules
 dist
+build
 dist-ssr
 *.local
 
-# Ignore compiled JavaScript files in src (we only use TypeScript)
+# Compiled JavaScript files (keep config files)
 src/**/*.js
+src/**/*.jsx
 !src/**/*.config.js
+
+# TypeScript build info
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*

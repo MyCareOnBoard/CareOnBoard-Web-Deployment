@@ -1,1 +1,0 @@
-export default function LogoHeader(){ return <img src="/cab-logo-color.png" alt="logo" className="w-28 mb-4" /> }

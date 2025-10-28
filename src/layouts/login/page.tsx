@@ -1,3 +1,5 @@
+
+
 import type React from "react"
 import { useState } from "react"
 import { useNavigate, Link } from "react-router"
@@ -7,8 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useAuth } from "@/lib/auth-context"
-import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/features/auth"
+import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -31,7 +33,7 @@ export default function LoginPage() {
         title: "Success",
         description: "Logged in successfully",
       })
-      navigate("/onboarding")
+      navigate("/dashboard")
     } catch (error: any) {
       toast({
         title: "Error",
@@ -101,7 +103,7 @@ export default function LoginPage() {
               <Checkbox
                 id="remember"
                 checked={rememberMe}
-                onCheckedChange={(checked: boolean) => setRememberMe(checked)}
+                onCheckedChange={(checked: any) => setRememberMe(checked as boolean)}
                 className="border-gray-300"
               />
               <label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer">

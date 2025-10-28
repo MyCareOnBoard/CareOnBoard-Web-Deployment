@@ -18,8 +18,8 @@ import { AuthLayout } from "@/components/auth-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useAuth } from "@/lib/auth-context"
-import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/features/auth"
+import { useToast } from "@/hooks/use-toast"
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState("")
@@ -42,7 +42,7 @@ export default function SignUpPage() {
         title: "Success",
         description: "Account created successfully",
       })
-      navigate("/onboarding")
+      navigate("/dashboard")
     } catch (error: any) {
       toast({
         title: "Error",

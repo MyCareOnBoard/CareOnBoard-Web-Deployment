@@ -1,1 +1,0 @@
-import LogoHeader from './LogoHeader'; export default function SlideTwo(){ return (<div className="text-center px-6"><LogoHeader /><img src="https://via.placeholder.com/300x200" className="w-64 h-40 object-cover rounded-md mb-4" /><h3 className="text-xl font-semibold">Feature</h3><p className="text-gray-600">Details</p></div>); }

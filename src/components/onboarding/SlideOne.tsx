@@ -1,1 +1,0 @@
-import LogoHeader from './LogoHeader'; export default function SlideOne(){ return (<div className="text-center px-6"><LogoHeader /><h2 className="text-2xl font-bold">Welcome</h2><p className="text-gray-600 mt-2">Intro text as per design.</p></div>); }

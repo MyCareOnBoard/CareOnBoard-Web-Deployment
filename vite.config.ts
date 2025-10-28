@@ -44,61 +44,13 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      outDir: "dist",
-      assetsDir: "assets",
+      assetsInlineLimit: 0,
       emptyOutDir: true,
-      sourcemap: false,
-      minify: "esbuild",
-      assetsInlineLimit: 4096, // 4kb - inline assets smaller than this
-      chunkSizeWarningLimit: 500, // warn if chunks are larger than 500kb
+      outDir: "dist",
       rollupOptions: {
-        input: {
-          main: "./index.html",
-        },
-        output: {
-          // Organize output files by type
-          entryFileNames: "js/[name]-[hash].js",
-          chunkFileNames: "js/[name]-[hash].js",
-          assetFileNames: (assetInfo) => {
-            const name = assetInfo.name || '';
-            const extType = name.split('.').pop() || '';
-            
-            // Organize assets by type
-            if (/png|jpe?g|svg|gif|tiff|bmp|ico|webp/i.test(extType)) {
-              return 'images/[name]-[hash][extname]';
-            }
-            if (/woff2?|eot|ttf|otf/i.test(extType)) {
-              return 'fonts/[name]-[hash][extname]';
-            }
-            if (/css/i.test(extType)) {
-              return 'css/[name]-[hash][extname]';
-            }
-            return 'assets/[name]-[hash][extname]';
-          },
-          // Better code splitting for performance
-          manualChunks: (id) => {
-            // Vendor chunks
-            if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-                return 'vendor-react';
-              }
-              if (id.includes('@radix-ui')) {
-                return 'vendor-radix';
-              }
-              if (id.includes('firebase')) {
-                return 'vendor-firebase';
-              }
-              if (id.includes('recharts') || id.includes('lucide')) {
-                return 'vendor-charts';
-              }
-              return 'vendor';
-            }
-          },
-        },
+        input: "./index.html",
       },
     },
-    // Configure public directory
-    publicDir: "public",
     define: {
       "process.env": env,
     },
