@@ -14,7 +14,7 @@ import type { Step } from "./types";
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getApplicationStatus, type ApplicationStatus } from "@/lib/api/job-application";
+import { getApplicationStatus, updateApplicationStatus, type ApplicationStatus } from "@/lib/api/job-application";
 import { useAuth } from "@/utils/auth";
 
 const STEP_TITLES = [
@@ -24,6 +24,8 @@ const STEP_TITLES = [
   "Final Agency Review",
   "Official Hire & Orientation",
 ];
+
+const STEP_NAMES = ["profile", "eligibility", "compliance", "review", "orientation"];
 
 const STEP_POINT = [5, 30, 56, 76, 95];
 
@@ -62,7 +64,7 @@ function ApplicationContent() {
         if (!response.status.hasStarted) {
           setActiveStep(0);
         } else if (response.status.currentStep !== null) {
-          setActiveStep(response.status.currentStep);
+          setActiveStep(STEP_NAMES.indexOf(response.status.currentStep));
         } else {
           setActiveStep(0);
         }
@@ -85,10 +87,11 @@ function ApplicationContent() {
     [activeStep]
   );
 
-  const handleNext = () => {
-    if (activeStep !== STEP_TITLES.length - 1) {
-      setActiveStep(activeStep + 1);
-    }
+  const handleNext = async () => {
+    // await updateApplicationStatus({
+    //   status: "submitted",
+    //   currentStep: STEP_NAMES[activeStep],
+    // });
     setShowSuccessDialog(true);
   };
 
@@ -112,7 +115,7 @@ function ApplicationContent() {
 
   const handleSuccessDialogContinue = () => {
     setShowSuccessDialog(false);
-    goToStep(1);
+    setActiveStep(activeStep + 1);
   };
 
   if (isLoading) {
@@ -152,8 +155,8 @@ function ApplicationContent() {
       </div>
       <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <SuccessDialogContent
-          title="Title"
-          description="You have successfully completed Profile & Pre-Screening. Click 'next' to go to the next phase."
+          title={`Stage ${activeStep + 1} Submitted`}
+          description={`You have successfully completed ${STEP_TITLES[activeStep]}. Click 'next' to go to the next phase.`}
           buttonText="Appointment"
           onButtonClick={handleSuccessDialogContinue}
         />

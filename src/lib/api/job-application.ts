@@ -85,7 +85,7 @@ export const submitPreScreening = async (data: PreScreeningData): Promise<ApiRes
  */
 export interface ApplicationStatus {
     hasStarted: boolean;
-    currentStep: number | null;
+    currentStep: string | null;
     status: 'not_started' | 'in_progress' | 'submitted' | 'under_review' | 'approved' | 'rejected' | null;
 }
 
@@ -96,6 +96,7 @@ export interface ApplicationStatusResponse {
     success: boolean;
     status: ApplicationStatus;
     message?: string;
+    error?: string;
 }
 
 /**
@@ -111,6 +112,32 @@ export const getApplicationStatus = async (): Promise<ApplicationStatusResponse>
         return response.data;
     } catch (error) {
         console.error('Failed to fetch application status:', error);
+        throw error;
+    }
+};
+
+export interface UpdateApplicationStatusRequest {
+    status?: 'not_started' | 'in_progress' | 'submitted' | 'under_review' | 'approved' | 'rejected';
+    currentStep?: string;
+}
+
+export interface UpdateApplicationStatusResponse {
+    status: string;
+    currentStep: string;
+}
+
+export const updateApplicationStatus = async (
+    data: UpdateApplicationStatusRequest
+): Promise<UpdateApplicationStatusResponse> => {
+    try {
+        const response = await axiosClient.put<UpdateApplicationStatusResponse>(
+            `${JOB_APPLICATION_BASE_CAMEL}/status`,
+            data
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to update application status:', error);
         throw error;
     }
 };

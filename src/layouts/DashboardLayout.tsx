@@ -51,7 +51,7 @@ function HeaderActionButton({ icon: Icon, ariaLabel }: { icon: ComponentType<{ c
   );
 }
 
-export function Header({ actions }: { actions?: ReactNode }) {
+export function Header({ actions, userName }: { actions?: ReactNode; userName?: string }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   return (
@@ -72,7 +72,7 @@ export function Header({ actions }: { actions?: ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <div className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer">
                   <img src="/src/assets/icons/images/user-profile-image.png" alt="User profile" className="h-[34px] w-[34px] rounded-full object-cover" />
-                  <p className="pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a]">Nola Hawkins</p>
+                  <p className="pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a]">{userName || 'User'}</p>
                   {isDropdownOpen ? (
                     <ChevronUp className="h-4 w-4 text-[#808081] mr-2" />
                   ) : (
@@ -152,11 +152,7 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
   const reduxUser = useSelector((state: RootState) => state.auth?.user);
 
   useEffect(() => {
-    console.log('[DashboardLayout] Auth check:', { 
-      user: user?.email, 
-      loading,
-      reduxUser: reduxUser?.email 
-    });
+    console.log('[DashboardLayout] Auth check:', user, reduxUser);
   }, [user, loading, reduxUser]);
 
   if (loading) {
@@ -172,7 +168,7 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
   console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
   return (
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
-      <Header />
+      <Header userName={user?.fullName} />
       <Sidebar />
       <main className="ml-[240px] pt-[130px] pb-10">
         <div className="px-8">{children ?? <Outlet />}</div>
