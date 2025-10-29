@@ -1,6 +1,7 @@
-import { lazy } from "react";
+import { Component, lazy } from "react";
 import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
+import path from "path/win32";
 
 // Lazy load all components for better performance and code splitting
 const SplashScreen = lazy(() => import("@/pages/splash"));
@@ -22,6 +23,10 @@ export const router = createBrowserRouter([
     Component: SplashScreen,
   },
   {
+    path: `${Routes.onboarding}/*`,
+    Component: OnboardingPage,
+  },
+  {
     path: Routes.root,
     Component: AppLayout,
     children: [
@@ -36,10 +41,6 @@ export const router = createBrowserRouter([
       {
         path: Routes.forgotPassword,
         Component: ForgotPasswordPage,
-      },
-      {
-        path: Routes.onboarding,
-        Component: OnboardingPage,
       },
     ],
   },
