@@ -51,7 +51,7 @@ function HeaderActionButton({ icon: Icon, ariaLabel }: { icon: ComponentType<{ c
   );
 }
 
-export function Header({ actions, userName }: { actions?: ReactNode; userName?: string }) {
+export function Header({ actions, userName, onLogout }: { actions?: ReactNode; userName?: string; onLogout?: () => void }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   return (
@@ -92,8 +92,12 @@ export function Header({ actions, userName }: { actions?: ReactNode; userName?: 
                   <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
+                <DropdownMenuItem 
+                  variant="destructive" 
+                  onClick={onLogout}
+                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                >
+                  <LogOut className="mr-2 h-4 w-4 text-red-600" />
                   <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -148,12 +152,20 @@ export function Sidebar({ footer }: { footer?: ReactNode }) {
 }
 
 export default function DashboardLayout({ children }: { children?: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const navigate = useNavigate();
   const reduxUser = useSelector((state: RootState) => state.auth?.user);
 
-  useEffect(() => {
-    console.log('[DashboardLayout] Auth check:', user, reduxUser);
-  }, [user, loading, reduxUser]);
+  const handleLogout = async () => {
+    try {
+      console.log('[DashboardLayout] Logging out...');
+      await logout();
+      console.log('[DashboardLayout] Logout successful, redirecting to login');
+      navigate(Routes.login, { replace: true });
+    } catch (error) {
+      console.error('[DashboardLayout] Logout failed:', error);
+    }
+  };
 
   if (loading) {
     console.log('[DashboardLayout] Still loading...');
@@ -168,7 +180,7 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
   console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
   return (
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
-      <Header userName={user?.fullName} />
+      <Header userName={user?.fullName} onLogout={handleLogout} />
       <Sidebar />
       <main className="ml-[240px] pt-[130px] pb-10">
         <div className="px-8">{children ?? <Outlet />}</div>
