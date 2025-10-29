@@ -78,7 +78,7 @@ const booleanQuestionsDefaults = BOOLEAN_QUESTIONS.reduce(
 );
 
 interface ProfilePreScreeningStepProps {
-  onNext: (data: ProfilePreScreeningFormValues) => void;
+  onNext: () => void;
 }
 
 export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningStepProps) {
@@ -147,7 +147,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         console.log('Pre-screening submitted successfully:', response);
         
         // Proceed to next step with form data
-        onNext(values);
+        onNext();
       } catch (error) {
         setUploadError('Failed to submit application. Please try again.');
         console.error('Error submitting pre-screening:', error);

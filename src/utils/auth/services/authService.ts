@@ -31,7 +31,7 @@ export function transformFirebaseUser(firebaseUser: FirebaseUser): User {
     email: firebaseUser.email || '',
     fullName: firebaseUser.displayName || '',
     emailVerified: firebaseUser.emailVerified,
-    createdAt: firebaseUser.metadata.creationTime 
+    createdAt: firebaseUser.metadata.creationTime
       ? new Date(firebaseUser.metadata.creationTime)
       : new Date(),
     updatedAt: new Date(),
@@ -54,9 +54,9 @@ export async function loginWithEmail(email: string, password: string): Promise<A
     }
   } catch (error: any) {
     console.error('Login error:', error)
-    
+
     let errorMessage = 'Failed to login'
-    
+
     // Handle Firebase auth errors
     switch (error.code) {
       case 'auth/invalid-email':
@@ -98,7 +98,7 @@ export async function registerWithEmail(fullName: string, email: string, passwor
 
     // Create user account
     const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-    
+
     // Update user profile with display name
     await updateProfile(userCredential.user, {
       displayName: fullName,
@@ -114,9 +114,9 @@ export async function registerWithEmail(fullName: string, email: string, passwor
     }
   } catch (error: any) {
     console.error('Registration error:', error)
-    
+
     let errorMessage = 'Failed to create account'
-    
+
     // Handle Firebase auth errors
     switch (error.code) {
       case 'auth/email-already-in-use':
@@ -145,15 +145,15 @@ export async function registerWithEmail(fullName: string, email: string, passwor
 export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
     await firebaseSendPasswordResetEmail(auth, email)
-    
+
     return {
       success: true,
     }
   } catch (error: any) {
     console.error('Password reset error:', error)
-    
+
     let errorMessage = 'Failed to send reset email'
-    
+
     // Handle Firebase auth errors
     switch (error.code) {
       case 'auth/invalid-email':
@@ -193,7 +193,7 @@ export async function getCurrentUser(): Promise<User | null> {
     // Use Firebase auth state observer
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
       unsubscribe()
-      
+
       if (firebaseUser) {
         resolve(transformFirebaseUser(firebaseUser))
       } else {
@@ -212,7 +212,7 @@ export async function getCurrentUser(): Promise<User | null> {
  */
 export async function getIdToken(forceRefresh = false): Promise<string | null> {
   const user = auth.currentUser
-  
+
   if (!user) {
     return null
   }

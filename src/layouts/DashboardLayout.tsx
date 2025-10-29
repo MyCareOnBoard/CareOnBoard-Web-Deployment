@@ -51,7 +51,7 @@ function HeaderActionButton({ icon: Icon, ariaLabel }: { icon: ComponentType<{ c
   );
 }
 
-export function Header({ actions }: { actions?: ReactNode }) {
+export function Header({ actions, userName, onLogout }: { actions?: ReactNode; userName?: string; onLogout?: () => void }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   return (
@@ -72,7 +72,7 @@ export function Header({ actions }: { actions?: ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <div className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer">
                   <img src="/src/assets/icons/images/user-profile-image.png" alt="User profile" className="h-[34px] w-[34px] rounded-full object-cover" />
-                  <p className="pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a]">Nola Hawkins</p>
+                  <p className="pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a]">{userName || 'User'}</p>
                   {isDropdownOpen ? (
                     <ChevronUp className="h-4 w-4 text-[#808081] mr-2" />
                   ) : (
@@ -92,8 +92,12 @@ export function Header({ actions }: { actions?: ReactNode }) {
                   <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={onLogout}
+                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                >
+                  <LogOut className="mr-2 h-4 w-4 text-red-600" />
                   <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -148,16 +152,20 @@ export function Sidebar({ footer }: { footer?: ReactNode }) {
 }
 
 export default function DashboardLayout({ children }: { children?: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const navigate = useNavigate();
   const reduxUser = useSelector((state: RootState) => state.auth?.user);
 
-  useEffect(() => {
-    console.log('[DashboardLayout] Auth check:', {
-      user: user?.email,
-      loading,
-      reduxUser: reduxUser?.email
-    });
-  }, [user, loading, reduxUser]);
+  const handleLogout = async () => {
+    try {
+      console.log('[DashboardLayout] Logging out...');
+      await logout();
+      console.log('[DashboardLayout] Logout successful, redirecting to login');
+      navigate(Routes.login, { replace: true });
+    } catch (error) {
+      console.error('[DashboardLayout] Logout failed:', error);
+    }
+  };
 
   if (loading) {
     console.log('[DashboardLayout] Still loading...');
@@ -172,7 +180,7 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
   console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
   return (
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
-      <Header />
+      <Header userName={user?.fullName} onLogout={handleLogout} />
       <Sidebar />
       <main className="ml-[240px] pt-[130px] pb-10">
         <div className="px-8">{children ?? <Outlet />}</div>

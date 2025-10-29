@@ -14,7 +14,7 @@ import type { Step } from "./types";
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getApplicationStatus, type ApplicationStatus } from "@/lib/api/job-application";
+import { getApplicationStatus, updateApplicationStatus, type ApplicationStatus } from "@/lib/api/job-application";
 import { useAuth } from "@/utils/auth";
 
 const STEP_TITLES = [
@@ -25,9 +25,10 @@ const STEP_TITLES = [
   "Official Hire & Orientation",
 ];
 
+const STEP_NAMES = ["profile", "eligibility", "compliance", "review", "orientation"];
+
 const STEP_POINT = [5, 30, 56, 76, 95];
 
-// Loading component
 function ApplicationLoading() {
   return (
     <div className="flex min-h-[400px] items-center justify-center">
@@ -39,7 +40,6 @@ function ApplicationLoading() {
   );
 }
 
-// Main application content
 function ApplicationContent() {
   const { user } = useAuth();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -48,9 +48,7 @@ function ApplicationContent() {
   const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
   const progressValue = useMemo(() => STEP_POINT[activeStep], [activeStep]);
 
-  // Fetch application status only when user is authenticated
   useEffect(() => {
-    // Don't fetch if user is not loaded yet
     if (!user) {
       setIsLoading(false);
       return;
@@ -61,15 +59,17 @@ function ApplicationContent() {
         setIsLoading(true);
         const response = await getApplicationStatus();
         console.log('Application status:', response);
-        setApplicationStatus(response.data);
+        setApplicationStatus(response.status);
 
-        // Set active step based on current step from API
-        if (response.data.currentStep !== undefined) {
-          setActiveStep(response.data.currentStep);
+        if (!response.status.hasStarted) {
+          setActiveStep(0);
+        } else if (response.status.currentStep !== null) {
+          setActiveStep(STEP_NAMES.indexOf(response.status.currentStep));
+        } else {
+          setActiveStep(0);
         }
       } catch (error) {
         console.error('Error fetching application status:', error);
-        // Continue with default state if fetch fails
       } finally {
         setIsLoading(false);
       }
@@ -87,7 +87,11 @@ function ApplicationContent() {
     [activeStep]
   );
 
-  const handleNext = (_data: ProfilePreScreeningFormValues) => {
+  const handleNext = async () => {
+    // await updateApplicationStatus({
+    //   status: "submitted",
+    //   currentStep: STEP_NAMES[activeStep],
+    // });
     setShowSuccessDialog(true);
   };
 
@@ -103,18 +107,17 @@ function ApplicationContent() {
 
   const stepComponents = [
     <ProfilePreScreeningStep key="profile" onNext={handleNext} />,
-    <DocumentUploadStep key="documents" onBack={() => goToStep(0)} onNext={() => goToStep(2)} />,
-    <ConditionalHireStep key="conditional" onBack={() => goToStep(1)} onNext={() => goToStep(3)} />,
-    <FinalReviewStep key="review" onBack={() => goToStep(2)} onNext={() => goToStep(4)} />,
-    <OrientationStep key="orientation" onBack={() => goToStep(3)} onNext={() => goToStep(4)} />,
+    <DocumentUploadStep key="documents" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
+    <ConditionalHireStep key="conditional" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
+    <FinalReviewStep key="review" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
+    <OrientationStep key="orientation" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
   ];
 
   const handleSuccessDialogContinue = () => {
     setShowSuccessDialog(false);
-    goToStep(1);
+    setActiveStep(activeStep + 1);
   };
 
-  // Show loading state while fetching application status
   if (isLoading) {
     return <ApplicationLoading />;
   }
@@ -152,8 +155,8 @@ function ApplicationContent() {
       </div>
       <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <SuccessDialogContent
-          title="Title"
-          description="You have successfully completed Profile & Pre-Screening. Click 'next' to go to the next phase."
+          title={`Stage ${activeStep + 1} Submitted`}
+          description={`You have successfully completed ${STEP_TITLES[activeStep]}. Click 'next' to go to the next phase.`}
           buttonText="Appointment"
           onButtonClick={handleSuccessDialogContinue}
         />
@@ -162,7 +165,6 @@ function ApplicationContent() {
   );
 }
 
-// Wrapper component with Suspense
 export default function ApplicationStepper() {
   return (
     <Suspense fallback={<ApplicationLoading />}>

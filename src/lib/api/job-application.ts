@@ -6,10 +6,13 @@
 import axiosClient from '../axios';
 import { ApiResponse } from '../api-types';
 
+// API endpoint constants
+const JOB_APPLICATION_BASE = '/job-application';
+const JOB_APPLICATION_BASE_CAMEL = '/jobApplication';
+
 export interface ResumeUploadResponse {
     fileUrl: string;
     fileName: string;
-    fileSize: number;
     uploadedAt: string;
 }
 
@@ -24,7 +27,7 @@ export const uploadResume = async (file: File): Promise<ApiResponse<ResumeUpload
         formData.append('file', file);
 
         const response = await axiosClient.post<ApiResponse<ResumeUploadResponse>>(
-            '/job-application/upload-resume',
+            `${JOB_APPLICATION_BASE}/upload-resume`,
             formData,
             {
                 headers: {
@@ -66,7 +69,7 @@ export interface PreScreeningData {
 export const submitPreScreening = async (data: PreScreeningData): Promise<ApiResponse<any>> => {
     try {
         const response = await axiosClient.post<ApiResponse<any>>(
-            '/job-application/pre-screening',
+            `${JOB_APPLICATION_BASE}/pre-screening`,
             data
         );
 
@@ -81,26 +84,60 @@ export const submitPreScreening = async (data: PreScreeningData): Promise<ApiRes
  * Application status response structure
  */
 export interface ApplicationStatus {
-    applicationId?: string;
-    status: 'not_started' | 'in_progress' | 'submitted' | 'under_review' | 'approved' | 'rejected';
-    currentStep?: number;
-    completedSteps?: string[];
-    lastUpdated?: string;
+    hasStarted: boolean;
+    currentStep: string | null;
+    status: 'not_started' | 'in_progress' | 'submitted' | 'under_review' | 'approved' | 'rejected' | null;
+}
+
+/**
+ * Application status API response (uses 'status' field instead of 'data')
+ */
+export interface ApplicationStatusResponse {
+    success: boolean;
+    status: ApplicationStatus;
+    message?: string;
+    error?: string;
 }
 
 /**
  * Get current application status
  * @returns Promise with application status data
  */
-export const getApplicationStatus = async (): Promise<ApiResponse<ApplicationStatus>> => {
+export const getApplicationStatus = async (): Promise<ApplicationStatusResponse> => {
     try {
-        const response = await axiosClient.get<ApiResponse<ApplicationStatus>>(
-            '/job-application/status'
+        const response = await axiosClient.get<ApplicationStatusResponse>(
+            `${JOB_APPLICATION_BASE_CAMEL}/status`
         );
 
         return response.data;
     } catch (error) {
         console.error('Failed to fetch application status:', error);
+        throw error;
+    }
+};
+
+export interface UpdateApplicationStatusRequest {
+    status?: 'not_started' | 'in_progress' | 'submitted' | 'under_review' | 'approved' | 'rejected';
+    currentStep?: string;
+}
+
+export interface UpdateApplicationStatusResponse {
+    status: string;
+    currentStep: string;
+}
+
+export const updateApplicationStatus = async (
+    data: UpdateApplicationStatusRequest
+): Promise<UpdateApplicationStatusResponse> => {
+    try {
+        const response = await axiosClient.put<UpdateApplicationStatusResponse>(
+            `${JOB_APPLICATION_BASE_CAMEL}/status`,
+            data
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to update application status:', error);
         throw error;
     }
 };
@@ -113,7 +150,7 @@ export const getApplicationStatus = async (): Promise<ApiResponse<ApplicationSta
 export const submitJobApplication = async (applicationData: any): Promise<ApiResponse<any>> => {
     try {
         const response = await axiosClient.post<ApiResponse<any>>(
-            '/job-application/submit',
+            `${JOB_APPLICATION_BASE}/submit`,
             applicationData
         );
 
