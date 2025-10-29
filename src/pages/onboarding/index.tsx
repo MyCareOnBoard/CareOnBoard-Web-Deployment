@@ -1,12 +1,13 @@
 import React from "react";
-import { Routes, Route, useNavigate } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router";
 import OnboardingSlider from "./components/OnboardingSlider";
 import VerifyEmail from "./VerifyEmail";
 import VerifyOTP from "./VerifyOTP";
 import SuccessMessage from "./components/SuccessMessage";
+import { Routes as AppRoutes } from "@/routes/constants";
 
 export default function OnboardingPage() {
-  const nav = useNavigate();
+  const navigate = useNavigate();
 
   return (
     <Routes>
@@ -22,7 +23,7 @@ export default function OnboardingPage() {
           <SuccessMessage
             title="Email Verification Complete!"
             buttonText="Continue to Dashboard"
-            onButtonClick={() => nav("/dashboard")}
+            onButtonClick={() => navigate(AppRoutes.dashboard)}
           />
         }
       />

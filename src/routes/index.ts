@@ -23,7 +23,7 @@ export const router = createBrowserRouter([
     Component: SplashScreen,
   },
   {
-    path: `${Routes.onboarding}/*`,
+    path: Routes.onboarding,
     Component: OnboardingPage,
   },
   {
