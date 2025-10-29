@@ -105,7 +105,7 @@ export default function LoginPage() {
         title: "Success",
         description: "Logged in successfully",
       })
-      navigate(Routes.application)
+      navigate(Routes.dashboard)
     } catch (error: any) {
       toast({
         title: "Error",
