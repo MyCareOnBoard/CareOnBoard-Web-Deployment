@@ -165,12 +165,12 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-[33px]">
-        <div className="flex gap-[50px]">
+        <div className="flex flex-wrap gap-[50px]">
           <FormField
             control={form.control}
             name="fullName"
             render={({ field }) => (
-              <div className="w-[353px]">
+              <div className="w-[300px]">
                 <FormItem className="space-y-2">
                   <FormLabel className="text-xs font-normal text-[#10141a]">Full Name</FormLabel>
                   <FormControl className="mb-0">
@@ -205,7 +205,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
               const formattedDob = field.value ? format(field.value, "MMMM d, yyyy") : "";
 
               return (
-                <div className="w-[353px]">
+                <div className="w-[300px]">
                   <FormItem className="space-y-2">
                     <FormLabel className="text-xs font-normal text-[#10141a]">Date of birth</FormLabel>
                     <Popover open={isDobOpen} onOpenChange={setIsDobOpen}>
@@ -226,7 +226,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                           </button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent align="start" className="mt-3 w-[353px] border-none bg-white p-0 shadow-none">
+                      <PopoverContent align="start" className="mt-3 w-[300px] border-none bg-white p-0 shadow-none">
                         <Calendar
                           mode="single"
                           className="bg-white"
@@ -262,12 +262,12 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
             }}
           />
         </div>
-
+        
         <FormField
           control={form.control}
           name="address"
           render={({ field }) => (
-            <div className="w-[353px]">
+            <div className="w-[300px]">
               <FormItem className="space-y-2">
                 <FormLabel className="text-xs font-normal text-[#10141a]">Address</FormLabel>
                 <FormControl className="mb-0">
