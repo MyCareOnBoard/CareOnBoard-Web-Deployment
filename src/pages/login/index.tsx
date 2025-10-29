@@ -105,7 +105,7 @@ export default function LoginPage() {
         title: "Success",
         description: "Logged in successfully",
       })
-      navigate(Routes.dashboard)
+      navigate("/onboarding")
     } catch (error: any) {
       toast({
         title: "Error",
@@ -122,7 +122,7 @@ export default function LoginPage() {
       {/* Page Header */}
       <div className="space-y-2">
         <h2 className="text-3xl font-bold text-gray-900">Login to account</h2>
-        <p className="text-gray-500 text-sm">Please enter your information to access your account</p>
+        <p className="text-sm text-gray-500">Please enter your information to access your account</p>
       </div>
 
       {/* Login Form */}
@@ -172,7 +172,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-900"
+              className="absolute text-gray-600 -translate-y-1/2 right-4 top-1/2 hover:text-gray-900"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -218,7 +218,7 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-gray-600 pt-2">
+      <p className="pt-2 text-sm text-center text-gray-600">
         Don't have an account?{" "}
         <Link to="/signup" className="text-[#00B4B8] hover:text-[#148a9c] font-semibold">
           Sign Up

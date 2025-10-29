@@ -5,12 +5,14 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[60px] text-sm font-semibold leading-[1.4] transition-all duration-200 cursor-pointer disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-5 shrink-0 px-4 h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[60px] text-sm font-semibold leading-[1.4] transition-all duration-200 cursor-pointer disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-5 shrink-0 px-4 h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer",
   {
     variants: {
       variant: {
         default:
           "bg-[#00b4b8] text-white hover:bg-[#00a0a4] active:bg-[#008f93]",
+                   default_full:
+          "bg-[#00B4B8] text-white hover:bg-[#029a9c] active:bg-[#029a9c] w-full",
         destructive:
           "bg-[#ff4d4d] text-white hover:bg-[#ff6161] active:bg-[#ff7575] [&>svg]:text-white",
         outline:
