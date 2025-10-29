@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import { getIdToken } from '@/utils/auth';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -10,8 +11,9 @@ const axiosClient: AxiosInstance = axios.create({
 });
 
 axiosClient.interceptors.request.use(
-    (config: InternalAxiosRequestConfig) => {
-        const token = localStorage.getItem('authToken');
+    async (config: InternalAxiosRequestConfig) => {
+        // Get Firebase ID token
+        const token = await getIdToken();
 
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -31,11 +33,11 @@ axiosClient.interceptors.response.use(
     (response: AxiosResponse) => {
         return response;
     },
-    (error: AxiosError) => {
+    async (error: AxiosError) => {
         if (error.response) {
             switch (error.response.status) {
                 case 401:
-                    localStorage.removeItem('authToken');
+                    // Token expired or invalid - redirect to login
                     window.location.href = '/login';
                     break;
                 case 403:
@@ -60,16 +62,27 @@ axiosClient.interceptors.response.use(
     }
 );
 
+/**
+ * @deprecated Use getIdToken from '@/utils/auth' instead
+ * Firebase handles token management automatically
+ */
 export const setAuthToken = (token: string): void => {
-    localStorage.setItem('authToken', token);
+    console.warn('setAuthToken is deprecated. Firebase manages tokens automatically.');
 };
 
+/**
+ * @deprecated Firebase handles token management automatically
+ */
 export const removeAuthToken = (): void => {
-    localStorage.removeItem('authToken');
+    console.warn('removeAuthToken is deprecated. Use logout from auth context instead.');
 };
 
-export const getAuthToken = (): string | null => {
-    return localStorage.getItem('authToken');
+/**
+ * @deprecated Use getIdToken from '@/utils/auth' instead
+ */
+export const getAuthToken = (): Promise<string | null> => {
+    console.warn('getAuthToken is deprecated. Use getIdToken from @/utils/auth instead.');
+    return getIdToken();
 };
 
 export const setEnvironment = (env: string): void => {

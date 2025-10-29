@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useAuth } from "@/utils/auth"
 import { useToast } from "@/hooks/use-toast"
 import { ButtonLoader } from "@/components/ui/loader"
+import { Routes } from "@/routes/constants"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
