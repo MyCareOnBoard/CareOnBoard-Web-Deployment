@@ -92,8 +92,8 @@ export function Header({ actions, userName, onLogout }: { actions?: ReactNode; u
                   <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  variant="destructive" 
+                <DropdownMenuItem
+                  variant="destructive"
                   onClick={onLogout}
                   className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
                 >

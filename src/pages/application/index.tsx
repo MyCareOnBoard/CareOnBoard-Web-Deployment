@@ -60,7 +60,7 @@ function ApplicationContent() {
         const response = await getApplicationStatus();
         console.log('Application status:', response);
         setApplicationStatus(response.status);
-        
+
         if (!response.status.hasStarted) {
           setActiveStep(0);
         } else if (response.status.currentStep !== null) {
@@ -131,10 +131,10 @@ function ApplicationContent() {
           <span>Cancel Application Form</span>
         </Button>
       </div>
-      <div className="overflow-x-auto">
-        <div className="min-w-[1161px] pe-4">
-          <div className="mb-[44px]">
-            <div className="mb-5 flex items-center justify-between text-sm leading-[1.4]">
+      <div>
+        <div className="pe-4">
+          <div className="mb-[44px] pb-3 scrollbar-hide overflow-x-auto">
+            <div className="min-w-[100vw] mb-5 flex items-center justify-between text-sm leading-[1.4]">
               {steps.map((step) => (
                 <span
                   key={step.title}
