@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, useNavigate } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router";
 import OnboardingSlider from "./components/OnboardingSlider";
 import VerifyEmail from "./VerifyEmail";
 import VerifyOTP from "./VerifyOTP";

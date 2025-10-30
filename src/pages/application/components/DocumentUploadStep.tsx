@@ -28,30 +28,37 @@ export default function DocumentUploadStep({onBack, onNext}: DocumentUploadStepP
     {
       id: "photo-id",
       label: "Photo ID (Driver’s License, State ID, Passport)",
+      placeholder: "Upload your photo ID"
     },
     {
       id: "social-security",
       label: "Social Security Card or valid work permit.",
+      placeholder: "Upload social security card"
     },
     {
       id: "high-school",
       label: "High School Diploma/GED certificate.",
+      placeholder: "Upload high school certificate"
     },
     {
       id: "relevant-certificate",
       label: "Any relevant certifications (e.g., CPR, First Aid — optional at this stage).",
+      placeholder: "Upload any certificate"
     },
     {
       id: "hepatitis-b-vaccination",
       label: "Hepatitis B vaccination series documents.",
+      placeholder: "Upload Hepatitis B vaccination series documents."
     },
     {
       id: "hepatitis-b-immunity",
       label: "Hepatitis B immunity (titer result)",
+      placeholder: "Upload Hepatitis B immunity (titer result)"
     },
     {
       id: "tb-test",
       label: "TB test result.",
+      placeholder: "Upload TB test result"
     }
   ]
 
@@ -63,7 +70,7 @@ export default function DocumentUploadStep({onBack, onNext}: DocumentUploadStepP
           <FileUpload
             name={file.id}
             className="h-[90px] w-full max-w-[100vw]"
-            label={selectedFileName ?? "Upload your resume"}
+            label={selectedFileName ?? file.placeholder}
             accept=".pdf,.doc,.docx"
             onBlur={onBlur}
             onChange={(event) => {

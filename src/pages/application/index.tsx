@@ -43,7 +43,7 @@ function ApplicationLoading() {
 function ApplicationContent() {
   const { user } = useAuth();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
   const progressValue = useMemo(() => STEP_POINT[activeStep], [activeStep]);

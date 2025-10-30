@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import LogoHeader from './components/LogoHeader'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -25,7 +25,7 @@ export default function VerifyEmail(){
           </span>
         </div>
         <div className="min-h-[420px] flex flex-col items-center p-20 text-center bg-white shadow-2xl rounded-2xl gap-y-2">
-          <LogoHeader />    
+          <LogoHeader />
           <h3 className="mb-2 text-2xl font-semibold">Congratulations! You have completed onboarding session.</h3>
           <p className="mb-4 font-bold text-gray-600 bg-bold">Now Verify your Email</p>
           <Input aria-label='Email Address' value={email} onChange={(e:any)=>setEmail(e.target.value)} placeholder="you@example.com" className="w-full max-w-md py-2 text-center border rounded-xl" />
@@ -36,7 +36,7 @@ export default function VerifyEmail(){
         </div>
         <div className="flex justify-center my-3">
           <Button variant="outline" onClick={() => nav(-1)}>Back</Button>
-        </div>  
+        </div>
       </div>
     </div>
 
