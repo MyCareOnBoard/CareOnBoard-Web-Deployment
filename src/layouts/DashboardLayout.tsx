@@ -172,12 +172,13 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
     return <PageLoader text="Checking authentication..." />;
   }
 
-  if (!user) {
-    console.log('[DashboardLayout] No user, redirecting to login');
-    return <Navigate to={Routes.login} replace />;
-  }
+  useEffect(() => {
+    if (!user) {
+      console.log('[DashboardLayout] No user, redirecting to login');
+      navigate(Routes.login, { replace: true });
+    }
+  }, [user]);
 
-  console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
   return (
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
       <Header userName={user?.fullName} onLogout={handleLogout} />

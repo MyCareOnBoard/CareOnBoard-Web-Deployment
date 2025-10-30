@@ -7,11 +7,11 @@ import axiosClient from '../axios';
 import { ApiResponse } from '../api-types';
 
 // API endpoint constants
-const JOB_APPLICATION_BASE = '/job-application';
-const JOB_APPLICATION_BASE_CAMEL = '/jobApplication';
+const JOB_APPLICATION_BASE = '/jobApplication';
+const JOB_APPLICATION_UPLOADS_BASE = '/uploads';
 
 export interface ResumeUploadResponse {
-    fileUrl: string;
+    url: string;
     fileName: string;
     uploadedAt: string;
 }
@@ -27,7 +27,7 @@ export const uploadResume = async (file: File): Promise<ApiResponse<ResumeUpload
         formData.append('file', file);
 
         const response = await axiosClient.post<ApiResponse<ResumeUploadResponse>>(
-            `${JOB_APPLICATION_BASE}/uploads/resume`,
+            `${JOB_APPLICATION_UPLOADS_BASE}/resume`,
             formData,
             {
                 headers: {
@@ -106,7 +106,7 @@ export interface ApplicationStatusResponse {
 export const getApplicationStatus = async (): Promise<ApplicationStatusResponse> => {
     try {
         const response = await axiosClient.get<ApplicationStatusResponse>(
-            `${JOB_APPLICATION_BASE_CAMEL}/status`
+            `${JOB_APPLICATION_BASE}/status`
         );
 
         return response.data;
@@ -117,7 +117,7 @@ export const getApplicationStatus = async (): Promise<ApplicationStatusResponse>
 };
 
 export interface UpdateApplicationStatusRequest {
-    status?: 'not_started' | 'in_progress' | 'submitted' | 'under_review' | 'approved' | 'rejected';
+    status?: 'incomplete' | 'pre-screening_complete' | 'eligibility_pending' | 'eligibility_complete' | 'submitted' | 'under_review' | 'approved' | 'rejected';
     currentStep?: string;
 }
 
@@ -131,7 +131,7 @@ export const updateApplicationStatus = async (
 ): Promise<UpdateApplicationStatusResponse> => {
     try {
         const response = await axiosClient.put<UpdateApplicationStatusResponse>(
-            `${JOB_APPLICATION_BASE_CAMEL}/status`,
+            `${JOB_APPLICATION_BASE}/status`,
             data
         );
 

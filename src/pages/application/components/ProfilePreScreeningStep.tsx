@@ -115,7 +115,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         try {
           const uploadResponse = await uploadResume(file);
           console.log('Resume uploaded successfully:', uploadResponse);
-          resumeUrl = uploadResponse.data.fileUrl;
+          resumeUrl = uploadResponse.data.url;
         } catch (error) {
           setUploadError('Failed to upload resume. Please try again.');
           return; // Don't proceed if upload fails
@@ -176,7 +176,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                   <FormControl className="mb-0">
                     <Input placeholder="Enter full name" {...field} />
                   </FormControl>
-                  <FormMessage className="text-xs" />
+                  <FormMessage className="text-xs text-[#d53411]" />
                 </FormItem>
               </div>
             )}
@@ -192,7 +192,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                   <FormControl className="mb-0">
                     <Input placeholder="Enter your email" type="email" {...field} />
                   </FormControl>
-                  <FormMessage className="text-xs" />
+                  <FormMessage className="text-xs text-[#d53411]" />
                 </FormItem>
               </div>
             )}
@@ -255,7 +255,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                         />
                       </PopoverContent>
                     </Popover>
-                    <FormMessage className="text-xs" />
+                    <FormMessage className="text-xs text-[#d53411]" />
                   </FormItem>
                 </div>
               );
@@ -271,7 +271,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                   <FormControl className="mb-0">
                     <Input placeholder="Enter Address" {...field} />
                   </FormControl>
-                  <FormMessage className="text-xs" />
+                  <FormMessage className="text-xs text-[#d53411]" />
                 </FormItem>
               </div>
             )}
@@ -349,7 +349,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                     </div>
                   </fieldset>
                   {fieldState.error ? (
-                    <p className="mt-1 text-xs text-destructive">{fieldState.error.message}</p>
+                    <p className="mt-1 text-xs text-[#d53411]">{fieldState.error.message}</p>
                   ) : null}
                 </div>
               )}
@@ -381,8 +381,8 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                     }}
                   />
                 </FormControl>
-                {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
-                <FormMessage className="text-xs" />
+                {uploadError && <p className="text-xs text-[#d53411]">{uploadError}</p>}
+                <FormMessage className="text-xs text-[#d53411]" />
               </FormItem>
             );
           }}
