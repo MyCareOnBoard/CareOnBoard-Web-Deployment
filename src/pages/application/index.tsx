@@ -88,21 +88,11 @@ function ApplicationContent() {
   );
 
   const handleNext = async () => {
-    // await updateApplicationStatus({
-    //   status: "submitted",
-    //   currentStep: STEP_NAMES[activeStep],
-    // });
-    setShowSuccessDialog(true);
-  };
-
-  const goToStep = (index: number) => {
-    setActiveStep((previous) => {
-      const clampedIndex = Math.max(0, Math.min(index, STEP_TITLES.length - 1));
-      if (clampedIndex === previous) {
-        return previous;
-      }
-      return clampedIndex;
+    updateApplicationStatus({
+      status: "submitted",
+      currentStep: STEP_NAMES[activeStep],
     });
+    setShowSuccessDialog(true);
   };
 
   const stepComponents = [
