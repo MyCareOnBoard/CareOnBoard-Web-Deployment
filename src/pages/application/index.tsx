@@ -42,7 +42,7 @@ function ApplicationLoading() {
 
 function ApplicationContent() {
   const { user } = useAuth();
-  const [showSuccessDialog, setShowSuccessDialog] = useState(true);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
