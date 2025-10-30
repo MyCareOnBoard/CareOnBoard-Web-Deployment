@@ -42,7 +42,7 @@ function ApplicationLoading() {
 
 function ApplicationContent() {
   const { user } = useAuth();
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(true);
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
@@ -157,7 +157,7 @@ function ApplicationContent() {
         <SuccessDialogContent
           title={`Stage ${activeStep + 1} Submitted`}
           description={`You have successfully completed ${STEP_TITLES[activeStep]}. Click 'next' to go to the next phase.`}
-          buttonText="Appointment"
+          buttonText="Next"
           onButtonClick={handleSuccessDialogContinue}
         />
       </SuccessDialog>

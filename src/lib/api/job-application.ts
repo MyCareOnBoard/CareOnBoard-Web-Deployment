@@ -27,7 +27,7 @@ export const uploadResume = async (file: File): Promise<ApiResponse<ResumeUpload
         formData.append('file', file);
 
         const response = await axiosClient.post<ApiResponse<ResumeUploadResponse>>(
-            `${JOB_APPLICATION_BASE}/upload-resume`,
+            `${JOB_APPLICATION_BASE}/uploads/resume`,
             formData,
             {
                 headers: {
