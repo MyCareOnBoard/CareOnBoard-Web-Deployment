@@ -29,7 +29,7 @@ const STEP_NAMES = ["profile", "eligibility", "compliance", "review", "orientati
 
 const STEP_COUNT = 5;
 const getProgressPercentage = (step: number) => {
-  return Math.min(100, Math.max(0, Math.round((step / (STEP_COUNT - 1)) * 100)));
+  return Math.min(100, Math.max(8, Math.round((step / (STEP_COUNT - 1)) * 95)));
 };
 
 function ApplicationLoading() {

@@ -7,6 +7,7 @@ import { PersistGate } from "redux-persist/integration/react";
 import {persistor, store} from "./store/redux/store";
 import { AuthProvider } from "@/utils/auth";
 import { Toaster } from "sonner";
+import "@fontsource/urbanist";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
