@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import {ComponentType, ReactNode, useEffect} from "react";
 import { useMemo, useState } from "react";
 import {Navigate, Outlet, useLocation, useNavigate} from "react-router";
 import { ChevronDown, ChevronUp, User, Settings, LogOut } from "lucide-react";
