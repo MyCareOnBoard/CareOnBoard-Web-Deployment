@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import SlideOne from "./SlideOne";
 import SlideTwo from "./SlideTwo";
 import SlideThree from "./SlideThree";

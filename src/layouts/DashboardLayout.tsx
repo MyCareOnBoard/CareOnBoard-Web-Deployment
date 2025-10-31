@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
-import { useMemo, useState, useEffect } from "react";
-import { Outlet, useLocation, useNavigate, Navigate } from "react-router";
+import { useMemo, useState } from "react";
+import {Navigate, Outlet, useLocation, useNavigate} from "react-router";
 import { ChevronDown, ChevronUp, User, Settings, LogOut } from "lucide-react";
 import { useSelector } from "react-redux";
 

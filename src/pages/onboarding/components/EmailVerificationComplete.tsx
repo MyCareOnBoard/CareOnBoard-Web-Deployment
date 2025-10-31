@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router"
 import { motion } from "framer-motion"
 import Confetti from "react-confetti"
 import { MailCheck } from "lucide-react"
-import { Button } from "../../../components/ui/button"
+import { Button } from "@/components/ui/button"
 import LogoHeader from "./LogoHeader"
 
 export default function EmailVerificationComplete() {

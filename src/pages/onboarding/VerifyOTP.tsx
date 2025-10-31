@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import LogoHeader from './components/LogoHeader'
 import { Input } from '@/components/ui/input'
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ export default function VerifyOTP() {
           </span>
         </div>
         <div className="min-h-[420px] flex flex-col items-center p-20 text-center bg-white shadow-2xl rounded-2xl gap-y-2">
-          <LogoHeader /> 
+          <LogoHeader />
         <h3 className="mb-2 text-4xl font-semibold">
           Congratulations! You have completed onboarding session.
         </h3>
@@ -80,6 +80,6 @@ export default function VerifyOTP() {
         </p>
       </div>
     </div>
-  </div> 
+  </div>
   );
 }
