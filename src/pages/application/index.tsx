@@ -27,7 +27,10 @@ const STEP_TITLES = [
 
 const STEP_NAMES = ["profile", "eligibility", "compliance", "review", "orientation"];
 
-const STEP_POINT = [5, 30, 56, 76, 95];
+const STEP_COUNT = 5;
+const getProgressPercentage = (step: number) => {
+  return Math.min(100, Math.max(0, Math.round((step / (STEP_COUNT - 1)) * 100)));
+};
 
 function ApplicationLoading() {
   return (
@@ -46,7 +49,7 @@ function ApplicationContent() {
   const [activeStep, setActiveStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
-  const progressValue = useMemo(() => STEP_POINT[activeStep], [activeStep]);
+  const progressValue = useMemo(() => getProgressPercentage(activeStep), [activeStep]);
 
   useEffect(() => {
     if (!user) {
@@ -148,7 +151,12 @@ function ApplicationContent() {
                 </span>
               ))}
             </div>
-            <Slider value={[progressValue]} max={100} icon={<UserIcon className="h-4 w-4 text-[#00b4b8] fill-[#00b4b8] stroke-[#00b4b8]" />} />
+            <Slider
+              value={[progressValue]}
+              max={100}
+              icon={<UserIcon className="h-4 w-4 text-[#00b4b8] fill-[#00b4b8] stroke-[#00b4b8]" />}
+              className={"min-w-[100vw]"}
+            />
           </div>
           {stepComponents[activeStep]}
         </div>
