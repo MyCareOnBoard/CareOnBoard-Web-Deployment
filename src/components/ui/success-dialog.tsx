@@ -51,11 +51,11 @@ const SuccessDialogContent = React.forwardRef<
       )}
       {...props}
     >
-      <div className="flex flex-col items-center gap-6">
+      <div className="flex flex-col items-center gap-[24px]">
         {/* Success Icon */}
-        <div className="relative h-[100px] w-[100px]">
+        <div className="relative inline-grid h-[100px] w-[100px] shrink-0">
           <div className="absolute inset-0 rounded-full bg-[#f0faf4]" />
-          <div className="absolute left-[14px] top-[14px] flex h-[72px] w-[72px] items-center justify-center rounded-full bg-[#0eaf52]">
+          <div className="absolute left-[14.5px] top-[14px] flex h-[72px] w-[72px] items-center justify-center rounded-full bg-[#0eaf52] overflow-hidden">
             <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none">
               <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -63,14 +63,14 @@ const SuccessDialogContent = React.forwardRef<
         </div>
 
         {/* Content */}
-        <div className="flex w-full flex-col gap-3 text-center">
+        <div className="flex w-full flex-col gap-[12px] text-center whitespace-pre-wrap">
           {title && (
-            <h2 className="text-base font-medium leading-[1.6] text-[#10141a]">
+            <p className="font-semibold text-[32px] leading-normal text-[#10141a]">
               {title}
-            </h2>
+            </p>
           )}
           {description && (
-            <p className="text-base font-medium leading-[1.6] text-[#808081]">
+            <p className="font-medium text-[16px] leading-[1.6] text-[#808081]">
               {description}
             </p>
           )}
@@ -80,8 +80,7 @@ const SuccessDialogContent = React.forwardRef<
         {/* Button */}
         {buttonText && (
           <Button 
-            className="w-full" 
-            size="lg"
+            className="w-full rounded-[60px] bg-[#00b4b8] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-white backdrop-blur-[22px] hover:bg-[#00a3a7]" 
             onClick={onButtonClick}
           >
             {buttonText}

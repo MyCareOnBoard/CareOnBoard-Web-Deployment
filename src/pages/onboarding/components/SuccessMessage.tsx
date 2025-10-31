@@ -1,23 +1,17 @@
 import { useEffect, useState } from "react";
+import {  useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
 import { MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LogoHeader from "./LogoHeader";
+import { Routes as AppRoutes } from "@/routes/constants";
 
-interface SuccessMessageProps {
-  title: string;
-  buttonText?: string;
-  onButtonClick?: () => void;
-}
 
-export default function SuccessMessage({
-  title = "Email Verified Successfully!",
-  buttonText = "Continue to Dashboard",
-  onButtonClick,
-}: SuccessMessageProps) {
+export default function SuccessMessage() {
   const [showConfetti, setShowConfetti] = useState(true);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  const navigate = useNavigate();
 
   useEffect(() => {
     const updateSize = () =>
@@ -63,9 +57,9 @@ export default function SuccessMessage({
           </div>
         </motion.div>
 
-        <h2 className="mb-2 text-2xl font-semibold text-gray-900">{title}</h2>
-        <Button className="w-full" onClick={onButtonClick}>
-          {buttonText}
+        <h2 className="mb-2 text-2xl font-semibold text-gray-900">Email Verified Successfully!</h2>
+        <Button className="w-full" onClick={() => navigate(AppRoutes.dashboard)}>
+          Continue to Dashboard
         </Button>
       </motion.div>
     </div>

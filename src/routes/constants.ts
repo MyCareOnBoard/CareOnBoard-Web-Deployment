@@ -10,4 +10,7 @@ export const Routes = {
   signup: "/signup",
   forgotPassword: "/forgot-password",
   onboarding: "/onboarding",
+  onboardingEmail: "/onboarding/email",
+  onboardingOTP: "/onboarding/otp",
+  onboardingSuccess: "/onboarding/success",
 };

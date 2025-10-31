@@ -115,7 +115,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         try {
           const uploadResponse = await uploadResume(file);
           console.log('Resume uploaded successfully:', uploadResponse);
-          resumeUrl = uploadResponse.data.fileUrl;
+          resumeUrl = uploadResponse.data.url;
         } catch (error) {
           setUploadError('Failed to upload resume. Please try again.');
           return; // Don't proceed if upload fails
@@ -165,7 +165,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-[33px]">
-        <div className="flex gap-[50px]">
+        <div className="flex flex-wrap gap-[50px]">
           <FormField
             control={form.control}
             name="fullName"
@@ -176,7 +176,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                   <FormControl className="mb-0">
                     <Input placeholder="Enter full name" {...field} />
                   </FormControl>
-                  <FormMessage className="text-xs" />
+                  <FormMessage className="text-xs text-[#d53411]" />
                 </FormItem>
               </div>
             )}
@@ -186,13 +186,13 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
             control={form.control}
             name="email"
             render={({ field }) => (
-              <div className="w-[354px]">
+              <div className="w-[353px]">
                 <FormItem className="space-y-2">
                   <FormLabel className="text-xs font-normal text-[#10141a]">Email</FormLabel>
                   <FormControl className="mb-0">
                     <Input placeholder="Enter your email" type="email" {...field} />
                   </FormControl>
-                  <FormMessage className="text-xs" />
+                  <FormMessage className="text-xs text-[#d53411]" />
                 </FormItem>
               </div>
             )}
@@ -255,29 +255,28 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                         />
                       </PopoverContent>
                     </Popover>
-                    <FormMessage className="text-xs" />
+                    <FormMessage className="text-xs text-[#d53411]" />
                   </FormItem>
                 </div>
               );
             }}
           />
+          <FormField
+            control={form.control}
+            name="address"
+            render={({ field }) => (
+              <div className="w-[353px]">
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-xs font-normal text-[#10141a]">Address</FormLabel>
+                  <FormControl className="mb-0">
+                    <Input placeholder="Enter Address" {...field} />
+                  </FormControl>
+                  <FormMessage className="text-xs text-[#d53411]" />
+                </FormItem>
+              </div>
+            )}
+          />
         </div>
-
-        <FormField
-          control={form.control}
-          name="address"
-          render={({ field }) => (
-            <div className="w-[353px]">
-              <FormItem className="space-y-2">
-                <FormLabel className="text-xs font-normal text-[#10141a]">Address</FormLabel>
-                <FormControl className="mb-0">
-                  <Input placeholder="Enter Address" {...field} />
-                </FormControl>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            </div>
-          )}
-        />
 
         <FormField
           control={form.control}
@@ -350,7 +349,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                     </div>
                   </fieldset>
                   {fieldState.error ? (
-                    <p className="mt-1 text-xs text-destructive">{fieldState.error.message}</p>
+                    <p className="mt-1 text-xs text-[#d53411]">{fieldState.error.message}</p>
                   ) : null}
                 </div>
               )}
@@ -382,8 +381,8 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                     }}
                   />
                 </FormControl>
-                {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
-                <FormMessage className="text-xs" />
+                {uploadError && <p className="text-xs text-[#d53411]">{uploadError}</p>}
+                <FormMessage className="text-xs text-[#d53411]" />
               </FormItem>
             );
           }}

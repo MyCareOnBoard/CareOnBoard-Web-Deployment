@@ -15,6 +15,9 @@ const ApplicationDashboard = lazy(() => import("@/pages/application"));
 const DocumentsPage = lazy(() => import("@/pages/documents"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
 const ForgotPasswordPage = lazy(() => import("@/pages/forgot-password"));
+const VerifyEmailPage = lazy(() => import("@/pages/onboarding/VerifyEmail"));
+const VerifyOTPPage = lazy(() => import("@/pages/onboarding/VerifyOTP"));
+const SuccessMessagePage = lazy(() => import("@/pages/onboarding/components/SuccessMessage"));
 
 export const router = createBrowserRouter([
   {
@@ -23,8 +26,22 @@ export const router = createBrowserRouter([
     Component: SplashScreen,
   },
   {
-    path: `${Routes.onboarding}/*`,
+    path: Routes.onboarding,
     Component: OnboardingPage,
+    children: [
+      {
+        path: Routes.onboardingEmail,
+        Component: VerifyEmailPage,
+      },
+      {
+        path: Routes.onboardingOTP,
+        Component: VerifyOTPPage,
+      },
+      {
+        path: Routes.onboardingSuccess,
+        Component: SuccessMessagePage,
+      },
+    ],
   },
   {
     path: Routes.root,

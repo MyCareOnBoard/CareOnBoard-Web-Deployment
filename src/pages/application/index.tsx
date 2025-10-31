@@ -52,17 +52,11 @@ function ApplicationContent() {
   const progressValue = useMemo(() => getProgressPercentage(activeStep), [activeStep]);
 
   useEffect(() => {
-    if (!user) {
-      setIsLoading(false);
-      return;
-    }
 
     const fetchApplicationStatus = async () => {
       try {
         setIsLoading(true);
         const response = await getApplicationStatus();
-        console.log('Application status:', response);
-        setApplicationStatus(response.status);
 
         if (!response.status.hasStarted) {
           setActiveStep(0);
@@ -91,21 +85,7 @@ function ApplicationContent() {
   );
 
   const handleNext = async () => {
-    // await updateApplicationStatus({
-    //   status: "submitted",
-    //   currentStep: STEP_NAMES[activeStep],
-    // });
     setShowSuccessDialog(true);
-  };
-
-  const goToStep = (index: number) => {
-    setActiveStep((previous) => {
-      const clampedIndex = Math.max(0, Math.min(index, STEP_TITLES.length - 1));
-      if (clampedIndex === previous) {
-        return previous;
-      }
-      return clampedIndex;
-    });
   };
 
   const stepComponents = [
@@ -117,6 +97,16 @@ function ApplicationContent() {
   ];
 
   const handleSuccessDialogContinue = () => {
+    
+    let status: 'incomplete' | 'pre-screening_complete' | 'eligibility_pending' | 'eligibility_complete' | 'submitted' | 'under_review' | 'approved' | 'rejected' = 'incomplete'
+
+    if (activeStep === 0) {
+      status = 'pre-screening_complete'
+    }
+    updateApplicationStatus({
+      status,
+      currentStep: STEP_NAMES[activeStep+1],
+    });
     setShowSuccessDialog(false);
     setActiveStep(activeStep + 1);
   };
@@ -137,15 +127,14 @@ function ApplicationContent() {
       <div>
         <div className="pe-4">
           <div className="mb-[44px] pb-3 scrollbar-hide overflow-x-auto">
-            <div className="min-w-[100vw] mb-5 flex items-center justify-between text-sm leading-[1.4]">
+            <div className="min-w-[100vw] mb-5 flex items-center text-sm leading-[1.4] justify-between">
               {steps.map((step) => (
                 <span
                   key={step.title}
                   className={cn(
-                    "text-center",
+                    "text-center whitespace-nowrap flex-1 min-w-fit px-2",
                     step.status === "complete" ? "font-medium text-[#10141a]" : "font-normal text-[#808081]"
                   )}
-                  style={{ width: "auto" }}
                 >
                   {step.title}
                 </span>
@@ -165,7 +154,7 @@ function ApplicationContent() {
         <SuccessDialogContent
           title={`Stage ${activeStep + 1} Submitted`}
           description={`You have successfully completed ${STEP_TITLES[activeStep]}. Click 'next' to go to the next phase.`}
-          buttonText="Appointment"
+          buttonText="Next"
           onButtonClick={handleSuccessDialogContinue}
         />
       </SuccessDialog>
