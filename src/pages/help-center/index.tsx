@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { submitQuestion, QuestionCategory } from "@/lib/api/help-center";
+import { useToast } from "@/hooks/use-toast";
 
 const faqData = [
   {
@@ -33,12 +35,45 @@ const faqData = [
 
 export default function HelpCenterPage() {
   const [question, setQuestion] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle question submission
-    console.log("Question submitted:", question);
-    setQuestion("");
+    
+    if (!question.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a question before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await submitQuestion({
+        question: question.trim(),
+        category: "general" as QuestionCategory,
+      });
+
+      if (response.success) {
+        toast({
+          title: "Success!",
+          description: response.message || "Your question has been submitted successfully. We'll get back to you soon.",
+        });
+        setQuestion("");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to submit your question. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -75,8 +110,8 @@ export default function HelpCenterPage() {
             onChange={(e) => setQuestion(e.target.value)}
             className="w-full"
           />
-          <Button type="submit" size="lg" className="w-full">
-            Send us
+          <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Sending..." : "Send us"}
           </Button>
         </form>
       </div>
