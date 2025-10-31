@@ -62,11 +62,11 @@ function ApplicationContent() {
         setApplicationStatus(response.status);
 
         if (!response.status.hasStarted) {
-          setActiveStep(0);
+          setActiveStep(1);
         } else if (response.status.currentStep !== null) {
           setActiveStep(STEP_NAMES.indexOf(response.status.currentStep));
         } else {
-          setActiveStep(0);
+          setActiveStep(1);
         }
       } catch (error) {
         console.error('Error fetching application status:', error);

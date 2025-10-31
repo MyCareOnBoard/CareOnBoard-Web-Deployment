@@ -80,6 +80,62 @@ export default function DocumentUploadStep({onBack, onNext}: DocumentUploadStepP
           />
         </div>
       )}
+      <div className={"mb-6"}>
+        <p className={"text-sm mb-2 flex items-center"}>
+          <span>Upload document</span>
+          <span className={"flex items-center gap-2"}>
+            <span>I-9 form</span>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M15.4168 5.76152L5.34501 15.8334L4.1665 14.6549L14.2383 4.58301L15.4168 5.76152Z"
+                    fill="#5993FF"/>
+              <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M5.8335 4.16699H15.8335V14.167H14.1668V5.83366H5.8335V4.16699Z"
+                    fill="#5993FF"/>
+              </svg>
+          </span>
+          <span>(Download the form, after filling up the form, You need to upload the form here)</span>
+        </p>
+        <FileUpload
+          name={"upload-i-9-form"}
+          className="h-[90px] w-full max-w-[100vw]"
+          label={selectedFileName ?? "Upload I-9 form"}
+          accept=".pdf,.doc,.docx"
+          onBlur={onBlur}
+          onChange={(event) => {
+            onChange(event.target.files ?? null);
+            setUploadError(null);
+          }}
+        />
+      </div>
+      <div className={"mb-6"}>
+        <p className={"text-sm mb-2 flex items-center"}>
+          <span>Upload document</span>
+          <span className={"flex items-center gap-2"}>
+            <span>W-4 forms</span>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M15.4168 5.76152L5.34501 15.8334L4.1665 14.6549L14.2383 4.58301L15.4168 5.76152Z"
+                    fill="#5993FF"/>
+              <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M5.8335 4.16699H15.8335V14.167H14.1668V5.83366H5.8335V4.16699Z"
+                    fill="#5993FF"/>
+              </svg>
+          </span>
+          <span>(Download the form, after filling up the form, You need to upload the form here)</span>
+        </p>
+        <FileUpload
+          name={"upload-w-4-form"}
+          className="h-[90px] w-full max-w-[100vw]"
+          label={selectedFileName ?? "Upload W-4 Form"}
+          accept=".pdf,.doc,.docx"
+          onBlur={onBlur}
+          onChange={(event) => {
+            onChange(event.target.files ?? null);
+            setUploadError(null);
+          }}
+        />
+      </div>
     </div>
   );
 }
