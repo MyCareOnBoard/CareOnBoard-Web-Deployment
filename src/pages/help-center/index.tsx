@@ -62,6 +62,7 @@ export default function HelpCenterPage() {
         toast({
           title: "Success!",
           description: response.message || "Your question has been submitted successfully. We'll get back to you soon.",
+          variant: "success",
         });
         setQuestion("");
       }

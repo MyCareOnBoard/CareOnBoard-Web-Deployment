@@ -46,7 +46,7 @@ function ApplicationLoading() {
 function ApplicationContent() {
   const { user } = useAuth();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState(4);
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
   const progressValue = useMemo(() => getProgressPercentage(activeStep), [activeStep]);
@@ -72,7 +72,8 @@ function ApplicationContent() {
       }
     };
 
-    fetchApplicationStatus();
+    setIsLoading(false);
+    // fetchApplicationStatus();
   }, [user]);
 
   const steps = useMemo<Step[]>(
