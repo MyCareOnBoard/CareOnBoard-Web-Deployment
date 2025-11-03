@@ -4,10 +4,11 @@ import { cn } from "@/lib/utils"
 
 interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
+  labelClassName?: string;
 }
 
 const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, label, ...props }, ref) => {
+  ({ className, label, labelClassName, ...props }, ref) => {
     const id = React.useId();
     const inputId = props.id || id;
 
@@ -32,7 +33,12 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
           <Check className="h-3.5 w-3.5 text-white opacity-0 transition-opacity" />
         </span>
         {label && (
-          <span className="text-sm font-medium leading-[1.4] text-[#10141a] peer-disabled:opacity-50">
+          <span
+            className={cn(
+              "text-sm font-medium leading-[1.4] text-[#10141a] peer-disabled:opacity-50",
+              labelClassName
+            )}
+          >
             {label}
           </span>
         )}

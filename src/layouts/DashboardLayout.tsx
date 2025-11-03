@@ -1,6 +1,6 @@
-import type { ComponentType, ReactNode } from "react";
-import { useMemo, useState, useEffect } from "react";
-import { Outlet, useLocation, useNavigate, Navigate } from "react-router";
+import {ComponentType, ReactNode, useEffect} from "react";
+import { useMemo, useState } from "react";
+import {Navigate, Outlet, useLocation, useNavigate} from "react-router";
 import { ChevronDown, ChevronUp, User, Settings, LogOut } from "lucide-react";
 import { useSelector } from "react-redux";
 
@@ -172,12 +172,13 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
     return <PageLoader text="Checking authentication..." />;
   }
 
-  if (!user) {
-    console.log('[DashboardLayout] No user, redirecting to login');
-    return <Navigate to={Routes.login} replace />;
-  }
+  useEffect(() => {
+    if (!user) {
+      console.log('[DashboardLayout] No user, redirecting to login');
+      navigate(Routes.login, { replace: true });
+    }
+  }, [user]);
 
-  console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
   return (
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
       <Header userName={user?.fullName} onLogout={handleLogout} />

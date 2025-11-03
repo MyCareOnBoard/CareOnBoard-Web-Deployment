@@ -10,6 +10,13 @@ const axiosClient: AxiosInstance = axios.create({
     },
 });
 
+export const axiosClientWithoutAuth: AxiosInstance = axios.create({
+    baseURL: BASE_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
 axiosClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
         // Get Firebase ID token

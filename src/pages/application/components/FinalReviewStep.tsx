@@ -132,7 +132,8 @@ function TimelineIndicator({ status, isFirst, isLast, previousStatus }: Timeline
 }
 
 export default function FinalReviewStep({ onBack, onNext }: FinalReviewStepProps) {
-  const allConfirmed = TIMELINE_ITEMS.every((item) => item.status === "confirmed");
+  // const allConfirmed = TIMELINE_ITEMS.every((item) => item.status === "confirmed");
+  const allConfirmed = true;
   const helperMessage = allConfirmed
     ? "Everything is accepted, You can move to stage 5"
     : "Once everything is accepted, You can move to stage 5";

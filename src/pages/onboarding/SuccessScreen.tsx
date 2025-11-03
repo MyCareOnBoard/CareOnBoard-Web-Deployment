@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import SuccessMessage from "./SuccessMessage";
 
 export default function SuccessScreen() {

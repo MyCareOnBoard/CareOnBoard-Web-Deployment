@@ -1,4 +1,4 @@
-import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import {combineReducers, configureStore} from "@reduxjs/toolkit";
 import {
   persistStore,
   persistReducer,
@@ -12,7 +12,8 @@ import {
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import authReducer from "@/utils/auth/store/authSlice";
-import type { User } from "@/utils/auth/types";
+import {applicationApi} from "@/pages/application/api";
+import {documentsApi} from "@/pages/documents/api";
 
 // Transform to handle Date serialization
 const dateTransform = createTransform(
@@ -48,11 +49,13 @@ const dateTransform = createTransform(
     }
     return outboundState
   },
-  { whitelist: ['auth'] }
+  {whitelist: ['auth']}
 )
 
 const rootReducer = combineReducers({
   auth: authReducer,
+  [applicationApi.reducerPath]: applicationApi.reducer,
+  [documentsApi.reducerPath]: documentsApi.reducer,
 });
 
 const persistConfig = {
@@ -71,7 +74,8 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }),
+    }).concat(applicationApi.middleware).concat(documentsApi.middleware),
+  devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
 
 export const persistor = persistStore(store);

@@ -1,7 +1,8 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
-import { vi, describe, it, expect } from "vitest";
+import { MemoryRouter, Routes, Route } from "react-router";
+import { vi } from "vitest";
+
 /**
  * Mock framer-motion to keep tests synchronous and avoid animation timing issues.
  * We replace motion.div with a plain div and AnimatePresence with a fragment.
