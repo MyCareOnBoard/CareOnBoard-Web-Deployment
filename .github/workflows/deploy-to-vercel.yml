@@ -1,0 +1,42 @@
+name: Deploy Pipeline
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    name: Build Project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+  sync-and-deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decrypt and set env vars
+        run: |
+          openssl aes-256-cbc -d -in secrets.json.enc -out secrets.json -pass file:.encryption_key -pbkdf2 -iter 100000
+          echo "ENV_TOKEN=$(jq -r '.token' secrets.json)" >> $GITHUB_ENV
+
+      - name: Mirror to Target Repo
+        run: |
+          echo ${{ env.ENV_TOKEN }} | gh auth login --with-token
+          gh auth setup-git
+          gh repo clone https://github.com/iOta-Digital-Lab-Inc/Care-On-Board.git
+          cd Care-On-Board
+          rm .github/workflows/deploy-to-vercel.yml
+          git config --global user.email "phaisalsey6@gmail.com"
+          git config --global user.name "Faisal-Sey"
+          git add .
+          git commit -m "Remove GitHub Actions workflows"
+          git remote add target https://github.com/Faisal-Sey/myCareOnBoard.git
+          git push target main --force
