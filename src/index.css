@@ -1,2 +1,111 @@
 @import "tailwindcss";
-@config "../tailwind.config.js";
+
+:root {
+    /* Primary Colors from Figma */
+    --main-color: #00b4b8;
+    --white: #ffffff;
+
+    /* Semantic Colors from Figma */
+    --red: #d53411;
+    --blue: #2b82ff;
+    --green: #0eaf52;
+
+    /* Grey Scale from Figma */
+    --grey-200: #b2b2b3;
+    --grey-800: #565656;
+
+    /* Application Tokens */
+    --background: #eef4f5;
+    --foreground: #10141a;
+    --card: var(--white);
+    --card-foreground: #10141a;
+    --border: rgba(16, 20, 26, 0.08);
+
+    /* Input Tokens */
+    --input-bg: var(--white);
+    --input-border: #cccccd;
+    --input-text: #10141a;
+    --input-placeholder: var(--grey-200);
+    --input-error-border: var(--red);
+    --input-error-text: var(--red);
+
+    /* Component Tokens */
+    --ring: var(--main-color);
+    --primary: var(--main-color);
+    --primary-foreground: var(--white);
+    --secondary: rgba(255, 255, 255, 0.5);
+    --secondary-foreground: #10141a;
+    --muted: rgba(255, 255, 255, 0.32);
+    --muted-foreground: var(--grey-800);
+    --accent: rgba(255, 255, 255, 0.32);
+    --accent-foreground: #10141a;
+    --destructive: var(--red);
+    --destructive-foreground: var(--white);
+    --success: var(--green);
+    --success-foreground: var(--white);
+    --info: var(--blue);
+    --info-foreground: var(--white);
+
+    /* Border Radius */
+    --radius-lg: 24px;
+    --radius-md: 16px;
+    --radius-sm: 10px;
+
+    font-family: "Urbanist", system-ui, sans-serif;
+}
+
+body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    min-height: 100vh;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
+
+/* Optional: Custom scrollbar styling if you want to keep it visible */
+.scrollbar-custom::-webkit-scrollbar {
+    height: 4px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 2px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 2px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.2s ease-out;
+}
+
+* {
+    font-family: "Urbanist", system-ui, sans-serif;
+}

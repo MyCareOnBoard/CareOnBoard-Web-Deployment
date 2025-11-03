@@ -1,0 +1,58 @@
+export interface Step {
+    title: string;
+    status: "complete" | "pending";
+}
+
+export interface UploadDocumentResponse {
+    success: boolean;
+    message: string;
+    data: {
+        fileName: string;
+        fileSize: number;
+        fileType: string;
+        url: string;
+        storagePath: string;
+        uploadedAt: string;
+    };
+}
+
+export type DocumentTypes = "resume"
+    | "photo-id"
+    | "social-security-card"
+    | "diploma"
+    | "certifications"
+    | "hepatitis-b-vaccination"
+    | "hepatitis-b-immunity"
+    | "tb-tes"
+    | "i9-form"
+    | "w4-form"
+
+export interface UploadDocumentPayload {
+    documentType: DocumentTypes;
+    data: FormData;
+}
+
+export interface DocumentUploadAndEligibilityPayload {
+    photoIdUrl?: string;
+    socialSecurityCardUrl?: string;
+    diplomaUrl?: string;
+    certificationsUrl?: string;
+    hepatitisBVaccinationUrl?: string;
+    hepatitisBImmunityUrl?: string;
+    tbTestResultUrl?: string;
+    i9FormUrl?: string;
+    w4FormUrl?: string;
+    references: {
+        name: string;
+        relationship: string;
+        phoneNumber: string;
+        email: string;
+    }[];
+    declarationAgreed: boolean;
+}
+
+export interface DocumentUploadAndEligibilityResponse {
+    success: boolean;
+    message: string;
+    data: DocumentUploadAndEligibilityPayload;
+}

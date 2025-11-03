@@ -23,6 +23,13 @@ vi.mock('react-router', async () => {
 // Mock for window.scrollTo
 window.scrollTo = vi.fn();
 
+// Mock for ResizeObserver (needed by Radix UI Slider)
+global.ResizeObserver = class ResizeObserver {
+  observe() { }
+  unobserve() { }
+  disconnect() { }
+};
+
 // Clean up after each test
 afterEach(() => {
   cleanup();

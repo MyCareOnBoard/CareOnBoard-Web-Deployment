@@ -1,7 +1,11 @@
 import * as React from "react"
 import * as SliderPrimitive from "@radix-ui/react-slider"
 
-import { cn } from "src/lib/utils"
+import { cn } from "@/lib/utils"
+
+interface SliderProps extends React.ComponentProps<typeof SliderPrimitive.Root> {
+  icon?: React.ReactNode;
+}
 
 function Slider({
   className,
@@ -9,8 +13,9 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  icon,
   ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>) {
+}: SliderProps) {
   const _values = React.useMemo(
     () =>
       Array.isArray(value)
@@ -37,20 +42,22 @@ function Slider({
       <SliderPrimitive.Track
         data-slot="slider-track"
         className={cn(
-          "relative h-2 w-full overflow-hidden rounded-full bg-[#f3f6f7]"
+          "relative h-[8px] w-full overflow-hidden rounded-[200px] bg-[#f3f6f7]"
         )}
       >
         <SliderPrimitive.Range
           data-slot="slider-range"
-          className="absolute h-full bg-[var(--color-main)]"
+          className="absolute h-full rounded-[200px] bg-[#00b4b8]"
         />
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (
         <SliderPrimitive.Thumb
           data-slot="slider-thumb"
           key={index}
-          className="relative z-10 block size-8 shrink-0 rounded-full border-2 border-[var(--color-main)] bg-[rgba(239,242,243,0.3)] backdrop-blur-[4px] transition-transform duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 after:absolute after:inset-1 after:rounded-full after:bg-[var(--color-main)]"
-        />
+          className="relative z-10 flex size-[32px] shrink-0 items-center justify-center rounded-[200px] border border-[#00b4b8] bg-[rgba(239,242,243,0.3)] backdrop-blur-sm transition-transform duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/25 disabled:pointer-events-none disabled:opacity-50"
+        >
+          {icon && <span className="flex items-center justify-center">{icon}</span>}
+        </SliderPrimitive.Thumb>
       ))}
     </SliderPrimitive.Root>
   )

@@ -1,3 +1,18 @@
+# Environment and config files
+.env
+.env.local
+.env.production
+.env.development
+.env.test
+
+# Firebase and private keys
+firebase.json
+.firebaserc
+*.key
+*.pem
+*.p12
+*.crt
+
 # Logs
 logs
 *.log
@@ -9,8 +24,17 @@ lerna-debug.log*
 
 node_modules
 dist
+build
 dist-ssr
 *.local
+
+# Compiled JavaScript files (keep config files)
+src/**/*.js
+src/**/*.jsx
+!src/**/*.config.js
+
+# TypeScript build info
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +46,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.cursor/*
+# Firebase Emulator Data
+emulator-data/
+.firebase/
