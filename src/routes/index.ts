@@ -2,6 +2,7 @@ import { Component, lazy } from "react";
 import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
 import path from "path/win32";
+import { Settings } from 'lucide-react';
 
 // Lazy load all components for better performance and code splitting
 const SplashScreen = lazy(() => import("@/pages/splash"));
@@ -18,6 +19,7 @@ const ForgotPasswordPage = lazy(() => import("@/pages/forgot-password"));
 const VerifyEmailPage = lazy(() => import("@/pages/onboarding/VerifyEmail"));
 const VerifyOTPPage = lazy(() => import("@/pages/onboarding/VerifyOTP"));
 const SuccessMessagePage = lazy(() => import("@/pages/onboarding/components/SuccessMessage"));
+const SettingsPage = lazy(() => import("@/pages/settings"));
 
 export const router = createBrowserRouter([
   {
@@ -84,6 +86,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.helpCenter,
         Component: HelpCenterPage,
+      },
+      {
+        path: Routes.settings,
+        Component: SettingsPage,
       },
     ],
   },
