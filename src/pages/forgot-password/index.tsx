@@ -102,7 +102,7 @@ export default function ForgotPasswordPage() {
         <div className="space-y-5">
           <div className="p-4 bg-green-50 border border-green-200 rounded-2xl">
             <p className="text-sm text-green-800">
-              Password reset instructions have been sent to your email address.
+              Password reset instructions have been sent to your email address. Check your inbox and spam folder.
             </p>
           </div>
           <Link to="/login">
