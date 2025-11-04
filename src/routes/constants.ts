@@ -11,6 +11,7 @@ export const Routes = {
   login: "/login",
   signup: "/signup",
   forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
   onboarding: "/onboarding",
   onboardingEmail: "/onboarding/email",
   onboardingOTP: "/onboarding/otp",
