@@ -57,7 +57,7 @@ export default function SuccessMessage({
         >
           <div className="flex items-center justify-center w-20 h-20 bg-green-100 rounded-full">
             <img
-              src="/src/assets/icons/email-verified-success-icon.svg"
+              src="/email-verified-success-icon.svg"
               alt="Mail Verified Icon"
               className="mx-auto w-100 h-100"
             />
