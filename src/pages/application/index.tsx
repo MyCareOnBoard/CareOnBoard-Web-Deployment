@@ -46,7 +46,7 @@ function ApplicationLoading() {
 function ApplicationContent() {
   const { user } = useAuth();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
   const progressValue = useMemo(() => getProgressPercentage(activeStep), [activeStep]);
@@ -59,11 +59,11 @@ function ApplicationContent() {
         const response = await getApplicationStatus();
 
         if (!response.status.hasStarted) {
-          setActiveStep(0);
+          setActiveStep(1);
         } else if (response.status.currentStep !== null) {
           setActiveStep(STEP_NAMES.indexOf(response.status.currentStep));
         } else {
-          setActiveStep(0);
+          setActiveStep(1);
         }
       } catch (error) {
         console.error('Error fetching application status:', error);

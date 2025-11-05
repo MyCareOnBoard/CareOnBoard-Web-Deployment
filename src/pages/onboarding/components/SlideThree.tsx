@@ -13,7 +13,7 @@ export default function SlideThree() {
   return (
     <div className="flex flex-col items-center px-6 text-center">
       <LogoHeader />
-      <img src="/src/assets/onboarding_assets/minimum-req-img.png" alt="minimum-requirement" className="object-contain w-64 h-40 mb-4 rounded-md" />
+      <img src="/minimum-req-img.png" alt="minimum-requirement" className="object-contain w-64 h-40 mb-4 rounded-md" />
       <h3 className="text-xl font-semibold">Applicants must:</h3>
       <div className="w-full max-w-md mt-2">
         {items.map((it, i) => (
