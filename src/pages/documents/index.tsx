@@ -6,6 +6,12 @@ export default function DocumentsPage() {
     refetchOnMountOrArgChange: true
   });
 
+  const extractFileName = (url: string | null) => {
+    if (!url) return "";
+    const splittedFileUrl = url ? url.split("/") : []
+    return splittedFileUrl[splittedFileUrl.length - 1]
+  }
+
   return (
     <div>
       <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">Documents</h1>
@@ -20,7 +26,7 @@ export default function DocumentsPage() {
               <div className="relative">
                 <Input
                   type="text"
-                  placeholder={value.url || "Not submitted"}
+                  placeholder={extractFileName(value.url) || "Not submitted"}
                   className="w-full pr-10"
                 />
                 <button

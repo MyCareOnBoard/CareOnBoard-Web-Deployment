@@ -53,7 +53,7 @@ export default function SuccessMessage() {
         >
           <div className="flex items-center justify-center w-20 h-20 bg-green-100 rounded-full">
             {/* <MailCheck className="w-10 h-10 text-green-600" /> */}
-              <img src="/src/assets/icons/email-verified-success-icon.svg" alt="Mail Verified Icon" className="mx-auto w-100 h-100" />
+              <img src="/email-verified-success-icon.svg" alt="Mail Verified Icon" className="mx-auto w-100 h-100" />
           </div>
         </motion.div>
 
