@@ -71,7 +71,7 @@ export function Header({ actions, userName, onLogout }: { actions?: ReactNode; u
             <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
               <DropdownMenuTrigger asChild>
                 <div className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer">
-                  <img src="/src/assets/icons/images/user-profile-image.png" alt="User profile" className="h-[34px] w-[34px] rounded-full object-cover" />
+                  <img src="/user-profile-image.png" alt="User profile" className="h-[34px] w-[34px] rounded-full object-cover" />
                   <p className="pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a]">{userName || 'User'}</p>
                   {isDropdownOpen ? (
                     <ChevronUp className="h-4 w-4 text-[#808081] mr-2" />

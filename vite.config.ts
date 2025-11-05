@@ -43,6 +43,7 @@ export default defineConfig(({ mode }) => {
         ],
       },
     },
+    publicDir: "public",
     build: {
       assetsInlineLimit: 0,
       emptyOutDir: true,
