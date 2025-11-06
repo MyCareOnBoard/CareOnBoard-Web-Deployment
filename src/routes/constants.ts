@@ -16,4 +16,5 @@ export const Routes = {
   onboardingOTP: "/onboarding/otp",
   onboardingSuccess: "/onboarding/success",
   settings: "/applicant/settings",
+  profile: "/applicant/profile",
 };
