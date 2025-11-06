@@ -18,7 +18,7 @@ export default function AccountTab({ onSave }: { onSave: () => void }) {
   const form = useForm<AccountFormValues>({
     defaultValues: {
       fullName: "Remy",
-      email: "remy@gmail.com",
+      email: "flashm2u@gmail.com",
     },
   });
 
@@ -67,7 +67,7 @@ export default function AccountTab({ onSave }: { onSave: () => void }) {
               <img
                 src={tempImage || selectedImage}
                 alt="Profile"
-                className="object-cover w-14 h-14 rounded-full"
+                className="object-cover rounded-full w-14 h-14"
               />
               <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                 <label className="bg-[#00b3ad] hover:bg-[#00a39f] text-white font-medium px-5 py-2 rounded-full transition cursor-pointer">
@@ -122,7 +122,7 @@ export default function AccountTab({ onSave }: { onSave: () => void }) {
               render={({ field }) => (
                 <FormItem className="w-full">
                   <FormControl>
-                    <Input type="email" placeholder="Enter your email" {...field} />
+                    <Input type="email" placeholder="Enter your email" {...field} disabled />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -1,6 +1,6 @@
-import {ComponentType, ReactNode, useEffect} from "react";
-import { useMemo, useState } from "react";
-import {Navigate, Outlet, useLocation, useNavigate} from "react-router";
+import type { ComponentType, ReactNode } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { Outlet, useLocation, useNavigate, Navigate } from "react-router";
 import { ChevronDown, ChevronUp, User, Settings, LogOut } from "lucide-react";
 import { useSelector } from "react-redux";
 
@@ -46,14 +46,15 @@ function HeaderActionButton({ icon: Icon, ariaLabel }: { icon: ComponentType<{ c
       aria-label={ariaLabel}
       className="grid h-[42px] w-[42px] place-items-center rounded-[50px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] text-[#808081] backdrop-blur-[22px] cursor-pointer hover:bg-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.5)] transition-all duration-200"
     >
-      <Icon className="h-5 w-5" />
+      <Icon className="w-5 h-5" />
     </button>
   );
 }
 
 export function Header({ actions, userName, onLogout }: { actions?: ReactNode; userName?: string; onLogout?: () => void }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
+  const navigate = useNavigate();
+  
   return (
     <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5]">
       <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between px-8">
@@ -81,23 +82,23 @@ export function Header({ actions, userName, onLogout }: { actions?: ReactNode; u
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 z-[100] bg-white">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                {/* <DropdownMenuLabel>Account</DropdownMenuLabel> */}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
+                <DropdownMenuItem  className="cursor-pointer focus:text-[#00b3ad] focus:bg-[#E5EFFA]" onClick={() => navigate("/applicant/profile")}>
+                  <User className="w-4 h-4 mr-2" />
                   <span>Profile</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
+                <DropdownMenuItem className="cursor-pointer focus:text-[#00b3ad] focus:bg-[#E5EFFA]" onClick={() => navigate("/applicant/settings")}>
+                  <Settings className="w-4 h-4 mr-2" />
                   <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={onLogout}
-                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                  className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50"
                 >
-                  <LogOut className="mr-2 h-4 w-4 text-red-600" />
+                  <LogOut className="w-4 h-4 mr-2 text-red-600" />
                   <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -171,6 +172,7 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
     }
   }, [user]);
 
+  console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
   return (
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
       <Header userName={user?.fullName} onLogout={handleLogout} />
