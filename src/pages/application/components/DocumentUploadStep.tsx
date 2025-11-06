@@ -189,10 +189,6 @@ export default function DocumentUploadStep({onBack, onNext}: DocumentUploadStepP
     }
   }, [eligibilityVerificationData]);
 
-  useEffect(() => {
-    console.log(references)
-  }, [references]);
-
   return (
     <form className={"w-full"} onSubmit={handleSubmit}>
       {files.map((file) =>

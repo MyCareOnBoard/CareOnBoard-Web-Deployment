@@ -5,17 +5,17 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function SlideFour({ onInnerComplete }: { onInnerComplete: (completed: boolean) => void }) {
   const mini = [
-    { title: "This portal has five stages:", img: "/src/assets/onboarding_assets/stage-1.png", text: "Profile & Pre-Screening – Basic information & role fit." },
-    { title: "This portal has five stages:", text: "Document Upload & Eligibility Verification – Proof of ID, education, and work eligibility.", img: "/src/assets/onboarding_assets/stage-2.png" },
-    { title: "This portal has five stages:", text: "Conditional Hire & Compliance – Background check, fingerprinting, and initial trainings.", img: "/src/assets/onboarding_assets/stage-3.png" },
-    { title: "This portal has five stages:", text: "Learn how to fill reports", img: "/src/assets/onboarding_assets/stage-4.png" },
-    { title: "This portal has five stages:", text: "Final Agency Review - HR review and DDD record creation", img: "/src/assets/onboarding_assets/stage-4.png" },
-    { title: "Have the following ready before starting:", text: "Valid photo ID (Driver’s License, State ID, or Passport).", img: "/src/assets/onboarding_assets/stage-4.png" },
-    { title: "Have the following ready before starting:", text: "Social Security Card or valid work permit.", img: "/src/assets/onboarding_assets/stage-4.png" },
-    { title: "Have the following ready before starting:", text: "High School Diploma / GED certificate.", img: "/src/assets/onboarding_assets/stage-4.png" },
-    { title: "Have the following ready before starting:", text: "Employment history and references.", img: "/src/assets/onboarding_assets/stage-4.png" },
-    { title: "Have the following ready before starting:", text: "Professional references (minimum 2).", img: "/src/assets/onboarding_assets/stage-4.png" },
-    { title: "Have the following ready before starting:", text: "Resume (optional, but recommended).", img: "/src/assets/onboarding_assets/stage-4.png" },
+    { title: "This portal has five stages:", img: "/stage-1.png", text: "Profile & Pre-Screening – Basic information & role fit." },
+    { title: "This portal has five stages:", text: "Document Upload & Eligibility Verification – Proof of ID, education, and work eligibility.", img: "/stage-2.png" },
+    { title: "This portal has five stages:", text: "Conditional Hire & Compliance – Background check, fingerprinting, and initial trainings.", img: "/stage-3.png" },
+    { title: "This portal has five stages:", text: "Learn how to fill reports", img: "/stage-4.png" },
+    { title: "This portal has five stages:", text: "Final Agency Review - HR review and DDD record creation", img: "/stage-4.png" },
+    { title: "Have the following ready before starting:", text: "Valid photo ID (Driver’s License, State ID, or Passport).", img: "/stage-4.png" },
+    { title: "Have the following ready before starting:", text: "Social Security Card or valid work permit.", img: "/stage-4.png" },
+    { title: "Have the following ready before starting:", text: "High School Diploma / GED certificate.", img: "/stage-4.png" },
+    { title: "Have the following ready before starting:", text: "Employment history and references.", img: "/stage-4.png" },
+    { title: "Have the following ready before starting:", text: "Professional references (minimum 2).", img: "/stage-4.png" },
+    { title: "Have the following ready before starting:", text: "Resume (optional, but recommended).", img: "/stage-4.png" },
   ];
 
   const [i, setI] = useState(0);

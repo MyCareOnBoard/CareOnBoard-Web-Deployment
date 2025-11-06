@@ -16,6 +16,7 @@ const ApplicationDashboard = lazy(() => import("@/pages/application"));
 const DocumentsPage = lazy(() => import("@/pages/documents"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
 const ForgotPasswordPage = lazy(() => import("@/pages/forgot-password"));
+const ResetPasswordPage = lazy(() => import("@/pages/reset-password"));
 const VerifyEmailPage = lazy(() => import("@/pages/onboarding/VerifyEmail"));
 const VerifyOTPPage = lazy(() => import("@/pages/onboarding/VerifyOTP"));
 const SuccessMessagePage = lazy(() => import("@/pages/onboarding/components/SuccessMessage"));
@@ -61,6 +62,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.forgotPassword,
         Component: ForgotPasswordPage,
+      },
+      {
+        path: Routes.resetPassword,
+        Component: ResetPasswordPage,
       },
     ],
   },
