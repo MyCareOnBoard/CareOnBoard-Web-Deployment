@@ -2,12 +2,14 @@ import React, {useState, useRef, useEffect} from 'react';
 import {X} from 'lucide-react';
 import {Button} from "@/components/ui/button";
 import {FileUpload} from "@/components/ui/file-upload";
+import {useSignDocumentMutation} from "@/pages/application/api";
 
 const DigitalSignatureModal = (
-  {isOpen, setIsOpen, proceed}: {
+  {isOpen, setIsOpen, proceed, useCase}: {
     isOpen: boolean;
     setIsOpen: (value: boolean) => void;
-    proceed: () => void
+    proceed: () => void;
+    useCase: "official-hire" | "conditional-hire"
   }
 ) => {
   const [activeTab, setActiveTab] = useState('type');
@@ -17,6 +19,8 @@ const DigitalSignatureModal = (
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+
+  const [signDocument] = useSignDocumentMutation();
 
   // Initialize canvas for drawing
   useEffect(() => {
@@ -86,19 +90,23 @@ const DigitalSignatureModal = (
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     let signatureData = null;
 
     if (activeTab === 'type' && typedSignature) {
-      signatureData = {type: 'typed', value: typedSignature};
+      signatureData = {signatureType: 'type', signatureData: typedSignature};
     } else if (activeTab === 'draw' && canvasRef.current) {
-      signatureData = {type: 'drawn', value: canvasRef.current.toDataURL()};
+      signatureData = {signatureType: 'draw', signatureData: canvasRef.current.toDataURL()};
     } else if (activeTab === 'upload' && uploadedImage) {
-      signatureData = {type: 'uploaded', value: uploadedImage};
+      signatureData = {signatureType: 'upload', signatureData: uploadedImage};
     }
 
     if (signatureData) {
       console.log('Signature saved:', signatureData);
+      await signDocument({
+        context: useCase,
+        data: signatureData
+      }).unwrap();
       proceed();
       setIsOpen(false);
     } else {
