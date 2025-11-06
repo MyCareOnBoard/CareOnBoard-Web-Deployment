@@ -12,6 +12,8 @@ import {
   sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   signOut,
   updateProfile,
+  verifyPasswordResetCode,
+  confirmPasswordReset,
   type User as FirebaseUser,
 } from 'firebase/auth'
 import type { User } from '../types'
@@ -166,6 +168,84 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
         errorMessage = error.message || 'Failed to send reset email'
     }
 
+    return {
+      success: false,
+      error: errorMessage,
+    }
+  }
+}
+
+/**
+ * Verify password reset code
+ * Used to verify the code from the reset link before showing password form
+ */
+export async function verifyResetCode(code: string): Promise<{ success: boolean; email?: string; error?: string }> {
+  try {
+    const email = await verifyPasswordResetCode(auth, code)
+    
+    return {
+      success: true,
+      email,
+    }
+  } catch (error: any) {
+    console.error('Reset code verification error:', error)
+    
+    let errorMessage = 'Invalid or expired reset code'
+    
+    switch (error.code) {
+      case 'auth/expired-action-code':
+        errorMessage = 'This reset link has expired. Please request a new one.'
+        break
+      case 'auth/invalid-action-code':
+        errorMessage = 'This reset link is invalid. Please request a new one.'
+        break
+      case 'auth/user-disabled':
+        errorMessage = 'This account has been disabled.'
+        break
+      case 'auth/user-not-found':
+        errorMessage = 'No account found for this reset link.'
+        break
+      default:
+        errorMessage = error.message || 'Invalid or expired reset code'
+    }
+    
+    return {
+      success: false,
+      error: errorMessage,
+    }
+  }
+}
+
+/**
+ * Confirm password reset with new password
+ * Completes the password reset process
+ */
+export async function confirmReset(code: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await confirmPasswordReset(auth, code, newPassword)
+    
+    return {
+      success: true,
+    }
+  } catch (error: any) {
+    console.error('Password reset confirmation error:', error)
+    
+    let errorMessage = 'Failed to reset password'
+    
+    switch (error.code) {
+      case 'auth/expired-action-code':
+        errorMessage = 'This reset link has expired. Please request a new one.'
+        break
+      case 'auth/invalid-action-code':
+        errorMessage = 'This reset link is invalid. Please request a new one.'
+        break
+      case 'auth/weak-password':
+        errorMessage = 'Password is too weak. Please choose a stronger password.'
+        break
+      default:
+        errorMessage = error.message || 'Failed to reset password'
+    }
+    
     return {
       success: false,
       error: errorMessage,

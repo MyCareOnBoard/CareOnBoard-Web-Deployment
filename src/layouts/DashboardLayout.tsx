@@ -158,23 +158,15 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
 
   const handleLogout = async () => {
     try {
-      console.log('[DashboardLayout] Logging out...');
       await logout();
-      console.log('[DashboardLayout] Logout successful, redirecting to login');
       navigate(Routes.login, { replace: true });
     } catch (error) {
       console.error('[DashboardLayout] Logout failed:', error);
     }
   };
 
-  if (loading) {
-    console.log('[DashboardLayout] Still loading...');
-    return <PageLoader text="Checking authentication..." />;
-  }
-
   useEffect(() => {
     if (!user) {
-      console.log('[DashboardLayout] No user, redirecting to login');
       navigate(Routes.login, { replace: true });
     }
   }, [user]);
