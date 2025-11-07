@@ -54,7 +54,7 @@ export const applicationApi = createApi({
     }),
     submitOfficialHire: builder.mutation<void, void>({
       query: () => ({
-        url: `/official-hire/submit`,
+        url: `/officialHire/submit`,
         method: "POST",
         requiresAuth: true
       })

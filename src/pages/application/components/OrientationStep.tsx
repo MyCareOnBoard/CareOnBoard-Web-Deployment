@@ -16,8 +16,9 @@ export default function OrientationStep({onBack, onNext}: OrientationStepProps) 
   const {data} = useCheckSignatureStatusQuery("official-hire");
   const [submitOfficialHire] = useSubmitOfficialHireMutation();
 
-  const handleModalOpen = () => {
+  const handleModalOpen = async () => {
     if (data?.data?.signatureId) {
+      await handleSubmitOfficialHire();
       setIsEmployeeModalOpen(true);
     } else {
       setIsModalOpen(true);
