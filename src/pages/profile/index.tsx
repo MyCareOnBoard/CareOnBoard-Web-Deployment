@@ -7,7 +7,6 @@ import {
   MapPin,
   Calendar,
   Briefcase,
-  Pencil,
   X,
   Trash2,
   CalendarIcon,
@@ -151,10 +150,14 @@ export default function ProfilePage() {
           {/* Edit Button */}
           <button
             title="Edit Profile"
-            className="absolute top-5 right-5 bg-[#0F172A] text-white p-2 rounded-full hover:bg-[#1f2937] transition"
+            className="absolute cursor-pointer top-5 right-5 bg-[#0F172A] text-white rounded-full hover:bg-[#1f2937] transition"
             onClick={() => setShowEdit(true)}
           >
-            <Pencil className="w-4 h-4" />
+            <img 
+              src="/edit-outline.svg"
+              alt="Mail Verified Icon"
+              className="w-10 h-10 mx-auto"
+            />
           </button>
 
           {/* Header Section */}

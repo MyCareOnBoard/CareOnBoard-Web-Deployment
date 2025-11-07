@@ -9,7 +9,7 @@ export default function SuccessScreen() {
       title="Email Verification Complete!"
       // message="Your email has been verified. You can now continue to your dashboard."
       buttonText="Continue to Dashboard"
-      onButtonClick={() => nav("/dashboard")}
+      onButtonClick={() => nav("/applicant/dashboard")}
     />
   );
 }
