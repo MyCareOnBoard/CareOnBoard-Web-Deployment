@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import LogoHeader from './LogoHeader'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import {Routes} from "@/routes/constants";
 
 export default function VerifyOTP() {
   const [otp, setOtp] = useState('')
@@ -18,7 +19,7 @@ export default function VerifyOTP() {
     setTimeout(() => {
       setLoading(false)
       if (otp === '123456') {
-        nav('/success')
+        nav(Routes.onboardingSuccess)
       } else {
         setError('Invalid OTP (try 123456)')
       }

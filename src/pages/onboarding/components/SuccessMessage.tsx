@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {  useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
-import { MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LogoHeader from "./LogoHeader";
 import { Routes as AppRoutes } from "@/routes/constants";
