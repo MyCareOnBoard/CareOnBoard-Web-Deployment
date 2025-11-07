@@ -7,6 +7,7 @@ import SlideFour from "./SlideFour";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import {Routes} from "@/routes/constants";
 
 export default function OnboardingSlider() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export default function OnboardingSlider() {
       setIdx((p) => p + 1);
     } else {
       localStorage.setItem("onboarding_completed", "true");
-      navigate("/onboarding/email"); // Redirect after completion
+      navigate(Routes.onboardingEmail);
     }
   };
 
