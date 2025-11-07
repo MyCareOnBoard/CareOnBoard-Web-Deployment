@@ -1,7 +1,8 @@
 import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 import {
-  DocumentUploadAndEligibilityPayload, DocumentUploadAndEligibilityResponse,
+  CheckSignatureStatusResponse,
+  DocumentUploadAndEligibilityPayload, DocumentUploadAndEligibilityResponse, SignDocumentPayload,
   UploadDocumentPayload,
   UploadDocumentResponse
 } from "@/pages/application/types";
@@ -35,6 +36,28 @@ export const applicationApi = createApi({
         method: "GET",
         requiresAuth: true
       })
+    }),
+    checkSignatureStatus: builder.query<CheckSignatureStatusResponse, string>({
+      query: (context) => ({
+        url: `/signature?context=${context}`,
+        method: "GET",
+        requiresAuth: true
+      })
+    }),
+    signDocument: builder.mutation<CheckSignatureStatusResponse, SignDocumentPayload>({
+      query: ({context, data}) => ({
+        url: `/signature?context=${context}`,
+        method: "POST",
+        data: data,
+        requiresAuth: true
+      })
+    }),
+    submitOfficialHire: builder.mutation<void, void>({
+      query: () => ({
+        url: `/officialHire/submit`,
+        method: "POST",
+        requiresAuth: true
+      })
     })
   }),
 });
@@ -42,5 +65,8 @@ export const applicationApi = createApi({
 export const {
   useUploadDocumentMutation,
   useSubmitDocumentUploadAndEligibilityVerificationMutation,
-  useGetEligibilityVerificationQuery
+  useGetEligibilityVerificationQuery,
+  useCheckSignatureStatusQuery,
+  useSignDocumentMutation,
+  useSubmitOfficialHireMutation
 } = applicationApi;

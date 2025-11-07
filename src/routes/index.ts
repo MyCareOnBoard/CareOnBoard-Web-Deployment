@@ -21,6 +21,7 @@ const VerifyEmailPage = lazy(() => import("@/pages/onboarding/VerifyEmail"));
 const VerifyOTPPage = lazy(() => import("@/pages/onboarding/VerifyOTP"));
 const SuccessMessagePage = lazy(() => import("@/pages/onboarding/components/SuccessMessage"));
 const SettingsPage = lazy(() => import("@/pages/settings"));
+const ProfilePage = lazy(() => import("@/pages/profile"));
 
 export const router = createBrowserRouter([
   {
@@ -95,6 +96,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.settings,
         Component: SettingsPage,
+      },
+      {
+        path: Routes.profile,
+        Component: ProfilePage,
       },
     ],
   },

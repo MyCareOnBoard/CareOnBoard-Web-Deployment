@@ -2,15 +2,37 @@ import {Button} from "@/components/ui/button";
 import DigitalSignatureModal from "@/pages/application/components/DigitalSignature";
 import {useState} from "react";
 import EmployeeUserPanelLoginDetailsModal from "@/pages/application/components/EmployeeUserPanelLoginDetailsModal";
+import {useCheckSignatureStatusQuery, useSubmitOfficialHireMutation} from "@/pages/application/api";
 
 interface OrientationStepProps {
   onBack?: () => void;
   onNext?: () => void;
 }
 
-export default function OrientationStep({ onBack, onNext }: OrientationStepProps) {
+export default function OrientationStep({onBack, onNext}: OrientationStepProps) {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState<boolean>(false);
+
+  const {data} = useCheckSignatureStatusQuery("official-hire");
+  const [submitOfficialHire] = useSubmitOfficialHireMutation();
+
+  const handleModalOpen = async () => {
+    if (data?.data?.signatureId) {
+      await handleSubmitOfficialHire();
+      setIsEmployeeModalOpen(true);
+    } else {
+      setIsModalOpen(true);
+    }
+  }
+
+  const handleSubmitOfficialHire = async () => {
+    try {
+      await submitOfficialHire().unwrap();
+      setIsEmployeeModalOpen(true);
+    } catch (error) {
+      console.error(error);
+    }
+  }
 
   return (
     <div className={"flex items-center justify-center"}>
@@ -29,20 +51,20 @@ export default function OrientationStep({ onBack, onNext }: OrientationStepProps
         <Button
           variant="ghost"
           className="font-normal  border border-[#B2B2B3] text-[#B2B2B3] text-lg px-8"
-          onClick={() => setIsModalOpen(true)
-        }
+          onClick={handleModalOpen}
         >
-          Open Signature Module
+          {data?.data?.signatureId ? "Complete Official Hire" : "Open Signature Module"}
         </Button>
       </div>
       <DigitalSignatureModal
         isOpen={isModalOpen}
         setIsOpen={setIsModalOpen}
-        proceed={() => setIsEmployeeModalOpen(true)}
+        proceed={handleSubmitOfficialHire}
+        useCase={"official-hire"}
       />
       <EmployeeUserPanelLoginDetailsModal
-         isOpen={isEmployeeModalOpen}
-         setIsOpen={setIsEmployeeModalOpen}
+        isOpen={isEmployeeModalOpen}
+        setIsOpen={setIsEmployeeModalOpen}
       />
     </div>
   );

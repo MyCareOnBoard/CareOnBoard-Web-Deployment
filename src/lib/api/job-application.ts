@@ -161,3 +161,51 @@ export const submitJobApplication = async (applicationData: any): Promise<ApiRes
     }
 };
 
+/**
+ * Final Review Checklist Item
+ */
+export interface FinalReviewChecklistItem {
+    id: string;
+    title: string;
+    status: 'confirmed' | 'pending';
+    confirmedAt: string | null;
+    confirmedBy: string | null;
+    order: number;
+}
+
+/**
+ * Final Review Summary
+ */
+export interface FinalReviewSummary {
+    total: number;
+    confirmed: number;
+    pending: number;
+    allConfirmed: boolean;
+}
+
+/**
+ * Final Review Response
+ */
+export interface FinalReviewResponse {
+    success: boolean;
+    checklist: FinalReviewChecklistItem[];
+    summary: FinalReviewSummary;
+}
+
+/**
+ * Get final review checklist
+ * @returns Promise with final review checklist data
+ */
+export const getFinalReviewChecklist = async (): Promise<FinalReviewResponse> => {
+    try {
+        const response = await axiosClient.get<FinalReviewResponse>(
+            'https://us-central1-care-on-board.cloudfunctions.net/finalReview/checklist'
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch final review checklist:', error);
+        throw error;
+    }
+};
+
