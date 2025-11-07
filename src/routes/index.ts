@@ -1,27 +1,23 @@
-import { Component, lazy } from "react";
 import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
-import path from "path/win32";
-import { Settings } from 'lucide-react';
+import SplashScreen from "@/pages/splash";
+import VerifyOTP from "@/pages/onboarding/components/VerifyOTP";
+import VerifyEmail from "@/pages/onboarding/components/VerifyEmail";
+import SuccessMessage from "@/pages/onboarding/components/SuccessMessage";
+import AppLayout from "@/layouts/AppLayout";
+import LoginPage from "@/pages/login";
+import SignUpPage from "@/pages/signup";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
+import DashboardLayout from "@/layouts/DashboardLayout";
+import DashboardPage from "@/pages/dashboard";
+import DocumentsPage from "@/pages/documents";
+import HelpCenterPage from "@/pages/help-center";
+import SettingsPage from "@/pages/settings";
+import ProfilePage from "@/pages/profile";
+import ApplicationStepper from "@/pages/application";
+import OnboardingSlider from "@/pages/onboarding/components/OnboardingSlider";
 
-// Lazy load all components for better performance and code splitting
-const SplashScreen = lazy(() => import("@/pages/splash"));
-const AppLayout = lazy(() => import("@/layouts/AppLayout"));
-const LoginPage = lazy(() => import("@/pages/login"));
-const SignupPage = lazy(() => import("@/pages/signup"));
-const OnboardingPage = lazy(() => import("@/pages/onboarding"));
-const DashboardLayout = lazy(() => import("@/layouts/DashboardLayout"));
-const DashboardPage = lazy(() => import("@/pages/dashboard"));
-const ApplicationDashboard = lazy(() => import("@/pages/application"));
-const DocumentsPage = lazy(() => import("@/pages/documents"));
-const HelpCenterPage = lazy(() => import("@/pages/help-center"));
-const ForgotPasswordPage = lazy(() => import("@/pages/forgot-password"));
-const ResetPasswordPage = lazy(() => import("@/pages/reset-password"));
-const VerifyEmailPage = lazy(() => import("@/pages/onboarding/VerifyEmail"));
-const VerifyOTPPage = lazy(() => import("@/pages/onboarding/VerifyOTP"));
-const SuccessMessagePage = lazy(() => import("@/pages/onboarding/components/SuccessMessage"));
-const SettingsPage = lazy(() => import("@/pages/settings"));
-const ProfilePage = lazy(() => import("@/pages/profile"));
 
 export const router = createBrowserRouter([
   {
@@ -31,19 +27,22 @@ export const router = createBrowserRouter([
   },
   {
     path: Routes.onboarding,
-    Component: OnboardingPage,
     children: [
       {
+        path: Routes.onboarding,
+        Component: OnboardingSlider,
+      },
+      {
         path: Routes.onboardingEmail,
-        Component: VerifyEmailPage,
+        Component: VerifyEmail,
       },
       {
         path: Routes.onboardingOTP,
-        Component: VerifyOTPPage,
+        Component: VerifyOTP,
       },
       {
         path: Routes.onboardingSuccess,
-        Component: SuccessMessagePage,
+        Component: SuccessMessage,
       },
     ],
   },
@@ -57,7 +56,7 @@ export const router = createBrowserRouter([
       },
       {
         path: Routes.signup,
-        Component: SignupPage,
+        Component: SignUpPage,
       },
       {
         path: Routes.forgotPassword,
@@ -79,7 +78,7 @@ export const router = createBrowserRouter([
       },
       {
         path: Routes.application,
-        Component: ApplicationDashboard,
+        Component: ApplicationStepper,
       },
       {
         path: Routes.dashboard,

@@ -1,8 +1,9 @@
 import {Input} from "@/components/ui/input";
 import {useGetDocumentsQuery} from "@/pages/documents/api";
+import {PageLoader} from "@/components/ui/loader";
 
 export default function DocumentsPage() {
-  const {data} = useGetDocumentsQuery(undefined, {
+  const {data, isLoading} = useGetDocumentsQuery(undefined, {
     refetchOnMountOrArgChange: true
   });
 
@@ -10,6 +11,10 @@ export default function DocumentsPage() {
     if (!url) return "";
     const splittedFileUrl = url ? url.split("/") : []
     return splittedFileUrl[splittedFileUrl.length - 1]
+  }
+
+  if (isLoading) {
+    return <PageLoader text="Loading documents..." />
   }
 
   return (
@@ -29,7 +34,7 @@ export default function DocumentsPage() {
                   placeholder={extractFileName(value.url) || "Not submitted"}
                   className="w-full pr-10"
                 />
-                <button
+                {value.url && <button
                   type="button"
                   className="cursor-pointer absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                   onClick={() => {
@@ -37,7 +42,7 @@ export default function DocumentsPage() {
                   }}
                 >
                   <img src={"/eye.svg"} alt={"view icon"}/>
-                </button>
+                </button>}
               </div>
             </div>
           ))
