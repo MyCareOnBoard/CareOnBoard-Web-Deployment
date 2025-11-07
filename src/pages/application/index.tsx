@@ -59,11 +59,11 @@ function ApplicationContent() {
         const response = await getApplicationStatus();
 
         if (!response.status.hasStarted) {
-          setActiveStep(2);
+          setActiveStep(0);
         } else if (response.status.currentStep !== null) {
           setActiveStep(STEP_NAMES.indexOf(response.status.currentStep));
         } else {
-          setActiveStep(2);
+          setActiveStep(0);
         }
       } catch (error) {
         console.error('Error fetching application status:', error);
