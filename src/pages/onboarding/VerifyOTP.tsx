@@ -71,7 +71,7 @@ export default function VerifyOTP() {
       }
       
       // Step 3: Redirect to dashboard
-      nav("/dashboard", { replace: true })
+      nav("/applicant/dashboard", { replace: true })
     } catch (e: any) {
       setError(e?.message || "Invalid or expired OTP")
     } finally {

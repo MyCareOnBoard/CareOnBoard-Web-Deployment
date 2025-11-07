@@ -31,3 +31,53 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
 
   return data
 }
+
+// Onboarding API helpers
+
+// If you have a central apiFetch utility, import it.
+// import { apiFetch } from '@/lib/api/client'
+
+interface UserProfile {
+  onboarding?: boolean
+  // add other profile fields if needed
+}
+
+function getBase(): string {
+  // Prefer existing env vars; fallback to relative (handled by dev proxy / hosting rewrites)
+  const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+  const prefix = (import.meta.env.VITE_API_PREFIX ?? '/api').replace(/\/$/, '')
+  return `${base}${prefix}`
+}
+
+async function rawFetch<T>(path: string, init: RequestInit): Promise<T> {
+  const res = await fetch(`${getBase()}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(init.headers || {}),
+    },
+    credentials: 'include',
+    ...init,
+  })
+  if (!res.ok) {
+    let message = `Request failed (${res.status})`
+    try {
+      const data = await res.json()
+      if (data?.message) message = data.message
+    } catch {
+      const text = await res.text().catch(() => '')
+      if (text) message = text
+    }
+    throw new Error(message)
+  }
+  if (res.status === 204) return undefined as unknown as T
+  return res.json() as Promise<T>
+}
+
+// Marks the user as having completed onboarding
+export async function completeOnboarding(): Promise<UserProfile> {
+  return rawFetch<UserProfile>('/users/profile', {
+    method: 'PUT',
+    body: JSON.stringify({ onboarding: true }),
+  })
+}

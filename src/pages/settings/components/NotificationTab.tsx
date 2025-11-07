@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import SuccessModal from "./SuccessModal";
+import {
+  getNotificationSettings,
+  updateNotificationSettings,
+  NotificationSettings,
+} from "@/lib/api/settings";
 
 interface NotificationTabProps {
   onSave: () => void;
@@ -11,7 +16,32 @@ export default function NotificationTab({ onSave }: NotificationTabProps) {
   const [inAppNotif, setInAppNotif] = useState(true);
   const [apptChanges, setApptChanges] = useState(false);
   const [sysWarnings, setSysWarnings] = useState(false);
+
+  const [initial, setInitial] = useState<NotificationSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const prefs = await getNotificationSettings();
+        setEmailNotif(prefs.emailNotifications);
+        setInAppNotif(prefs.inAppNotifications);
+        setApptChanges(prefs.appointmentChanges);
+        setSysWarnings(prefs.systemWarnings);
+        setInitial(prefs);
+      } catch (e: any) {
+        setError(e.message || "Failed to load notification settings");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const toggles = [
     {
@@ -40,17 +70,49 @@ export default function NotificationTab({ onSave }: NotificationTabProps) {
     },
   ];
 
-  const handleSave = () => {
-    onSave();
-    setShowModal(true);
+  const hasChanges =
+    initial &&
+    (emailNotif !== initial.emailNotifications ||
+      inAppNotif !== initial.inAppNotifications ||
+      apptChanges !== initial.appointmentChanges ||
+      sysWarnings !== initial.systemWarnings);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const prefs: NotificationSettings = {
+        emailNotifications: emailNotif,
+        inAppNotifications: inAppNotif,
+        appointmentChanges: apptChanges,
+        systemWarnings: sysWarnings,
+      };
+      await updateNotificationSettings(prefs);
+      setInitial(prefs);
+      onSave();
+      setShowModal(true);
+    } catch (e: any) {
+      setError(e.message || "Failed to save notification settings");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
-    setEmailNotif(true);
-    setInAppNotif(true);
-    setApptChanges(false);
-    setSysWarnings(false);
+    if (!initial) return;
+    setEmailNotif(initial.emailNotifications);
+    setInAppNotif(initial.inAppNotifications);
+    setApptChanges(initial.appointmentChanges);
+    setSysWarnings(initial.systemWarnings);
+    setError("");
   };
+
+  if (loading)
+    return (
+      <p className="text-sm text-gray-500">
+        Loading notification settings...
+      </p>
+    );
 
   return (
     <div className="space-y-5">
@@ -63,6 +125,9 @@ export default function NotificationTab({ onSave }: NotificationTabProps) {
           Control how and when you receive updates from the platform.
         </p>
       </div>
+
+      {/* Error Message */}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       {/* Notification Toggles */}
       {toggles.map((item, i) => (
@@ -81,11 +146,12 @@ export default function NotificationTab({ onSave }: NotificationTabProps) {
               onChange={() => item.setter(!item.state)}
               className="sr-only"
               aria-checked={item.state}
+              disabled={saving}
             />
             <div
               className={`w-11 h-6 rounded-full transition-colors ${
                 item.state ? "bg-[#00B4B8]" : "bg-gray-300"
-              }`}
+              } ${saving ? "opacity-50" : ""}`}
             >
               <div
                 className={`absolute top-[2px] left-[2px] w-5 h-5 bg-white rounded-full transition-transform ${
@@ -104,6 +170,7 @@ export default function NotificationTab({ onSave }: NotificationTabProps) {
           variant="outline"
           className="border-[#00b3ad] text-[#00b3ad] hover:bg-[#00b3ad]/10 rounded-full px-8 py-2"
           onClick={handleCancel}
+          disabled={saving || !hasChanges}
         >
           Cancel
         </Button>
@@ -111,9 +178,10 @@ export default function NotificationTab({ onSave }: NotificationTabProps) {
         <Button
           type="button"
           onClick={handleSave}
+          disabled={saving || !hasChanges}
           className="px-6 py-2 bg-[#00b3ad] text-white font-medium rounded-full hover:bg-[#00a39f] transition"
         >
-          Save Changes
+          {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
 
