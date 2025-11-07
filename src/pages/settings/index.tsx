@@ -45,7 +45,7 @@ export default function SettingsPage() {
       {/* Tab Content */}
       <div className="p-4 bg-[#f7f7f7] rounded-2xl">
         {activeTab === "account" ? (
-          <AccountTab onSave={handleSave} />
+          <AccountTab onSaved={handleSave} />
         ) : (
           <NotificationTab onSave={handleSave} />
         )}
