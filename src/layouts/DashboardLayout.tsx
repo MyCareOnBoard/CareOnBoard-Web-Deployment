@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { useMemo, useState, useEffect } from "react";
 import { Outlet, useLocation, useNavigate, Navigate } from "react-router";
-import { ChevronDown, ChevronUp, User, Settings, LogOut } from "lucide-react";
+import { ChevronDown, ChevronUp, User, Settings, LogOut, Lock, HelpCircle } from "lucide-react";
 import { useSelector } from "react-redux";
 
 import { cn } from "@/lib/utils";
@@ -84,10 +84,11 @@ function UserAvatar({ userName, userImage }: { userName?: string; userImage?: st
   );
 }
 
-export function Header({ actions, userName, userImage, onLogout }: { actions?: ReactNode; userName?: string; userImage?: string; onLogout?: () => void }) {
+export function Header({ actions, userName, userImage, userRole, onLogout }: { actions?: ReactNode; userName?: string; userImage?: string; userRole?: string; onLogout?: () => void }) {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isNotificationDropdownOpen, setIsNotificationDropdownOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   
   return (
     <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5]">
@@ -116,15 +117,39 @@ export function Header({ actions, userName, userImage, onLogout }: { actions?: R
                   {/* <span className="absolute right-[9px] top-[9px] block h-[10px] w-[10px] rounded-full bg-[#d53411]" /> */}
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80 z-[100] bg-white">
-                <DropdownMenuLabel className="text-base font-semibold">Notifications</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <div className="px-4 py-8 text-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <BellIcon className="w-8 h-8 text-[#b2b2b3]" />
-                    <p className="text-sm text-[#808081]">No notifications yet</p>
-                    <p className="text-xs text-[#b2b2b3]">You'll see updates here when there's activity</p>
+              <DropdownMenuContent align="end" className="w-[320px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-[12px] p-0 backdrop-blur-sm">
+                {/* Notifications Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(239,239,239,0.08)]">
+                  <h3 className="text-[16px] font-semibold text-[#10141a]">Notifications</h3>
+                  <span className="text-[12px] font-medium text-[#00b4b8] cursor-pointer hover:underline">
+                    Mark all as read
+                  </span>
+                </div>
+                
+                {/* Empty State */}
+                <div className="px-4 py-12 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white/50">
+                      <BellIcon className="w-8 h-8 text-[#b2b2b3]" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[14px] font-semibold text-[#10141a]">No notifications yet</p>
+                      <p className="text-[12px] font-medium text-[#808081]">You'll see updates here when there's activity</p>
+                    </div>
                   </div>
+                </div>
+                
+                {/* Footer */}
+                <div className="border-t border-[rgba(239,239,239,0.08)]">
+                  <button
+                    className="w-full px-4 py-3 text-[14px] font-semibold text-[#00b4b8] hover:bg-white/30 transition-colors"
+                    onClick={() => {
+                      setIsNotificationDropdownOpen(false);
+                      // Navigate to notifications page when implemented
+                    }}
+                  >
+                    View all notifications
+                  </button>
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -140,26 +165,75 @@ export function Header({ actions, userName, userImage, onLogout }: { actions?: R
                   )}
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 z-[100] bg-white">
-                {/* <DropdownMenuLabel>Account</DropdownMenuLabel> */}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem  className="cursor-pointer focus:text-[#00b3ad] focus:bg-[#E5EFFA]" onClick={() => navigate("/applicant/profile")}>
-                  <User className="w-4 h-4 mr-2" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer focus:text-[#00b3ad] focus:bg-[#E5EFFA]" onClick={() => navigate("/applicant/settings")}>
-                  <Settings className="w-4 h-4 mr-2" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={onLogout}
-                  className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50"
-                >
-                  <LogOut className="w-4 h-4 mr-2 text-red-600" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-[214px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-[12px] p-0 backdrop-blur-sm">
+                {/* <div className="flex items-center gap-3 p-3 border-b border-[rgba(239,239,239,0.08)]">
+                  <UserAvatar userName={userName} userImage={userImage} />
+                  <div className="flex flex-col gap-1 flex-1">
+                    <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+                      {userName || 'User'}
+                    </p>
+                    <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
+                      {userRole || 'DSP'}
+                    </p>
+                  </div>
+                </div> */}
+                <div className="py-0">
+                  <DropdownMenuItem 
+                    className={cn(
+                      "cursor-pointer px-4 py-2 rounded-none gap-3",
+                      location.pathname === Routes.profile
+                        ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
+                        : "hover:bg-white/50 focus:bg-white/50"
+                    )}
+                    onClick={() => navigate(Routes.profile)}
+                  >
+                    <User className={cn("w-4 h-4", location.pathname === Routes.profile ? "text-[#00b4b8]" : "text-[#808081]")} />
+                    <span className={cn(
+                      "text-[14px]",
+                      location.pathname === Routes.profile ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
+                    )}>Profile</span>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem 
+                    className={cn(
+                      "cursor-pointer px-4 py-2 rounded-none gap-3",
+                      location.pathname === Routes.settings
+                        ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
+                        : "hover:bg-white/50 focus:bg-white/50"
+                    )}
+                    onClick={() => navigate(Routes.settings)}
+                  >
+                    <Lock className={cn("w-4 h-4", location.pathname === Routes.settings ? "text-[#00b4b8]" : "text-[#808081]")} />
+                    <span className={cn(
+                      "text-[14px]",
+                      location.pathname === Routes.settings ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
+                    )}>Settings</span>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem 
+                    className={cn(
+                      "cursor-pointer px-4 py-2 rounded-none gap-3",
+                      location.pathname === Routes.helpCenter
+                        ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
+                        : "hover:bg-white/50 focus:bg-white/50"
+                    )}
+                    onClick={() => navigate(Routes.helpCenter)}
+                  >
+                    <HelpCircle className={cn("w-4 h-4", location.pathname === Routes.helpCenter ? "text-[#00b4b8]" : "text-[#808081]")} />
+                    <span className={cn(
+                      "text-[14px]",
+                      location.pathname === Routes.helpCenter ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
+                    )}>Help Center</span>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem
+                    onClick={onLogout}
+                    className="cursor-pointer hover:bg-white/50 focus:bg-white/50 px-4 py-2 rounded-none gap-3"
+                  >
+                    <LogOut className="w-4 h-4 text-[#d53411]" />
+                    <span className="font-medium text-[14px] text-[#d53411]">Logout</span>
+                  </DropdownMenuItem>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -236,7 +310,8 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
       <Header 
         userName={user?.fullName} 
-        userImage={(user as any)?.profileImage || user?.photoURL} 
+        userImage={(user as any)?.profileImage || user?.photoURL}
+        userRole={(user as any)?.role || 'DSP'}
         onLogout={handleLogout} 
       />
       <Sidebar />
