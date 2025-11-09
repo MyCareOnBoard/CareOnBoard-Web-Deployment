@@ -85,7 +85,8 @@ function UserAvatar({ userName, userImage }: { userName?: string; userImage?: st
 }
 
 export function Header({ actions, userName, userImage, onLogout }: { actions?: ReactNode; userName?: string; userImage?: string; onLogout?: () => void }) {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [isNotificationDropdownOpen, setIsNotificationDropdownOpen] = useState(false);
   const navigate = useNavigate();
   
   return (
@@ -102,16 +103,37 @@ export function Header({ actions, userName, userImage, onLogout }: { actions?: R
               ariaLabel="Settings" 
               onClick={() => navigate("/applicant/settings")}
             />
-            <div className="relative">
-              <HeaderActionButton icon={BellIcon} ariaLabel="Notifications" />
-              {/* <span className="absolute right-[9px] top-[9px] block h-[10px] w-[10px] rounded-full bg-[#d53411]" /> */}
-            </div>
-            <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+            <DropdownMenu open={isNotificationDropdownOpen} onOpenChange={setIsNotificationDropdownOpen}>
+              <DropdownMenuTrigger asChild>
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-label="Notifications"
+                    className="grid h-[42px] w-[42px] place-items-center rounded-[50px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] text-[#808081] backdrop-blur-[22px] cursor-pointer hover:bg-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.5)] transition-all duration-200"
+                  >
+                    <BellIcon className="w-5 h-5" />
+                  </button>
+                  {/* <span className="absolute right-[9px] top-[9px] block h-[10px] w-[10px] rounded-full bg-[#d53411]" /> */}
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80 z-[100] bg-white">
+                <DropdownMenuLabel className="text-base font-semibold">Notifications</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <div className="px-4 py-8 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <BellIcon className="w-8 h-8 text-[#b2b2b3]" />
+                    <p className="text-sm text-[#808081]">No notifications yet</p>
+                    <p className="text-xs text-[#b2b2b3]">You'll see updates here when there's activity</p>
+                  </div>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu open={isUserDropdownOpen} onOpenChange={setIsUserDropdownOpen}>
               <DropdownMenuTrigger asChild>
                 <div className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer">
                   <UserAvatar userName={userName} userImage={userImage} />
                   <p className="pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a]">{userName || 'User'}</p>
-                  {isDropdownOpen ? (
+                  {isUserDropdownOpen ? (
                     <ChevronUp className="h-4 w-4 text-[#808081] mr-2" />
                   ) : (
                     <ChevronDown className="h-4 w-4 text-[#808081] mr-2" />
