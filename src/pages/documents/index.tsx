@@ -13,16 +13,20 @@ export default function DocumentsPage() {
     return splittedFileUrl[splittedFileUrl.length - 1]
   }
 
-  if (isLoading) {
-    return <PageLoader text="Loading documents..." />
-  }
-
   return (
     <div>
       <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">Documents</h1>
       <p className="text-black font-semibold">
         Here are your submitted documents
       </p>
+      {isLoading ? (
+        <div className="flex min-h-[400px] items-center justify-center">
+          <div className="text-center">
+            <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
+            <p className="text-sm text-[#808081]">Loading documents...</p>
+          </div>
+        </div>
+      ) : (
       <form className={"mt-5 space-y-5 max-w-md"}>
         {
           Object.entries(data?.documents || {}).map(([key, value]) => (
@@ -48,6 +52,7 @@ export default function DocumentsPage() {
           ))
         }
       </form>
+      )}
     </div>
   );
 }
