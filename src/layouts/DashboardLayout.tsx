@@ -102,7 +102,7 @@ export function Header({ actions, userName, userImage, userRole, onLogout }: { a
             <HeaderActionButton 
               icon={CogIcon} 
               ariaLabel="Settings" 
-              onClick={() => navigate("/applicant/settings")}
+              onClick={() => navigate(Routes.settings)}
             />
             <DropdownMenu open={isNotificationDropdownOpen} onOpenChange={setIsNotificationDropdownOpen}>
               <DropdownMenuTrigger asChild>
@@ -286,9 +286,8 @@ export function Sidebar({ footer }: { footer?: ReactNode }) {
 }
 
 export default function DashboardLayout({ children }: { children?: ReactNode }) {
-  const { user, loading, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const reduxUser = useSelector((state: RootState) => state.auth?.user);
 
   const handleLogout = async () => {
     try {
@@ -305,7 +304,6 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
     }
   }, [user]);
 
-  console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
   return (
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
       <Header 

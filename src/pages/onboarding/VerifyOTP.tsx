@@ -6,6 +6,7 @@ import { verifyOtp, resendOtp } from "@/lib/api/otp"
 import { apiFetch } from "@/lib/api/otp"
 import { getAuth } from "firebase/auth"
 import LogoHeader from "./components/LogoHeader"
+import { Routes } from "@/routes/constants"
 
 export default function VerifyOTP() {
   const nav = useNavigate()
@@ -71,7 +72,7 @@ export default function VerifyOTP() {
       }
       
       // Step 3: Redirect to dashboard
-      nav("/applicant/dashboard", { replace: true })
+      nav(Routes.dashboard, { replace: true })
     } catch (e: any) {
       setError(e?.message || "Invalid or expired OTP")
     } finally {

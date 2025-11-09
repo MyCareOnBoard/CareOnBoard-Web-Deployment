@@ -1,5 +1,5 @@
-import {createBrowserRouter} from "react-router";
-import {Routes} from "@/routes/constants";
+import { createBrowserRouter } from "react-router";
+import { Routes } from "@/routes/constants";
 import SplashScreen from "@/pages/splash";
 import VerifyOTP from "@/pages/onboarding/VerifyOTP";
 import VerifyEmail from "@/pages/onboarding/VerifyEmail";
@@ -22,7 +22,6 @@ import SuccessScreen from "@/pages/onboarding/SuccessScreen";
 export const router = createBrowserRouter([
   {
     path: Routes.splash,
-    index: true,
     Component: SplashScreen,
   },
   {
@@ -42,7 +41,6 @@ export const router = createBrowserRouter([
     Component: SuccessScreen,
   },
   {
-    path: Routes.root,
     Component: AppLayout,
     children: [
       {
@@ -64,7 +62,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: Routes.app,
+    path: Routes.root,
     Component: DashboardLayout,
     children: [
       {

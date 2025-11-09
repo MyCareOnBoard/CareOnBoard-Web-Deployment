@@ -1,13 +1,11 @@
-import { Settings } from "lucide-react";
-
 export const Routes = {
   root: "/",
-  splash: "/",
-  app: "/applicant",
-  dashboard: "/applicant/dashboard",
-  application: "/applicant/application",
-  documents: "/applicant/documents",
-  helpCenter: "/applicant/help-center",
+  splash: "/splash",
+  app: "/",
+  dashboard: "/dashboard",
+  application: "/application",
+  documents: "/documents",
+  helpCenter: "/help-center",
   login: "/login",
   signup: "/signup",
   forgotPassword: "/forgot-password",
@@ -16,6 +14,6 @@ export const Routes = {
   onboardingEmail: "/onboarding/email",
   onboardingOTP: "/onboarding/otp",
   onboardingSuccess: "/onboarding/success",
-  settings: "/applicant/settings",
-  profile: "/applicant/profile",
+  settings: "/settings",
+  profile: "/profile",
 };
