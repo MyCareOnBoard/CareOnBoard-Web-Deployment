@@ -37,13 +37,15 @@ const navItems: NavItem[] = [
   { label: "Application", path: Routes.application, icon: UserIcon },
   { label: "Documents", path: Routes.documents, icon: FileIcon },
   { label: "Help Center", path: Routes.helpCenter, icon: QuestionIcon },
+  { label: "Settings", path: Routes.settings, icon: CogIcon },
 ];
 
-function HeaderActionButton({ icon: Icon, ariaLabel }: { icon: ComponentType<{ className?: string }>; ariaLabel: string }) {
+function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: ComponentType<{ className?: string }>; ariaLabel: string; onClick?: () => void }) {
   return (
     <button
       type="button"
       aria-label={ariaLabel}
+      onClick={onClick}
       className="grid h-[42px] w-[42px] place-items-center rounded-[50px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] text-[#808081] backdrop-blur-[22px] cursor-pointer hover:bg-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.5)] transition-all duration-200"
     >
       <Icon className="w-5 h-5" />
@@ -51,7 +53,38 @@ function HeaderActionButton({ icon: Icon, ariaLabel }: { icon: ComponentType<{ c
   );
 }
 
-export function Header({ actions, userName, onLogout }: { actions?: ReactNode; userName?: string; onLogout?: () => void }) {
+function UserAvatar({ userName, userImage }: { userName?: string; userImage?: string }) {
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  if (userImage) {
+    return (
+      <img 
+        src={userImage} 
+        alt="User profile" 
+        className="h-[34px] w-[34px] rounded-full object-cover"
+        onError={(e) => {
+          // Hide the image and show initials if image fails to load
+          e.currentTarget.style.display = 'none';
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xs font-semibold">
+      {getInitials(userName)}
+    </div>
+  );
+}
+
+export function Header({ actions, userName, userImage, onLogout }: { actions?: ReactNode; userName?: string; userImage?: string; onLogout?: () => void }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
   
@@ -64,7 +97,11 @@ export function Header({ actions, userName, onLogout }: { actions?: ReactNode; u
 
         {actions ?? (
           <div className="flex items-center gap-[10px]">
-            <HeaderActionButton icon={CogIcon} ariaLabel="Settings" />
+            <HeaderActionButton 
+              icon={CogIcon} 
+              ariaLabel="Settings" 
+              onClick={() => navigate("/applicant/settings")}
+            />
             <div className="relative">
               <HeaderActionButton icon={BellIcon} ariaLabel="Notifications" />
               {/* <span className="absolute right-[9px] top-[9px] block h-[10px] w-[10px] rounded-full bg-[#d53411]" /> */}
@@ -72,7 +109,7 @@ export function Header({ actions, userName, onLogout }: { actions?: ReactNode; u
             <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
               <DropdownMenuTrigger asChild>
                 <div className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer">
-                  <img src="/user-profile-image.png" alt="User profile" className="h-[34px] w-[34px] rounded-full object-cover" />
+                  <UserAvatar userName={userName} userImage={userImage} />
                   <p className="pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a]">{userName || 'User'}</p>
                   {isDropdownOpen ? (
                     <ChevronUp className="h-4 w-4 text-[#808081] mr-2" />
@@ -175,7 +212,11 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
   console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
   return (
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
-      <Header userName={user?.fullName} onLogout={handleLogout} />
+      <Header 
+        userName={user?.fullName} 
+        userImage={(user as any)?.profileImage || user?.photoURL} 
+        onLogout={handleLogout} 
+      />
       <Sidebar />
       <main className="ml-[240px] pt-[130px] pb-10">
         <div className="px-8">{children ?? <Outlet />}</div>
