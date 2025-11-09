@@ -62,7 +62,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: Routes.dashboard,
+    // path: Routes.dashboard,
     Component: DashboardLayout,
     children: [
       {
