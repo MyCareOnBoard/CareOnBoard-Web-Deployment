@@ -21,7 +21,7 @@ import SuccessScreen from "@/pages/onboarding/SuccessScreen";
 
 export const router = createBrowserRouter([
   {
-    path: Routes.splash,
+    path: Routes.root,
     Component: SplashScreen,
   },
   {
@@ -62,13 +62,9 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: Routes.root,
+    path: Routes.dashboard,
     Component: DashboardLayout,
     children: [
-      {
-        index: true,
-        Component: DashboardPage,
-      },
       {
         path: Routes.application,
         Component: ApplicationStepper,
