@@ -249,7 +249,7 @@ export function Sidebar({ footer }: { footer?: ReactNode }) {
 
   const activePath = useMemo(() => {
     const match = navItems.find(({ path }) => location.pathname === path);
-    return match?.path ?? Routes.dashboard;
+    return match?.path ?? '';
   }, [location.pathname]);
 
   return (
