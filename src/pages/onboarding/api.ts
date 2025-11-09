@@ -34,13 +34,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
 
 // Onboarding API helpers
 
-// If you have a central apiFetch utility, import it.
-// import { apiFetch } from '@/lib/api/client'
-
-interface UserProfile {
-  onboarding?: boolean
-  // add other profile fields if needed
-}
+import type { UserProfile, UserProfileResponse } from '@/lib/api/users'
 
 function getBase(): string {
   // Prefer existing env vars; fallback to relative (handled by dev proxy / hosting rewrites)
@@ -76,8 +70,14 @@ async function rawFetch<T>(path: string, init: RequestInit): Promise<T> {
 
 // Marks the user as having completed onboarding
 export async function completeOnboarding(): Promise<UserProfile> {
-  return rawFetch<UserProfile>('/users/profile', {
+  const response = await rawFetch<UserProfileResponse>('/users/profile', {
     method: 'PUT',
-    body: JSON.stringify({ onboarding: true }),
+    body: JSON.stringify({ onboardingCompleted: true }),
   })
+
+  if (!response.success || !response.user) {
+    throw new Error("Invalid response format from server")
+  }
+
+  return response.user
 }

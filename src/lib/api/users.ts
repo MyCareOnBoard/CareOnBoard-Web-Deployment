@@ -1,16 +1,47 @@
 import { apiFetch } from "./otp" // Reuse your existing Firebase-aware fetch helper
 
-// Define user data shape for type safety
+/**
+ * Firebase Timestamp structure
+ */
+export interface FirebaseTimestamp {
+  _seconds: number
+  _nanoseconds: number
+}
+
+/**
+ * User Profile data shape matching backend API response
+ */
 export interface UserProfile {
-  id?: string
-  name?: string
-  email?: string
+  id: string
+  uid: string
+  email: string
+  fullName: string
+  emailVerified: boolean
+  userType?: string
+  otpVerified?: boolean
+  otpVerifiedAt?: FirebaseTimestamp
+  onboardingCompleted?: boolean
+  createdAt: FirebaseTimestamp
+  updatedAt: FirebaseTimestamp
+  // Profile-specific fields
   phone?: string
   address?: string
   gender?: "Male" | "Female" | "Other" | string
   summary?: string
   joiningDate?: string
   photo?: string
+  photoURL?: string
+  phoneNumber?: string
+  role?: string
+  profileImage?: string
+}
+
+/**
+ * API Response wrapper for user profile
+ */
+export interface UserProfileResponse {
+  success: boolean
+  user: UserProfile
 }
 
 /**
@@ -19,7 +50,13 @@ export interface UserProfile {
  */
 export async function getUserProfile(): Promise<UserProfile> {
   try {
-    return await apiFetch("/users/profile")
+    const response: UserProfileResponse = await apiFetch("/users/profile")
+
+    if (!response.success || !response.user) {
+      throw new Error("Invalid response format from server")
+    }
+
+    return response.user
   } catch (err: any) {
     // Re-throw with more context
     if (err.message?.includes("404")) {
@@ -31,20 +68,20 @@ export async function getUserProfile(): Promise<UserProfile> {
 
 /**
  * ✅ Update the authenticated user's profile
- * Endpoint: PUT /users/update
+ * Endpoint: PUT /users/profile
  */
-export async function updateUserProfile(profileData: UserProfile): Promise<UserProfile> {
+export async function updateUserProfile(profileData: Partial<UserProfile>): Promise<UserProfile> {
   try {
-    const data = await apiFetch("/users/profile", {
+    const response: UserProfileResponse = await apiFetch("/users/profile", {
       method: "PUT",
       body: JSON.stringify(profileData),
     })
 
-    if (!data || typeof data !== "object") {
-      throw new Error("Invalid response format")
+    if (!response.success || !response.user) {
+      throw new Error("Invalid response format from server")
     }
 
-    return data
+    return response.user
   } catch (err: any) {
     console.error("updateUserProfile error:", err)
     throw new Error(err.message || "Failed to update user profile")

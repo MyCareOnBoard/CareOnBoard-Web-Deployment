@@ -12,6 +12,7 @@ import { useAuth } from "@/utils/auth"
 import { useToast } from "@/hooks/use-toast"
 import { ButtonLoader } from "@/components/ui/loader"
 import { Routes } from "@/routes/constants"
+import { getUserProfile } from "@/lib/api/users"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -105,7 +106,14 @@ export default function LoginPage() {
         title: "Success",
         description: "Logged in successfully",
       })
-      navigate("/onboarding")
+
+      const profile = await getUserProfile()
+      // Check if onboarding is already completed
+      if (profile.onboardingCompleted) {
+        navigate(Routes.dashboard, { replace: true })
+        return
+      }
+      navigate(Routes.onboarding)
     } catch (error: any) {
       toast({
         title: "Error",
