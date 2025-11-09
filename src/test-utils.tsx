@@ -11,7 +11,7 @@ const mockNavigate = vi.fn();
 const TestWrapper = () => {
   // Create a test router with the app's routes
   const testRouter = createMemoryRouter(router.routes, {
-    initialEntries: ['/application'],
+    initialEntries: ['/dashboard/application'],
     initialIndex: 0,
   });
 
