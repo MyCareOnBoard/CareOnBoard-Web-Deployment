@@ -1,4 +1,5 @@
 import { useRef, useState } from "react"
+import { useNavigate } from "react-router"
 import { Button } from "@/components/ui/button"
 import {
   User,
@@ -19,6 +20,7 @@ import DatePicker from "react-datepicker"
 import PhoneInput from "react-phone-number-input"
 import "react-datepicker/dist/react-datepicker.css"
 import "react-phone-number-input/style.css"
+import { Routes } from "@/routes/constants"
 
 function formatISODateToLong(iso: string) {
   const d = new Date(iso)
@@ -39,6 +41,7 @@ function formatUSPhone(e164: string) {
 }
 
 export default function ProfilePage() {
+  const navigate = useNavigate()
   const [showEdit, setShowEdit] = useState(false)
   const [formData, setFormData] = useState<any>({})
   const [saving, setSaving] = useState(false)
@@ -138,8 +141,11 @@ export default function ProfilePage() {
     <div className="p-6 sm:p-10 bg-[#EEF5F6] rounded-2xl min-h-[calc(100vh-100px)]">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-3xl font-semibold text-gray-800">Dashboard</h2>
-          <Button className="rounded-full bg-[#00B4B8] hover:bg-[#00a0a4] px-4 py-2 h-10 text-white gap-2">
+          <h2 className="text-3xl font-semibold text-gray-800">Profile</h2>
+          <Button 
+            onClick={() => navigate(Routes.application)}
+            className="rounded-full bg-[#00B4B8] hover:bg-[#00a0a4] px-4 py-2 h-10 text-white gap-2"
+          >
             <Plus size={16} />
             New Application
           </Button>
