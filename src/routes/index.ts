@@ -1,9 +1,8 @@
 import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
 import SplashScreen from "@/pages/splash";
-import VerifyOTP from "@/pages/onboarding/components/VerifyOTP";
-import VerifyEmail from "@/pages/onboarding/components/VerifyEmail";
-import SuccessMessage from "@/pages/onboarding/components/SuccessMessage";
+import VerifyOTP from "@/pages/onboarding/VerifyOTP";
+import VerifyEmail from "@/pages/onboarding/VerifyEmail";
 import AppLayout from "@/layouts/AppLayout";
 import LoginPage from "@/pages/login";
 import SignUpPage from "@/pages/signup";
@@ -17,37 +16,31 @@ import SettingsPage from "@/pages/settings";
 import ProfilePage from "@/pages/profile";
 import ApplicationStepper from "@/pages/application";
 import OnboardingSlider from "@/pages/onboarding/components/OnboardingSlider";
+import SuccessScreen from "@/pages/onboarding/SuccessScreen";
 
 
 export const router = createBrowserRouter([
   {
     path: Routes.splash,
-    index: true,
     Component: SplashScreen,
   },
   {
     path: Routes.onboarding,
-    children: [
-      {
-        path: Routes.onboarding,
-        Component: OnboardingSlider,
-      },
-      {
-        path: Routes.onboardingEmail,
-        Component: VerifyEmail,
-      },
-      {
-        path: Routes.onboardingOTP,
-        Component: VerifyOTP,
-      },
-      {
-        path: Routes.onboardingSuccess,
-        Component: SuccessMessage,
-      },
-    ],
+    Component: OnboardingSlider,
   },
   {
-    path: Routes.root,
+    path: Routes.onboardingEmail,
+    Component: VerifyEmail,
+  },
+  {
+    path: Routes.onboardingOTP,
+    Component: VerifyOTP,
+  },
+  {
+    path: Routes.onboardingSuccess,
+    Component: SuccessScreen,
+  },
+  {
     Component: AppLayout,
     children: [
       {
@@ -69,7 +62,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: Routes.app,
+    path: Routes.root,
     Component: DashboardLayout,
     children: [
       {

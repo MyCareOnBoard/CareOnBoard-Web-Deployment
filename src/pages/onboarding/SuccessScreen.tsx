@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router";
 import SuccessMessage from "./SuccessMessage";
+import { Routes } from "@/routes/constants";
 
 export default function SuccessScreen() {
   const nav = useNavigate();
@@ -9,7 +10,7 @@ export default function SuccessScreen() {
       title="Email Verification Complete!"
       // message="Your email has been verified. You can now continue to your dashboard."
       buttonText="Continue to Dashboard"
-      onButtonClick={() => nav("/applicant/dashboard")}
+      onButtonClick={() => nav(Routes.dashboard)}
     />
   );
 }

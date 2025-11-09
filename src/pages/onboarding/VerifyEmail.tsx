@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { sendOtp } from "@/lib/api/otp"
 import { apiFetch } from "@/lib/api/otp"
 import { getAuth } from "firebase/auth"
 import LogoHeader from "./components/LogoHeader"
+import { Routes } from "@/routes/constants"
 
 export default function VerifyEmail() {
   const [email, setEmail] = useState("")
@@ -38,14 +39,14 @@ export default function VerifyEmail() {
             // Check if onboarding is already completed
             if (profile.user.onboardingCompleted) {
               console.log("✅ Onboarding already completed, redirecting to dashboard")
-              nav("/applicant/dashboard", { replace: true })
+              nav(Routes.dashboard, { replace: true })
               return
             }
             
             // Check if email and OTP are both verified
             if (profile.user.emailVerified && profile.user.otpVerified) {
               console.log("✅ Email and OTP verified, redirecting to dashboard")
-              nav("/applicant/dashboard", { replace: true })
+              nav(Routes.dashboard, { replace: true })
               return
             }
             
