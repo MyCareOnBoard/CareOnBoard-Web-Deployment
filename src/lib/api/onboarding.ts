@@ -4,7 +4,21 @@
  */
 
 import axiosClient from '../axios';
-import type { UserProfile, UserProfileResponse } from './users';
+import type { FirebaseTimestamp, UserProfile, UserProfileResponse } from './users';
+
+function firebaseTimestampToISOString(timestamp?: FirebaseTimestamp): string | undefined {
+    if (!timestamp) {
+        return undefined;
+    }
+
+    const milliseconds = timestamp._seconds * 1000 + timestamp._nanoseconds / 1_000_000;
+    return new Date(milliseconds).toISOString();
+}
+
+export interface OnboardingStatus {
+    completed: boolean
+    completedAt?: string
+}
 
 /**
  * Create user profile data structure
@@ -100,3 +114,25 @@ export async function checkProfileStatus(): Promise<UserProfile | null> {
     }
 }
 
+/**
+ * Get onboarding completion status for the current user
+ */
+export async function getOnboardingStatus(): Promise<OnboardingStatus> {
+    try {
+        console.log('🔄 [Onboarding] Fetching onboarding status...')
+
+        // Get user profile which includes onboardingCompleted field
+        const profile = await getUserProfile()
+
+        console.log('📥 [Onboarding] Profile data:', profile)
+        console.log('✅ [Onboarding] Status from API - completed:', profile.onboardingCompleted)
+
+        return {
+            completed: profile.onboardingCompleted || false,
+            completedAt: firebaseTimestampToISOString(profile.otpVerifiedAt), // Use OTP verification time as proxy for completion time
+        }
+    } catch (error: any) {
+        console.warn('⚠️ [Onboarding] API call failed:', error.message)
+        throw error;
+    }
+}
