@@ -13,7 +13,7 @@ import {
   CalendarIcon,
   Plus,
   Building2,
-  // Camera, // COMMENTED OUT - Image upload disabled
+  Camera,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { motion, AnimatePresence } from "framer-motion"
@@ -26,9 +26,9 @@ import {
   getProfileInfo,
   updateProfileInfo,
   deleteAccount,
-  // uploadProfilePicture, // COMMENTED OUT - Image upload disabled
   type ProfileInfo,
 } from "@/lib/api/profile"
+import { updateAccountInfo } from "@/lib/api/settings"
 import { getAuth } from "firebase/auth"
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal"
 
@@ -65,7 +65,6 @@ function formatFullAddress(profile: ProfileInfo): string {
   
   if (parts.length === 0) return "Not provided"
   
-  // Format: "123 Main St, Syracuse, Connecticut 35624"
   const streetAddress = profile.address || ""
   const cityStateZip = [profile.city, profile.state].filter(Boolean).join(", ")
   const fullCityStateZip = [cityStateZip, profile.zipCode].filter(Boolean).join(" ")
@@ -88,9 +87,11 @@ export default function ProfilePage() {
   // Profile data from API
   const [profile, setProfile] = useState<ProfileInfo | null>(null)
 
-  // Image upload - COMMENTED OUT
-  // const fileInputRef = useRef<HTMLInputElement>(null)
+  // Image upload states
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [photoPreview, setPhotoPreview] = useState<string>("")
+  const [tempImage, setTempImage] = useState<string | null>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
 
   // Load profile data on mount
   useEffect(() => {
@@ -107,10 +108,11 @@ export default function ProfilePage() {
       
       console.log('📥 API returned:', data)
       
-      // Fallback to Firebase auth if data is missing (matches AccountTab logic)
+      // Fallback to Firebase auth if data is missing
       let fullName = data.fullName || ""
       let email = data.email || ""
       let joiningDate = data.joiningDate || ""
+      let profilePicture = data.profilePicture || ""
       
       const auth = getAuth()
       await auth.authStateReady?.()
@@ -124,13 +126,16 @@ export default function ProfilePage() {
         console.log("⚠️ Using Firebase email as fallback:", currentUser.email)
         email = currentUser.email
       }
+      if (!profilePicture && currentUser?.photoURL) {
+        console.log("⚠️ Using Firebase photoURL as fallback:", currentUser.photoURL)
+        profilePicture = currentUser.photoURL
+      }
       
       // If no joining date from API, use Firebase account creation date
       if (!joiningDate && currentUser?.metadata?.creationTime) {
         const creationDate = new Date(currentUser.metadata.creationTime)
         joiningDate = creationDate.toISOString().split('T')[0]
         console.log("⚠️ Using Firebase account creation date as joining date:", joiningDate)
-        console.log("   Creation timestamp:", currentUser.metadata.creationTime)
       }
 
       const mergedProfile: ProfileInfo = {
@@ -138,28 +143,16 @@ export default function ProfilePage() {
         fullName,
         email,
         joiningDate,
+        profilePicture,
       }
 
-      console.log("✅ Merged profile data:")
-      console.log("  - Full Name:", mergedProfile.fullName)
-      console.log("  - Email:", mergedProfile.email)
-      console.log("  - Phone:", mergedProfile.phone)
-      console.log("  - Address:", mergedProfile.address)
-      console.log("  - City:", mergedProfile.city)
-      console.log("  - State:", mergedProfile.state)
-      console.log("  - Zip Code:", mergedProfile.zipCode)
-      console.log("  - Gender:", mergedProfile.gender)
-      console.log("  - DOB:", mergedProfile.dateOfBirth)
-      console.log("  - Joining Date:", mergedProfile.joiningDate)
-      console.log("  - Profile Picture:", mergedProfile.profilePicture)
-      console.log("  - Summary:", mergedProfile.summary)
+      console.log("✅ Merged profile data:", mergedProfile)
 
       setProfile(mergedProfile)
 
-      // Set photo preview - use empty string if no profile picture
-      const profilePhoto = mergedProfile.profilePicture || ""
-      setPhotoPreview(profilePhoto)
-      console.log("🖼️ Set photo preview to:", profilePhoto || "(empty - will show placeholder)")
+      // Set photo preview
+      setPhotoPreview(profilePicture)
+      console.log("🖼️ Set photo preview to:", profilePicture || "(empty - will show placeholder)")
 
       // Initialize form data
       const initialData: Partial<ProfileInfo> = {
@@ -178,14 +171,12 @@ export default function ProfilePage() {
       }
 
       setFormData(initialData)
-      console.log("📝 Initialized form data:", initialData)
 
       // Set date picker
       if (mergedProfile.dateOfBirth) {
         const dateObj = new Date(mergedProfile.dateOfBirth)
         if (!isNaN(dateObj.getTime())) {
           setSelectedDate(dateObj)
-          console.log("📅 Set date picker to:", dateObj)
         }
       }
     } catch (err: any) {
@@ -205,7 +196,12 @@ export default function ProfilePage() {
     setShowEdit(true)
     setError("")
 
-    // Re-initialize form data from current profile state
+    // Reset image states to current profile
+    setPhotoPreview(profile.profilePicture || "")
+    setTempImage(null)
+    setImageFile(null)
+
+    // Re-initialize form data
     const editFormData: Partial<ProfileInfo> = {
       fullName: profile.fullName || "",
       email: profile.email || "",
@@ -234,11 +230,48 @@ export default function ProfilePage() {
     console.log("📝 Edit form initialized:", editFormData)
   }
 
+  const handleImageClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    console.log("📷 Image selected:", file.name, file.size, "bytes")
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image file")
+      return
+    }
+
+    // Validate file size (2MB max, matching AccountTab)
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Image must be less than 2MB")
+      return
+    }
+
+    setError("")
+
+    // Create preview
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = reader.result as string
+      console.log("🖼️ Image preview created")
+      setTempImage(result)
+      setPhotoPreview(result)
+    }
+    reader.readAsDataURL(file)
+
+    setImageFile(file)
+  }
+
   const handleSave = async () => {
     if (!profile) return
 
     console.log("💾 Starting save process...")
-    console.log("💾 Current form data:", formData)
+    console.log("💾 Has image file:", !!imageFile)
 
     // Validate required fields
     if (!formData.phone?.trim()) {
@@ -274,7 +307,22 @@ export default function ProfilePage() {
     setError("")
 
     try {
-      // Prepare update data with ALL fields to ensure persistence
+      // Step 1: If image changed, upload it via Settings API (same as AccountTab)
+      if (imageFile) {
+        console.log("📤 Uploading profile picture via Settings API...")
+        const accountResult = await updateAccountInfo({
+          profilePictureFile: imageFile,
+        })
+        console.log("✅ Image uploaded, new URL:", accountResult.profilePicture)
+        
+        // Update local state with new image URL
+        if (accountResult.profilePicture) {
+          setPhotoPreview(accountResult.profilePicture)
+          setProfile(prev => prev ? { ...prev, profilePicture: accountResult.profilePicture } : null)
+        }
+      }
+
+      // Step 2: Update profile data
       const updateData: Partial<ProfileInfo> = {
         phone: formData.phone.trim(),
         address: formData.address.trim(),
@@ -287,34 +335,27 @@ export default function ProfilePage() {
         role: formData.role || profile.role || "DSP",
       }
 
-      // Include fullName if provided
-      if (formData.fullName !== undefined) {
+      // Include fullName if changed
+      if (formData.fullName !== undefined && formData.fullName !== profile.fullName) {
         updateData.fullName = formData.fullName.trim()
       }
 
-      // Include current photo to maintain it
-      if (profile.profilePicture) {
-        updateData.profilePicture = profile.profilePicture
-      }
-      
-      // Include joining date to maintain it
-      if (profile.joiningDate) {
-        updateData.joiningDate = profile.joiningDate
-      }
-
-      console.log("📤 Sending update request with data:", updateData)
+      console.log("📤 Updating profile data:", updateData)
 
       await updateProfileInfo(updateData)
 
       console.log("✅ Profile updated successfully")
 
-      // Reload profile data to ensure sync with server
+      // Reload profile data to ensure sync
       await loadProfileData()
+
+      // Clear temp image states
+      setTempImage(null)
+      setImageFile(null)
 
       setShowEdit(false)
       setSuccess(true)
 
-      // Hide success message after 2 seconds
       setTimeout(() => {
         setSuccess(false)
       }, 2000)
@@ -338,16 +379,12 @@ export default function ProfilePage() {
       await deleteAccount()
       console.log("✅ Account deleted successfully")
       
-      // Clear auth and storage
       localStorage.clear()
       sessionStorage.clear()
       
-      // Redirect to login
       navigate("/login", { replace: true })
     } catch (err: any) {
       console.error("❌ Delete failed:", err)
-      
-      // Show error message below the profile card, not in modal
       setError(err?.message || "Failed to delete account. Please try again or contact support.")
       setDeleting(false)
       setShowDeleteConfirm(false)
@@ -429,7 +466,7 @@ export default function ProfilePage() {
 
           {/* Header Section */}
           <div className="flex flex-col gap-6 mb-6 md:mb-8 md:flex-row md:items-center md:justify-start">
-            {/* Image - Shows placeholder if no image */}
+            {/* Profile Image */}
             <div className="relative group">
               {photoPreview ? (
                 <img
@@ -438,7 +475,6 @@ export default function ProfilePage() {
                   className="object-cover border border-gray-100 w-28 h-28 md:w-32 md:h-32 rounded-2xl"
                   onError={(e) => {
                     console.error("❌ Image failed to load:", photoPreview)
-                    // Set to empty to show placeholder
                     setPhotoPreview("")
                   }}
                 />
@@ -530,7 +566,7 @@ export default function ProfilePage() {
               className="fixed top-0 bottom-0 right-0 z-50 w-full max-w-md overflow-y-auto bg-white shadow-2xl rounded-l-2xl">
               <div className="p-8 pb-24">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold">Update Account</h3>
+                  <h3 className="text-xl font-semibold">Update Profile</h3>
                   <button
                     onClick={() => {
                       setShowEdit(false)
@@ -538,10 +574,8 @@ export default function ProfilePage() {
                     }}
                     className="text-gray-400 hover:text-gray-600">
                     <X size={20} />
-            </button>
+                  </button>
                 </div>
-                    
-                <p className="mb-6 text-sm text-gray-500">Basic Info</p>
 
                 {error && (
                   <div className="p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-xl" role="alert">
@@ -550,7 +584,57 @@ export default function ProfilePage() {
                 )}
 
                 <div className="space-y-5">
-                  {/* Full Name - NOT REQUIRED */}
+                  {/* Profile Picture Upload */}
+                  <div>
+                    <label className="block mb-2 text-sm font-medium text-gray-700">
+                      Profile Picture
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <div className="relative group">
+                        {photoPreview ? (
+                          <img
+                            src={photoPreview}
+                            alt="Profile preview"
+                            className="object-cover w-20 h-20 border border-gray-200 rounded-xl"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center w-20 h-20 bg-gray-100 border border-gray-200 rounded-xl">
+                            <User size={32} className="text-gray-400" />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleImageClick}
+                          className="absolute inset-0 flex items-center justify-center transition-opacity opacity-0 bg-black/50 rounded-xl group-hover:opacity-100"
+                        >
+                          <Camera size={24} className="text-white" />
+                        </button>
+                      </div>
+                      <div className="flex-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleImageClick}
+                          className="w-full"
+                        >
+                          <Camera size={16} className="mr-2" />
+                          {photoPreview ? "Change Picture" : "Upload Picture"}
+                        </Button>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Max size: 2MB • JPG, PNG
+                        </p>
+                      </div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Full Name */}
                   <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       Full Name
@@ -562,7 +646,7 @@ export default function ProfilePage() {
                     />
                   </div>
 
-                  {/* Email Address - DISABLED & READ-ONLY */}
+                  {/* Email - Read Only */}
                   <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       Email Address
@@ -578,7 +662,7 @@ export default function ProfilePage() {
                     <p className="mt-1 text-xs text-gray-500">Email address cannot be modified</p>
                   </div>
 
-                  {/* Phone Number - REQUIRED */}
+                  {/* Phone Number */}
                   <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       Phone Number <span className="text-red-500">*</span>
@@ -593,7 +677,7 @@ export default function ProfilePage() {
                     />
                   </div>
 
-                  {/* Street Address - REQUIRED */}
+                  {/* Street Address */}
                   <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       Street Address <span className="text-red-500">*</span>
@@ -606,7 +690,7 @@ export default function ProfilePage() {
                     />
                   </div>
 
-                  {/* City - REQUIRED */}
+                  {/* City */}
                   <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       City <span className="text-red-500">*</span>
@@ -619,7 +703,7 @@ export default function ProfilePage() {
                     />
                   </div>
 
-                  {/* State and Zip Code - REQUIRED */}
+                  {/* State and Zip */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block mb-2 text-sm font-medium text-gray-700">
@@ -646,7 +730,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Date of Birth - REQUIRED */}
+                  {/* Date of Birth */}
                   <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       Date of Birth <span className="text-red-500">*</span>
@@ -676,7 +760,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Gender - REQUIRED */}
+                  {/* Gender */}
                   <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       Gender <span className="text-red-500">*</span>
@@ -707,7 +791,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Professional Summary - NOT REQUIRED */}
+                  {/* Professional Summary */}
                   <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       Professional Summary
