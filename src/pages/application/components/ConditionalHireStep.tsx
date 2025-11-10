@@ -405,9 +405,10 @@ export default function ConditionalHireStep({
                 </Button>
                 <Button
                   onClick={handleAccept}
+                  disabled={isSubmitting}
                   className="px-6 bg-teal-500 hover:bg-teal-600 text-white rounded-full"
                 >
-                  Sign Digitally
+                    {isSubmitting ? "Submitting..." : "Sign Digitally"}
                 </Button>
               </div>
             </div>
