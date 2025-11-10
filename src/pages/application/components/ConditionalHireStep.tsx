@@ -42,7 +42,6 @@ export default function ConditionalHireStep({
 
       if (hasSignature && !submissionSuccessful) {
         // Signature exists, directly submit conditional hire
-        console.log("[ConditionalHireStep] Signature exists, auto-submitting conditional hire...");
         try {
           await submitConditionalHire().unwrap();
           setSubmissionSuccessful(true);
@@ -92,8 +91,6 @@ export default function ConditionalHireStep({
     setShowSignatureModal(false);
 
     try {
-      console.log("[ConditionalHireStep] Submitting conditional hire after signature...");
-      
       // Submit conditional hire to backend with acceptance
       await submitConditionalHire().unwrap();
       setSubmissionSuccessful(true);

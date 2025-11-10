@@ -12,8 +12,12 @@ interface ComplianceStepProps {
   onNext?: () => void;
 }
 
-export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) {
-  const [finalizeConditionalHire, { isLoading }] = useFinalizeConditionalHireMutation();
+export default function ComplianceStep({
+  onBack,
+  onNext,
+}: ComplianceStepProps) {
+  const [finalizeConditionalHire, { isLoading }] =
+    useFinalizeConditionalHireMutation();
   const [authorizations, setAuthorizations] = useState({
     drugTest: false,
     fingerprint: false,
@@ -37,11 +41,11 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
   const canProceed = allAuthorizationsChecked && allAgreementsChecked;
 
   const handleAuthorizationToggle = (key: keyof typeof authorizations) => {
-    setAuthorizations(prev => ({ ...prev, [key]: !prev[key] }));
+    setAuthorizations((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleAgreementToggle = (key: keyof typeof agreements) => {
-    setAgreements(prev => ({ ...prev, [key]: !prev[key] }));
+    setAgreements((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleNext = async () => {
@@ -66,11 +70,8 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
         },
         informationCorrect: agreements.informationCorrect,
       };
+      await finalizeConditionalHire(payload).unwrap();
 
-      console.log("Submitting compliance payload:", payload);
-      const response = await finalizeConditionalHire(payload).unwrap();
-      console.log("Compliance finalization response:", response);
-      
       toast.success("Compliance requirements submitted successfully!", {
         description: "You can now proceed to the next step.",
         duration: 4000,
@@ -92,7 +93,8 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
     <div className="max-w-4xl p-6">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Begin compliance requirements while applicant is "conditionally hired."
+          Begin compliance requirements while applicant is "conditionally
+          hired."
         </h2>
       </div>
 
@@ -102,25 +104,28 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
           <span className="text-gray-900">Authorize Drug test appointment</span>
           <Toggle
             pressed={authorizations.drugTest}
-            onPressedChange={() => handleAuthorizationToggle('drugTest')}
-          />
-        </div>
-
-        <div className="flex items-center justify-between py-3 border-b border-gray-200">
-          <span className="text-gray-900">Authorize Fingerprint appointment</span>
-          <Toggle
-            pressed={authorizations.fingerprint}
-            onPressedChange={() => handleAuthorizationToggle('fingerprint')}
+            onPressedChange={() => handleAuthorizationToggle("drugTest")}
           />
         </div>
 
         <div className="flex items-center justify-between py-3 border-b border-gray-200">
           <span className="text-gray-900">
-            Authorize Central Registry Check (Developmental Disabilities Abuse/Neglect Registry)
+            Authorize Fingerprint appointment
+          </span>
+          <Toggle
+            pressed={authorizations.fingerprint}
+            onPressedChange={() => handleAuthorizationToggle("fingerprint")}
+          />
+        </div>
+
+        <div className="flex items-center justify-between py-3 border-b border-gray-200">
+          <span className="text-gray-900">
+            Authorize Central Registry Check (Developmental Disabilities
+            Abuse/Neglect Registry)
           </span>
           <Toggle
             pressed={authorizations.centralRegistry}
-            onPressedChange={() => handleAuthorizationToggle('centralRegistry')}
+            onPressedChange={() => handleAuthorizationToggle("centralRegistry")}
           />
         </div>
 
@@ -130,7 +135,7 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
           </span>
           <Toggle
             pressed={authorizations.cariCheck}
-            onPressedChange={() => handleAuthorizationToggle('cariCheck')}
+            onPressedChange={() => handleAuthorizationToggle("cariCheck")}
           />
         </div>
 
@@ -140,7 +145,7 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
           </span>
           <Toggle
             pressed={authorizations.sexOffender}
-            onPressedChange={() => handleAuthorizationToggle('sexOffender')}
+            onPressedChange={() => handleAuthorizationToggle("sexOffender")}
           />
         </div>
 
@@ -150,7 +155,7 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
           </span>
           <Toggle
             pressed={authorizations.oigExclusion}
-            onPressedChange={() => handleAuthorizationToggle('oigExclusion')}
+            onPressedChange={() => handleAuthorizationToggle("oigExclusion")}
           />
         </div>
 
@@ -158,7 +163,7 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
           <span className="text-gray-900">Authorize Health & TB Screening</span>
           <Toggle
             pressed={authorizations.healthTB}
-            onPressedChange={() => handleAuthorizationToggle('healthTB')}
+            onPressedChange={() => handleAuthorizationToggle("healthTB")}
           />
         </div>
 
@@ -168,7 +173,7 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
           </span>
           <Toggle
             pressed={authorizations.referenceChecks}
-            onPressedChange={() => handleAuthorizationToggle('referenceChecks')}
+            onPressedChange={() => handleAuthorizationToggle("referenceChecks")}
           />
         </div>
       </div>
@@ -179,7 +184,7 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
           <Checkbox
             id="abuse-awareness"
             checked={agreements.abuseAwareness}
-            onChange={() => handleAgreementToggle('abuseAwareness')}
+            onChange={() => handleAgreementToggle("abuseAwareness")}
           />
           <Label
             htmlFor="abuse-awareness"
@@ -200,7 +205,7 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
           <Checkbox
             id="hipaa"
             checked={agreements.hipaaConfidentiality}
-            onChange={() => handleAgreementToggle('hipaaConfidentiality')}
+            onChange={() => handleAgreementToggle("hipaaConfidentiality")}
           />
           <Label
             htmlFor="hipaa"
@@ -221,7 +226,7 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
           <Checkbox
             id="developmental-disabilities"
             checked={agreements.developmentalDisabilities}
-            onChange={() => handleAgreementToggle('developmentalDisabilities')}
+            onChange={() => handleAgreementToggle("developmentalDisabilities")}
           />
           <Label
             htmlFor="developmental-disabilities"
@@ -240,17 +245,17 @@ export default function ComplianceStep({ onBack, onNext }: ComplianceStepProps) 
       </div>
 
       <div className="flex items-start mb-6 space-x-3">
-         <Checkbox
-         id="information-correct"
-         checked={agreements.informationCorrect}
-         onChange={() => handleAgreementToggle('informationCorrect')}
-         />
-         <Label
-         htmlFor="information-correct"
-         className="text-sm text-gray-700 cursor-pointer leading-relaxed"
-         >
-         I hereby declared that all the information are correct
-         </Label>
+        <Checkbox
+          id="information-correct"
+          checked={agreements.informationCorrect}
+          onChange={() => handleAgreementToggle("informationCorrect")}
+        />
+        <Label
+          htmlFor="information-correct"
+          className="text-sm text-gray-700 cursor-pointer leading-relaxed"
+        >
+          I hereby declared that all the information are correct
+        </Label>
       </div>
 
       {/* Action Buttons */}
