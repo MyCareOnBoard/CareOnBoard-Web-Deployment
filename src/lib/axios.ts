@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { getIdToken } from '@/utils/auth';
+import { auth } from '@/lib/firebase';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -17,8 +18,37 @@ export const axiosClientWithoutAuth: AxiosInstance = axios.create({
     },
 });
 
+/**
+ * Wait for Firebase auth to initialize
+ * This prevents race conditions on page refresh
+ */
+const waitForAuthInit = (): Promise<void> => {
+    return new Promise((resolve) => {
+        // If there's already a current user, auth is initialized
+        if (auth.currentUser !== null) {
+            resolve();
+            return;
+        }
+
+        // Wait for auth state to be determined (max 5 seconds)
+        const timeout = setTimeout(() => {
+            unsubscribe();
+            resolve();
+        }, 5000);
+
+        const unsubscribe = auth.onAuthStateChanged(() => {
+            clearTimeout(timeout);
+            unsubscribe();
+            resolve();
+        });
+    });
+};
+
 axiosClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
+        // Wait for Firebase auth to initialize before getting token
+        await waitForAuthInit();
+
         // Get Firebase ID token
         const token = await getIdToken();
 

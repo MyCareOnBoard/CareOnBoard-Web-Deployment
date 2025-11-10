@@ -44,7 +44,7 @@ function ApplicationLoading() {
 }
 
 function ApplicationContent() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,6 +52,16 @@ function ApplicationContent() {
   const progressValue = useMemo(() => getProgressPercentage(activeStep), [activeStep]);
 
   useEffect(() => {
+    // Don't fetch until auth is initialized
+    if (authLoading) {
+      return;
+    }
+
+    // Don't fetch if user is not authenticated
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
 
     const fetchApplicationStatus = async () => {
       try {
@@ -73,7 +83,7 @@ function ApplicationContent() {
     };
 
     fetchApplicationStatus();
-  }, [user]);
+  }, [user, authLoading]);
 
   const steps = useMemo<Step[]>(
     () =>

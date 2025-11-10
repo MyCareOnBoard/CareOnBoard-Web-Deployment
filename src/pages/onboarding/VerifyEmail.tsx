@@ -3,12 +3,13 @@ import { useNavigate } from "react-router"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { sendOtp } from "@/lib/api/otp"
-import { apiFetch } from "@/lib/api/otp"
-import { getAuth } from "firebase/auth"
+import { checkProfileStatus, createUserProfile } from "@/lib/api/onboarding"
+import { useAuth } from "@/utils/auth"
 import LogoHeader from "./components/LogoHeader"
 import { Routes } from "@/routes/constants"
 
 export default function VerifyEmail() {
+  const { user, loading: authLoading } = useAuth()
   const [email, setEmail] = useState("")
   const [error, setError] = useState("")
   const [sending, setSending] = useState(false)
@@ -18,57 +19,48 @@ export default function VerifyEmail() {
   // 🔹 Fetch or create user profile
   useEffect(() => {
     const fetchOrCreateProfile = async () => {
-      try {
-        const auth = getAuth()
-        await auth.authStateReady()
-        const user = auth.currentUser
+      // Wait for auth to be initialized
+      if (authLoading) {
+        return
+      }
 
+      try {
         if (!user?.email) {
           throw new Error("No authenticated user found")
         }
 
         setEmail(user.email)
 
-        // Try to get existing profile from /users/profile
-        let profile: any
-        try {
-          profile = await apiFetch("/users/profile")
-          if (profile?.user) {
-            console.log("✅ Profile found")
-            
-            // Check if onboarding is already completed
-            if (profile.user.onboardingCompleted) {
-              console.log("✅ Onboarding already completed, redirecting to dashboard")
-              nav(Routes.dashboard, { replace: true })
-              return
-            }
-            
-            // Check if email and OTP are both verified
-            if (profile.user.emailVerified && profile.user.otpVerified) {
-              console.log("✅ Email and OTP verified, redirecting to dashboard")
-              nav(Routes.dashboard, { replace: true })
-              return
-            }
-            
-            // Profile exists but verification not completed - continue
+        // Check if profile exists
+        const profile = await checkProfileStatus()
+        
+        if (profile) {
+          console.log("✅ Profile found")
+          
+          // Check if onboarding is already completed
+          if (profile.onboardingCompleted) {
+            console.log("✅ Onboarding already completed, redirecting to dashboard")
+            nav(Routes.dashboard, { replace: true })
             return
           }
-        } catch (e: any) {
-          // If 404 or "user not found", create profile
-          if (!/404|not found/i.test(e?.message || "")) {
-            throw e // Re-throw non-404 errors
+          
+          // Check if email and OTP are both verified
+          if (profile.emailVerified && profile.otpVerified) {
+            console.log("✅ Email and OTP verified, redirecting to dashboard")
+            nav(Routes.dashboard, { replace: true })
+            return
           }
+          
+          // Profile exists but verification not completed - continue
+          return
         }
 
-        // Create profile using /users/create endpoint
+        // Create profile if it doesn't exist
         console.log("Creating user profile...")
-        await apiFetch("/users/create", {
-          method: "POST",
-          body: JSON.stringify({
-            email: user.email,
-            fullName: user.displayName || "User",
-            uid: user.uid,
-          }),
+        await createUserProfile({
+          email: user.email,
+          fullName: user.fullName || "User",
+          uid: user.uid,
         })
 
         console.log("✅ Profile created successfully")
@@ -81,7 +73,7 @@ export default function VerifyEmail() {
     }
 
     fetchOrCreateProfile()
-  }, [nav])
+  }, [user, authLoading, nav])
 
   // 🔹 Send OTP using the helper function
   const sendOTP = async () => {
@@ -133,7 +125,7 @@ export default function VerifyEmail() {
             Now verify your email address to continue
           </p>
 
-          {loading ? (
+          {authLoading || loading ? (
             <p className="text-gray-500">Initializing your profile...</p>
           ) : (
             <Input
@@ -151,7 +143,7 @@ export default function VerifyEmail() {
             <Button
               variant="default_full"
               onClick={sendOTP}
-              disabled={sending || loading || !email}
+              disabled={sending || authLoading || loading || !email}
               className="px-6 w-100 py-2 bg-[#00B4B8] text-white rounded-full"
             >
               {sending ? "Sending..." : "Send OTP"}

@@ -1,4 +1,4 @@
-import { apiFetch } from "./otp" // Reuse your existing Firebase-aware fetch helper
+import axiosClient from '../axios';
 
 /**
  * Firebase Timestamp structure
@@ -50,19 +50,20 @@ export interface UserProfileResponse {
  */
 export async function getUserProfile(): Promise<UserProfile> {
   try {
-    const response: UserProfileResponse = await apiFetch("/users/profile")
+    const response = await axiosClient.get<UserProfileResponse>("/users/profile");
 
-    if (!response.success || !response.user) {
-      throw new Error("Invalid response format from server")
+    if (!response.data.success || !response.data.user) {
+      throw new Error("Invalid response format from server");
     }
 
-    return response.user
+    return response.data.user;
   } catch (err: any) {
     // Re-throw with more context
-    if (err.message?.includes("404")) {
-      throw new Error("Profile not found. Please complete your onboarding first.")
+    if (err.response?.status === 404) {
+      throw new Error("Profile not found. Please complete your onboarding first.");
     }
-    throw err
+    console.error('Failed to get user profile:', err);
+    throw err;
   }
 }
 
@@ -72,19 +73,16 @@ export async function getUserProfile(): Promise<UserProfile> {
  */
 export async function updateUserProfile(profileData: Partial<UserProfile>): Promise<UserProfile> {
   try {
-    const response: UserProfileResponse = await apiFetch("/users/profile", {
-      method: "PUT",
-      body: JSON.stringify(profileData),
-    })
+    const response = await axiosClient.put<UserProfileResponse>("/users/profile", profileData);
 
-    if (!response.success || !response.user) {
-      throw new Error("Invalid response format from server")
+    if (!response.data.success || !response.data.user) {
+      throw new Error("Invalid response format from server");
     }
 
-    return response.user
+    return response.data.user;
   } catch (err: any) {
-    console.error("updateUserProfile error:", err)
-    throw new Error(err.message || "Failed to update user profile")
+    console.error("updateUserProfile error:", err);
+    throw new Error(err.message || "Failed to update user profile");
   }
 }
 
@@ -95,25 +93,22 @@ export async function updateUserProfile(profileData: Partial<UserProfile>): Prom
  */
 export async function uploadUserPhoto(file: File): Promise<{ url: string }> {
   try {
-    const formData = new FormData()
-    formData.append("photo", file)
+    const formData = new FormData();
+    formData.append("photo", file);
 
-    const data = await apiFetch("/users/upload-photo", {
-      method: "POST",
-      body: formData,
-      // Important: apiFetch already adds the Firebase token automatically
+    const response = await axiosClient.post<{ url: string }>("/users/upload-photo", formData, {
       headers: {
-        // omit Content-Type to allow browser to set multipart boundary
-      } as any,
-    })
+        'Content-Type': 'multipart/form-data',
+      },
+    });
 
-    if (!data || !data.url) {
-      throw new Error("Upload failed: no file URL returned")
+    if (!response.data || !response.data.url) {
+      throw new Error("Upload failed: no file URL returned");
     }
 
-    return data
+    return response.data;
   } catch (err: any) {
-    console.error("uploadUserPhoto error:", err)
-    throw new Error(err.message || "Failed to upload photo")
+    console.error("uploadUserPhoto error:", err);
+    throw new Error(err.message || "Failed to upload photo");
   }
 }
