@@ -17,10 +17,18 @@ export default function OrientationStep({onBack, onNext}: OrientationStepProps) 
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState<boolean>(false);
 
-    const {data, isLoading: isLoadingSignatureStatus} = useCheckSignatureStatusQuery("official-hire", {
+    const {
+        data,
+        isLoading: isLoadingSignatureStatus,
+        refetch: refetchSignatureStatus,
+    } = useCheckSignatureStatusQuery("official-hire", {
         refetchOnMountOrArgChange: true,
     });
-    const {data: officialHireStatus, isLoading: isLoadingOfficialHireStatus} = useGetOfficialHireStatusQuery(undefined, {
+    const {
+        data: officialHireStatus,
+        isLoading: isLoadingOfficialHireStatus,
+        refetch: refetchOfficialHireStatus,
+    } = useGetOfficialHireStatusQuery(undefined, {
         refetchOnMountOrArgChange: true,
     });
     const [submitOfficialHire] = useSubmitOfficialHireMutation();
@@ -40,6 +48,8 @@ export default function OrientationStep({onBack, onNext}: OrientationStepProps) 
         try {
             await submitOfficialHire().unwrap();
             setIsEmployeeModalOpen(true);
+            refetchSignatureStatus();
+            refetchOfficialHireStatus();
         } catch (error) {
             console.error(error);
         }
