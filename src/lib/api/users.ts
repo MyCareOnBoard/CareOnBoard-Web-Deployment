@@ -33,7 +33,7 @@ export interface UserProfile {
   photoURL?: string
   phoneNumber?: string
   role?: string
-  profileImage?: string
+  profilePicture?: string
 }
 
 /**

@@ -25,6 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getUserProfile, UserProfile } from "@/lib/api/users";
 
 type NavItem = {
   label: string;
@@ -287,6 +288,7 @@ export function Sidebar({ footer }: { footer?: ReactNode }) {
 
 export default function DashboardLayout({ children }: { children?: ReactNode }) {
   const { user, logout } = useAuth();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -302,6 +304,16 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
     if (!user) {
       navigate(Routes.login, { replace: true });
     }
+    const fetchUserProfile = async () => {
+      try {
+        const userInfo = await getUserProfile();
+        console.log("🚀 User Profile:", userInfo);
+        setUserProfile(userInfo);
+      } catch (error) {
+        console.error("🚨 Error fetching user profile:", error);
+      }
+    };
+    fetchUserProfile();
   }, [user]);
 
   return (
