@@ -58,6 +58,39 @@ export const applicationApi = createApi({
         method: "POST",
         requiresAuth: true
       })
+    }),
+    submitConditionalHire: builder.mutation<void, void>({
+      query: (data) => ({
+        url: `/conditionalHire/submit`,
+        method: "POST",
+        data: data,
+        requiresAuth: true
+      })
+    }),
+    finalizeConditionalHire: builder.mutation<void, {
+      authorizations: {
+        drugTest: boolean;
+        fingerprint: boolean;
+        centralRegistry: boolean;
+        cariCheck: boolean;
+        sexOffenderRegistry: boolean;
+        oigExclusion: boolean;
+        healthTbScreening: boolean;
+        referenceChecks: boolean;
+      };
+      termsAcceptance: {
+        abuseNeglectExploitation: boolean;
+        hipaaConfidentiality: boolean;
+        developmentalDisabilities: boolean;
+      };
+      informationCorrect: boolean;
+    }>({
+      query: (data) => ({
+        url: `/conditionalHire/finalize`,
+        method: "POST",
+        data: data,
+        requiresAuth: true
+      })
     })
   }),
 });
@@ -68,5 +101,7 @@ export const {
   useGetEligibilityVerificationQuery,
   useCheckSignatureStatusQuery,
   useSignDocumentMutation,
-  useSubmitOfficialHireMutation
+  useSubmitOfficialHireMutation,
+  useSubmitConditionalHireMutation,
+  useFinalizeConditionalHireMutation
 } = applicationApi;
