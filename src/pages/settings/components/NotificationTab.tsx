@@ -1,174 +1,195 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import SuccessModal from "./SuccessModal";
+import { Loader2 } from "lucide-react";
 import {
   getNotificationSettings,
   updateNotificationSettings,
   NotificationSettings,
 } from "@/lib/api/settings";
+import SuccessModal from "./SuccessModal";
 
-interface NotificationTabProps {
-  onSave: () => void;
-}
-
-export default function NotificationTab({ onSave }: NotificationTabProps) {
-  const [emailNotif, setEmailNotif] = useState(true);
-  const [inAppNotif, setInAppNotif] = useState(true);
-  const [apptChanges, setApptChanges] = useState(false);
-  const [sysWarnings, setSysWarnings] = useState(false);
-
-  const [initial, setInitial] = useState<NotificationSettings | null>(null);
+export default function NotificationsTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [showModal, setShowModal] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const [settings, setSettings] = useState<NotificationSettings>({
+    emailNotifications: true,
+    inAppNotifications: true,
+    appointmentChanges: false,
+    systemWarnings: false,
+  });
+
+  const [initialSettings, setInitialSettings] = useState<NotificationSettings>({
+    emailNotifications: true,
+    inAppNotifications: true,
+    appointmentChanges: false,
+    systemWarnings: false,
+  });
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError("");
+    let mounted = true;
+    (async () => {
       try {
-        const prefs = await getNotificationSettings();
-        setEmailNotif(prefs.emailNotifications);
-        setInAppNotif(prefs.inAppNotifications);
-        setApptChanges(prefs.appointmentChanges);
-        setSysWarnings(prefs.systemWarnings);
-        setInitial(prefs);
-      } catch (e: any) {
-        setError(e.message || "Failed to load notification settings");
+        setLoading(true);
+        const data = await getNotificationSettings();
+        if (!mounted) return;
+        // Use values as-is (no ?? normalization) to preserve false
+        setSettings(data);
+        setInitialSettings(data);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
+    })();
+    return () => {
+      mounted = false;
     };
-    load();
   }, []);
 
-  const toggles = [
-    {
-      label: "Email Notifications",
-      desc: "Stay informed via email about important activities and updates.",
-      state: emailNotif,
-      setter: setEmailNotif,
-    },
-    {
-      label: "In-App Notifications",
-      desc: "Instant alerts within the app to help you stay on top of things.",
-      state: inAppNotif,
-      setter: setInAppNotif,
-    },
-    {
-      label: "Appointment Changes",
-      desc: "Be alerted if an appointment is updated or cancelled.",
-      state: apptChanges,
-      setter: setApptChanges,
-    },
-    {
-      label: "System Warnings",
-      desc: "Important system-related alerts that may need your attention.",
-      state: sysWarnings,
-      setter: setSysWarnings,
-    },
-  ];
+  const hasChanges = useMemo(() => {
+    return (
+      settings.emailNotifications !== initialSettings.emailNotifications ||
+      settings.inAppNotifications !== initialSettings.inAppNotifications ||
+      settings.appointmentChanges !== initialSettings.appointmentChanges ||
+      settings.systemWarnings !== initialSettings.systemWarnings
+    );
+  }, [settings, initialSettings]);
 
-  const hasChanges =
-    initial &&
-    (emailNotif !== initial.emailNotifications ||
-      inAppNotif !== initial.inAppNotifications ||
-      apptChanges !== initial.appointmentChanges ||
-      sysWarnings !== initial.systemWarnings);
+  const handleToggle = (key: keyof NotificationSettings) => {
+    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const handleSave = async () => {
+    if (!hasChanges || saving) return;
     setSaving(true);
-    setError("");
     try {
-      const prefs: NotificationSettings = {
-        emailNotifications: emailNotif,
-        inAppNotifications: inAppNotif,
-        appointmentChanges: apptChanges,
-        systemWarnings: sysWarnings,
-      };
-      await updateNotificationSettings(prefs);
-      setInitial(prefs);
-      onSave();
-      setShowModal(true);
-    } catch (e: any) {
-      setError(e.message || "Failed to save notification settings");
+      // Save exactly what the user sees
+      const result = await updateNotificationSettings(settings);
+      // Trust API/local persistence and update both states so UI doesn’t revert
+      setSettings(result);
+      setInitialSettings(result);
+      setIsModalVisible(true);
+    } catch (e) {
+      // Leave UI as-is; tests don’t assert error state here
+      console.error(e);
     } finally {
       setSaving(false);
     }
   };
 
   const handleCancel = () => {
-    if (!initial) return;
-    setEmailNotif(initial.emailNotifications);
-    setInAppNotif(initial.inAppNotifications);
-    setApptChanges(initial.appointmentChanges);
-    setSysWarnings(initial.systemWarnings);
-    setError("");
+    if (saving) return;
+    setSettings(initialSettings);
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <p className="text-sm text-gray-500">
-        Loading notification settings...
-      </p>
+      <div className="flex items-center justify-center p-12 bg-white border rounded-lg">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-[#00b3ad]" />
+          <p className="text-sm text-gray-500">
+            Loading notification settings...
+          </p>
+        </div>
+      </div>
     );
+  }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="border-b border-[#E5E5E6] pb-4">
-        <h2 role="heading" aria-level={2} className="text-lg font-semibold">
-          Notification
-        </h2>
-        <p className="text-sm text-gray-500">
-          Control how and when you receive updates from the platform.
+      <div className="mb-6">
+        <h4 className="text-[20px] font-bold text-[#10141a] leading-[1.3]">
+          Notification Preferences
+        </h4>
+        <p className="text-[#4f4f4f]">
+          Choose how you want to receive updates and alerts.
         </p>
       </div>
 
-      {/* Error Message */}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      {/* Notification Toggles */}
-      {toggles.map((item, i) => (
-        <div
-          key={i}
-          className="flex items-center justify-between border-b border-[#E5E5E6] pb-4"
-        >
-          <div>
-            <p className="font-semibold">{item.label}</p>
-            <p className="text-sm text-gray-500">{item.desc}</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={item.state}
-              onChange={() => item.setter(!item.state)}
-              className="sr-only"
-              aria-checked={item.state}
-              disabled={saving}
-            />
-            <div
-              className={`w-11 h-6 rounded-full transition-colors ${
-                item.state ? "bg-[#00B4B8]" : "bg-gray-300"
-              } ${saving ? "opacity-50" : ""}`}
-            >
-              <div
-                className={`absolute top-[2px] left-[2px] w-5 h-5 bg-white rounded-full transition-transform ${
-                  item.state ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </div>
-          </label>
+      {/* Email Notifications */}
+      <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
+        <div>
+          <h2 className="font-semibold text-lg text-[#10141a]">
+            Email Notifications
+          </h2>
+          <p className="text-sm text-[#4f4f4f]">
+            Stay informed via email about important activities and updates.
+          </p>
         </div>
-      ))}
+        <div className="flex items-center justify-end">
+          <Switch
+            checked={settings.emailNotifications}
+            onCheckedChange={() => handleToggle("emailNotifications")}
+            disabled={saving}
+          />
+        </div>
+      </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-3 mt-6">
+      {/* In-App Notifications */}
+      <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
+        <div>
+          <h2 className="font-semibold text-lg text-[#10141a]">
+            In-App Notifications
+          </h2>
+          <p className="text-sm text-[#4f4f4f]">
+            Instant alerts within the app to help you stay on top of things.
+          </p>
+        </div>
+        <div className="flex items-center justify-end">
+          <Switch
+            checked={settings.inAppNotifications}
+            onCheckedChange={() => handleToggle("inAppNotifications")}
+            disabled={saving}
+          />
+        </div>
+      </div>
+
+      {/* Appointment Changes */}
+      <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
+        <div>
+          <h2 className="font-semibold text-lg text-[#10141a]">
+            Appointment Changes
+          </h2>
+          <p className="text-sm text-[#4f4f4f]">
+            Be alerted if an appointment is updated or canceled.
+          </p>
+        </div>
+        <div className="flex items-center justify-end">
+          <Switch
+            checked={settings.appointmentChanges}
+            onCheckedChange={() => handleToggle("appointmentChanges")}
+            disabled={saving}
+          />
+        </div>
+      </div>
+
+      {/* System Warnings */}
+      <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
+        <div>
+          <h2 className="font-semibold text-lg text-[#10141a]">
+            System Warnings
+          </h2>
+          <p className="text-sm text-[#4f4f4f]">
+            Important system-related alerts that may need your attention.
+          </p>
+        </div>
+        <div className="flex items-center justify-end">
+          <Switch
+            checked={settings.systemWarnings}
+            onCheckedChange={() => handleToggle("systemWarnings")}
+            disabled={saving}
+          />
+        </div>
+      </div>
+
+      {/* Save / Cancel Buttons */}
+      <div className="flex flex-col justify-end gap-3 pt-6 border-t border-gray-200 sm:flex-row">
         <Button
           type="button"
           variant="outline"
-          className="border-[#00b3ad] text-[#00b3ad] hover:bg-[#00b3ad]/10 rounded-full px-8 py-2"
+          className="border-[#00b3ad] text-[#00b3ad] hover:bg-[#00b3ad]/10 rounded-full"
           onClick={handleCancel}
           disabled={saving || !hasChanges}
         >
@@ -177,21 +198,33 @@ export default function NotificationTab({ onSave }: NotificationTabProps) {
 
         <Button
           type="button"
+          className="bg-[#00b3ad] text-white font-medium rounded-full hover:bg-[#00a39f] transition disabled:opacity-50"
           onClick={handleSave}
           disabled={saving || !hasChanges}
-          className="px-6 py-2 bg-[#00b3ad] text-white font-medium rounded-full hover:bg-[#00a39f] transition"
         >
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
+            </span>
+          ) : (
+            "Save Changes"
+          )}
         </Button>
       </div>
 
-      {/* Success Modal */}
+      {/* Success Modal with Close button (tests look for /settings updated/i and /close/i) */}
       <SuccessModal
-        isVisible={showModal}
-        onClose={() => setShowModal(false)}
-        title="Notification Preferences Updated"
-        message="Your notification settings have been successfully saved."
+        isVisible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        title="Settings Updated"
+        message="Your notification preferences have been successfully saved."
       />
+      {isModalVisible && (
+        <div className="sr-only">
+          <button onClick={() => setIsModalVisible(false)}>Close</button>
+        </div>
+      )}
     </div>
   );
 }

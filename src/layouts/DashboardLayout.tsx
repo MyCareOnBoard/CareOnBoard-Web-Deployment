@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/utils/auth";
 import type { RootState } from "@/store/redux/store";
 import { PageLoader } from "@/components/ui/loader";
+import { OnboardingCheck } from "@/pages/onboarding/components/onboardingCheck";
 
 import BellIcon from "@/assets/icons/bell.svg?react";
 import CogIcon from "@/assets/icons/cog.svg?react";
@@ -316,19 +317,22 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
     fetchUserProfile();
   }, [user]);
 
+  
   return (
-    <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
-      <Header 
+    <OnboardingCheck>
+      <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
+        <Header 
         userName={user?.fullName} 
         userImage={(user as any)?.profileImage || user?.photoURL}
         userRole={(user as any)?.role || 'DSP'}
         onLogout={handleLogout} 
       />
-      <Sidebar />
-      <main className="ml-[240px] pt-[130px] pb-10">
-        <div className="px-8">{children ?? <Outlet />}</div>
-      </main>
-    </div>
+        <Sidebar />
+        <main className="ml-[240px] pt-[130px] pb-10">
+          <div className="px-8">{children ?? <Outlet />}</div>
+        </main>
+      </div>
+    </OnboardingCheck>
   );
 }
 
