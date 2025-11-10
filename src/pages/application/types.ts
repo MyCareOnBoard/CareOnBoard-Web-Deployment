@@ -84,3 +84,26 @@ export interface SignDocumentPayload {
     signatureData: string;
   }
 }
+
+export interface CheckOfficialSignatureStatusResponse {
+    success: boolean;
+    status: {
+        letterSigning: {
+            hasSigned: boolean;
+            isSubmitted: boolean;
+            signatureType: string;
+            signedAt: {
+                _seconds: number;
+                _nanoseconds: number;
+            };
+            submittedAt: {
+                _seconds: number;
+                _nanoseconds: number;
+            }
+        },
+        overall: {
+            status: string;
+            readyForNextStep: boolean;
+        }
+    }
+}
