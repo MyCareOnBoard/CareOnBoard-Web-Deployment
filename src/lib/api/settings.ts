@@ -15,7 +15,6 @@ export interface NotificationSettings {
 
 // helpers
 function parseAccount(raw: any): AccountInfo {
-  console.log("🔍 parseAccount raw:", JSON.stringify(raw, null, 2))
   const u =
     raw?.user ??
     raw?.account ??
@@ -44,141 +43,141 @@ function parseAccount(raw: any): AccountInfo {
     u.picture ??
     ""
 
-  const result = {
+  return {
     email: u.email ?? "",
     fullName: fullName ?? "",
     profilePicture: profilePicture ?? "",
   }
-
-  console.log("✅ parseAccount result:", result)
-  return result
 }
 
 // Account info
 export async function getAccountInfo(): Promise<AccountInfo> {
-  console.log("📡 GET /userProfile/account-info")
-  let response = await axiosClient.get("/userProfile/account-info")
-  let res = response.data
-  console.log("📥 GET Response:", JSON.stringify(res, null, 2))
+  try {
+    const primaryResponse = await axiosClient.get("/userProfile/account-info")
+    let responseData = primaryResponse.data
 
-  // If backend returns empty, try alternative endpoints
-  if (!res || (!res.email && !res.fullName && !res.user?.email)) {
-    console.warn("⚠️ /userProfile/account-info returned empty, trying /users/profile...")
-    try {
-      response = await axiosClient.get("/users/profile")
-      res = response.data
-      console.log("📥 GET /users/profile Response:", JSON.stringify(res, null, 2))
-    } catch (e) {
-      console.warn("⚠️ /users/profile also failed:", e)
+    if (!responseData || (!responseData.email && !responseData.fullName && !responseData?.user?.email)) {
+      const fallbackResponse = await axiosClient.get("/users/profile")
+      responseData = fallbackResponse.data
     }
-  }
 
-  return parseAccount(res)
+    return parseAccount(responseData)
+  } catch (error) {
+    console.error("Failed to fetch account info:", error)
+    throw error
+  }
 }
 
 export async function updateFullName(fullName: string): Promise<void> {
-  console.log("📡 PUT /userProfile/account-info with fullName:", fullName)
-
-  // Try primary endpoint
   try {
-    const response = await axiosClient.put("/userProfile/account-info", { fullName })
-    console.log("📥 PUT /userProfile/account-info response:", JSON.stringify(response.data, null, 2))
-  } catch (e: any) {
-    console.warn("⚠️ PUT /userProfile/account-info failed, trying /users/profile...", e)
-
-    // Fallback to alternative endpoint
-    const response = await axiosClient.put("/users/profile", { fullName })
-    console.log("📥 PUT /users/profile response:", JSON.stringify(response.data, null, 2))
+    await axiosClient.put("/userProfile/account-info", { fullName })
+  } catch (primaryError) {
+    console.error("Failed to update full name via /userProfile/account-info:", primaryError)
+    try {
+      await axiosClient.put("/users/profile", { fullName })
+    } catch (fallbackError) {
+      console.error("Failed to update full name via fallback endpoint:", fallbackError)
+      throw fallbackError
+    }
   }
 }
 
 export async function updateProfilePicture(profilePicture: string): Promise<void> {
-  console.log("📡 PUT /userProfile/account-info with profilePicture:", profilePicture)
-
   try {
-    const response = await axiosClient.put("/userProfile/account-info", { profilePicture })
-    console.log("📥 PUT /userProfile/account-info (picture) response:", JSON.stringify(response.data, null, 2))
-  } catch (e: any) {
-    console.warn("⚠️ PUT /userProfile/account-info failed, trying /users/profile...", e)
-
-    const response = await axiosClient.put("/users/profile", { profilePicture })
-    console.log("📥 PUT /users/profile (picture) response:", JSON.stringify(response.data, null, 2))
+    await axiosClient.put("/userProfile/account-info", { profilePicture })
+  } catch (primaryError) {
+    console.error("Failed to update profile picture via /userProfile/account-info:", primaryError)
+    try {
+      await axiosClient.put("/users/profile", { profilePicture })
+    } catch (fallbackError) {
+      console.error("Failed to update profile picture via fallback endpoint:", fallbackError)
+      throw fallbackError
+    }
   }
 }
 
 // Profile picture upload (multipart) -> returns data.url per provided schema
 export async function uploadProfilePicture(file: File): Promise<string> {
-  console.log("📡 POST /profilePictureUpload with file:", file.name, file.size, "bytes")
-
-  const formData = new FormData()
-  formData.append("file", file, file.name)
-
   try {
+    const formData = new FormData()
+    formData.append("file", file)
+
     const response = await axiosClient.post("/profilePictureUpload", formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        "Content-Type": "multipart/form-data",
       },
     })
 
-    console.log("✅ Upload response JSON:", JSON.stringify(response.data, null, 2))
-
-    // Match the provided schema: json.data.url
+    const data = response.data
     const uploadedUrl =
-      response.data?.data?.url ||
-      response.data?.url ||
-      response.data?.data?.profilePicture ||
-      response.data?.data?.profilePictureUrl ||
+      data?.data?.url ??
+      data?.url ??
+      data?.data?.profilePicture ??
+      data?.data?.profilePictureUrl ??
       ""
 
-    console.log("🖼️ Extracted URL:", uploadedUrl)
-
     if (!uploadedUrl) {
-      console.error("❌ No URL in upload response")
       throw new Error("Upload succeeded but no URL returned")
     }
 
     return uploadedUrl
-  } catch (error: any) {
-    console.error("❌ Upload error:", error)
-    throw new Error(error.response?.data?.message || error.message || "Failed to upload profile picture")
+  } catch (error) {
+    console.error("Failed to upload profile picture:", error)
+    throw error
   }
 }
 
 // Combined convenience - Upload image AND update full name
 export async function updateAccountInfo(opts: { fullName?: string; profilePictureFile?: File }): Promise<AccountInfo> {
-  let uploadedUrl: string | undefined
+  try {
+    if (opts.profilePictureFile) {
+      await uploadProfilePicture(opts.profilePictureFile)
+    }
 
-  if (opts.profilePictureFile) {
-    // This should auto-update the user's profilePicture field
-    uploadedUrl = await uploadProfilePicture(opts.profilePictureFile)
+    if (opts.fullName) {
+      await updateFullName(opts.fullName.trim())
+    }
+
+    return await getAccountInfo()
+  } catch (error) {
+    console.error("Failed to update account info:", error)
+    throw error
   }
-
-  if (opts.fullName) {
-    await updateFullName(opts.fullName.trim())
-  }
-
-  // Single GET to verify - should return fresh data
-  return await getAccountInfo()
 }
 
-// Notifications
+// Notifications (unchanged)
 export async function getNotificationSettings(): Promise<NotificationSettings> {
-  const response = await axiosClient.get("/userProfile/notifications")
-  const res = response.data
-  const n = res?.notifications || res || {}
-  return {
-    emailNotifications: !!n.emailNotifications,
-    inAppNotifications: !!n.inAppNotifications,
-    appointmentChanges: !!n.appointmentChanges,
-    systemWarnings: !!n.systemWarnings,
+  try {
+    const response = await axiosClient.get("/userProfile/notifications")
+    const res = response.data
+    const n = res?.notifications || res || {}
+    return {
+      emailNotifications: !!n.emailNotifications,
+      inAppNotifications: !!n.inAppNotifications,
+      appointmentChanges: !!n.appointmentChanges,
+      systemWarnings: !!n.systemWarnings,
+    }
+  } catch (error) {
+    console.error("Failed to fetch notification settings:", error)
+    throw error
   }
 }
 
 export async function updateNotificationSettings(prefs: NotificationSettings): Promise<NotificationSettings> {
-  await axiosClient.put("/userProfile/notifications", prefs)
-  return getNotificationSettings()
+  try {
+    await axiosClient.put("/userProfile/notifications", prefs)
+    return await getNotificationSettings()
+  } catch (error) {
+    console.error("Failed to update notification settings:", error)
+    throw error
+  }
 }
 
 export async function deleteAccount(): Promise<void> {
-  await axiosClient.delete("/userProfile/account")
+  try {
+    await axiosClient.delete("/userProfile/account")
+  } catch (error) {
+    console.error("Failed to delete account:", error)
+    throw error
+  }
 }
