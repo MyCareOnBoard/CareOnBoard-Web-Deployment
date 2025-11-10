@@ -27,6 +27,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getUserProfile, UserProfile } from "@/lib/api/users";
+import { getAccountInfo, type AccountInfo } from "@/lib/api/settings";
+import { getAuth } from "firebase/auth";
 
 type NavItem = {
   label: string;
@@ -56,6 +58,8 @@ function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: Componen
 }
 
 function UserAvatar({ userName, userImage }: { userName?: string; userImage?: string }) {
+  const [imageError, setImageError] = useState(false);
+  
   const getInitials = (name?: string) => {
     if (!name) return 'U';
     const parts = name.trim().split(' ');
@@ -65,24 +69,25 @@ function UserAvatar({ userName, userImage }: { userName?: string; userImage?: st
     return name.substring(0, 2).toUpperCase();
   };
 
-  if (userImage) {
+  // Show initials if no image or image failed to load
+  if (!userImage || imageError) {
     return (
-      <img 
-        src={userImage} 
-        alt="User profile" 
-        className="h-[34px] w-[34px] rounded-full object-cover"
-        onError={(e) => {
-          // Hide the image and show initials if image fails to load
-          e.currentTarget.style.display = 'none';
-        }}
-      />
+      <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xs font-semibold">
+        {getInitials(userName)}
+      </div>
     );
   }
 
   return (
-    <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xs font-semibold">
-      {getInitials(userName)}
-    </div>
+    <img 
+      src={userImage} 
+      alt="User profile" 
+      className="h-[34px] w-[34px] rounded-full object-cover"
+      onError={() => {
+        console.warn('⚠️ Failed to load profile image:', userImage);
+        setImageError(true);
+      }}
+    />
   );
 }
 
@@ -168,17 +173,6 @@ export function Header({ actions, userName, userImage, userRole, onLogout }: { a
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[214px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-[12px] p-0 backdrop-blur-sm">
-                {/* <div className="flex items-center gap-3 p-3 border-b border-[rgba(239,239,239,0.08)]">
-                  <UserAvatar userName={userName} userImage={userImage} />
-                  <div className="flex flex-col gap-1 flex-1">
-                    <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-                      {userName || 'User'}
-                    </p>
-                    <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
-                      {userRole || 'DSP'}
-                    </p>
-                  </div>
-                </div> */}
                 <div className="py-0">
                   <DropdownMenuItem 
                     className={cn(
@@ -230,7 +224,7 @@ export function Header({ actions, userName, userImage, userRole, onLogout }: { a
                   
                   <DropdownMenuItem
                     onClick={onLogout}
-                    className="cursor-pointer hover:bg-white/50 focus:bg-white/50 px-4 py-2 rounded-none gap-3"
+                    className="gap-3 px-4 py-2 rounded-none cursor-pointer hover:bg-white/50 focus:bg-white/50"
                   >
                     <LogOut className="w-4 h-4 text-[#d53411]" />
                     <span className="font-medium text-[14px] text-[#d53411]">Logout</span>
@@ -289,7 +283,8 @@ export function Sidebar({ footer }: { footer?: ReactNode }) {
 
 export default function DashboardLayout({ children }: { children?: ReactNode }) {
   const { user, logout } = useAuth();
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -301,32 +296,77 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
     }
   };
 
+  // Load account info (includes profile picture)
   useEffect(() => {
     if (!user) {
       navigate(Routes.login, { replace: true });
+      return;
     }
-    const fetchUserProfile = async () => {
+
+    const loadAccountInfo = async () => {
       try {
-        const userInfo = await getUserProfile();
-        console.log("🚀 User Profile:", userInfo);
-        setUserProfile(userInfo);
+        setLoading(true);
+        console.log('🔄 [DashboardLayout] Loading account info...');
+        
+        const info = await getAccountInfo();
+        console.log('✅ [DashboardLayout] Account info loaded:', info);
+        
+        setAccountInfo(info);
       } catch (error) {
-        console.error("🚨 Error fetching user profile:", error);
+        console.error('❌ [DashboardLayout] Failed to load account info:', error);
+        
+        // Fallback to Firebase auth data
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          setAccountInfo({
+            email: currentUser.email || '',
+            fullName: currentUser.displayName || '',
+            profilePicture: currentUser.photoURL || undefined,
+          });
+        }
+      } finally {
+        setLoading(false);
       }
     };
-    fetchUserProfile();
-  }, [user]);
 
-  
+    loadAccountInfo();
+
+    // Listen for profile picture updates (custom event from AccountTab/Profile)
+    const handleProfileUpdate = (event: CustomEvent) => {
+      console.log('🔄 [DashboardLayout] Profile updated event received:', event.detail);
+      if (event.detail?.profilePicture) {
+        setAccountInfo(prev => prev ? { ...prev, profilePicture: event.detail.profilePicture } : null);
+      }
+      if (event.detail?.fullName) {
+        setAccountInfo(prev => prev ? { ...prev, fullName: event.detail.fullName } : null);
+      }
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate as EventListener);
+    };
+  }, [user, navigate]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#eef4f5]">
+        <PageLoader />
+      </div>
+    );
+  }
+
   return (
     <OnboardingCheck>
       <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
         <Header 
-        userName={user?.fullName} 
-        userImage={(user as any)?.profileImage || user?.photoURL}
-        userRole={(user as any)?.role || 'DSP'}
-        onLogout={handleLogout} 
-      />
+          userName={accountInfo?.fullName || (user as any)?.fullName || (user as any)?.displayName} 
+          userImage={accountInfo?.profilePicture || (user as any)?.photoURL}
+          userRole={(user as any)?.role || 'DSP'}
+          onLogout={handleLogout} 
+        />
         <Sidebar />
         <main className="ml-[240px] pt-[130px] pb-10">
           <div className="px-8">{children ?? <Outlet />}</div>
