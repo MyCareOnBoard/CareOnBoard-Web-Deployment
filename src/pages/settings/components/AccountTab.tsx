@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, ChangeEvent } from "react"
-import { getAccountInfo, updateAccountInfo, AccountInfo, deleteAccount } from "@/lib/api/settings"
+import { getAccountInfo, updateAccountInfo, AccountInfo } from "@/lib/api/settings"
+import { deleteAccount } from "@/lib/api/profile" // Use profile delete endpoint
 import { useForm } from "react-hook-form"
 import { Form, FormField, FormItem, FormMessage, FormControl } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -7,6 +8,9 @@ import { Button } from "@/components/ui/button"
 import SuccessModal from "./SuccessModal"
 import { getAuth } from "firebase/auth"
 import { Trash2, Loader2, User, AlertCircle } from "lucide-react"
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal"
+import { useNavigate } from "react-router"
+import { Routes } from "@/routes/constants"
 
 interface AccountFormValues {
   fullName: string
@@ -18,6 +22,7 @@ interface AccountTabProps {
 }
 
 export default function AccountTab({ onSaved }: AccountTabProps) {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -29,7 +34,7 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  // Add modal title/message so we can reuse SuccessModal for delete
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [modalTitle, setModalTitle] = useState<string>("Account Updated")
   const [modalMessage, setModalMessage] = useState<string>("Your account information has been successfully saved.")
 
@@ -132,12 +137,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
     console.log("💾 Image changed:", imageChanged)
     console.log("💾 Has profile picture:", hasProfilePicture)
     
-    // Validation: Profile picture is required
-    if (!hasProfilePicture && !imageFile) {
-      setError("Profile picture is required. Please upload an image.")
-      return
-    }
-    
     if (!hasChanges) {
       setError("No changes to save")
       return
@@ -147,6 +146,8 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       setError("Full name is required")
       return
     }
+
+    // Remove the profile picture requirement check since we now allow saving without image
 
     setSaving(true)
     setError("")
@@ -169,7 +170,7 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       const updatedInfo: AccountInfo = {
         email: result.email || info?.email || data.email,
         fullName: result.fullName || data.fullName.trim(),
-        profilePicture: result.profilePicture || selectedImage,
+        profilePicture: result.profilePicture || selectedImage || initialImage || undefined,
       }
 
       console.log("📝 Updated info object:", updatedInfo)
@@ -187,45 +188,102 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       if (result.profilePicture) {
         console.log("🖼️ Setting new profile picture from result:", result.profilePicture)
         setSelectedImage(result.profilePicture)
-      } else if (tempImage && !result.profilePicture) {
-        console.log("🖼️ Keeping temp preview as selected image")
-        setSelectedImage(tempImage)
       }
       
-      // Clear temp state
-      setTempImage(null)
-      setImageFile(null)
+      // Clear temp state only if upload was successful or no image was uploaded
+      if (!imageChanged || result.profilePicture) {
+        setTempImage(null)
+        setImageFile(null)
+      }
 
       console.log("✅ Save completed successfully")
       onSaved?.(updatedInfo)
+      
       // Set modal content for save success
       setModalTitle("Account Updated")
-      setModalMessage("Your account information has been successfully saved.")
+      
+      // Determine appropriate success message
+      if (imageChanged && result.profilePicture) {
+        setModalMessage("Your account information and profile picture have been successfully saved.")
+      } else if (imageChanged && !result.profilePicture) {
+        setModalMessage("Your name has been updated. Profile picture will be uploaded when server connection is restored.")
+      } else {
+        setModalMessage("Your name has been successfully updated.")
+      }
+      
       setIsModalVisible(true)
     } catch (e: any) {
       console.error("❌ Save failed:", e)
-      setError(e.message || "Failed to save changes")
+      
+      // Provide user-friendly error messages
+      let errorMessage = e.message || "Failed to save changes"
+      
+      if (errorMessage.includes("Image upload requires server connection")) {
+        errorMessage = "Cannot upload image - server is unavailable. Your name has been saved. Please try uploading the image again later."
+        
+        // If only name change succeeded via Firebase fallback, don't show as complete failure
+        if (nameChanged) {
+          setModalTitle("Partial Update")
+          setModalMessage("Your name has been updated successfully. However, the profile picture could not be uploaded. Please try again when the server is available.")
+          setIsModalVisible(true)
+          
+          // Update the form to reflect the name change
+          setInitialFullName(data.fullName.trim())
+          
+          // Clear the error since we're showing a success modal with explanation
+          setError("")
+          setSaving(false)
+          return
+        }
+      } else if (errorMessage.includes("Network error") || errorMessage.includes("Unable to reach")) {
+        if (imageChanged) {
+          errorMessage = "Cannot upload image - server is unavailable. Please try again later."
+        } else {
+          errorMessage = "Server unavailable. Please check your connection and try again."
+        }
+      }
+      
+      setError(errorMessage)
     } finally {
       setSaving(false)
     }
   }
 
-  // Replace simulated delete with real API call
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to permanently delete your account?")) return
-    setError("")
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true)
+  }
+
+  // Delete confirmation handler - Uses same endpoint as ProfilePage
+  const handleDeleteConfirm = async () => {
     setDeleting(true)
+    setError("")
+
     try {
+      console.log("🗑️ [AccountTab] Deleting account using profile endpoint...")
+      
+      // Use deleteAccount from @/lib/api/profile (same as ProfilePage)
       await deleteAccount()
-      // Show success modal (you may redirect/sign out here if needed)
-      setModalTitle("Account Deleted")
-      setModalMessage("Your account has been permanently deleted.")
-      setIsModalVisible(true)
-    } catch (e: any) {
-      setError(e?.message || "Failed to delete account")
-    } finally {
+      
+      console.log("✅ [AccountTab] Account deleted successfully")
+      
+      // Clear auth and storage (matches ProfilePage)
+      localStorage.clear()
+      sessionStorage.clear()
+      
+      // Redirect to login (matches ProfilePage)
+      navigate(Routes.login, { replace: true })
+    } catch (err: any) {
+      console.error("❌ [AccountTab] Delete failed:", err)
+      
+      // Show error message (matches ProfilePage)
+      setError(err?.message || "Failed to delete account. Please try again or contact support.")
       setDeleting(false)
+      setShowDeleteConfirm(false)
     }
+  }
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false)
   }
 
   const handleCancel = () => {
@@ -276,7 +334,7 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
           <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
             <div>
               <h2 className="font-semibold text-lg text-[#10141a]">
-                Profile Picture <span className="text-red-500">*</span>
+                Profile Picture
               </h2>
               <p className="text-sm text-[#4f4f4f]">
                 Upload a photo so your team can recognize you.
@@ -291,8 +349,8 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
                   className="object-cover rounded-full w-14 h-14 ring-2 ring-offset-2 ring-gray-200"
                 />
               ) : (
-                <div className="flex items-center justify-center bg-gray-200 rounded-full w-14 h-14 ring-2 ring-offset-2 ring-red-300">
-                  <User className="w-6 h-6 text-gray-500" />
+                <div className="flex items-center justify-center bg-gray-100 border border-gray-200 rounded-full w-14 h-14 ring-2 ring-offset-2 ring-gray-300">
+                  <User className="w-6 h-6 text-gray-400" />
                 </div>
               )}
               <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
@@ -300,7 +358,9 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
                   {saving ? "Uploading..." : displayImage ? "Change Image" : "Upload Image"}
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,image/jpg"
+                    accept="image/*"
+                    aria-label="Upload Image"
+                    data-testid="profile-image-input"
                     onChange={handleImageChange}
                     className="hidden"
                     disabled={saving}
@@ -321,7 +381,7 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
                   </button>
                 )}
                 <p className="text-sm text-[#4f4f4f]">
-                  JPG/PNG, max 2MB {!hasProfilePicture && <span className="text-red-500">(Required)</span>}
+                  JPG/PNG, max 2MB
                 </p>
               </div>
             </div>
@@ -387,16 +447,24 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
             />
           </div>
 
-          {/* Delete Account */}
-          <div className="grid gap-6 pt-6 pb-6 border-t border-gray-200 sm:grid-cols-2">
+          {/* Danger Zone - Delete Account */}
+          <div className="grid gap-6 px-6 pt-6 pb-6 -mx-6 border-t-2 border-red-200 bg-red-50/30 sm:grid-cols-2">
             <div>
-              <h2 className="font-semibold text-lg text-[#10141a]">Delete My Account</h2>
-              <p className="text-sm text-[#4f4f4f]">Permanently delete the account.</p>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-red-600">
+                <AlertCircle className="w-5 h-5" />
+                Danger Zone
+              </h2>
+              <p className="mt-1 text-sm font-medium text-red-700">
+                Delete My Account
+              </p>
+              <p className="text-sm text-[#4f4f4f] mt-2">
+                Once you delete your account, there is no going back. Please be certain.
+              </p>
             </div>
-            <div className="flex justify-end">
+            <div className="flex items-start justify-end">
               <Button
                 type="button"
-                onClick={handleDelete}
+                onClick={handleDeleteClick}
                 variant="destructive"
                 disabled={deleting}
                 className="flex items-center gap-2 bg-[#d93c24] hover:bg-[#c52d16] rounded-full"
@@ -436,6 +504,18 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
           </div>
         </form>
       </Form>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={deleting}
+        title="Delete Account?"
+        message="Are you sure you want to permanently delete your account? This action cannot be undone and all your data will be lost."
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
 
       {/* Success Modal */}
       <SuccessModal

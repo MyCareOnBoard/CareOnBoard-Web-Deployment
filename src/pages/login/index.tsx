@@ -1,5 +1,3 @@
-
-
 import type React from "react"
 import { useState } from "react"
 import { useNavigate, Link } from "react-router"
@@ -12,6 +10,7 @@ import { useAuth } from "@/utils/auth"
 import { useToast } from "@/hooks/use-toast"
 import { ButtonLoader } from "@/components/ui/loader"
 import { Routes } from "@/routes/constants"
+import { getOnboardingStatus } from "@/lib/api/onboarding"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -100,16 +99,52 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      console.log("🔐 Attempting login for:", email)
+      
+      // Login with Firebase
       await login(email, password)
+      
+      console.log("✅ Login successful, checking onboarding status...")
+      
+      // Check if user has completed onboarding
+      const onboardingStatus = await getOnboardingStatus()
+      console.log("📊 Onboarding status:", onboardingStatus)
+      
       toast({
         title: "Success",
         description: "Logged in successfully",
       })
-      navigate("/onboarding")
+
+      // Redirect based on onboarding completion
+      if (!onboardingStatus.completed) {
+        console.log("🎓 First-time user detected, redirecting to onboarding")
+        navigate("/onboarding", { replace: true })
+      } else {
+        console.log("✅ Returning user detected, redirecting to dashboard")
+        navigate("/applicant/dashboard", { replace: true })
+      }
+      
     } catch (error: any) {
+      console.error("❌ Login error:", error)
+      
+      // Handle specific error cases
+      let errorMessage = "Failed to login"
+      
+      if (error.code === "auth/invalid-credential" || error.code === "auth/wrong-password") {
+        errorMessage = "Invalid email or password"
+      } else if (error.code === "auth/user-not-found") {
+        errorMessage = "No account found with this email"
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Too many failed attempts. Please try again later"
+      } else if (error.code === "auth/network-request-failed") {
+        errorMessage = "Network error. Please check your connection"
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to login",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {

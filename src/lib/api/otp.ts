@@ -1,4 +1,10 @@
 import { auth, getFreshIdToken } from "@/lib/firebase"
+import { getAuth } from 'firebase/auth'
+
+// API Configuration
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+
+console.log('🔧 [API] Base URL configured as:', API_BASE_URL)
 
 const stripTrailing = (s: string) => s.replace(/\/+$/, "")
 const trimSlashes = (s: string) => s.replace(/^\/+|\/+$/g, "")
@@ -33,123 +39,160 @@ async function waitForAuthReady() {
   })
 }
 
-export async function apiFetch(endpoint: string, options: RequestInit = {}) {
-  await waitForAuthReady()
-  const token = await getFreshIdToken(true)
+/**
+ * Get current user's ID token for API authentication
+ */
+async function getIdToken(): Promise<string> {
+  const auth = getAuth()
+  const user = auth.currentUser
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(options.headers && !(options.headers instanceof Headers)
-      ? (options.headers as Record<string, string>)
-      : {}),
+  if (!user) {
+    throw new Error('No authenticated user found')
   }
 
-  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`
-  const url = `${BASE_URL}${BASE_PATH}${path}`
-
-  console.log(`📡 Fetching: ${options.method || 'GET'} ${url}`)
-
-  let response: Response
   try {
-    response = await fetch(url, { 
-      ...options, 
+    const token = await user.getIdToken()
+    console.log('🔑 [API] Got ID token for user:', user.uid)
+    return token
+  } catch (error) {
+    console.error('❌ [API] Failed to get ID token:', error)
+    throw new Error('Failed to get authentication token')
+  }
+}
+
+/**
+ * Generic API fetch wrapper with authentication
+ */
+export async function apiFetch(
+  endpoint: string,
+  options: RequestInit & { headers?: HeadersInit | undefined } = {}
+): Promise<any> {
+  try {
+    const idToken = await getIdToken()
+    
+    // Check if body is FormData
+    const isFormData = options.body instanceof FormData
+    
+    const headers: HeadersInit = {
+      Authorization: `Bearer ${idToken}`,
+      // Only set Content-Type if not FormData (browser sets it automatically with boundary)
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...options.headers,
+    }
+
+    // Remove undefined headers
+    if (options.headers === undefined) {
+      delete (headers as any)['Content-Type']
+    }
+
+    const url = `${API_BASE_URL}${endpoint}`
+    
+    console.log(`🌐 [API] ${options.method || 'GET'} ${url}`)
+    if (isFormData) {
+      console.log('📦 [API] Sending FormData')
+    } else if (options.body) {
+      console.log('📦 [API] Request body:', options.body)
+    }
+
+    const response = await fetch(url, {
+      ...options,
       headers,
-      mode: 'cors', // Explicitly set CORS mode
     })
-  } catch (e: any) {
-    console.error(`❌ Network error for ${url}:`, e)
-    throw new Error(`Network error: Unable to reach the server. Please check your connection and API configuration.`)
-  }
 
-  const text = await response.text()
-  let data: any
-  try {
-    data = text ? JSON.parse(text) : null
-  } catch {
-    data = { message: text || "Invalid response from server" }
-  }
+    console.log(`📡 [API] Response status: ${response.status} ${response.statusText}`)
 
-  if (!response.ok) {
-    console.error(`❌ API Error ${response.status}:`, data)
-    
-    if (response.status === 401) {
-      localStorage.removeItem("authToken")
-      window.location.href = "/login"
-      return
-    }
-    
+    // Handle 404 specifically
     if (response.status === 404) {
-      throw new Error(`Endpoint not found: ${path}`)
+      throw new Error(`Endpoint not found: ${endpoint}`)
     }
-    
-    throw new Error(data?.message || data?.error || `API Error: ${response.status}`)
-  }
 
-  console.log(`✅ Success: ${url}`, data)
-  return data
-}
+    const responseText = await response.text()
+    console.log('📥 [API] Response text:', responseText.substring(0, 200))
 
-// Internal helper to try multiple endpoints
-async function apiFetchWithFallback(endpoints: string[], options?: RequestInit) {
-  let lastErr: any
-  console.log(`🔄 Trying ${endpoints.length} endpoints:`, endpoints)
-  
-  for (const ep of endpoints) {
+    let data
     try {
-      const result = await apiFetch(ep, options)
-      console.log(`✅ Success with endpoint: ${ep}`)
-      return result
-    } catch (e: any) {
-      const msg = e?.message || ""
-      console.warn(`⚠️ Failed: ${ep} - ${msg}`)
-      
-      // Only continue on 404 errors, throw others immediately
-      if (/404/.test(msg) || /not found/i.test(msg) || /endpoint not found/i.test(msg)) {
-        lastErr = e
-        continue
-      }
-      
-      // For network errors, don't try other endpoints
-      if (/network error/i.test(msg)) {
-        throw e
-      }
-      
-      throw e
+      data = responseText ? JSON.parse(responseText) : {}
+    } catch (e) {
+      console.error('❌ [API] Failed to parse JSON response')
+      throw new Error('Invalid JSON response from server')
+    }
+
+    if (!response.ok) {
+      console.error('❌ [API] Error response:', data)
+      throw new Error(data.message || `HTTP error! status: ${response.status}`)
+    }
+
+    return data
+  } catch (error: any) {
+    // Enhance error messages
+    if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+      console.error('❌ [API] Network error - Unable to reach server')
+      console.error('❌ [API] Attempted URL:', `${API_BASE_URL}${endpoint}`)
+      throw new Error('Network error: Unable to reach the server. Please check your connection and API configuration.')
+    }
+    throw error
+  }
+}
+
+/**
+ * Send OTP to user's email
+ */
+export async function sendOtp(email: string): Promise<{ success: boolean; message: string }> {
+  console.log('📧 [OTP] Sending OTP to:', email)
+  
+  const response = await apiFetch('/auth/send-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+
+  console.log('✅ [OTP] Send response:', response)
+  return response
+}
+
+/**
+ * Verify OTP code
+ */
+export async function verifyOtp(
+  email: string,
+  code: string
+): Promise<{ success: boolean; message: string }> {
+  console.log('🔐 [OTP] Verifying OTP for:', email)
+  
+  const response = await apiFetch('/auth/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  })
+
+  console.log('✅ [OTP] Verify response:', response)
+  return response
+}
+
+/**
+ * Check if user has verified OTP
+ */
+export async function checkOtpStatus(): Promise<{
+  otpVerified: boolean
+  otpVerifiedAt?: string
+}> {
+  console.log('🔍 [OTP] Checking OTP status...')
+  
+  try {
+    const response = await apiFetch('/auth/otp-status', {
+      method: 'GET',
+    })
+
+    console.log('✅ [OTP] Status response:', response)
+    
+    return {
+      otpVerified: response.otpVerified || false,
+      otpVerifiedAt: response.otpVerifiedAt,
+    }
+  } catch (error: any) {
+    console.error('❌ [OTP] Failed to check status:', error)
+    
+    // Return false on error instead of throwing
+    return {
+      otpVerified: false,
     }
   }
-  
-  console.error("❌ All endpoints failed")
-  throw lastErr || new Error("All API endpoints are unavailable. Please contact support.")
-}
-
-export async function sendOtp(email: string) {
-  const body = { email }
-  return apiFetchWithFallback(
-    ["/otp/send", "/api/otp/send", "/auth/otp/send"],
-    { method: "POST", body: JSON.stringify(body) }
-  )
-}
-
-export async function verifyOtp(email: string, otp: string) {
-  const body = { email, otp }
-  return apiFetchWithFallback(
-    ["/otp/verify", "/api/otp/verify", "/auth/otp/verify"],
-    { method: "POST", body: JSON.stringify(body) }
-  )
-}
-
-export async function resendOtp(email: string) {
-  const body = { email }
-  return apiFetchWithFallback(
-    ["/otp/resend", "/api/otp/resend", "/auth/otp/resend"],
-    { method: "POST", body: JSON.stringify(body) }
-  )
-}
-
-export async function getOtpStatus(email: string) {
-  return apiFetchWithFallback(
-    [`/otp/status?email=${encodeURIComponent(email)}`, `/api/otp/status?email=${encodeURIComponent(email)}`],
-    { method: "GET" }
-  )
 }

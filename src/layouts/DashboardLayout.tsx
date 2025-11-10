@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/utils/auth";
 import type { RootState } from "@/store/redux/store";
 import { PageLoader } from "@/components/ui/loader";
+import { OnboardingCheck } from "@/pages/onboarding/components/onboardingCheck";
 
 import BellIcon from "@/assets/icons/bell.svg?react";
 import CogIcon from "@/assets/icons/cog.svg?react";
@@ -67,7 +68,6 @@ export function Header({ actions, userName, onLogout }: { actions?: ReactNode; u
             <HeaderActionButton icon={CogIcon} ariaLabel="Settings" />
             <div className="relative">
               <HeaderActionButton icon={BellIcon} ariaLabel="Notifications" />
-              {/* <span className="absolute right-[9px] top-[9px] block h-[10px] w-[10px] rounded-full bg-[#d53411]" /> */}
             </div>
             <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
               <DropdownMenuTrigger asChild>
@@ -82,19 +82,17 @@ export function Header({ actions, userName, onLogout }: { actions?: ReactNode; u
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 z-[100] bg-white">
-                {/* <DropdownMenuLabel>Account</DropdownMenuLabel> */}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem  className="cursor-pointer focus:text-[#00b3ad] focus:bg-[#E5EFFA]" onClick={() => navigate("/applicant/profile")}>
+                <DropdownMenuItem className="cursor-pointer focus:text-[#00b3ad] focus:bg-[#E5EFFA]" onClick={() => navigate(Routes.profile)}>
                   <User className="w-4 h-4 mr-2" />
                   <span>Profile</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer focus:text-[#00b3ad] focus:bg-[#E5EFFA]" onClick={() => navigate("/applicant/settings")}>
+                <DropdownMenuItem className="cursor-pointer focus:text-[#00b3ad] focus:bg-[#E5EFFA]" onClick={() => navigate(Routes.settings)}>
                   <Settings className="w-4 h-4 mr-2" />
                   <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  variant="destructive"
                   onClick={onLogout}
                   className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50"
                 >
@@ -173,14 +171,17 @@ export default function DashboardLayout({ children }: { children?: ReactNode }) 
   }, [user]);
 
   console.log('[DashboardLayout] User authenticated, rendering dashboard layout');
+  
   return (
-    <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
-      <Header userName={user?.fullName} onLogout={handleLogout} />
-      <Sidebar />
-      <main className="ml-[240px] pt-[130px] pb-10">
-        <div className="px-8">{children ?? <Outlet />}</div>
-      </main>
-    </div>
+    <OnboardingCheck>
+      <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
+        <Header userName={user?.fullName} onLogout={handleLogout} />
+        <Sidebar />
+        <main className="ml-[240px] pt-[130px] pb-10">
+          <div className="px-8">{children ?? <Outlet />}</div>
+        </main>
+      </div>
+    </OnboardingCheck>
   );
 }
 

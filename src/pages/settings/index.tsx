@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
 import AccountTab from "./components/AccountTab";
-import NotificationTab from "./components/NotificationTab";
+import NotificationsTab from "./components/NotificationTab";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<"account" | "notification">("account");
@@ -47,7 +47,7 @@ export default function SettingsPage() {
         {activeTab === "account" ? (
           <AccountTab onSaved={handleSave} />
         ) : (
-          <NotificationTab onSave={handleSave} />
+          <NotificationsTab />
         )}
       </div>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { useLocation, useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { verifyOtp, resendOtp } from "@/lib/api/otp"
@@ -70,8 +70,8 @@ export default function VerifyOTP() {
         // Don't block navigation if update fails
       }
       
-      // Step 3: Redirect to dashboard
-      nav("/applicant/dashboard", { replace: true })
+      // Step 3: Redirect to success screen
+      nav("/onboarding/success", { replace: true })
     } catch (e: any) {
       setError(e?.message || "Invalid or expired OTP")
     } finally {
