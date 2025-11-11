@@ -358,6 +358,7 @@ export default function DocumentUploadStep({onBack, onNext}: DocumentUploadStepP
           onChange={(event) => setValue(event.target.checked)}
           labelClassName={"text-[#808081] font-normal"}
           label="I hereby declared that all the information are correct"
+          required={true}
         />
       </div>
       <div className="mt-6 pb-6">
