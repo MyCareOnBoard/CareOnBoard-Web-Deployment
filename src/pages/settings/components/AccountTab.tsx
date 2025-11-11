@@ -132,10 +132,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
 
   const handleSave = async (data: AccountFormValues) => {
     console.log("💾 Save triggered")
-    console.log("💾 Has changes:", hasChanges)
-    console.log("💾 Name changed:", nameChanged)
-    console.log("💾 Image changed:", imageChanged)
-    console.log("💾 Has profile picture:", hasProfilePicture)
     
     if (!hasChanges) {
       setError("No changes to save")
@@ -147,100 +143,64 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       return
     }
 
-    // Remove the profile picture requirement check since we now allow saving without image
-
     setSaving(true)
     setError("")
     
     try {
       console.log("🚀 Calling updateAccountInfo...")
-      console.log("📤 Sending fullName:", nameChanged ? data.fullName.trim() : "unchanged")
-      console.log("📤 Sending image:", imageChanged ? imageFile!.name : "unchanged")
+      console.log("📤 Name:", nameChanged ? data.fullName.trim() : "unchanged")
+      console.log("📤 Image:", imageChanged ? imageFile!.name : "unchanged")
       
       const result = await updateAccountInfo({
         fullName: nameChanged ? data.fullName.trim() : undefined,
         profilePictureFile: imageChanged ? imageFile! : undefined,
       })
 
-      console.log("✅ API Response:", result)
-      console.log("✅ Response fullName:", result.fullName)
-      console.log("✅ Response profilePicture:", result.profilePicture)
+      console.log("✅ Save result:", result)
 
-      // Create updated info - preserve existing values if API doesn't return them
-      const updatedInfo: AccountInfo = {
-        email: result.email || info?.email || data.email,
-        fullName: result.fullName || data.fullName.trim(),
-        profilePicture: result.profilePicture || selectedImage || initialImage || undefined,
-      }
-
-      console.log("📝 Updated info object:", updatedInfo)
-
-      // Update all state
-      setInfo(updatedInfo)
-      setInitialFullName(updatedInfo.fullName)
-      setInitialImage(updatedInfo.profilePicture || "")
+      // Update state with exact API response
+      setInfo(result)
+      setInitialFullName(result.fullName)
       
-      // Update form values
-      form.setValue("fullName", updatedInfo.fullName, { shouldValidate: false, shouldDirty: false })
-      form.setValue("email", updatedInfo.email, { shouldValidate: false, shouldDirty: false })
-      
-      // Update displayed image
+      // Update image states if new image was uploaded
       if (result.profilePicture) {
-        console.log("🖼️ Setting new profile picture from result:", result.profilePicture)
+        console.log("🖼️ Updating profile picture to:", result.profilePicture)
+        setInitialImage(result.profilePicture)
         setSelectedImage(result.profilePicture)
       }
       
-      // Clear temp state only if upload was successful or no image was uploaded
-      if (!imageChanged || result.profilePicture) {
-        setTempImage(null)
-        setImageFile(null)
-      }
+      // Clear temporary states
+      setTempImage(null)
+      setImageFile(null)
+
+      // Reset form to prevent "unsaved changes"
+      form.reset(
+        { fullName: result.fullName, email: result.email },
+        { keepDefaultValues: false }
+      )
 
       console.log("✅ Save completed successfully")
-      onSaved?.(updatedInfo)
+      onSaved?.(result)
       
-      // Set modal content for save success
-      setModalTitle("Account Updated")
-      
-      // Determine appropriate success message
+      // Set success message
       if (imageChanged && result.profilePicture) {
+        setModalTitle("Account Updated")
         setModalMessage("Your account information and profile picture have been successfully saved.")
-      } else if (imageChanged && !result.profilePicture) {
-        setModalMessage("Your name has been updated. Profile picture will be uploaded when server connection is restored.")
       } else {
-        setModalMessage("Your name has been successfully updated.")
+        setModalTitle("Account Updated")
+        setModalMessage("Your account information has been successfully saved.")
       }
       
       setIsModalVisible(true)
     } catch (e: any) {
       console.error("❌ Save failed:", e)
       
-      // Provide user-friendly error messages
       let errorMessage = e.message || "Failed to save changes"
       
       if (errorMessage.includes("Image upload requires server connection")) {
-        errorMessage = "Cannot upload image - server is unavailable. Your name has been saved. Please try uploading the image again later."
-        
-        // If only name change succeeded via Firebase fallback, don't show as complete failure
-        if (nameChanged) {
-          setModalTitle("Partial Update")
-          setModalMessage("Your name has been updated successfully. However, the profile picture could not be uploaded. Please try again when the server is available.")
-          setIsModalVisible(true)
-          
-          // Update the form to reflect the name change
-          setInitialFullName(data.fullName.trim())
-          
-          // Clear the error since we're showing a success modal with explanation
-          setError("")
-          setSaving(false)
-          return
-        }
-      } else if (errorMessage.includes("Network error") || errorMessage.includes("Unable to reach")) {
-        if (imageChanged) {
-          errorMessage = "Cannot upload image - server is unavailable. Please try again later."
-        } else {
-          errorMessage = "Server unavailable. Please check your connection and try again."
-        }
+        errorMessage = "Cannot upload image - server is unavailable. Please try again when connected."
+      } else if (errorMessage.includes("Failed to upload profile picture")) {
+        errorMessage = "Profile picture upload failed. Please check the file and try again."
       }
       
       setError(errorMessage)

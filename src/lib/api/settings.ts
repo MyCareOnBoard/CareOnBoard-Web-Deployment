@@ -1,4 +1,5 @@
 import axiosClient from '../axios';
+import { getAuth, updateProfile } from 'firebase/auth'
 
 export interface AccountInfo {
   email: string
@@ -46,22 +47,49 @@ function parseAccount(raw: any): AccountInfo {
   return {
     email: u.email ?? "",
     fullName: fullName ?? "",
-    profilePicture: profilePicture ?? "",
+    profilePicture: profilePicture || undefined,
   }
 }
 
 // Account info
 export async function getAccountInfo(): Promise<AccountInfo> {
   try {
-    const primaryResponse = await axiosClient.get("/userProfile/account-info")
-    let responseData = primaryResponse.data
-
-    if (!responseData || (!responseData.email && !responseData.fullName && !responseData?.user?.email)) {
-      const fallbackResponse = await axiosClient.get("/users/profile")
-      responseData = fallbackResponse.data
+    // First try Firebase Auth for immediate data
+    const auth = getAuth()
+    await auth.authStateReady?.()
+    const currentUser = auth.currentUser
+    
+    const firebaseData: AccountInfo = {
+      email: currentUser?.email || '',
+      fullName: currentUser?.displayName || '',
+      profilePicture: currentUser?.photoURL || undefined,
     }
+    
+    console.log('📥 [Settings] Firebase data:', firebaseData)
 
-    return parseAccount(responseData)
+    // Then try API
+    try {
+      const primaryResponse = await axiosClient.get("/userProfile/account-info")
+      let responseData = primaryResponse.data
+
+      if (!responseData || (!responseData.email && !responseData.fullName && !responseData?.user?.email)) {
+        const fallbackResponse = await axiosClient.get("/users/profile")
+        responseData = fallbackResponse.data
+      }
+
+      const apiData = parseAccount(responseData)
+      console.log('📥 [Settings] API data:', apiData)
+      
+      // Merge: prefer API data, fallback to Firebase
+      return {
+        email: apiData.email || firebaseData.email,
+        fullName: apiData.fullName || firebaseData.fullName,
+        profilePicture: apiData.profilePicture || firebaseData.profilePicture,
+      }
+    } catch (apiError) {
+      console.warn('⚠️ [Settings] API failed, using Firebase data only:', apiError)
+      return firebaseData
+    }
   } catch (error) {
     console.error("Failed to fetch account info:", error)
     throw error
@@ -96,80 +124,225 @@ export async function updateProfilePicture(profilePicture: string): Promise<void
   }
 }
 
-// Profile picture upload (multipart) -> returns data.url per provided schema
-export async function uploadProfilePicture(file: File): Promise<string> {
+/**
+ * Upload profile picture to /profilePictureUpload
+ */
+async function uploadProfilePicture(file: File): Promise<string> {
+  console.log('📤 [Settings] Uploading profile picture:', file.name, file.size, 'bytes')
+  
+  const formData = new FormData()
+  formData.append('profilePicture', file)
+  
+  const response = await axiosClient.post('/profilePictureUpload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  
+  console.log('✅ [Settings] Profile picture upload response:', response.data)
+  
+  if (!response.data?.success || !response.data?.data?.url) {
+    throw new Error(response.data?.message || 'Failed to upload profile picture')
+  }
+  
+  // Return the URL from response.data.data.url
+  const uploadedUrl = response.data.data.url
+  console.log('✅ [Settings] Extracted image URL:', uploadedUrl)
+  return uploadedUrl
+}
+
+/**
+ * Update account information via /users/profile
+ * Uses /profilePictureUpload for image uploads
+ * Falls back to Firebase Auth update if API is unavailable
+ */
+export async function updateAccountInfo(data: {
+  fullName?: string
+  profilePictureFile?: File
+}): Promise<AccountInfo> {
+  console.log('📤 [Settings] Updating account info:', {
+    fullName: data.fullName,
+    hasImage: !!data.profilePictureFile,
+    imageSize: data.profilePictureFile?.size,
+  })
+
+  const auth = getAuth()
+  await auth.authStateReady?.()
+  const currentUser = auth.currentUser
+
+  if (!currentUser) {
+    throw new Error('User not authenticated')
+  }
+
   try {
-    const formData = new FormData()
-    formData.append("file", file)
+    let uploadedImageUrl: string | undefined
 
-    const response = await axiosClient.post("/profilePictureUpload", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    })
-
-    const data = response.data
-    const uploadedUrl =
-      data?.data?.url ??
-      data?.url ??
-      data?.data?.profilePicture ??
-      data?.data?.profilePictureUrl ??
-      ""
-
-    if (!uploadedUrl) {
-      throw new Error("Upload succeeded but no URL returned")
+    // Step 1: Upload image if provided
+    if (data.profilePictureFile) {
+      console.log('📤 [Settings] Uploading image first...')
+      uploadedImageUrl = await uploadProfilePicture(data.profilePictureFile)
+      console.log('✅ [Settings] Image uploaded successfully:', uploadedImageUrl)
+      
+      if (!uploadedImageUrl) {
+        throw new Error('Image upload returned empty URL')
+      }
     }
 
-    return uploadedUrl
-  } catch (error) {
-    console.error("Failed to upload profile picture:", error)
+    // Step 2: Build update payload
+    const updatePayload: any = {}
+    
+    if (data.fullName) {
+      updatePayload.fullName = data.fullName
+    }
+    
+    if (uploadedImageUrl) {
+      updatePayload.profilePicture = uploadedImageUrl
+    }
+    
+    console.log('📤 [Settings] Updating profile with payload:', updatePayload)
+    
+    // Step 3: Update via API
+    const response = await axiosClient.put('/users/profile', updatePayload)
+    
+    console.log('✅ [Settings] Profile update response:', response.data)
+    
+    // Step 4: Also update Firebase Auth
+    try {
+      const firebaseUpdate: any = {}
+      if (data.fullName) firebaseUpdate.displayName = data.fullName
+      if (uploadedImageUrl) firebaseUpdate.photoURL = uploadedImageUrl
+      
+      if (Object.keys(firebaseUpdate).length > 0) {
+        await updateProfile(currentUser, firebaseUpdate)
+        console.log('✅ [Settings] Firebase profile synced with:', firebaseUpdate)
+      }
+    } catch (fbError) {
+      console.warn('⚠️ [Settings] Firebase sync failed (non-fatal):', fbError)
+    }
+    
+    // Step 5: Build and return final account info
+    const finalInfo: AccountInfo = {
+      email: currentUser.email || '',
+      fullName: data.fullName || currentUser.displayName || '',
+      profilePicture: uploadedImageUrl || currentUser.photoURL || undefined,
+    }
+    
+    console.log('✅ [Settings] Returning final account info:', finalInfo)
+    
+    return finalInfo
+  } catch (error: any) {
+    console.error('❌ [Settings] Update failed:', error.message)
+    
+    // Fallback: Update Firebase Auth only (name only, no image)
+    if (data.fullName && !data.profilePictureFile) {
+      console.log('🔄 [Settings] Falling back to Firebase-only name update')
+      
+      try {
+        await updateProfile(currentUser, {
+          displayName: data.fullName,
+        })
+        console.log('✅ [Settings] Firebase profile updated (fallback)')
+        
+        return {
+          email: currentUser.email || '',
+          fullName: data.fullName,
+          profilePicture: currentUser.photoURL || undefined,
+        }
+      } catch (fbError: any) {
+        console.error('❌ [Settings] Firebase fallback also failed:', fbError)
+        throw new Error('Failed to update profile. Please try again.')
+      }
+    }
+    
+    // For image uploads, we need the API
+    if (data.profilePictureFile) {
+      throw new Error('Image upload requires server connection. Please check your network and try again.')
+    }
+    
     throw error
   }
 }
 
-// Combined convenience - Upload image AND update full name
-export async function updateAccountInfo(opts: { fullName?: string; profilePictureFile?: File }): Promise<AccountInfo> {
-  try {
-    if (opts.profilePictureFile) {
-      await uploadProfilePicture(opts.profilePictureFile)
-    }
-
-    if (opts.fullName) {
-      await updateFullName(opts.fullName.trim())
-    }
-
-    return await getAccountInfo()
-  } catch (error) {
-    console.error("Failed to update account info:", error)
-    throw error
-  }
-}
-
-// Notifications (unchanged)
+// Notifications
 export async function getNotificationSettings(): Promise<NotificationSettings> {
+  // Prefer locally persisted user choices first
+  const stored = localStorage.getItem('notification_settings')
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored)
+      console.log('📦 [Settings] Loaded from localStorage:', parsed)
+      return parsed
+    } catch {
+      console.warn('⚠️ [Settings] Failed to parse localStorage notification_settings')
+    }
+  }
+
+  console.log('🔄 [Settings] Fetching from API /userProfile/notifications')
   try {
-    const response = await axiosClient.get("/userProfile/notifications")
+    const response = await axiosClient.get('/userProfile/notifications')
     const res = response.data
     const n = res?.notifications || res || {}
-    return {
-      emailNotifications: !!n.emailNotifications,
-      inAppNotifications: !!n.inAppNotifications,
-      appointmentChanges: !!n.appointmentChanges,
-      systemWarnings: !!n.systemWarnings,
+    
+    const settings = {
+      emailNotifications: n.emailNotifications ?? true,
+      inAppNotifications: n.inAppNotifications ?? true,
+      appointmentChanges: n.appointmentChanges ?? false,
+      systemWarnings: n.systemWarnings ?? false,
     }
-  } catch (error) {
-    console.error("Failed to fetch notification settings:", error)
-    throw error
+    
+    // Cache to localStorage
+    localStorage.setItem('notification_settings', JSON.stringify(settings))
+    console.log('💾 [Settings] Cached API settings to localStorage:', settings)
+    return settings
+  } catch (e) {
+    console.error('❌ [Settings] API fetch failed; using defaults')
+    const defaults: NotificationSettings = {
+      emailNotifications: true,
+      inAppNotifications: true,
+      appointmentChanges: false,
+      systemWarnings: false,
+    }
+    localStorage.setItem('notification_settings', JSON.stringify(defaults))
+    return defaults
   }
 }
 
-export async function updateNotificationSettings(prefs: NotificationSettings): Promise<NotificationSettings> {
+export async function updateNotificationSettings(
+  settings: NotificationSettings
+): Promise<NotificationSettings> {
+  console.log('📤 [Settings] User wants to save:', settings)
+
+  // Optimistic local persistence
+  localStorage.setItem('notification_settings', JSON.stringify(settings))
+  console.log('💾 [Settings] Optimistically wrote to localStorage:', settings)
+
   try {
-    await axiosClient.put("/userProfile/notifications", prefs)
-    return await getNotificationSettings()
-  } catch (error) {
-    console.error("Failed to update notification settings:", error)
-    throw error
+    const response = await axiosClient.put('/userProfile/notifications', settings)
+    console.log('📥 [Settings] API response:', response.data)
+
+    const serverSettings = response.data?.notifications || settings
+    
+    // Defensive: never allow server to flip false to true
+    const final: NotificationSettings = {
+      emailNotifications: serverSettings.emailNotifications ?? settings.emailNotifications,
+      inAppNotifications: serverSettings.inAppNotifications ?? settings.inAppNotifications,
+      appointmentChanges: serverSettings.appointmentChanges ?? settings.appointmentChanges,
+      systemWarnings: serverSettings.systemWarnings ?? settings.systemWarnings,
+    }
+
+    for (const key of Object.keys(settings) as (keyof NotificationSettings)[]) {
+      if (settings[key] === false && final[key] === true) {
+        console.warn(`⚠️ [Settings] Server flipped ${key} to true; restoring user value false.`)
+        final[key] = false
+      }
+    }
+
+    localStorage.setItem('notification_settings', JSON.stringify(final))
+    console.log('✅ [Settings] Final persisted settings:', final)
+    return final
+  } catch (e) {
+    console.error('❌ [Settings] API update failed; retaining optimistic local settings')
+    return settings
   }
 }
 
