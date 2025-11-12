@@ -227,3 +227,38 @@ export const getFinalReviewChecklist = async (): Promise<FinalReviewResponse> =>
     }
 };
 
+/**
+ * Cancel Application Response
+ */
+export interface CancelApplicationResponse {
+    success: boolean;
+    message: string;
+    data: {
+        cancelledAt: string;
+        archiveId: string;
+        deletedSections: {
+            preScreening: boolean;
+            eligibilityVerification: boolean;
+            conditionalHire: boolean;
+            officialHire: boolean;
+        };
+    };
+}
+
+/**
+ * Cancel the current job application
+ * @returns Promise with cancellation response
+ */
+export const cancelApplication = async (): Promise<CancelApplicationResponse> => {
+    try {
+        const response = await axiosClient.post<CancelApplicationResponse>(
+            `${JOB_APPLICATION_BASE}/cancel`
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to cancel application:', error);
+        throw error;
+    }
+};
+
