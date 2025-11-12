@@ -14,18 +14,10 @@ import type { Step } from "./types";
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getApplicationStatus, updateApplicationStatus, type ApplicationStatus } from "@/lib/api/job-application";
+import { ApplicationStatusNames, ApplicationStatusType, getApplicationStatus, updateApplicationStatus, type ApplicationStatus } from "@/lib/api/job-application";
 import { useAuth } from "@/utils/auth";
+import { APPLICATION_STEP_NAMES, APPLICATION_STEP_TITLES } from "@/lib/api/job-application";
 
-const STEP_TITLES = [
-  "Profile & Pre-Screening",
-  "Document Upload & Eligibility Verification",
-  "Conditional Hire & Compliance",
-  "Final Agency Review",
-  "Official Hire & Orientation",
-];
-
-const STEP_NAMES = ["profile", "eligibility", "compliance", "review", "orientation"];
 
 const STEP_COUNT = 5;
 const getProgressPercentage = (step: number) => {
@@ -71,7 +63,7 @@ function ApplicationContent() {
         if (!response.status.hasStarted) {
           setActiveStep(0);
         } else if (response.status.currentStep !== null) {
-          setActiveStep(STEP_NAMES.indexOf(response.status.currentStep));
+          setActiveStep(APPLICATION_STEP_NAMES.indexOf(response.status.currentStep));
         } else {
           setActiveStep(0);
         }
@@ -87,7 +79,7 @@ function ApplicationContent() {
 
   const steps = useMemo<Step[]>(
     () =>
-      STEP_TITLES.map((title, index) => ({
+      APPLICATION_STEP_TITLES.map((title, index) => ({
         title,
         status: index <= activeStep ? "complete" : "pending",
       })),
@@ -96,6 +88,10 @@ function ApplicationContent() {
 
   const handleNext = async () => {
     setShowSuccessDialog(true);
+    updateApplicationStatus({
+      status: ApplicationStatusNames[activeStep+1],
+      currentStep: APPLICATION_STEP_NAMES[activeStep+1],
+    });
   };
 
   const stepComponents = [
@@ -107,16 +103,6 @@ function ApplicationContent() {
   ];
 
   const handleSuccessDialogContinue = () => {
-    
-    let status: 'incomplete' | 'pre-screening_complete' | 'eligibility_pending' | 'eligibility_complete' | 'submitted' | 'under_review' | 'approved' | 'rejected' = 'incomplete'
-
-    if (activeStep === 0) {
-      status = 'pre-screening_complete'
-    }
-    updateApplicationStatus({
-      status,
-      currentStep: STEP_NAMES[activeStep+1],
-    });
     setShowSuccessDialog(false);
     setActiveStep(activeStep + 1);
   };
@@ -163,7 +149,7 @@ function ApplicationContent() {
       <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <SuccessDialogContent
           title={`Stage ${activeStep + 1} Submitted`}
-          description={`You have successfully completed ${STEP_TITLES[activeStep]}. Click 'next' to go to the next phase.`}
+          description={`You have successfully completed ${APPLICATION_STEP_TITLES[activeStep]}. Click 'next' to go to the next phase.`}
           buttonText="Next"
           onButtonClick={handleSuccessDialogContinue}
         />

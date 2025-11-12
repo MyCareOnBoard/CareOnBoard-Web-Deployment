@@ -62,7 +62,7 @@ const profilePreScreeningSchema = z.object({
   }),
   booleanQuestions: z.object(booleanQuestionsSchemaShape),
   resume: fileListSchema,
-  declaration: z.literal(true, {
+  declaration: z.boolean().refine((val) => val, {
     message: "You must confirm the information is correct",
   }),
 });
@@ -98,7 +98,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
       gender: undefined,
       booleanQuestions: booleanQuestionsDefaults,
       resume: undefined,
-      declaration: true,
+      declaration: false,
     },
   });
 
