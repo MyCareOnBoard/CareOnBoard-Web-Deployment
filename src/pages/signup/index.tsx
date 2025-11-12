@@ -21,6 +21,11 @@ import { Label } from "@/components/ui/label"
 import { useAuth } from "@/utils/auth"
 import { useToast } from "@/hooks/use-toast"
 import { ButtonLoader } from "@/components/ui/loader"
+import { 
+  getAuthErrorMessage, 
+  getSuccessMessage,
+  getValidationMessage 
+} from "@/utils/auth/helpers/errorMessages"
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState("")
@@ -41,25 +46,25 @@ export default function SignUpPage() {
   // Validate full name
   const validateFullName = (name: string) => {
     if (!name) {
-      return "Full name is required"
+      return getValidationMessage('fullName', 'required')
     }
     if (name.trim().length < 2) {
-      return "Full name must be at least 2 characters"
+      return getValidationMessage('fullName', 'tooShort')
     }
     if (!/^[a-zA-Z\s]+$/.test(name)) {
-      return "Full name should only contain letters"
+      return getValidationMessage('fullName', 'invalid')
     }
     return ""
   }
 
   // Validate email format
   const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!email) {
-      return "Email is required"
+      return getValidationMessage('email', 'required')
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      return "Please enter a valid email address"
+      return getValidationMessage('email', 'invalid')
     }
     return ""
   }
@@ -67,19 +72,19 @@ export default function SignUpPage() {
   // Validate password
   const validatePassword = (password: string) => {
     if (!password) {
-      return "Password is required"
+      return getValidationMessage('password', 'required')
     }
     if (password.length < 6) {
-      return "Password must be at least 6 characters"
+      return getValidationMessage('password', 'tooShort')
     }
     if (!/(?=.*[a-z])/.test(password)) {
-      return "Password must contain at least one lowercase letter"
+      return getValidationMessage('password', 'missingLowercase')
     }
     if (!/(?=.*[A-Z])/.test(password)) {
-      return "Password must contain at least one uppercase letter"
+      return getValidationMessage('password', 'missingUppercase')
     }
     if (!/(?=.*\d)/.test(password)) {
-      return "Password must contain at least one number"
+      return getValidationMessage('password', 'missingNumber')
     }
     return ""
   }
@@ -138,7 +143,7 @@ export default function SignUpPage() {
       })
       toast({
         title: "Validation Error",
-        description: "Please fix the errors in the form",
+        description: getValidationMessage('form', 'invalid'),
         variant: "destructive",
       })
       return
@@ -148,15 +153,17 @@ export default function SignUpPage() {
 
     try {
       await signup(email, password, fullName)
+      const successMsg = getSuccessMessage('signup')
       toast({
-        title: "Success",
-        description: "Account created successfully",
+        title: successMsg.title,
+        description: successMsg.description,
       })
       navigate("/login")
     } catch (error: any) {
+      const errorMessage = getAuthErrorMessage(error)
       toast({
-        title: "Error",
-        description: error.message || "Failed to create account",
+        title: "Unable to create account",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {

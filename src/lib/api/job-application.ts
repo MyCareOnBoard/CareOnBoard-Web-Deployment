@@ -80,13 +80,31 @@ export const submitPreScreening = async (data: PreScreeningData): Promise<ApiRes
     }
 };
 
+
+
+export const APPLICATION_STEP_TITLES = [
+    "Profile & Pre-Screening",
+    "Document Upload & Eligibility Verification",
+    "Conditional Hire & Compliance",
+    "Final Agency Review",
+    "Official Hire & Orientation",
+];
+
+export const APPLICATION_STEP_NAMES = ["profile", "eligibility", "compliance", "review", "orientation"];
+
+export type ApplicationStepName = typeof APPLICATION_STEP_NAMES[number] | null;
+
+export const ApplicationStatusNames = ["incomplete", "pre-screening_complete", "eligibility_pending", "eligibility_complete", "submitted", "under_review", "approved", "rejected"];
+
+export type ApplicationStatusType = typeof ApplicationStatusNames[number];
+
 /**
  * Application status response structure
  */
 export interface ApplicationStatus {
     hasStarted: boolean;
-    currentStep: string | null;
-    status: 'not_started' | 'in_progress' | 'submitted' | 'under_review' | 'approved' | 'rejected' | null;
+    currentStep: ApplicationStepName;
+    status: ApplicationStatusType;
 }
 
 /**
@@ -117,13 +135,13 @@ export const getApplicationStatus = async (): Promise<ApplicationStatusResponse>
 };
 
 export interface UpdateApplicationStatusRequest {
-    status?: 'incomplete' | 'pre-screening_complete' | 'eligibility_pending' | 'eligibility_complete' | 'submitted' | 'under_review' | 'approved' | 'rejected';
-    currentStep?: string;
+    status?: ApplicationStatusType;
+    currentStep?: ApplicationStepName;
 }
 
 export interface UpdateApplicationStatusResponse {
-    status: string;
-    currentStep: string;
+    status: ApplicationStatusType;
+    currentStep: ApplicationStepName;
 }
 
 export const updateApplicationStatus = async (
