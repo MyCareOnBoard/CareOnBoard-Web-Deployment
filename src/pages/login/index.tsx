@@ -10,8 +10,12 @@ import { useAuth } from "@/utils/auth"
 import { useToast } from "@/hooks/use-toast"
 import { ButtonLoader } from "@/components/ui/loader"
 import { Routes } from "@/routes/constants"
-import { getUserProfile } from "@/lib/api/users"
-import { getOnboardingStatus } from "@/lib/api/onboarding"
+import { getUserProfile, getOnboardingStatus } from "@/lib/api/onboarding"
+import { 
+  getAuthErrorMessage, 
+  getSuccessMessage,
+  getValidationMessage 
+} from "@/utils/auth/helpers/errorMessages"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -30,12 +34,12 @@ export default function LoginPage() {
 
   // Validate email format
   const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!email) {
-      return "Email is required"
+      return getValidationMessage('email', 'required')
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      return "Please enter a valid email address"
+      return getValidationMessage('email', 'invalid')
     }
     return ""
   }
@@ -43,10 +47,10 @@ export default function LoginPage() {
   // Validate password
   const validatePassword = (password: string) => {
     if (!password) {
-      return "Password is required"
+      return getValidationMessage('password', 'required')
     }
     if (password.length < 6) {
-      return "Password must be at least 6 characters"
+      return getValidationMessage('password', 'tooShort')
     }
     return ""
   }
@@ -91,7 +95,7 @@ export default function LoginPage() {
       })
       toast({
         title: "Validation Error",
-        description: "Please fix the errors in the form",
+        description: getValidationMessage('form', 'invalid'),
         variant: "destructive",
       })
       return
@@ -111,9 +115,10 @@ export default function LoginPage() {
       const onboardingStatus = await getOnboardingStatus()
       console.log("📊 Onboarding status:", onboardingStatus)
       
+      const successMsg = getSuccessMessage('login')
       toast({
-        title: "Success",
-        description: "Logged in successfully",
+        title: successMsg.title,
+        description: successMsg.description,
       })
 
       const profile = await getUserProfile()
@@ -126,23 +131,10 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("❌ Login error:", error)
       
-      // Handle specific error cases
-      let errorMessage = "Failed to login"
-      
-      if (error.code === "auth/invalid-credential" || error.code === "auth/wrong-password") {
-        errorMessage = "Invalid email or password"
-      } else if (error.code === "auth/user-not-found") {
-        errorMessage = "No account found with this email"
-      } else if (error.code === "auth/too-many-requests") {
-        errorMessage = "Too many failed attempts. Please try again later"
-      } else if (error.code === "auth/network-request-failed") {
-        errorMessage = "Network error. Please check your connection"
-      } else if (error.message) {
-        errorMessage = error.message
-      }
+      const errorMessage = getAuthErrorMessage(error)
       
       toast({
-        title: "Error",
+        title: "Unable to log in",
         description: errorMessage,
         variant: "destructive",
       })
