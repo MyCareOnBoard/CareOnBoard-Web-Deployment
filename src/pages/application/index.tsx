@@ -1,4 +1,5 @@
 import { Suspense, useMemo, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -12,11 +13,13 @@ import OrientationStep from "./components/OrientationStep";
 
 import type { Step } from "./types";
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
+import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ApplicationStatusNames, ApplicationStatusType, getApplicationStatus, updateApplicationStatus, type ApplicationStatus } from "@/lib/api/job-application";
+import { ApplicationStatusNames, ApplicationStatusType, getApplicationStatus, updateApplicationStatus, cancelApplication, type ApplicationStatus } from "@/lib/api/job-application";
 import { useAuth } from "@/utils/auth";
 import { APPLICATION_STEP_NAMES, APPLICATION_STEP_TITLES } from "@/lib/api/job-application";
+import { useToast } from "@/hooks/use-toast";
 
 
 const STEP_COUNT = 5;
@@ -37,7 +40,11 @@ function ApplicationLoading() {
 
 function ApplicationContent() {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
@@ -59,6 +66,9 @@ function ApplicationContent() {
       try {
         setIsLoading(true);
         const response = await getApplicationStatus();
+        
+        // Store the application status
+        setApplicationStatus(response.status);
 
         if (!response.status.hasStarted) {
           setActiveStep(0);
@@ -88,9 +98,15 @@ function ApplicationContent() {
 
   const handleNext = async () => {
     setShowSuccessDialog(true);
-    updateApplicationStatus({
+    const updatedStatus = await updateApplicationStatus({
       status: ApplicationStatusNames[activeStep+1],
       currentStep: APPLICATION_STEP_NAMES[activeStep+1],
+    });
+    
+    setApplicationStatus({
+      hasStarted: true,
+      status: updatedStatus.status,
+      currentStep: updatedStatus.currentStep,
     });
   };
 
@@ -107,6 +123,43 @@ function ApplicationContent() {
     setActiveStep(activeStep + 1);
   };
 
+  const handleCancelClick = () => {
+    setShowCancelDialog(true);
+  };
+
+  const handleCancelConfirm = async () => {
+    try {
+      setIsCancelling(true);
+      const response = await cancelApplication();
+      
+      if (response.success) {
+        setShowCancelDialog(false);
+        toast({
+          title: "Application Cancelled",
+          description: response.message || "Your application has been cancelled successfully.",
+          variant: "success",
+        });
+        
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Error cancelling application:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel application. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleCancelReject = () => {
+    setShowCancelDialog(false);
+  };
+
   if (isLoading) {
     return <ApplicationLoading />;
   }
@@ -115,7 +168,13 @@ function ApplicationContent() {
     <>
       <div className="mb-[24px] flex items-center justify-between">
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">Application</h1>
-        <Button type="button" variant="destructive" className="gap-[13px] px-4">
+        <Button 
+          type="button" 
+          variant="destructive" 
+          className="gap-[13px] px-4"
+          onClick={handleCancelClick}
+          disabled={!applicationStatus?.hasStarted}
+        >
           <X className="h-5 w-5" />
           <span>Cancel Application Form</span>
         </Button>
@@ -154,6 +213,17 @@ function ApplicationContent() {
           onButtonClick={handleSuccessDialogContinue}
         />
       </SuccessDialog>
+      <ConfirmDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <ConfirmDialogContent
+          title="Cancel Application?"
+          description="Are you sure you want to cancel your application? All your progress will be lost and this action cannot be undone."
+          confirmText="Yes, Cancel Application"
+          cancelText="No, Keep It"
+          onConfirm={handleCancelConfirm}
+          onCancel={handleCancelReject}
+          isLoading={isCancelling}
+        />
+      </ConfirmDialog>
     </>
   );
 }
