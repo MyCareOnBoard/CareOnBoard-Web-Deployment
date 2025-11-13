@@ -25,6 +25,7 @@ import {
   getSuccessMessage,
   getValidationMessage 
 } from "@/utils/auth/helpers/errorMessages"
+import {Routes} from "@/routes/constants";
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState("")
@@ -157,7 +158,7 @@ export default function SignUpPage() {
         title: successMsg.title,
         description: successMsg.description,
       })
-      navigate("/login")
+      navigate(Routes.auth.login)
     } catch (error: any) {
       const errorMessage = getAuthErrorMessage(error)
       toast({
@@ -309,7 +310,7 @@ export default function SignUpPage() {
       <div className="space-y-3 pt-2">
         <p className="text-center text-sm text-gray-600">
           Already have an account?{" "}
-          <Link to="/login" className="text-[#17a2b8] hover:text-[#148a9c] font-semibold">
+          <Link to={Routes.auth.login} className="text-[#17a2b8] hover:text-[#148a9c] font-semibold">
             Login
           </Link>
         </p>

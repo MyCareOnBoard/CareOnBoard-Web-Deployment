@@ -1,35 +1,16 @@
 import {type ComponentType, ReactNode, useMemo} from "react";
 import {useLocation, useNavigate} from "react-router";
-import {Routes} from "@/routes/constants";
-import QuestionIcon from "@/assets/icons/question-mark-circle.svg?react";
-import UserIcon from "@/assets/icons/user.svg?react";
-import FileIcon from "@/assets/icons/file.svg?react";
-import CogIcon from "@/assets/icons/cog.svg?react";
-import HomeIcon from "@/assets/icons/home.svg?react";
 import {cn} from "@/lib/utils";
 
-type NavItem = {
+export type NavItem = {
   label: string;
   path: string;
   icon: ComponentType<{ className?: string }>;
 };
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", path: Routes.applicant.dashboard, icon: HomeIcon },
-  { label: "Application", path: Routes.applicant.application, icon: UserIcon },
-  { label: "Documents", path: Routes.applicant.documents, icon: FileIcon },
-  {
-    label: "Help Center",
-    path: Routes.common.helpCenter,
-    icon: QuestionIcon
-  },
-  {
-    label: "Settings",
-    path: Routes.common.settings, icon: CogIcon
-  },
-];
-
-export default function DashboardSidebar({ footer }: { footer?: ReactNode }) {
+export default function DashboardSidebar(
+  { navItems, footer }: { footer?: ReactNode, navItems: NavItem[] }
+) {
   const location = useLocation();
   const navigate = useNavigate();
 

@@ -28,6 +28,7 @@ import {
   getSuccessMessage,
   getValidationMessage,
 } from "@/utils/auth/helpers/errorMessages"
+import {Routes} from "@/routes/constants";
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
@@ -165,7 +166,7 @@ export default function ResetPasswordPage() {
 
       // Redirect to login after a short delay
       setTimeout(() => {
-        navigate("/login")
+        navigate(Routes.auth.login)
       }, 2000)
     } catch (error: any) {
       console.error("[ResetPassword] Password reset error:", error)
@@ -202,13 +203,13 @@ export default function ResetPasswordPage() {
             <p className="text-gray-600 mb-8">
               This password reset link is invalid or has expired. Please request a new one.
             </p>
-            <Link to="/forgot-password">
+            <Link to={Routes.auth.forgotPassword}>
               <Button className="w-full h-12 rounded-2xl bg-[#17a2b8] hover:bg-[#148a9c] mb-4">
                 Request New Reset Link
               </Button>
             </Link>
             <Link
-              to="/login"
+              to={Routes.auth.login}
               className="inline-block text-sm text-[#17a2b8] hover:text-[#148a9c] font-medium"
             >
               Back to Login
@@ -389,7 +390,7 @@ export default function ResetPasswordPage() {
 
         <div className="mt-6 text-center">
           <Link
-            to="/login"
+            to={Routes.auth.login}
             className="text-sm text-[#17a2b8] hover:text-[#148a9c] font-medium"
           >
             Back to Login

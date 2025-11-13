@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useAuth } from "@/utils/auth"
+import {setProfile, useAuth} from "@/utils/auth"
 import { useToast } from "@/hooks/use-toast"
 import { ButtonLoader } from "@/components/ui/loader"
 import { Routes } from "@/routes/constants"
@@ -16,6 +16,8 @@ import {
   getSuccessMessage,
   getValidationMessage 
 } from "@/utils/auth/helpers/errorMessages"
+import {UserType} from "@/lib/api/users";
+import {useDispatch} from "react-redux";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -30,6 +32,7 @@ export default function LoginPage() {
 
   const { login } = useAuth()
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const { toast } = useToast()
 
   // Validate email format
@@ -81,6 +84,11 @@ export default function LoginPage() {
     }
   }
 
+  const dashboardRoutes = {
+    [UserType.APPLICANT]: Routes.applicant.dashboard,
+    [UserType.USER]: Routes.userPanel.dashboard,
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -122,9 +130,14 @@ export default function LoginPage() {
       })
 
       const profile = await getUserProfile()
+      dispatch(setProfile(profile))
+      if (profile.userType !== UserType.APPLICANT) {
+        navigate(dashboardRoutes[profile.userType as UserType], { replace: true })
+        return
+      }
       // Check if onboarding is already completed
       if (profile.onboardingCompleted) {
-        navigate(Routes.applicant.dashboard, { replace: true })
+        navigate(dashboardRoutes[UserType.APPLICANT], { replace: true })
         return
       }
       navigate(Routes.onboarding.index)
@@ -223,7 +236,7 @@ export default function LoginPage() {
               Remember me
             </label>
           </div>
-          <Link to="/forgot-password" className="text-sm text-[#17a2b8] hover:text-[#148a9c] font-medium">
+          <Link to={Routes.auth.forgotPassword} className="text-sm text-[#17a2b8] hover:text-[#148a9c] font-medium">
             Forgot password?
           </Link>
         </div>
@@ -246,7 +259,7 @@ export default function LoginPage() {
 
       <p className="pt-2 text-sm text-center text-gray-600">
         Don't have an account?{" "}
-        <Link to="/signup" className="text-[#00B4B8] hover:text-[#148a9c] font-semibold">
+        <Link to={Routes.auth.signup} className="text-[#00B4B8] hover:text-[#148a9c] font-semibold">
           Sign Up
         </Link>
       </p>

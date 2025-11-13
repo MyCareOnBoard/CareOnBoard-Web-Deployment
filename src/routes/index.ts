@@ -7,7 +7,7 @@ import LoginPage from "@/pages/auth/login";
 import SignUpPage from "@/pages/auth/signup";
 import ForgotPasswordPage from "@/pages/auth/forgot-password";
 import ResetPasswordPage from "@/pages/auth/reset-password";
-import DashboardPage from "@/pages/applicant/dashboard";
+import ApplicantDashboardPage from "@/pages/applicant/dashboard";
 import DocumentsPage from "@/pages/applicant/documents";
 import HelpCenterPage from "@/pages/help-center";
 import SettingsPage from "@/pages/settings";
@@ -18,7 +18,8 @@ import SuccessScreen from "@/pages/onboarding/SuccessScreen";
 import AuthLayout from "@/layouts/AuthLayout";
 import ApplicantDashboardLayout from "@/layouts/ApplicantDashboardLayout";
 import OnboardingLayout from "@/layouts/OnboardingLayout";
-import AuthenticatedLayout from "@/layouts/AuthenticatedLayout";
+import UserPanelDashboardLayout from "@/layouts/UserPanelLayout";
+import UserPanelDashboard from "@/pages/userPanel/dashboard";
 
 
 export const router = createBrowserRouter([
@@ -77,29 +78,45 @@ export const router = createBrowserRouter([
       },
       {
         path: Routes.applicant.dashboard,
-        Component: DashboardPage,
+        Component: ApplicantDashboardPage,
       },
       {
         path: Routes.applicant.documents,
         Component: DocumentsPage,
       },
-    ],
-  },
-  {
-    Component: AuthenticatedLayout,
-    children: [
       {
-        path: Routes.common.helpCenter,
+        path: Routes.applicant.helpCenter,
         Component: HelpCenterPage,
       },
       {
-        path: Routes.common.settings,
+        path: Routes.applicant.settings,
         Component: SettingsPage,
       },
       {
-        path: Routes.common.profile,
+        path: Routes.applicant.profile,
         Component: ProfilePage,
       },
-    ]
+    ],
+  },
+  {
+    Component: UserPanelDashboardLayout,
+    children: [
+      {
+        path: Routes.userPanel.dashboard,
+        Component: UserPanelDashboard,
+      },
+      {
+        path: Routes.userPanel.helpCenter,
+        Component: HelpCenterPage,
+      },
+      {
+        path: Routes.userPanel.settings,
+        Component: SettingsPage,
+      },
+      {
+        path: Routes.userPanel.profile,
+        Component: ProfilePage,
+      },
+    ],
   },
 ]);

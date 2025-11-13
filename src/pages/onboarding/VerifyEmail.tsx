@@ -74,7 +74,7 @@ export default function VerifyEmail() {
       await sendOtp(trimmedEmail)
       
       // Navigate to OTP verification page
-      nav("/onboarding/otp", { state: { email: trimmedEmail } })
+      nav(Routes.onboarding.otp, { state: { email: trimmedEmail } })
     } catch (err: any) {
       const errorMsg = err?.message || "Failed to send OTP"
       

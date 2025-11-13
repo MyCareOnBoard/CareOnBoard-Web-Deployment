@@ -34,7 +34,7 @@ const applicationStages = [{
 
 export type ApplicationStage = typeof applicationStages[number];
 
-export default function DashboardPage() {
+export default function ApplicantDashboardPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [applicationStage, setApplicationStage] = useState<ApplicationStage>(applicationStages[0]);

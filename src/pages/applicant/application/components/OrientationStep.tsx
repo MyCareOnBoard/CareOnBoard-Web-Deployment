@@ -7,10 +7,15 @@ import {
     useGetOfficialHireStatusQuery,
     useSubmitOfficialHireMutation
 } from "@/pages/applicant/application/api";
+import {useDispatch} from "react-redux";
+import {getUserProfile} from "@/lib/api/onboarding";
+import {setProfile} from "@/utils/auth";
 
 export default function OrientationStep() {
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState<boolean>(false);
+
+    const dispatch = useDispatch();
 
     const {
         data,
@@ -28,8 +33,18 @@ export default function OrientationStep() {
     });
     const [submitOfficialHire] = useSubmitOfficialHireMutation();
 
+    const handleProfileRetrieve = async () => {
+      try {
+        const profile = await getUserProfile();
+        dispatch(setProfile(profile));
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
     const handleModalOpen = async () => {
         if (officialHireStatus?.status?.overall?.status === "completed") {
+            await handleProfileRetrieve();
             setIsEmployeeModalOpen(true);
         } else if (data?.data?.signatureId) {
             await handleSubmitOfficialHire();

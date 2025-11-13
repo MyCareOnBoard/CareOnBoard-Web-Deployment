@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { getIdToken } from '@/utils/auth';
 import { auth } from '@/lib/firebase';
+import {Routes} from "@/routes/constants";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -74,8 +75,9 @@ axiosClient.interceptors.response.use(
         if (error.response) {
             switch (error.response.status) {
                 case 401:
-                    // Token expired or invalid - redirect to login
-                    window.location.href = '/login';
+                    if (window.location.pathname !== Routes.auth.login) {
+                      window.location.href = Routes.auth.login;
+                    }
                     break;
                 case 403:
                     console.error('Access forbidden:', error.response.data);

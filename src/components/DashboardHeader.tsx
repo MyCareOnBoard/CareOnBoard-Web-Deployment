@@ -12,6 +12,7 @@ import CogIcon from "@/assets/icons/cog.svg?react";
 import LogoNameIcon from "@/assets/icons/logo-name.svg?react";
 import { ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {UserType} from "@/lib/api/users";
 
 
 function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: ComponentType<{ className?: string }>; ariaLabel: string; onClick?: () => void }) {
@@ -62,11 +63,27 @@ function UserAvatar({ userName, userImage }: { userName?: string; userImage?: st
   );
 }
 
-export default function DashboardHeader({ actions, userName, userImage, onLogout }: { actions?: ReactNode; userName?: string; userImage?: string; userRole?: string; onLogout?: () => void }) {
+export default function DashboardHeader(
+  { actions, userName, userImage, onLogout, userType }: {
+    actions?: ReactNode;
+    userName?: string;
+    userImage?: string;
+    userRole?: string;
+    userType?: string;
+    onLogout?: () => void
+  }) {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isNotificationDropdownOpen, setIsNotificationDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const makeCommonRoute = (route: string) => {
+    const userTypeKeys = {
+      [UserType.APPLICANT]: "applicant",
+      [UserType.USER]: "user-panel"
+    }
+    return route.replace(':userType', userTypeKeys[userType as UserType] || 'applicant');
+  }
   
   return (
     <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5]">
@@ -80,7 +97,7 @@ export default function DashboardHeader({ actions, userName, userImage, onLogout
             <HeaderActionButton 
               icon={CogIcon} 
               ariaLabel="Settings" 
-              onClick={() => navigate(Routes.common.settings)}
+              onClick={() => navigate(makeCommonRoute(Routes.common.settings))}
             />
             <DropdownMenu open={isNotificationDropdownOpen} onOpenChange={setIsNotificationDropdownOpen}>
               <DropdownMenuTrigger asChild>
@@ -148,48 +165,48 @@ export default function DashboardHeader({ actions, userName, userImage, onLogout
                   <DropdownMenuItem 
                     className={cn(
                       "cursor-pointer px-4 py-2 rounded-none gap-3",
-                      location.pathname === Routes.common.profile
+                      location.pathname === makeCommonRoute(Routes.common.profile)
                         ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
                         : "hover:bg-white/50 focus:bg-white/50"
                     )}
-                    onClick={() => navigate(Routes.common.profile)}
+                    onClick={() => navigate(makeCommonRoute(Routes.common.profile))}
                   >
-                    <User className={cn("w-4 h-4", location.pathname === Routes.common.profile ? "text-[#00b4b8]" : "text-[#808081]")} />
+                    <User className={cn("w-4 h-4", location.pathname === makeCommonRoute(Routes.common.profile) ? "text-[#00b4b8]" : "text-[#808081]")} />
                     <span className={cn(
                       "text-[14px]",
-                      location.pathname === Routes.common.profile ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
+                      location.pathname === makeCommonRoute(Routes.common.profile) ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
                     )}>Profile</span>
                   </DropdownMenuItem>
                   
                   <DropdownMenuItem 
                     className={cn(
                       "cursor-pointer px-4 py-2 rounded-none gap-3",
-                      location.pathname === Routes.common.settings
+                      location.pathname === makeCommonRoute(Routes.common.settings)
                         ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
                         : "hover:bg-white/50 focus:bg-white/50"
                     )}
-                    onClick={() => navigate(Routes.common.settings)}
+                    onClick={() => navigate(makeCommonRoute(Routes.common.settings))}
                   >
-                    <Lock className={cn("w-4 h-4", location.pathname === Routes.common.settings ? "text-[#00b4b8]" : "text-[#808081]")} />
+                    <Lock className={cn("w-4 h-4", location.pathname === makeCommonRoute(Routes.common.settings) ? "text-[#00b4b8]" : "text-[#808081]")} />
                     <span className={cn(
                       "text-[14px]",
-                      location.pathname === Routes.common.settings ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
+                      location.pathname === makeCommonRoute(Routes.common.settings) ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
                     )}>Settings</span>
                   </DropdownMenuItem>
                   
                   <DropdownMenuItem 
                     className={cn(
                       "cursor-pointer px-4 py-2 rounded-none gap-3",
-                      location.pathname === Routes.common.helpCenter
+                      location.pathname === makeCommonRoute(Routes.common.helpCenter)
                         ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
                         : "hover:bg-white/50 focus:bg-white/50"
                     )}
-                    onClick={() => navigate(Routes.common.helpCenter)}
+                    onClick={() => navigate(makeCommonRoute(Routes.common.helpCenter))}
                   >
-                    <HelpCircle className={cn("w-4 h-4", location.pathname === Routes.common.helpCenter ? "text-[#00b4b8]" : "text-[#808081]")} />
+                    <HelpCircle className={cn("w-4 h-4", location.pathname === makeCommonRoute(Routes.common.helpCenter) ? "text-[#00b4b8]" : "text-[#808081]")} />
                     <span className={cn(
                       "text-[14px]",
-                      location.pathname === Routes.common.helpCenter ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
+                      location.pathname === makeCommonRoute(Routes.common.helpCenter) ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
                     )}>Help Center</span>
                   </DropdownMenuItem>
                   

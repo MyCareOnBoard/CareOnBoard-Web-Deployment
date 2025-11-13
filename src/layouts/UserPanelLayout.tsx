@@ -2,20 +2,33 @@ import type {ReactNode} from "react";
 import {useEffect} from "react";
 import {Outlet, useNavigate} from "react-router";
 import {useAuth} from "@/utils/auth";
+import {Routes} from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, {NavItem} from "@/components/DashboardSidebar";
 import {UserProfile, UserType} from "@/lib/api/users";
 import {useSelector} from "react-redux";
 import type {RootState} from "@/store/redux/store";
-import {Routes} from "@/routes/constants";
 import QuestionIcon from "@/assets/icons/question-mark-circle.svg?react";
-import UserIcon from "@/assets/icons/user.svg?react";
-import FileIcon from "@/assets/icons/file.svg?react";
 import CogIcon from "@/assets/icons/cog.svg?react";
 import HomeIcon from "@/assets/icons/home.svg?react";
 
 
-export default function ApplicantDashboardLayout({children}: { children?: ReactNode }) {
+const navItems: NavItem[] = [
+  {label: "Dashboard", path: Routes.userPanel.dashboard, icon: HomeIcon},
+  {
+    label: "Help Center",
+    path: Routes.userPanel.helpCenter,
+    icon: QuestionIcon
+  },
+  {
+    label: "Settings",
+    path: Routes.userPanel.settings,
+    icon: CogIcon
+  },
+];
+
+
+export default function UserPanelDashboardLayout({children}: { children?: ReactNode }) {
   const {user, logout} = useAuth();
   const profile: UserProfile | null = useSelector((state: RootState) => state.auth?.profile)
   const navigate = useNavigate();
@@ -29,24 +42,10 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
     }
   };
 
-  const navItems: NavItem[] = [
-    {label: "Dashboard", path: Routes.applicant.dashboard, icon: HomeIcon},
-    {label: "Application", path: Routes.applicant.application, icon: UserIcon},
-    {label: "Documents", path: Routes.applicant.documents, icon: FileIcon},
-    {
-      label: "Help Center",
-      path: Routes.applicant.helpCenter,
-      icon: QuestionIcon
-    },
-    {
-      label: "Settings",
-      path: Routes.applicant.settings,
-      icon: CogIcon
-    },
-  ];
+  console.log(user, profile, navItems)
 
   useEffect(() => {
-    if (!user || (profile && profile.userType !== UserType.APPLICANT)) {
+    if (!user || (profile && profile.userType !== UserType.USER)) {
       navigate(Routes.auth.login, {replace: true});
     }
   }, [user, profile]);

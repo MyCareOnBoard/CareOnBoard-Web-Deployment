@@ -23,6 +23,7 @@ import {
   getSuccessMessage,
   getValidationMessage 
 } from "@/utils/auth/helpers/errorMessages"
+import {Routes} from "@/routes/constants";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -112,7 +113,7 @@ export default function ForgotPasswordPage() {
               Password reset instructions have been sent to your email address. Check your inbox and spam folder.
             </p>
           </div>
-          <Link to="/login">
+          <Link to={Routes.auth.login}>
             <Button className="w-full h-12 bg-[#17a2b8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold transition-all">
               Back to Login
             </Button>
@@ -164,7 +165,7 @@ export default function ForgotPasswordPage() {
 
       <p className="text-center text-sm text-gray-600 pt-2">
         Remember your password?{" "}
-        <Link to="/login" className="text-[#17a2b8] hover:text-[#148a9c] font-semibold">
+        <Link to={Routes.auth.login} className="text-[#17a2b8] hover:text-[#148a9c] font-semibold">
           Login
         </Link>
       </p>

@@ -382,7 +382,7 @@ export default function ProfilePage() {
       localStorage.clear()
       sessionStorage.clear()
       
-      navigate("/login", { replace: true })
+      navigate(Routes.auth.login, { replace: true })
     } catch (err: any) {
       console.error("❌ Delete failed:", err)
       setError(err?.message || "Failed to delete account. Please try again or contact support.")

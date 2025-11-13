@@ -6,6 +6,15 @@ export const Routes = {
     dashboard: "/applicant/dashboard",
     application: "/applicant/dashboard/application",
     documents: "/applicant/dashboard/documents",
+    helpCenter: "/applicant/dashboard/help-center",
+    settings: "/applicant/dashboard/settings",
+    profile: "/applicant/dashboard/profile",
+  },
+  userPanel: {
+    dashboard: "/user-panel/dashboard",
+    helpCenter: "/user-panel/dashboard/help-center",
+    settings: "/user-panel/dashboard/settings",
+    profile: "/user-panel/dashboard/profile",
   },
   auth: {
     login: "/auth/login",

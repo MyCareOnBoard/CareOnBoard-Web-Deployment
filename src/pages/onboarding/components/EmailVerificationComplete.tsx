@@ -5,6 +5,7 @@ import Confetti from "react-confetti"
 import { MailCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import LogoHeader from "./LogoHeader"
+import {Routes} from "@/routes/constants";
 
 export default function EmailVerificationComplete() {
   const nav = useNavigate()
@@ -66,7 +67,7 @@ export default function EmailVerificationComplete() {
           Your email has been verified. You can now continue to your dashboard.
         </p>
 
-        <Button className="w-full" onClick={() => nav("/dashboard")}>
+        <Button className="w-full" onClick={() => nav(Routes.applicant.dashboard)}>
           Continue to Dashboard
         </Button>
       </motion.div>

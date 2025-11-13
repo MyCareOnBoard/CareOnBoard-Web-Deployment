@@ -20,6 +20,7 @@ import { ApplicationStatusNames, getApplicationStatus, updateApplicationStatus, 
 import { useAuth } from "@/utils/auth";
 import { APPLICATION_STEP_NAMES, APPLICATION_STEP_TITLES } from "@/lib/api/job-application";
 import { useToast } from "@/hooks/use-toast";
+import {Routes} from "@/routes/constants";
 
 
 const STEP_COUNT = 5;
@@ -141,7 +142,7 @@ function ApplicationContent() {
         });
         
         setTimeout(() => {
-          navigate("/dashboard");
+          navigate(Routes.applicant.dashboard);
         }, 1500);
       }
     } catch (error) {
