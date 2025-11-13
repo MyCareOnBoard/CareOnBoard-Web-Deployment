@@ -20,6 +20,7 @@ import ApplicantDashboardLayout from "@/layouts/ApplicantDashboardLayout";
 import OnboardingLayout from "@/layouts/OnboardingLayout";
 import UserPanelDashboardLayout from "@/layouts/UserPanelLayout";
 import UserPanelDashboard from "@/pages/userPanel/dashboard";
+import UserPanelMileage from "@/pages/userPanel/mileage";
 import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
 
 
@@ -121,6 +122,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.userPanel.profile,
         Component: ProfilePage,
+      },
+      {
+        path: Routes.userPanel.mileage,
+        Component: UserPanelMileage,
       },
     ],
   },
