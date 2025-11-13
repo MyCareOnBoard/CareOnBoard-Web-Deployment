@@ -233,8 +233,7 @@ describe("ProfilePreScreeningStep", () => {
     });
 
     it("shows 'Uploading...' text while uploading", async () => {
-      const user = userEvent.setup();
-      
+
       // Mock a delayed upload
       (uploadResume as Mock).mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve({ data: {}, success: true }), 100))
@@ -321,7 +320,6 @@ describe("ProfilePreScreeningStep", () => {
 
   describe("Button States", () => {
     it("disables button during upload", async () => {
-      const user = userEvent.setup();
       (uploadResume as Mock).mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve({ data: {}, success: true }), 1000))
       );

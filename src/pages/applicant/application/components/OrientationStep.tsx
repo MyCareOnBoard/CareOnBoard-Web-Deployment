@@ -1,19 +1,14 @@
 import {Button} from "@/components/ui/button";
-import DigitalSignatureModal from "@/pages/application/components/DigitalSignature";
+import DigitalSignatureModal from "@/pages/applicant/application/components/DigitalSignature";
 import {useState} from "react";
-import EmployeeUserPanelLoginDetailsModal from "@/pages/application/components/EmployeeUserPanelLoginDetailsModal";
+import EmployeeUserPanelLoginDetailsModal from "@/pages/applicant/application/components/EmployeeUserPanelLoginDetailsModal";
 import {
     useCheckSignatureStatusQuery,
     useGetOfficialHireStatusQuery,
     useSubmitOfficialHireMutation
-} from "@/pages/application/api";
+} from "@/pages/applicant/application/api";
 
-interface OrientationStepProps {
-    onBack?: () => void;
-    onNext?: () => void;
-}
-
-export default function OrientationStep({onBack, onNext}: OrientationStepProps) {
+export default function OrientationStep() {
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState<boolean>(false);
 

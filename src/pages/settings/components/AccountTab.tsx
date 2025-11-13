@@ -128,7 +128,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
   const nameChanged = fullNameValue.trim() !== initialFullName.trim()
   const imageChanged = !!imageFile
   const hasChanges = nameChanged || imageChanged
-  const hasProfilePicture = !!(tempImage || selectedImage || initialImage)
 
   const handleSave = async (data: AccountFormValues) => {
     console.log("💾 Save triggered")
@@ -231,7 +230,7 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       sessionStorage.clear()
       
       // Redirect to login (matches ProfilePage)
-      navigate(Routes.login, { replace: true })
+      navigate(Routes.auth.login, { replace: true })
     } catch (err: any) {
       console.error("❌ [AccountTab] Delete failed:", err)
       

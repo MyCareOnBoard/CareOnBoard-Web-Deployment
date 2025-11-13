@@ -6,7 +6,7 @@ import ComplianceStep from "./ComplianceStep";
 import {
   useCheckSignatureStatusQuery,
   useSubmitConditionalHireMutation,
-} from "@/pages/application/api";
+} from "@/pages/applicant/application/api";
 import { useAuth } from "@/utils/auth";
 import { toast } from "sonner";
 

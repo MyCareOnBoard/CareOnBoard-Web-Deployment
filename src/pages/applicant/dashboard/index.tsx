@@ -19,7 +19,7 @@ export default function DashboardPage() {
           </span>
         </div>
         <Button
-          onClick={() => navigate(Routes.application)}
+          onClick={() => navigate(Routes.applicant.application)}
           className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-2.5 h-auto font-medium shadow-sm transition-all duration-200 hover:shadow-md"
         >
           <Plus size={18} />
@@ -49,7 +49,7 @@ export default function DashboardPage() {
 
           {/* CTA Button */}
           <Button
-            onClick={() => navigate(Routes.application)}
+            onClick={() => navigate(Routes.applicant.application)}
             className="flex items-center gap-2 bg-white hover:bg-gray-50 text-[#00b4b8] border-2 border-[#00b4b8] rounded-full px-6 py-2.5 h-auto font-medium transition-all duration-200 hover:shadow-md"
           >
             <Plus size={18} />

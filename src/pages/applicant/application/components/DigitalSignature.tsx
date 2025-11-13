@@ -2,7 +2,7 @@ import React, {useState, useRef, useEffect} from 'react';
 import {X} from 'lucide-react';
 import {Button} from "@/components/ui/button";
 import {FileUpload} from "@/components/ui/file-upload";
-import {useSignDocumentMutation} from "@/pages/application/api";
+import {useSignDocumentMutation} from "@/pages/applicant/application/api";
 
 const DigitalSignatureModal = (
   {isOpen, setIsOpen, proceed, useCase}: {
@@ -219,7 +219,7 @@ const DigitalSignatureModal = (
                       if (!canvasRef.current) return;
                       canvasRef.current.dispatchEvent(mouseEvent);
                     }}
-                    onTouchEnd={(e) => {
+                    onTouchEnd={() => {
                       const mouseEvent = new MouseEvent('mouseup', {});
                       if (!canvasRef.current) return;
                       canvasRef.current.dispatchEvent(mouseEvent);

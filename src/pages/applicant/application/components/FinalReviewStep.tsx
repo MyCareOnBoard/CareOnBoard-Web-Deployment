@@ -58,7 +58,7 @@ interface TimelineIndicatorProps {
   previousStatus?: ReviewItemStatus;
 }
 
-function TimelineIndicator({ status, isFirst, isLast, previousStatus }: TimelineIndicatorProps) {
+function TimelineIndicator({ status, isFirst, isLast }: TimelineIndicatorProps) {
   const currentStyle = STATUS_STYLES[status];
 
   return (

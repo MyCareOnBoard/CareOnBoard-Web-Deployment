@@ -1,48 +1,18 @@
-import type { ComponentType, ReactNode } from "react";
-import { useMemo, useState, useEffect } from "react";
-import { Outlet, useLocation, useNavigate, Navigate } from "react-router";
-import { ChevronDown, ChevronUp, User, Settings, LogOut, Lock, HelpCircle } from "lucide-react";
-import { useSelector } from "react-redux";
-
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/utils/auth";
-import type { RootState } from "@/store/redux/store";
-import { PageLoader } from "@/components/ui/loader";
-import { OnboardingCheck } from "@/pages/onboarding/components/onboardingCheck";
-
-import BellIcon from "@/assets/icons/bell.svg?react";
-import CogIcon from "@/assets/icons/cog.svg?react";
-import FileIcon from "@/assets/icons/file.svg?react";
-import HomeIcon from "@/assets/icons/home.svg?react";
-import LogoNameIcon from "@/assets/icons/logo-name.svg?react";
-import QuestionIcon from "@/assets/icons/question-mark-circle.svg?react";
-import UserIcon from "@/assets/icons/user.svg?react";
-import { Routes } from "@/routes/constants";
+import {ReactNode, useState, ComponentType} from "react";
+import {useLocation, useNavigate} from "react-router";
+import {Routes} from "@/routes/constants";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getUserProfile, UserProfile } from "@/lib/api/users";
-import { getAccountInfo, type AccountInfo } from "@/lib/api/settings";
-import { getAuth } from "firebase/auth";
+import BellIcon from "@/assets/icons/bell.svg?react";
+import CogIcon from "@/assets/icons/cog.svg?react";
+import LogoNameIcon from "@/assets/icons/logo-name.svg?react";
+import { ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-type NavItem = {
-  label: string;
-  path: string;
-  icon: ComponentType<{ className?: string }>;
-};
-
-const navItems: NavItem[] = [
-  { label: "Dashboard", path: Routes.dashboard, icon: HomeIcon },
-  { label: "Application", path: Routes.application, icon: UserIcon },
-  { label: "Documents", path: Routes.documents, icon: FileIcon },
-  { label: "Help Center", path: Routes.helpCenter, icon: QuestionIcon },
-  { label: "Settings", path: Routes.settings, icon: CogIcon },
-];
 
 function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: ComponentType<{ className?: string }>; ariaLabel: string; onClick?: () => void }) {
   return (
@@ -56,6 +26,7 @@ function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: Componen
     </button>
   );
 }
+
 
 function UserAvatar({ userName, userImage }: { userName?: string; userImage?: string }) {
   const [imageError, setImageError] = useState(false);
@@ -79,9 +50,9 @@ function UserAvatar({ userName, userImage }: { userName?: string; userImage?: st
   }
 
   return (
-    <img 
-      src={userImage} 
-      alt="User profile" 
+    <img
+      src={userImage}
+      alt="User profile"
       className="h-[34px] w-[34px] rounded-full object-cover"
       onError={() => {
         console.warn('⚠️ Failed to load profile image:', userImage);
@@ -91,7 +62,7 @@ function UserAvatar({ userName, userImage }: { userName?: string; userImage?: st
   );
 }
 
-export function Header({ actions, userName, userImage, userRole, onLogout }: { actions?: ReactNode; userName?: string; userImage?: string; userRole?: string; onLogout?: () => void }) {
+export default function DashboardHeader({ actions, userName, userImage, onLogout }: { actions?: ReactNode; userName?: string; userImage?: string; userRole?: string; onLogout?: () => void }) {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isNotificationDropdownOpen, setIsNotificationDropdownOpen] = useState(false);
   const navigate = useNavigate();
@@ -109,7 +80,7 @@ export function Header({ actions, userName, userImage, userRole, onLogout }: { a
             <HeaderActionButton 
               icon={CogIcon} 
               ariaLabel="Settings" 
-              onClick={() => navigate(Routes.settings)}
+              onClick={() => navigate(Routes.common.settings)}
             />
             <DropdownMenu open={isNotificationDropdownOpen} onOpenChange={setIsNotificationDropdownOpen}>
               <DropdownMenuTrigger asChild>
@@ -177,48 +148,48 @@ export function Header({ actions, userName, userImage, userRole, onLogout }: { a
                   <DropdownMenuItem 
                     className={cn(
                       "cursor-pointer px-4 py-2 rounded-none gap-3",
-                      location.pathname === Routes.profile
+                      location.pathname === Routes.common.profile
                         ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
                         : "hover:bg-white/50 focus:bg-white/50"
                     )}
-                    onClick={() => navigate(Routes.profile)}
+                    onClick={() => navigate(Routes.common.profile)}
                   >
-                    <User className={cn("w-4 h-4", location.pathname === Routes.profile ? "text-[#00b4b8]" : "text-[#808081]")} />
+                    <User className={cn("w-4 h-4", location.pathname === Routes.common.profile ? "text-[#00b4b8]" : "text-[#808081]")} />
                     <span className={cn(
                       "text-[14px]",
-                      location.pathname === Routes.profile ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
+                      location.pathname === Routes.common.profile ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
                     )}>Profile</span>
                   </DropdownMenuItem>
                   
                   <DropdownMenuItem 
                     className={cn(
                       "cursor-pointer px-4 py-2 rounded-none gap-3",
-                      location.pathname === Routes.settings
+                      location.pathname === Routes.common.settings
                         ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
                         : "hover:bg-white/50 focus:bg-white/50"
                     )}
-                    onClick={() => navigate(Routes.settings)}
+                    onClick={() => navigate(Routes.common.settings)}
                   >
-                    <Lock className={cn("w-4 h-4", location.pathname === Routes.settings ? "text-[#00b4b8]" : "text-[#808081]")} />
+                    <Lock className={cn("w-4 h-4", location.pathname === Routes.common.settings ? "text-[#00b4b8]" : "text-[#808081]")} />
                     <span className={cn(
                       "text-[14px]",
-                      location.pathname === Routes.settings ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
+                      location.pathname === Routes.common.settings ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
                     )}>Settings</span>
                   </DropdownMenuItem>
                   
                   <DropdownMenuItem 
                     className={cn(
                       "cursor-pointer px-4 py-2 rounded-none gap-3",
-                      location.pathname === Routes.helpCenter
+                      location.pathname === Routes.common.helpCenter
                         ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
                         : "hover:bg-white/50 focus:bg-white/50"
                     )}
-                    onClick={() => navigate(Routes.helpCenter)}
+                    onClick={() => navigate(Routes.common.helpCenter)}
                   >
-                    <HelpCircle className={cn("w-4 h-4", location.pathname === Routes.helpCenter ? "text-[#00b4b8]" : "text-[#808081]")} />
+                    <HelpCircle className={cn("w-4 h-4", location.pathname === Routes.common.helpCenter ? "text-[#00b4b8]" : "text-[#808081]")} />
                     <span className={cn(
                       "text-[14px]",
-                      location.pathname === Routes.helpCenter ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
+                      location.pathname === Routes.common.helpCenter ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
                     )}>Help Center</span>
                   </DropdownMenuItem>
                   
@@ -238,141 +209,3 @@ export function Header({ actions, userName, userImage, userRole, onLogout }: { a
     </header>
   );
 }
-
-export function Sidebar({ footer }: { footer?: ReactNode }) {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  const activePath = useMemo(() => {
-    const match = navItems.find(({ path }) => location.pathname === path);
-    return match?.path ?? '';
-  }, [location.pathname]);
-
-  return (
-    <aside className="fixed left-[42.5px] top-[130px] z-40 w-[156px] space-y-3 bg-[#eef4f5]">
-      <nav className="space-y-1">
-        {navItems.map(({ icon: Icon, label, path }) => {
-          const isActive = activePath === path;
-          return (
-            <button
-              key={label}
-              type="button"
-              onClick={() => navigate(path)}
-              className={cn(
-                "flex h-[52px] w-full items-center gap-3 rounded-[60px] px-4 text-sm font-semibold backdrop-blur-[22px] transition cursor-pointer",
-                isActive ? "bg-[#00b4b8] font-medium text-white" : "font-medium text-[#808081] hover:bg-white/40"
-              )}
-            >
-              <Icon
-                className={cn(
-                  "h-5 w-5",
-                  isActive
-                    ? "[&_*]:stroke-white [&_*]:fill-transparent [&_path]:stroke-white [&_path]:fill-transparent [&_circle]:stroke-white [&_circle]:fill-transparent [&_rect]:stroke-white [&_rect]:fill-transparent"
-                    : "[&_*]:stroke-[#808081] [&_*]:fill-transparent [&_path]:stroke-[#808081] [&_path]:fill-transparent [&_circle]:stroke-[#808081] [&_circle]:fill-transparent [&_rect]:stroke-[#808081] [&_rect]:fill-transparent"
-                )}
-              />
-              {label}
-            </button>
-          );
-        })}
-      </nav>
-      {footer}
-    </aside>
-  );
-}
-
-export default function DashboardLayout({ children }: { children?: ReactNode }) {
-  const { user, logout } = useAuth();
-  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate(Routes.login, { replace: true });
-    } catch (error) {
-      console.error('[DashboardLayout] Logout failed:', error);
-    }
-  };
-
-  // Load account info (includes profile picture)
-  useEffect(() => {
-    if (!user) {
-      navigate(Routes.login, { replace: true });
-      return;
-    }
-
-    const loadAccountInfo = async () => {
-      try {
-        setLoading(true);
-        console.log('🔄 [DashboardLayout] Loading account info...');
-        
-        const info = await getAccountInfo();
-        console.log('✅ [DashboardLayout] Account info loaded:', info);
-        
-        setAccountInfo(info);
-      } catch (error) {
-        console.error('❌ [DashboardLayout] Failed to load account info:', error);
-        
-        // Fallback to Firebase auth data
-        const auth = getAuth();
-        const currentUser = auth.currentUser;
-        if (currentUser) {
-          setAccountInfo({
-            email: currentUser.email || '',
-            fullName: currentUser.displayName || '',
-            profilePicture: currentUser.photoURL || undefined,
-          });
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadAccountInfo();
-
-    // Listen for profile picture updates (custom event from AccountTab/Profile)
-    const handleProfileUpdate = (event: CustomEvent) => {
-      console.log('🔄 [DashboardLayout] Profile updated event received:', event.detail);
-      if (event.detail?.profilePicture) {
-        setAccountInfo(prev => prev ? { ...prev, profilePicture: event.detail.profilePicture } : null);
-      }
-      if (event.detail?.fullName) {
-        setAccountInfo(prev => prev ? { ...prev, fullName: event.detail.fullName } : null);
-      }
-    };
-
-    window.addEventListener('profileUpdated', handleProfileUpdate as EventListener);
-
-    return () => {
-      window.removeEventListener('profileUpdated', handleProfileUpdate as EventListener);
-    };
-  }, [user, navigate]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#eef4f5]">
-        <PageLoader />
-      </div>
-    );
-  }
-
-  return (
-    <OnboardingCheck>
-      <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
-        <Header 
-          userName={accountInfo?.fullName || (user as any)?.fullName || (user as any)?.displayName} 
-          userImage={accountInfo?.profilePicture || (user as any)?.photoURL}
-          userRole={(user as any)?.role || 'DSP'}
-          onLogout={handleLogout} 
-        />
-        <Sidebar />
-        <main className="ml-[240px] pt-[130px] pb-10">
-          <div className="px-8">{children ?? <Outlet />}</div>
-        </main>
-      </div>
-    </OnboardingCheck>
-  );
-}
-

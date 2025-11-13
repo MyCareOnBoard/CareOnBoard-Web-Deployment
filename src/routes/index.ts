@@ -1,22 +1,24 @@
-import { createBrowserRouter } from "react-router";
-import { Routes } from "@/routes/constants";
+import {createBrowserRouter} from "react-router";
+import {Routes} from "@/routes/constants";
 import SplashScreen from "@/pages/splash";
 import VerifyOTP from "@/pages/onboarding/VerifyOTP";
 import VerifyEmail from "@/pages/onboarding/VerifyEmail";
-import AppLayout from "@/layouts/AppLayout";
-import LoginPage from "@/pages/login";
-import SignUpPage from "@/pages/signup";
-import ForgotPasswordPage from "@/pages/forgot-password";
-import ResetPasswordPage from "@/pages/reset-password";
-import DashboardLayout from "@/layouts/DashboardLayout";
-import DashboardPage from "@/pages/dashboard";
-import DocumentsPage from "@/pages/documents";
+import LoginPage from "@/pages/auth/login";
+import SignUpPage from "@/pages/auth/signup";
+import ForgotPasswordPage from "@/pages/auth/forgot-password";
+import ResetPasswordPage from "@/pages/auth/reset-password";
+import DashboardPage from "@/pages/applicant/dashboard";
+import DocumentsPage from "@/pages/applicant/documents";
 import HelpCenterPage from "@/pages/help-center";
 import SettingsPage from "@/pages/settings";
 import ProfilePage from "@/pages/profile";
-import ApplicationStepper from "@/pages/application";
+import ApplicationStepper from "@/pages/applicant/application";
 import OnboardingSlider from "@/pages/onboarding/components/OnboardingSlider";
 import SuccessScreen from "@/pages/onboarding/SuccessScreen";
+import AuthLayout from "@/layouts/AuthLayout";
+import ApplicantDashboardLayout from "@/layouts/ApplicantDashboardLayout";
+import OnboardingLayout from "@/layouts/OnboardingLayout";
+import AuthenticatedLayout from "@/layouts/AuthenticatedLayout";
 
 
 export const router = createBrowserRouter([
@@ -25,70 +27,79 @@ export const router = createBrowserRouter([
     Component: SplashScreen,
   },
   {
-    path: Routes.onboarding,
-    Component: OnboardingSlider,
-  },
-  {
-    path: Routes.onboardingEmail,
-    Component: VerifyEmail,
-  },
-  {
-    path: Routes.onboardingOTP,
-    Component: VerifyOTP,
-  },
-  {
-    path: Routes.onboardingSuccess,
-    Component: SuccessScreen,
-  },
-  {
-    Component: AppLayout,
+    Component: OnboardingLayout,
     children: [
       {
-        path: Routes.login,
+        path: Routes.onboarding.index,
+        Component: OnboardingSlider,
+      },
+      {
+        path: Routes.onboarding.email,
+        Component: VerifyEmail,
+      },
+      {
+        path: Routes.onboarding.otp,
+        Component: VerifyOTP,
+      },
+      {
+        path: Routes.onboarding.success,
+        Component: SuccessScreen,
+      },
+    ]
+  },
+  {
+    Component: AuthLayout,
+    children: [
+      {
+        path: Routes.auth.login,
         Component: LoginPage,
       },
       {
-        path: Routes.signup,
+        path: Routes.auth.signup,
         Component: SignUpPage,
       },
       {
-        path: Routes.forgotPassword,
+        path: Routes.auth.forgotPassword,
         Component: ForgotPasswordPage,
       },
       {
-        path: Routes.resetPassword,
+        path: Routes.auth.resetPassword,
         Component: ResetPasswordPage,
       },
     ],
   },
   {
-    // path: Routes.dashboard,
-    Component: DashboardLayout,
+    Component: ApplicantDashboardLayout,
     children: [
       {
-        path: Routes.application,
+        path: Routes.applicant.application,
         Component: ApplicationStepper,
       },
       {
-        path: Routes.dashboard,
+        path: Routes.applicant.dashboard,
         Component: DashboardPage,
       },
       {
-        path: Routes.documents,
+        path: Routes.applicant.documents,
         Component: DocumentsPage,
       },
+    ],
+  },
+  {
+    Component: AuthenticatedLayout,
+    children: [
       {
-        path: Routes.helpCenter,
+        path: Routes.common.helpCenter,
         Component: HelpCenterPage,
       },
       {
-        path: Routes.settings,
+        path: Routes.common.settings,
         Component: SettingsPage,
       },
       {
-        path: Routes.profile,
+        path: Routes.common.profile,
         Component: ProfilePage,
       },
-    ],
+    ]
   },
 ]);

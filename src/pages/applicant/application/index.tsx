@@ -4,7 +4,7 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import UserIcon from "@/assets/icons/user.svg?react";
 
-import ProfilePreScreeningStep, { type ProfilePreScreeningFormValues } from "./components/ProfilePreScreeningStep";
+import ProfilePreScreeningStep from "./components/ProfilePreScreeningStep";
 import DocumentUploadStep from "./components/DocumentUploadStep";
 import ConditionalHireStep from "./components/ConditionalHireStep";
 import FinalReviewStep from "./components/FinalReviewStep";
@@ -48,7 +48,6 @@ function ApplicationContent() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
   const progressValue = useMemo(() => getProgressPercentage(activeStep), [activeStep]);
 
   useEffect(() => {
@@ -103,7 +102,7 @@ function ApplicationContent() {
     <DocumentUploadStep key="documents" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
     <ConditionalHireStep key="conditional" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
     <FinalReviewStep key="review" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
-    <OrientationStep key="orientation" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
+    <OrientationStep key="orientation" />,
   ];
 
   const handleSuccessDialogContinue = () => {

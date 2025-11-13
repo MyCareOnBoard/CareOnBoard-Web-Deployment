@@ -27,7 +27,7 @@ const quotes: Quote[] = [
   },
 ]
 
-export default function AppLayout() {
+export default function AuthLayout() {
   const [currentQuote, setCurrentQuote] = useState(0)
 
   // Auto-rotate quotes every 5 seconds

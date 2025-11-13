@@ -434,7 +434,7 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-3xl font-semibold text-gray-800">Profile</h2>
           <Button 
-            onClick={() => navigate(Routes.application)}
+            onClick={() => navigate(Routes.applicant.application)}
             className="rounded-full bg-[#00B4B8] hover:bg-[#00a0a4] px-4 py-2 h-10 text-white gap-2"
           >
             <Plus size={16} />
@@ -473,7 +473,7 @@ export default function ProfilePage() {
                   src={photoPreview}
                   alt="Profile"
                   className="object-cover border border-gray-100 w-28 h-28 md:w-32 md:h-32 rounded-2xl"
-                  onError={(e) => {
+                  onError={() => {
                     console.error("❌ Image failed to load:", photoPreview)
                     setPhotoPreview("")
                   }}

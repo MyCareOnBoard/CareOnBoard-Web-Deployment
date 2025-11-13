@@ -8,8 +8,8 @@ import {
   useGetEligibilityVerificationQuery,
   useSubmitDocumentUploadAndEligibilityVerificationMutation,
   useUploadDocumentMutation
-} from "@/pages/application/api";
-import {DocumentTypes} from "@/pages/application/types";
+} from "@/pages/applicant/application/api";
+import {DocumentTypes} from "@/pages/applicant/application/types";
 
 interface DocumentUploadStepProps {
   onBack?: () => void;
@@ -60,7 +60,7 @@ const files = [
   }
 ]
 
-export default function DocumentUploadStep({onBack, onNext}: DocumentUploadStepProps) {
+export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
   const [documentTypeUploading, setDocumentTypeUploading] = useState<DocumentTypes | null>(null);
   const ref = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(false);

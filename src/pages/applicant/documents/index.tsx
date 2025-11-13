@@ -1,6 +1,5 @@
 import {Input} from "@/components/ui/input";
-import {useGetDocumentsQuery} from "@/pages/documents/api";
-import {PageLoader} from "@/components/ui/loader";
+import {useGetDocumentsQuery} from "@/pages/applicant/documents/api";
 
 export default function DocumentsPage() {
   const {data, isLoading} = useGetDocumentsQuery(undefined, {

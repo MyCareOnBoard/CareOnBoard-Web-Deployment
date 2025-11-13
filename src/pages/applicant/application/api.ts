@@ -1,12 +1,12 @@
 import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 import {
-    CheckOfficialSignatureStatusResponse,
-    CheckSignatureStatusResponse,
-    DocumentUploadAndEligibilityPayload, DocumentUploadAndEligibilityResponse, SignDocumentPayload,
-    UploadDocumentPayload,
-    UploadDocumentResponse
-} from "@/pages/application/types";
+  CheckOfficialSignatureStatusResponse,
+  CheckSignatureStatusResponse,
+  DocumentUploadAndEligibilityPayload, DocumentUploadAndEligibilityResponse, SignDocumentPayload,
+  UploadDocumentPayload,
+  UploadDocumentResponse
+} from "@/pages/applicant/application/types";
 
 export const applicationApi = createApi({
     reducerPath: "applicationApi",

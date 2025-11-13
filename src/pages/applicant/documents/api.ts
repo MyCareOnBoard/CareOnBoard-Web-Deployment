@@ -1,6 +1,6 @@
 import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
-import {UserDocsResponse} from "@/pages/documents/types";
+import {UserDocsResponse} from "@/pages/applicant/documents/types";
 
 export const documentsApi = createApi({
   reducerPath: "documentsApi",

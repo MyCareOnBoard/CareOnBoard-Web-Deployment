@@ -1,56 +1,32 @@
-/**
- * Sign Up Page
- *
- * Styled to match the exact design from the provided image.
- * Features:
- * - Full name, email, and password fields
- * - Password visibility toggle with eye icon
- * - Teal rounded sign up button
- * - Link to login page
- * - Terms of service and privacy policy agreement
- */
-
 import type React from "react"
 import { useState } from "react"
 import { useNavigate, Link } from "react-router"
 import { Eye, EyeOff } from "lucide-react"
-import AppLayout from "@/layouts/AppLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useAuth } from "@/utils/auth"
 import { useToast } from "@/hooks/use-toast"
 import { ButtonLoader } from "@/components/ui/loader"
+import { Routes } from "@/routes/constants"
+import { getUserProfile } from "@/lib/api/users"
+import { getOnboardingStatus } from "@/lib/api/onboarding"
 
-export default function SignUpPage() {
-  const [fullName, setFullName] = useState("")
+export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<{
-    fullName?: string
     email?: string
     password?: string
   }>({})
 
-  const { signup } = useAuth()
+  const { login } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
-
-  // Validate full name
-  const validateFullName = (name: string) => {
-    if (!name) {
-      return "Full name is required"
-    }
-    if (name.trim().length < 2) {
-      return "Full name must be at least 2 characters"
-    }
-    if (!/^[a-zA-Z\s]+$/.test(name)) {
-      return "Full name should only contain letters"
-    }
-    return ""
-  }
 
   // Validate email format
   const validateEmail = (email: string) => {
@@ -72,24 +48,10 @@ export default function SignUpPage() {
     if (password.length < 6) {
       return "Password must be at least 6 characters"
     }
-    if (!/(?=.*[a-z])/.test(password)) {
-      return "Password must contain at least one lowercase letter"
-    }
-    if (!/(?=.*[A-Z])/.test(password)) {
-      return "Password must contain at least one uppercase letter"
-    }
-    if (!/(?=.*\d)/.test(password)) {
-      return "Password must contain at least one number"
-    }
     return ""
   }
 
   // Real-time validation on blur
-  const handleFullNameBlur = () => {
-    const nameError = validateFullName(fullName)
-    setErrors(prev => ({ ...prev, fullName: nameError }))
-  }
-
   const handleEmailBlur = () => {
     const emailError = validateEmail(email)
     setErrors(prev => ({ ...prev, email: emailError }))
@@ -101,13 +63,6 @@ export default function SignUpPage() {
   }
 
   // Clear errors on input
-  const handleFullNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFullName(e.target.value)
-    if (errors.fullName) {
-      setErrors(prev => ({ ...prev, fullName: "" }))
-    }
-  }
-
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value)
     if (errors.email) {
@@ -126,13 +81,11 @@ export default function SignUpPage() {
     e.preventDefault()
     
     // Validate all fields
-    const nameError = validateFullName(fullName)
     const emailError = validateEmail(email)
     const passwordError = validatePassword(password)
 
-    if (nameError || emailError || passwordError) {
+    if (emailError || passwordError) {
       setErrors({
-        fullName: nameError,
         email: emailError,
         password: passwordError,
       })
@@ -147,16 +100,50 @@ export default function SignUpPage() {
     setLoading(true)
 
     try {
-      await signup(email, password, fullName)
+      console.log("🔐 Attempting login for:", email)
+      
+      // Login with Firebase
+      await login(email, password)
+      
+      console.log("✅ Login successful, checking onboarding status...")
+      
+      // Check if user has completed onboarding
+      const onboardingStatus = await getOnboardingStatus()
+      console.log("📊 Onboarding status:", onboardingStatus)
+      
       toast({
         title: "Success",
-        description: "Account created successfully",
+        description: "Logged in successfully",
       })
-      navigate("/login")
+
+      const profile = await getUserProfile()
+      // Check if onboarding is already completed
+      if (profile.onboardingCompleted) {
+        navigate(Routes.applicant.dashboard, { replace: true })
+        return
+      }
+      navigate(Routes.onboarding.index)
     } catch (error: any) {
+      console.error("❌ Login error:", error)
+      
+      // Handle specific error cases
+      let errorMessage = "Failed to login"
+      
+      if (error.code === "auth/invalid-credential" || error.code === "auth/wrong-password") {
+        errorMessage = "Invalid email or password"
+      } else if (error.code === "auth/user-not-found") {
+        errorMessage = "No account found with this email"
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Too many failed attempts. Please try again later"
+      } else if (error.code === "auth/network-request-failed") {
+        errorMessage = "Network error. Please check your connection"
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to create account",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -168,38 +155,12 @@ export default function SignUpPage() {
     <div className="space-y-6">
       {/* Page Header */}
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold text-gray-900">Create an account</h2>
-        <p className="text-gray-500 text-sm">
-          Set up your access to manage users, data, and healthcare operations.
-        </p>
+        <h2 className="text-3xl font-bold text-gray-900">Login to account</h2>
+        <p className="text-sm text-gray-500">Please enter your information to access your account</p>
       </div>
 
-      {/* Registration Form */}
+      {/* Login Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Full Name Field */}
-        <div className="space-y-2">
-          <Label htmlFor="fullName" className="text-sm font-medium text-gray-900">
-            Full Name
-          </Label>
-          <Input
-            id="fullName"
-            type="text"
-            placeholder="Enter full name"
-            value={fullName}
-            onChange={handleFullNameChange}
-            onBlur={handleFullNameBlur}
-            required
-            className={`h-12 rounded-2xl border-gray-200 bg-white text-base placeholder:text-gray-400 ${
-              errors.fullName ? 'border-red-500 focus-visible:ring-red-500' : ''
-            }`}
-          />
-          {errors.fullName && (
-            <p className="text-sm text-red-600">
-              {errors.fullName}
-            </p>
-          )}
-        </div>
-
         {/* Email Field */}
         <div className="space-y-2">
           <Label htmlFor="email" className="text-sm font-medium text-gray-900">
@@ -238,7 +199,6 @@ export default function SignUpPage() {
               onChange={handlePasswordChange}
               onBlur={handlePasswordBlur}
               required
-              minLength={6}
               className={`h-12 rounded-2xl border-gray-200 bg-white text-base placeholder:text-gray-400 pr-12 ${
                 errors.password ? 'border-red-500 focus-visible:ring-red-500' : ''
               }`}
@@ -246,7 +206,7 @@ export default function SignUpPage() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-900"
+              className="absolute text-gray-600 -translate-y-1/2 right-4 top-1/2 hover:text-gray-900"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -257,67 +217,47 @@ export default function SignUpPage() {
               {errors.password}
             </p>
           )}
-          {/* Password strength indicator */}
-          {password && !errors.password && (
-            <div className="space-y-1">
-              <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full transition-all ${
-                    password.length >= 8 && /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)
-                      ? 'bg-green-500 w-full'
-                      : password.length >= 6
-                      ? 'bg-yellow-500 w-2/3'
-                      : 'bg-red-500 w-1/3'
-                  }`}
-                />
-              </div>
-              <p className="text-xs text-gray-500">
-                Password strength: {
-                  password.length >= 8 && /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)
-                    ? 'Strong'
-                    : password.length >= 6
-                    ? 'Medium'
-                    : 'Weak'
-                }
-              </p>
-            </div>
-          )}
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="remember"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="border-gray-300 rounded-md"
+            />
+            <label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer">
+              Remember me
+            </label>
+          </div>
+          <Link to="/forgot-password" className="text-sm text-[#17a2b8] hover:text-[#148a9c] font-medium">
+            Forgot password?
+          </Link>
         </div>
 
         <Button
           type="submit"
           disabled={loading}
-          className="w-full h-12 bg-[#17a2b8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold mt-4 transition-all"
+          className="w-full h-12 bg-[#00B4B8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold mt-4 transition-all"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
               <ButtonLoader />
-              Creating account...
+              Logging in...
             </span>
           ) : (
-            "Sign Up"
+            "Login"
           )}
         </Button>
       </form>
 
-      <div className="space-y-3 pt-2">
-        <p className="text-center text-sm text-gray-600">
-          Already have an account?{" "}
-          <Link to="/login" className="text-[#17a2b8] hover:text-[#148a9c] font-semibold">
-            Login
-          </Link>
-        </p>
-        <p className="text-center text-xs text-gray-500 leading-relaxed">
-          By creating an account, you agree to our{" "}
-          <Link to="/terms" className="text-gray-900 font-medium underline">
-            Terms of Service
-          </Link>{" "}
-          and{" "}
-          <Link to="/privacy" className="text-gray-900 font-medium underline">
-            Privacy Policy
-          </Link>
-        </p>
-      </div>
+      <p className="pt-2 text-sm text-center text-gray-600">
+        Don't have an account?{" "}
+        <Link to="/signup" className="text-[#00B4B8] hover:text-[#148a9c] font-semibold">
+          Sign Up
+        </Link>
+      </p>
     </div>
   )
 }

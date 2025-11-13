@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { useFinalizeConditionalHireMutation } from "@/pages/application/api";
+import { useFinalizeConditionalHireMutation } from "@/pages/applicant/application/api";
 import { toast } from "sonner";
 
 interface ComplianceStepProps {
@@ -13,7 +13,6 @@ interface ComplianceStepProps {
 }
 
 export default function ComplianceStep({
-  onBack,
   onNext,
 }: ComplianceStepProps) {
   const [finalizeConditionalHire, { isLoading }] =

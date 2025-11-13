@@ -40,14 +40,14 @@ export default function VerifyEmail() {
           // Check if onboarding is already completed
           if (profile.onboardingCompleted) {
             console.log("✅ Onboarding already completed, redirecting to dashboard")
-            nav(Routes.dashboard, { replace: true })
+            nav(Routes.applicant.dashboard, { replace: true })
             return
           }
           
           // Check if email and OTP are both verified
           if (profile.emailVerified && profile.otpVerified) {
             console.log("✅ Email and OTP verified, redirecting to dashboard")
-            nav(Routes.dashboard, { replace: true })
+            nav(Routes.applicant.dashboard, { replace: true })
             return
           }
           
