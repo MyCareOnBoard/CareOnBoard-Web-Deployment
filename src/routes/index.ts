@@ -20,6 +20,7 @@ import ApplicantDashboardLayout from "@/layouts/ApplicantDashboardLayout";
 import OnboardingLayout from "@/layouts/OnboardingLayout";
 import UserPanelDashboardLayout from "@/layouts/UserPanelLayout";
 import UserPanelDashboard from "@/pages/userPanel/dashboard";
+import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
 
 
 export const router = createBrowserRouter([
@@ -104,6 +105,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.userPanel.dashboard,
         Component: UserPanelDashboard,
+      },
+      {
+        path: Routes.userPanel.shiftManagement,
+        Component: ShiftManagementPage,
       },
       {
         path: Routes.userPanel.helpCenter,
