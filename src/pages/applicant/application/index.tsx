@@ -1,4 +1,5 @@
 import { Suspense, useMemo, useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -12,20 +13,14 @@ import OrientationStep from "./components/OrientationStep";
 
 import type { Step } from "./types";
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
+import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getApplicationStatus, updateApplicationStatus, type ApplicationStatus } from "@/lib/api/job-application";
+import { ApplicationStatusNames, getApplicationStatus, updateApplicationStatus, cancelApplication, type ApplicationStatus } from "@/lib/api/job-application";
 import { useAuth } from "@/utils/auth";
+import { APPLICATION_STEP_NAMES, APPLICATION_STEP_TITLES } from "@/lib/api/job-application";
+import { useToast } from "@/hooks/use-toast";
 
-const STEP_TITLES = [
-  "Profile & Pre-Screening",
-  "Document Upload & Eligibility Verification",
-  "Conditional Hire & Compliance",
-  "Final Agency Review",
-  "Official Hire & Orientation",
-];
-
-const STEP_NAMES = ["profile", "eligibility", "compliance", "review", "orientation"];
 
 const STEP_COUNT = 5;
 const getProgressPercentage = (step: number) => {
@@ -45,7 +40,12 @@ function ApplicationLoading() {
 
 function ApplicationContent() {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus | null>(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const progressValue = useMemo(() => getProgressPercentage(activeStep), [activeStep]);
@@ -66,11 +66,14 @@ function ApplicationContent() {
       try {
         setIsLoading(true);
         const response = await getApplicationStatus();
+        
+        // Store the application status
+        setApplicationStatus(response.status);
 
         if (!response.status.hasStarted) {
           setActiveStep(0);
         } else if (response.status.currentStep !== null) {
-          setActiveStep(STEP_NAMES.indexOf(response.status.currentStep));
+          setActiveStep(APPLICATION_STEP_NAMES.indexOf(response.status.currentStep));
         } else {
           setActiveStep(0);
         }
@@ -86,7 +89,7 @@ function ApplicationContent() {
 
   const steps = useMemo<Step[]>(
     () =>
-      STEP_TITLES.map((title, index) => ({
+      APPLICATION_STEP_TITLES.map((title, index) => ({
         title,
         status: index <= activeStep ? "complete" : "pending",
       })),
@@ -95,6 +98,16 @@ function ApplicationContent() {
 
   const handleNext = async () => {
     setShowSuccessDialog(true);
+    const updatedStatus = await updateApplicationStatus({
+      status: ApplicationStatusNames[activeStep+1],
+      currentStep: APPLICATION_STEP_NAMES[activeStep+1],
+    });
+    
+    setApplicationStatus({
+      hasStarted: true,
+      status: updatedStatus.status,
+      currentStep: updatedStatus.currentStep,
+    });
   };
 
   const stepComponents = [
@@ -106,18 +119,45 @@ function ApplicationContent() {
   ];
 
   const handleSuccessDialogContinue = () => {
-    
-    let status: 'incomplete' | 'pre-screening_complete' | 'eligibility_pending' | 'eligibility_complete' | 'submitted' | 'under_review' | 'approved' | 'rejected' = 'incomplete'
-
-    if (activeStep === 0) {
-      status = 'pre-screening_complete'
-    }
-    updateApplicationStatus({
-      status,
-      currentStep: STEP_NAMES[activeStep+1],
-    });
     setShowSuccessDialog(false);
     setActiveStep(activeStep + 1);
+  };
+
+  const handleCancelClick = () => {
+    setShowCancelDialog(true);
+  };
+
+  const handleCancelConfirm = async () => {
+    try {
+      setIsCancelling(true);
+      const response = await cancelApplication();
+      
+      if (response.success) {
+        setShowCancelDialog(false);
+        toast({
+          title: "Application Cancelled",
+          description: response.message || "Your application has been cancelled successfully.",
+          variant: "success",
+        });
+        
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Error cancelling application:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel application. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleCancelReject = () => {
+    setShowCancelDialog(false);
   };
 
   if (isLoading) {
@@ -128,7 +168,13 @@ function ApplicationContent() {
     <>
       <div className="mb-[24px] flex items-center justify-between">
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">Application</h1>
-        <Button type="button" variant="destructive" className="gap-[13px] px-4">
+        <Button 
+          type="button" 
+          variant="destructive" 
+          className="gap-[13px] px-4"
+          onClick={handleCancelClick}
+          disabled={!applicationStatus?.hasStarted}
+        >
           <X className="h-5 w-5" />
           <span>Cancel Application Form</span>
         </Button>
@@ -162,11 +208,22 @@ function ApplicationContent() {
       <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <SuccessDialogContent
           title={`Stage ${activeStep + 1} Submitted`}
-          description={`You have successfully completed ${STEP_TITLES[activeStep]}. Click 'next' to go to the next phase.`}
+          description={`You have successfully completed ${APPLICATION_STEP_TITLES[activeStep]}. Click 'next' to go to the next phase.`}
           buttonText="Next"
           onButtonClick={handleSuccessDialogContinue}
         />
       </SuccessDialog>
+      <ConfirmDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <ConfirmDialogContent
+          title="Cancel Application?"
+          description="Are you sure you want to cancel your application? All your progress will be lost and this action cannot be undone."
+          confirmText="Yes, Cancel Application"
+          cancelText="No, Keep It"
+          onConfirm={handleCancelConfirm}
+          onCancel={handleCancelReject}
+          isLoading={isCancelling}
+        />
+      </ConfirmDialog>
     </>
   );
 }

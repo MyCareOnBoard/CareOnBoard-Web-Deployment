@@ -17,6 +17,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth'
 import type { User } from '../types'
+import { getAuthErrorMessage } from '@/utils/auth'
 
 export interface AuthResponse {
   success: boolean
@@ -57,30 +58,9 @@ export async function loginWithEmail(email: string, password: string): Promise<A
   } catch (error: any) {
     console.error('Login error:', error)
 
-    let errorMessage = 'Failed to login'
-
-    // Handle Firebase auth errors
-    switch (error.code) {
-      case 'auth/invalid-email':
-        errorMessage = 'Invalid email address'
-        break
-      case 'auth/user-disabled':
-        errorMessage = 'This account has been disabled'
-        break
-      case 'auth/user-not-found':
-      case 'auth/wrong-password':
-        errorMessage = 'Invalid email or password'
-        break
-      case 'auth/too-many-requests':
-        errorMessage = 'Too many failed attempts. Please try again later'
-        break
-      default:
-        errorMessage = error.message || 'Failed to login'
-    }
-
     return {
       success: false,
-      error: errorMessage,
+      error: getAuthErrorMessage(error),
     }
   }
 }
@@ -117,26 +97,9 @@ export async function registerWithEmail(fullName: string, email: string, passwor
   } catch (error: any) {
     console.error('Registration error:', error)
 
-    let errorMessage = 'Failed to create account'
-
-    // Handle Firebase auth errors
-    switch (error.code) {
-      case 'auth/email-already-in-use':
-        errorMessage = 'Email already registered'
-        break
-      case 'auth/invalid-email':
-        errorMessage = 'Invalid email address'
-        break
-      case 'auth/weak-password':
-        errorMessage = 'Password is too weak'
-        break
-      default:
-        errorMessage = error.message || 'Failed to create account'
-    }
-
     return {
       success: false,
-      error: errorMessage,
+      error: getAuthErrorMessage(error),
     }
   }
 }
@@ -154,23 +117,9 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
   } catch (error: any) {
     console.error('Password reset error:', error)
 
-    let errorMessage = 'Failed to send reset email'
-
-    // Handle Firebase auth errors
-    switch (error.code) {
-      case 'auth/invalid-email':
-        errorMessage = 'Invalid email address'
-        break
-      case 'auth/user-not-found':
-        errorMessage = 'No account found with this email'
-        break
-      default:
-        errorMessage = error.message || 'Failed to send reset email'
-    }
-
     return {
       success: false,
-      error: errorMessage,
+      error: getAuthErrorMessage(error),
     }
   }
 }

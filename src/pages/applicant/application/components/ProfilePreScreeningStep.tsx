@@ -62,7 +62,7 @@ const profilePreScreeningSchema = z.object({
   }),
   booleanQuestions: z.object(booleanQuestionsSchemaShape),
   resume: fileListSchema,
-  declaration: z.literal(true, {
+  declaration: z.boolean().refine((val) => val, {
     message: "You must confirm the information is correct",
   }),
 });
@@ -98,7 +98,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
       gender: undefined,
       booleanQuestions: booleanQuestionsDefaults,
       resume: undefined,
-      declaration: true,
+      declaration: false,
     },
   });
 
@@ -251,7 +251,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                             dropdown_root: "relative border-none shadow-none has-focus:ring-0",
                             caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
                           }}
-                          initialFocus
+                          autoFocus={true}
                         />
                       </PopoverContent>
                     </Popover>

@@ -25,6 +25,18 @@ export {
   clearUserSession
 } from './services/firebase-auth'
 
+// Helpers
+export {
+  getAuthErrorMessage,
+  getSuccessMessage,
+  getValidationMessage,
+  isNetworkError,
+  requiresReauth,
+  isExpiredActionCode,
+  AUTH_SUCCESS_MESSAGES,
+  VALIDATION_MESSAGES
+} from './helpers/errorMessages'
+
 // Hooks
 export * from './hooks'
 

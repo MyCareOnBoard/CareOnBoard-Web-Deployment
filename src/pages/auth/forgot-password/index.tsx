@@ -18,6 +18,11 @@ import { Label } from "@/components/ui/label"
 import { useAuth } from "@/utils/auth"
 import { useToast } from "@/hooks/use-toast"
 import { ButtonLoader } from "@/components/ui/loader"
+import { 
+  getAuthErrorMessage, 
+  getSuccessMessage,
+  getValidationMessage 
+} from "@/utils/auth/helpers/errorMessages"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -30,12 +35,12 @@ export default function ForgotPasswordPage() {
 
   // Validate email format
   const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!email) {
-      return "Email is required"
+      return getValidationMessage('email', 'required')
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      return "Please enter a valid email address"
+      return getValidationMessage('email', 'invalid')
     }
     return ""
   }
@@ -74,14 +79,16 @@ export default function ForgotPasswordPage() {
     try {
       await resetPassword(email)
       setSent(true)
+      const successMsg = getSuccessMessage('passwordResetSent')
       toast({
-        title: "Success",
-        description: "Password reset email sent",
+        title: successMsg.title,
+        description: successMsg.description,
       })
     } catch (error: any) {
+      const errorMessage = getAuthErrorMessage(error)
       toast({
-        title: "Error",
-        description: error.message || "Failed to send reset email",
+        title: "Unable to send reset email",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {

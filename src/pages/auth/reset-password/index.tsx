@@ -23,6 +23,11 @@ import { Label } from "@/components/ui/label"
 import { ButtonLoader } from "@/components/ui/loader"
 import { Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react"
 import { toast } from "sonner"
+import { 
+  getAuthErrorMessage, 
+  getSuccessMessage,
+  getValidationMessage,
+} from "@/utils/auth/helpers/errorMessages"
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
@@ -49,7 +54,7 @@ export default function ResetPasswordPage() {
 
   const verifyResetCode = async () => {
     if (!oobCode || mode !== "resetPassword") {
-      toast.error("Invalid or expired reset link")
+      toast.error("Invalid or missing reset link")
       setVerifying(false)
       return
     }
@@ -64,13 +69,7 @@ export default function ResetPasswordPage() {
     } catch (error: any) {
       console.error("[ResetPassword] Code verification error:", error)
 
-      let errorMessage = "Invalid or expired reset link"
-      if (error.code === "auth/expired-action-code") {
-        errorMessage = "This reset link has expired. Please request a new one."
-      } else if (error.code === "auth/invalid-action-code") {
-        errorMessage = "This reset link is invalid. Please request a new one."
-      }
-
+      const errorMessage = getAuthErrorMessage(error)
       toast.error(errorMessage)
       setVerifying(false)
       setIsValidCode(false)
@@ -78,11 +77,11 @@ export default function ResetPasswordPage() {
   }
 
   const validatePassword = (value: string): string | undefined => {
-    if (!value) return "Password is required"
-    if (value.length < 8) return "Password must be at least 8 characters"
-    if (!/(?=.*[a-z])/.test(value)) return "Must contain a lowercase letter"
-    if (!/(?=.*[A-Z])/.test(value)) return "Must contain an uppercase letter"
-    if (!/(?=.*\d)/.test(value)) return "Must contain a number"
+    if (!value) return getValidationMessage('password', 'required')
+    if (value.length < 8) return getValidationMessage('password', 'tooShort')
+    if (!/(?=.*[a-z])/.test(value)) return getValidationMessage('password', 'missingLowercase')
+    if (!/(?=.*[A-Z])/.test(value)) return getValidationMessage('password', 'missingUppercase')
+    if (!/(?=.*\d)/.test(value)) return getValidationMessage('password', 'missingNumber')
     return undefined
   }
 
@@ -123,9 +122,9 @@ export default function ResetPasswordPage() {
 
   const handleConfirmPasswordBlur = () => {
     if (!confirmPassword) {
-      setErrors((prev) => ({ ...prev, confirmPassword: "Please confirm your password" }))
+      setErrors((prev) => ({ ...prev, confirmPassword: getValidationMessage('confirmPassword', 'required') }))
     } else if (password !== confirmPassword) {
-      setErrors((prev) => ({ ...prev, confirmPassword: "Passwords do not match" }))
+      setErrors((prev) => ({ ...prev, confirmPassword: getValidationMessage('confirmPassword', 'mismatch') }))
     }
   }
 
@@ -135,9 +134,9 @@ export default function ResetPasswordPage() {
     // Validate all fields
     const passwordError = validatePassword(password)
     const confirmError = !confirmPassword
-      ? "Please confirm your password"
+      ? getValidationMessage('confirmPassword', 'required')
       : password !== confirmPassword
-      ? "Passwords do not match"
+      ? getValidationMessage('confirmPassword', 'mismatch')
       : undefined
 
     if (passwordError || confirmError) {
@@ -145,12 +144,12 @@ export default function ResetPasswordPage() {
         password: passwordError,
         confirmPassword: confirmError,
       })
-      toast.error("Please fix the errors before submitting")
+      toast.error(getValidationMessage('form', 'invalid'))
       return
     }
 
     if (!oobCode) {
-      toast.error("Invalid reset code")
+      toast.error("Invalid reset code. Please request a new password reset link.")
       return
     }
 
@@ -161,7 +160,8 @@ export default function ResetPasswordPage() {
       await confirmPasswordReset(auth, oobCode, password)
 
       console.log("[ResetPassword] Password reset successful")
-      toast.success("Password reset successful! Redirecting to login...")
+      const successMsg = getSuccessMessage('passwordResetComplete')
+      toast.success(successMsg.description)
 
       // Redirect to login after a short delay
       setTimeout(() => {
@@ -170,15 +170,7 @@ export default function ResetPasswordPage() {
     } catch (error: any) {
       console.error("[ResetPassword] Password reset error:", error)
 
-      let errorMessage = "Failed to reset password"
-      if (error.code === "auth/expired-action-code") {
-        errorMessage = "This reset link has expired. Please request a new one."
-      } else if (error.code === "auth/invalid-action-code") {
-        errorMessage = "This reset link is invalid. Please request a new one."
-      } else if (error.code === "auth/weak-password") {
-        errorMessage = "Password is too weak. Please choose a stronger password."
-      }
-
+      const errorMessage = getAuthErrorMessage(error)
       toast.error(errorMessage)
     } finally {
       setLoading(false)
