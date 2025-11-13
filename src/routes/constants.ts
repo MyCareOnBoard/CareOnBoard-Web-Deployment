@@ -12,6 +12,12 @@ export const Routes = {
   },
   userPanel: {
     dashboard: "/user-panel/dashboard",
+    shiftManagement: "/user-panel/shift-management",
+    clientsAndServices: "/user-panel/clients-and-services",
+    planOfCare: "/user-panel/plan-of-care",
+    notes: "/user-panel/notes",
+    mileage: "/user-panel/mileage",
+    expenses: "/user-panel/expenses",
     helpCenter: "/user-panel/dashboard/help-center",
     settings: "/user-panel/dashboard/settings",
     profile: "/user-panel/dashboard/profile",

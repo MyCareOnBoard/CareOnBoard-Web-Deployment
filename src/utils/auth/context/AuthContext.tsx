@@ -60,7 +60,6 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
           dispatch(setProfile(profile.data.user))
         }
       } catch (error) {
-        console.log("Going to firebase")
         console.error('[AuthContext] Error fetching user profile:', error)
       }
 

@@ -20,7 +20,7 @@ export default function DashboardSidebar(
   }, [location.pathname]);
 
   return (
-    <aside className="fixed left-[42.5px] top-[130px] z-40 w-[156px] space-y-3 bg-[#eef4f5]">
+    <aside className="fixed left-[42.5px] top-[130px] z-40 w-[180px] space-y-3 bg-[#eef4f5]">
       <nav className="space-y-1">
         {navItems.map(({ icon: Icon, label, path }) => {
           const isActive = activePath === path;
