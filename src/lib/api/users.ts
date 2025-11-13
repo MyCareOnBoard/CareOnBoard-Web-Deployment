@@ -39,6 +39,7 @@ export interface UserProfile {
   phoneNumber?: string
   role?: string
   profilePicture?: string
+  dateOfBirth?: string;
 }
 
 /**
