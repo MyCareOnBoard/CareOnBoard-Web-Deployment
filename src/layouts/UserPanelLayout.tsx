@@ -42,8 +42,6 @@ export default function UserPanelDashboardLayout({children}: { children?: ReactN
     }
   };
 
-  console.log(user, profile, navItems)
-
   useEffect(() => {
     if (!user || (profile && profile.userType !== UserType.USER)) {
       navigate(Routes.auth.login, {replace: true});
@@ -56,7 +54,7 @@ export default function UserPanelDashboardLayout({children}: { children?: ReactN
         userName={user?.fullName}
         userImage={(user as any)?.profileImage || user?.photoURL}
         userRole={(user as any)?.role || 'DSP'}
-        userType={(user as any)?.userType || UserType.APPLICANT}
+        userType={profile?.userType || UserType.APPLICANT}
         onLogout={handleLogout}
       />
       <DashboardSidebar navItems={navItems}/>

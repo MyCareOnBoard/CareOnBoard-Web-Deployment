@@ -57,7 +57,7 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
         userName={user?.fullName}
         userImage={(user as any)?.profileImage || user?.photoURL}
         userRole={(user as any)?.role || 'DSP'}
-        userType={(user as any)?.userType || UserType.APPLICANT}
+        userType={profile?.userType || UserType.APPLICANT}
         onLogout={handleLogout}
       />
       <DashboardSidebar navItems={navItems}/>
