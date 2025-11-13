@@ -13,7 +13,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { getAuthErrorMessage } from '../helpers/errorMessages';
+import { getAuthErrorMessage } from '@/utils/auth';
 
 export interface User {
   id: string

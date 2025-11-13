@@ -322,7 +322,7 @@ src/pages/application/components/__tests__/
 └── README.md                                  # Test documentation
 ```
 
-For more details, see the [test documentation](src/pages/application/components/__tests__/README.md).
+For more details, see the [test documentation](src/pages/applicant/application/components/__tests__/README.md).
 
 ## 🔧 Editor Setup
 

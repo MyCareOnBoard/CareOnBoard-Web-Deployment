@@ -4,6 +4,7 @@ import { useSelector } from "react-redux"
 import type { RootState } from "@/store/redux/store"
 import { PageLoader } from "./ui/loader"
 import { useEffect } from "react"
+import {Routes} from "@/routes/constants";
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -33,7 +34,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!user) {
     console.log('[ProtectedRoute] No user, redirecting to login')
-    return <Navigate to="/login" replace />
+    return <Navigate to={Routes.auth.login} replace />
   }
 
   console.log('[ProtectedRoute] User authenticated, rendering protected content')

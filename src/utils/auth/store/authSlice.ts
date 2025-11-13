@@ -15,7 +15,8 @@ import {
 } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import type { AuthState, User, LoginCredentials, SignupCredentials } from '../types'
-import { transformFirebaseUser } from '../services/authService'
+import { transformFirebaseUser } from '@/utils/auth'
+import {UserProfile} from "@/lib/api/users";
 
 // Initial state
 const initialState: AuthState = {
@@ -23,6 +24,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   error: null,
+  profile: null
 }
 
 /**
@@ -140,6 +142,9 @@ const authSlice = createSlice({
       state.user = action.payload
       state.isAuthenticated = !!action.payload
     },
+    setProfile: (state, action: PayloadAction<UserProfile | null>) => {
+      state.profile = action.payload
+    }
   },
   extraReducers: (builder) => {
     // Login
@@ -217,5 +222,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { clearError, setUser } = authSlice.actions
+export const { clearError, setUser, setProfile } = authSlice.actions
 export default authSlice.reducer

@@ -11,8 +11,8 @@ import {
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import authReducer from "@/utils/auth/store/authSlice";
-import {applicationApi} from "@/pages/application/api";
-import {documentsApi} from "@/pages/documents/api";
+import {applicationApi} from "@/pages/applicant/application/api";
+import {documentsApi} from "@/pages/applicant/documents/api";
 
 const rootReducer = combineReducers({
   auth: authReducer,

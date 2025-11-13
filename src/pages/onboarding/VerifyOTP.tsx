@@ -71,9 +71,8 @@ export default function VerifyOTP() {
         console.warn("⚠️ Could not update onboarding status:", updateErr)
         // Don't block navigation if update fails
       }
-      
-      // Step 3: Redirect to onboarding success screen
-      nav(Routes.onboardingSuccess, { replace: true })
+
+      nav(Routes.onboarding.success, { replace: true })
     } catch (e: any) {
       setError(e?.message || "Invalid or expired OTP")
     } finally {
