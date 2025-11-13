@@ -26,10 +26,10 @@ export function OnboardingCheck({ children }: OnboardingCheckProps) {
       // Don't check if already on onboarding pages or auth pages
       const isOnboardingPage = location.pathname.startsWith('/onboarding')
       const isAuthPage = [
-        Routes.login,
-        Routes.signup,
-        Routes.forgotPassword,
-        Routes.resetPassword
+        Routes.auth.login,
+        Routes.auth.signup,
+        Routes.auth.forgotPassword,
+        Routes.auth.resetPassword
       ].includes(location.pathname)
       
       if (isOnboardingPage || isAuthPage) {
@@ -58,7 +58,7 @@ export function OnboardingCheck({ children }: OnboardingCheckProps) {
 
       if (!status.completed) {
         console.log('[OnboardingCheck] Onboarding not completed, redirecting to /onboarding')
-        navigate(Routes.onboarding, { replace: true })
+        navigate(Routes.onboarding.index, { replace: true })
       } else {
         console.log('[OnboardingCheck] Onboarding already completed, allowing access')
         setChecking(false)

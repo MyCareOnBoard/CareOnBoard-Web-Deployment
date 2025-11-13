@@ -1,22 +1,21 @@
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
-import { useDispatch, useSelector } from "react-redux"
-import { loginUser, signupUser, logoutUser as logoutRedux, setUser } from "../store/authSlice"
-import type { AppDispatch, RootState } from "@/store/redux/store"
+import {createContext, useContext, useEffect, useState} from "react"
+import {useDispatch, useSelector} from "react-redux"
+import {setUser, setProfile} from "@/utils/auth"
+import type {AppDispatch, RootState} from "@/store/redux/store"
 import {
   loginWithEmail,
   registerWithEmail,
   sendPasswordResetEmail,
   logout as logoutUser,
-  getCurrentUser,
-  // saveUserSession,
-  // clearUserSession,
   getIdToken,
-  type AuthResponse,
 } from "../services/authService"
-import type { User } from "../types"
-import { createUser as createBackendUser } from "../api/client"
-import { PageLoader } from "@/components/ui/loader"
+import type {User} from "../types"
+import {createUser as createBackendUser} from "../api/client"
+import {PageLoader} from "@/components/ui/loader"
+import {UserProfileResponse} from "@/lib/api/users";
+import axiosClient from "@/lib/axios";
+import {auth} from "@/lib/firebase";
 
 interface AuthContextType {
   user: User | null
@@ -42,7 +41,7 @@ export const useAuth = () => useContext(AuthContext)
  * Wraps the app to provide auth state to all components
  * Syncs with Redux for state persistence
  */
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({children}: { children: React.ReactNode }) {
   const dispatch = useDispatch<AppDispatch>()
   const reduxUser = useSelector((state: RootState) => state.auth?.user)
   const [user, setUserState] = useState<User | null>(null)
@@ -54,7 +53,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       console.log('[AuthContext] Initializing auth...')
       console.log('[AuthContext] Redux user:', reduxUser)
-      
+
+      try {
+        const profile = await axiosClient.get<UserProfileResponse>("/users/profile");
+        if (profile.data.success || profile.data.user) {
+          dispatch(setProfile(profile.data.user))
+        }
+      } catch (error) {
+        console.error('[AuthContext] Error fetching user profile:', error)
+      }
+
       // First, check if we have a persisted user in Redux
       if (reduxUser) {
         console.log('[AuthContext] Found persisted user in Redux:', reduxUser.email)
@@ -63,17 +71,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false)
         return
       }
-      
-      // If no Redux user, check Firebase auth state
-      const currentUser = await getCurrentUser()
-      console.log('[AuthContext] Firebase current user:', currentUser?.email || 'null')
-      
+
+      // If no Redux user, check Firebase auth state synchronously
+      const currentUser = auth.currentUser;
       if (currentUser) {
-        console.log('[AuthContext] Syncing Firebase user to Redux')
-        setUserState(currentUser)
-        dispatch(setUser(currentUser))
+        const user = {
+          uid: currentUser.uid,
+          email: currentUser.email || '',
+          fullName: currentUser.displayName || '',
+          emailVerified: currentUser.emailVerified,
+          createdAt: currentUser.metadata.creationTime
+            ? new Date(currentUser.metadata.creationTime)
+            : new Date(),
+          updatedAt: new Date(),
+          photoURL: currentUser.photoURL || undefined,
+          phoneNumber: currentUser.phoneNumber || undefined,
+        }
+        setUserState(user)
+        dispatch(setUser(user))
       }
-      
+
       setIsInitialized(true)
       setLoading(false)
     }
@@ -103,11 +120,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     console.log('[AuthContext] Login successful, updating state and Redux')
     console.log('[AuthContext] User object:', response.user)
-    
+
     // Update local state and Redux
     setUserState(response.user)
     dispatch(setUser(response.user))
-    
+
     console.log('[AuthContext] User dispatched to Redux')
   }
 
@@ -125,13 +142,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     console.log('[AuthContext] Signup successful, updating state and Redux')
     console.log('[AuthContext] User object:', response.user)
-    
+
     // Update local state and Redux
     setUserState(response.user)
     dispatch(setUser(response.user))
-    
+
     console.log('[AuthContext] User dispatched to Redux')
-    
+
     // Create user in backend
     try {
       await createBackendUser(fullName)
@@ -197,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Show loader while checking auth state
   if (loading) {
-    return <PageLoader text="Checking authentication..." />
+    return <PageLoader text="Checking authentication..."/>
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

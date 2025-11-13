@@ -35,7 +35,7 @@ export default function OnboardingSlider() {
       setIdx((p) => p + 1);
     } else {
       localStorage.setItem("onboarding_completed", "true");
-      navigate(Routes.onboardingEmail);
+      navigate(Routes.onboarding.email);
       // Mark onboarding as completed
       setCompleting(true);
       setError("");
@@ -46,13 +46,13 @@ export default function OnboardingSlider() {
         console.log("✅ [OnboardingSlider] Onboarding completed successfully");
 
         // Redirect to email verification
-        navigate(Routes.onboardingEmail, { replace: true });
+        navigate(Routes.onboarding.email, { replace: true });
       } catch (error: any) {
         console.error("❌ [OnboardingSlider] Failed to complete onboarding:", error);
 
         // Since localStorage fallback was set, we can still proceed
         console.log("⚠️ [OnboardingSlider] Proceeding with localStorage fallback");
-        navigate(Routes.onboardingEmail, { replace: true });
+        navigate(Routes.onboarding.email, { replace: true });
       } finally {
         setCompleting(false);
       }

@@ -8,6 +8,11 @@ export interface FirebaseTimestamp {
   _nanoseconds: number
 }
 
+export enum UserType {
+  APPLICANT = "pre_employee_user",
+  USER = "employee_user",
+}
+
 /**
  * User Profile data shape matching backend API response
  */
@@ -17,7 +22,7 @@ export interface UserProfile {
   email: string
   fullName: string
   emailVerified: boolean
-  userType?: string
+  userType?: UserType
   otpVerified?: boolean
   otpVerifiedAt?: FirebaseTimestamp
   onboardingCompleted?: boolean
@@ -34,6 +39,7 @@ export interface UserProfile {
   phoneNumber?: string
   role?: string
   profilePicture?: string
+  dateOfBirth?: string;
 }
 
 /**

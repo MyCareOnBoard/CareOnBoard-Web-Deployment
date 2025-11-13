@@ -1,7 +1,7 @@
 import React from "react"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { MemoryRouter } from "react-router-dom"
+import { MemoryRouter } from "react-router"
 import { describe, it, beforeEach, expect, vi } from "vitest"
 
 vi.mock("framer-motion", async () => {

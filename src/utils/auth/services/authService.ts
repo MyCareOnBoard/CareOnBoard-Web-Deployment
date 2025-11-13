@@ -17,7 +17,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth'
 import type { User } from '../types'
-import { getAuthErrorMessage } from '../helpers/errorMessages'
+import { getAuthErrorMessage } from '@/utils/auth'
 
 export interface AuthResponse {
   success: boolean

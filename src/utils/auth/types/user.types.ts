@@ -4,6 +4,8 @@
  * Type definitions for user objects in the auth system
  */
 
+import {UserProfile} from "@/lib/api/users";
+
 /**
  * User object structure
  */
@@ -26,6 +28,7 @@ export interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  profile: UserProfile | null
 }
 
 /**

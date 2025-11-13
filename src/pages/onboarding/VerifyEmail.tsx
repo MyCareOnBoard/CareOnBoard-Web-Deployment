@@ -38,7 +38,7 @@ export default function VerifyEmail() {
         if (profile) {
           // Only redirect if BOTH onboarding is completed AND OTP is verified
           if (profile.onboardingCompleted && profile.otpVerified) {
-            nav(Routes.dashboard, { replace: true })
+            nav(Routes.applicant.dashboard, { replace: true })
             return
           }
           
@@ -74,7 +74,7 @@ export default function VerifyEmail() {
       await sendOtp(trimmedEmail)
       
       // Navigate to OTP verification page
-      nav("/onboarding/otp", { state: { email: trimmedEmail } })
+      nav(Routes.onboarding.otp, { state: { email: trimmedEmail } })
     } catch (err: any) {
       const errorMsg = err?.message || "Failed to send OTP"
       
