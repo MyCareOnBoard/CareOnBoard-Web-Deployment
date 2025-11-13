@@ -21,7 +21,6 @@ export const Routes = {
     helpCenter: "/user-panel/dashboard/help-center",
     settings: "/user-panel/dashboard/settings",
     profile: "/user-panel/dashboard/profile",
-    mileage: "/user-panel/mileage",
   },
   auth: {
     login: "/auth/login",
