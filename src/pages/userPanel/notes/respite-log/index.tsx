@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Radio } from "@/components/ui/radio";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import CalendarDaysIcon from "@/assets/icons/calendar-days.svg?react";
 import { format } from "date-fns";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
+import VoiceInputButton from "@/components/VoiceInputButton";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 
 type MealType = "breakfast" | "lunch" | "dinner";
 
@@ -39,13 +41,14 @@ export default function RespiteLogPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] pb-20">
-      {/* Page Header */}
-      <div className="mb-3">
-        <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
-          Notes
-        </h1>
-      </div>
+    <VoiceRecordingProvider pageTitle="Respite Log">
+      <div className="min-h-[calc(100vh-200px)] pb-20">
+        {/* Page Header */}
+        <div className="mb-3">
+          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
+            Notes
+          </h1>
+        </div>
 
       {/* Form Title */}
       <h2 className="text-[14px] font-semibold leading-[1.4] text-black mb-[34px] font-['Urbanist',sans-serif]">
@@ -236,11 +239,13 @@ export default function RespiteLogPage() {
           <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
             Activities
           </label>
-          <Textarea
+          <VoiceEnabledTextarea
             value={activities}
-            onChange={(e) => setActivities(e.target.value)}
+            onChange={setActivities}
             className="h-[143px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
             placeholder=""
+            fieldName="Activities"
+            pageTitle="Respite Log"
           />
         </div>
 
@@ -249,11 +254,13 @@ export default function RespiteLogPage() {
           <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
             Comments:
           </label>
-          <Textarea
+          <VoiceEnabledTextarea
             value={comments}
-            onChange={(e) => setComments(e.target.value)}
+            onChange={setComments}
             className="h-[143px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
             placeholder=""
+            fieldName="Comments"
+            pageTitle="Respite Log"
           />
         </div>
 
@@ -262,11 +269,13 @@ export default function RespiteLogPage() {
           <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
             Health Concerns:
           </label>
-          <Textarea
+          <VoiceEnabledTextarea
             value={healthConcerns}
-            onChange={(e) => setHealthConcerns(e.target.value)}
+            onChange={setHealthConcerns}
             className="h-[90px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
             placeholder=""
+            fieldName="Health Concerns"
+            pageTitle="Respite Log"
           />
         </div>
 
@@ -275,11 +284,13 @@ export default function RespiteLogPage() {
           <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
             Supplies Needed Soon:
           </label>
-          <Textarea
+          <VoiceEnabledTextarea
             value={suppliesNeeded}
-            onChange={(e) => setSuppliesNeeded(e.target.value)}
+            onChange={setSuppliesNeeded}
             className="h-[90px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
             placeholder=""
+            fieldName="Supplies Needed Soon"
+            pageTitle="Respite Log"
           />
         </div>
 
@@ -305,7 +316,11 @@ export default function RespiteLogPage() {
           </button>
         </div>
       </div>
+
+      {/* Floating Action Button */}
+      <VoiceInputButton />
     </div>
+    </VoiceRecordingProvider>
   );
 }
 

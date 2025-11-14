@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import TimePicker from "@/components/TimePicker";
 import ContentEditableCell from "@/components/ContentEditableCell";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 
 type ActivityRow = {
   id: string;
@@ -91,13 +92,14 @@ export default function CommunityBasedPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] pb-20">
-      {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
-          Notes
-        </h1>
-      </div>
+    <VoiceRecordingProvider pageTitle="Community Based/Individual – Activities Log">
+      <div className="min-h-[calc(100vh-200px)] pb-20">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
+            Notes
+          </h1>
+        </div>
 
       {/* Department Information */}
       <div className="text-center mb-6 space-y-2">
@@ -307,6 +309,8 @@ export default function CommunityBasedPage() {
                     <ContentEditableCell
                       value={activity.activity}
                       onChange={(value) => updateActivity(activity.id, 'activity', value)}
+                      fieldName="Individualized Activity"
+                      pageTitle="Community Based/Individual – Activities Log"
                     />
                   </div>
                   {/* Description */}
@@ -314,6 +318,8 @@ export default function CommunityBasedPage() {
                     <ContentEditableCell
                       value={activity.description}
                       onChange={(value) => updateActivity(activity.id, 'description', value)}
+                      fieldName="Description"
+                      pageTitle="Community Based/Individual – Activities Log"
                     />
                   </div>
                 </div>
@@ -340,9 +346,10 @@ export default function CommunityBasedPage() {
         </p>
       </div>
 
-      {/* Floating Action Button */}
-      <VoiceInputButton />
-    </div>
+        {/* Floating Action Button */}
+        <VoiceInputButton />
+      </div>
+    </VoiceRecordingProvider>
   );
 }
 

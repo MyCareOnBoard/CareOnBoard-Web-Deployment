@@ -28,6 +28,7 @@ import CommunityInclusionPage from "@/pages/userPanel/notes/community-inclusion"
 import DayHabilitationPage from "@/pages/userPanel/notes/day-habilitation";
 import PrevocationalTrainingPage from "@/pages/userPanel/notes/prevocational-training";
 import RespiteLogPage from "@/pages/userPanel/notes/respite-log";
+import SupportedEmploymentInterventionPage from "@/pages/userPanel/notes/supported-employment-intervention";
 
 
 export const router = createBrowserRouter([
@@ -156,6 +157,10 @@ export const router = createBrowserRouter([
       {
         path: "/user-panel/notes/respite-log",
         Component: RespiteLogPage,
+      },
+      {
+        path: "/user-panel/notes/supported-employment-intervention",
+        Component: SupportedEmploymentInterventionPage,
       },
     ],
   },

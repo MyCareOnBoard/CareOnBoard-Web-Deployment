@@ -1,8 +1,9 @@
 import React, { useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
 import MicrophoneIcon from "@/assets/icons/microphone.svg?react";
 import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
 
-interface ContentEditableCellProps {
+interface VoiceEnabledTextareaProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
@@ -11,7 +12,7 @@ interface ContentEditableCellProps {
   pageTitle?: string;
 }
 
-const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
+const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
   value,
   onChange,
   className = "",
@@ -21,10 +22,6 @@ const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const { startRecording } = useVoiceRecording();
-
-  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-    onChange(e.currentTarget.textContent || "");
-  };
 
   const handleMicrophoneClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -37,17 +34,15 @@ const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div
-        contentEditable
-        suppressContentEditableWarning
-        onInput={handleInput}
-        className={`w-full min-h-[71px] border-0 bg-transparent text-center focus:outline-none text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] py-6 ${className}`}
-        dangerouslySetInnerHTML={{ __html: value }}
-        data-placeholder={placeholder}
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={className}
+        placeholder={placeholder}
       />
       {isHovered && (
         <button
-          className="absolute bottom-2 right-2 bg-[#00b4b8] border border-[rgba(0,0,0,0.12)] rounded-full w-8 h-8 flex items-center justify-center shadow-md hover:bg-[#009da1] transition-colors z-10 cursor-pointer"
+          className="absolute bottom-4 right-4 bg-[#00b4b8] border border-[rgba(0,0,0,0.12)] rounded-full w-8 h-8 flex items-center justify-center shadow-md hover:bg-[#009da1] transition-colors z-10 cursor-pointer"
           aria-label="Voice input"
           title="Voice input"
           onClick={handleMicrophoneClick}
@@ -59,5 +54,5 @@ const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
   );
 };
 
-export default ContentEditableCell;
+export default VoiceEnabledTextarea;
 

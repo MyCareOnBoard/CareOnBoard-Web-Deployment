@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import InformationCircleIcon from "@/assets/icons/information-circle.svg?react";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import ContentEditableCell from "@/components/ContentEditableCell";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 
 type ActivityRow = {
   id: string;
@@ -52,13 +53,14 @@ export default function ActivitiesLogTemplate({ title }: ActivitiesLogTemplatePr
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] pb-20">
-      {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
-          Notes
-        </h1>
-      </div>
+    <VoiceRecordingProvider pageTitle={title}>
+      <div className="min-h-[calc(100vh-200px)] pb-20">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
+            Notes
+          </h1>
+        </div>
 
       {/* Department Information */}
       <div className="text-center mb-6 space-y-2">
@@ -233,6 +235,8 @@ export default function ActivitiesLogTemplate({ title }: ActivitiesLogTemplatePr
                     <ContentEditableCell
                       value={activity.strategies}
                       onChange={(value) => updateActivity(activity.id, 'strategies', value)}
+                      fieldName="Strategies Addressed Today"
+                      pageTitle={title}
                     />
                   </div>
                   {/* Activities */}
@@ -240,6 +244,8 @@ export default function ActivitiesLogTemplate({ title }: ActivitiesLogTemplatePr
                     <ContentEditableCell
                       value={activity.activities}
                       onChange={(value) => updateActivity(activity.id, 'activities', value)}
+                      fieldName="Today's Activities to Address Strategies"
+                      pageTitle={title}
                     />
                   </div>
                   {/* Location */}
@@ -247,6 +253,8 @@ export default function ActivitiesLogTemplate({ title }: ActivitiesLogTemplatePr
                     <ContentEditableCell
                       value={activity.location}
                       onChange={(value) => updateActivity(activity.id, 'location', value)}
+                      fieldName="Location of Activities"
+                      pageTitle={title}
                     />
                   </div>
                   {/* Notes */}
@@ -254,6 +262,8 @@ export default function ActivitiesLogTemplate({ title }: ActivitiesLogTemplatePr
                     <ContentEditableCell
                       value={activity.notes}
                       onChange={(value) => updateActivity(activity.id, 'notes', value)}
+                      fieldName="Notes Related to Today's Activities & Progress Toward Outcome(s)"
+                      pageTitle={title}
                     />
                   </div>
                 </div>
@@ -287,9 +297,10 @@ export default function ActivitiesLogTemplate({ title }: ActivitiesLogTemplatePr
         </p>
       </div>
 
-      {/* Floating Action Button */}
-      <VoiceInputButton />
-    </div>
+        {/* Floating Action Button */}
+        <VoiceInputButton />
+      </div>
+    </VoiceRecordingProvider>
   );
 }
 
