@@ -29,6 +29,7 @@ import DayHabilitationPage from "@/pages/userPanel/notes/day-habilitation";
 import PrevocationalTrainingPage from "@/pages/userPanel/notes/prevocational-training";
 import RespiteLogPage from "@/pages/userPanel/notes/respite-log";
 import SupportedEmploymentInterventionPage from "@/pages/userPanel/notes/supported-employment-intervention";
+import Expenses from "@/pages/userPanel/expenses";
 
 
 export const router = createBrowserRouter([
@@ -161,6 +162,10 @@ export const router = createBrowserRouter([
       {
         path: "/user-panel/notes/supported-employment-intervention",
         Component: SupportedEmploymentInterventionPage,
+      },
+      {
+        path: Routes.userPanel.expenses,
+        Component: Expenses,
       },
     ],
   },
