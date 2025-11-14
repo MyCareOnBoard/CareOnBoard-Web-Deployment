@@ -42,7 +42,7 @@ const navItems: NavItem[] = [
 
 export default function UserPanelDashboardLayout({children}: { children?: ReactNode }) {
   const {user, logout} = useAuth();
-  const profile: UserProfile | null = useSelector((state: RootState) => state.auth?.profile)
+  const profile: UserProfile | null = useSelector((state: RootState) => state?.auth?.profile)
   const navigate = useNavigate();
 
   const handleLogout = async () => {
