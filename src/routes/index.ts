@@ -1,5 +1,5 @@
-import {createBrowserRouter} from "react-router";
-import {Routes} from "@/routes/constants";
+import { createBrowserRouter } from "react-router";
+import { Routes } from "@/routes/constants";
 import SplashScreen from "@/pages/splash";
 import VerifyOTP from "@/pages/onboarding/VerifyOTP";
 import VerifyEmail from "@/pages/onboarding/VerifyEmail";
@@ -22,6 +22,9 @@ import UserPanelDashboardLayout from "@/layouts/UserPanelLayout";
 import UserPanelDashboard from "@/pages/userPanel/dashboard";
 import UserPanelMileage from "@/pages/userPanel/mileage";
 import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
+import NotesPage from "@/pages/userPanel/notes";
+import CommunityBasedPage from "@/pages/userPanel/notes/community-based";
+import CommunityInclusionPage from "@/pages/userPanel/notes/community-inclusion";
 
 
 export const router = createBrowserRouter([
@@ -126,6 +129,18 @@ export const router = createBrowserRouter([
       {
         path: Routes.userPanel.mileage,
         Component: UserPanelMileage,
+      },
+      {
+        path: Routes.userPanel.notes,
+        Component: NotesPage,
+      },
+      {
+        path: "/user-panel/notes/community-based",
+        Component: CommunityBasedPage,
+      },
+      {
+        path: "/user-panel/notes/community-inclusion",
+        Component: CommunityInclusionPage,
       },
     ],
   },

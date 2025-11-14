@@ -15,7 +15,7 @@ export default function DashboardSidebar(
   const navigate = useNavigate();
 
   const activePath = useMemo(() => {
-    const match = navItems.find(({ path }) => location.pathname === path);
+    const match = navItems.find(({ path }) => location.pathname.includes(path));
     return match?.path ?? '';
   }, [location.pathname]);
 
