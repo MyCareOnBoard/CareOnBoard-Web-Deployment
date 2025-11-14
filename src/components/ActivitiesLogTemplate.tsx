@@ -1,72 +1,39 @@
 import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import InformationCircleIcon from "@/assets/icons/information-circle.svg?react";
 import VoiceInputButton from "@/components/VoiceInputButton";
-import TimePicker from "@/components/TimePicker";
 import ContentEditableCell from "@/components/ContentEditableCell";
 
 type ActivityRow = {
   id: string;
   date: Date | undefined;
-  startTime: string;
-  endTime: string;
-  activity: string;
-  description: string;
+  units: string;
+  strategies: string;
+  activities: string;
+  location: string;
+  notes: string;
 };
 
-type ServiceStrategy = {
-  id: string;
-  label: string;
-  checked: boolean;
-};
+interface ActivitiesLogTemplateProps {
+  title: string;
+}
 
-export default function CommunityBasedPage() {
-  const [name, setName] = useState("");
-  const [servicePlanYear, setServicePlanYear] = useState("");
-  const [serviceCode] = useState("TDHJ/3421");
-  const [ispOutcome, setIspOutcome] = useState("");
+export default function ActivitiesLogTemplate({ title }: ActivitiesLogTemplateProps) {
+  const [individualName, setIndividualName] = useState("");
+  const [totalUnits, setTotalUnits] = useState("");
   const [completedBy, setCompletedBy] = useState("");
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
-  
-  const [serviceStrategies, setServiceStrategies] = useState<ServiceStrategy[]>([
-    { 
-      id: "adl", 
-      label: "Assistance with Activities of Daily Living (such as getting dressed, eating, personal hygiene, etc.)", 
-      checked: false 
-    },
-    { 
-      id: "community", 
-      label: "Assistance with Increasing Community Participation (such as daily errands, attending events, restaurant, purchasing items, travel training, etc.)", 
-      checked: false 
-    },
-    { 
-      id: "independence", 
-      label: "Assistance with Increasing Independence (such as helping the individual learn to do laundry, cook, clean, dress, grocery shop, pay for items, etc.)", 
-      checked: false 
-    },
-    { 
-      id: "job-support", 
-      label: "Assistance with On-The-Job Support (such as safety awareness, using the restroom, attending to task, lunch/breaks, etc.)", 
-      checked: false 
-    },
-    { 
-      id: "learning", 
-      label: "Assistance with Learning Activities (such as basic tutoring – math, reading, writing; support in attending a class; etc.)", 
-      checked: false 
-    },
-  ]);
-  
   const [activities, setActivities] = useState<ActivityRow[]>([
-    { id: "1", date: undefined, startTime: "", endTime: "", activity: "", description: "" },
-    { id: "2", date: undefined, startTime: "", endTime: "", activity: "", description: "" },
-    { id: "3", date: undefined, startTime: "", endTime: "", activity: "", description: "" },
-    { id: "4", date: undefined, startTime: "", endTime: "", activity: "", description: "" },
-    { id: "5", date: undefined, startTime: "", endTime: "", activity: "", description: "" },
-    { id: "6", date: undefined, startTime: "", endTime: "", activity: "", description: "" },
-    { id: "7", date: undefined, startTime: "", endTime: "", activity: "", description: "" },
+    { id: "1", date: undefined, units: "", strategies: "", activities: "", location: "", notes: "" },
+    { id: "2", date: undefined, units: "", strategies: "", activities: "", location: "", notes: "" },
+    { id: "3", date: undefined, units: "", strategies: "", activities: "", location: "", notes: "" },
+    { id: "4", date: undefined, units: "", strategies: "", activities: "", location: "", notes: "" },
+    { id: "5", date: undefined, units: "", strategies: "", activities: "", location: "", notes: "" },
+    { id: "6", date: undefined, units: "", strategies: "", activities: "", location: "", notes: "" },
+    { id: "7", date: undefined, units: "", strategies: "", activities: "", location: "", notes: "" },
   ]);
 
   const currentDate = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric" });
@@ -82,12 +49,6 @@ export default function CommunityBasedPage() {
       return "";
     }
     return format(date, "dd.MM.yy");
-  };
-
-  const toggleStrategy = (id: string) => {
-    setServiceStrategies(serviceStrategies.map(strategy =>
-      strategy.id === id ? { ...strategy, checked: !strategy.checked } : strategy
-    ));
   };
 
   return (
@@ -118,116 +79,86 @@ export default function CommunityBasedPage() {
       </div>
 
       {/* Form Title */}
-      <h2 className="text-[20px] font-semibold leading-[1.6] text-[#10141a] text-center mb-2 font-['Urbanist',sans-serif]">
-        Community Based/Individual – Activities Log (TDHJ/3421)
+      <h2 className="text-[20px] font-semibold leading-[1.6] text-[#10141a] text-center mb-8 font-['Urbanist',sans-serif] whitespace-pre-wrap">
+        {title}
       </h2>
 
-      {/* Applicability Note */}
-      <p className="text-[14px] font-semibold leading-[1.4] text-black text-center mb-8 font-['Urbanist',sans-serif]">
-        (Not applicable when delivering daily rate version of Individual Supports. Only used for 15 minute unit version)
-      </p>
-
-      {/* Top Form Fields */}
-      <div className="flex gap-6 mb-6">
-        <div className="flex-1">
-          <label className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-            Name
-          </label>
-          <Input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder=""
-            className="w-full"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-            Service plan year
-          </label>
-          <Input
-            type="text"
-            value={servicePlanYear}
-            onChange={(e) => setServicePlanYear(e.target.value)}
-            placeholder=""
-            className="w-full"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-            Service Code
-          </label>
-          <Input
-            type="text"
-            value={serviceCode}
-            disabled
-            className="w-full text-[#b2b2b3]"
-          />
-        </div>
-      </div>
-
-      {/* ISP Outcome */}
+      {/* Name of Individual */}
       <div className="mb-6">
-        <label className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-          ISP Outcome
-        </label>
-        <Input
-          type="text"
-          value={ispOutcome}
-          onChange={(e) => setIspOutcome(e.target.value)}
-          placeholder=""
-          className="w-full"
-        />
-      </div>
-
-      {/* Service Strategies */}
-      <div className="mb-6">
-        <p className="text-[14px] font-semibold leading-[1.4] text-black mb-3 font-['Urbanist',sans-serif]">
-          Service Strategies (check all that apply):
+        <p className="text-[14px] font-semibold leading-[1.4] text-black font-['Urbanist',sans-serif]">
+          Name of Individual :
         </p>
-        <div className="space-y-3">
-          {serviceStrategies.map((strategy) => (
-            <Checkbox
-              key={strategy.id}
-              checked={strategy.checked}
-              onChange={() => toggleStrategy(strategy.id)}
-              label={strategy.label}
-              labelClassName="text-[14px] font-normal leading-[1.4] text-[#808081] font-['Urbanist',sans-serif]"
-            />
-          ))}
-        </div>
       </div>
 
       {/* Activities Log Table */}
-      <div className="overflow-x-auto mb-6">
+      <div className="overflow-x-auto">
         <div className="w-[1163px]">
           {/* Table Header */}
           <div className="border border-[#b2b2b3] rounded-tl-[2px] rounded-tr-[2px] overflow-hidden">
             <div className="border-b border-[#b2b2b3] bg-[#eef4f5] h-[71px]">
-              <div className="grid grid-cols-[112px_120px_120px_350px_1fr] gap-0 h-full">
+              <div className="grid grid-cols-[112px_120px_160px_230px_140px_1fr] gap-0 h-full">
                 <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
                   <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
                     Date
                   </p>
                 </div>
                 <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
-                  <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                    {"Start\nTime"}
-                  </p>
-                </div>
-                <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
-                  <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                    {"End\nTime"}
-                  </p>
-                </div>
-                <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
                   <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-                    Individualized Activity
+                    # of Units
+                  </p>
+                </div>
+                <div className="relative px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="absolute top-2 right-2 h-4 w-4 cursor-pointer">
+                        <InformationCircleIcon className="h-4 w-4 text-[#10141a]" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent 
+                      align="center" 
+                      side="top"
+                      className="bg-white rounded-[6px] px-4 py-3 shadow-lg border-none w-[250px]"
+                      sideOffset={5}
+                    >
+                      <p className="text-[10px] font-normal leading-[1.6] text-black font-['Urbanist',sans-serif]">
+                        Strategies addressed from the Individual Service Plan (ISP)
+                      </p>
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
+                    {"Strategies\nAddressed\nToday"}
+                  </p>
+                </div>
+                <div className="relative px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="absolute top-2 right-2 h-4 w-4 cursor-pointer">
+                        <InformationCircleIcon className="h-4 w-4 text-[#10141a]" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent 
+                      align="center" 
+                      side="top"
+                      className="bg-white rounded-[6px] px-4 py-3 shadow-lg border-none w-[250px]"
+                      sideOffset={5}
+                    >
+                      <p className="text-[10px] font-normal leading-[1.6] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
+                        {`can use calendars or other activity  lists that reflect today's activities, if  applicable`}
+                      </p>
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
+                    {"Today\u2019s Activities to Address\nStrategies"}
+                  </p>
+                </div>
+                <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
+                  <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
+                    {"Location of\nActivities"}
                   </p>
                 </div>
                 <div className="px-4 py-3 flex items-center justify-center text-center">
                   <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                    {"Tell us about the day, and how the activities will help\nthe individual reach the above outcome"}
+                    {"Notes Related to Today\u2019s Activities &\nProgress Toward Outcome(s)"}
                   </p>
                 </div>
               </div>
@@ -240,7 +171,7 @@ export default function CommunityBasedPage() {
               {activities.map((activity, index) => (
                 <div 
                   key={activity.id}
-                  className={`grid grid-cols-[112px_120px_120px_350px_1fr] gap-0 min-h-[71px] transition-colors ${
+                  className={`grid grid-cols-[112px_120px_160px_230px_140px_1fr] gap-0 min-h-[71px] transition-colors ${
                     index < activities.length - 1 ? 'border-b border-[#b2b2b3]' : ''
                   } hover:bg-white`}
                 >
@@ -288,32 +219,41 @@ export default function CommunityBasedPage() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  {/* Start Time */}
+                  {/* Units */}
                   <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                    <TimePicker
-                      value={activity.startTime}
-                      onChange={(value) => updateActivity(activity.id, 'startTime', value)}
+                    <Input
+                      type="number"
+                      value={activity.units}
+                      onChange={(e) => updateActivity(activity.id, 'units', e.target.value)}
+                      className="h-auto p-0 border-0 bg-transparent text-center focus-visible:ring-0 text-[14px] w-full"
                     />
                   </div>
-                  {/* End Time */}
-                  <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                    <TimePicker
-                      value={activity.endTime}
-                      onChange={(value) => updateActivity(activity.id, 'endTime', value)}
-                    />
-                  </div>
-                  {/* Activity */}
+                  {/* Strategies */}
                   <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                     <ContentEditableCell
-                      value={activity.activity}
-                      onChange={(value) => updateActivity(activity.id, 'activity', value)}
+                      value={activity.strategies}
+                      onChange={(value) => updateActivity(activity.id, 'strategies', value)}
                     />
                   </div>
-                  {/* Description */}
+                  {/* Activities */}
+                  <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
+                    <ContentEditableCell
+                      value={activity.activities}
+                      onChange={(value) => updateActivity(activity.id, 'activities', value)}
+                    />
+                  </div>
+                  {/* Location */}
+                  <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
+                    <ContentEditableCell
+                      value={activity.location}
+                      onChange={(value) => updateActivity(activity.id, 'location', value)}
+                    />
+                  </div>
+                  {/* Notes */}
                   <div className="px-4 py-3 flex items-center justify-center">
                     <ContentEditableCell
-                      value={activity.description}
-                      onChange={(value) => updateActivity(activity.id, 'description', value)}
+                      value={activity.notes}
+                      onChange={(value) => updateActivity(activity.id, 'notes', value)}
                     />
                   </div>
                 </div>
@@ -321,6 +261,13 @@ export default function CommunityBasedPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Total Units Label - Positioned below Units column */}
+      <div className="mt-4">
+        <p className="text-[14px] font-semibold leading-[1.4] text-black font-['Urbanist',sans-serif]">
+          Total Units :
+        </p>
       </div>
 
       {/* Completed By Section */}
@@ -332,7 +279,7 @@ export default function CommunityBasedPage() {
           type="text"
           value={completedBy}
           onChange={(e) => setCompletedBy(e.target.value)}
-          placeholder=""
+          placeholder="Enter name"
           className="max-w-md"
         />
         <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">

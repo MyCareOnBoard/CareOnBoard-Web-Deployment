@@ -1,10 +1,11 @@
 import React from "react";
 import ActivitiesLogTemplate from "@/components/ActivitiesLogTemplate";
 
-export default function CommunityInclusionPage() {
+export default function PrevocationalTrainingPage() {
   return (
     <ActivitiesLogTemplate 
-      title="Community Inclusion Services – Activities Log (TDHJ/3421)"
+      title="Prevocational Training Services – Activities Log (TDHJ/3421)"
     />
   );
 }
+

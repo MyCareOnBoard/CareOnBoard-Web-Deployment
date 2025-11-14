@@ -25,6 +25,8 @@ import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
 import NotesPage from "@/pages/userPanel/notes";
 import CommunityBasedPage from "@/pages/userPanel/notes/community-based";
 import CommunityInclusionPage from "@/pages/userPanel/notes/community-inclusion";
+import DayHabilitationPage from "@/pages/userPanel/notes/day-habilitation";
+import PrevocationalTrainingPage from "@/pages/userPanel/notes/prevocational-training";
 
 
 export const router = createBrowserRouter([
@@ -141,6 +143,14 @@ export const router = createBrowserRouter([
       {
         path: "/user-panel/notes/community-inclusion",
         Component: CommunityInclusionPage,
+      },
+      {
+        path: "/user-panel/notes/day-habilitation",
+        Component: DayHabilitationPage,
+      },
+      {
+        path: "/user-panel/notes/prevocational-training",
+        Component: PrevocationalTrainingPage,
       },
     ],
   },
