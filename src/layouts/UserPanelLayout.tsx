@@ -11,10 +11,22 @@ import type {RootState} from "@/store/redux/store";
 import QuestionIcon from "@/assets/icons/question-mark-circle.svg?react";
 import CogIcon from "@/assets/icons/cog.svg?react";
 import HomeIcon from "@/assets/icons/home.svg?react";
+import ExchangeIcon from "@/assets/icons/exchange-01.svg?react";
+import ShareKnowledgeIcon from "@/assets/icons/share-knowledge.svg?react";
+import ServiceIcon from "@/assets/icons/service.svg?react";
+import NoteIcon from "@/assets/icons/note-01.svg?react";
+import InvoiceIcon from "@/assets/icons/invoice-01.svg?react";
+import UserRoadsideIcon from "@/assets/icons/user-roadside.svg?react";
 
 
 const navItems: NavItem[] = [
   {label: "Dashboard", path: Routes.userPanel.dashboard, icon: HomeIcon},
+  {label: "Shift Management", path: Routes.userPanel.shiftManagement, icon: ExchangeIcon},
+  {label: "Clients & Services", path: Routes.userPanel.clientsAndServices, icon: ShareKnowledgeIcon},
+  {label: "Plan of Care", path: Routes.userPanel.planOfCare, icon: ServiceIcon},
+  {label: "Notes", path: Routes.userPanel.notes, icon: NoteIcon},
+  {label: "Mileage", path: Routes.userPanel.mileage, icon: UserRoadsideIcon},
+  {label: "Expenses", path: Routes.userPanel.expenses, icon: InvoiceIcon},
   {
     label: "Help Center",
     path: Routes.userPanel.helpCenter,
@@ -30,7 +42,7 @@ const navItems: NavItem[] = [
 
 export default function UserPanelDashboardLayout({children}: { children?: ReactNode }) {
   const {user, logout} = useAuth();
-  const profile: UserProfile | null = useSelector((state: RootState) => state.auth?.profile)
+  const profile: UserProfile | null = useSelector((state: RootState) => state?.auth?.profile)
   const navigate = useNavigate();
 
   const handleLogout = async () => {
