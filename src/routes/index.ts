@@ -22,6 +22,7 @@ import UserPanelDashboardLayout from "@/layouts/UserPanelLayout";
 import UserPanelDashboard from "@/pages/userPanel/dashboard";
 import UserPanelMileage from "@/pages/userPanel/mileage";
 import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
+import ClientsAndServicesPage from "@/pages/userPanel/clientsAndServices";
 import NotesPage from "@/pages/userPanel/notes";
 import CommunityBasedPage from "@/pages/userPanel/notes/community-based";
 import CommunityInclusionPage from "@/pages/userPanel/notes/community-inclusion";
@@ -116,6 +117,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.userPanel.shiftManagement,
         Component: ShiftManagementPage,
+      },
+      {
+        path: Routes.userPanel.clientsAndServices,
+        Component: ClientsAndServicesPage,
       },
       {
         path: Routes.userPanel.helpCenter,
