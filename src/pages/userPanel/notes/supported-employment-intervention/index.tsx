@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import ContentEditableCell from "@/components/ContentEditableCell";
+import TimePicker from "@/components/TimePicker";
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 
 type InterventionRow = {
@@ -20,13 +21,10 @@ type InterventionRow = {
 
 type ServiceRow = {
   id: string;
-  date: string;
-  seProfessional: string;
-  startTime: string;
-  endTime: string;
-  total: string;
+  datesOfSeServices: {date: Date | undefined; seProfessional: string};
+  noOfHours: {start: string; end: string; total: string};
   servicesProvided: string;
-  progress: string;
+  EmployeeProgress: string;
 };
 
 export default function SupportedEmploymentInterventionPage() {
@@ -42,6 +40,7 @@ export default function SupportedEmploymentInterventionPage() {
   const [completedBy, setCompletedBy] = useState("");
   const [isStartDateOpen, setIsStartDateOpen] = useState(false);
   const [isEndDateOpen, setIsEndDateOpen] = useState(false);
+  const [openServiceDateId, setOpenServiceDateId] = useState<string | null>(null);
   
   const [interventions, setInterventions] = useState<InterventionRow[]>([
     { id: "1", training: "", employerVision: "", achievementPlan: "" },
@@ -54,10 +53,10 @@ export default function SupportedEmploymentInterventionPage() {
   ]);
 
   const [services, setServices] = useState<ServiceRow[]>([
-    { id: "1", date: "", seProfessional: "", startTime: "", endTime: "", total: "", servicesProvided: "", progress: "" },
-    { id: "2", date: "", seProfessional: "", startTime: "", endTime: "", total: "", servicesProvided: "", progress: "" },
-    { id: "3", date: "", seProfessional: "", startTime: "", endTime: "", total: "", servicesProvided: "", progress: "" },
-    { id: "4", date: "", seProfessional: "", startTime: "", endTime: "", total: "", servicesProvided: "", progress: "" },
+    { id: "1", datesOfSeServices: {date: undefined, seProfessional: ""}, noOfHours: {start: "", end: "", total: ""}, servicesProvided: "", EmployeeProgress: ""  },
+    { id: "2", datesOfSeServices: {date: undefined, seProfessional: ""}, noOfHours: {start: "", end: "", total: ""}, servicesProvided: "", EmployeeProgress: ""  },
+    { id: "3", datesOfSeServices: {date: undefined, seProfessional: ""}, noOfHours: {start: "", end: "", total: ""}, servicesProvided: "", EmployeeProgress: ""  },
+    { id: "4", datesOfSeServices: {date: undefined, seProfessional: ""}, noOfHours: {start: "", end: "", total: ""}, servicesProvided: "", EmployeeProgress: ""  },
   ]);
 
   const updateIntervention = (id: string, field: keyof InterventionRow, value: string) => {
@@ -66,10 +65,38 @@ export default function SupportedEmploymentInterventionPage() {
     ));
   };
 
-  const updateService = (id: string, field: keyof ServiceRow, value: string) => {
+  const updateService = (id: string, field: keyof ServiceRow, value: any) => {
     setServices(services.map(service => 
       service.id === id ? { ...service, [field]: value } : service
     ));
+  };
+
+  const formatDisplayDate = (date: Date | undefined) => {
+    if (!date) {
+      return "";
+    }
+    return format(date, "dd.MM.yy");
+  };
+
+  const calculateHoursDifference = (startTime: string, endTime: string): string => {
+    if (!startTime || !endTime) {
+      return "";
+    }
+    
+    const [startHours, startMinutes] = startTime.split(':').map(Number);
+    const [endHours, endMinutes] = endTime.split(':').map(Number);
+    
+    const startTotalMinutes = startHours * 60 + startMinutes;
+    const endTotalMinutes = endHours * 60 + endMinutes;
+    
+    const diffMinutes = endTotalMinutes - startTotalMinutes;
+    const hours = Math.floor(diffMinutes / 60);
+    const minutes = diffMinutes % 60;
+    
+    if (minutes === 0) {
+      return `${hours}h`;
+    }
+    return `${hours}h ${minutes}m`;
   };
 
   return (
@@ -431,71 +458,121 @@ export default function SupportedEmploymentInterventionPage() {
             </div>
 
             {/* Table Body */}
-            <div className="border border-[#b2b2b3] rounded-bl-[2px] rounded-br-[2px] border-t-0">
-              <div className="bg-[#eef4f5]">
-                {services.map((service, index) => (
-                  <div key={service.id} className="grid grid-cols-[140px_150px_1fr_1fr] grid-rows-[49px_49px_49px]" style={{ display: 'grid' }}>
-                    {/* Column 1, Row 1: Date */}
-                    <div className="border-r border-b border-[#b2b2b3] px-4 py-3 flex items-center">
-                      <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-                        Date :
-                      </p>
-                    </div>
-                    
-                    {/* Column 2, Row 1: Start */}
-                    <div className="border-r border-b border-[#b2b2b3] px-4 py-3 flex items-center">
-                      <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-                        Start :
-                      </p>
-                    </div>
-                    
-                    {/* Column 3, Rows 1-3: Services Provided (rowspan) */}
-                    <div className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3] px-4 py-3 flex items-center justify-center`} style={{ gridRow: '1 / 4' }}>
-                      <ContentEditableCell
-                        value={service.servicesProvided}
-                        onChange={(value) => updateService(service.id, 'servicesProvided', value)}
-                        fieldName="What SE services were provided during this visit?"
-                        pageTitle={pageTitle}
-                      />
-                    </div>
-                    
-                    {/* Column 4, Rows 1-3: Progress (rowspan) */}
-                    <div className={`${index < services.length - 1 ? 'border-b border-[#b2b2b3]' : ''} px-4 py-3 flex items-center justify-center`} style={{ gridRow: '1 / 4' }}>
-                      <ContentEditableCell
-                        value={service.progress}
-                        onChange={(value) => updateService(service.id, 'progress', value)}
-                        fieldName="How is the employee progressing toward his/her outcomes and meeting the standards that have been identified above?"
-                        pageTitle={pageTitle}
-                      />
-                    </div>
-
-                    {/* Column 1, Row 2: SE Professionals */}
-                    <div className="border-r border-b border-[#b2b2b3] px-4 py-3 flex items-center">
-                      <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-                        SE Professionals :
-                      </p>
-                    </div>
-                    
-                    {/* Column 2, Row 2: End */}
-                    <div className="border-r border-b border-[#b2b2b3] px-4 py-3 flex items-center">
-                      <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-                        End :
-                      </p>
-                    </div>
-
-                    {/* Column 1, Row 3: Empty */}
-                    <div className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
-                    </div>
-                    
-                    {/* Column 2, Row 3: Total */}
-                    <div className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3] px-4 py-3 flex items-center`}>
-                      <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-                        Total :
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="border border-[#b2b2b3] rounded-bl-[2px] rounded-br-[2px] border-t-0 overflow-hidden">
+              <table className="w-full bg-[#eef4f5]" style={{ borderCollapse: 'collapse' }}>
+                <tbody>
+                  {services.map((service, index) => (
+                    <React.Fragment key={service.id}>
+                      <tr className="hover:bg-white transition-colors grid grid-cols-4 gap-0 min-w-[1163px] h-full">
+                        <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]  `}>
+                          <tr  className="flex flex-col min-h-[147px]">
+                            <td  className="border-b border-[#b2b2b3] flex">
+                              <div className="bg-[#D9D9D9] w-[80px] h-[49px] flex items-center justify-center">Date:</div>
+                              <div className="flex-1 flex items-center justify-center">
+                                <Popover 
+                                  open={openServiceDateId === service.id} 
+                                  onOpenChange={(open) => setOpenServiceDateId(open ? service.id : null)}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <button 
+                                      type="button" 
+                                      className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
+                                    >
+                                      <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
+                                        {formatDisplayDate(service.datesOfSeServices.date)}
+                                      </span>
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                                    <Calendar
+                                      mode="single"
+                                      className="bg-white"
+                                      captionLayout="dropdown"
+                                      startMonth={new Date(1924, 0)}
+                                      endMonth={new Date()}
+                                      selected={service.datesOfSeServices.date}
+                                      defaultMonth={service.datesOfSeServices.date ?? new Date()}
+                                      onSelect={(date) => {
+                                        if (date) {
+                                          updateService(service.id, 'datesOfSeServices', {
+                                            ...service.datesOfSeServices,
+                                            date: date
+                                          });
+                                          setOpenServiceDateId(null);
+                                        }
+                                      }}
+                                      formatters={{
+                                        formatMonthDropdown: (date) =>
+                                          date.toLocaleString("default", { month: "long" }),
+                                      }}
+                                      classNames={{
+                                        dropdown_root: "relative border-none shadow-none has-focus:ring-0",
+                                        caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
+                                      }}
+                                      autoFocus={true}
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="pt-4 ps-5">SE Professional:</span>
+                              <ContentEditableCell
+                              value={service.datesOfSeServices.seProfessional}
+                              onChange={(value) => updateService(service.id, 'datesOfSeServices', {
+                                ...service.datesOfSeServices,
+                                seProfessional: value
+                              })}
+                              fieldName="SE Professional"
+                              pageTitle={pageTitle}
+                            /></td>
+                          </tr>
+                        </td>
+                        <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
+                          {Object.entries(service.noOfHours).map(([key, value]) => (
+                            <tr key={key} className="flex flex-col h-[49px]">
+                              <td className="border-b border-[#b2b2b3] h-[49px] flex">
+                                <div className="bg-[#D9D9D9] w-[80px] h-full flex items-center justify-end pe-5 capitalize">{key}:</div>
+                                <div className="flex-1 flex items-center justify-center">
+                                  {key === 'start' || key === 'end' ? (
+                                    <TimePicker
+                                      value={value}
+                                      onChange={(newValue) => {
+                                        const updatedHours = { ...service.noOfHours, [key]: newValue };
+                                        // Auto-calculate total if both start and end are set
+                                        if (key === 'start' && updatedHours.end) {
+                                          updatedHours.total = calculateHoursDifference(newValue, updatedHours.end);
+                                        } else if (key === 'end' && updatedHours.start) {
+                                          updatedHours.total = calculateHoursDifference(updatedHours.start, newValue);
+                                        }
+                                        updateService(service.id, 'noOfHours', updatedHours);
+                                      }}
+                                    />
+                                  ) : (
+                                    <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
+                                      {value}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </td>
+                        <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
+                          <div className="flex items-center justify-center min-h-[147px]">
+                            <ContentEditableCell
+                              value={service.servicesProvided}
+                              onChange={(value) => updateService(service.id, 'servicesProvided', value)}
+                              fieldName="What SE services were provided during this visit?"
+                              pageTitle={pageTitle}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
