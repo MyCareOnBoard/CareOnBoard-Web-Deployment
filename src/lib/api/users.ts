@@ -9,8 +9,8 @@ export interface FirebaseTimestamp {
 }
 
 export enum UserType {
-  APPLICANT = "pre_employee_user",
-  USER = "employee_user",
+  APPLICANT = "applicant",
+  USER = "employee",
 }
 
 /**
