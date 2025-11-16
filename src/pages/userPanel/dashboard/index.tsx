@@ -8,7 +8,7 @@ import {UserProfileResponse} from "@/lib/api/users";
 import {setProfile} from "@/utils/auth";
 import {auth} from "@/lib/firebase";
 import {Toggle} from "@/components/ui/toggle";
-import {FaChevronLeft, FaChevronRight} from "react-icons/fa";
+import {ChevronLeft, ChevronRight} from "lucide-react";
 import UserPanelDocumentUpload from "@/pages/userPanel/dashboard/components/uploadDocumentModal";
 import {AnimatePresence, motion} from "framer-motion";
 
@@ -315,10 +315,10 @@ export default function UserPanelDashboardPage() {
           <div className="flex items-center justify-center gap-2 mt-6">
             <span className={"text-[18px]"}>1/<span className={"text-[#808081]"}>8</span></span>
             <div className={"bg-white rounded-full p-2 cursor-pointer"}>
-              <FaChevronLeft size={14}/>
+              <ChevronLeft size={14}/>
             </div>
             <div className={"bg-white rounded-full p-2 cursor-pointer"}>
-              <FaChevronRight size={14}/>
+              <ChevronRight size={14}/>
             </div>
           </div>
         </div>

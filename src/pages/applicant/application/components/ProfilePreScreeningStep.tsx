@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +13,7 @@ import { Radio } from "@/components/ui/radio";
 import { Calendar } from "@/components/ui/calendar";
 import { FileUpload } from "@/components/ui/file-upload";
 import CalendarDaysIcon from "@/assets/icons/calendar-days.svg?react";
-import { format } from "date-fns";
+import { format, differenceInYears } from "date-fns";
 import { uploadResume, submitPreScreening, type PreScreeningData } from "@/lib/api/job-application";
 
 const DEFAULT_DOB = new Date();
@@ -50,7 +50,7 @@ const fileListSchema = z.custom<FileList>(
   {
     message: "Resume file is required",
   }
-);
+).optional();
 
 const profilePreScreeningSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
@@ -101,6 +101,26 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
       declaration: false,
     },
   });
+
+  // Calculate age from date of birth
+  const calculateAge = (dateOfBirth: Date): number => {
+    return differenceInYears(new Date(), dateOfBirth);
+  };
+
+  // Watch date of birth to automatically set isAdult
+  const dateOfBirth = form.watch("dateOfBirth");
+  const isAtLeast18 = dateOfBirth ? calculateAge(dateOfBirth) >= 18 : false;
+
+  useEffect(() => {
+    if (dateOfBirth) {
+      const age = calculateAge(dateOfBirth);
+      form.setValue("booleanQuestions.isAdult", age >= 18 ? "Yes" : "No", {
+        shouldValidate: true,
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    }
+  }, [dateOfBirth, form]);
 
   const handleSubmit = async (values: ProfilePreScreeningFormValues) => {
     try {
@@ -314,47 +334,55 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         />
 
         <div className="space-y-[30px]">
-          {BOOLEAN_QUESTIONS.map((question) => (
-            <FormField
-              key={question.name}
-              control={form.control}
-              name={`booleanQuestions.${question.name}`}
-              render={({ field, fieldState }) => (
-                <div className="w-[450px]">
-                  <fieldset className="border-0 p-0">
-                    <legend className="mb-1 text-xs font-normal text-[#10141a]">{question.label}</legend>
-                    <div className="flex gap-[9px]">
-                      <Radio
-                        id={`${question.name}-yes`}
-                        name={field.name}
-                        value="Yes"
-                        label="Yes"
-                        checked={field.value === "Yes"}
-                        onChange={() => {
-                          field.onChange("Yes");
-                          field.onBlur();
-                        }}
-                      />
-                      <Radio
-                        id={`${question.name}-no`}
-                        name={field.name}
-                        value="No"
-                        label="No"
-                        checked={field.value === "No"}
-                        onChange={() => {
-                          field.onChange("No");
-                          field.onBlur();
-                        }}
-                      />
-                    </div>
-                  </fieldset>
-                  {fieldState.error ? (
-                    <p className="mt-1 text-xs text-[#d53411]">{fieldState.error.message}</p>
-                  ) : null}
-                </div>
-              )}
-            />
-          ))}
+          {BOOLEAN_QUESTIONS.map((question) => {
+            // Lock the isAdult question based on date of birth
+            const isAdultQuestion = question.name === "isAdult";
+            const isDisabled = isAdultQuestion && dateOfBirth !== undefined;
+
+            return (
+              <FormField
+                key={question.name}
+                control={form.control}
+                name={`booleanQuestions.${question.name}`}
+                render={({ field, fieldState }) => (
+                  <div className="w-[450px]">
+                    <fieldset className="border-0 p-0">
+                      <legend className="mb-1 text-xs font-normal text-[#10141a]">{question.label}</legend>
+                      <div className="flex gap-[9px]">
+                        <Radio
+                          id={`${question.name}-yes`}
+                          name={field.name}
+                          value="Yes"
+                          label="Yes"
+                          checked={field.value === "Yes"}
+                          disabled={isDisabled}
+                          onChange={() => {
+                            field.onChange("Yes");
+                            field.onBlur();
+                          }}
+                        />
+                        <Radio
+                          id={`${question.name}-no`}
+                          name={field.name}
+                          value="No"
+                          label="No"
+                          checked={field.value === "No"}
+                          disabled={isDisabled}
+                          onChange={() => {
+                            field.onChange("No");
+                            field.onBlur();
+                          }}
+                        />
+                      </div>
+                    </fieldset>
+                    {fieldState.error ? (
+                      <p className="mt-1 text-xs text-[#d53411]">{fieldState.error.message}</p>
+                    ) : null}
+                  </div>
+                )}
+              />
+            );
+          })}
         </div>
 
         <FormField
@@ -412,10 +440,17 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         />
 
         <div className="pb-12">
+          {dateOfBirth && !isAtLeast18 && (
+            <div className="mb-4 rounded-md bg-[#fef2f2] border border-[#fecaca] px-4 py-3">
+              <p className="text-sm text-[#dc2626]">
+                You must be at least 18 years old to submit an application. Based on your date of birth, you are currently under 18 years old.
+              </p>
+            </div>
+          )}
           <Button 
             type="submit" 
-            disabled={!form.formState.isValid || form.formState.isSubmitting || isUploading || isSubmitting}
-            className={!form.formState.isValid ? 'bg-[#b2b2b3] backdrop-blur-[22px] hover:bg-[#b2b2b3] active:bg-[#b2b2b3]' : ''}
+            disabled={!form.formState.isValid || form.formState.isSubmitting || isUploading || isSubmitting || !isAtLeast18}
+            className={(!form.formState.isValid || !isAtLeast18) ? 'bg-[#b2b2b3] backdrop-blur-[22px] hover:bg-[#b2b2b3] active:bg-[#b2b2b3]' : ''}
           >
             <span>
               {isUploading ? 'Uploading...' : isSubmitting ? 'Submitting...' : 'Next'}

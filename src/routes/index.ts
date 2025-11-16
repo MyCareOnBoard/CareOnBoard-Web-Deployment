@@ -1,5 +1,5 @@
-import {createBrowserRouter} from "react-router";
-import {Routes} from "@/routes/constants";
+import { createBrowserRouter } from "react-router";
+import { Routes } from "@/routes/constants";
 import SplashScreen from "@/pages/splash";
 import VerifyOTP from "@/pages/onboarding/VerifyOTP";
 import VerifyEmail from "@/pages/onboarding/VerifyEmail";
@@ -22,6 +22,15 @@ import UserPanelDashboardLayout from "@/layouts/UserPanelLayout";
 import UserPanelDashboard from "@/pages/userPanel/dashboard";
 import UserPanelMileage from "@/pages/userPanel/mileage";
 import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
+import ClientsAndServicesPage from "@/pages/userPanel/clientsAndServices";
+import NotesPage from "@/pages/userPanel/notes";
+import CommunityBasedPage from "@/pages/userPanel/notes/community-based";
+import CommunityInclusionPage from "@/pages/userPanel/notes/community-inclusion";
+import DayHabilitationPage from "@/pages/userPanel/notes/day-habilitation";
+import PrevocationalTrainingPage from "@/pages/userPanel/notes/prevocational-training";
+import RespiteLogPage from "@/pages/userPanel/notes/respite-log";
+import SupportedEmploymentInterventionPage from "@/pages/userPanel/notes/supported-employment-intervention";
+import SupportedEmploymentPrePage from "@/pages/userPanel/notes/supported-employment-pre";
 import Expenses from "@/pages/userPanel/expenses";
 
 
@@ -113,6 +122,10 @@ export const router = createBrowserRouter([
         Component: ShiftManagementPage,
       },
       {
+        path: Routes.userPanel.clientsAndServices,
+        Component: ClientsAndServicesPage,
+      },
+      {
         path: Routes.userPanel.helpCenter,
         Component: HelpCenterPage,
       },
@@ -127,6 +140,38 @@ export const router = createBrowserRouter([
       {
         path: Routes.userPanel.mileage,
         Component: UserPanelMileage,
+      },
+      {
+        path: Routes.userPanel.notes,
+        Component: NotesPage,
+      },
+      {
+        path: "/user-panel/notes/community-based",
+        Component: CommunityBasedPage,
+      },
+      {
+        path: "/user-panel/notes/community-inclusion",
+        Component: CommunityInclusionPage,
+      },
+      {
+        path: "/user-panel/notes/day-habilitation",
+        Component: DayHabilitationPage,
+      },
+      {
+        path: "/user-panel/notes/prevocational-training",
+        Component: PrevocationalTrainingPage,
+      },
+      {
+        path: "/user-panel/notes/respite-log",
+        Component: RespiteLogPage,
+      },
+      {
+        path: "/user-panel/notes/supported-employment-intervention",
+        Component: SupportedEmploymentInterventionPage,
+      },
+      {
+        path: "/user-panel/notes/supported-employment-pre",
+        Component: SupportedEmploymentPrePage,
       },
       {
         path: Routes.userPanel.expenses,
