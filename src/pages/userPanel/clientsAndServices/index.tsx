@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { getClients, type Client } from "@/lib/api/clients";
 import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 import { toast } from "sonner";
@@ -107,20 +108,11 @@ export default function ClientsAndServicesPage() {
             <span className="text-sm font-medium text-gray-700">
               Work Availability
             </span>
-            <button
-              onClick={() => setWorkAvailability(!workAvailability)}
-              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                workAvailability ? "bg-[#00B4B8]" : "bg-gray-300"
-              }`}
-              role="switch"
-              aria-checked={workAvailability}
-            >
-              <span
-                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  workAvailability ? "translate-x-7" : "translate-x-1"
-                }`}
-              />
-            </button>
+            <Toggle
+              className="h-8 w-14"
+              pressed={workAvailability}
+              onPressedChange={setWorkAvailability}
+            />
           </div>
         </div>
 
