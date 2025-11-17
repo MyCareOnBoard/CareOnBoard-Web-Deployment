@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import MicrophoneIcon from "@/assets/icons/microphone.svg?react";
 import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
 
@@ -21,6 +21,14 @@ const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const { startRecording } = useVoiceRecording();
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Only update the DOM when value changes externally (not from user typing)
+  useEffect(() => {
+    if (contentRef.current && contentRef.current.textContent !== value) {
+      contentRef.current.textContent = value;
+    }
+  }, [value]);
 
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
     onChange(e.currentTarget.textContent || "");
@@ -38,11 +46,11 @@ const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
+        ref={contentRef}
         contentEditable
         suppressContentEditableWarning
         onInput={handleInput}
         className={`w-full min-h-[71px] border-0 bg-transparent text-center focus:outline-none text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] py-6 ${className}`}
-        dangerouslySetInnerHTML={{ __html: value }}
         data-placeholder={placeholder}
       />
       {isHovered && (
