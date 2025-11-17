@@ -25,7 +25,16 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
 
   const handleMicrophoneClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    startRecording(fieldName, pageTitle);
+    startRecording(
+      fieldName, 
+      pageTitle,
+      undefined, // onTranscript - not needed during recording
+      (transcript) => {
+        // onAccept - only called when Accept button is clicked
+        // Update the textarea value with the transcribed text
+        onChange(transcript);
+      }
+    );
   };
 
   return (

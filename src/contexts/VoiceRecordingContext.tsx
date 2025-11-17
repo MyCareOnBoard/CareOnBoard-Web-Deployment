@@ -7,13 +7,14 @@ interface VoiceRecordingContextType {
   partialTranscript: string;
   committedTranscripts: string[];
   detectedLanguage: string | null;
-  startRecording: (fieldName?: string, pageTitle?: string, onTranscript?: (text: string) => void) => void;
+  startRecording: (fieldName?: string, pageTitle?: string, onTranscript?: (text: string) => void, onAccept?: (text: string) => void) => void;
   stopRecording: () => void;
   toggleRecording: () => void;
   setPartialTranscript: (text: string) => void;
   addCommittedTranscript: (text: string) => void;
   setDetectedLanguage: (language: string) => void;
   clearTranscripts: () => void;
+  getOnAcceptCallback: () => ((text: string) => void) | null;
 }
 
 const VoiceRecordingContext = createContext<VoiceRecordingContextType | undefined>(undefined);
@@ -31,14 +32,16 @@ export function VoiceRecordingProvider({ children, pageTitle }: VoiceRecordingPr
   const [committedTranscripts, setCommittedTranscripts] = useState<string[]>([]);
   const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
   
-  // Store the callback in a ref so it can be called from the transcription handlers
+  // Store the callbacks in refs so they can be called from the transcription handlers
   const onTranscriptCallback = useRef<((text: string) => void) | null>(null);
+  const onAcceptCallback = useRef<((text: string) => void) | null>(null);
 
-  const startRecording = useCallback((fieldName?: string, recordingPageTitle?: string, onTranscript?: (text: string) => void) => {
+  const startRecording = useCallback((fieldName?: string, recordingPageTitle?: string, onTranscript?: (text: string) => void, onAccept?: (text: string) => void) => {
     setIsRecording(true);
     setActiveFieldName(fieldName || null);
     setActivePageTitle(recordingPageTitle || pageTitle || null);
     onTranscriptCallback.current = onTranscript || null;
+    onAcceptCallback.current = onAccept || null;
     // Clear previous transcripts when starting a new recording
     setPartialTranscript("");
     setCommittedTranscripts([]);
@@ -50,6 +53,7 @@ export function VoiceRecordingProvider({ children, pageTitle }: VoiceRecordingPr
     setActiveFieldName(null);
     setActivePageTitle(null);
     onTranscriptCallback.current = null;
+    onAcceptCallback.current = null;
   }, []);
   
   const toggleRecording = useCallback(() => setIsRecording(prev => !prev), []);
@@ -68,6 +72,10 @@ export function VoiceRecordingProvider({ children, pageTitle }: VoiceRecordingPr
     setDetectedLanguage(null);
   }, []);
 
+  const getOnAcceptCallback = useCallback(() => {
+    return onAcceptCallback.current;
+  }, []);
+
   return (
     <VoiceRecordingContext.Provider 
       value={{ 
@@ -83,7 +91,8 @@ export function VoiceRecordingProvider({ children, pageTitle }: VoiceRecordingPr
         setPartialTranscript,
         addCommittedTranscript,
         setDetectedLanguage,
-        clearTranscripts
+        clearTranscripts,
+        getOnAcceptCallback
       }}
     >
       {children}

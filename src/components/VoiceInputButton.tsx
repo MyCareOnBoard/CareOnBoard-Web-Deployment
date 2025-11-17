@@ -60,7 +60,8 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
     setPartialTranscript,
     addCommittedTranscript,
     setDetectedLanguage,
-    stopRecording 
+    stopRecording,
+    getOnAcceptCallback
   } = useVoiceRecording();
 
   const [error, setError] = useState<string | null>(null);
@@ -194,7 +195,13 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
       clearTimeout(speechTimeoutRef.current);
     }
     
-    // Call the onAccept callback with the transcript and language code
+    // Call the onAccept callback from the context (for ContentEditableCell)
+    const contextOnAccept = getOnAcceptCallback();
+    if (contextOnAccept && fullTranscript) {
+      contextOnAccept(fullTranscript);
+    }
+    
+    // Call the onAccept prop callback with the transcript and language code
     if (onAccept && fullTranscript) {
       onAccept(fullTranscript, detectedLanguage);
     }

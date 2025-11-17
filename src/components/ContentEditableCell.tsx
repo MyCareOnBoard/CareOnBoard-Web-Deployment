@@ -36,7 +36,21 @@ const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
 
   const handleMicrophoneClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    startRecording(fieldName, pageTitle);
+    startRecording(
+      fieldName, 
+      pageTitle,
+      undefined, // onTranscript - not needed during recording
+      (transcript) => {
+        // onAccept - only called when Accept button is clicked
+        // Update the cell value with the transcribed text
+        onChange(transcript);
+        
+        // Also update the DOM directly to ensure it displays
+        if (contentRef.current) {
+          contentRef.current.textContent = transcript;
+        }
+      }
+    );
   };
 
   return (
