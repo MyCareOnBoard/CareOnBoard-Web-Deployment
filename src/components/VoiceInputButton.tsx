@@ -10,7 +10,6 @@ interface VoiceInputButtonProps {
   className?: string;
 }
 
-// Waveform animation component
 function WaveformIcon({ isActive }: { isActive: boolean }) {
   return (
     <>
@@ -70,32 +69,26 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   const hasConnected = useRef(false);
   const speechTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize ElevenLabs Scribe with language detection
   const scribe = useScribe({
     modelId: "scribe_v2_realtime",
     onPartialTranscript: (data) => {
       setPartialTranscript(data.text);
       
-      // Detect speech activity
       if (data.text && data.text.trim().length > 0) {
         setIsSpeaking(true);
         
-        // Clear existing timeout
         if (speechTimeoutRef.current) {
           clearTimeout(speechTimeoutRef.current);
         }
-        
-        // Set speaking to false after 500ms of no updates
+
         speechTimeoutRef.current = setTimeout(() => {
           setIsSpeaking(false);
         }, 500);
       }
     },
     onCommittedTranscript: (data: any) => {
-      console.log("Committed transcript:", data);
-      console.log("Committed transcript:", data.text, "Language:", data.language_code);
+
       addCommittedTranscript(data.text);
-      // Set detected language if available
       if (data.language_code) {
         setDetectedLanguage(data.language_code);
       }
@@ -107,7 +100,6 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
     },
   });
 
-  // Connect to microphone when recording starts
   useEffect(() => {
     const connectToMicrophone = async () => {
       if (isRecording && !scribe.isConnected && !hasConnected.current) {
@@ -116,10 +108,8 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
           setError(null);
           setIsConnecting(true);
           
-          // Fetch single-use token from server
           const token = await getScribeToken();
           
-          // Connect to ElevenLabs with microphone
           await scribe.connect({
             token,
             microphone: {
@@ -127,12 +117,11 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
               noiseSuppression: true,
               autoGainControl: true,
             },
-            vadThreshold: 0.5, // Sensitivity for detecting speech (0-1, higher = more sensitive)
-            vadSilenceThresholdSecs: 1.0, // Seconds of silence before committingCommit on silence
+            vadThreshold: 0.5,
+            vadSilenceThresholdSecs: 1.0,
             commitStrategy: CommitStrategy.VAD,
           });
-          
-          console.log("Connected to ElevenLabs Scribe");
+
           setIsConnecting(false);
         } catch (err) {
           console.error("Failed to connect to Scribe:", err);
@@ -148,7 +137,6 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording]);
 
-  // Disconnect when component unmounts (safety net)
   useEffect(() => {
     return () => {
       if (scribe.isConnected) {
@@ -157,7 +145,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run cleanup on unmount
+  }, []);
 
   const handleStop = async () => {
     if (scribe.isConnected) {
@@ -165,7 +153,6 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
       hasConnected.current = false;
     }
     
-    // Clear speech timeout
     if (speechTimeoutRef.current) {
       clearTimeout(speechTimeoutRef.current);
     }
@@ -176,62 +163,49 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   };
 
   const handleAccept = async () => {
-    // Get the full transcript (combine committed transcripts)
     const fullTranscript = committedTranscripts.join(' ').trim();
     
-    // Close the scribe connection immediately
     if (scribe.isConnected) {
       try {
         await scribe.disconnect();
         hasConnected.current = false;
-        console.log('Scribe connection closed');
       } catch (error) {
         console.error('Error closing scribe connection:', error);
       }
     }
     
-    // Clear speech timeout
     if (speechTimeoutRef.current) {
       clearTimeout(speechTimeoutRef.current);
     }
     
-    // Call the onAccept callback from the context (for ContentEditableCell)
     const contextOnAccept = getOnAcceptCallback();
     if (contextOnAccept && fullTranscript) {
       contextOnAccept(fullTranscript);
     }
     
-    // Call the onAccept prop callback with the transcript and language code
     if (onAccept && fullTranscript) {
       onAccept(fullTranscript, detectedLanguage);
     }
     
-    // Stop recording
     setIsConnecting(false);
     setIsSpeaking(false);
     stopRecording();
     
-    // Trigger the onClick callback if provided
     onClick?.();
   };
 
-  // Don't render anything if not recording
   if (!isRecording) {
     return null;
   }
 
-  // With VAD enabled, separate committed and partial transcripts
   const committedText = committedTranscripts.join(' ').trim();
   
-  // For the accept button, use committed transcripts (VAD auto-commits on silence)
   const fullTranscript = committedText;
   
-  // Combined display text for textarea (committed + partial)
   const displayTranscript = committedText 
     ? (partialTranscript ? `${committedText} ${partialTranscript}` : committedText)
     : partialTranscript;
 
-  // Format language code for display (e.g., "en" -> "English")
   const getLanguageName = (code: string): string => {
     const languageMap: Record<string, string> = {
       'en': 'English',
@@ -258,14 +232,10 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
 
   return (
     <div className={`fixed bottom-8 right-8 ${className}`}>
-      {/* Recording status card */}
       <div className="bg-white rounded-[10px] shadow-lg p-4 flex flex-col gap-3 animate-fade-in w-[500px]">
-        {/* Header: Language, Waveform, and Controls */}
         <div className="flex items-center gap-3">
-          {/* Waveform */}
           <WaveformIcon isActive={isSpeaking} />
           
-          {/* Language or Status */}
           <div className="flex-1 min-w-0">
             {isConnecting ? (
               <div className="flex items-center gap-2">
@@ -290,7 +260,6 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             )}
           </div>
 
-          {/* Accept button - show when we have transcript and not connecting */}
           {fullTranscript && !error && !isConnecting && (
             <button
               onClick={handleAccept}
@@ -302,7 +271,6 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             </button>
           )}
 
-          {/* Microphone indicator */}
           <div className="relative flex-shrink-0">
             <div 
               className={`relative bg-[#00b4b8] border border-[rgba(0,0,0,0.12)] rounded-full w-[30px] h-[30px] flex items-center justify-center shadow-lg transition-all duration-300 ${
@@ -313,7 +281,6 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             </div>
           </div>
           
-          {/* Stop button */}
           <button
             onClick={handleStop}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0 cursor-pointer"
@@ -332,7 +299,6 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
           </button>
         </div>
 
-        {/* Transcript Textarea - Full Width */}
         {!isConnecting && (
           <>
             {error ? (
