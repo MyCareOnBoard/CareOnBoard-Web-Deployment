@@ -13,6 +13,7 @@ export const Routes = {
   userPanel: {
     dashboard: "/user-panel/dashboard",
     shiftManagement: "/user-panel/shift-management",
+    manualShiftManagement: "/user-panel/manual-shift-management",
     clientsAndServices: "/user-panel/clients-and-services",
     planOfCare: "/user-panel/plan-of-care",
     notes: "/user-panel/notes",
