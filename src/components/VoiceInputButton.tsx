@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import MicrophoneIcon from "@/assets/icons/microphone.svg?react";
 import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
-import ElevenLabsTranscription from "@/components/transcription/ElevenLabsTranscription";
+// import ElevenLabsTranscription from "@/components/transcription/ElevenLabsTranscription";
+import AssemblyAITranscription from "@/components/transcription/AssemblyAITranscription";
 
 interface VoiceInputButtonProps {
   onClick?: () => void;
@@ -141,8 +142,8 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
 
   return (
     <>
-      {/* ElevenLabs Transcription Service - can be swapped for other services */}
-      <ElevenLabsTranscription
+      {/* AssemblyAI Transcription Service - can be swapped for other services */}
+      <AssemblyAITranscription
         isRecording={isRecording}
         onPartialTranscript={setPartialTranscript}
         onCommittedTranscript={addCommittedTranscript}
