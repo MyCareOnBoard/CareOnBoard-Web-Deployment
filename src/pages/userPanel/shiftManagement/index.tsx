@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { Clock, MapPin, Calendar, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Shift, ShiftStatus, ShiftActionStatus } from "./types";
 import { format } from "date-fns";
 import { ClockOutModal } from "./ClockOutModal";
 import ExpandIcon from "@/assets/icons/arrow-expand-01.svg?react";
+import { Routes } from "@/routes/constants";
 
 // Mock data for demonstration - will be replaced with real API data
 const initialTodayShifts: Shift[] = [
@@ -216,14 +218,14 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick }
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden lg:flex items-center gap-6 w-full">
+      <div className="items-center hidden w-full gap-6 lg:flex">
         {/* Client Avatar */}
         <div className="w-[52.5px] h-[60px] rounded-[8px] overflow-hidden flex-shrink-0">
           {shift.client.avatar ? (
             <img
               src={shift.client.avatar}
               alt={shift.client.name}
-              className="w-full h-full object-cover"
+              className="object-cover w-full h-full"
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-xl font-bold">
@@ -233,7 +235,7 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick }
         </div>
 
         {/* Shift Details */}
-        <div className="flex-1 flex items-center gap-16 min-w-0">
+        <div className="flex items-center flex-1 min-w-0 gap-16">
           {/* Client Name */}
           <div className="flex flex-col gap-1.5 flex-shrink-0">
             <p className="text-[16px] font-semibold text-[#10141a] leading-[1.6] whitespace-nowrap">
@@ -245,7 +247,7 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick }
           {/* Info Grid */}
           <div className="flex flex-wrap gap-x-16 gap-y-2">
             {showDate && (
-              <div className="flex flex-col gap-1 flex-shrink-0">
+              <div className="flex flex-col flex-shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Date</p>
                 <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">
                   {format(new Date(shift.date), "dd MMMM")}
@@ -253,13 +255,13 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick }
               </div>
             )}
 
-            <div className="flex flex-col gap-1 flex-shrink-0">
+            <div className="flex flex-col flex-shrink-0 gap-1">
               <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
               <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.location}</p>
             </div>
 
             {shift.availableAt && (
-              <div className="flex flex-col gap-1 flex-shrink-0">
+              <div className="flex flex-col flex-shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">
                   {shift.clockedInAt ? "Started at" : "Available at"}
                 </p>
@@ -270,7 +272,7 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick }
             )}
 
             {shift.clockedInAt && !shift.availableAt && (
-              <div className="flex flex-col gap-1 flex-shrink-0">
+              <div className="flex flex-col flex-shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">
                   {shift.clockedOutAt ? "Clocked In" : "Started at"}
                 </p>
@@ -279,7 +281,7 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick }
             )}
 
             {shift.clockedOutAt && (
-              <div className="flex flex-col gap-1 flex-shrink-0">
+              <div className="flex flex-col flex-shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked Out</p>
                 <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.clockedOutAt}</p>
               </div>
@@ -387,7 +389,7 @@ function ShiftSection({
     <div
       className={`${backgroundColor} backdrop-blur border border-white/30 rounded-[30px] p-5 relative`}
     >
-      <div className="flex flex-col sm:flex-row items-start justify-between gap-3 mb-6">
+      <div className="flex flex-col items-start justify-between gap-3 mb-6 sm:flex-row">
         <div>
           <h3 className="text-[18px] lg:text-[20px] font-medium text-[#10141a] leading-[1.6] whitespace-nowrap">{title}</h3>
           <p className="text-[12px] lg:text-[14px] text-[#808081] leading-[1.4] mt-1">{subtitle}</p>
@@ -449,6 +451,7 @@ function ShiftSection({
 }
 
 export default function ShiftManagementPage() {
+  const navigate = useNavigate();
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [previousExpanded, setPreviousExpanded] = useState(false);
   const [todayShifts, setTodayShifts] = useState<Shift[]>(initialTodayShifts);
@@ -605,12 +608,15 @@ export default function ShiftManagementPage() {
   return (
     <div className="min-h-[calc(100vh-200px)] px-2 sm:px-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 lg:mb-8">
+      <div className="flex flex-col items-start justify-between gap-4 mb-6 sm:flex-row sm:items-center lg:mb-8">
         <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-semibold leading-[1.6] text-[#10141a] whitespace-nowrap">
           Shift Management
         </h1>
 
-        <Button className="bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap">
+        <Button 
+          onClick={() => navigate(Routes.userPanel.manualShiftManagement)}
+          className="bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap"
+        >
           <Plus size={20} />
           Manual Timesheet
         </Button>
