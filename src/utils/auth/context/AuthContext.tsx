@@ -48,11 +48,8 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
 
-  // Initialize auth state - check both Redux (persisted) and Firebase
   useEffect(() => {
     const initAuth = async () => {
-      console.log('[AuthContext] Initializing auth...')
-      console.log('[AuthContext] Redux user:', reduxUser)
 
       try {
         const profile = await axiosClient.get<UserProfileResponse>("/users/profile");
@@ -63,9 +60,7 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
         console.error('[AuthContext] Error fetching user profile:', error)
       }
 
-      // First, check if we have a persisted user in Redux
       if (reduxUser) {
-        console.log('[AuthContext] Found persisted user in Redux:', reduxUser.email)
         setUserState(reduxUser)
         setIsInitialized(true)
         setLoading(false)
@@ -101,7 +96,6 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
   // Sync local state when Redux state changes (after login/signup)
   useEffect(() => {
     if (isInitialized) {
-      console.log('[AuthContext] Redux user changed:', reduxUser?.email || 'null')
       setUserState(reduxUser ?? null)
     }
   }, [reduxUser, isInitialized])

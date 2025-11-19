@@ -32,7 +32,6 @@ export function VoiceRecordingProvider({ children, pageTitle }: VoiceRecordingPr
   const [committedTranscripts, setCommittedTranscripts] = useState<string[]>([]);
   const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
   
-  // Store the callbacks in refs so they can be called from the transcription handlers
   const onTranscriptCallback = useRef<((text: string) => void) | null>(null);
   const onAcceptCallback = useRef<((text: string) => void) | null>(null);
 
@@ -42,7 +41,6 @@ export function VoiceRecordingProvider({ children, pageTitle }: VoiceRecordingPr
     setActivePageTitle(recordingPageTitle || pageTitle || null);
     onTranscriptCallback.current = onTranscript || null;
     onAcceptCallback.current = onAccept || null;
-    // Clear previous transcripts when starting a new recording
     setPartialTranscript("");
     setCommittedTranscripts([]);
     setDetectedLanguage(null);
@@ -60,7 +58,6 @@ export function VoiceRecordingProvider({ children, pageTitle }: VoiceRecordingPr
 
   const addCommittedTranscript = useCallback((text: string) => {
     setCommittedTranscripts(prev => [...prev, text]);
-    // Call the callback with the full transcript
     if (onTranscriptCallback.current) {
       onTranscriptCallback.current(text);
     }

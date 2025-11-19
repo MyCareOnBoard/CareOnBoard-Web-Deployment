@@ -77,8 +77,6 @@ export default function DashboardHeader(
   const navigate = useNavigate();
   const location = useLocation();
 
-  console.log('userType:', userType);
-
   const makeCommonRoute = (route: string) => {
     const userTypeKeys = {
       [UserType.APPLICANT]: "applicant",
