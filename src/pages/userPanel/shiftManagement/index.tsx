@@ -1,72 +1,30 @@
 import { useState, useEffect } from "react";
-import { Clock, MapPin, Calendar, ChevronRight, Plus } from "lucide-react";
+import { Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Shift, ShiftStatus, ShiftActionStatus } from "./types";
 import { format } from "date-fns";
 import { ClockOutModal } from "./ClockOutModal";
 import ExpandIcon from "@/assets/icons/arrow-expand-01.svg?react";
-
-// Mock data for demonstration - will be replaced with real API data
-const initialTodayShifts: Shift[] = [
-  {
-    id: "1",
-    client: {
-      id: "c1",
-      name: "DR. Brooklyn Simmons",
-      avatar: "https://i.pravatar.cc/150?u=brooklyn",
-    },
-    date: new Date().toISOString(),
-    location: "221/B Baker Street",
-    startTime: "2:30 PM",
-    availableAt: "2:30 PM",
-    status: ShiftStatus.AVAILABLE,
-    actionStatus: ShiftActionStatus.CLOCK_IN,
-    shiftId: "TDHJ/3421",
-    additionalStatus: "Expiring Soon",
-  },
-];
-
-const initialUpcomingShifts: Shift[] = Array.from({ length: 16 }, (_, i) => ({
-    id: `u${i + 1}`,
-    client: {
-      id: `c${i + 1}`,
-      name: "DR. Brooklyn Simmons",
-      avatar: "https://i.pravatar.cc/150?u=brooklyn",
-    },
-    date: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000).toISOString(),
-    location: "221/B Baker Street",
-    startTime: "2:30 PM",
-    availableAt: "2:30 PM",
-    status: ShiftStatus.PENDING,
-    shiftId: "TDHJ/3421",
-    additionalStatus: "Starts tomorrow",
-  }));
-
-const initialPreviousShifts: Shift[] = Array.from({ length: 16 }, (_, i) => ({
-    id: `p${i + 1}`,
-    client: {
-      id: `c${i + 1}`,
-      name: "DR. Brooklyn Simmons",
-      avatar: "https://i.pravatar.cc/150?u=brooklyn",
-    },
-    date: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000).toISOString(),
-    location: "221/B Baker Street",
-    startTime: "2:30 PM",
-    clockedInAt: "2:30 PM",
-    clockedOutAt: i < 6 ? "4:30 PM" : undefined,
-    status: ShiftStatus.COMPLETED,
-    shiftId: "TDHJ/3421",
-    sessionDuration: "2 hour session",
-  }));
+import {
+  listShifts,
+  getTodayShifts,
+  clockIn as apiClockIn,
+  clockOut as apiClockOut,
+  updateShiftStatus,
+  seedShifts,
+} from "@/lib/api/shift-management";
+import { toast } from "sonner";
+import { useAuth } from "@/utils/auth/context/AuthContext";
 
 interface ShiftCardProps {
   shift: Shift;
   showDate?: boolean;
   showAction?: boolean;
   onActionClick?: (shiftId: string) => void;
+  isLoading?: boolean;
 }
 
-function ShiftCard({ shift, showDate = false, showAction = true, onActionClick }: ShiftCardProps) {
+function ShiftCard({ shift, showDate = false, showAction = true, onActionClick, isLoading = false }: ShiftCardProps) {
   const getStatusColor = (status?: string) => {
     if (!status) return "";
     
@@ -103,9 +61,10 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick }
     return (
       <Button
         onClick={() => onActionClick?.(shift.id)}
-        className={`${config.color} text-white rounded-full px-4 py-2 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2`}
+        disabled={isLoading}
+        className={`${config.color} text-white rounded-full px-4 py-2 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
       >
-        <Clock size={16} />
+        {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
         {config.label}
       </Button>
     );
@@ -341,6 +300,7 @@ interface ShiftSectionProps {
   maxVisibleShifts?: number;
   showAction?: boolean;
   onActionClick?: (shiftId: string) => void;
+  isLoading?: boolean;
 }
 
 function ShiftSection({
@@ -355,6 +315,7 @@ function ShiftSection({
   maxVisibleShifts = 2,
   showAction = true,
   onActionClick,
+  isLoading = false,
 }: ShiftSectionProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -408,15 +369,22 @@ function ShiftSection({
       </div>
 
       <div className="space-y-3">
-        {displayShifts.map((shift) => (
-          <ShiftCard
-            key={shift.id}
-            shift={shift}
-            showDate={showDate}
-            showAction={showAction}
-            onActionClick={onActionClick}
-          />
-        ))}
+        {displayShifts.length > 0 ? (
+          displayShifts.map((shift) => (
+            <ShiftCard
+              key={shift.id}
+              shift={shift}
+              showDate={showDate}
+              showAction={showAction}
+              onActionClick={onActionClick}
+              isLoading={isLoading}
+            />
+          ))
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-[14px] text-[#808081]">No shifts available</p>
+          </div>
+        )}
       </div>
 
       {isExpanded && totalPages > 1 && (
@@ -449,17 +417,78 @@ function ShiftSection({
 }
 
 export default function ShiftManagementPage() {
+  const { user } = useAuth();
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [previousExpanded, setPreviousExpanded] = useState(false);
-  const [todayShifts, setTodayShifts] = useState<Shift[]>(initialTodayShifts);
-  const [upcomingShifts, setUpcomingShifts] = useState<Shift[]>(initialUpcomingShifts);
-  const [previousShifts, setPreviousShifts] = useState<Shift[]>(initialPreviousShifts);
+  const [todayShifts, setTodayShifts] = useState<Shift[]>([]);
+  const [upcomingShifts, setUpcomingShifts] = useState<Shift[]>([]);
+  const [previousShifts, setPreviousShifts] = useState<Shift[]>([]);
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [clockOutShiftId, setClockOutShiftId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<string>("Getting location...");
   const [locationError, setLocationError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [shiftsLoading, setShiftsLoading] = useState(false);
+  const [seedingData, setSeedingData] = useState(false);
 
   const currentDate = new Date();
+
+  // Load shifts from API
+  useEffect(() => {
+    if (user?.uid) {
+      loadShifts();
+    }
+  }, [user?.uid]);
+
+  const loadShifts = async () => {
+    try {
+      setLoading(true);
+      
+      // Use user.uid as agencyId for now
+      const agencyId = user?.uid;
+      
+      if (!agencyId) {
+        console.warn('No user ID available for fetching shifts');
+        return;
+      }
+      
+      // Fetch today's shifts
+      const todayResponse = await getTodayShifts(agencyId);
+      if (todayResponse.success) {
+        setTodayShifts(todayResponse.shifts.filter(
+          shift => shift.status === ShiftStatus.AVAILABLE || shift.status === ShiftStatus.ONGOING
+        ));
+      }
+
+      // Fetch upcoming shifts (pending status)
+      const upcomingResponse = await listShifts({ 
+        status: ShiftStatus.PENDING,
+        limit: 50,
+        agencyId 
+      });
+      if (upcomingResponse.success) {
+        setUpcomingShifts(upcomingResponse.shifts);
+      }
+
+      // Fetch completed shifts
+      const completedResponse = await listShifts({ 
+        status: ShiftStatus.COMPLETED,
+        limit: 50,
+        agencyId 
+      });
+      if (completedResponse.success) {
+        setPreviousShifts(completedResponse.shifts);
+      }
+
+    } catch (error: any) {
+      console.error('Failed to load shifts:', error);
+      toast.error('Failed to load shifts', {
+        description: error?.response?.data?.error || 'Please try again later'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Get user's location on component mount
   useEffect(() => {
@@ -523,84 +552,164 @@ export default function ShiftManagementPage() {
     }
   }, []); // Empty dependency array - run once on mount
 
-  const handleShiftAction = (shiftId: string) => {
-    setTodayShifts((prevShifts) =>
-      prevShifts.map((shift) => {
-        if (shift.id !== shiftId) return shift;
+  const handleShiftAction = async (shiftId: string) => {
+    const shift = todayShifts.find((s) => s.id === shiftId);
+    if (!shift) return;
 
-        // Handle different action states
-        switch (shift.actionStatus) {
-          case ShiftActionStatus.CLOCK_IN:
-            // Clock in - transition to shift started state
-            return {
-              ...shift,
-              actionStatus: ShiftActionStatus.SHIFT_STARTED,
-              clockedInAt: format(new Date(), "h:mm a"),
-              availableAt: undefined,
-              additionalStatus: "Ongoing Shift",
-              timeRemaining: 32, // This would come from the backend
-              status: ShiftStatus.ONGOING,
-            };
+    try {
+      setShiftsLoading(true);
 
-          case ShiftActionStatus.SHIFT_STARTED:
-            // Shift is ongoing - button changes to Clock Out
-            return {
-              ...shift,
-              actionStatus: ShiftActionStatus.CLOCK_OUT,
-              additionalStatus: "Ongoing Shift", // Keep the "Ongoing Shift" badge
-              timeRemaining: 5, // This would be calculated from backend
-            };
+      // Handle different action states
+      switch (shift.actionStatus) {
+        case ShiftActionStatus.CLOCK_IN:
+          // Clock in via API
+          const clockInResponse = await apiClockIn(shiftId);
+          if (clockInResponse.success) {
+            toast.success('Clocked in successfully!');
+            
+            // Update local state with API response
+            setTodayShifts((prevShifts) =>
+              prevShifts.map((s) =>
+                s.id === shiftId
+                  ? {
+                      ...s,
+                      ...clockInResponse.shift,
+                      actionStatus: ShiftActionStatus.SHIFT_STARTED,
+                      additionalStatus: "Ongoing Shift",
+                    }
+                  : s
+              )
+            );
+          }
+          break;
 
-          case ShiftActionStatus.CLOCK_OUT:
-            // Show confirmation modal instead of immediately clocking out
-            setShowClockOutModal(true);
-            setClockOutShiftId(shiftId);
-            return shift; // Don't change the shift yet
+        case ShiftActionStatus.SHIFT_STARTED:
+          // Update to show clock out button
+          setTodayShifts((prevShifts) =>
+            prevShifts.map((s) =>
+              s.id === shiftId
+                ? {
+                    ...s,
+                    actionStatus: ShiftActionStatus.CLOCK_OUT,
+                    additionalStatus: "Ongoing Shift",
+                  }
+                : s
+            )
+          );
+          break;
 
-          default:
-            return shift;
-        }
-      })
-    );
+        case ShiftActionStatus.CLOCK_OUT:
+          // Show confirmation modal instead of immediately clocking out
+          setShowClockOutModal(true);
+          setClockOutShiftId(shiftId);
+          break;
+
+        default:
+          break;
+      }
+    } catch (error: any) {
+      console.error('Failed to perform shift action:', error);
+      toast.error('Action failed', {
+        description: error?.response?.data?.error || 'Please try again'
+      });
+    } finally {
+      setShiftsLoading(false);
+    }
   };
 
-  const handleClockOutConfirm = () => {
+  const handleClockOutConfirm = async () => {
     if (!clockOutShiftId) return;
 
     // Find the shift to clock out
     const shiftToClockOut = todayShifts.find((s) => s.id === clockOutShiftId);
     if (!shiftToClockOut) return;
 
-    // Calculate session duration
-    const clockInTime = shiftToClockOut.clockedInAt || shiftToClockOut.startTime;
-    const clockOutTime = format(new Date(), "h:mm a");
-    
-    // Create completed shift for previous shifts
-    const completedShift: Shift = {
-      ...shiftToClockOut,
-      status: ShiftStatus.COMPLETED,
-      clockedOutAt: clockOutTime,
-      actionStatus: undefined,
-      additionalStatus: undefined,
-      timeRemaining: undefined,
-      sessionDuration: "2 hour session", // This would be calculated from actual times
-    };
+    try {
+      setShiftsLoading(true);
 
-    // Move shift to previous shifts (add at the beginning)
-    setPreviousShifts((prev) => [completedShift, ...prev]);
+      // Clock out via API
+      const clockOutResponse = await apiClockOut(clockOutShiftId);
+      
+      if (clockOutResponse.success) {
+        toast.success('Clocked out successfully!', {
+          description: `Session duration: ${clockOutResponse.shift.sessionDuration || 'N/A'}`
+        });
 
-    // Remove from today's shifts
-    setTodayShifts((prev) => prev.filter((s) => s.id !== clockOutShiftId));
+        // Create completed shift for previous shifts
+        const completedShift: Shift = {
+          ...shiftToClockOut,
+          ...clockOutResponse.shift,
+          actionStatus: undefined,
+          additionalStatus: undefined,
+          timeRemaining: undefined,
+        };
 
-    // Close modal and reset
-    setShowClockOutModal(false);
-    setClockOutShiftId(null);
+        // Move shift to previous shifts (add at the beginning)
+        setPreviousShifts((prev) => [completedShift, ...prev]);
+
+        // Remove from today's shifts
+        setTodayShifts((prev) => prev.filter((s) => s.id !== clockOutShiftId));
+      }
+    } catch (error: any) {
+      console.error('Failed to clock out:', error);
+      toast.error('Clock out failed', {
+        description: error?.response?.data?.error || 'Please try again'
+      });
+    } finally {
+      setShiftsLoading(false);
+      setShowClockOutModal(false);
+      setClockOutShiftId(null);
+    }
   };
 
   const handleClockOutCancel = () => {
     setShowClockOutModal(false);
     setClockOutShiftId(null);
   };
+
+  const handleSeedData = async () => {
+    try {
+      setSeedingData(true);
+      
+      // Use user.uid as agencyId for seeding
+      const agencyId = user?.uid;
+      
+      if (!agencyId) {
+        toast.error('User not authenticated');
+        return;
+      }
+      
+      const response = await seedShifts({ agencyId });
+      
+      if (response.success) {
+        toast.success('Dummy data created successfully!', {
+          description: `Created ${response.summary.totalCount} shifts across all statuses`
+        });
+        
+        // Reload shifts to show the new data
+        await loadShifts();
+      }
+    } catch (error: any) {
+      console.error('Failed to seed data:', error);
+      toast.error('Failed to create dummy data', {
+        description: error?.response?.data?.error || 'Please try again'
+      });
+    } finally {
+      setSeedingData(false);
+    }
+  };
+
+  // Show loading state on initial load
+  if (loading) {
+    return (
+      <div className="min-h-[calc(100vh-200px)] px-2 sm:px-0 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 animate-spin text-[#00b4b8]" />
+          <p className="text-[16px] text-[#808081]">Loading shifts...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-200px)] px-2 sm:px-0">
@@ -610,10 +719,25 @@ export default function ShiftManagementPage() {
           Shift Management
         </h1>
 
-        <Button className="bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap">
-          <Plus size={20} />
-          Manual Timesheet
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button 
+            onClick={handleSeedData}
+            disabled={seedingData}
+            className="bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {seedingData ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : (
+              <Database size={20} />
+            )}
+            {seedingData ? 'Creating...' : 'Seed Data'}
+          </Button>
+
+          <Button className="bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap">
+            <Plus size={20} />
+            Manual Timesheet
+          </Button>
+        </div>
       </div>
 
       {/* Main Frame Container */}
@@ -669,6 +793,7 @@ export default function ShiftManagementPage() {
               showExpandButton={false}
               maxVisibleShifts={1}
               onActionClick={handleShiftAction}
+              isLoading={shiftsLoading}
             />
           )}
 
@@ -681,6 +806,7 @@ export default function ShiftManagementPage() {
             isExpanded={upcomingExpanded}
             onExpandToggle={() => setUpcomingExpanded(!upcomingExpanded)}
             showDate
+            isLoading={shiftsLoading}
           />
 
           {/* Previous Shifts */}
@@ -693,6 +819,7 @@ export default function ShiftManagementPage() {
             onExpandToggle={() => setPreviousExpanded(!previousExpanded)}
             showDate
             showAction={false}
+            isLoading={shiftsLoading}
           />
         </div>
       </div>
