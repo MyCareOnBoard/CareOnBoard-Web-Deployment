@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 import TimesheetWeek from "./components/TimesheetWeek";
-import SignatureModal from "./components/SignatureModal";
 import ConfirmShiftModal from "./components/ConfirmShiftModal";
 import SuccessModal from "./components/SuccessModal";
 import { useToast } from "@/hooks/use-toast";
 import type { RootState } from "@/store/redux/store";
 import { getUserProfile, UserProfile } from "@/lib/api/users";
 import { Routes } from "@/routes/constants";
+import DigitalSignatureModal from "@/pages/applicant/application/components/DigitalSignature";
 
 interface FormData {
   yourFirstName: string;
@@ -453,18 +453,20 @@ export default function ManualShiftManagementPage() {
       </div>
 
       {/* Modals */}
-      <SignatureModal
-        open={clientSignatureModalOpen}
-        onOpenChange={setClientSignatureModalOpen}
+      <DigitalSignatureModal
+        isOpen={clientSignatureModalOpen}
+        setIsOpen={setClientSignatureModalOpen}
         onSave={handleClientSignatureSave}
-        title="Client Signature"
+        skipBackend
+        useCase="manual-timesheet-client"
       />
 
-      <SignatureModal
-        open={userSignatureModalOpen}
-        onOpenChange={setUserSignatureModalOpen}
+      <DigitalSignatureModal
+        isOpen={userSignatureModalOpen}
+        setIsOpen={setUserSignatureModalOpen}
         onSave={handleUserSignatureSave}
-        title="User Signature"
+        skipBackend
+        useCase="manual-timesheet-user"
       />
 
       <ConfirmShiftModal

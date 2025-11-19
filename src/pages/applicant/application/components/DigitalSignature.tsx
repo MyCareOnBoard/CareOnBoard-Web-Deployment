@@ -4,14 +4,28 @@ import {Button} from "@/components/ui/button";
 import {FileUpload} from "@/components/ui/file-upload";
 import {useSignDocumentMutation} from "@/pages/applicant/application/api";
 
-const DigitalSignatureModal = (
-  {isOpen, setIsOpen, proceed, useCase}: {
-    isOpen: boolean;
-    setIsOpen: (value: boolean) => void;
-    proceed: () => void;
-    useCase: "official-hire" | "conditional-hire"
-  }
-) => {
+type SignaturePayload = {
+  signatureType: string;
+  signatureData: string;
+};
+
+interface DigitalSignatureModalProps {
+  isOpen: boolean;
+  setIsOpen: (value: boolean) => void;
+  proceed?: () => void;
+  useCase?: string;
+  onSave?: (signatureData: SignaturePayload) => void;
+  skipBackend?: boolean;
+}
+
+const DigitalSignatureModal = ({
+  isOpen,
+  setIsOpen,
+  proceed,
+  useCase = "general",
+  onSave,
+  skipBackend = false,
+}: DigitalSignatureModalProps) => {
   const [activeTab, setActiveTab] = useState('type');
   const [typedSignature, setTypedSignature] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
@@ -91,7 +105,7 @@ const DigitalSignatureModal = (
   };
 
   const handleNext = async () => {
-    let signatureData = null;
+    let signatureData: SignaturePayload | null = null;
 
     if (activeTab === 'type' && typedSignature) {
       signatureData = {signatureType: 'type', signatureData: typedSignature};
@@ -102,13 +116,21 @@ const DigitalSignatureModal = (
     }
 
     if (signatureData) {
-      console.log('Signature saved:', signatureData);
-      await signDocument({
-        context: useCase,
-        data: signatureData
-      }).unwrap();
-      proceed();
-      setIsOpen(false);
+      try {
+        if (!skipBackend) {
+          await signDocument({
+            context: useCase,
+            data: signatureData
+          }).unwrap();
+        }
+
+        onSave?.(signatureData);
+        proceed?.();
+        setIsOpen(false);
+      } catch (error) {
+        console.error('Failed to save signature:', error);
+        alert('Failed to save signature. Please try again.');
+      }
     } else {
       alert('Please provide a signature before proceeding.');
     }
