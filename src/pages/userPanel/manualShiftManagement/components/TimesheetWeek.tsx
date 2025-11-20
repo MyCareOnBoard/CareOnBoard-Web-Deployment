@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { CalendarIcon, Clock } from "lucide-react";
 import { format } from "date-fns";
+import TimePicker from "@/components/TimePicker";
 
 interface WeekData {
   [day: string]: {
@@ -29,18 +29,38 @@ export default function TimesheetWeek({
     day: null,
     open: false,
   });
-  const [timePickerState, setTimePickerState] = useState<{ 
-    day: string | null; 
-    field: "checkIn" | "checkOut" | null;
-    open: boolean;
-  }>({
-    day: null,
-    field: null,
-    open: false,
-  });
-  const [tempTime, setTempTime] = useState({ hour: "10", minute: "00", period: "AM" });
 
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  // Convert 12-hour format with AM/PM to 24-hour format
+  const convertTo24Hour = (time12h: string): string => {
+    if (!time12h) return "";
+    const [time, period] = time12h.split(" ");
+    if (!time || !period) return "";
+    
+    const [hour, minute] = time.split(":");
+    let hour24 = parseInt(hour);
+    
+    if (period === "AM") {
+      hour24 = hour24 === 12 ? 0 : hour24;
+    } else {
+      hour24 = hour24 === 12 ? 12 : hour24 + 12;
+    }
+    
+    return `${hour24.toString().padStart(2, "0")}:${minute}`;
+  };
+
+  // Convert 24-hour format to 12-hour format with AM/PM
+  const convertTo12Hour = (time24h: string): string => {
+    if (!time24h) return "";
+    const [hour, minute] = time24h.split(":");
+    const hour24 = parseInt(hour);
+    
+    const displayHour = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+    const period = hour24 >= 12 ? "PM" : "AM";
+    
+    return `${displayHour.toString().padStart(2, "0")}:${minute} ${period}`;
+  };
 
   const handleDateSelect = (date: Date | undefined, day: string) => {
     if (date) {
@@ -53,38 +73,15 @@ export default function TimesheetWeek({
     setDatePickerState({ day: null, open: false });
   };
 
-  const handleTimeClick = (day: string, field: "checkIn" | "checkOut") => {
-    // Parse existing time if available
-    const currentTime = weekData[day][field];
-    if (currentTime) {
-      const [time, period] = currentTime.split(" ");
-      if (time && period) {
-        const [hour, minute] = time.split(":");
-        setTempTime({ hour: hour || "10", minute: minute || "00", period: period || "AM" });
-      }
-    } else {
-      setTempTime({ hour: "10", minute: "00", period: "AM" });
-    }
-    
-    setTimePickerState({ day, field, open: true });
-  };
-
-  const handleTimeSave = () => {
-    if (timePickerState.day && timePickerState.field) {
-      const timeString = `${tempTime.hour.padStart(2, '0')}:${tempTime.minute.padStart(2, '0')} ${tempTime.period}`;
-      onWeekDataChange({
-        ...weekData,
-        [timePickerState.day]: { 
-          ...weekData[timePickerState.day], 
-          [timePickerState.field]: timeString 
-        },
-      });
-    }
-    setTimePickerState({ day: null, field: null, open: false });
-  };
-
-  const handleTimeCancel = () => {
-    setTimePickerState({ day: null, field: null, open: false });
+  const handleTimeChange = (day: string, field: "checkIn" | "checkOut", time24h: string) => {
+    const time12h = convertTo12Hour(time24h);
+    onWeekDataChange({
+      ...weekData,
+      [day]: { 
+        ...weekData[day], 
+        [field]: time12h 
+      },
+    });
   };
 
   return (
@@ -131,8 +128,20 @@ export default function TimesheetWeek({
                 <PopoverContent className="w-auto p-0 bg-white" align="start">
                   <Calendar
                     mode="single"
+                    className="bg-white"
+                    captionLayout="dropdown"
+                    startMonth={new Date(1924, 0)}
+                    endMonth={new Date()}
                     onSelect={(date) => handleDateSelect(date, day)}
-                    initialFocus
+                    formatters={{
+                      formatMonthDropdown: (date) =>
+                        date.toLocaleString("default", { month: "long" }),
+                    }}
+                    classNames={{
+                      dropdown_root: "relative border-none shadow-none has-focus:ring-0",
+                      caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
+                    }}
+                    autoFocus={true}
                   />
                 </PopoverContent>
               </Popover>
@@ -140,170 +149,38 @@ export default function TimesheetWeek({
             
             {/* Check In Time Picker */}
             <div className="flex items-center">
-              <Popover 
-                open={timePickerState.open && timePickerState.day === day && timePickerState.field === "checkIn"} 
-                onOpenChange={(open) => {
-                  if (!open) {
-                    setTimePickerState({ day: null, field: null, open: false });
-                  }
-                }}
+              <TimePicker
+                value={convertTo24Hour(weekData[day].checkIn)}
+                onChange={(time24h) => handleTimeChange(day, "checkIn", time24h)}
               >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleTimeClick(day, "checkIn")}
-                    className={`w-full justify-start text-left font-normal border-[#e5e5e6] rounded-md bg-white hover:bg-[#f8f9fa] ${
-                      !weekData[day].checkIn && "text-[#a0a0a1]"
-                    }`}
-                  >
-                    <Clock className="w-4 h-4 mr-2" />
-                    {weekData[day].checkIn || "---"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="bg-white w-80" align="start">
-                  <div className="p-4 space-y-4">
-                    <h4 className="font-semibold text-center text-[#10141a]">Set Time</h4>
-                    
-                    <div className="flex items-center justify-center gap-2">
-                      <Input
-                        type="number"
-                        min="1"
-                        max="12"
-                        value={tempTime.hour}
-                        onChange={(e) => {
-                          let value = parseInt(e.target.value) || 1;
-                          if (value < 1) value = 1;
-                          if (value > 12) value = 12;
-                          setTempTime({ ...tempTime, hour: value.toString() });
-                        }}
-                        className="w-16 text-center border-[#e5e5e6] rounded-md"
-                      />
-                      <span className="text-lg font-semibold text-[#10141a]">:</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="59"
-                        value={tempTime.minute}
-                        onChange={(e) => {
-                          let value = parseInt(e.target.value) || 0;
-                          if (value < 0) value = 0;
-                          if (value > 59) value = 59;
-                          setTempTime({ ...tempTime, minute: value.toString().padStart(2, "0") });
-                        }}
-                        className="w-16 text-center border-[#e5e5e6] rounded-md"
-                      />
-                      <select
-                        value={tempTime.period}
-                        onChange={(e) => setTempTime({ ...tempTime, period: e.target.value })}
-                        className="border border-[#e5e5e6] rounded-md px-3 py-2 bg-white text-[#10141a] focus:outline-none focus:ring-2 focus:ring-[#00b4b8]"
-                      >
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                      </select>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={handleTimeCancel}
-                        className="flex-1 border-[#e5e5e6] rounded-md"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleTimeSave}
-                        className="flex-1 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-md"
-                      >
-                        Save
-                      </Button>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                <Button
+                  variant="outline"
+                  className={`w-full justify-start text-left font-normal border-[#e5e5e6] rounded-md bg-white hover:bg-[#f8f9fa] ${
+                    !weekData[day].checkIn && "text-[#a0a0a1]"
+                  }`}
+                >
+                  <Clock className="w-4 h-4 mr-2" />
+                  {weekData[day].checkIn || "---"}
+                </Button>
+              </TimePicker>
             </div>
             
             {/* Check Out Time Picker */}
             <div className="flex items-center">
-              <Popover 
-                open={timePickerState.open && timePickerState.day === day && timePickerState.field === "checkOut"} 
-                onOpenChange={(open) => {
-                  if (!open) {
-                    setTimePickerState({ day: null, field: null, open: false });
-                  }
-                }}
+              <TimePicker
+                value={convertTo24Hour(weekData[day].checkOut)}
+                onChange={(time24h) => handleTimeChange(day, "checkOut", time24h)}
               >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleTimeClick(day, "checkOut")}
-                    className={`w-full justify-start text-left font-normal border-[#e5e5e6] rounded-md bg-white hover:bg-[#f8f9fa] ${
-                      !weekData[day].checkOut && "text-[#a0a0a1]"
-                    }`}
-                  >
-                    <Clock className="w-4 h-4 mr-2" />
-                    {weekData[day].checkOut || "---"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="bg-white w-80" align="start">
-                  <div className="p-4 space-y-4">
-                    <h4 className="font-semibold text-center text-[#10141a]">Set Time</h4>
-                    
-                    <div className="flex items-center justify-center gap-2">
-                      <Input
-                        type="number"
-                        min="1"
-                        max="12"
-                        value={tempTime.hour}
-                        onChange={(e) => {
-                          let value = parseInt(e.target.value) || 1;
-                          if (value < 1) value = 1;
-                          if (value > 12) value = 12;
-                          setTempTime({ ...tempTime, hour: value.toString() });
-                        }}
-                        className="w-16 text-center border-[#e5e5e6] rounded-md"
-                      />
-                      <span className="text-lg font-semibold text-[#10141a]">:</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="59"
-                        value={tempTime.minute}
-                        onChange={(e) => {
-                          let value = parseInt(e.target.value) || 0;
-                          if (value < 0) value = 0;
-                          if (value > 59) value = 59;
-                          setTempTime({ ...tempTime, minute: value.toString().padStart(2, "0") });
-                        }}
-                        className="w-16 text-center border-[#e5e5e6] rounded-md"
-                      />
-                      <select
-                        value={tempTime.period}
-                        onChange={(e) => setTempTime({ ...tempTime, period: e.target.value })}
-                        className="border border-[#e5e5e6] rounded-md px-3 py-2 bg-white text-[#10141a] focus:outline-none focus:ring-2 focus:ring-[#00b4b8]"
-                      >
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                      </select>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={handleTimeCancel}
-                        className="flex-1 border-[#e5e5e6] rounded-md"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleTimeSave}
-                        className="flex-1 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-md"
-                      >
-                        Save
-                      </Button>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                <Button
+                  variant="outline"
+                  className={`w-full justify-start text-left font-normal border-[#e5e5e6] rounded-md bg-white hover:bg-[#f8f9fa] ${
+                    !weekData[day].checkOut && "text-[#a0a0a1]"
+                  }`}
+                >
+                  <Clock className="w-4 h-4 mr-2" />
+                  {weekData[day].checkOut || "---"}
+                </Button>
+              </TimePicker>
             </div>
           </div>
         ))}
