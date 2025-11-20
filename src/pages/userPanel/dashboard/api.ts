@@ -59,7 +59,7 @@ export const userPanelDashboardApi = createApi({
     }),
     getEmployeeTrainings: builder.query<GetEmployeeTrainingsResponse[], void>({
       query: () => ({
-        url: `/employees/trainings`,
+        url: `/employees/employee/trainings`,
         method: "GET",
         requiresAuth: true,
       }),

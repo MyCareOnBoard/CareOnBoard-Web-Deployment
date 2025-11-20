@@ -11,6 +11,10 @@ import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import ContentEditableCell from "@/components/ContentEditableCell";
 import TimePicker from "@/components/TimePicker";
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
+import {Button} from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import {Routes} from "@/routes/constants";
+import {useNavigate} from "react-router";
 
 type InterventionRow = {
   id: string;
@@ -41,6 +45,8 @@ export default function SupportedEmploymentInterventionPage() {
   const [isStartDateOpen, setIsStartDateOpen] = useState(false);
   const [isEndDateOpen, setIsEndDateOpen] = useState(false);
   const [openServiceDateId, setOpenServiceDateId] = useState<string | null>(null);
+
+  const navigate = useNavigate();
   
   const [interventions, setInterventions] = useState<InterventionRow[]>([
     { id: "1", training: "", employerVision: "", achievementPlan: "" },
@@ -103,10 +109,17 @@ export default function SupportedEmploymentInterventionPage() {
     <VoiceRecordingProvider pageTitle={pageTitle}>
       <div className="min-h-[calc(100vh-200px)] pb-20">
         {/* Page Header */}
-        <div className="mb-8">
+        <div className="mb-8 flex justify-between items-center">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
             Notes
           </h1>
+          <Button
+            onClick={() => navigate(Routes.userPanel.notes.index)}
+            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
+          >
+            <ArrowLeft className="w-5 h-5"/>
+            Back to Notes
+          </Button>
         </div>
 
         {/* Department Information */}
