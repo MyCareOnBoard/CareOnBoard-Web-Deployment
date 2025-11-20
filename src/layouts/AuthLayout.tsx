@@ -47,7 +47,7 @@ export default function AuthLayout() {
       >
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 opacity-40 overflow-hidden">
+          <div className="absolute inset-0 overflow-hidden opacity-40">
             <img 
               alt="" 
               className="absolute h-full left-[-14.67%] max-w-none top-[-8.3%] w-[121.76%] object-cover"
@@ -63,7 +63,7 @@ export default function AuthLayout() {
         </div>
 
         {/* Content */}
-        <div className="relative z-10 flex flex-col h-full justify-between">
+        <div className="relative z-10 flex flex-col justify-between h-full">
           {/* Logo */}
           <div className="flex gap-[11.563px] items-center">
             <div className="w-[37px] h-[37px] flex items-center justify-center">
