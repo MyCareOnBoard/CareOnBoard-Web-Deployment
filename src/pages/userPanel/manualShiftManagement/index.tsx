@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
@@ -114,6 +114,12 @@ export default function ManualShiftManagementPage() {
   const [submitting, setSubmitting] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [locationSuggestions, setLocationSuggestions] = useState<Array<{ display_name: string; place_id: string }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchingLocation, setSearchingLocation] = useState(false);
+  
+  const locationInputRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Signature upload mutation
   const [signDocument] = useSignDocumentMutation();
@@ -165,6 +171,24 @@ export default function ManualShiftManagementPage() {
     signatureData: string;
   } | null>(null);
 
+  // Handle clicks outside location dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (locationInputRef.current && !locationInputRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      // Clear any pending search timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Fetch user profile and populate form
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -210,6 +234,56 @@ export default function ManualShiftManagementPage() {
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    
+    // If it's the location field, trigger search for suggestions
+    if (field === "location") {
+      handleLocationSearch(value);
+    }
+  };
+
+  const handleLocationSearch = async (query: string) => {
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // If query is too short, hide suggestions
+    if (query.trim().length < 3) {
+      setShowSuggestions(false);
+      setLocationSuggestions([]);
+      return;
+    }
+
+    // Debounce the search
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        setSearchingLocation(true);
+        
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`
+        );
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch suggestions");
+        }
+
+        const data = await response.json();
+        setLocationSuggestions(data);
+        setShowSuggestions(data.length > 0);
+      } catch (error) {
+        console.error("Failed to fetch location suggestions:", error);
+        setLocationSuggestions([]);
+        setShowSuggestions(false);
+      } finally {
+        setSearchingLocation(false);
+      }
+    }, 500); // 500ms debounce
+  };
+
+  const handleSelectSuggestion = (suggestion: { display_name: string; place_id: string }) => {
+    setFormData((prev) => ({ ...prev, location: suggestion.display_name }));
+    setShowSuggestions(false);
+    setLocationSuggestions([]);
   };
 
   const handleGetLocation = async () => {
@@ -570,11 +644,17 @@ export default function ManualShiftManagementPage() {
               <label className="block mb-2 text-sm font-medium text-[#10141a]">
                 Location
               </label>
-              <div className="relative">
+              <div className="relative" ref={locationInputRef}>
                 <Input
                   value={formData.location}
                   onChange={(e) => handleInputChange("location", e.target.value)}
                   className="border-[#e5e5e6] rounded-md pr-10"
+                  placeholder="Type to search for location..."
+                  onFocus={() => {
+                    if (locationSuggestions.length > 0) {
+                      setShowSuggestions(true);
+                    }
+                  }}
                 />
                 <button
                   type="button"
@@ -587,6 +667,30 @@ export default function ManualShiftManagementPage() {
                     className={`w-5 h-5 text-[#00b4b8] cursor-pointer ${gettingLocation ? 'animate-pulse' : ''}`} 
                   />
                 </button>
+                
+                {/* Suggestions Dropdown */}
+                {showSuggestions && locationSuggestions.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                    {searchingLocation && (
+                      <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent"></div>
+                        Searching...
+                      </div>
+                    )}
+                    {!searchingLocation && locationSuggestions.map((suggestion) => (
+                      <div
+                        key={suggestion.place_id}
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
+                      >
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-[#00b4b8] flex-shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">{suggestion.display_name}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
