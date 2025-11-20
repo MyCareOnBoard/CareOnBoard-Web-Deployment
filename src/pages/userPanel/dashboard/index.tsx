@@ -1,44 +1,39 @@
-import React, {useEffect, useState} from "react";
-import {useDispatch, useSelector} from "react-redux";
+import React, {useState, useCallback} from "react";
+import {useNavigate} from "react-router";
 import {Plus, X} from "lucide-react";
 import {Button} from "@/components/ui/button";
-import type {RootState} from "@/store/redux/store";
-import axiosClient from "@/lib/axios";
-import {UserProfileResponse} from "@/lib/api/users";
-import {setProfile} from "@/utils/auth";
 import {auth} from "@/lib/firebase";
 import {Toggle} from "@/components/ui/toggle";
 import {ChevronLeft, ChevronRight} from "lucide-react";
 import UserPanelDocumentUpload from "@/pages/userPanel/dashboard/components/uploadDocumentModal";
 import {AnimatePresence, motion} from "framer-motion";
+import {
+  useGetEmployeeDocumentsQuery,
+  useGetEmployeeInfoQuery,
+  useGetEmployeeTrainingsQuery,
+  useUpdateEmployeeInfoMutation
+} from "@/pages/userPanel/dashboard/api";
+import {userPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
+import {Routes} from "@/routes/constants";
 
-// Mock data for documents - replace with actual API call
-const mockDocuments = [
-  {id: 1, name: "Proof-Of-Driver's License, State ID, Passport)", status: "Available"},
-  {id: 2, name: "Social Security Card", status: "Available"},
-  {id: 3, name: "Hepatitis B vaccination series documents", status: "Available"},
-  {id: 4, name: "Hepatitis B immunity titer result)", status: "Available"},
-  {id: 5, name: "Tb test result", status: "Available"},
-  {id: 6, name: "I-9 form", status: "Expired"},
-  {id: 7, name: "W-4 Form", status: "Pending Soon"},
-];
-
-// Mock data for trainings - replace with actual API call
-const mockTrainings = [
-  {id: 1, name: "Training one", status: "New Training"},
-];
 
 export default function UserPanelDashboardPage() {
-  const [loading, setLoading] = useState(false);
-  const dispatch = useDispatch();
-  const [workAvailability, setWorkAvailability] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<boolean>(false);
   const [locationError, setLocationError] = useState<boolean>(false);
   const [loggedOut, setLoggedOut] = useState<boolean>(false);
   const [askLocationPerm, setAskLocationPerm] = useState<boolean>(false);
-  const [isDocumentUploadModalOpen, setIsDocumentUploadModalOpen] = useState(false);
-  const profile = useSelector((state: RootState) => state.auth?.profile);
+  const [isDocumentUploadModalOpen, setIsDocumentUploadModalOpen] = useState<boolean>(false);
+  const [workAvailability, setWorkAvailability] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 5;
+
+  const {data: employeeDocuments = []} = useGetEmployeeDocumentsQuery();
+  const {data: employeeInfo, isLoading} = useGetEmployeeInfoQuery();
+  const {data: trainings = []} = useGetEmployeeTrainingsQuery();
+  const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
+
+  const navigate = useNavigate();
 
   const currentUser = auth.currentUser;
 
@@ -47,6 +42,13 @@ export default function UserPanelDashboardPage() {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {day: "numeric", month: "long", year: "numeric"});
   };
+
+  const getDocument = useCallback((documentType: string) => {
+    return employeeDocuments?.find(doc => doc.documentType === documentType) || {
+      status: "",
+      fileUrl: ""
+    };
+  }, [employeeDocuments]);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -106,7 +108,22 @@ export default function UserPanelDashboardPage() {
     setTimeout(() => setAskLocationPerm(false), 3000);
   }
 
-  if (loading) {
+  const handleWorkAvailabilityChange = () => {
+    setWorkAvailability((prev) => !prev);
+    try {
+      updateEmployeeInfo({
+        workAvailability: !employeeInfo?.workAvailability
+      }).unwrap();
+    } catch (error) {
+      console.error("Error updating work availability:", error);
+    }
+  }
+
+  const goToProfile = () => {
+    navigate(Routes.userPanel.profile);
+  }
+
+  if (isLoading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
@@ -118,26 +135,10 @@ export default function UserPanelDashboardPage() {
     );
   }
 
-  const fetchProfile = async () => {
-    try {
-      const profile = await axiosClient.get<UserProfileResponse>("/users/profile");
-      if (profile.data.success || profile.data.user) {
-        dispatch(setProfile(profile.data.user))
-      }
-    } catch (error) {
-      console.error('[AuthContext] Error fetching user profile:', error)
-    }
+  const handleOpenDocument = (url: string | null) => {
+    if (!url) return;
+    window.open(url, "_blank");
   }
-
-  useEffect(() => {
-    fetchProfile()
-  }, []);
-
-  useEffect(() => {
-    if (profile) {
-      setLoading(false);
-    }
-  }, [profile]);
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -161,14 +162,14 @@ export default function UserPanelDashboardPage() {
                   <div>
                     <img
                       src={currentUser?.photoURL}
-                      alt={profile?.fullName}
+                      alt={employeeInfo?.fullName}
                       className="w-[180px] h-full rounded-[12px] object-cover"
                     />
                   </div>
                 ) : (
                   <div
                     className="w-[180px] h-full rounded-[12px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-6xl font-bold">
-                    {profile?.fullName?.charAt(0) || "U"}
+                    {employeeInfo?.fullName?.charAt(0) || "U"}
                   </div>
                 )}
               </div>
@@ -179,9 +180,9 @@ export default function UserPanelDashboardPage() {
               <div className={"flex justify-between items-center mb-6"}>
                 <div
                   className="bg-[#F0FAF4] border border-[#0EAF52] text-[#0EAF52] text-sm font-semibold px-2 py-1 rounded-full">
-                  ID-2223
+                  ID-{employeeInfo?.tagId}
                 </div>
-                <svg className={"cursor-pointer"} width="40" height="40" viewBox="0 0 40 40" fill="none"
+                <svg onClick={goToProfile} className={"cursor-pointer"} width="40" height="40" viewBox="0 0 40 40" fill="none"
                      xmlns="http://www.w3.org/2000/svg">
                   <rect width="40" height="40" rx="20" fill="white" fill-opacity="0.5"/>
                   <rect x="0.5" y="0.5" width="39" height="39" rx="19.5" stroke="white" stroke-opacity="0.3"/>
@@ -193,13 +194,16 @@ export default function UserPanelDashboardPage() {
               </div>
               <div className="space-y-2 mb-4">
                 <h2 className="text-[24px] font-bold text-[#10141a]">
-                  {profile?.fullName || "User Name"}
+                  {employeeInfo?.fullName || "User Name"}
                 </h2>
                 <p className="text-[14px] text-[#808081]">
-                  {profile?.role || "DSA"} • {profile?.dateOfBirth ? calculateAge(profile?.dateOfBirth) + ' yrs old' : ''}
+                  {employeeInfo?.role || "No role assigned"} • {employeeInfo?.dateOfBirth ? calculateAge(employeeInfo?.dateOfBirth) + ' yrs old' : ''}
                 </p>
                 <p className="text-[14px] text-[#808081]">
-                  Hiring Date: {formatDate(profile?.joiningDate)}
+                  {employeeInfo?.hireDate
+                    ? `Hiring Date: ${formatDate(employeeInfo?.hireDate)}`
+                    : ""
+                  }
                 </p>
               </div>
 
@@ -208,8 +212,8 @@ export default function UserPanelDashboardPage() {
                 <span className="text-[#808081]">Work Availability</span>
                 <Toggle
                   className={"h-8 w-14"}
-                  pressed={workAvailability}
-                  onPressedChange={() => setWorkAvailability((prev) => !prev)}
+                  pressed={isLoading ? workAvailability : employeeInfo?.workAvailability}
+                  onPressedChange={handleWorkAvailabilityChange}
                 />
               </div>
             </div>
@@ -229,37 +233,42 @@ export default function UserPanelDashboardPage() {
 
             {/* Training Items */}
             <div className="space-y-3">
-              {mockTrainings.map((training) => (
-                <div
-                  key={training.id}
-                  className="flex items-center justify-between p-3 rounded-[12px] border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={"/document-image.png"}
-                      alt={"document"}
-                      className="w-12 h-12 text-[#808081] scale-x-[-1]"
-                    />
-                    <span className="text-[14px] font-semibold text-[#10141a]">
-                      {training.name}
-                    </span>
-                  </div>
-                  <span
-                    className={`text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
-                      "assigned"
-                    )}`}
-                  >
-                    {"Take Training"}
-                  </span>
-                  <span
-                    className={`text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
-                      "assigned"
-                    )}`}
-                  >
-                    {"Assigned"}
-                  </span>
-                </div>
-              ))}
+              {trainings?.length > 0
+                ? (
+                  trainings.map((training) => (
+                    <div
+                      key={training.id}
+                      className="flex items-center justify-between p-3 rounded-[12px] border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={"/document-image.png"}
+                          alt={"document"}
+                          className="w-12 h-12 text-[#808081] scale-x-[-1]"
+                        />
+                        <span className="text-[14px] font-semibold text-[#10141a]">
+                          {training.name}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
+                          "assigned"
+                        )}`}
+                      >
+                        {"Take Training"}
+                      </span>
+                      <span
+                        className={`text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
+                          "assigned"
+                        )}`}
+                      >
+                        {"Assigned"}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-[14px] text-[#808081]">No trainings available</p>
+                )}
             </div>
           </div>
         </div>
@@ -285,11 +294,14 @@ export default function UserPanelDashboardPage() {
 
           {/* Documents List */}
           <div className="space-y-3">
-            {mockDocuments.map((document) => (
-              <div
-                key={document.id}
-                className="flex items-center justify-between p-4 rounded-[12px] border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
-              >
+            {userPanelDocumentTypes
+              .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+              .map((document) => (
+                <div
+                  key={document.value}
+                  onClick={() => handleOpenDocument(getDocument(document.value)?.fileUrl)}
+                  className="cursor-pointer flex items-center justify-between p-4 rounded-[12px] border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
+                >
                 <div className="flex items-center gap-3">
                   <img
                     src={"/document-image.png"}
@@ -297,30 +309,42 @@ export default function UserPanelDashboardPage() {
                     className="w-12 h-12 text-[#808081] scale-x-[-1]"
                   />
                   <span className="text-[14px] font-medium text-[#10141a]">
-                    {document.name}
+                    {document.label}
                   </span>
                 </div>
                 <span
-                  className={`text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
-                    document.status
+                  className={`capitalize text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
+                    getDocument(document.value)?.status || "pending"
                   )}`}
                 >
-                  {document.status}
+                  {getDocument(document.value)?.status || "Pending"}
                 </span>
               </div>
             ))}
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-center gap-2 mt-6">
-            <span className={"text-[18px]"}>1/<span className={"text-[#808081]"}>8</span></span>
-            <div className={"bg-white rounded-full p-2 cursor-pointer"}>
-              <ChevronLeft size={14}/>
+          {userPanelDocumentTypes.length > itemsPerPage && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <span className={"text-[18px]"}>
+                {currentPage}/<span className={"text-[#808081]"}>
+                  {Math.ceil(userPanelDocumentTypes.length / itemsPerPage)}
+                </span>
+              </span>
+              <div 
+                className={`rounded-full p-2 cursor-pointer ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'bg-white'}`}
+                onClick={() => currentPage > 1 && setCurrentPage(prev => prev - 1)}
+              >
+                <ChevronLeft size={14} className={currentPage === 1 ? 'text-gray-400' : ''}/>
+              </div>
+              <div 
+                className={`rounded-full p-2 cursor-pointer ${currentPage * itemsPerPage >= userPanelDocumentTypes.length ? 'opacity-50 cursor-not-allowed' : 'bg-white'}`}
+                onClick={() => currentPage * itemsPerPage < userPanelDocumentTypes.length && setCurrentPage(prev => prev + 1)}
+              >
+                <ChevronRight size={14} className={currentPage * itemsPerPage >= userPanelDocumentTypes.length ? 'text-gray-400' : ''}/>
+              </div>
             </div>
-            <div className={"bg-white rounded-full p-2 cursor-pointer"}>
-              <ChevronRight size={14}/>
-            </div>
-          </div>
+          )}
         </div>
       </div>
       <UserPanelDocumentUpload
@@ -328,9 +352,6 @@ export default function UserPanelDashboardPage() {
         setIsOpen={setIsDocumentUploadModalOpen}
         onComplete={handleDocumentUploaded}
         onError={handleDocumentUploadError}
-        onLocationError={handleLocationError}
-        onLoggedOut={handleLoggedOutError}
-        onAskLocationPerm={handleAskPermissionError}
       />
       <AnimatePresence>
         {error && (

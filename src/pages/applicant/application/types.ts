@@ -28,7 +28,7 @@ export type DocumentTypes = "resume"
   | "w4-form"
 
 export interface UploadDocumentPayload {
-  documentType: DocumentTypes;
+  documentType?: DocumentTypes;
   data: FormData;
 }
 
