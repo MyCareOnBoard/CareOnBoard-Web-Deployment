@@ -152,35 +152,35 @@ export const router = createBrowserRouter([
         Component: UserPanelMileage,
       },
       {
-        path: Routes.userPanel.notes,
+        path: Routes.userPanel.notes.index,
         Component: NotesPage,
       },
       {
-        path: "/user-panel/notes/community-based",
+        path: Routes.userPanel.notes.communityBased,
         Component: CommunityBasedPage,
       },
       {
-        path: "/user-panel/notes/community-inclusion",
+        path: Routes.userPanel.notes.communityInclusion,
         Component: CommunityInclusionPage,
       },
       {
-        path: "/user-panel/notes/day-habilitation",
+        path: Routes.userPanel.notes.dayHabilitation,
         Component: DayHabilitationPage,
       },
       {
-        path: "/user-panel/notes/prevocational-training",
+        path: Routes.userPanel.notes.preVocationalTraining,
         Component: PrevocationalTrainingPage,
       },
       {
-        path: "/user-panel/notes/respite-log",
+        path: Routes.userPanel.notes.respiteLog,
         Component: RespiteLogPage,
       },
       {
-        path: "/user-panel/notes/supported-employment-intervention",
+        path: Routes.userPanel.notes.supportedEmploymentIntervention,
         Component: SupportedEmploymentInterventionPage,
       },
       {
-        path: "/user-panel/notes/supported-employment-pre",
+        path: Routes.userPanel.notes.supportedEmploymentPre,
         Component: SupportedEmploymentPrePage,
       },
       {
