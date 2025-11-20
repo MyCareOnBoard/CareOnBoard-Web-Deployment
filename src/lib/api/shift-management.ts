@@ -78,7 +78,6 @@ export interface CreateShiftRequest {
     startTime: string;
     endTime?: string;
     status: ShiftStatus;
-    shiftId: string; // Reference ID like "TDHJ/3421"
     availableAt?: string;
     additionalStatus?: string;
     client?: Client;
