@@ -386,7 +386,7 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
   );
 }
 
-const FileNameCard = (
+export const FileNameCard = (
   {fileUploads, documentType}: {
     fileUploads: FileUploadedInfo[];
     documentType: DocumentTypes;

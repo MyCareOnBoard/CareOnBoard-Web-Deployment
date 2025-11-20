@@ -13,11 +13,13 @@ import storage from "redux-persist/lib/storage";
 import authReducer from "@/utils/auth/store/authSlice";
 import {applicationApi} from "@/pages/applicant/application/api";
 import {documentsApi} from "@/pages/applicant/documents/api";
+import {userPanelDashboardApi} from "@/pages/userPanel/dashboard/api";
 
 const rootReducer = combineReducers({
   auth: authReducer,
   [applicationApi.reducerPath]: applicationApi.reducer,
   [documentsApi.reducerPath]: documentsApi.reducer,
+  [userPanelDashboardApi.reducerPath]: userPanelDashboardApi.reducer,
 });
 
 const persistConfig = {
@@ -36,7 +38,9 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(applicationApi.middleware).concat(documentsApi.middleware),
+    }).concat(applicationApi.middleware)
+      .concat(documentsApi.middleware)
+      .concat(userPanelDashboardApi.middleware),
   devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
 
