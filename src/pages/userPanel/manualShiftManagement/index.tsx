@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
+import { ChevronDown, ChevronUp, ArrowLeft, MapPin } from "lucide-react";
 import TimesheetWeek from "./components/TimesheetWeek";
 import ConfirmShiftModal from "./components/ConfirmShiftModal";
 import SuccessModal from "./components/SuccessModal";
@@ -112,6 +112,7 @@ export default function ManualShiftManagementPage() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // Signature upload mutation
@@ -209,6 +210,85 @@ export default function ManualShiftManagementPage() {
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleGetLocation = async () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation Not Supported",
+        description: "Your browser doesn't support geolocation.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGettingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        try {
+          // Use Nominatim (OpenStreetMap) reverse geocoding
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          
+          if (!response.ok) {
+            throw new Error("Failed to fetch address");
+          }
+
+          const data = await response.json();
+          
+          // Format address from the response
+          const address = data.display_name || `${latitude}, ${longitude}`;
+          
+          setFormData((prev) => ({ ...prev, location: address }));
+          
+          toast({
+            title: "Location Retrieved",
+            description: "Your current location has been added.",
+          });
+        } catch (error) {
+          console.error("Failed to get address:", error);
+          // Fallback to coordinates if reverse geocoding fails
+          setFormData((prev) => ({ 
+            ...prev, 
+            location: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` 
+          }));
+          
+          toast({
+            title: "Location Retrieved",
+            description: "Location coordinates have been added.",
+          });
+        } finally {
+          setGettingLocation(false);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        setGettingLocation(false);
+        
+        let errorMessage = "Failed to get your location.";
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location permission denied. Please enable location access.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location information is unavailable.";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out.";
+            break;
+        }
+        
+        toast({
+          title: "Location Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+    );
   };
 
   const handleClientSignatureSave = (signatureData: {
@@ -490,11 +570,24 @@ export default function ManualShiftManagementPage() {
               <label className="block mb-2 text-sm font-medium text-[#10141a]">
                 Location
               </label>
-              <Input
-                value={formData.location}
-                onChange={(e) => handleInputChange("location", e.target.value)}
-                className="border-[#e5e5e6] rounded-md"
-              />
+              <div className="relative">
+                <Input
+                  value={formData.location}
+                  onChange={(e) => handleInputChange("location", e.target.value)}
+                  className="border-[#e5e5e6] rounded-md pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={handleGetLocation}
+                  disabled={gettingLocation}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Get current location"
+                >
+                  <MapPin 
+                    className={`w-5 h-5 text-[#00b4b8] cursor-pointer ${gettingLocation ? 'animate-pulse' : ''}`} 
+                  />
+                </button>
+              </div>
             </div>
           </div>
 
