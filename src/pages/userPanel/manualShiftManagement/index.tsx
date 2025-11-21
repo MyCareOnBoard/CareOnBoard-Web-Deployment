@@ -12,7 +12,7 @@ import type { RootState } from "@/store/redux/store";
 import { getUserProfile, UserProfile } from "@/lib/api/users";
 import { Routes } from "@/routes/constants";
 import DigitalSignatureModal from "@/pages/applicant/application/components/DigitalSignature";
-import { createShift, CreateShiftRequest, ShiftStatus } from "@/lib/api/shift-management";
+import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus } from "@/lib/api/shift-management";
 import { format, parse } from "date-fns";
 import { useSignDocumentMutation } from "@/pages/applicant/application/api";
 
@@ -87,6 +87,8 @@ function buildManualShiftRequests(
           startTime: dayData.checkIn,
           endTime: dayData.checkOut,
           status: ShiftStatus.COMPLETED,
+          type: ShiftType.MANUAL,
+          submissionStatus: SubmissionStatus.SUBMITTED,
           client: {
             id: `client-${uid}`,
             name: `${formData.clientFirstName} ${formData.clientLastName}`.trim(),
@@ -137,7 +139,7 @@ export default function ManualShiftManagementPage() {
   const [week2Expanded, setWeek2Expanded] = useState(false);
 
   const [week1Data, setWeek1Data] = useState<WeekData>({
-    Sunday: { date: "19 January", checkIn: "10:30 PM", checkOut: "10:30 PM" },
+    Sunday: { date: "", checkIn: "", checkOut: "" },
     Monday: { date: "", checkIn: "", checkOut: "" },
     Tuesday: { date: "", checkIn: "", checkOut: "" },
     Wednesday: { date: "", checkIn: "", checkOut: "" },

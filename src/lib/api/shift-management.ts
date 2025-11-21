@@ -32,6 +32,22 @@ export enum ShiftActionStatus {
 }
 
 /**
+ * Shift Type Enum
+ */
+export enum ShiftType {
+    AUTOMATIC = "automatic",
+    MANUAL = "manual",
+}
+
+/**
+ * Submission Status Enum
+ */
+export enum SubmissionStatus {
+    DRAFT = "draft",
+    SUBMITTED = "submitted",
+}
+
+/**
  * Client interface
  */
 export interface Client {
@@ -55,7 +71,8 @@ export interface Shift {
     clockedOutAt?: string;
     status: ShiftStatus;
     actionStatus?: ShiftActionStatus;
-    shiftId: string; // e.g., "TDHJ/3421"
+    type?: ShiftType; // Default: automatic
+    submissionStatus?: SubmissionStatus; // Default: draft
     timeRemaining?: number; // minutes remaining
     sessionDuration?: string; // e.g., "2 hour session"
     additionalStatus?: string; // e.g., "Expiring Soon", "Starts tomorrow"
@@ -81,6 +98,8 @@ export interface CreateShiftRequest {
     availableAt?: string;
     additionalStatus?: string;
     client?: Client;
+    type?: ShiftType; // Default: automatic
+    submissionStatus?: SubmissionStatus; // Default: draft
 }
 
 /**
@@ -99,6 +118,8 @@ export interface UpdateShiftRequest {
     sessionDuration?: string;
     clockedInAt?: string;
     clockedOutAt?: string;
+    type?: ShiftType;
+    submissionStatus?: SubmissionStatus;
 }
 
 /**
@@ -106,6 +127,10 @@ export interface UpdateShiftRequest {
  */
 export interface ClockInRequest {
     clockedInAt?: string; // Optional, uses current time if not provided
+}
+
+export interface ShiftStartedRequest {
+    [key: string]: any; // Optional data for shift started
 }
 
 export interface ClockOutRequest {
@@ -331,6 +356,33 @@ export const clockIn = async (
 };
 
 /**
+ * Mark shift as started
+ * Updates shift status to indicate work has begun
+ * @param shiftId - The ID of the shift to start
+ * @param agencyId - Optional agency ID to pass as query parameter
+ * @param data - Optional shift started data
+ * @returns Promise with updated shift response
+ */
+export const shiftStarted = async (
+    shiftId: string,
+    agencyId?: string,
+    data: ShiftStartedRequest = {}
+): Promise<ShiftResponse> => {
+    try {
+        const url = agencyId
+            ? `${SHIFT_BASE}/${shiftId}/shift-started?agencyId=${agencyId}`
+            : `${SHIFT_BASE}/${shiftId}/shift-started`;
+
+        const response = await axiosClient.post<ShiftResponse>(url, data);
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to mark shift as started:', error);
+        throw error;
+    }
+};
+
+/**
  * Clock out from a shift
  * Changes status from 'ongoing' to 'completed'
  * Automatically calculates session duration
@@ -381,23 +433,41 @@ export const updateShiftStatus = async (
 // ==================== Helper Functions ====================
 
 /**
- * Helper function to get today's shifts
+ * Helper function to get today's nearest shift
  * @param agencyId - Optional agency ID to filter by
- * @returns Promise with today's shifts
+ * @returns Promise with today's shifts (converted to array format)
  */
-export const getTodayShifts = async (agencyId?: string): Promise<ListShiftsResponse> => {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    return listShifts({ date: today, agencyId });
+export const getTodayShifts = async (agencyId?: string): Promise<ShiftResponse> => {
+    try {
+        const response = await axiosClient.get<ShiftResponse>(
+            `${SHIFT_BASE}/today`,
+            { params: { agencyId } }
+        );
+
+        return response.data
+    } catch (error) {
+        console.error('Failed to fetch today\'s shifts:', error);
+        throw error;
+    }
 };
 
 /**
- * Helper function to get available shifts
- * @param limit - Optional limit on number of results
+ * Helper function to get all upcoming available shifts
+ * @param limit - Optional limit on number of results (default: 20)
  * @param agencyId - Optional agency ID to filter by
  * @returns Promise with available shifts
  */
-export const getAvailableShifts = async (limit?: number, agencyId?: string): Promise<ListShiftsResponse> => {
-    return listShifts({ status: ShiftStatus.AVAILABLE, limit, agencyId });
+export const getAvailableShifts = async (limit: number = 20, agencyId?: string): Promise<ListShiftsResponse> => {
+    try {
+        const response = await axiosClient.get<ListShiftsResponse>(
+            `${SHIFT_BASE}/upcoming`,
+            { params: { agencyId, limit } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch upcoming shifts:', error);
+        throw error;
+    }
 };
 
 /**
@@ -417,6 +487,25 @@ export const getOngoingShifts = async (agencyId?: string): Promise<ListShiftsRes
  */
 export const getCompletedShifts = async (limit?: number, agencyId?: string): Promise<ListShiftsResponse> => {
     return listShifts({ status: ShiftStatus.COMPLETED, limit, agencyId });
+};
+
+/**
+ * Helper function to get previous shifts (completed/expired)
+ * @param limit - Optional limit on number of results (default: 30)
+ * @param agencyId - Optional agency ID to filter by
+ * @returns Promise with previous shifts
+ */
+export const getPreviousShifts = async (limit: number = 30, agencyId?: string): Promise<ListShiftsResponse> => {
+    try {
+        const response = await axiosClient.get<ListShiftsResponse>(
+            `${SHIFT_BASE}/previous`,
+            { params: { agencyId, limit } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch previous shifts:', error);
+        throw error;
+    }
 };
 
 /**

@@ -24,7 +24,7 @@ const navItems: NavItem[] = [
   {label: "Shift Management", path: Routes.userPanel.shiftManagement, icon: ExchangeIcon},
   {label: "Clients & Services", path: Routes.userPanel.clientsAndServices, icon: ShareKnowledgeIcon},
   {label: "Plan of Care", path: Routes.userPanel.planOfCare, icon: ServiceIcon},
-  {label: "Notes", path: Routes.userPanel.notes, icon: NoteIcon},
+  {label: "Notes", path: Routes.userPanel.notes.index, icon: NoteIcon},
   {label: "Mileage", path: Routes.userPanel.mileage, icon: UserRoadsideIcon},
   {label: "Expenses", path: Routes.userPanel.expenses, icon: InvoiceIcon},
   {

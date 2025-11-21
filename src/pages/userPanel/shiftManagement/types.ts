@@ -12,6 +12,16 @@ export enum ShiftActionStatus {
   CLOCK_OUT = "clock_out",
 }
 
+export enum ShiftType {
+  AUTOMATIC = "automatic",
+  MANUAL = "manual",
+}
+
+export enum SubmissionStatus {
+  DRAFT = "draft",
+  SUBMITTED = "submitted",
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -30,7 +40,8 @@ export interface Shift {
   clockedOutAt?: string;
   status: ShiftStatus;
   actionStatus?: ShiftActionStatus;
-  shiftId: string; // e.g., "TDHJ/3421"
+  type?: ShiftType; // Default: automatic
+  submissionStatus?: SubmissionStatus; // Default: draft
   timeRemaining?: number; // minutes remaining
   sessionDuration?: string; // e.g., "2 hour session"
   additionalStatus?: string; // e.g., "Expiring Soon", "Starts tomorrow"
