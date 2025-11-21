@@ -1,12 +1,14 @@
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 interface ClockOutModalProps {
   isOpen: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  isLoading?: boolean;
 }
 
-export function ClockOutModal({ isOpen, onConfirm, onCancel }: ClockOutModalProps) {
+export function ClockOutModal({ isOpen, onConfirm, onCancel, isLoading = false }: ClockOutModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -37,15 +39,18 @@ export function ClockOutModal({ isOpen, onConfirm, onCancel }: ClockOutModalProp
               {/* Yes Button */}
               <Button
                 onClick={onConfirm}
-                className="w-full bg-[#d53411] hover:bg-[#b82d0f] text-white rounded-full px-4 py-4 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200"
+                disabled={isLoading}
+                className="w-full bg-[#d53411] hover:bg-[#b82d0f] text-white rounded-full px-4 py-4 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
+                {isLoading && <Loader2 size={16} className="animate-spin" />}
                 Yes
               </Button>
 
               {/* No Button */}
               <Button
                 onClick={onCancel}
-                className="w-full bg-[#b2b2b3] hover:bg-[#9a9a9b] text-white rounded-full px-4 py-4 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200"
+                disabled={isLoading}
+                className="w-full bg-[#b2b2b3] hover:bg-[#9a9a9b] text-white rounded-full px-4 py-4 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 No
               </Button>

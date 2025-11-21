@@ -32,6 +32,22 @@ export enum ShiftActionStatus {
 }
 
 /**
+ * Shift Type Enum
+ */
+export enum ShiftType {
+    AUTOMATIC = "automatic",
+    MANUAL = "manual",
+}
+
+/**
+ * Submission Status Enum
+ */
+export enum SubmissionStatus {
+    DRAFT = "draft",
+    SUBMITTED = "submitted",
+}
+
+/**
  * Client interface
  */
 export interface Client {
@@ -55,7 +71,8 @@ export interface Shift {
     clockedOutAt?: string;
     status: ShiftStatus;
     actionStatus?: ShiftActionStatus;
-    shiftId: string; // e.g., "TDHJ/3421"
+    type?: ShiftType; // Default: automatic
+    submissionStatus?: SubmissionStatus; // Default: draft
     timeRemaining?: number; // minutes remaining
     sessionDuration?: string; // e.g., "2 hour session"
     additionalStatus?: string; // e.g., "Expiring Soon", "Starts tomorrow"
@@ -81,6 +98,8 @@ export interface CreateShiftRequest {
     availableAt?: string;
     additionalStatus?: string;
     client?: Client;
+    type?: ShiftType; // Default: automatic
+    submissionStatus?: SubmissionStatus; // Default: draft
 }
 
 /**
@@ -99,6 +118,8 @@ export interface UpdateShiftRequest {
     sessionDuration?: string;
     clockedInAt?: string;
     clockedOutAt?: string;
+    type?: ShiftType;
+    submissionStatus?: SubmissionStatus;
 }
 
 /**
@@ -387,7 +408,7 @@ export const updateShiftStatus = async (
  */
 export const getTodayShifts = async (agencyId?: string): Promise<ListShiftsResponse> => {
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    return listShifts({ date: today, agencyId });
+    return listShifts({ date: today, status: ShiftStatus.AVAILABLE, agencyId });
 };
 
 /**
