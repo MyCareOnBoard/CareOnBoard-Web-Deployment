@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronDown, ChevronUp, ArrowLeft, MapPin } from "lucide-react";
+import { ChevronDown, ChevronUp, ArrowLeft, MapPin, Save, Send, Loader2 } from "lucide-react";
 import TimesheetWeek from "./components/TimesheetWeek";
 import ConfirmShiftModal from "./components/ConfirmShiftModal";
 import SuccessModal from "./components/SuccessModal";
@@ -12,9 +12,9 @@ import type { RootState } from "@/store/redux/store";
 import { getUserProfile, UserProfile } from "@/lib/api/users";
 import { Routes } from "@/routes/constants";
 import DigitalSignatureModal from "@/pages/applicant/application/components/DigitalSignature";
-import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus } from "@/lib/api/shift-management";
+import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift } from "@/lib/api/shift-management";
 import { format, parse } from "date-fns";
-import { useSignDocumentMutation } from "@/pages/applicant/application/api";
+import { useSignDocumentMutation, useCheckSignatureStatusQuery } from "@/pages/applicant/application/api";
 
 interface FormData {
   yourFirstName: string;
@@ -78,7 +78,7 @@ function buildManualShiftRequests(
           ? `Signed: Client(${clientSignature.signatureType}), User(${userSignature.signatureType})`
           : "Manual entry";
 
-        // Create shift request
+        // Create shift request (status and submissionStatus will be set by caller)
         const request: CreateShiftRequest = {
           uid,
           agencyId,
@@ -86,9 +86,9 @@ function buildManualShiftRequests(
           location: formData.location,
           startTime: dayData.checkIn,
           endTime: dayData.checkOut,
-          status: ShiftStatus.COMPLETED,
+          status: ShiftStatus.PENDING, // Default to PENDING, will be overridden by caller
           type: ShiftType.MANUAL,
-          submissionStatus: SubmissionStatus.SUBMITTED,
+          submissionStatus: SubmissionStatus.DRAFT, // Default to DRAFT, will be overridden by caller
           client: {
             id: `client-${uid}`,
             name: `${formData.clientFirstName} ${formData.clientLastName}`.trim(),
@@ -114,6 +114,7 @@ export default function ManualShiftManagementPage() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [locationSuggestions, setLocationSuggestions] = useState<Array<{ display_name: string; place_id: string }>>([]);
@@ -125,6 +126,14 @@ export default function ManualShiftManagementPage() {
 
   // Signature upload mutation
   const [signDocument] = useSignDocumentMutation();
+
+  // Fetch existing signatures
+  const { data: clientSignatureData } = useCheckSignatureStatusQuery("manual-timesheet-client", {
+    skip: !user?.uid,
+  });
+  const { data: userSignatureData } = useCheckSignatureStatusQuery("manual-timesheet-user", {
+    skip: !user?.uid,
+  });
 
   const [formData, setFormData] = useState<FormData>({
     yourFirstName: "",
@@ -233,6 +242,106 @@ export default function ManualShiftManagementPage() {
 
     fetchUserProfile();
   }, [user]);
+
+  // Load saved draft shifts
+  useEffect(() => {
+    const loadDraftShifts = async () => {
+      if (!user?.uid) return;
+
+      try {
+        // Fetch manual draft shifts
+        const response = await listShifts({
+          agencyId: user.uid,
+          type: ShiftType.MANUAL,
+          submissionStatus: SubmissionStatus.DRAFT,
+          limit: 100,
+        });
+
+        // Filter for manual shifts with draft submission status
+        const draftShifts = response.shifts.filter(
+          (shift) => shift.type === ShiftType.MANUAL && shift.submissionStatus === SubmissionStatus.DRAFT
+        );
+
+        if (draftShifts.length === 0) return;
+
+        // Parse drafts back into form structure
+        const firstShift = draftShifts[0];
+        
+        // Extract client name from first shift
+        if (firstShift.client?.name) {
+          const nameParts = firstShift.client.name.split(" ");
+          const clientFirstName = nameParts[0] || "";
+          const clientLastName = nameParts.slice(1).join(" ") || "";
+          
+          setFormData((prev) => ({
+            ...prev,
+            clientFirstName,
+            clientLastName,
+            location: firstShift.location || prev.location,
+          }));
+        }
+
+        // Group shifts by week and day
+        const newWeek1Data = { ...week1Data };
+        const newWeek2Data = { ...week2Data };
+        
+        draftShifts.forEach((shift) => {
+          // Parse the additionalStatus to determine week number
+          const weekMatch = shift.additionalStatus?.match(/Week (\d+) (\w+)/);
+          if (!weekMatch) return;
+
+          const weekNum = parseInt(weekMatch[1]);
+          const dayName = weekMatch[2];
+
+          // Parse date to display format (e.g., "19 January")
+          const shiftDate = new Date(shift.date);
+          const displayDate = format(shiftDate, "d MMMM");
+
+          const dayData = {
+            date: displayDate,
+            checkIn: shift.startTime || "",
+            checkOut: shift.endTime || "",
+          };
+
+          // Update appropriate week data
+          if (weekNum === 1 && dayName in newWeek1Data) {
+            newWeek1Data[dayName as keyof WeekData] = dayData;
+          } else if (weekNum === 2 && dayName in newWeek2Data) {
+            newWeek2Data[dayName as keyof WeekData] = dayData;
+          }
+        });
+
+        setWeek1Data(newWeek1Data);
+        setWeek2Data(newWeek2Data);
+      } catch (error) {
+        console.error("❌ Failed to load draft shifts:", error);
+        // Silent fail - don't show error toast as this is optional functionality
+      }
+    };
+
+    loadDraftShifts();
+  }, [user?.uid]); // Only run when user changes
+
+  // Load existing signatures if available
+  useEffect(() => {
+    if (clientSignatureData?.success && clientSignatureData?.data) {
+      const { signatureType, signatureData } = clientSignatureData.data;
+      setClientSignature({
+        signatureType,
+        signatureData,
+      });
+    }
+  }, [clientSignatureData]);
+
+  useEffect(() => {
+    if (userSignatureData?.success && userSignatureData?.data) {
+      const { signatureType, signatureData } = userSignatureData.data;
+      setUserSignature({
+        signatureType,
+        signatureData,
+      });
+    }
+  }, [userSignatureData]);
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -393,6 +502,201 @@ export default function ManualShiftManagementPage() {
     });
   };
 
+  const handleSave = async () => {
+    if (!user?.uid) {
+      toast({
+        title: "Authentication Error",
+        description: "User not authenticated. Please log in and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate client information
+    if (!formData.clientFirstName || !formData.clientLastName || !formData.location) {
+      toast({
+        title: "Client Information Required",
+        description: "Please fill in client name and location before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.location.length < 3) {
+      toast({
+        title: "Location Required",
+        description: "Please enter a valid location before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate that at least one shift entry exists
+    const hasShiftData = [...Object.values(week1Data), ...Object.values(week2Data)].some(
+      (day) => day.date && day.checkIn && day.checkOut
+    );
+
+    if (!hasShiftData) {
+      toast({
+        title: "No Timesheet Entries",
+        description: "Please add at least one timesheet entry before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      // Step 0: Upload signatures if they exist (optional for drafts)
+      try {
+        if (clientSignature) {
+          await signDocument({
+            context: "manual-timesheet-client",
+            data: clientSignature,
+          }).unwrap();
+          console.log("✅ Uploaded client signature");
+        }
+
+        if (userSignature) {
+          await signDocument({
+            context: "manual-timesheet-user",
+            data: userSignature,
+          }).unwrap();
+          console.log("✅ Uploaded user signature");
+        }
+      } catch (signatureError: any) {
+        console.warn("⚠️ Failed to upload signatures during save (continuing anyway):", signatureError);
+        // Don't block saving if signature upload fails - signatures are optional for drafts
+      }
+
+      // Step 1: Fetch existing draft shifts
+      const existingDraftsResponse = await listShifts({
+        agencyId: user.uid,
+        limit: 100,
+      });
+
+      const existingDrafts = existingDraftsResponse.shifts.filter(
+        (shift) => shift.type === ShiftType.MANUAL && shift.submissionStatus === SubmissionStatus.DRAFT
+      );
+
+      console.log(`📄 Found ${existingDrafts.length} existing draft(s)`);
+
+      // Step 2: Build shift requests as drafts (no signatures required)
+      const shiftRequests = buildManualShiftRequests(
+        formData,
+        week1Data,
+        week2Data,
+        user.uid,
+        user.uid,
+        clientSignature,
+        userSignature
+      );
+
+      // Step 3: Override submission status to DRAFT and set clocked times
+      const draftRequests = shiftRequests.map(request => ({
+        ...request,
+        submissionStatus: SubmissionStatus.DRAFT,
+        status: ShiftStatus.PENDING, // Use PENDING for drafts instead of COMPLETED
+        type: ShiftType.MANUAL, // Ensure type is set to manual
+        clockedInAt: request.startTime, // Set clockedInAt from startTime
+        clockedOutAt: request.endTime, // Set clockedOutAt from endTime
+      }));
+
+      if (draftRequests.length === 0) {
+        toast({
+          title: "No Valid Entries",
+          description: "No valid timesheet entries found to save.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Step 4: Update existing or create new shifts
+      const savePromises = draftRequests.map(async (request) => {
+        // Try to find an existing draft for the same date
+        const existingShift = existingDrafts.find(
+          (draft) => draft.date === request.date
+        );
+
+        if (existingShift) {
+          // Update existing shift
+          console.log(`✏️ Updating existing shift for ${request.date}`);
+          return updateShift(existingShift.id, {
+            location: request.location,
+            startTime: request.startTime,
+            endTime: request.endTime,
+            clockedInAt: request.clockedInAt,
+            clockedOutAt: request.clockedOutAt,
+            additionalStatus: request.additionalStatus,
+            status: request.status,
+            submissionStatus: request.submissionStatus,
+            type: request.type,
+          });
+        } else {
+          // Create new shift
+          console.log(`➕ Creating new shift for ${request.date}`);
+          return createShift(request);
+        }
+      });
+
+      // Step 5: Delete drafts that are no longer in the form
+      const requestDates = new Set(draftRequests.map(r => r.date));
+      const shiftsToDelete = existingDrafts.filter(
+        (draft) => !requestDates.has(draft.date)
+      );
+
+      const deletePromises = shiftsToDelete.map((shift) => {
+        console.log(`🗑️ Deleting removed draft for ${shift.date}`);
+        return deleteShift(shift.id);
+      });
+
+      // Step 6: Execute all save and delete operations
+      const [saveResults, deleteResults] = await Promise.all([
+        Promise.allSettled(savePromises),
+        Promise.allSettled(deletePromises),
+      ]);
+
+      // Combine results
+      const results = [...saveResults, ...deleteResults];
+
+      // Check for failures
+      const failures = results.filter((r) => r.status === "rejected");
+      const successes = results.filter((r) => r.status === "fulfilled");
+
+      if (failures.length > 0) {
+        console.error("Failed to save some shifts:", failures);
+        toast({
+          title: "Partial Save",
+          description: `Saved timesheet entries as drafts.`,
+          variant: failures.length === results.length ? "destructive" : "success",
+        });
+      }
+
+      if (successes.length > 0) {
+        const hasSignatures = clientSignature || userSignature;
+        const signaturesText = hasSignatures 
+          ? " Signatures have been uploaded." 
+          : " You can add signatures later before submitting.";
+        
+        toast({
+          title: "Draft Saved",
+          description: `Successfully saved timesheet entry(ies) as draft.`,
+          variant: "success",
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to save draft timesheet:", error);
+      toast({
+        title: "Save Failed",
+        description: error?.response?.data?.error || "Failed to save draft. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSubmit = () => {
     // Validate signatures
     if (!clientSignature || !userSignature) {
@@ -443,7 +747,6 @@ export default function ManualShiftManagementPage() {
 
     try {
       setSubmitting(true);
-      setConfirmModalOpen(false);
 
       // Step 1: Upload signatures to backend
       try {
@@ -462,11 +765,13 @@ export default function ManualShiftManagementPage() {
         }
       } catch (signatureError: any) {
         console.error("Failed to upload signatures:", signatureError);
+        setConfirmModalOpen(false);
         toast({
           title: "Signature Upload Failed",
           description: "Failed to upload signatures. Please try again.",
           variant: "destructive",
         });
+        setSubmitting(false);
         return;
       }
 
@@ -482,17 +787,29 @@ export default function ManualShiftManagementPage() {
       );
 
       if (shiftRequests.length === 0) {
+        setConfirmModalOpen(false);
         toast({
           title: "No Valid Entries",
           description: "No valid timesheet entries found to submit.",
           variant: "destructive",
         });
+        setSubmitting(false);
         return;
       }
 
-      // Step 3: Submit all shifts in parallel
+      // Step 3: Set status to COMPLETED and add clockedInAt/clockedOutAt for submission
+      const finalShiftRequests = shiftRequests.map(request => ({
+        ...request,
+        status: ShiftStatus.COMPLETED, // Set to COMPLETED only on submit
+        submissionStatus: SubmissionStatus.SUBMITTED, // Set to SUBMITTED only on submit
+        clockedInAt: request.startTime, // Set clockedInAt from startTime
+        clockedOutAt: request.endTime, // Set clockedOutAt from endTime
+        type: ShiftType.MANUAL, // Ensure type is set to manual
+      }));
+
+      // Step 4: Submit all shifts in parallel
       const results = await Promise.allSettled(
-        shiftRequests.map((request) => createShift(request))
+        finalShiftRequests.map((request) => createShift(request))
       );
 
       // Check for failures
@@ -509,7 +826,8 @@ export default function ManualShiftManagementPage() {
       }
 
       if (successes.length > 0) {
-        // Show success modal
+        // Close confirmation modal and show success modal
+        setConfirmModalOpen(false);
         setSuccessModalOpen(true);
 
         toast({
@@ -524,6 +842,7 @@ export default function ManualShiftManagementPage() {
       }
     } catch (error: any) {
       console.error("Failed to submit manual timesheet:", error);
+      setConfirmModalOpen(false);
       toast({
         title: "Submission Failed",
         description: error?.response?.data?.error || "Failed to submit timesheet. Please try again.",
@@ -711,15 +1030,17 @@ export default function ManualShiftManagementPage() {
               <Button
                 onClick={() => setWeek1Expanded(!week1Expanded)}
                 variant="ghost"
-                className="bg-[#B2B2B3] hover:bg-[#808081] text-white"
+                className="backdrop-blur-[22px] bg-[rgba(178,178,179,0.1)] hover:bg-[rgba(178,178,179,0.2)] text-[#808081] rounded-[60px] px-4 py-2 h-auto font-normal text-xs transition-all"
               >
                 {week1Expanded ? (
                   <>
-                    Collapse <ChevronUp className="w-4 h-4 ml-2 text-white" />
+                    <ChevronUp className="w-[18px] h-[18px] mr-2 text-[#808081]" />
+                    Collapse
                   </>
                 ) : (
                   <>
-                    Expand <ChevronDown className="w-4 h-4 ml-2 text-white" />
+                    <ChevronDown className="w-[18px] h-[18px] mr-2 text-[#808081]" />
+                    Expand
                   </>
                 )}
               </Button>
@@ -748,15 +1069,17 @@ export default function ManualShiftManagementPage() {
               <Button
                 onClick={() => setWeek2Expanded(!week2Expanded)}
                 variant="ghost"
-                className="bg-[#B2B2B3] hover:bg-[#808081] text-white"
+                className="backdrop-blur-[22px] bg-[rgba(178,178,179,0.1)] hover:bg-[rgba(178,178,179,0.2)] text-[#808081] rounded-[60px] px-4 py-2 h-auto font-normal text-xs transition-all"
               >
                 {week2Expanded ? (
                   <>
-                    Collapse <ChevronUp className="w-4 h-4 ml-2 text-white" />
+                    <ChevronUp className="w-[18px] h-[18px] mr-2 text-[#808081]" />
+                    Collapse
                   </>
                 ) : (
                   <>
-                    Expand <ChevronDown className="w-4 h-4 ml-2 text-white" />
+                    <ChevronDown className="w-[18px] h-[18px] mr-2 text-[#808081]" />
+                    Expand
                   </>
                 )}
               </Button>
@@ -833,19 +1156,30 @@ export default function ManualShiftManagementPage() {
           </div>
 
           {/* Submit Buttons */}
-          <div className="flex items-center gap-4 mt-8">
+          <div className="flex items-center justify-end gap-4 mt-8">
             <Button
+              onClick={handleSave}
               variant="outline"
-              className="bg-[#d1d5db] hover:bg-[#9ca3af] text-[#4b5563] rounded-full px-8 py-3 h-auto font-semibold border-0"
-              disabled={submitting}
+              className="bg-[#d1d5db] hover:bg-[#9ca3af] text-[#4b5563] rounded-full px-8 py-3 h-auto font-semibold border-0 flex items-center gap-2"
+              disabled={saving || submitting}
             >
-              Save
+              {saving ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Save className="w-5 h-5" />
+              )}
+              {saving ? "Saving..." : "Save"}
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting}
-              className="bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-8 py-3 h-auto font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={saving || submitting}
+              className="bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-8 py-3 h-auto font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
+              {submitting ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
               {submitting ? "Submitting..." : "Submit"}
             </Button>
           </div>
@@ -873,6 +1207,7 @@ export default function ManualShiftManagementPage() {
         open={confirmModalOpen}
         onOpenChange={setConfirmModalOpen}
         onConfirm={handleConfirmSubmit}
+        loading={submitting}
       />
 
       <SuccessModal
