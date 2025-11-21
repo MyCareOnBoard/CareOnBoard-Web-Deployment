@@ -106,24 +106,24 @@ const calculateTimeUntilStart = (startTime: string, date: string): string => {
     const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
     
     if (diffInMinutes <= 0) {
-      return 'Available now';
+      return 'Starting now';
     }
     
     const hours = Math.floor(diffInMinutes / 60);
     const minutes = diffInMinutes % 60;
     
     if (hours === 0) {
-      return `Available in ${minutes}min`;
+      return `Starts in ${minutes}min`;
     }
     
     if (minutes === 0) {
-      return `Available in ${hours}h`;
+      return `Starts in ${hours}h`;
     }
     
-    return `Available in ${hours}h ${minutes}min`;
+    return `Starts in ${hours}h ${minutes}min`;
   } catch (error) {
     console.error('Error calculating time until start:', error);
-    return 'Available soon';
+    return 'Starting soon';
   }
 };
 
@@ -214,7 +214,10 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
           {/* Time */}
           <div className="flex flex-col gap-0.5">
             <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">
-              {shift.clockedInAt ? "Started at" : "Available at"}
+              {shift.clockedInAt 
+                ? (panel === 'previous' ? "Clocked In" : "Started at")
+                : "Available at"
+              }
             </p>
             <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">
               {shift.clockedInAt 
@@ -238,15 +241,15 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
           <div className="grid grid-cols-3 gap-2 text-sm">
             {shift.clockedInAt && (
               <div className="flex flex-col gap-0.5">
-                <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Clock In</p>
-                <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.clockedInAt}</p>
+                <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked In</p>
+                <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{format(new Date(shift.clockedInAt), 'hh:mm a')}</p>
               </div>
             )}
 
             {shift.clockedOutAt && (
               <div className="flex flex-col gap-0.5">
-                <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Clock Out</p>
-                <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.clockedOutAt}</p>
+                <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked Out</p>
+                <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{format(new Date(shift.clockedOutAt), 'hh:mm a')}</p>
               </div>
             )}
           </div>
@@ -278,7 +281,7 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
 
           {panel === 'upcoming' && (
             <>
-              {shift.status === ShiftStatus.PENDING && shift.startTime && (
+              {shift.startTime && (
                 <span className="bg-[rgba(14,175,82,0.05)] border-[#0eaf52] border-[0.5px] border-solid text-[#0eaf52] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
                   {calculateTimeUntilStart(shift.startTime, shift.date)}
                 </span>
@@ -336,6 +339,15 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
 
           {/* Info Grid */}
           <div className="flex flex-wrap gap-x-16 gap-y-2">
+            {panel === 'previous' && (
+              <div className="flex flex-col flex-shrink-0 gap-1">
+                <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Date</p>
+                <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">
+                  {format(new Date(shift.date), "dd MMMM")}
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col flex-shrink-0 gap-1">
               <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
               <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.location}</p>
@@ -344,7 +356,10 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
             {shift.startTime && (
               <div className="flex flex-col flex-shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">
-                  {shift.clockedInAt ? "Started at" : "Available at"}
+                  {shift.clockedInAt 
+                    ? (panel === 'previous' ? "Clocked In" : "Started at")
+                    : "Available at"
+                  }
                 </p>
                 <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">
                   {shift.clockedInAt 
@@ -360,7 +375,7 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
             {shift.clockedInAt && !shift.startTime && (
               <div className="flex flex-col flex-shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">
-                  {shift.clockedOutAt ? "Clocked In" : "Started at"}
+                  {panel === 'previous' ? "Clocked In" : (shift.clockedOutAt ? "Clocked In" : "Started at")}
                 </p>
                 <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{format(new Date(shift.clockedInAt), 'hh:mm a')}</p>
               </div>
@@ -401,7 +416,7 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
 
           {panel === 'upcoming' && (
             <>
-              {shift.status === ShiftStatus.PENDING && shift.startTime && (
+              {shift.startTime && (
                 <span className="bg-[rgba(14,175,82,0.05)] border-[#0eaf52] border-[0.5px] border-solid text-[#0eaf52] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
                   {calculateTimeUntilStart(shift.startTime, shift.date)}
                 </span>
@@ -947,6 +962,7 @@ export default function ShiftManagementPage() {
               isExpanded={upcomingExpanded}
               onExpandToggle={() => setUpcomingExpanded(!upcomingExpanded)}
               showDate
+              showAction={false}
               isLoading={shiftsLoading}
             />
           )}
