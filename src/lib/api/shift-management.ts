@@ -94,6 +94,8 @@ export interface CreateShiftRequest {
     location: string;
     startTime: string;
     endTime?: string;
+    clockedInAt?: string;
+    clockedOutAt?: string;
     status: ShiftStatus;
     availableAt?: string;
     additionalStatus?: string;
@@ -151,6 +153,8 @@ export interface UpdateShiftStatusRequest {
  */
 export interface ListShiftsParams {
     status?: ShiftStatus;
+    type?: ShiftType;
+    submissionStatus?: SubmissionStatus;
     date?: string; // Format: YYYY-MM-DD
     limit?: number; // 1-100, default: 50
     agencyId?: string; // Filter by agency ID

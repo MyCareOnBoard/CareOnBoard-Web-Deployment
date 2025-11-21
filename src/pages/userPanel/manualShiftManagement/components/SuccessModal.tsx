@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router";
 import {
   Dialog,
   DialogContent,
@@ -6,8 +5,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CheckCircle2 } from "lucide-react";
-import { Routes } from "@/routes/constants";
-import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
 
 interface SuccessModalProps {
   open: boolean;
@@ -18,19 +16,6 @@ export default function SuccessModal({
   open,
   onOpenChange,
 }: SuccessModalProps) {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (open) {
-      const timer = setTimeout(() => {
-        onOpenChange(false);
-        navigate(Routes.userPanel.dashboard);
-      }, 2000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [open, onOpenChange, navigate]);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-8 bg-white shadow-xl sm:max-w-md rounded-3xl">
@@ -42,11 +27,18 @@ export default function SuccessModal({
           </div>
           
           <DialogTitle className="text-2xl font-bold text-[#10141a] mb-3">
-            Signed Successfully
+            Timesheet Submitted Successfully
           </DialogTitle>
-          <DialogDescription className="text-sm text-[#808081]">
-            Your signature has been recorded. Care on Board ensures you that this signature won't be used for any other reasons in the future.
+          <DialogDescription className="text-sm text-[#808081] mb-6">
+            Your bi-weekly timesheet has been submitted with signatures. You can now review your submitted timesheets or create a new one.
           </DialogDescription>
+
+          <Button
+            onClick={() => onOpenChange(false)}
+            className="w-full bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full py-3 h-auto font-medium text-base"
+          >
+            Close
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
