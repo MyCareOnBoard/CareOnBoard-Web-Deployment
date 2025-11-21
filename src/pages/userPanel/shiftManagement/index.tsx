@@ -8,12 +8,13 @@ import { ClockOutModal } from "./ClockOutModal";
 import ExpandIcon from "@/assets/icons/arrow-expand-01.svg?react";
 import { Routes } from "@/routes/constants";
 import {
-  listShifts,
   getTodayShifts,
   clockIn as apiClockIn,
   clockOut as apiClockOut,
   updateShiftStatus,
   seedShifts,
+  getAvailableShifts,
+  getPreviousShifts,
 } from "@/lib/api/shift-management";
 import { toast } from "sonner";
 import { useAuth } from "@/utils/auth/context/AuthContext";
@@ -66,6 +67,35 @@ const calculateRemainingMinutes = (clockedInAt: string, endTime: string, date: s
   } catch (error) {
     console.error('Error calculating remaining minutes:', error);
     return 0;
+  }
+};
+
+const calculateTimeUntilStart = (startTime: string, date: string): string => {
+  try {
+    const now = new Date();
+    const startDateTime = convertTimeToISODate(startTime, date);
+    const diffInMs = startDateTime.getTime() - now.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    
+    if (diffInMinutes <= 0) {
+      return 'Available now';
+    }
+    
+    const hours = Math.floor(diffInMinutes / 60);
+    const minutes = diffInMinutes % 60;
+    
+    if (hours === 0) {
+      return `Available in ${minutes}min`;
+    }
+    
+    if (minutes === 0) {
+      return `Available in ${hours}h`;
+    }
+    
+    return `Available in ${hours}h ${minutes}min`;
+  } catch (error) {
+    console.error('Error calculating time until start:', error);
+    return 'Available soon';
   }
 };
 
@@ -203,7 +233,13 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick, 
             </span>
           )}
 
-          {shift.additionalStatus && !(shift.actionStatus === ShiftActionStatus.SHIFT_STARTED || shift.actionStatus === ShiftActionStatus.CLOCK_OUT) && (
+          {shift.status === ShiftStatus.PENDING && shift.startTime && (
+            <span className="bg-[rgba(14,175,82,0.05)] border-[#0eaf52] border-[0.5px] border-solid text-[#0eaf52] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
+              {calculateTimeUntilStart(shift.startTime, shift.date)}
+            </span>
+          )}
+
+          {shift.additionalStatus && !(shift.actionStatus === ShiftActionStatus.SHIFT_STARTED || shift.actionStatus === ShiftActionStatus.CLOCK_OUT) && shift.status !== ShiftStatus.PENDING && (
             <span
               className={`text-[11px] font-semibold py-1 px-2 rounded-[60px] border-solid leading-normal text-center whitespace-nowrap ${getStatusColor(shift.additionalStatus)}`}
             >
@@ -245,7 +281,7 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick, 
 
           {/* Info Grid */}
           <div className="flex flex-wrap gap-x-16 gap-y-2">
-            {showDate && (
+            {shift.clockedInAt && (
               <div className="flex flex-col flex-shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Date</p>
                 <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">
@@ -265,7 +301,7 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick, 
                   {shift.clockedInAt ? "Started at" : "Available at"}
                 </p>
                 <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">
-                  {shift.clockedInAt || shift.availableAt}
+                  {shift.clockedInAt || format(new Date(shift.availableAt), 'dd MMMM yyyy hh:mm a')}
                 </p>
               </div>
             )}
@@ -275,14 +311,14 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick, 
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">
                   {shift.clockedOutAt ? "Clocked In" : "Started at"}
                 </p>
-                <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.clockedInAt}</p>
+                <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{format(new Date(shift.clockedInAt), 'hh:mm a')}</p>
               </div>
             )}
 
             {shift.clockedOutAt && (
               <div className="flex flex-col flex-shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked Out</p>
-                <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.clockedOutAt}</p>
+                <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{format(new Date(shift.clockedOutAt), 'hh:mm a')}</p>
               </div>
             )}
           </div>
@@ -303,7 +339,13 @@ function ShiftCard({ shift, showDate = false, showAction = true, onActionClick, 
             </span>
           )}
 
-          {shift.additionalStatus && !(shift.actionStatus === ShiftActionStatus.SHIFT_STARTED || shift.actionStatus === ShiftActionStatus.CLOCK_OUT) && (
+          {shift.status === ShiftStatus.PENDING && shift.startTime && (
+            <span className="bg-[rgba(14,175,82,0.05)] border-[#0eaf52] border-[0.5px] border-solid text-[#0eaf52] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
+              {calculateTimeUntilStart(shift.startTime, shift.date)}
+            </span>
+          )}
+
+          {shift.additionalStatus && !(shift.actionStatus === ShiftActionStatus.SHIFT_STARTED || shift.actionStatus === ShiftActionStatus.CLOCK_OUT) && shift.status !== ShiftStatus.PENDING && (
             <span
               className={`text-[12px] font-semibold py-1 px-2 rounded-[60px] border-solid leading-normal text-center whitespace-nowrap ${getStatusColor(shift.additionalStatus)}`}
             >
@@ -492,6 +534,10 @@ export default function ShiftManagementPage() {
           return shift;
         })
       );
+
+      setUpcomingShifts((prevShifts) =>
+        prevShifts.map((shift) => ({ ...shift }))
+      );
     }, 60000);
 
     return () => clearInterval(interval);
@@ -556,11 +602,7 @@ export default function ShiftManagementPage() {
     const loadUpcomingShifts = async () => {
       try {
         setUpcomingLoading(true);
-        const upcomingResponse = await listShifts({ 
-          status: ShiftStatus.PENDING,
-          limit: 50,
-          agencyId 
-        });
+        const upcomingResponse = await getAvailableShifts(undefined, agencyId);
         if (upcomingResponse.success) {
           setUpcomingShifts(upcomingResponse.shifts);
         }
@@ -577,13 +619,9 @@ export default function ShiftManagementPage() {
     const loadPreviousShifts = async () => {
       try {
         setPreviousLoading(true);
-        const completedResponse = await listShifts({ 
-          status: ShiftStatus.COMPLETED,
-          limit: 50,
-          agencyId 
-        });
-        if (completedResponse.success) {
-          setPreviousShifts(completedResponse.shifts);
+        const previousResponse = await getPreviousShifts(30, agencyId);
+        if (previousResponse.success) {
+          setPreviousShifts(previousResponse.shifts);
         }
       } catch (error: any) {
         console.error('Failed to load previous shifts:', error);

@@ -402,23 +402,45 @@ export const updateShiftStatus = async (
 // ==================== Helper Functions ====================
 
 /**
- * Helper function to get today's shifts
+ * Helper function to get today's nearest shift
  * @param agencyId - Optional agency ID to filter by
- * @returns Promise with today's shifts
+ * @returns Promise with today's shifts (converted to array format)
  */
 export const getTodayShifts = async (agencyId?: string): Promise<ListShiftsResponse> => {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    return listShifts({ date: today, status: ShiftStatus.AVAILABLE, agencyId });
+    try {
+        const response = await axiosClient.get<ShiftResponse>(
+            `${SHIFT_BASE}/today`,
+            { params: { agencyId } }
+        );
+
+        return {
+            success: response.data.success,
+            count: response.data.shift ? 1 : 0,
+            shifts: response.data.shift ? [response.data.shift] : []
+        };
+    } catch (error) {
+        console.error('Failed to fetch today\'s shifts:', error);
+        throw error;
+    }
 };
 
 /**
- * Helper function to get available shifts
- * @param limit - Optional limit on number of results
+ * Helper function to get all upcoming available shifts
+ * @param limit - Optional limit on number of results (default: 20)
  * @param agencyId - Optional agency ID to filter by
  * @returns Promise with available shifts
  */
-export const getAvailableShifts = async (limit?: number, agencyId?: string): Promise<ListShiftsResponse> => {
-    return listShifts({ status: ShiftStatus.AVAILABLE, limit, agencyId });
+export const getAvailableShifts = async (limit: number = 20, agencyId?: string): Promise<ListShiftsResponse> => {
+    try {
+        const response = await axiosClient.get<ListShiftsResponse>(
+            `${SHIFT_BASE}/upcoming`,
+            { params: { agencyId, limit } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch upcoming shifts:', error);
+        throw error;
+    }
 };
 
 /**
@@ -438,6 +460,25 @@ export const getOngoingShifts = async (agencyId?: string): Promise<ListShiftsRes
  */
 export const getCompletedShifts = async (limit?: number, agencyId?: string): Promise<ListShiftsResponse> => {
     return listShifts({ status: ShiftStatus.COMPLETED, limit, agencyId });
+};
+
+/**
+ * Helper function to get previous shifts (completed/expired)
+ * @param limit - Optional limit on number of results (default: 30)
+ * @param agencyId - Optional agency ID to filter by
+ * @returns Promise with previous shifts
+ */
+export const getPreviousShifts = async (limit: number = 30, agencyId?: string): Promise<ListShiftsResponse> => {
+    try {
+        const response = await axiosClient.get<ListShiftsResponse>(
+            `${SHIFT_BASE}/previous`,
+            { params: { agencyId, limit } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch previous shifts:', error);
+        throw error;
+    }
 };
 
 /**
