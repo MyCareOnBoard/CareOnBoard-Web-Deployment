@@ -129,6 +129,10 @@ export interface ClockInRequest {
     clockedInAt?: string; // Optional, uses current time if not provided
 }
 
+export interface ShiftStartedRequest {
+    [key: string]: any; // Optional data for shift started
+}
+
 export interface ClockOutRequest {
     clockedOutAt?: string; // Optional, uses current time if not provided
     sessionDuration?: string; // Optional, auto-calculated if not provided
@@ -352,6 +356,33 @@ export const clockIn = async (
 };
 
 /**
+ * Mark shift as started
+ * Updates shift status to indicate work has begun
+ * @param shiftId - The ID of the shift to start
+ * @param agencyId - Optional agency ID to pass as query parameter
+ * @param data - Optional shift started data
+ * @returns Promise with updated shift response
+ */
+export const shiftStarted = async (
+    shiftId: string,
+    agencyId?: string,
+    data: ShiftStartedRequest = {}
+): Promise<ShiftResponse> => {
+    try {
+        const url = agencyId
+            ? `${SHIFT_BASE}/${shiftId}/shift-started?agencyId=${agencyId}`
+            : `${SHIFT_BASE}/${shiftId}/shift-started`;
+
+        const response = await axiosClient.post<ShiftResponse>(url, data);
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to mark shift as started:', error);
+        throw error;
+    }
+};
+
+/**
  * Clock out from a shift
  * Changes status from 'ongoing' to 'completed'
  * Automatically calculates session duration
@@ -406,18 +437,14 @@ export const updateShiftStatus = async (
  * @param agencyId - Optional agency ID to filter by
  * @returns Promise with today's shifts (converted to array format)
  */
-export const getTodayShifts = async (agencyId?: string): Promise<ListShiftsResponse> => {
+export const getTodayShifts = async (agencyId?: string): Promise<ShiftResponse> => {
     try {
         const response = await axiosClient.get<ShiftResponse>(
             `${SHIFT_BASE}/today`,
             { params: { agencyId } }
         );
 
-        return {
-            success: response.data.success,
-            count: response.data.shift ? 1 : 0,
-            shifts: response.data.shift ? [response.data.shift] : []
-        };
+        return response.data
     } catch (error) {
         console.error('Failed to fetch today\'s shifts:', error);
         throw error;
