@@ -36,6 +36,15 @@ export const userPanelNotesApi = createApi({
         data
       }),
       invalidatesTags: ['SingleActivityLog']
+    }),
+    submitActivityLogNotes: builder.mutation<void, { activityLog: string, logNoteIds: string[] }>({
+      query: ({activityLog, logNoteIds}) => ({
+        url: `/employees/employee/activity-logs/${activityLog}/notes/submit`,
+        method: "POST",
+        requiresAuth: true,
+        data: { logNoteIds }
+      }),
+      invalidatesTags: ['SingleActivityLog']
     })
   }),
 });
@@ -43,5 +52,6 @@ export const userPanelNotesApi = createApi({
 export const {
   useGetAllActivityLogsQuery,
   useGetSingleActivityLogQuery,
-  useCreateOrUpdateActivityLogMutation
+  useCreateOrUpdateActivityLogMutation,
+  useSubmitActivityLogNotesMutation
 } = userPanelNotesApi;
