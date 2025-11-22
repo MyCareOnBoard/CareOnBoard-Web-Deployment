@@ -12,7 +12,14 @@ import {Button} from "@/components/ui/button";
 import {Routes} from "@/routes/constants";
 import {ArrowLeft} from "lucide-react";
 import {useLocation, useNavigate} from "react-router";
-import {useCreateOrUpdateActivityLogMutation, useGetSingleActivityLogQuery} from "@/pages/userPanel/notes/api";
+import {
+  useCreateOrUpdateActivityLogMutation,
+  useGetSingleActivityLogQuery,
+  useSubmitActivityLogNotesMutation
+} from "@/pages/userPanel/notes/api";
+import {useSelector} from "react-redux";
+import {RootState} from "@/store/redux/store";
+import {toast} from "sonner";
 
 type ActivityRow = {
   id: string;
@@ -54,16 +61,17 @@ const initialActivities = [
 ]
 
 export default function CommunityBasedPage() {
-  const [completedBy, setCompletedBy] = useState("");
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
 
   const navigate = useNavigate();
+  const profile = useSelector((store: RootState) => store?.auth?.profile);
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
 
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId
   });
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
+  const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
 
   const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
 
@@ -109,50 +117,68 @@ export default function CommunityBasedPage() {
   const updateActivity = async (
     id: string,
     index: number,
-    field: keyof ActivityRow, value: any,
+    field: keyof ActivityRow,
+    value: any,
   ) => {
-    let activity;
-    if (id) {
-      activity = activities.find(activity => activity.id === id);
-    } else {
-      activity = activities[index];
-    }
-    const date = activity?.date;
-    const startTime = field === "startTime" ? value : activity?.startTime;
-    const endTime = field === "endTime" ? value : activity?.endTime;
-
     setActivities(prevActivities => {
-      const updatedActivities = prevActivities.map((act, activityIndex) => {
+      return prevActivities.map((act, activityIndex) => {
         if ((id && act.id === id) || (index === activityIndex)) {
           return {...act, [field]: value};
         } else {
           return act;
         }
       });
-
-      if (date && startTime && endTime) {
-        const updatedActivity = updatedActivities.find((act, activityIndex) =>
-          (id && act.id === id) || (index === activityIndex)
-        );
-
-        if (updatedActivity) {
-          debouncedMutateNote({
-            activityLog: activityLogId!,
-            data: {
-              id: id,
-              startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
-              endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
-              metadata: {
-                activity: updatedActivity.activity,
-                description: updatedActivity.description,
-              }
-            }
-          });
-        }
-      }
-
-      return updatedActivities;
     });
+
+    const currentActivities = activities;
+
+    let activity;
+    if (id) {
+      activity = currentActivities.find(activity => activity.id === id);
+    } else {
+      activity = currentActivities[index];
+    }
+
+    if (!activity) return;
+
+    const newActivity = {
+      ...activity,
+      [field]: value
+    };
+
+    const date = newActivity.date;
+    const startTime = field === "startTime" ? value : newActivity.startTime;
+    const endTime = field === "endTime" ? value : newActivity.endTime;
+
+    console.log(date, startTime, endTime, id)
+
+    if (date && startTime && endTime && id !== "") {
+      mutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
+          endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
+          metadata: {
+            activity: newActivity.activity,
+            description: newActivity.description,
+          }
+        }
+      }).unwrap();
+    } else if (date && startTime && endTime && id === "") {
+      debouncedMutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
+          endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
+          metadata: {
+            activity: newActivity.activity,
+            description: newActivity.description,
+          }
+        }
+      });
+    }
   }
 
   const formatDisplayDate = (date: Date | undefined) => {
@@ -168,8 +194,28 @@ export default function CommunityBasedPage() {
     ));
   };
 
+  const handleSubmit = async () => {
+    try {
+      const errors = activities.filter((activity) => !activity.id);
+      if (errors.length > 0) {
+        toast.error(`Please fill in all required fields for these dates ${errors.map(activity => activity.date).toString()}`);
+        return;
+      }
+      await submitNotes({
+        activityLog: activityLogId!,
+        logNoteIds: activities.map((activity) => activity.id)
+      }).unwrap();
+      setActivities(initialActivities);
+      toast.success('Note submitted successfully!');
+    } catch (error: any) {
+      console.error('Error submitting activity log:', error);
+      toast.error(error?.data?.message || 'Failed to submit activity log.');
+    }
+  }
+
   useEffect(() => {
     if (!isLoading && activityLog && activityLog.notes.length > 0) {
+      console.log(activityLog);
       const modifyActivityNotes = activityLog.notes.map((note) => ({
         id: note.id,
         date: note.startDate?.split("T")?.[0] ? new Date(note.startDate?.split("T")?.[0]) : undefined,
@@ -192,7 +238,7 @@ export default function CommunityBasedPage() {
         ...initialActivities.slice(modifyActivityNotes.length)
       ]);
     }
-  }, [isLoading]);
+  }, [isLoading, activityLog]);
 
   if (isLoading) {
     return (
@@ -404,6 +450,9 @@ export default function CommunityBasedPage() {
                             endMonth={new Date()}
                             selected={activity.date}
                             defaultMonth={activity.date ?? new Date()}
+                            disabled={{
+                              after: new Date()
+                            }}
                             onSelect={async (date) => {
                               if (date) {
                                 await updateActivity(activity.id, index, 'date', date);
@@ -470,9 +519,9 @@ export default function CommunityBasedPage() {
           </label>
           <Input
             type="text"
-            value={completedBy}
-            onChange={(e) => setCompletedBy(e.target.value)}
+            value={profile?.fullName || ""}
             placeholder=""
+            disabled={true}
             className="max-w-md"
           />
           <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">
@@ -481,10 +530,12 @@ export default function CommunityBasedPage() {
         </div>
         <div className={"flex justify-end mt-3"}>
           <Button
-            type={"submit"}
+            type={"button"}
+            onClick={handleSubmit}
+            disabled={isSubmitting}
             className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
           >
-            Submit
+            {isSubmitting ? "Submitting..." : "Submit"}
           </Button>
         </div>
 
