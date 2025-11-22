@@ -45,6 +45,15 @@ export const userPanelNotesApi = createApi({
         data: { logNoteIds }
       }),
       invalidatesTags: ['SingleActivityLog']
+    }),
+    seedActivityLogs: builder.mutation<void, Record<string, any>[]>({
+      query: (data) => ({
+        url: `/employees/employee/activity-logs/seed`,
+        method: "POST",
+        requiresAuth: true,
+        data
+      }),
+      invalidatesTags: ['ActivityLogs']
     })
   }),
 });
@@ -53,5 +62,6 @@ export const {
   useGetAllActivityLogsQuery,
   useGetSingleActivityLogQuery,
   useCreateOrUpdateActivityLogMutation,
-  useSubmitActivityLogNotesMutation
+  useSubmitActivityLogNotesMutation,
+  useSeedActivityLogsMutation
 } = userPanelNotesApi;
