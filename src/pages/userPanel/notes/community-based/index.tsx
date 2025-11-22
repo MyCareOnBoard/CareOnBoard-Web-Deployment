@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Checkbox} from "@/components/ui/checkbox";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
@@ -20,6 +20,7 @@ import {
 import {useSelector} from "react-redux";
 import {RootState} from "@/store/redux/store";
 import {toast} from "sonner";
+import {useDebounce} from "@/hooks/useDebounce";
 
 type ActivityRow = {
   id: string;
@@ -36,19 +37,6 @@ type ServiceStrategy = {
   checked: boolean;
 };
 
-const useDebounce = (callback: Function, delay: number) => {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  return useCallback((...args: any[]) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
-    timeoutRef.current = setTimeout(() => {
-      callback(...args);
-    }, delay);
-  }, [callback, delay]);
-};
 
 const initialActivities = [
   {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
