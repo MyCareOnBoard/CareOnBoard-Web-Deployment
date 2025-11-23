@@ -138,7 +138,7 @@ export default function CommunityBasedPage() {
     const startTime = field === "startTime" ? value : newActivity.startTime;
     const endTime = field === "endTime" ? value : newActivity.endTime;
 
-    if (date && startTime && endTime && id !== "") {
+    if (date && startTime && endTime && id === "") {
       await mutateNote({
         activityLog: activityLogId!,
         data: {
@@ -151,7 +151,7 @@ export default function CommunityBasedPage() {
           }
         }
       }).unwrap();
-    } else if (date && startTime && endTime && id === "") {
+    } else if (date && startTime && endTime && id !== "") {
       debouncedMutateNote({
         activityLog: activityLogId!,
         data: {
@@ -201,28 +201,38 @@ export default function CommunityBasedPage() {
 
   useEffect(() => {
     if (!isLoading && activityLog && activityLog.notes.length > 0) {
-      console.log(activityLog);
-      const modifyActivityNotes = activityLog.notes.map((note) => ({
-        id: note.id,
-        date: note.startDate?.split("T")?.[0] ? new Date(note.startDate?.split("T")?.[0]) : undefined,
-        startTime: note.startDate ? new Date(note.startDate).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        }) : "",
-        endTime: note.endDate ? new Date(note.endDate).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        }) : "",
-        activity: note.metadata?.activity,
-        description: note.metadata?.description,
-      }));
-      console.log(modifyActivityNotes);
-      setActivities([
-        ...modifyActivityNotes,
-        ...initialActivities.slice(modifyActivityNotes.length)
-      ]);
+      if (activities.some((activity) => activity.id)) {
+        const newActivities = activities.map((activity, index) => {
+          if (!activity.id) {
+            if (activityLog.notes.length > index) {
+              activity.id = activityLog.notes[index].id;
+            }
+          }
+          return activity;
+        });
+        setActivities(newActivities);
+      } else {
+        const modifyActivityNotes = activityLog.notes.map((note) => ({
+          id: note.id,
+          date: note.startDate?.split("T")?.[0] ? new Date(note.startDate?.split("T")?.[0]) : undefined,
+          startTime: note.startDate ? new Date(note.startDate).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }) : "",
+          endTime: note.endDate ? new Date(note.endDate).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }) : "",
+          activity: note.metadata?.activity,
+          description: note.metadata?.description,
+        }));
+        setActivities([
+          ...modifyActivityNotes,
+          ...initialActivities.slice(modifyActivityNotes.length)
+        ]);
+      }
     }
   }, [isLoading, activityLog]);
 

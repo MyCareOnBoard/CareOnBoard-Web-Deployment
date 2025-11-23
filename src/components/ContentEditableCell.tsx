@@ -63,7 +63,7 @@ const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
         ref={contentRef}
         contentEditable
         suppressContentEditableWarning
-        onKeyDown={handleInput}
+        onInput={handleInput}
         className={`w-full min-h-[71px] border-0 bg-transparent text-center focus:outline-none text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] py-6 ${className}`}
         data-placeholder={placeholder}
       />

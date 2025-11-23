@@ -162,19 +162,31 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
 
   useEffect(() => {
     if (!isLoading && activityLog && activityLog.notes.length > 0) {
-      const modifyActivityNotes = activityLog.notes.map((note) => ({
-        id: note.id,
-        date: note.startDate ? new Date(note.startDate) : undefined,
-        units: note.metadata?.units,
-        strategies: note.metadata?.strategies,
-        activities: note.metadata?.activities,
-        location: note.metadata?.location,
-        notes: note.metadata?.notes,
-      }));
-      setActivities([
-        ...modifyActivityNotes,
-        ...initialActivities.slice(modifyActivityNotes.length)
-      ]);
+      if (activities.some((activity) => activity.id)) {
+        const newActivities = activities.map((activity, index) => {
+          if (!activity.id) {
+            if (activityLog.notes.length > index) {
+              activity.id = activityLog.notes[index].id;
+            }
+          }
+          return activity;
+        });
+        setActivities(newActivities);
+      } else {
+        const modifyActivityNotes = activityLog.notes.map((note) => ({
+          id: note.id,
+          date: note.startDate ? new Date(note.startDate) : undefined,
+          units: note.metadata?.units,
+          strategies: note.metadata?.strategies,
+          activities: note.metadata?.activities,
+          location: note.metadata?.location,
+          notes: note.metadata?.notes,
+        }));
+        setActivities([
+          ...modifyActivityNotes,
+          ...initialActivities.slice(modifyActivityNotes.length)
+        ]);
+      }
     }
   }, [isLoading, activityLog]);
 

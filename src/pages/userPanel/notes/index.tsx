@@ -170,6 +170,31 @@ export default function NotesPage() {
         "serviceCode": "TDHJ/3424",
         "toileting": "Test"
       }
+    },
+    {
+      "activityType": "supported-employment-pre",
+      "description": "",
+      "metadata": {
+        "individual": "Andrews Doe",
+        "serviceCode": "TDHJ/3424",
+        "totalHours": "4",
+        "reportingStartDate": "2025-11-20",
+        "reportingEndDate": "2025-11-30"
+      }
+    },
+    {
+      "activityType": "supported-employment-intervention",
+      "description": "",
+      "metadata": {
+        "individual": "Andrews Doe",
+        "employer": "Downtown Inc",
+        "jobType": "Menial Work",
+        "ISPOutcome": "All good",
+        "serviceCode": "TDHJ/3426",
+        "totalHours": "4",
+        "reportingStartDate": "2025-11-20",
+        "reportingEndDate": "2025-11-30"
+      }
     }
   ]
 
@@ -201,18 +226,20 @@ export default function NotesPage() {
           Notes
         </h1>
         <div className={"flex items-center space-x-4"}>
-          <Button
-            onClick={handleSeedData}
-            disabled={seedingData}
-            className="bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {seedingData ? (
-              <Loader2 size={20} className="animate-spin"/>
-            ) : (
-              <Database size={20}/>
-            )}
-            {seedingData ? 'Creating...' : 'Seed Data'}
-          </Button>
+          {(noteTypes?.length === 0 && !isLoading) && (
+            <Button
+              onClick={handleSeedData}
+              disabled={seedingData}
+              className="bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {seedingData ? (
+                <Loader2 size={20} className="animate-spin"/>
+              ) : (
+                <Database size={20}/>
+              )}
+              {seedingData ? 'Creating...' : 'Seed Data'}
+            </Button>
+          )}
           <p className="text-[20px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
             Total Mileage : 0KM
           </p>
