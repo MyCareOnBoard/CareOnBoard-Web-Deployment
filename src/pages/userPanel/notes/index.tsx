@@ -161,6 +161,15 @@ export default function NotesPage() {
         "individual": "Andrews Doe",
         "serviceCode": "TDHJ/3424"
       }
+    },
+    {
+      "activityType": "respite-log",
+      "description": "",
+      "metadata": {
+        "individual": "Andrews Doe",
+        "serviceCode": "TDHJ/3424",
+        "toileting": "Test"
+      }
     }
   ]
 

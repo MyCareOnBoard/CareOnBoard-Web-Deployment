@@ -28,7 +28,7 @@ export const userPanelNotesApi = createApi({
       }),
       providesTags: ['SingleActivityLog']
     }),
-    createOrUpdateActivityLog: builder.mutation<void, { activityLog: string, data: CreateActivityLogPayload }>({
+    createOrUpdateActivityLog: builder.mutation<{ data: GetActivityLogResponse }, { activityLog: string, data: CreateActivityLogPayload }>({
       query: ({activityLog, data}) => ({
         url: `/employees/employee/activity-logs/${activityLog}/notes`,
         method: "PUT",
