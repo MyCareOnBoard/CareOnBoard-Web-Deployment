@@ -226,7 +226,7 @@ export default function NotesPage() {
           Notes
         </h1>
         <div className={"flex items-center space-x-4"}>
-          {(noteTypes?.length === 0 && !isLoading) && (
+          {(notes?.length === 0 && !isLoading) && (
             <Button
               onClick={handleSeedData}
               disabled={seedingData}
