@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Checkbox} from "@/components/ui/checkbox";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
@@ -20,6 +20,7 @@ import {
 import {useSelector} from "react-redux";
 import {RootState} from "@/store/redux/store";
 import {toast} from "sonner";
+import {useDebounce} from "@/hooks/useDebounce";
 
 type ActivityRow = {
   id: string;
@@ -36,19 +37,6 @@ type ServiceStrategy = {
   checked: boolean;
 };
 
-const useDebounce = (callback: Function, delay: number) => {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  return useCallback((...args: any[]) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
-    timeoutRef.current = setTimeout(() => {
-      callback(...args);
-    }, delay);
-  }, [callback, delay]);
-};
 
 const initialActivities = [
   {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
@@ -106,8 +94,8 @@ export default function CommunityBasedPage() {
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
 
   const debouncedMutateNote = useDebounce(
-    (params: any) => {
-      mutateNote(params).unwrap().catch(error => {
+    async (params: any) => {
+      await mutateNote(params).unwrap().catch(error => {
         console.error('Failed to update activity:', error);
       });
     },
@@ -150,10 +138,8 @@ export default function CommunityBasedPage() {
     const startTime = field === "startTime" ? value : newActivity.startTime;
     const endTime = field === "endTime" ? value : newActivity.endTime;
 
-    console.log(date, startTime, endTime, id)
-
     if (date && startTime && endTime && id !== "") {
-      mutateNote({
+      await mutateNote({
         activityLog: activityLogId!,
         data: {
           id: id,
