@@ -10,6 +10,7 @@ interface VoiceEnabledTextareaProps {
   placeholder?: string;
   fieldName?: string;
   pageTitle?: string;
+  disabled?: boolean;
 }
 
 const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
@@ -19,6 +20,7 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
   placeholder = "",
   fieldName,
   pageTitle,
+  disabled = false
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const { startRecording } = useVoiceRecording();
@@ -48,6 +50,7 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
         onChange={(e) => onChange(e.target.value)}
         className={className}
         placeholder={placeholder}
+        disabled={disabled}
       />
       {isHovered && (
         <button

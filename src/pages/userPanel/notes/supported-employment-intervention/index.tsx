@@ -1,20 +1,29 @@
-import React, { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import React, {useEffect, useState} from "react";
+import {Input} from "@/components/ui/input";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
+import {Calendar} from "@/components/ui/calendar";
+import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group";
 import CalendarDaysIcon from "@/assets/icons/calendar-days.svg?react";
 import InformationCircleIcon from "@/assets/icons/information-circle.svg?react";
-import { format } from "date-fns";
+import {format} from "date-fns";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import ContentEditableCell from "@/components/ContentEditableCell";
 import TimePicker from "@/components/TimePicker";
-import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
+import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Button} from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import {ArrowLeft} from "lucide-react";
 import {Routes} from "@/routes/constants";
-import {useNavigate} from "react-router";
+import {useLocation, useNavigate} from "react-router";
+import {
+  useCreateOrUpdateActivityLogMutation,
+  useGetSingleActivityLogQuery,
+  useSubmitActivityLogNotesMutation
+} from "@/pages/userPanel/notes/api";
+import {useDebounce} from "@/hooks/useDebounce";
+import {useSelector} from "react-redux";
+import {RootState} from "@/store/redux/store";
+import {toast} from "sonner";
 
 type InterventionRow = {
   id: string;
@@ -25,56 +34,224 @@ type InterventionRow = {
 
 type ServiceRow = {
   id: string;
-  datesOfSeServices: {date: Date | undefined; seProfessional: string};
-  noOfHours: {start: string; end: string; total: string};
+  datesOfSeServices: { date: Date | undefined; seProfessional: string };
+  noOfHours: { start: string; end: string; total: string };
   servicesProvided: string;
   EmployeeProgress: string;
 };
 
+const initialServices = [
+  {
+    id: "",
+    datesOfSeServices: {date: undefined, seProfessional: ""},
+    noOfHours: {start: "", end: "", total: ""},
+    servicesProvided: "",
+    EmployeeProgress: ""
+  },
+  {
+    id: "",
+    datesOfSeServices: {date: undefined, seProfessional: ""},
+    noOfHours: {start: "", end: "", total: ""},
+    servicesProvided: "",
+    EmployeeProgress: ""
+  },
+  {
+    id: "",
+    datesOfSeServices: {date: undefined, seProfessional: ""},
+    noOfHours: {start: "", end: "", total: ""},
+    servicesProvided: "",
+    EmployeeProgress: ""
+  },
+  {
+    id: "",
+    datesOfSeServices: {date: undefined, seProfessional: ""},
+    noOfHours: {start: "", end: "", total: ""},
+    servicesProvided: "",
+    EmployeeProgress: ""
+  },
+];
+const initialInterventions = [
+  {id: "", training: "", employerVision: "", achievementPlan: ""},
+  {id: "", training: "", employerVision: "", achievementPlan: ""},
+  {id: "", training: "", employerVision: "", achievementPlan: ""},
+  {id: "", training: "", employerVision: "", achievementPlan: ""},
+  {id: "", training: "", employerVision: "", achievementPlan: ""},
+  {id: "", training: "", employerVision: "", achievementPlan: ""},
+  {id: "", training: "", employerVision: "", achievementPlan: ""},
+]
+
 export default function SupportedEmploymentInterventionPage() {
   const pageTitle = "Supported Employment Services – Intervention Plan and Service Log";
-  
-  const [individualName, setIndividualName] = useState("");
-  const [employer, setEmployer] = useState("");
-  const [typeOfJob, setTypeOfJob] = useState("");
-  const [applicableOutcomes, setApplicableOutcomes] = useState("");
-  const [totalHours, setTotalHours] = useState("");
+
   const [reportingStartDate, setReportingStartDate] = useState<Date | undefined>(undefined);
   const [reportingEndDate, setReportingEndDate] = useState<Date | undefined>(undefined);
-  const [completedBy, setCompletedBy] = useState("");
   const [isStartDateOpen, setIsStartDateOpen] = useState(false);
   const [isEndDateOpen, setIsEndDateOpen] = useState(false);
   const [openServiceDateId, setOpenServiceDateId] = useState<string | null>(null);
+  const profile = useSelector((store: RootState) => store?.auth?.profile);
 
   const navigate = useNavigate();
-  
-  const [interventions, setInterventions] = useState<InterventionRow[]>([
-    { id: "1", training: "", employerVision: "", achievementPlan: "" },
-    { id: "2", training: "", employerVision: "", achievementPlan: "" },
-    { id: "3", training: "", employerVision: "", achievementPlan: "" },
-    { id: "4", training: "", employerVision: "", achievementPlan: "" },
-    { id: "5", training: "", employerVision: "", achievementPlan: "" },
-    { id: "6", training: "", employerVision: "", achievementPlan: "" },
-    { id: "7", training: "", employerVision: "", achievementPlan: "" },
-  ]);
 
-  const [services, setServices] = useState<ServiceRow[]>([
-    { id: "1", datesOfSeServices: {date: undefined, seProfessional: ""}, noOfHours: {start: "", end: "", total: ""}, servicesProvided: "", EmployeeProgress: ""  },
-    { id: "2", datesOfSeServices: {date: undefined, seProfessional: ""}, noOfHours: {start: "", end: "", total: ""}, servicesProvided: "", EmployeeProgress: ""  },
-    { id: "3", datesOfSeServices: {date: undefined, seProfessional: ""}, noOfHours: {start: "", end: "", total: ""}, servicesProvided: "", EmployeeProgress: ""  },
-    { id: "4", datesOfSeServices: {date: undefined, seProfessional: ""}, noOfHours: {start: "", end: "", total: ""}, servicesProvided: "", EmployeeProgress: ""  },
-  ]);
+  const [interventions, setInterventions] = useState<InterventionRow[]>(initialInterventions);
+  const [services, setServices] = useState<ServiceRow[]>(initialServices);
 
-  const updateIntervention = (id: string, field: keyof InterventionRow, value: string) => {
-    setInterventions(interventions.map(intervention => 
-      intervention.id === id ? { ...intervention, [field]: value } : intervention
-    ));
+  const activityLogId = new URLSearchParams(useLocation().search).get("id");
+  const [mutateNote] = useCreateOrUpdateActivityLogMutation();
+  const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
+  const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
+    skip: !activityLogId
+  });
+
+  const debouncedMutateNote = useDebounce(
+    async (params: any) => {
+      await mutateNote(params).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
+      });
+    },
+    500
+  );
+
+  const updateIntervention = async (
+    id: string,
+    index: number,
+    field: keyof InterventionRow,
+    value: string
+  ) => {
+    setInterventions((prevInterventions) => {
+      return prevInterventions.map((intervention, activityIndex) => {
+        if ((id && intervention.id === id) || (index === activityIndex)) {
+          return {...intervention, [field]: value}
+        } else {
+          return intervention
+        }
+      })
+    });
+
+    const currentInterventions = interventions;
+
+    let intervention;
+    if (id) {
+      intervention = currentInterventions.find(intervention => intervention.id === id);
+    } else {
+      intervention = currentInterventions[index];
+    }
+
+    if (!intervention) return;
+
+    const newIntervention = {
+      ...intervention,
+      [field]: value
+    };
+
+    const training = newIntervention.training;
+
+    if (training && id === "") {
+      await mutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(new Date(), "yyyy-MM-dd"),
+          endDate: format(new Date(), "yyyy-MM-dd"),
+          metadata: {
+            training: newIntervention.training,
+            employerVision: newIntervention.employerVision,
+            achievementPlan: newIntervention.achievementPlan,
+            type: "intervention"
+          },
+          index
+        }
+      }).unwrap();
+    } else if (training && id !== "") {
+      debouncedMutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(new Date(), "yyyy-MM-dd"),
+          endDate: format(new Date(), "yyyy-MM-dd"),
+          metadata: {
+            training: newIntervention.training,
+            employerVision: newIntervention.employerVision,
+            achievementPlan: newIntervention.achievementPlan,
+            type: "intervention"
+          },
+          index
+        }
+      });
+    }
   };
 
-  const updateService = (id: string, field: keyof ServiceRow, value: any) => {
-    setServices(services.map(service => 
-      service.id === id ? { ...service, [field]: value } : service
-    ));
+  const updateService = async (
+    id: string,
+    index: number,
+    field: keyof ServiceRow,
+    value: any
+  ) => {
+    setServices((prevServices) => {
+      return prevServices.map((service, activityIndex) => {
+        if ((id && service.id === id) || (index === activityIndex)) {
+          return {...service, [field]: value}
+        } else {
+          return service
+        }
+      })
+    });
+
+
+    const currentServices = services;
+
+    let service;
+    if (id) {
+      service = currentServices.find(service => service.id === id);
+    } else {
+      service = currentServices[index];
+    }
+
+    if (!service) return;
+
+    const newService = {
+      ...service,
+      [field]: value
+    };
+
+    const date = newService.datesOfSeServices.date;
+
+    if (date && id === "") {
+      await mutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(date, "yyyy-MM-dd"),
+          endDate: format(date, "yyyy-MM-dd"),
+          metadata: {
+            seProfessional: newService.datesOfSeServices.seProfessional,
+            noOfHoursStart: newService.noOfHours.start,
+            noOfHoursEnd: newService.noOfHours.end,
+            noOfHoursTotal: newService.noOfHours.total,
+            servicesProvided: newService.servicesProvided,
+            EmployeeProgress: newService.EmployeeProgress,
+            type: "service"
+          }
+        }
+      }).unwrap();
+    } else if (date && id !== "") {
+      debouncedMutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(date, "yyyy-MM-dd"),
+          endDate: format(date, "yyyy-MM-dd"),
+          metadata: {
+            seProfessional: newService.datesOfSeServices.seProfessional,
+            noOfHoursStart: newService.noOfHours.start,
+            noOfHoursEnd: newService.noOfHours.end,
+            noOfHoursTotal: newService.noOfHours.total,
+            servicesProvided: newService.servicesProvided,
+            EmployeeProgress: newService.EmployeeProgress,
+            type: "service"
+          }
+        }
+      });
+    }
   };
 
   const formatDisplayDate = (date: Date | undefined) => {
@@ -88,22 +265,134 @@ export default function SupportedEmploymentInterventionPage() {
     if (!startTime || !endTime) {
       return "";
     }
-    
+
     const [startHours, startMinutes] = startTime.split(':').map(Number);
     const [endHours, endMinutes] = endTime.split(':').map(Number);
-    
+
     const startTotalMinutes = startHours * 60 + startMinutes;
     const endTotalMinutes = endHours * 60 + endMinutes;
-    
+
     const diffMinutes = endTotalMinutes - startTotalMinutes;
     const hours = Math.floor(diffMinutes / 60);
     const minutes = diffMinutes % 60;
-    
+
     if (minutes === 0) {
       return `${hours}h`;
     }
     return `${hours}h ${minutes}m`;
   };
+
+  const handleServicesSubmit = async () => {
+    try {
+      const errors = services.filter((service) => !service.id);
+      if (errors.length > 0) {
+        toast.error(`Please fill in all required fields for these dates ${errors.map(service => service.datesOfSeServices.date).toString()}`);
+        return;
+      }
+      await submitNotes({
+        activityLog: activityLogId!,
+        logNoteIds: services.map((service) => service.id)
+      }).unwrap();
+      setServices(initialServices);
+      toast.success('Note submitted successfully!');
+    } catch (error: any) {
+      console.error('Error submitting activity log:', error);
+      toast.error(error?.data?.message || 'Failed to submit activity log.');
+    }
+  }
+
+  const handleInterventionsSubmit = async () => {
+    try {
+      const errors = interventions.filter((intervention) => !intervention.id);
+      if (errors.length > 0) {
+        toast.error(`Please fill in all required fields for these rows ${errors.map((intervention, index) => index + 1).toString()}`);
+        return;
+      }
+      await submitNotes({
+        activityLog: activityLogId!,
+        logNoteIds: interventions.map((intervention) => intervention.id)
+      }).unwrap();
+      setInterventions(initialInterventions);
+      toast.success('Note submitted successfully!');
+    } catch (error: any) {
+      console.error('Error submitting activity log:', error);
+      toast.error(error?.data?.message || 'Failed to submit activity log.');
+    }
+  }
+
+  useEffect(() => {
+    if (!isLoading && activityLog && activityLog.notes.length > 0) {
+      if (services.some((service) => service.id)) {
+        const serviceNotes = activityLog.notes.filter((note) => note.metadata?.type === "service");
+        const newServices = services.map((service, index) => {
+          if (!service.id) {
+            if (serviceNotes.length > index) {
+              service.id = serviceNotes[index].id;
+            }
+          }
+          return service;
+        });
+        setServices(newServices);
+      } else {
+        const serviceNotes = activityLog.notes.filter((note) => note.metadata?.type === "service");
+        const formattedServiceNotes = serviceNotes.map((note) => ({
+          id: note.id,
+          datesOfSeServices: {
+            date: new Date(note.startDate),
+            seProfessional: note.metadata?.seProfessional || "",
+          },
+          noOfHours: {
+            start: note.metadata?.noOfHoursStart || "",
+            end: note.metadata?.noOfHoursEnd || "",
+            total: note.metadata?.noOfHoursTotal || ""
+          },
+          servicesProvided: note.metadata?.servicesProvided || "",
+          EmployeeProgress: note.metadata?.EmployeeProgress || "",
+        }));
+        setServices([
+          ...formattedServiceNotes,
+          ...initialServices.slice(formattedServiceNotes.length)
+        ]);
+      }
+
+      if (interventions.some((intervention) => intervention.id)) {
+        const interventionNotes = activityLog.notes.filter((note) => note.metadata?.type === "intervention");
+        const newInterventions = interventions.map((intervention, index) => {
+          if (!intervention.id) {
+            if (interventionNotes.length > index) {
+              intervention.id = interventionNotes[index].id;
+            }
+          }
+          return intervention;
+        });
+        setInterventions(newInterventions);
+      } else {
+        const interventionNotes = activityLog.notes.filter((note) => note.metadata?.type === "intervention");
+        const formattedInterventionNotes = interventionNotes.map((note) => ({
+          id: note.id,
+          training: note.metadata?.training || "",
+          employerVision: note.metadata?.employerVision || "",
+          achievementPlan: note.metadata?.achievementPlan || "",
+        }));
+        setInterventions([
+          ...formattedInterventionNotes,
+          ...initialInterventions.slice(formattedInterventionNotes.length)
+        ]);
+      }
+    }
+  }, [isLoading, activityLog])
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <div
+            className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
+          <p className="text-sm text-[#808081]">Loading notes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <VoiceRecordingProvider pageTitle={pageTitle}>
@@ -130,9 +419,9 @@ export default function SupportedEmploymentInterventionPage() {
           <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
             Division of Developmental Disabilities
           </p>
-          <a 
-            href="https://www.nj.gov/humanservice/add" 
-            target="_blank" 
+          <a
+            href="https://www.nj.gov/humanservice/add"
+            target="_blank"
             rel="noopener noreferrer"
             className="text-[14px] font-normal leading-[1.4] text-[#2b82ff] hover:underline font-['Urbanist',sans-serif]"
           >
@@ -141,8 +430,9 @@ export default function SupportedEmploymentInterventionPage() {
         </div>
 
         {/* Form Title */}
-        <h2 className="text-[20px] font-semibold leading-[1.6] text-[#10141a] text-center mb-8 font-['Urbanist',sans-serif]">
-          Supported Employment Services – Intervention Plan and Service Log (TDHJ/3421)
+        <h2
+          className="text-[20px] font-semibold leading-[1.6] text-[#10141a] text-center mb-8 font-['Urbanist',sans-serif]">
+          Supported Employment Services – Intervention Plan and Service Log ({activityLog?.metadata?.serviceCode})
         </h2>
 
         {/* Top Form Fields */}
@@ -153,8 +443,8 @@ export default function SupportedEmploymentInterventionPage() {
             </label>
             <Input
               type="text"
-              value={individualName}
-              onChange={(e) => setIndividualName(e.target.value)}
+              value={activityLog?.metadata?.individual ?? ""}
+              disabled={true}
               className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
             />
           </div>
@@ -164,8 +454,8 @@ export default function SupportedEmploymentInterventionPage() {
             </label>
             <Input
               type="text"
-              value={employer}
-              onChange={(e) => setEmployer(e.target.value)}
+              value={activityLog?.metadata?.employer ?? ""}
+              disabled={true}
               className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
             />
           </div>
@@ -173,29 +463,33 @@ export default function SupportedEmploymentInterventionPage() {
 
         {/* Type of Job Section */}
         <div className="mb-6">
-          <label className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
+          <label
+            className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
             Type of job (brief description of the work generally performed by the individual)
           </label>
           <VoiceEnabledTextarea
-            value={typeOfJob}
-            onChange={setTypeOfJob}
+            value={activityLog?.metadata?.jobType ?? ""}
             className="min-h-[80px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
             placeholder=""
             fieldName="Type of Job"
+            disabled={true}
+            onChange={() => console.log("changed")}
             pageTitle={pageTitle}
           />
         </div>
 
         {/* Applicable ISP Outcomes */}
         <div className="mb-6">
-          <label className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
+          <label
+            className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
             Applicable ISP Outcome(s)
           </label>
           <VoiceEnabledTextarea
-            value={applicableOutcomes}
-            onChange={setApplicableOutcomes}
+            value={activityLog?.metadata?.ISPOutcome ?? ""}
             className="min-h-[80px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
             placeholder=""
+            disabled={true}
+            onChange={() => console.log("changed")}
             fieldName="Applicable ISP Outcomes"
             pageTitle={pageTitle}
           />
@@ -209,8 +503,8 @@ export default function SupportedEmploymentInterventionPage() {
             </label>
             <Input
               type="text"
-              value={totalHours}
-              onChange={(e) => setTotalHours(e.target.value)}
+              value={activityLog?.metadata?.totalHours ?? ""}
+              disabled={true}
               className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
             />
           </div>
@@ -223,13 +517,16 @@ export default function SupportedEmploymentInterventionPage() {
                 <button type="button" className="w-full focus:outline-none">
                   <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                     <InputGroupInput
-                      value={reportingStartDate ? format(reportingStartDate, "MMMM d, yyyy") : ""}
+                      value={activityLog?.metadata?.reportingStartDate
+                        ? format(activityLog?.metadata?.reportingStartDate, "MMMM d, yyyy")
+                        : ""
+                      }
                       placeholder="Select date"
                       readOnly
                       className="text-[#10141a] border-0 bg-transparent"
                     />
                     <InputGroupAddon align="inline-end">
-                      <CalendarDaysIcon className="h-5 w-5 text-[#808081]" />
+                      <CalendarDaysIcon className="h-5 w-5 text-[#808081]"/>
                     </InputGroupAddon>
                   </InputGroup>
                 </button>
@@ -241,7 +538,7 @@ export default function SupportedEmploymentInterventionPage() {
                   captionLayout="dropdown"
                   startMonth={new Date(1924, 0)}
                   endMonth={new Date()}
-                  selected={reportingStartDate}
+                  selected={activityLog?.metadata?.reportingStartDate ? new Date(activityLog?.metadata?.reportingStartDate) : undefined}
                   defaultMonth={reportingStartDate ?? new Date()}
                   onSelect={(selectedDate) => {
                     if (selectedDate) {
@@ -251,13 +548,14 @@ export default function SupportedEmploymentInterventionPage() {
                   }}
                   formatters={{
                     formatMonthDropdown: (date) =>
-                      date.toLocaleString("default", { month: "long" }),
+                      date.toLocaleString("default", {month: "long"}),
                   }}
                   classNames={{
                     dropdown_root: "relative border-none shadow-none has-focus:ring-0",
                     caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
                   }}
                   autoFocus={true}
+                  disabled={true}
                 />
               </PopoverContent>
             </Popover>
@@ -271,13 +569,16 @@ export default function SupportedEmploymentInterventionPage() {
                 <button type="button" className="w-full focus:outline-none">
                   <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                     <InputGroupInput
-                      value={reportingEndDate ? format(reportingEndDate, "MMMM d, yyyy") : ""}
+                      value={activityLog?.metadata?.reportingEndDate
+                        ? format(activityLog?.metadata?.reportingEndDate, "MMMM d, yyyy")
+                        : ""
+                      }
                       placeholder="Select date"
                       readOnly
                       className="text-[#10141a] border-0 bg-transparent"
                     />
                     <InputGroupAddon align="inline-end">
-                      <CalendarDaysIcon className="h-5 w-5 text-[#808081]" />
+                      <CalendarDaysIcon className="h-5 w-5 text-[#808081]"/>
                     </InputGroupAddon>
                   </InputGroup>
                 </button>
@@ -289,7 +590,9 @@ export default function SupportedEmploymentInterventionPage() {
                   captionLayout="dropdown"
                   startMonth={new Date(1924, 0)}
                   endMonth={new Date()}
-                  selected={reportingEndDate}
+                  selected={activityLog?.metadata?.reportingEndDate
+                    ? new Date(activityLog?.metadata?.reportingEndDate)
+                    : undefined}
                   defaultMonth={reportingEndDate ?? new Date()}
                   onSelect={(selectedDate) => {
                     if (selectedDate) {
@@ -299,7 +602,7 @@ export default function SupportedEmploymentInterventionPage() {
                   }}
                   formatters={{
                     formatMonthDropdown: (date) =>
-                      date.toLocaleString("default", { month: "long" }),
+                      date.toLocaleString("default", {month: "long"}),
                   }}
                   classNames={{
                     dropdown_root: "relative border-none shadow-none has-focus:ring-0",
@@ -319,8 +622,8 @@ export default function SupportedEmploymentInterventionPage() {
           </label>
           <Input
             type="text"
-            value={completedBy}
-            onChange={(e) => setCompletedBy(e.target.value)}
+            value={profile?.fullName ?? ""}
+            disabled={true}
             className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4 w-full"
           />
         </div>
@@ -332,15 +635,16 @@ export default function SupportedEmploymentInterventionPage() {
             <div className="border border-[#b2b2b3] rounded-tl-[2px] rounded-tr-[2px] overflow-hidden">
               <div className="border-b border-[#b2b2b3] bg-[#eef4f5] min-h-[71px]">
                 <div className="grid grid-cols-3 gap-0 h-full">
-                  <div className="relative px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
+                  <div
+                    className="relative px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
                     <Popover>
                       <PopoverTrigger asChild>
                         <button type="button" className="absolute top-2 right-2 h-4 w-4 cursor-pointer">
-                          <InformationCircleIcon className="h-4 w-4 text-[#10141a]" />
+                          <InformationCircleIcon className="h-4 w-4 text-[#10141a]"/>
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent 
-                        align="center" 
+                      <PopoverContent
+                        align="center"
                         side="top"
                         className="bg-white rounded-[6px] px-4 py-3 shadow-lg border-none w-[250px]"
                         sideOffset={5}
@@ -363,11 +667,11 @@ export default function SupportedEmploymentInterventionPage() {
                     <Popover>
                       <PopoverTrigger asChild>
                         <button type="button" className="absolute top-2 right-2 h-4 w-4 cursor-pointer">
-                          <InformationCircleIcon className="h-4 w-4 text-[#10141a]" />
+                          <InformationCircleIcon className="h-4 w-4 text-[#10141a]"/>
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent 
-                        align="center" 
+                      <PopoverContent
+                        align="center"
                         side="top"
                         className="bg-white rounded-[6px] px-4 py-3 shadow-lg border-none w-[250px]"
                         sideOffset={5}
@@ -389,8 +693,8 @@ export default function SupportedEmploymentInterventionPage() {
             <div className="border border-[#b2b2b3] rounded-bl-[2px] rounded-br-[2px] border-t-0">
               <div className="bg-[#eef4f5]">
                 {interventions.map((intervention, index) => (
-                  <div 
-                    key={intervention.id}
+                  <div
+                    key={`intervention-${index}`}
                     className={`grid grid-cols-3 gap-0 min-h-[71px] transition-colors ${
                       index < interventions.length - 1 ? 'border-b border-[#b2b2b3]' : ''
                     } hover:bg-white`}
@@ -399,7 +703,7 @@ export default function SupportedEmploymentInterventionPage() {
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <ContentEditableCell
                         value={intervention.training}
-                        onChange={(value) => updateIntervention(intervention.id, 'training', value)}
+                        onChange={(value) => updateIntervention(intervention.id, index, 'training', value)}
                         fieldName="What is the standard required?"
                         pageTitle={pageTitle}
                       />
@@ -408,7 +712,7 @@ export default function SupportedEmploymentInterventionPage() {
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <ContentEditableCell
                         value={intervention.employerVision}
-                        onChange={(value) => updateIntervention(intervention.id, 'employerVision', value)}
+                        onChange={(value) => updateIntervention(intervention.id, index, 'employerVision', value)}
                         fieldName="How does the employee currently perform the tasks, actions, areas related to these standards?"
                         pageTitle={pageTitle}
                       />
@@ -417,7 +721,7 @@ export default function SupportedEmploymentInterventionPage() {
                     <div className="px-4 py-3 flex items-center justify-center">
                       <ContentEditableCell
                         value={intervention.achievementPlan}
-                        onChange={(value) => updateIntervention(intervention.id, 'achievementPlan', value)}
+                        onChange={(value) => updateIntervention(intervention.id, index, 'achievementPlan', value)}
                         fieldName="What is being done to address the identified issues?"
                         pageTitle={pageTitle}
                       />
@@ -437,6 +741,16 @@ export default function SupportedEmploymentInterventionPage() {
           <p className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
             June 19th
           </p>
+        </div>
+        <div className={"flex justify-end mt-3 mb-8"}>
+          <Button
+            type={"button"}
+            onClick={handleInterventionsSubmit}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
+          >
+            {isSubmitting ? "Submitting..." : "Submit"}
+          </Button>
         </div>
 
         {/* Service Log Table */}
@@ -463,7 +777,8 @@ export default function SupportedEmploymentInterventionPage() {
                   </div>
                   <div className="px-4 py-3 flex items-center justify-center text-center">
                     <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-                      How is the employee progressing toward his/her outcomes and meeting the standards that have been identified above?
+                      How is the employee progressing toward his/her outcomes and meeting the standards that have been
+                      identified above?
                     </p>
                   </div>
                 </div>
@@ -472,118 +787,136 @@ export default function SupportedEmploymentInterventionPage() {
 
             {/* Table Body */}
             <div className="border border-[#b2b2b3] rounded-bl-[2px] rounded-br-[2px] border-t-0 overflow-hidden">
-              <table className="w-full bg-[#eef4f5]" style={{ borderCollapse: 'collapse' }}>
+              <table className="w-full bg-[#eef4f5]" style={{borderCollapse: 'collapse'}}>
                 <tbody>
-                  {services.map((service, index) => (
-                    <React.Fragment key={service.id}>
-                      <tr className="hover:bg-white transition-colors grid grid-cols-4 gap-0 min-w-[1163px] h-full">
-                        <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]  `}>
-                          <tr  className="flex flex-col min-h-[147px]">
-                            <td  className="border-b border-[#b2b2b3] flex">
-                              <div className="bg-[#D9D9D9] w-[80px] h-[49px] flex items-center justify-center">Date:</div>
-                              <div className="flex-1 flex items-center justify-center">
-                                <Popover 
-                                  open={openServiceDateId === service.id} 
-                                  onOpenChange={(open) => setOpenServiceDateId(open ? service.id : null)}
-                                >
-                                  <PopoverTrigger asChild>
-                                    <button 
-                                      type="button" 
-                                      className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
-                                    >
-                                      <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
+                {services.map((service, index) => (
+                  <React.Fragment key={`services-${index}`}>
+                    <tr className="hover:bg-white transition-colors grid grid-cols-4 gap-0 min-w-[1163px] h-full">
+                      <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]  `}>
+                        <tr className="flex flex-col min-h-[147px]">
+                          <td className="border-b border-[#b2b2b3] flex">
+                            <div className="bg-[#D9D9D9] w-[80px] h-[49px] flex items-center justify-center">Date:</div>
+                            <div className="flex-1 flex items-center justify-center">
+                              <Popover
+                                open={openServiceDateId === String(index)}
+                                onOpenChange={(open) => setOpenServiceDateId(open ? String(index) : null)}
+                              >
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
+                                  >
+                                      <span
+                                        className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
                                         {formatDisplayDate(service.datesOfSeServices.date)}
                                       </span>
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
-                                    <Calendar
-                                      mode="single"
-                                      className="bg-white"
-                                      captionLayout="dropdown"
-                                      startMonth={new Date(1924, 0)}
-                                      endMonth={new Date()}
-                                      selected={service.datesOfSeServices.date}
-                                      defaultMonth={service.datesOfSeServices.date ?? new Date()}
-                                      onSelect={(date) => {
-                                        if (date) {
-                                          updateService(service.id, 'datesOfSeServices', {
-                                            ...service.datesOfSeServices,
-                                            date: date
-                                          });
-                                          setOpenServiceDateId(null);
-                                        }
-                                      }}
-                                      formatters={{
-                                        formatMonthDropdown: (date) =>
-                                          date.toLocaleString("default", { month: "long" }),
-                                      }}
-                                      classNames={{
-                                        dropdown_root: "relative border-none shadow-none has-focus:ring-0",
-                                        caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
-                                      }}
-                                      autoFocus={true}
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                              </div>
-                            </td>
-                            <td>
-                              <span className="pt-4 ps-5">SE Professional:</span>
-                              <ContentEditableCell
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent align="start"
+                                                className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                                  <Calendar
+                                    mode="single"
+                                    className="bg-white"
+                                    captionLayout="dropdown"
+                                    startMonth={new Date(1924, 0)}
+                                    endMonth={new Date()}
+                                    selected={service.datesOfSeServices.date}
+                                    defaultMonth={service.datesOfSeServices.date ?? new Date()}
+                                    disabled={{
+                                      after: new Date()
+                                    }}
+                                    onSelect={async (date) => {
+                                      if (date) {
+                                        await updateService(service.id, index, 'datesOfSeServices', {
+                                          ...service.datesOfSeServices,
+                                          date: date
+                                        });
+                                        setOpenServiceDateId(null);
+                                      }
+                                    }}
+                                    formatters={{
+                                      formatMonthDropdown: (date) =>
+                                        date.toLocaleString("default", {month: "long"}),
+                                    }}
+                                    classNames={{
+                                      dropdown_root: "relative border-none shadow-none has-focus:ring-0",
+                                      caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
+                                    }}
+                                    autoFocus={true}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="pt-4 ps-5">SE Professional:</span>
+                            <ContentEditableCell
                               value={service.datesOfSeServices.seProfessional}
-                              onChange={(value) => updateService(service.id, 'datesOfSeServices', {
+                              onChange={(value) => updateService(service.id, index, 'datesOfSeServices', {
                                 ...service.datesOfSeServices,
                                 seProfessional: value
                               })}
                               fieldName="SE Professional"
                               pageTitle={pageTitle}
                             /></td>
-                          </tr>
-                        </td>
-                        <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
-                          {Object.entries(service.noOfHours).map(([key, value]) => (
-                            <tr key={key} className="flex flex-col h-[49px]">
-                              <td className="border-b border-[#b2b2b3] h-[49px] flex">
-                                <div className="bg-[#D9D9D9] w-[80px] h-full flex items-center justify-end pe-5 capitalize">{key}:</div>
-                                <div className="flex-1 flex items-center justify-center">
-                                  {key === 'start' || key === 'end' ? (
-                                    <TimePicker
-                                      value={value}
-                                      onChange={(newValue) => {
-                                        const updatedHours = { ...service.noOfHours, [key]: newValue };
-                                        // Auto-calculate total if both start and end are set
-                                        if (key === 'start' && updatedHours.end) {
-                                          updatedHours.total = calculateHoursDifference(newValue, updatedHours.end);
-                                        } else if (key === 'end' && updatedHours.start) {
-                                          updatedHours.total = calculateHoursDifference(updatedHours.start, newValue);
-                                        }
-                                        updateService(service.id, 'noOfHours', updatedHours);
-                                      }}
-                                    />
-                                  ) : (
-                                    <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
+                        </tr>
+                      </td>
+                      <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
+                        {Object.entries(service.noOfHours).map(([key, value]) => (
+                          <tr key={key} className="flex flex-col h-[49px]">
+                            <td className="border-b border-[#b2b2b3] h-[49px] flex">
+                              <div
+                                className="bg-[#D9D9D9] w-[80px] h-full flex items-center justify-end pe-5 capitalize">{key}:
+                              </div>
+                              <div className="flex-1 flex items-center justify-center">
+                                {key === 'start' || key === 'end' ? (
+                                  <TimePicker
+                                    value={value}
+                                    onChange={async (newValue) => {
+                                      const updatedHours = {...service.noOfHours, [key]: newValue};
+                                      // Auto-calculate total if both start and end are set
+                                      if (key === 'start' && updatedHours.end) {
+                                        updatedHours.total = calculateHoursDifference(newValue, updatedHours.end);
+                                      } else if (key === 'end' && updatedHours.start) {
+                                        updatedHours.total = calculateHoursDifference(updatedHours.start, newValue);
+                                      }
+                                      await updateService(service.id, index, 'noOfHours', updatedHours);
+                                    }}
+                                  />
+                                ) : (
+                                  <span
+                                    className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
                                       {value}
                                     </span>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </td>
-                        <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
-                          <div className="flex items-center justify-center min-h-[147px]">
-                            <ContentEditableCell
-                              value={service.servicesProvided}
-                              onChange={(value) => updateService(service.id, 'servicesProvided', value)}
-                              fieldName="What SE services were provided during this visit?"
-                              pageTitle={pageTitle}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    </React.Fragment>
-                  ))}
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </td>
+                      <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
+                        <div className="flex items-center justify-center min-h-[147px]">
+                          <ContentEditableCell
+                            value={service.servicesProvided}
+                            onChange={(value) => updateService(service.id, index, 'servicesProvided', value)}
+                            fieldName="What SE services were provided during this visit?"
+                            pageTitle={pageTitle}
+                          />
+                        </div>
+                      </td>
+                      <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
+                        <div className="flex items-center justify-center min-h-[147px]">
+                          <ContentEditableCell
+                            value={service.EmployeeProgress}
+                            onChange={(value) => updateService(service.id, index, 'EmployeeProgress', value)}
+                            fieldName="How is the employee progressing toward his/her outcomes and meeting the standards that have been identified above?"
+                            pageTitle={pageTitle}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))}
                 </tbody>
               </table>
             </div>
@@ -599,9 +932,19 @@ export default function SupportedEmploymentInterventionPage() {
             June 1997
           </p>
         </div>
+        <div className={"flex justify-end mt-3"}>
+          <Button
+            type={"button"}
+            onClick={handleServicesSubmit}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
+          >
+            {isSubmitting ? "Submitting..." : "Submit"}
+          </Button>
+        </div>
 
         {/* Floating Action Button */}
-        <VoiceInputButton />
+        <VoiceInputButton/>
       </div>
     </VoiceRecordingProvider>
   );

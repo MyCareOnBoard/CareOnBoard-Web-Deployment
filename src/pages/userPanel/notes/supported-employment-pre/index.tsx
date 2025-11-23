@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Calendar} from "@/components/ui/calendar";
@@ -13,7 +13,16 @@ import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Button} from "@/components/ui/button";
 import {ArrowLeft} from "lucide-react";
 import {Routes} from "@/routes/constants";
-import {useNavigate} from "react-router";
+import {useLocation, useNavigate} from "react-router";
+import {
+  useCreateOrUpdateActivityLogMutation,
+  useGetSingleActivityLogQuery,
+  useSubmitActivityLogNotesMutation
+} from "@/pages/userPanel/notes/api";
+import {useSelector} from "react-redux";
+import {RootState} from "@/store/redux/store";
+import {useDebounce} from "@/hooks/useDebounce";
+import {toast} from "sonner";
 
 type ServiceRow = {
   id: string;
@@ -42,59 +51,141 @@ const activityOptions = [
   "Benefits counseling",
 ];
 
+const initialServices: ServiceRow[] = [
+  {
+    id: "",
+    datesOfSeServices: {date: undefined, seProfessional: ""},
+    noOfHours: {start: "", end: "", total: ""},
+    activityConducted: "",
+    whatWasDone: "",
+    howDidThisAssist: ""
+  },
+  {
+    id: "",
+    datesOfSeServices: {date: undefined, seProfessional: ""},
+    noOfHours: {start: "", end: "", total: ""},
+    activityConducted: "",
+    whatWasDone: "",
+    howDidThisAssist: ""
+  },
+  {
+    id: "",
+    datesOfSeServices: {date: undefined, seProfessional: ""},
+    noOfHours: {start: "", end: "", total: ""},
+    activityConducted: "",
+    whatWasDone: "",
+    howDidThisAssist: ""
+  },
+  {
+    id: "",
+    datesOfSeServices: {date: undefined, seProfessional: ""},
+    noOfHours: {start: "", end: "", total: ""},
+    activityConducted: "",
+    whatWasDone: "",
+    howDidThisAssist: ""
+  },
+]
+
 export default function SupportedEmploymentPrePage() {
   const pageTitle = "Supported Employment Services – Pre-Employment Service Log";
-
-  const [individualName, setIndividualName] = useState("");
-  const [totalHours, setTotalHours] = useState("");
   const [reportingStartDate, setReportingStartDate] = useState<Date | undefined>(undefined);
   const [reportingEndDate, setReportingEndDate] = useState<Date | undefined>(undefined);
-  const [completedBy, setCompletedBy] = useState("");
   const [isStartDateOpen, setIsStartDateOpen] = useState(false);
   const [isEndDateOpen, setIsEndDateOpen] = useState(false);
   const [openServiceDateId, setOpenServiceDateId] = useState<string | null>(null);
+  const profile = useSelector((store: RootState) => store?.auth?.profile);
 
   const navigate = useNavigate();
+  const activityLogId = new URLSearchParams(useLocation().search).get("id");
+  const [mutateNote] = useCreateOrUpdateActivityLogMutation();
+  const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
+  const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
+    skip: !activityLogId
+  });
 
-  const [services, setServices] = useState<ServiceRow[]>([
-    {
-      id: "1",
-      datesOfSeServices: {date: undefined, seProfessional: ""},
-      noOfHours: {start: "", end: "", total: ""},
-      activityConducted: "",
-      whatWasDone: "",
-      howDidThisAssist: ""
-    },
-    {
-      id: "2",
-      datesOfSeServices: {date: undefined, seProfessional: ""},
-      noOfHours: {start: "", end: "", total: ""},
-      activityConducted: "",
-      whatWasDone: "",
-      howDidThisAssist: ""
-    },
-    {
-      id: "3",
-      datesOfSeServices: {date: undefined, seProfessional: ""},
-      noOfHours: {start: "", end: "", total: ""},
-      activityConducted: "",
-      whatWasDone: "",
-      howDidThisAssist: ""
-    },
-    {
-      id: "4",
-      datesOfSeServices: {date: undefined, seProfessional: ""},
-      noOfHours: {start: "", end: "", total: ""},
-      activityConducted: "",
-      whatWasDone: "",
-      howDidThisAssist: ""
-    },
-  ]);
+  const [services, setServices] = useState<ServiceRow[]>(initialServices);
 
-  const updateService = (id: string, field: keyof ServiceRow, value: any) => {
-    setServices(services.map(service =>
-      service.id === id ? {...service, [field]: value} : service
-    ));
+  const debouncedMutateNote = useDebounce(
+    async (params: any) => {
+      await mutateNote(params).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
+      });
+    },
+    500
+  );
+
+  const updateService = async (
+    id: string,
+    index: number,
+    field: keyof ServiceRow,
+    value: any
+  ) => {
+    setServices((prevServices) => {
+      return prevServices.map((service, activityIndex) => {
+        if ((id && service.id === id) || (index === activityIndex)) {
+          return {...service, [field]: value}
+        } else {
+          return service
+        }
+      })
+    });
+
+
+    const currentServices = services;
+
+    let service;
+    if (id) {
+      service = currentServices.find(service => service.id === id);
+    } else {
+      service = currentServices[index];
+    }
+
+    if (!service) return;
+
+    const newService = {
+      ...service,
+      [field]: value
+    };
+
+    const date = newService.datesOfSeServices.date;
+
+    if (date && id === "") {
+      await mutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(date, "yyyy-MM-dd"),
+          endDate: format(date, "yyyy-MM-dd"),
+          metadata: {
+            seProfessional: newService.datesOfSeServices.seProfessional,
+            noOfHoursStart: newService.noOfHours.start,
+            noOfHoursEnd: newService.noOfHours.end,
+            noOfHoursTotal: newService.noOfHours.total,
+            activityConducted: newService.activityConducted,
+            whatWasDone: newService.whatWasDone,
+            howDidThisAssist: newService.howDidThisAssist
+          }
+        }
+      }).unwrap();
+    } else if (date && id !== "") {
+      debouncedMutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(date, "yyyy-MM-dd"),
+          endDate: format(date, "yyyy-MM-dd"),
+          metadata: {
+            seProfessional: newService.datesOfSeServices.seProfessional,
+            noOfHoursStart: newService.noOfHours.start,
+            noOfHoursEnd: newService.noOfHours.end,
+            noOfHoursTotal: newService.noOfHours.total,
+            activityConducted: newService.activityConducted,
+            whatWasDone: newService.whatWasDone,
+            howDidThisAssist: newService.howDidThisAssist
+          }
+        }
+      });
+    }
   };
 
   const formatDisplayDate = (date: Date | undefined) => {
@@ -124,6 +215,73 @@ export default function SupportedEmploymentPrePage() {
     }
     return `${hours}h ${minutes}m`;
   };
+
+  const handleSubmit = async () => {
+    try {
+      const errors = services.filter((service) => !service.id);
+      if (errors.length > 0) {
+        toast.error(`Please fill in all required fields for these dates ${errors.map(service => service.datesOfSeServices.date).toString()}`);
+        return;
+      }
+      await submitNotes({
+        activityLog: activityLogId!,
+        logNoteIds: services.map((service) => service.id)
+      }).unwrap();
+      setServices(initialServices);
+      toast.success('Note submitted successfully!');
+    } catch (error: any) {
+      console.error('Error submitting activity log:', error);
+      toast.error(error?.data?.message || 'Failed to submit activity log.');
+    }
+  }
+
+  useEffect(() => {
+    if (!isLoading && activityLog && activityLog.notes.length > 0) {
+      if (services.some((service) => service.id)) {
+        const newServices = services.map((service, index) => {
+          if (!service.id) {
+            if (activityLog.notes.length > index) {
+              service.id = activityLog.notes[index].id;
+            }
+          }
+          return service;
+        });
+        setServices(newServices);
+      } else {
+        const formattedNotes = activityLog.notes.map((note) => ({
+          id: note.id,
+          datesOfSeServices: {
+            date: new Date(note.startDate),
+            seProfessional: note.metadata?.seProfessional || "",
+          },
+          noOfHours: {
+            start: note.metadata?.noOfHoursStart || "",
+            end: note.metadata?.noOfHoursEnd || "",
+            total: note.metadata?.noOfHoursTotal || ""
+          },
+          activityConducted: note.metadata?.activityConducted || "",
+          whatWasDone: note.metadata?.whatWasDone || "",
+          howDidThisAssist: note.metadata?.howDidThisAssist || ""
+        }));
+        setServices([
+          ...formattedNotes,
+          ...initialServices.slice(formattedNotes.length)
+        ]);
+      }
+    }
+  }, [isLoading, activityLog])
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <div
+            className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
+          <p className="text-sm text-[#808081]">Loading notes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <VoiceRecordingProvider pageTitle={pageTitle}>
@@ -163,7 +321,7 @@ export default function SupportedEmploymentPrePage() {
         {/* Form Title */}
         <h2
           className="text-[20px] font-semibold leading-[1.6] text-[#10141a] text-center mb-8 font-['Urbanist',sans-serif]">
-          {pageTitle} (TDHJ/3421)
+          {pageTitle} ({activityLog?.metadata?.serviceCode})
         </h2>
 
         {/* Top Form Fields */}
@@ -173,8 +331,8 @@ export default function SupportedEmploymentPrePage() {
           </label>
           <Input
             type="text"
-            value={individualName}
-            onChange={(e) => setIndividualName(e.target.value)}
+            value={activityLog?.metadata?.individual || ""}
+            disabled={true}
             className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
           />
         </div>
@@ -187,8 +345,8 @@ export default function SupportedEmploymentPrePage() {
             </label>
             <Input
               type="text"
-              value={totalHours}
-              onChange={(e) => setTotalHours(e.target.value)}
+              value={activityLog?.metadata?.totalHours || ""}
+              disabled={true}
               className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
             />
           </div>
@@ -201,7 +359,10 @@ export default function SupportedEmploymentPrePage() {
                 <button type="button" className="w-full focus:outline-none">
                   <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                     <InputGroupInput
-                      value={reportingStartDate ? format(reportingStartDate, "MMMM d, yyyy") : ""}
+                      value={activityLog?.metadata?.reportingStartDate
+                        ? format(activityLog?.metadata?.reportingStartDate, "MMMM d, yyyy")
+                        : ""
+                      }
                       placeholder="Select date"
                       readOnly
                       className="text-[#10141a] border-0 bg-transparent"
@@ -219,7 +380,7 @@ export default function SupportedEmploymentPrePage() {
                   captionLayout="dropdown"
                   startMonth={new Date(1924, 0)}
                   endMonth={new Date()}
-                  selected={reportingStartDate}
+                  selected={activityLog?.metadata?.reportingStartDate ? new Date(activityLog?.metadata?.reportingStartDate) : undefined}
                   defaultMonth={reportingStartDate ?? new Date()}
                   onSelect={(selectedDate) => {
                     if (selectedDate) {
@@ -235,6 +396,7 @@ export default function SupportedEmploymentPrePage() {
                     dropdown_root: "relative border-none shadow-none has-focus:ring-0",
                     caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
                   }}
+                  disabled={true}
                   autoFocus={true}
                 />
               </PopoverContent>
@@ -249,7 +411,10 @@ export default function SupportedEmploymentPrePage() {
                 <button type="button" className="w-full focus:outline-none">
                   <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                     <InputGroupInput
-                      value={reportingEndDate ? format(reportingEndDate, "MMMM d, yyyy") : ""}
+                      value={activityLog?.metadata?.reportingEndDate
+                        ? format(activityLog?.metadata?.reportingEndDate, "MMMM d, yyyy")
+                        : ""
+                      }
                       placeholder="Select date"
                       readOnly
                       className="text-[#10141a] border-0 bg-transparent"
@@ -267,7 +432,10 @@ export default function SupportedEmploymentPrePage() {
                   captionLayout="dropdown"
                   startMonth={new Date(1924, 0)}
                   endMonth={new Date()}
-                  selected={reportingEndDate}
+                  selected={activityLog?.metadata?.reportingEndDate
+                    ? new Date(activityLog?.metadata?.reportingEndDate)
+                    : undefined}
+                  disabled={true}
                   defaultMonth={reportingEndDate ?? new Date()}
                   onSelect={(selectedDate) => {
                     if (selectedDate) {
@@ -297,8 +465,8 @@ export default function SupportedEmploymentPrePage() {
           </label>
           <Input
             type="text"
-            value={completedBy}
-            onChange={(e) => setCompletedBy(e.target.value)}
+            value={profile?.fullName ?? ""}
+            disabled={true}
             className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4 w-full"
           />
         </div>
@@ -344,7 +512,7 @@ export default function SupportedEmploymentPrePage() {
               <table className="w-full bg-[#eef4f5]" style={{borderCollapse: 'collapse'}}>
                 <tbody>
                 {services.map((service, index) => (
-                  <React.Fragment key={service.id}>
+                  <React.Fragment key={index}>
                     <tr className="hover:bg-white transition-colors grid grid-cols-5 gap-0 min-w-[1163px] h-full">
                       <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
                         <tr className="flex flex-col min-h-[147px]">
@@ -352,8 +520,8 @@ export default function SupportedEmploymentPrePage() {
                             <div className="bg-[#D9D9D9] w-[80px] h-[49px] flex items-center justify-center">Date:</div>
                             <div className="flex-1 flex items-center justify-center">
                               <Popover
-                                open={openServiceDateId === service.id}
-                                onOpenChange={(open) => setOpenServiceDateId(open ? service.id : null)}
+                                open={openServiceDateId === String(index)}
+                                onOpenChange={(open) => setOpenServiceDateId(open ? String(index) : null)}
                               >
                                 <PopoverTrigger asChild>
                                   <button
@@ -376,9 +544,12 @@ export default function SupportedEmploymentPrePage() {
                                     endMonth={new Date()}
                                     selected={service.datesOfSeServices.date}
                                     defaultMonth={service.datesOfSeServices.date ?? new Date()}
-                                    onSelect={(date) => {
+                                    disabled={{
+                                      after: new Date()
+                                    }}
+                                    onSelect={async (date) => {
                                       if (date) {
-                                        updateService(service.id, 'datesOfSeServices', {
+                                        await updateService(service.id, index, 'datesOfSeServices', {
                                           ...service.datesOfSeServices,
                                           date: date
                                         });
@@ -403,7 +574,7 @@ export default function SupportedEmploymentPrePage() {
                             <span className="pt-4 ps-5">SE Professional:</span>
                             <ContentEditableCell
                               value={service.datesOfSeServices.seProfessional}
-                              onChange={(value) => updateService(service.id, 'datesOfSeServices', {
+                              onChange={(value) => updateService(service.id, index, 'datesOfSeServices', {
                                 ...service.datesOfSeServices,
                                 seProfessional: value
                               })}
@@ -432,7 +603,7 @@ export default function SupportedEmploymentPrePage() {
                                       } else if (key === 'end' && updatedHours.start) {
                                         updatedHours.total = calculateHoursDifference(updatedHours.start, newValue);
                                       }
-                                      updateService(service.id, 'noOfHours', updatedHours);
+                                      updateService(service.id, index, 'noOfHours', updatedHours);
                                     }}
                                   />
                                 ) : (
@@ -450,7 +621,7 @@ export default function SupportedEmploymentPrePage() {
                         <div className="flex items-center justify-center min-h-[147px] px-4">
                           <Select
                             value={service.activityConducted}
-                            onValueChange={(value) => updateService(service.id, 'activityConducted', value)}
+                            onValueChange={(value) => updateService(service.id, index, 'activityConducted', value)}
                           >
                             <SelectTrigger className="w-full h-[44px] bg-white border border-[#cccccd] rounded-[12px]">
                               <SelectValue placeholder="Please select"/>
@@ -469,7 +640,7 @@ export default function SupportedEmploymentPrePage() {
                         <div className="flex items-center justify-center min-h-[147px]">
                           <ContentEditableCell
                             value={service.whatWasDone}
-                            onChange={(value) => updateService(service.id, 'whatWasDone', value)}
+                            onChange={(value) => updateService(service.id, index, 'whatWasDone', value)}
                             fieldName="What was done related to the activity"
                             pageTitle={pageTitle}
                           />
@@ -479,7 +650,7 @@ export default function SupportedEmploymentPrePage() {
                         <div className="flex items-center justify-center min-h-[147px]">
                           <ContentEditableCell
                             value={service.howDidThisAssist}
-                            onChange={(value) => updateService(service.id, 'howDidThisAssist', value)}
+                            onChange={(value) => updateService(service.id, index, 'howDidThisAssist', value)}
                             fieldName="How did this activity assist the job seeker"
                             pageTitle={pageTitle}
                           />
@@ -502,6 +673,16 @@ export default function SupportedEmploymentPrePage() {
           <p className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
             June 1991
           </p>
+        </div>
+        <div className={"flex justify-end mt-3"}>
+          <Button
+            type={"button"}
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
+          >
+            {isSubmitting ? "Submitting..." : "Submit"}
+          </Button>
         </div>
 
         {/* Floating Action Button */}

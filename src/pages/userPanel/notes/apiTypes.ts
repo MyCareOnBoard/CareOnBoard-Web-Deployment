@@ -30,4 +30,5 @@ export interface CreateActivityLogPayload {
   startDate: string;
   endDate: string;
   metadata?: Record<string, any>;
+  index?: number;
 }
