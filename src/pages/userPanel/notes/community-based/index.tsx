@@ -94,8 +94,8 @@ export default function CommunityBasedPage() {
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
 
   const debouncedMutateNote = useDebounce(
-    (params: any) => {
-      mutateNote(params).unwrap().catch(error => {
+    async (params: any) => {
+      await mutateNote(params).unwrap().catch(error => {
         console.error('Failed to update activity:', error);
       });
     },
@@ -138,10 +138,8 @@ export default function CommunityBasedPage() {
     const startTime = field === "startTime" ? value : newActivity.startTime;
     const endTime = field === "endTime" ? value : newActivity.endTime;
 
-    console.log(date, startTime, endTime, id)
-
     if (date && startTime && endTime && id !== "") {
-      mutateNote({
+      await mutateNote({
         activityLog: activityLogId!,
         data: {
           id: id,

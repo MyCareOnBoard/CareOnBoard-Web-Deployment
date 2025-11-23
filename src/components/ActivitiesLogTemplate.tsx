@@ -51,8 +51,8 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
   const profile = useSelector((store: RootState) => store?.auth?.profile);
 
   const debouncedMutateNote = useDebounce(
-    (params: any) => {
-      mutateNote(params).unwrap().catch(error => {
+    async (params: any) => {
+      await mutateNote(params).unwrap().catch(error => {
         console.error('Failed to update activity:', error);
       });
     },
@@ -112,7 +112,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
     };
 
     if (date && id === "") {
-      mutateNote({
+      await mutateNote({
         activityLog: activityLogId!,
         data: {
           id: id,

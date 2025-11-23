@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Radio} from "@/components/ui/radio";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
@@ -9,17 +9,20 @@ import {format} from "date-fns";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
-import { Button } from "@/components/ui/button";
+import {Button} from "@/components/ui/button";
 import {Routes} from "@/routes/constants";
 import {ArrowLeft} from "lucide-react";
-import {useNavigate} from "react-router";
+import {useLocation, useNavigate} from "react-router";
+import {
+  useCreateOrUpdateActivityLogMutation,
+  useGetSingleActivityLogQuery,
+  useSubmitActivityLogNotesMutation
+} from "@/pages/userPanel/notes/api";
+import {toast} from "sonner";
 
 type MealType = "breakfast" | "lunch" | "dinner";
 
 export default function RespiteLogPage() {
-  const [respiteLogFor, setRespiteLogFor] = useState("");
-  const [serviceCode] = useState("TDHJ/3421");
-  const [toileting, setToileting] = useState("");
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [medication, setMedication] = useState("");
@@ -29,6 +32,7 @@ export default function RespiteLogPage() {
   const [comments, setComments] = useState("");
   const [healthConcerns, setHealthConcerns] = useState("");
   const [suppliesNeeded, setSuppliesNeeded] = useState("");
+  const [selectedActivity, setSelectedActivity] = useState<string>("");
 
   const toggleMeal = (meal: MealType) => {
     setSelectedMeals((prev) =>
@@ -37,14 +41,110 @@ export default function RespiteLogPage() {
   };
 
   const navigate = useNavigate();
+  const activityLogId = new URLSearchParams(useLocation().search).get("id");
+  const [mutateNote] = useCreateOrUpdateActivityLogMutation();
+  const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
+  const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
+    skip: !activityLogId
+  });
 
-  const handleSave = () => {
-    console.log("Saving form...");
+  const handleSave = async () => {
+    if (!date) {
+      toast.error("Date is required.");
+      return;
+    }
+    try {
+      await mutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: selectedActivity,
+          startDate: format(date, "yyyy-MM-dd"),
+          endDate: format(date, "yyyy-MM-dd"),
+          metadata: {
+            medication: medication,
+            meals: selectedMeals,
+            activities: activities,
+            comments: comments,
+            healthConcerns: healthConcerns,
+            suppliesNeeded: suppliesNeeded,
+            medicationTime: medicationTime
+          }
+        }
+      }).unwrap();
+      toast.success("Respite Log saved successfully!");
+    } catch (error) {
+      console.error("Error saving activity log:", error);
+    }
   };
 
-  const handleSubmit = () => {
-    console.log("Submitting form...");
+  const handleSubmit = async () => {
+    if (!date) {
+      toast.error("Date is required.");
+      return;
+    }
+    try {
+      const {data} = await mutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: selectedActivity,
+          startDate: format(date, "yyyy-MM-dd"),
+          endDate: format(date, "yyyy-MM-dd"),
+          metadata: {
+            medication: medication,
+            meals: selectedMeals,
+            activities: activities,
+            comments: comments,
+            healthConcerns: healthConcerns,
+            suppliesNeeded: suppliesNeeded,
+            medicationTime: medicationTime
+          }
+        }
+      }).unwrap();
+      await submitNotes({
+        activityLog: activityLogId!,
+        logNoteIds: [data.id]
+      }).unwrap();
+      toast.success("Respite Log submitted successfully!");
+      setDate(undefined);
+      setMedication("");
+      setMedicationTime("");
+      setSelectedMeals([]);
+      setActivities("");
+      setComments("");
+      setHealthConcerns("");
+      setSuppliesNeeded("");
+      setSelectedActivity("");
+    } catch (error) {
+      console.error("Error saving activity log:", error);
+    }
   };
+
+  useEffect(() => {
+    if (activityLog && activityLog.notes.length > 0) {
+      const note = activityLog.notes[activityLog.notes.length - 1];
+      setDate(note?.startDate ? new Date(note.startDate) : undefined);
+      setMedication(note?.metadata?.medication ?? "");
+      setMedicationTime(note?.metadata?.medicationTime ?? "");
+      setSelectedMeals(note?.metadata?.meals ?? []);
+      setActivities(note?.metadata?.activities ?? "");
+      setComments(note?.metadata?.comments ?? "");
+      setHealthConcerns(note?.metadata?.healthConcerns ?? "");
+      setSuppliesNeeded(note?.metadata?.suppliesNeeded ?? "");
+      setSelectedActivity(note.id);
+    }
+  }, [activityLog]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <div
+            className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
+          <p className="text-sm text-[#808081]">Loading notes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <VoiceRecordingProvider pageTitle="Respite Log">
@@ -78,8 +178,8 @@ export default function RespiteLogPage() {
               </label>
               <Input
                 type="text"
-                value={respiteLogFor}
-                onChange={(e) => setRespiteLogFor(e.target.value)}
+                value={activityLog?.metadata?.individual ?? ""}
+                disabled={true}
                 className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
               />
             </div>
@@ -89,8 +189,8 @@ export default function RespiteLogPage() {
               </label>
               <Input
                 type="text"
-                value={serviceCode}
-                disabled
+                value={activityLog?.metadata?.serviceCode ?? ""}
+                disabled={true}
                 className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4 text-[#b2b2b3]"
               />
             </div>
@@ -100,8 +200,8 @@ export default function RespiteLogPage() {
               </label>
               <Input
                 type="text"
-                value={toileting}
-                onChange={(e) => setToileting(e.target.value)}
+                value={activityLog?.metadata?.toileting ?? ""}
+                disabled={true}
                 className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
               />
             </div>
@@ -321,11 +421,12 @@ export default function RespiteLogPage() {
             </button>
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={handleSubmit}
-              className="bg-[#00b4b8] backdrop-blur-[22px] rounded-[60px] px-[8px] py-[8px] w-[71px] flex items-center justify-center"
+              className="cursor-pointer bg-[#00b4b8] backdrop-blur-[22px] rounded-[60px] px-[8px] py-[8px] w-[71px] flex items-center justify-center"
             >
             <span className="text-[12px] font-semibold leading-[1.4] text-white font-['Urbanist',sans-serif]">
-              Submit
+              {isSubmitting ? "Submitting..." : "Submit"}
             </span>
             </button>
           </div>
