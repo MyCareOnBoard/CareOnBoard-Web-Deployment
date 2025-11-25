@@ -1,4 +1,4 @@
-import React, {useState, useCallback} from "react";
+import React, {useState, useCallback, useEffect} from "react";
 import {useNavigate} from "react-router";
 import {Plus, X} from "lucide-react";
 import {Button} from "@/components/ui/button";
@@ -123,6 +123,17 @@ export default function UserPanelDashboardPage() {
     navigate(Routes.userPanel.profile);
   }
 
+  const handleOpenDocument = (url: string | null) => {
+    if (!url) return;
+    window.open(url, "_blank");
+  }
+
+  useEffect(() => {
+    if (employeeInfo) {
+      setWorkAvailability(employeeInfo?.workAvailability);
+    }
+  }, [employeeInfo])
+
   if (isLoading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -133,11 +144,6 @@ export default function UserPanelDashboardPage() {
         </div>
       </div>
     );
-  }
-
-  const handleOpenDocument = (url: string | null) => {
-    if (!url) return;
-    window.open(url, "_blank");
   }
 
   return (
@@ -182,7 +188,8 @@ export default function UserPanelDashboardPage() {
                   className="bg-[#F0FAF4] border border-[#0EAF52] text-[#0EAF52] text-sm font-semibold px-2 py-1 rounded-full">
                   ID-{employeeInfo?.tagId}
                 </div>
-                <svg onClick={goToProfile} className={"cursor-pointer"} width="40" height="40" viewBox="0 0 40 40" fill="none"
+                <svg onClick={goToProfile} className={"cursor-pointer"} width="40" height="40" viewBox="0 0 40 40"
+                     fill="none"
                      xmlns="http://www.w3.org/2000/svg">
                   <rect width="40" height="40" rx="20" fill="white" fill-opacity="0.5"/>
                   <rect x="0.5" y="0.5" width="39" height="39" rx="19.5" stroke="white" stroke-opacity="0.3"/>
@@ -212,7 +219,7 @@ export default function UserPanelDashboardPage() {
                 <span className="text-[#808081]">Work Availability</span>
                 <Toggle
                   className={"h-8 w-14"}
-                  pressed={isLoading ? workAvailability : employeeInfo?.workAvailability}
+                  pressed={workAvailability}
                   onPressedChange={handleWorkAvailabilityChange}
                 />
               </div>
@@ -302,25 +309,25 @@ export default function UserPanelDashboardPage() {
                   onClick={() => handleOpenDocument(getDocument(document.value)?.fileUrl)}
                   className="cursor-pointer flex items-center justify-between p-4 rounded-[12px] border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
                 >
-                <div className="flex items-center gap-3">
-                  <img
-                    src={"/document-image.png"}
-                    alt={"document"}
-                    className="w-12 h-12 text-[#808081] scale-x-[-1]"
-                  />
-                  <span className="text-[14px] font-medium text-[#10141a]">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={"/document-image.png"}
+                      alt={"document"}
+                      className="w-12 h-12 text-[#808081] scale-x-[-1]"
+                    />
+                    <span className="text-[14px] font-medium text-[#10141a]">
                     {document.label}
                   </span>
-                </div>
-                <span
-                  className={`capitalize text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
-                    getDocument(document.value)?.status || "pending"
-                  )}`}
-                >
+                  </div>
+                  <span
+                    className={`capitalize text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
+                      getDocument(document.value)?.status || "pending"
+                    )}`}
+                  >
                   {getDocument(document.value)?.status || "Pending"}
                 </span>
-              </div>
-            ))}
+                </div>
+              ))}
           </div>
 
           {/* Pagination */}
@@ -331,17 +338,18 @@ export default function UserPanelDashboardPage() {
                   {Math.ceil(userPanelDocumentTypes.length / itemsPerPage)}
                 </span>
               </span>
-              <div 
+              <div
                 className={`rounded-full p-2 cursor-pointer ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'bg-white'}`}
                 onClick={() => currentPage > 1 && setCurrentPage(prev => prev - 1)}
               >
                 <ChevronLeft size={14} className={currentPage === 1 ? 'text-gray-400' : ''}/>
               </div>
-              <div 
+              <div
                 className={`rounded-full p-2 cursor-pointer ${currentPage * itemsPerPage >= userPanelDocumentTypes.length ? 'opacity-50 cursor-not-allowed' : 'bg-white'}`}
                 onClick={() => currentPage * itemsPerPage < userPanelDocumentTypes.length && setCurrentPage(prev => prev + 1)}
               >
-                <ChevronRight size={14} className={currentPage * itemsPerPage >= userPanelDocumentTypes.length ? 'text-gray-400' : ''}/>
+                <ChevronRight size={14}
+                              className={currentPage * itemsPerPage >= userPanelDocumentTypes.length ? 'text-gray-400' : ''}/>
               </div>
             </div>
           )}

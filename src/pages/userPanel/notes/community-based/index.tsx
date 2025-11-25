@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Checkbox} from "@/components/ui/checkbox";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
@@ -11,7 +11,16 @@ import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Button} from "@/components/ui/button";
 import {Routes} from "@/routes/constants";
 import {ArrowLeft} from "lucide-react";
-import {useNavigate} from "react-router";
+import {useLocation, useNavigate} from "react-router";
+import {
+  useCreateOrUpdateActivityLogMutation,
+  useGetSingleActivityLogQuery,
+  useSubmitActivityLogNotesMutation
+} from "@/pages/userPanel/notes/api";
+import {useSelector} from "react-redux";
+import {RootState} from "@/store/redux/store";
+import {toast} from "sonner";
+import {useDebounce} from "@/hooks/useDebounce";
 
 type ActivityRow = {
   id: string;
@@ -28,24 +37,40 @@ type ServiceStrategy = {
   checked: boolean;
 };
 
+
+const initialActivities = [
+  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
+  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
+  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
+  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
+  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
+  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
+  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
+]
+
 export default function CommunityBasedPage() {
-  const [name, setName] = useState("");
-  const [servicePlanYear, setServicePlanYear] = useState("");
-  const [serviceCode] = useState("TDHJ/3421");
-  const [ispOutcome, setIspOutcome] = useState("");
-  const [completedBy, setCompletedBy] = useState("");
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
 
   const navigate = useNavigate();
+  const profile = useSelector((store: RootState) => store?.auth?.profile);
+  const activityLogId = new URLSearchParams(useLocation().search).get("id");
+
+  const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
+    skip: !activityLogId
+  });
+  const [mutateNote] = useCreateOrUpdateActivityLogMutation();
+  const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
+
+  const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
 
   const [serviceStrategies, setServiceStrategies] = useState<ServiceStrategy[]>([
     {
-      id: "adl",
+      id: "dailyLiving",
       label: "Assistance with Activities of Daily Living (such as getting dressed, eating, personal hygiene, etc.)",
       checked: false
     },
     {
-      id: "community",
+      id: "communityParticipation",
       label: "Assistance with Increasing Community Participation (such as daily errands, attending events, restaurant, purchasing items, travel training, etc.)",
       checked: false
     },
@@ -55,7 +80,7 @@ export default function CommunityBasedPage() {
       checked: false
     },
     {
-      id: "job-support",
+      id: "support",
       label: "Assistance with On-The-Job Support (such as safety awareness, using the restroom, attending to task, lunch/breaks, etc.)",
       checked: false
     },
@@ -66,23 +91,81 @@ export default function CommunityBasedPage() {
     },
   ]);
 
-  const [activities, setActivities] = useState<ActivityRow[]>([
-    {id: "1", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-    {id: "2", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-    {id: "3", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-    {id: "4", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-    {id: "5", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-    {id: "6", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-    {id: "7", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-  ]);
-
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
 
-  const updateActivity = (id: string, field: keyof ActivityRow, value: any) => {
-    setActivities(activities.map(activity =>
-      activity.id === id ? {...activity, [field]: value} : activity
-    ));
-  };
+  const debouncedMutateNote = useDebounce(
+    async (params: any) => {
+      await mutateNote(params).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
+      });
+    },
+    500
+  );
+
+  const updateActivity = async (
+    id: string,
+    index: number,
+    field: keyof ActivityRow,
+    value: any,
+  ) => {
+    setActivities(prevActivities => {
+      return prevActivities.map((act, activityIndex) => {
+        if ((id && act.id === id) || (index === activityIndex)) {
+          return {...act, [field]: value};
+        } else {
+          return act;
+        }
+      });
+    });
+
+    const currentActivities = activities;
+
+    let activity;
+    if (id) {
+      activity = currentActivities.find(activity => activity.id === id);
+    } else {
+      activity = currentActivities[index];
+    }
+
+    if (!activity) return;
+
+    const newActivity = {
+      ...activity,
+      [field]: value
+    };
+
+    const date = newActivity.date;
+    const startTime = field === "startTime" ? value : newActivity.startTime;
+    const endTime = field === "endTime" ? value : newActivity.endTime;
+
+    if (date && startTime && endTime && id === "") {
+      await mutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
+          endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
+          metadata: {
+            activity: newActivity.activity,
+            description: newActivity.description,
+          }
+        }
+      }).unwrap();
+    } else if (date && startTime && endTime && id !== "") {
+      debouncedMutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
+          endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
+          metadata: {
+            activity: newActivity.activity,
+            description: newActivity.description,
+          }
+        }
+      });
+    }
+  }
 
   const formatDisplayDate = (date: Date | undefined) => {
     if (!date) {
@@ -96,6 +179,74 @@ export default function CommunityBasedPage() {
       strategy.id === id ? {...strategy, checked: !strategy.checked} : strategy
     ));
   };
+
+  const handleSubmit = async () => {
+    try {
+      const errors = activities.filter((activity) => !activity.id);
+      if (errors.length > 0) {
+        toast.error(`Please fill in all required fields for these dates ${errors.map(activity => activity.date).toString()}`);
+        return;
+      }
+      await submitNotes({
+        activityLog: activityLogId!,
+        logNoteIds: activities.map((activity) => activity.id)
+      }).unwrap();
+      setActivities(initialActivities);
+      toast.success('Note submitted successfully!');
+    } catch (error: any) {
+      console.error('Error submitting activity log:', error);
+      toast.error(error?.data?.message || 'Failed to submit activity log.');
+    }
+  }
+
+  useEffect(() => {
+    if (!isLoading && activityLog && activityLog.notes.length > 0) {
+      if (activities.some((activity) => activity.id)) {
+        const newActivities = activities.map((activity, index) => {
+          if (!activity.id) {
+            if (activityLog.notes.length > index) {
+              activity.id = activityLog.notes[index].id;
+            }
+          }
+          return activity;
+        });
+        setActivities(newActivities);
+      } else {
+        const modifyActivityNotes = activityLog.notes.map((note) => ({
+          id: note.id,
+          date: note.startDate?.split("T")?.[0] ? new Date(note.startDate?.split("T")?.[0]) : undefined,
+          startTime: note.startDate ? new Date(note.startDate).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }) : "",
+          endTime: note.endDate ? new Date(note.endDate).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }) : "",
+          activity: note.metadata?.activity,
+          description: note.metadata?.description,
+        }));
+        setActivities([
+          ...modifyActivityNotes,
+          ...initialActivities.slice(modifyActivityNotes.length)
+        ]);
+      }
+    }
+  }, [isLoading, activityLog]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <div
+            className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
+          <p className="text-sm text-[#808081]">Loading notes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <VoiceRecordingProvider pageTitle="Community Based/Individual – Activities Log">
@@ -135,11 +286,12 @@ export default function CommunityBasedPage() {
         {/* Form Title */}
         <h2
           className="text-[20px] font-semibold leading-[1.6] text-[#10141a] text-center mb-2 font-['Urbanist',sans-serif]">
-          Community Based/Individual – Activities Log (TDHJ/3421)
+          Community Based/Individual – Activities Log ({activityLog?.metadata?.serviceCode})
         </h2>
 
         {/* Applicability Note */}
-        <p className="text-[14px] font-semibold leading-[1.4] text-black text-center mb-8 font-['Urbanist',sans-serif]">
+        <p
+          className="text-[14px] font-semibold leading-[1.4] text-black text-center mb-8 font-['Urbanist',sans-serif]">
           (Not applicable when delivering daily rate version of Individual Supports. Only used for 15 minute unit
           version)
         </p>
@@ -153,10 +305,10 @@ export default function CommunityBasedPage() {
             </label>
             <Input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={activityLog?.metadata?.individual || ""}
               placeholder=""
               className="w-full"
+              disabled={true}
             />
           </div>
           <div className="flex-1">
@@ -166,10 +318,10 @@ export default function CommunityBasedPage() {
             </label>
             <Input
               type="text"
-              value={servicePlanYear}
-              onChange={(e) => setServicePlanYear(e.target.value)}
+              value={activityLog?.metadata?.serviceYear || ""}
               placeholder=""
               className="w-full"
+              disabled={true}
             />
           </div>
           <div className="flex-1">
@@ -179,9 +331,9 @@ export default function CommunityBasedPage() {
             </label>
             <Input
               type="text"
-              value={serviceCode}
-              disabled
-              className="w-full text-[#b2b2b3]"
+              value={activityLog?.metadata?.serviceCode || ""}
+              disabled={true}
+              className="w-full"
             />
           </div>
         </div>
@@ -194,10 +346,10 @@ export default function CommunityBasedPage() {
           </label>
           <Input
             type="text"
-            value={ispOutcome}
-            onChange={(e) => setIspOutcome(e.target.value)}
+            value={activityLog?.metadata?.ISPOutcome || ""}
             placeholder=""
             className="w-full"
+            disabled={true}
           />
         </div>
 
@@ -210,7 +362,7 @@ export default function CommunityBasedPage() {
             {serviceStrategies.map((strategy) => (
               <Checkbox
                 key={strategy.id}
-                checked={strategy.checked}
+                checked={activityLog?.metadata?.strategies?.includes(strategy.id) || strategy.checked}
                 onChange={() => toggleStrategy(strategy.id)}
                 label={strategy.label}
                 labelClassName="text-[14px] font-normal leading-[1.4] text-[#808081] font-['Urbanist',sans-serif]"
@@ -261,18 +413,18 @@ export default function CommunityBasedPage() {
             {/* Table Body */}
             <div className="border border-[#b2b2b3] rounded-bl-[2px] rounded-br-[2px] border-t-0">
               <div className="bg-[#eef4f5]">
-                {activities.map((activity, index) => (
+                {activities?.map((activity, index) => (
                   <div
-                    key={activity.id}
+                    key={index}
                     className={`grid grid-cols-[112px_120px_120px_350px_1fr] gap-0 min-h-[71px] transition-colors ${
-                      index < activities.length - 1 ? 'border-b border-[#b2b2b3]' : ''
+                      index < activities?.length - 1 ? 'border-b border-[#b2b2b3]' : ''
                     } hover:bg-white`}
                   >
                     {/* Date */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <Popover
-                        open={openDatePopoverId === activity.id}
-                        onOpenChange={(open) => setOpenDatePopoverId(open ? activity.id : null)}
+                        open={openDatePopoverId === String(index)}
+                        onOpenChange={(open) => setOpenDatePopoverId(open ? String(index) : null)}
                       >
                         <PopoverTrigger asChild>
                           <button
@@ -294,9 +446,12 @@ export default function CommunityBasedPage() {
                             endMonth={new Date()}
                             selected={activity.date}
                             defaultMonth={activity.date ?? new Date()}
-                            onSelect={(date) => {
+                            disabled={{
+                              after: new Date()
+                            }}
+                            onSelect={async (date) => {
                               if (date) {
-                                updateActivity(activity.id, 'date', date);
+                                await updateActivity(activity.id, index, 'date', date);
                                 setOpenDatePopoverId(null);
                               }
                             }}
@@ -317,21 +472,21 @@ export default function CommunityBasedPage() {
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <TimePicker
                         value={activity.startTime}
-                        onChange={(value) => updateActivity(activity.id, 'startTime', value)}
+                        onChange={(value) => updateActivity(activity.id, index, 'startTime', value)}
                       />
                     </div>
                     {/* End Time */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <TimePicker
                         value={activity.endTime}
-                        onChange={(value) => updateActivity(activity.id, 'endTime', value)}
+                        onChange={(value) => updateActivity(activity.id, index, 'endTime', value)}
                       />
                     </div>
                     {/* Activity */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <ContentEditableCell
                         value={activity.activity}
-                        onChange={(value) => updateActivity(activity.id, 'activity', value)}
+                        onChange={(value) => updateActivity(activity.id, index, 'activity', value)}
                         fieldName="Individualized Activity"
                         pageTitle="Community Based/Individual – Activities Log"
                       />
@@ -340,7 +495,7 @@ export default function CommunityBasedPage() {
                     <div className="px-4 py-3 flex items-center justify-center">
                       <ContentEditableCell
                         value={activity.description}
-                        onChange={(value) => updateActivity(activity.id, 'description', value)}
+                        onChange={(value) => updateActivity(activity.id, index, 'description', value)}
                         fieldName="Description"
                         pageTitle="Community Based/Individual – Activities Log"
                       />
@@ -360,14 +515,24 @@ export default function CommunityBasedPage() {
           </label>
           <Input
             type="text"
-            value={completedBy}
-            onChange={(e) => setCompletedBy(e.target.value)}
+            value={profile?.fullName || ""}
             placeholder=""
+            disabled={true}
             className="max-w-md"
           />
           <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">
             {currentDate}
           </p>
+        </div>
+        <div className={"flex justify-end mt-3"}>
+          <Button
+            type={"button"}
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
+          >
+            {isSubmitting ? "Submitting..." : "Submit"}
+          </Button>
         </div>
 
         {/* Floating Action Button */}

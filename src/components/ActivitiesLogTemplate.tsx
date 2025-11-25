@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Calendar} from "@/components/ui/calendar";
@@ -10,7 +10,26 @@ import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Button} from "@/components/ui/button";
 import {Routes} from "@/routes/constants";
 import {ArrowLeft} from "lucide-react";
-import {useNavigate} from "react-router";
+import {useLocation, useNavigate} from "react-router";
+import {
+  useCreateOrUpdateActivityLogMutation,
+  useGetSingleActivityLogQuery,
+  useSubmitActivityLogNotesMutation
+} from "@/pages/userPanel/notes/api";
+import {useDebounce} from "@/hooks/useDebounce";
+import {useSelector} from "react-redux";
+import {RootState} from "@/store/redux/store";
+import {toast} from "sonner";
+
+const initialActivities = [
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+]
 
 type ActivityRow = {
   id: string;
@@ -27,29 +46,93 @@ interface ActivitiesLogTemplateProps {
 }
 
 export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProps) {
-  const [individualName, setIndividualName] = useState("");
-  const [totalUnits, setTotalUnits] = useState("");
-  const [completedBy, setCompletedBy] = useState("");
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
-  const [activities, setActivities] = useState<ActivityRow[]>([
-    {id: "1", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-    {id: "2", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-    {id: "3", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-    {id: "4", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-    {id: "5", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-    {id: "6", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-    {id: "7", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-  ]);
+  const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
+  const profile = useSelector((store: RootState) => store?.auth?.profile);
+
+  const debouncedMutateNote = useDebounce(
+    async (params: any) => {
+      await mutateNote(params).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
+      });
+    },
+    500
+  );
 
   const navigate = useNavigate();
+  const activityLogId = new URLSearchParams(useLocation().search).get("id");
+
+  const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
+    skip: !activityLogId
+  });
+  const [mutateNote] = useCreateOrUpdateActivityLogMutation();
+  const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
 
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
 
-  const updateActivity = (id: string, field: keyof ActivityRow, value: any) => {
-    setActivities(activities.map(activity =>
-      activity.id === id ? {...activity, [field]: value} : activity
-    ));
-  };
+  const updateActivity = async (
+    id: string,
+    index: number,
+    field: keyof ActivityRow,
+    value: any,
+  ) => {
+    setActivities(prevActivities => {
+      return prevActivities.map((act, activityIndex) => {
+        if ((id && act.id === id) || (index === activityIndex)) {
+          return {...act, [field]: value};
+        } else {
+          return act;
+        }
+      });
+    });
+
+    const currentActivities = activities;
+
+    let activity;
+    if (id) {
+      activity = currentActivities.find(activity => activity.id === id);
+    } else {
+      activity = currentActivities[index];
+    }
+
+    if (!activity) return;
+
+    const newActivity = {
+      ...activity,
+      [field]: value
+    };
+
+    const date = newActivity.date;
+    const metadata = {
+      units: newActivity.units,
+      strategies: newActivity.strategies,
+      activities: newActivity.activities,
+      location: newActivity.location,
+      notes: newActivity.notes,
+    };
+
+    if (date && id === "") {
+      await mutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(date, "yyyy-MM-dd"),
+          endDate: format(date, "yyyy-MM-dd"),
+          metadata: metadata
+        }
+      }).unwrap();
+    } else if (date && id !== "") {
+      debouncedMutateNote({
+        activityLog: activityLogId!,
+        data: {
+          id: id,
+          startDate: format(date, "yyyy-MM-dd"),
+          endDate: format(date, "yyyy-MM-dd"),
+          metadata: metadata
+        }
+      });
+    }
+  }
 
   const formatDisplayDate = (date: Date | undefined) => {
     if (!date) {
@@ -57,6 +140,67 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
     }
     return format(date, "dd.MM.yy");
   };
+
+  const handleSubmit = async () => {
+    try {
+      const errors = activities.filter((activity) => !activity.id);
+      if (errors.length > 0) {
+        toast.error(`Please fill in all required fields for these dates ${errors.map(activity => activity.date).toString()}`);
+        return;
+      }
+      await submitNotes({
+        activityLog: activityLogId!,
+        logNoteIds: activities.map((activity) => activity.id)
+      }).unwrap();
+      setActivities(initialActivities);
+      toast.success('Note submitted successfully!');
+    } catch (error: any) {
+      console.error('Error submitting activity log:', error);
+      toast.error(error?.data?.message || 'Failed to submit activity log.');
+    }
+  }
+
+  useEffect(() => {
+    if (!isLoading && activityLog && activityLog.notes.length > 0) {
+      if (activities.some((activity) => activity.id)) {
+        const newActivities = activities.map((activity, index) => {
+          if (!activity.id) {
+            if (activityLog.notes.length > index) {
+              activity.id = activityLog.notes[index].id;
+            }
+          }
+          return activity;
+        });
+        setActivities(newActivities);
+      } else {
+        const modifyActivityNotes = activityLog.notes.map((note) => ({
+          id: note.id,
+          date: note.startDate ? new Date(note.startDate) : undefined,
+          units: note.metadata?.units,
+          strategies: note.metadata?.strategies,
+          activities: note.metadata?.activities,
+          location: note.metadata?.location,
+          notes: note.metadata?.notes,
+        }));
+        setActivities([
+          ...modifyActivityNotes,
+          ...initialActivities.slice(modifyActivityNotes.length)
+        ]);
+      }
+    }
+  }, [isLoading, activityLog]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <div
+            className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
+          <p className="text-sm text-[#808081]">Loading notes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <VoiceRecordingProvider pageTitle={title}>
@@ -96,13 +240,13 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
         {/* Form Title */}
         <h2
           className="text-[20px] font-semibold leading-[1.6] text-[#10141a] text-center mb-8 font-['Urbanist',sans-serif] whitespace-pre-wrap">
-          {title}
+          {title.replace(":serviceCode", activityLog?.metadata?.serviceCode ?? "")}
         </h2>
 
         {/* Name of Individual */}
         <div className="mb-6">
           <p className="text-[14px] font-semibold leading-[1.4] text-black font-['Urbanist',sans-serif]">
-            Name of Individual :
+            Name of Individual : {activityLog?.metadata?.individual}
           </p>
         </div>
 
@@ -193,7 +337,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
               <div className="bg-[#eef4f5]">
                 {activities.map((activity, index) => (
                   <div
-                    key={activity.id}
+                    key={index}
                     className={`grid grid-cols-[112px_120px_160px_230px_140px_1fr] gap-0 min-h-[71px] transition-colors ${
                       index < activities.length - 1 ? 'border-b border-[#b2b2b3]' : ''
                     } hover:bg-white`}
@@ -201,8 +345,8 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     {/* Date */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <Popover
-                        open={openDatePopoverId === activity.id}
-                        onOpenChange={(open) => setOpenDatePopoverId(open ? activity.id : null)}
+                        open={openDatePopoverId === String(index)}
+                        onOpenChange={(open) => setOpenDatePopoverId(open ? String(index) : null)}
                       >
                         <PopoverTrigger asChild>
                           <button
@@ -223,10 +367,13 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                             startMonth={new Date(1924, 0)}
                             endMonth={new Date()}
                             selected={activity.date}
+                            disabled={{
+                              after: new Date()
+                            }}
                             defaultMonth={activity.date ?? new Date()}
-                            onSelect={(date) => {
+                            onSelect={async (date) => {
                               if (date) {
-                                updateActivity(activity.id, 'date', date);
+                                await updateActivity(activity.id, index, 'date', date);
                                 setOpenDatePopoverId(null);
                               }
                             }}
@@ -248,7 +395,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                       <Input
                         type="number"
                         value={activity.units}
-                        onChange={(e) => updateActivity(activity.id, 'units', e.target.value)}
+                        onChange={(e) => updateActivity(activity.id, index, 'units', e.target.value)}
                         className="h-auto p-0 border-0 bg-transparent text-center focus-visible:ring-0 text-[14px] w-full"
                       />
                     </div>
@@ -256,7 +403,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <ContentEditableCell
                         value={activity.strategies}
-                        onChange={(value) => updateActivity(activity.id, 'strategies', value)}
+                        onChange={(value) => updateActivity(activity.id, index, 'strategies', value)}
                         fieldName="Strategies Addressed Today"
                         pageTitle={title}
                       />
@@ -265,7 +412,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <ContentEditableCell
                         value={activity.activities}
-                        onChange={(value) => updateActivity(activity.id, 'activities', value)}
+                        onChange={(value) => updateActivity(activity.id, index, 'activities', value)}
                         fieldName="Today's Activities to Address Strategies"
                         pageTitle={title}
                       />
@@ -274,7 +421,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <ContentEditableCell
                         value={activity.location}
-                        onChange={(value) => updateActivity(activity.id, 'location', value)}
+                        onChange={(value) => updateActivity(activity.id, index, 'location', value)}
                         fieldName="Location of Activities"
                         pageTitle={title}
                       />
@@ -283,7 +430,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     <div className="px-4 py-3 flex items-center justify-center">
                       <ContentEditableCell
                         value={activity.notes}
-                        onChange={(value) => updateActivity(activity.id, 'notes', value)}
+                        onChange={(value) => updateActivity(activity.id, index, 'notes', value)}
                         fieldName="Notes Related to Today's Activities & Progress Toward Outcome(s)"
                         pageTitle={title}
                       />
@@ -298,7 +445,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
         {/* Total Units Label - Positioned below Units column */}
         <div className="mt-4">
           <p className="text-[14px] font-semibold leading-[1.4] text-black font-['Urbanist',sans-serif]">
-            Total Units :
+            Total Units : {activities.reduce((acc, activity) => acc + (Number(activity.units) || 0), 0)}
           </p>
         </div>
 
@@ -310,16 +457,25 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
           </label>
           <Input
             type="text"
-            value={completedBy}
-            onChange={(e) => setCompletedBy(e.target.value)}
+            value={profile?.fullName ?? ""}
             placeholder="Enter name"
             className="max-w-md"
+            disabled={true}
           />
           <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">
             {currentDate}
           </p>
         </div>
-
+        <div className={"flex justify-end mt-3"}>
+          <Button
+            type={"button"}
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
+          >
+            {isSubmitting ? "Submitting..." : "Submit"}
+          </Button>
+        </div>
         {/* Floating Action Button */}
         <VoiceInputButton/>
       </div>
