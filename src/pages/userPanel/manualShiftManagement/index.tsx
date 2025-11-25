@@ -573,12 +573,12 @@ export default function ManualShiftManagementPage() {
       // Step 1: Fetch existing draft shifts
       const existingDraftsResponse = await listShifts({
         agencyId: user.uid,
+        type: ShiftType.MANUAL,
+        submissionStatus: SubmissionStatus.DRAFT,
         limit: 100,
       });
 
-      const existingDrafts = existingDraftsResponse.shifts.filter(
-        (shift) => shift.type === ShiftType.MANUAL && shift.submissionStatus === SubmissionStatus.DRAFT
-      );
+      const existingDrafts = existingDraftsResponse.shifts
 
       console.log(`📄 Found ${existingDrafts.length} existing draft(s)`);
 
