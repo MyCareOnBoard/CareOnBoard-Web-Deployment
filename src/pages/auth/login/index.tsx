@@ -87,6 +87,7 @@ export default function LoginPage() {
   const dashboardRoutes = {
     [UserType.APPLICANT]: Routes.applicant.dashboard,
     [UserType.USER]: Routes.userPanel.dashboard,
+    [UserType.AGENCY]: Routes.agency.dashboard,
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
