@@ -8,8 +8,6 @@ import DashboardSidebar, {NavItem} from "@/components/DashboardSidebar";
 import {UserProfile, UserType} from "@/lib/api/users";
 import {useSelector} from "react-redux";
 import type {RootState} from "@/store/redux/store";
-import QuestionIcon from "@/assets/icons/question-mark-circle.svg?react";
-import CogIcon from "@/assets/icons/cog.svg?react";
 import HomeIcon from "@/assets/icons/home.svg?react";
 import AiIcon from "@/assets/icons/ai.svg?react";
 import SupportIcon from "@/assets/icons/support.svg?react";
@@ -30,9 +28,9 @@ const navItems: NavItem[] = [
   {label: "DSP Management", path: Routes.agency.dspManagement, icon: UserRoundPlus},
   {label: "Client Management", path: Routes.agency.clients, icon: UsersRound},
   {label: "Scheduling", path: Routes.agency.scheduling, icon: NotepadText},
-  {label: "Notes", path: Routes.agency.analytics, icon: CalendarDays},
+  {label: "Notes", path: Routes.agency.notes, icon: CalendarDays},
   {label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText},
-  {label: "AI Automation", path: Routes.agency.analytics, icon: AiIcon},
+  {label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon},
   {label: "Support", path: Routes.agency.analytics, icon: SupportIcon},
   {label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon},
   {label: "Applicant Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon},

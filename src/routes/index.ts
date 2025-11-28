@@ -26,7 +26,6 @@ import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
 import ManualShiftManagementPage from "@/pages/userPanel/manualShiftManagement";
 import ClientsAndServicesPage from "@/pages/userPanel/clientsAndServices";
 import PlanOfCarePage from "@/pages/userPanel/planOfCare";
-import NotesPage from "@/pages/userPanel/notes";
 import CommunityBasedPage from "@/pages/userPanel/notes/community-based";
 import CommunityInclusionPage from "@/pages/userPanel/notes/community-inclusion";
 import DayHabilitationPage from "@/pages/userPanel/notes/day-habilitation";
@@ -45,6 +44,7 @@ import ApplicantDirectoryPage from "@/pages/agency/applicant-directory";
 import ReportsPage from "@/pages/agency/reports";
 import ComplianceAlertsPage from "@/pages/agency/compliance-alerts";
 import ShiftsPage from "@/pages/agency/shifts";
+import NotesPage from "@/pages/agency/notes";
 
 
 export const router = createBrowserRouter([
@@ -165,6 +165,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.agency.shifts,
         Component: ShiftsPage,
+      },
+      {
+        path: Routes.agency.notes,
+        Component: NotesPage,
       },
       {
         path: Routes.agency.helpCenter,
