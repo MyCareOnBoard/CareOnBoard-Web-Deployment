@@ -9,6 +9,7 @@ type TimeFilter = "lastWeek" | "thisMonth" | "thisYear";
 export default function ShiftsPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("lastWeek");
   const [hoveredShift, setHoveredShift] = useState<number | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const navigate = useNavigate();
@@ -176,12 +177,45 @@ export default function ShiftsPage() {
         </div>
 
         {/* Chart */}
-        <div className="relative">
+        <div className="relative mt-20">
+          {/* Tooltips Container (positioned outside scroll) */}
+          <div className="absolute inset-0 pointer-events-none z-50 overflow-visible">
+            {hoveredShift !== null && shiftsData[hoveredShift]?.scheduled > 0 ? (
+              <div
+                key={`tooltip-${shiftsData[hoveredShift].day}`}
+                className="absolute bottom-full mb-2"
+                style={{
+                  left: `${tooltipPosition - (scrollContainerRef.current?.scrollLeft || 0)}px`,
+                  transform: 'translateX(-50%)',
+                }}
+              >
+                <div className="rounded bg-white text-black px-4 py-3 whitespace-nowrap shadow-lg">
+                  <div className="mb-1 text-sm font-semibold">
+                    Report for {shiftsData[hoveredShift].date}
+                  </div>
+                  <div className="flex justify-between items-center gap-4">
+                    <div className="text-[#808081] text-xs">Scheduled View</div>
+                    <div className="text-black text-xs font-semibold">
+                      {shiftsData[hoveredShift].scheduled}
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center gap-4">
+                    <div className="text-[#808081] text-xs">Visit Completed</div>
+                    <div className="text-black text-xs font-semibold">
+                      {shiftsData[hoveredShift].completed}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
           <div
             ref={scrollContainerRef}
             className={`flex items-end gap-3 h-[280px] relative pb-4 ${
-              timeFilter === "thisMonth" ? "overflow-x-auto scrollbar-hide" : "justify-between"
+              timeFilter === "thisMonth" ? "overflow-x-auto scrollbar-hide" : "justify-between overflow-visible"
             }`}
+            style={{overflowY: 'visible'}}
           >
             {shiftsData.map((shift, index) => (
               <div
@@ -189,31 +223,17 @@ export default function ShiftsPage() {
                 className={`flex flex-col items-center h-full justify-end relative ${
                   timeFilter === "thisMonth" ? "min-w-[80px] flex-shrink-0" : "flex-1 min-w-[60px]"
                 }`}
-                onMouseEnter={() => setHoveredShift(index)}
+                onMouseEnter={(e) => {
+                  setHoveredShift(index);
+                  if (scrollContainerRef.current) {
+                    const containerRect = scrollContainerRef.current.getBoundingClientRect();
+                    const elementRect = e.currentTarget.getBoundingClientRect();
+                    const relativeLeft = elementRect.left - containerRect.left + scrollContainerRef.current.scrollLeft;
+                    setTooltipPosition(relativeLeft + (timeFilter === "thisMonth" ? 40 : elementRect.width / 2));
+                  }
+                }}
                 onMouseLeave={() => setHoveredShift(null)}
               >
-                {/* Tooltip */}
-                {hoveredShift === index && shift.scheduled > 0 && (
-                  <div
-                    className="rounded absolute bottom-full mb-2 bg-white text-black px-4 py-3 whitespace-nowrap z-50 shadow-lg">
-                    <div className="mb-1 text-sm font-semibold">
-                      Report for {shift.date}
-                    </div>
-                    <div className="flex justify-between items-center gap-4">
-                      <div className="text-[#808081] text-xs">Scheduled View</div>
-                      <div className="text-black text-xs font-semibold">
-                        {shift.scheduled}
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center gap-4">
-                      <div className="text-[#808081] text-xs">Visit Completed</div>
-                      <div className="text-black text-xs font-semibold">
-                        {shift.completed}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <div className="relative w-full flex gap-1 items-end justify-center h-full">
                   {shift.scheduled > 0 ? (
                     <>
