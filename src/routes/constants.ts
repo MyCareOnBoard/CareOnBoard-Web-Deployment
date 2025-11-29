@@ -10,6 +10,23 @@ export const Routes = {
     settings: "/applicant/dashboard/settings",
     profile: "/applicant/dashboard/profile",
   },
+  agency: {
+    dashboard: "/agency/dashboard",
+    dspManagement: "/agency/dsp-management",
+    clients: "/agency/clients",
+    billingAndApprovals: "/agency/billing-and-approvals",
+    aiAutomation: "/agency/automations",
+    scheduling: "/agency/scheduling",
+    analytics: "/agency/analytics",
+    applicantDirectory: "/agency/applicant-directory",
+    reports: "/agency/reports",
+    complianceAlerts: "/agency/dashboard/compliance-alerts",
+    shifts: "/agency/dashboard/shifts",
+    notes: "/agency/notes",
+    helpCenter: "/agency/dashboard/help-center",
+    settings: "/agency/dashboard/settings",
+    profile: "/agency/dashboard/profile",
+  },
   userPanel: {
     dashboard: "/user-panel/dashboard",
     shiftManagement: "/user-panel/shift-management",
@@ -28,9 +45,9 @@ export const Routes = {
     },
     mileage: "/user-panel/mileage",
     expenses: "/user-panel/expenses",
-    helpCenter: "/user-panel/dashboard/help-center",
-    settings: "/user-panel/dashboard/settings",
-    profile: "/user-panel/dashboard/profile",
+    helpCenter: "/user-panel/help-center",
+    settings: "/user-panel/settings",
+    profile: "/user-panel/profile",
   },
   auth: {
     login: "/auth/login",
@@ -45,8 +62,8 @@ export const Routes = {
     success: "/onboarding/success",
   },
   common: {
-    helpCenter: "/:userType/dashboard/help-center",
-    settings: "/:userType/dashboard/settings",
-    profile: "/:userType/dashboard/profile",
+    helpCenter: "/:userType/help-center",
+    settings: "/:userType/settings",
+    profile: "/:userType/profile",
   }
 };

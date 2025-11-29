@@ -11,6 +11,7 @@ export interface FirebaseTimestamp {
 export enum UserType {
   APPLICANT = "applicant",
   USER = "employee",
+  AGENCY = "agency",
 }
 
 /**
