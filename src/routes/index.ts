@@ -44,7 +44,8 @@ import ApplicantDirectoryPage from "@/pages/agency/applicant-directory";
 import ReportsPage from "@/pages/agency/reports";
 import ComplianceAlertsPage from "@/pages/agency/compliance-alerts";
 import ShiftsPage from "@/pages/agency/shifts";
-import NotesPage from "@/pages/agency/notes";
+import NotesPage from "@/pages/userPanel/notes";
+import AgencyNotesPage from "@/pages/agency/notes";
 
 
 export const router = createBrowserRouter([
@@ -168,7 +169,7 @@ export const router = createBrowserRouter([
       },
       {
         path: Routes.agency.notes,
-        Component: NotesPage,
+        Component: AgencyNotesPage,
       },
       {
         path: Routes.agency.helpCenter,
