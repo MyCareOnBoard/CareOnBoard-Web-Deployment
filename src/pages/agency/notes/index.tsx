@@ -2,6 +2,9 @@ import React, {useState, useRef, useEffect} from "react";
 import {Search, ChevronLeft, ChevronRight, CornerDownLeft} from "lucide-react";
 import {useGetAllSubmittedNotesQuery, useApproveSubmittedNotesMutation, useRejectSubmittedNotesMutation} from "./api";
 import {formatDistanceToNow} from "date-fns";
+import AgencyEditNote from "@/pages/agency/notes/editNote";
+import {useLocation, useNavigate} from "react-router";
+import {Routes} from "@/routes/constants";
 
 type NoteStatus = "submitted" | "approved" | "rejected";
 type FilterType =
@@ -23,8 +26,13 @@ export default function AgencyNotesPage() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [timeInterval, setTimeInterval] = useState<TimeIntervalType>("all");
   const [statusTab, setStatusTab] = useState<StatusTabType>("submitted");
+  const [isViewMode, setIsViewMode] = useState(false);
   const filterScrollRef = useRef<HTMLDivElement>(null);
   const itemsPerPage = 10;
+
+  const activityLogId = new URLSearchParams(useLocation().search).get("id");
+
+  const navigate = useNavigate();
 
   // Debounce search input
   useEffect(() => {
@@ -140,6 +148,10 @@ export default function AgencyNotesPage() {
       });
     }
   };
+
+  useEffect(() => {
+    if (activityLogId) setIsViewMode(true);
+  }, [activityLogId]);
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -393,7 +405,12 @@ export default function AgencyNotesPage() {
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2 justify-end">
                       <button
-                        className="cursor-pointer px-4 py-1.5 text-[11px] rounded-full bg-[#B2B2B3] font-semibold text-white hover:bg-[#9a9a9b] transition-colors flex items-center gap-1">
+                        onClick={() => {
+                          navigate(Routes.agency.notes + `?id=${note.activityLogId}`)
+                          setIsViewMode(true)
+                        }}
+                        className="cursor-pointer px-4 py-1.5 text-[11px] rounded-full bg-[#B2B2B3] font-semibold text-white hover:bg-[#9a9a9b] transition-colors flex items-center gap-1"
+                      >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                              strokeWidth="2">
                           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -484,6 +501,12 @@ export default function AgencyNotesPage() {
           </div>
         )}
       </div>
+
+      <AgencyEditNote
+        isOpen={isViewMode}
+        setIsOpen={setIsViewMode}
+        activityLogId={activityLogId}
+      />
     </div>
   );
 }
