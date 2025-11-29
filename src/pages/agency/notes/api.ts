@@ -16,6 +16,7 @@ export const agencyNotesApi = createApi({
         if (params.activityType) queryParams.append('activityType', params.activityType);
         if (params.search) queryParams.append('search', params.search);
         if (params.timeInterval) queryParams.append('timeInterval', params.timeInterval);
+        if (params.status) queryParams.append('status', params.status);
         
         return {
           url: `/employees/employee/submitted-notes?${queryParams.toString()}`,
@@ -25,9 +26,27 @@ export const agencyNotesApi = createApi({
       },
       providesTags: ['SubmittedNotes']
     }),
+    approveSubmittedNotes: builder.mutation<void, string>({
+      query: (submissionId) => ({
+        url: `/employees/employee/submitted-notes/${submissionId}/approve`,
+        method: "POST",
+        requiresAuth: true
+      }),
+      invalidatesTags: ['SubmittedNotes']
+    }),
+    rejectSubmittedNotes: builder.mutation<void, string>({
+      query: (submissionId) => ({
+        url: `/employees/employee/submitted-notes/${submissionId}/reject`,
+        method: "POST",
+        requiresAuth: true
+      }),
+      invalidatesTags: ['SubmittedNotes']
+    }),
   }),
 });
 
 export const {
   useGetAllSubmittedNotesQuery,
+  useApproveSubmittedNotesMutation,
+  useRejectSubmittedNotesMutation,
 } = agencyNotesApi;

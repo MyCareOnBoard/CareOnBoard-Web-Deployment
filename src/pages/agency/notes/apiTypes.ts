@@ -15,6 +15,8 @@ export interface SubmittedNote {
   activityDescription: string;
   submittedAt: string | null;
   submittedBy: string;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
   noteCount: number;
   notes: SubmittedNoteDetail[];
   status: "submitted" | "approved" | "rejected";
@@ -38,4 +40,5 @@ export interface SubmittedNotesQueryParams {
   activityType?: string;
   search?: string;
   timeInterval?: 'today' | 'this-month' | 'this-year' | 'all';
+  status?: 'submitted' | 'approved';
 }

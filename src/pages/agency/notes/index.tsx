@@ -1,6 +1,6 @@
 import React, {useState, useRef, useEffect} from "react";
 import {Search, ChevronLeft, ChevronRight, CornerDownLeft} from "lucide-react";
-import {useGetAllSubmittedNotesQuery} from "./api";
+import {useGetAllSubmittedNotesQuery, useApproveSubmittedNotesMutation, useRejectSubmittedNotesMutation} from "./api";
 import {formatDistanceToNow} from "date-fns";
 
 type NoteStatus = "submitted" | "approved" | "rejected";
@@ -14,6 +14,7 @@ type FilterType =
   | "supported-employment-pre"
   | "supported-employment-intervention";
 type TimeIntervalType = "all" | "today" | "this-month" | "this-year";
+type StatusTabType = "submitted" | "approved";
 
 export default function AgencyNotesPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,6 +22,7 @@ export default function AgencyNotesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [timeInterval, setTimeInterval] = useState<TimeIntervalType>("all");
+  const [statusTab, setStatusTab] = useState<StatusTabType>("submitted");
   const filterScrollRef = useRef<HTMLDivElement>(null);
   const itemsPerPage = 10;
 
@@ -39,8 +41,12 @@ export default function AgencyNotesPage() {
     limit: itemsPerPage,
     activityType: activeFilter,
     search: debouncedSearch,
-    timeInterval: timeInterval
+    timeInterval: timeInterval,
+    status: statusTab
   });
+
+  const [approveNotes, {isLoading: isApproving}] = useApproveSubmittedNotesMutation();
+  const [rejectNotes, {isLoading: isRejecting}] = useRejectSubmittedNotesMutation();
 
   const submittedNotes = data?.data || [];
   const pagination = data?.pagination || {
@@ -72,7 +78,27 @@ export default function AgencyNotesPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFilter, timeInterval]);
+  }, [activeFilter, timeInterval, statusTab]);
+
+  const handleApprove = async (submissionId: string) => {
+    try {
+      await approveNotes(submissionId).unwrap();
+      // Success - the query will automatically refetch due to invalidatesTags
+    } catch (error) {
+      console.error('Failed to approve notes:', error);
+      alert('Failed to approve notes. Please try again.');
+    }
+  };
+
+  const handleReject = async (submissionId: string) => {
+    try {
+      await rejectNotes(submissionId).unwrap();
+      // Success - the query will automatically refetch due to invalidatesTags
+    } catch (error) {
+      console.error('Failed to reject notes:', error);
+      alert('Failed to reject notes. Please try again.');
+    }
+  };
 
   const getStatusBadge = (status: NoteStatus) => {
     switch (status) {
@@ -127,6 +153,36 @@ export default function AgencyNotesPage() {
 
       {/* Main Content */}
       <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
+        {/* Status Tabs */}
+        <div className="flex items-center gap-3 mb-6 border-b border-[#e5e5e6] pb-4">
+          <button
+            onClick={() => setStatusTab("submitted")}
+            className={`px-6 py-2 text-[14px] font-semibold transition-all relative ${
+              statusTab === "submitted"
+                ? "text-[#2B82FF]"
+                : "text-[#808081] hover:text-[#10141a]"
+            }`}
+          >
+            Submitted
+            {statusTab === "submitted" && (
+              <div className="absolute bottom-[-17px] left-0 right-0 h-[3px] bg-[#2B82FF] rounded-t-full"/>
+            )}
+          </button>
+          <button
+            onClick={() => setStatusTab("approved")}
+            className={`px-6 py-2 text-[14px] font-semibold transition-all relative ${
+              statusTab === "approved"
+                ? "text-[#2B82FF]"
+                : "text-[#808081] hover:text-[#10141a]"
+            }`}
+          >
+            Approved
+            {statusTab === "approved" && (
+              <div className="absolute bottom-[-17px] left-0 right-0 h-[3px] bg-[#2B82FF] rounded-t-full"/>
+            )}
+          </button>
+        </div>
+
         {/* Filter Tabs and Actions */}
         <div className="flex items-center justify-between mb-6">
           {/* Filter Tabs with Scroll */}
@@ -144,7 +200,7 @@ export default function AgencyNotesPage() {
             >
               <button
                 onClick={() => setActiveFilter("all")}
-                className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
                   activeFilter === "all"
                     ? "bg-[#2B82FF] text-white"
                     : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
@@ -154,7 +210,7 @@ export default function AgencyNotesPage() {
               </button>
               <button
                 onClick={() => setActiveFilter("community-based")}
-                className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
                   activeFilter === "community-based"
                     ? "bg-[#2B82FF] text-white"
                     : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
@@ -164,7 +220,7 @@ export default function AgencyNotesPage() {
               </button>
               <button
                 onClick={() => setActiveFilter("community-inclusion")}
-                className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
                   activeFilter === "community-inclusion"
                     ? "bg-[#2B82FF] text-white"
                     : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
@@ -174,7 +230,7 @@ export default function AgencyNotesPage() {
               </button>
               <button
                 onClick={() => setActiveFilter("day-habilitation")}
-                className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
                   activeFilter === "day-habilitation"
                     ? "bg-[#2B82FF] text-white"
                     : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
@@ -184,7 +240,7 @@ export default function AgencyNotesPage() {
               </button>
               <button
                 onClick={() => setActiveFilter("prevocational-training")}
-                className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
                   activeFilter === "prevocational-training"
                     ? "bg-[#2B82FF] text-white"
                     : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
@@ -194,7 +250,7 @@ export default function AgencyNotesPage() {
               </button>
               <button
                 onClick={() => setActiveFilter("respite-log")}
-                className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
                   activeFilter === "respite-log"
                     ? "bg-[#2B82FF] text-white"
                     : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
@@ -204,7 +260,7 @@ export default function AgencyNotesPage() {
               </button>
               <button
                 onClick={() => setActiveFilter("supported-employment-pre")}
-                className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
                   activeFilter === "supported-employment-pre"
                     ? "bg-[#2B82FF] text-white"
                     : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
@@ -214,7 +270,7 @@ export default function AgencyNotesPage() {
               </button>
               <button
                 onClick={() => setActiveFilter("supported-employment-intervention")}
-                className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
                   activeFilter === "supported-employment-intervention"
                     ? "bg-[#2B82FF] text-white"
                     : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
@@ -345,28 +401,40 @@ export default function AgencyNotesPage() {
                         </svg>
                         View
                       </button>
-                      <button
-                        className="cursor-pointer px-4 py-1.5 text-[11px] rounded-full bg-[#B2B2B3] font-semibold text-white hover:bg-[#9a9a9b] transition-colors flex items-center gap-1">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             strokeWidth="2">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                        Edit
-                      </button>
-                      <button
-                        className="px-4 py-1.5 text-[11px] rounded-full bg-[#0EAF52] font-semibold text-white hover:bg-[#0c9644] transition-colors flex items-center gap-1">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Approve
-                      </button>
-                      <button
-                        className="px-4 py-1.5 text-[11px] rounded-full bg-[#FF6900] font-semibold text-white hover:bg-[#e55f00] transition-colors flex items-center gap-1">
-                        <CornerDownLeft size={14}/>
-                        Reject
-                      </button>
+                      {statusTab === "submitted" && (
+                        <>
+                          <button
+                            className="cursor-pointer px-4 py-1.5 text-[11px] rounded-full bg-[#B2B2B3] font-semibold text-white hover:bg-[#9a9a9b] transition-colors flex items-center gap-1">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 strokeWidth="2">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleApprove(note.id)}
+                            disabled={isApproving || isRejecting}
+                            className={`px-4 py-1.5 text-[11px] rounded-full bg-[#0EAF52] font-semibold text-white hover:bg-[#0c9644] transition-colors flex items-center gap-1 ${
+                              (isApproving || isRejecting) ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            {isApproving ? 'Approving...' : 'Approve'}
+                          </button>
+                          <button
+                            onClick={() => handleReject(note.id)}
+                            disabled={isApproving || isRejecting}
+                            className={`px-4 py-1.5 text-[11px] rounded-full bg-[#FF6900] font-semibold text-white hover:bg-[#e55f00] transition-colors flex items-center gap-1 ${
+                              (isApproving || isRejecting) ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}>
+                            <CornerDownLeft size={14}/>
+                            {isRejecting ? 'Rejecting...' : 'Reject'}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
