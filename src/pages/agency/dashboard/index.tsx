@@ -2,6 +2,7 @@ import React, {useState} from "react";
 import {ChevronRight, ArrowUpRight, ChevronLeft} from "lucide-react";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
+import {useGetExpiredDocumentsQuery} from "@/pages/agency/compliance-alerts/api";
 
 export default function AgencyDashboardPage() {
   const navigate = useNavigate();
@@ -34,22 +35,18 @@ export default function AgencyDashboardPage() {
 
   const [hoveredShift, setHoveredShift] = useState<number | null>(null);
 
-  const complianceAlerts = [
-    {
-      id: 1,
-      title: "Nola Hawkins",
-      subtitle: "Client",
-      document: "I-9 Form",
-      status: "Expired (2days ago)",
-    },
-    {
-      id: 2,
-      title: "Nola Hawkins",
-      subtitle: "DSP",
-      document: "I-9 Form",
-      status: "Expired (2days ago)",
-    },
-  ];
+  // Fetch expired documents for compliance alerts
+  const {data: expiredDocsData, isLoading: isLoadingAlerts} = useGetExpiredDocumentsQuery();
+  const expiredDocuments = expiredDocsData?.data || [];
+
+  // Transform to dashboard format and limit to first 10
+  const complianceAlerts = expiredDocuments.slice(0, 10).map(doc => ({
+    id: doc.id,
+    title: doc.employee.fullName,
+    subtitle: doc.employee.role,
+    document: doc.documentType,
+    status: `Expired (${doc.daysExpired} day${doc.daysExpired !== 1 ? 's' : ''} ago)`,
+  }));
 
   const maxShiftValue = Math.max(...shiftsData.map((d) => Math.max(d.scheduled, d.completed)));
 
@@ -256,29 +253,39 @@ export default function AgencyDashboardPage() {
 
               {/* Table */}
               <div className="space-y-3">
-                {complianceAlerts.map((alert) => (
-                  <div key={alert.id}
-                       className="flex items-center justify-between py-4 px-4 rounded-lg hover:bg-[#f9fafb] transition-colors border-b border-[#e5e5e6] last:border-0">
-                    <div className="flex-1">
-                      <div className="text-[14px] font-semibold text-[#10141a]">{alert.title}</div>
-                      <div className="text-[12px] font-medium text-[#808081]">{alert.subtitle}</div>
-                    </div>
-                    <div className="flex-1 px-4">
-                      <div className="text-[14px] text-[#808081]">Document</div>
-                      <div className="text-[14px] font-medium text-[#10141a]">{alert.document}</div>
-                    </div>
-                    <div className="flex-1 px-4">
-                      <div className="text-[14px] text-[#808081]">Status</div>
-                      <div className="text-[14px] font-medium text-[#d53411]">{alert.status}</div>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <button
-                        className="cursor-pointer px-4 py-2 text-[13px] rounded-full bg-[#B2B2B31A] border border-[#B2B2B3] font-semibold text-[#565656] transition-colors">
-                        Send Alert
-                      </button>
-                    </div>
+                {isLoadingAlerts ? (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-[14px] text-[#808081]">Loading compliance alerts...</p>
                   </div>
-                ))}
+                ) : complianceAlerts.length === 0 ? (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-[14px] text-[#808081]">No expired documents found.</p>
+                  </div>
+                ) : (
+                  complianceAlerts.map((alert) => (
+                    <div key={alert.id}
+                         className="flex items-center justify-between py-4 px-4 rounded-lg hover:bg-[#f9fafb] transition-colors border-b border-[#e5e5e6] last:border-0">
+                      <div className="flex-1">
+                        <div className="text-[14px] font-semibold text-[#10141a]">{alert.title}</div>
+                        <div className="text-[12px] font-medium text-[#808081]">{alert.subtitle}</div>
+                      </div>
+                      <div className="flex-1 px-4">
+                        <div className="text-[14px] text-[#808081]">Document</div>
+                        <div className="text-[14px] font-medium text-[#10141a]">{alert.document}</div>
+                      </div>
+                      <div className="flex-1 px-4">
+                        <div className="text-[14px] text-[#808081]">Status</div>
+                        <div className="text-[14px] font-medium text-[#d53411]">{alert.status}</div>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <button
+                          className="cursor-pointer px-4 py-2 text-[13px] rounded-full bg-[#B2B2B31A] border border-[#B2B2B3] font-semibold text-[#565656] transition-colors">
+                          Send Alert
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* Pagination */}
