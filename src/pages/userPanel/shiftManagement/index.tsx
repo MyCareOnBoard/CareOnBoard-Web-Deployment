@@ -14,8 +14,6 @@ import {
   clockIn as apiClockIn,
   shiftStarted as apiShiftStarted,
   clockOut as apiClockOut,
-  updateShiftStatus,
-  seedShifts,
   getAvailableShifts,
   getPreviousShifts,
 } from "@/lib/api/shift-management";
@@ -835,35 +833,6 @@ export default function ShiftManagementPage() {
       setShiftsLoading(false);
     }
   };
-  const handleSeedData = async () => {
-    try {
-      setSeedingData(true);
-      
-      const agencyId = user?.uid;
-      
-      if (!agencyId) {
-        toast.error('User not authenticated');
-        return;
-      }
-      
-      const response = await seedShifts({ agencyId });
-      
-      if (response.success) {
-        toast.success('Dummy data created successfully!', {
-          description: `Created ${response.summary.totalCount} shifts across all statuses`
-        });
-        
-        await loadShifts();
-      }
-    } catch (error: any) {
-      console.error('Failed to seed data:', error);
-      toast.error('Failed to create dummy data', {
-        description: error?.response?.data?.error || 'Please try again'
-      });
-    } finally {
-      setSeedingData(false);
-    }
-  };
 
   return (
     <div className="min-h-[calc(100vh-200px)] px-2 sm:px-0">
@@ -873,19 +842,6 @@ export default function ShiftManagementPage() {
         </h1>
 
         <div className="flex items-center gap-3">
-          <Button 
-            onClick={handleSeedData}
-            disabled={seedingData}
-            className="bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {seedingData ? (
-              <Loader2 size={20} className="animate-spin" />
-            ) : (
-              <Database size={20} />
-            )}
-            {seedingData ? 'Creating...' : 'Seed Data'}
-          </Button>
-
           <Button 
             onClick={() => navigate(Routes.userPanel.manualShiftManagement)}
             className="bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap"
