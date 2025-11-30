@@ -1,11 +1,11 @@
 import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
-import {SubmittedNotesResponse, SubmittedNotesQueryParams} from "./apiTypes";
+import {SubmittedNotesResponse, SubmittedNotesQueryParams, SubmittedNoteDetails} from "./apiTypes";
 
 export const agencyNotesApi = createApi({
   reducerPath: "agencyNotesApi",
   baseQuery: customBaseQuery,
-  tagTypes: ['SubmittedNotes'],
+  tagTypes: ['SubmittedNotes', 'SubmittedNoteDetails'],
   endpoints: (builder) => ({
     getAllSubmittedNotes: builder.query<SubmittedNotesResponse, SubmittedNotesQueryParams>({
       query: (params = {}) => {
@@ -42,6 +42,23 @@ export const agencyNotesApi = createApi({
       }),
       invalidatesTags: ['SubmittedNotes']
     }),
+    getSubmittedNoteDetails: builder.query<SubmittedNoteDetails, string>({
+      query: (submissionId) => ({
+        url: `/employees/employee/submitted-notes/${submissionId}`,
+        method: "GET",
+        requiresAuth: true
+      }),
+      providesTags: ['SubmittedNoteDetails']
+    }),
+    updateSubmittedNote: builder.mutation<any, { submissionId: string, data: any }>({
+      query: ({submissionId, data}) => ({
+        url: `/employees/employee/submitted-notes/${submissionId}/notes`,
+        method: "PUT",
+        requiresAuth: true,
+        data
+      }),
+      invalidatesTags: ['SubmittedNoteDetails']
+    }),
   }),
 });
 
@@ -49,4 +66,6 @@ export const {
   useGetAllSubmittedNotesQuery,
   useApproveSubmittedNotesMutation,
   useRejectSubmittedNotesMutation,
+  useGetSubmittedNoteDetailsQuery,
+  useUpdateSubmittedNoteMutation,
 } = agencyNotesApi;
