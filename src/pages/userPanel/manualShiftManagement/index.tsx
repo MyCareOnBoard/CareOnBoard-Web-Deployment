@@ -44,7 +44,7 @@ function buildManualShiftRequests(
   formData: FormData,
   week1Data: WeekData,
   week2Data: WeekData,
-  uid: string,
+  employeeId: string,
   agencyId: string,
   clientSignature: { signatureType: string; signatureData: string } | null,
   userSignature: { signatureType: string; signatureData: string } | null
@@ -80,7 +80,7 @@ function buildManualShiftRequests(
 
         // Create shift request (status and submissionStatus will be set by caller)
         const request: CreateShiftRequest = {
-          uid,
+          employeeId,
           agencyId,
           date: dateStr,
           location: formData.location,
@@ -90,7 +90,7 @@ function buildManualShiftRequests(
           type: ShiftType.MANUAL,
           submissionStatus: SubmissionStatus.DRAFT, // Default to DRAFT, will be overridden by caller
           client: {
-            id: `client-${uid}`,
+            id: `client-${employeeId}`,
             name: `${formData.clientFirstName} ${formData.clientLastName}`.trim(),
           },
           additionalStatus: `Manual timesheet - Week ${weekIndex + 1} ${day} - ${sessionDuration} - ${signatureInfo}`,

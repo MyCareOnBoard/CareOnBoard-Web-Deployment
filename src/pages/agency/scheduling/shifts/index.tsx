@@ -9,20 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
 
-// Sample data for shifts (will be replaced with API data)
-const sampleShifts = [
-  { id: "1", clientName: "DR.Brooklyn Simmons", clientAvatar: "", dspName: "Nola Hawkins", dspAvatar: "", location: "221/B Baker Street", duration: "2 hours" },
-  { id: "2", clientName: "DR.Brooklyn Simmons", clientAvatar: "", dspName: "Nola Hawkins", dspAvatar: "", location: "221/B Baker Street", duration: "2 hours" },
-  { id: "3", clientName: "DR.Brooklyn Simmons", clientAvatar: "", dspName: "Nola Hawkins", dspAvatar: "", location: "221/B Baker Street", duration: "2 hours" },
-  { id: "4", clientName: "DR.Brooklyn Simmons", clientAvatar: "", dspName: "Nola Hawkins", dspAvatar: "", location: "221/B Baker Street", duration: "2 hours" },
-  { id: "5", clientName: "DR.Brooklyn Simmons", clientAvatar: "", dspName: "Nola Hawkins", dspAvatar: "", location: "221/B Baker Street", duration: "2 hours" },
-  { id: "6", clientName: "DR.Brooklyn Simmons", clientAvatar: "", dspName: "Nola Hawkins", dspAvatar: "", location: "221/B Baker Street", duration: "2 hours" },
-  { id: "7", clientName: "DR.Brooklyn Simmons", clientAvatar: "", dspName: "Nola Hawkins", dspAvatar: "", location: "221/B Baker Street", duration: "2 hours" },
-];
-
 export default function ShiftsListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,7 +32,9 @@ export default function ShiftsListPage() {
         setLoading(true);
         const response = await listShifts({ 
           limit: 100,
-          agencyId: user?.uid,
+          agencyId: profile?.agency?.id,
+          client: true,
+          employee: true,
         });
         setShifts(response.shifts || []);
       } catch (error) {
@@ -58,9 +49,11 @@ export default function ShiftsListPage() {
       }
     };
 
-    fetchShifts();
+    if (profile?.agency?.id) {
+      fetchShifts();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
+  }, [profile?.agency?.id]);
 
   // Calendar days calculation
   const calendarDays = useMemo(() => {
@@ -81,7 +74,8 @@ export default function ShiftsListPage() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(shift => 
-        shift.client?.name?.toLowerCase().includes(query) ||
+        shift.client?.firstName?.toLowerCase().includes(query) ||
+        shift.client?.lastName?.toLowerCase().includes(query) ||
         shift.location?.toLowerCase().includes(query)
       );
     }
@@ -100,9 +94,6 @@ export default function ShiftsListPage() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
-  // Use sample data if no API data
-  const displayShifts = paginatedShifts.length > 0 ? paginatedShifts : sampleShifts.slice(0, itemsPerPage);
 
   const handleEdit = (shiftId: string) => {
     toast({
@@ -129,20 +120,20 @@ export default function ShiftsListPage() {
     }
   };
 
-  const handleSchedule = async (data: ScheduleFormData) => {
-    if (!user?.uid) {
+  const handleSchedule = async (data: ScheduleFormData): Promise<boolean> => {
+    if (!profile?.agency?.id) {
       toast({
         title: "Error",
-        description: "User not authenticated.",
+        description: "Agency not found.",
         variant: "destructive",
       });
-      return;
+      return false;
     }
 
     try {
       const shiftData = {
-        uid: user.uid,
-        agencyId: user.uid,
+        employeeId: data.assignedDspId,
+        agencyId: profile.agency.id,
         date: data.date ? format(data.date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
         location: data.clientAddress,
         startTime: data.clockInTime,
@@ -150,10 +141,7 @@ export default function ShiftsListPage() {
         status: ShiftStatus.PENDING,
         type: ShiftType.MANUAL,
         submissionStatus: SubmissionStatus.SUBMITTED,
-        client: {
-          id: `client-${Date.now()}`,
-          name: data.client,
-        },
+        clientId: data.clientId,
         additionalStatus: `Service: ${data.service} (${data.serviceCode}) - ${data.schedulingType}`,
       };
 
@@ -167,9 +155,12 @@ export default function ShiftsListPage() {
       // Refresh shifts list
       const response = await listShifts({ 
         limit: 100,
-        agencyId: user.uid,
+        agencyId: profile.agency.id,
+        client: true,
+        employee: true,
       });
       setShifts(response.shifts || []);
+      return true;
     } catch (error) {
       console.error("Failed to create schedule:", error);
       toast({
@@ -177,6 +168,7 @@ export default function ShiftsListPage() {
         description: "Failed to create schedule. Please try again.",
         variant: "destructive",
       });
+      return false;
     }
   };
 
@@ -192,11 +184,11 @@ export default function ShiftsListPage() {
   };
 
   // Calculate shift duration
-  const calculateDuration = (startTime?: string, endTime?: string): string => {
-    if (!startTime || !endTime) return "2 hours";
+  const calculateDuration = (date: string, startTime?: string, endTime?: string): string => {
+    if (!date || !startTime || !endTime) return "2 hours";
     try {
-      const start = new Date(`2000-01-01 ${startTime}`);
-      const end = new Date(`2000-01-01 ${endTime}`);
+      const start = new Date(`${date} ${startTime}`);
+      const end = new Date(`${date} ${endTime}`);
       const diffMs = end.getTime() - start.getTime();
       const hours = Math.floor(diffMs / (1000 * 60 * 60));
       const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -350,25 +342,25 @@ export default function ShiftsListPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-[#00b4b8]" />
               </div>
-            ) : displayShifts.length === 0 ? (
+            ) : paginatedShifts.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <p className="text-[14px] text-[#808081]">No shifts found</p>
               </div>
             ) : (
-              displayShifts.map((shift, index) => {
-                // Handle both API shifts and sample shifts
-                const isApiShift = 'client' in shift;
-                const clientName = isApiShift ? (shift as Shift).client?.name || "Unknown Client" : (shift as typeof sampleShifts[0]).clientName;
-                const clientAvatar = isApiShift ? (shift as Shift).client?.avatar : (shift as typeof sampleShifts[0]).clientAvatar;
-                const dspName = isApiShift ? "Nola Hawkins" : (shift as typeof sampleShifts[0]).dspName;
-                const location = isApiShift ? (shift as Shift).location || "Unknown Location" : (shift as typeof sampleShifts[0]).location;
-                const duration = isApiShift 
-                  ? calculateDuration((shift as Shift).startTime, (shift as Shift).endTime)
-                  : (shift as typeof sampleShifts[0]).duration;
+              paginatedShifts.map((shift) => {
+                const apiShift = shift as Shift;
+                const clientName = apiShift.client 
+                  ? `${apiShift.client.firstName || ""} ${apiShift.client.lastName || ""}`.trim() || "Unknown Client"
+                  : "Unknown Client";
+                const clientAvatar = apiShift.client?.profileImage;
+                const employeeName = apiShift.employee?.fullName || "Unknown DSP";
+                const employeeAvatar = apiShift.employee?.profilePicture;
+                const location = apiShift.location || "Unknown Location";
+                const duration = calculateDuration(apiShift.startTime, apiShift.endTime);
 
                 return (
                   <div
-                    key={shift.id || index}
+                    key={apiShift.id}
                     className="flex items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
                   >
                     {/* Client Info */}
@@ -394,14 +386,22 @@ export default function ShiftsListPage() {
                       </div>
                     </div>
 
-                    {/* DSP Info */}
+                    {/* DSP/Employee Info */}
                     <div className="flex items-center gap-4">
                       <div className="w-[52.5px] h-[60px] rounded-[8px] bg-[#e0e0e0] overflow-hidden flex-shrink-0">
-                        <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400" />
+                        {employeeAvatar ? (
+                          <img 
+                            src={employeeAvatar} 
+                            alt={employeeName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400" />
+                        )}
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[16px] font-semibold leading-[1.6] text-black">
-                          {dspName}
+                          {employeeName}
                         </span>
                         <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
                           DSP
@@ -427,7 +427,7 @@ export default function ShiftsListPage() {
                       <div className="flex items-center gap-2 ml-auto">
                         <Button
                           size="sm"
-                          onClick={() => handleEdit(shift.id)}
+                          onClick={() => handleEdit(apiShift.id)}
                           className="bg-[#b2b2b3] hover:bg-[#9a9a9b] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
                         >
                           <Pencil className="w-4 h-4" />
@@ -435,7 +435,7 @@ export default function ShiftsListPage() {
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => handleCancel(shift.id)}
+                          onClick={() => handleCancel(apiShift.id)}
                           className="bg-[#d53411] hover:bg-[#c02e0f] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
                         >
                           <X className="w-3 h-3" />
@@ -450,7 +450,7 @@ export default function ShiftsListPage() {
           </div>
 
           {/* Pagination */}
-          {(filteredShifts.length > 0 || sampleShifts.length > 0) && (
+          {filteredShifts.length > 0 && (
             <div className="flex items-center justify-center gap-2 mt-6">
               <span className="text-[16px] font-medium leading-[1.6] text-[#10141a]">
                 {currentPage}

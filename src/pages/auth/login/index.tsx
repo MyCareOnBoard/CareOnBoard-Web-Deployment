@@ -18,6 +18,7 @@ import {
 } from "@/utils/auth/helpers/errorMessages"
 import {UserType} from "@/lib/api/users";
 import {useDispatch} from "react-redux";
+import { listAgencies, seedAgency } from "@/lib/api/agencies";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -132,6 +133,37 @@ export default function LoginPage() {
 
       const profile = await getUserProfile()
       dispatch(setProfile(profile))
+      
+      // If user is an agency, check if agency exists and seed if it doesn't
+      if (profile.userType === UserType.AGENCY) {
+        try {
+          const agenciesResponse = await listAgencies({ limit: 1 })
+          
+          // If no agencies exist, seed one
+          if (!agenciesResponse.agencies || agenciesResponse.agencies.length === 0) {
+            console.log("🏢 No agency found, seeding agency...")
+            const agency = await seedAgency()
+            dispatch(setProfile({ ...profile, agency }))
+            console.log("✅ Agency seeded successfully")
+          } else {
+            console.log("✅ Agency already exists")
+            dispatch(setProfile({ ...profile, agency: agenciesResponse.agencies[0] }))
+          }
+        } catch (error: any) {
+          // If listing fails (e.g., 404), try to seed
+          if (error.response?.status === 404 || error.message?.includes('not found')) {
+            console.log("🏢 Agency not found, seeding agency...")
+            try {
+              const agency = await seedAgency()
+              dispatch(setProfile({ ...profile, agency }))
+              console.log("✅ Agency seeded successfully")
+            } catch (seedError) {
+              console.error("❌ Failed to seed agency:", seedError);
+            }
+          }
+        }
+      }
+
       if (profile.userType !== UserType.APPLICANT) {
         navigate(dashboardRoutes[profile.userType as UserType], { replace: true })
         return

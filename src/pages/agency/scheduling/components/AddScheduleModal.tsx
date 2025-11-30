@@ -1,7 +1,10 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
+import { searchClients, Client } from "@/lib/api/clients";
+import { searchEmployees, Employee } from "@/lib/api/employees";
+import { useAuth } from "@/utils/auth";
 
 interface AddScheduleModalProps {
   isOpen: boolean;
@@ -25,8 +28,10 @@ interface FormErrors {
 
 export interface ScheduleFormData {
   client: string;
+  clientId: string;
   clientAddress: string;
   assignedDsp: string;
+  assignedDspId: string;
   billingRate: string;
   service: string;
   serviceCode: string;
@@ -57,28 +62,12 @@ const serviceOptions = [
   "Respite Care",
 ];
 
-// Sample client data - in real app, this would come from API
-const clientOptions = [
-  { id: "1", name: "Dr. Brooklyn Simmons", address: "221/B Baker Street" },
-  { id: "2", name: "Dr. Sarah Johnson", address: "45 Oak Avenue" },
-  { id: "3", name: "Dr. Michael Chen", address: "789 Pine Road" },
-  { id: "4", name: "Dr. Emily Davis", address: "123 Maple Lane" },
-  { id: "5", name: "Dr. James Wilson", address: "567 Cedar Drive" },
-];
-
-// Sample DSP data - in real app, this would come from API
-const dspOptions = [
-  { id: "1", name: "Nola Hawkins", billingRate: "$45/hour" },
-  { id: "2", name: "John Smith", billingRate: "$40/hour" },
-  { id: "3", name: "Maria Garcia", billingRate: "$50/hour" },
-  { id: "4", name: "David Brown", billingRate: "$42/hour" },
-  { id: "5", name: "Lisa Anderson", billingRate: "$48/hour" },
-];
-
 const initialFormData: ScheduleFormData = {
   client: "",
+  clientId: "",
   clientAddress: "",
   assignedDsp: "",
+  assignedDspId: "",
   billingRate: "",
   service: "General Practitioners",
   serviceCode: "183535",
@@ -93,6 +82,7 @@ const initialFormData: ScheduleFormData = {
 };
 
 export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, editData, mode = "create" }: AddScheduleModalProps) {
+  const { user, profile } = useAuth();
   const [formData, setFormData] = useState<ScheduleFormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -109,6 +99,16 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showDspDropdown, setShowDspDropdown] = useState(false);
 
+  // API search states
+  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
+  const [dspSearchResults, setDspSearchResults] = useState<Employee[]>([]);
+  const [isSearchingClients, setIsSearchingClients] = useState(false);
+  const [isSearchingDsps, setIsSearchingDsps] = useState(false);
+
+  // Debounce refs
+  const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Reset form when modal opens/closes or when editData changes
   useEffect(() => {
     if (isOpen) {
@@ -119,43 +119,104 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
       }
       setErrors({});
       setIsSubmitting(false);
+      setClientSearchResults([]);
+      setDspSearchResults([]);
     }
   }, [isOpen, editData, mode]);
 
-  // Filter clients based on input
-  const filteredClients = useMemo(() => {
-    if (!formData.client) return [];
-    const query = formData.client.toLowerCase();
-    return clientOptions.filter(client => 
-      client.name.toLowerCase().includes(query)
-    );
-  }, [formData.client]);
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (clientSearchTimeoutRef.current) clearTimeout(clientSearchTimeoutRef.current);
+      if (dspSearchTimeoutRef.current) clearTimeout(dspSearchTimeoutRef.current);
+    };
+  }, []);
 
-  // Filter DSPs based on input
-  const filteredDsps = useMemo(() => {
-    if (!formData.assignedDsp) return [];
-    const query = formData.assignedDsp.toLowerCase();
-    return dspOptions.filter(dsp => 
-      dsp.name.toLowerCase().includes(query)
-    );
-  }, [formData.assignedDsp]);
+  // Search clients with debouncing
+  const handleClientSearch = useCallback(async (query: string) => {
+    // Clear existing timeout
+    if (clientSearchTimeoutRef.current) {
+      clearTimeout(clientSearchTimeoutRef.current);
+    }
 
-  const handleClientSelect = (client: typeof clientOptions[0]) => {
+    // If query is too short, clear results
+    if (query.trim().length < 2) {
+      setClientSearchResults([]);
+      setShowClientDropdown(false);
+      return;
+    }
+
+    // Debounce the search
+    clientSearchTimeoutRef.current = setTimeout(async () => {
+      try {
+        setIsSearchingClients(true);
+        const results = await searchClients(query);
+        setClientSearchResults(results);
+        setShowClientDropdown(results.length > 0);
+      } catch (error) {
+        console.error("Failed to search clients:", error);
+        setClientSearchResults([]);
+      } finally {
+        setIsSearchingClients(false);
+      }
+    }, 300);
+  }, []);
+
+  // Search DSPs/employees with debouncing
+  const handleDspSearch = useCallback(async (query: string) => {
+    // Clear existing timeout
+    if (dspSearchTimeoutRef.current) {
+      clearTimeout(dspSearchTimeoutRef.current);
+    }
+
+    // If query is too short, clear results
+    if (query.trim().length < 2) {
+      setDspSearchResults([]);
+      setShowDspDropdown(false);
+      return;
+    }
+
+    // Get agencyId from profile or user
+    const agencyId = profile?.agency?.id || user?.uid;
+
+    // Debounce the search
+    dspSearchTimeoutRef.current = setTimeout(async () => {
+      try {
+        setIsSearchingDsps(true);
+        const results = await searchEmployees(query, agencyId);
+        setDspSearchResults(results);
+        setShowDspDropdown(results.length > 0);
+      } catch (error) {
+        console.error("Failed to search employees:", error);
+        setDspSearchResults([]);
+      } finally {
+        setIsSearchingDsps(false);
+      }
+    }, 300);
+  }, [profile?.agency?.id, user?.uid]);
+
+  const handleClientSelect = (client: Client) => {
     setFormData(prev => ({
       ...prev,
-      client: client.name,
-      clientAddress: client.address,
+      client: client.firstName && client.lastName 
+        ? `${client.firstName} ${client.lastName}` 
+        : client.id,
+      clientId: client.id,
+      clientAddress: client.address || client.location || "",
     }));
     setShowClientDropdown(false);
+    setClientSearchResults([]);
   };
 
-  const handleDspSelect = (dsp: typeof dspOptions[0]) => {
+  const handleDspSelect = (employee: Employee) => {
     setFormData(prev => ({
       ...prev,
-      assignedDsp: dsp.name,
-      billingRate: dsp.billingRate,
+      assignedDsp: employee.fullName,
+      assignedDspId: employee.id,
+      billingRate: "", // Billing rate would come from a different source
     }));
     setShowDspDropdown(false);
+    setDspSearchResults([]);
   };
 
   // Calendar days calculation
@@ -341,22 +402,25 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
                 type="text"
                 value={formData.client}
                 onChange={(e) => {
-                  setFormData(prev => ({ ...prev, client: e.target.value, clientAddress: "" }));
-                  setShowClientDropdown(true);
+                  const value = e.target.value;
+                  setFormData(prev => ({ ...prev, client: value, clientId: "", clientAddress: "" }));
+                  handleClientSearch(value);
                   clearError("client");
                 }}
-                onFocus={() => formData.client && setShowClientDropdown(true)}
-                placeholder="Enter client name or ID"
+                placeholder="Search client name..."
                 className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
               />
+              {isSearchingClients && (
+                <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+              )}
             </div>
             {errors.client && (
               <span className="text-[12px] font-normal text-[#D53411]">{errors.client}</span>
             )}
             {/* Client Dropdown */}
-            {showClientDropdown && filteredClients.length > 0 && (
+            {showClientDropdown && clientSearchResults.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-[12px] shadow-lg z-20 max-h-[200px] overflow-y-auto">
-                {filteredClients.map((client) => (
+                {clientSearchResults.map((client) => (
                   <button
                     key={client.id}
                     onClick={() => {
@@ -365,8 +429,12 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
                     }}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
                   >
-                    <p className="text-[14px] font-normal text-black">{client.name}</p>
-                    <p className="text-[12px] font-normal text-[#808081]">{client.address}</p>
+                    <p className="text-[14px] font-normal text-black">
+                      {client.firstName && client.lastName 
+                        ? `${client.firstName} ${client.lastName}` 
+                        : client.id}
+                    </p>
+                    <p className="text-[12px] font-normal text-[#808081]">{client.address || client.location}</p>
                   </button>
                 ))}
               </div>
@@ -381,32 +449,35 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
                 type="text"
                 value={formData.assignedDsp}
                 onChange={(e) => {
-                  setFormData(prev => ({ ...prev, assignedDsp: e.target.value, billingRate: "" }));
-                  setShowDspDropdown(true);
+                  const value = e.target.value;
+                  setFormData(prev => ({ ...prev, assignedDsp: value, assignedDspId: "", billingRate: "" }));
+                  handleDspSearch(value);
                   clearError("assignedDsp");
                 }}
-                onFocus={() => formData.assignedDsp && setShowDspDropdown(true)}
-                placeholder="Enter DSP name or ID"
+                placeholder="Search DSP name..."
                 className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
               />
+              {isSearchingDsps && (
+                <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+              )}
             </div>
             {errors.assignedDsp && (
               <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
             )}
             {/* DSP Dropdown */}
-            {showDspDropdown && filteredDsps.length > 0 && (
+            {showDspDropdown && dspSearchResults.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-[12px] shadow-lg z-20 max-h-[200px] overflow-y-auto">
-                {filteredDsps.map((dsp) => (
+                {dspSearchResults.map((employee) => (
                   <button
-                    key={dsp.id}
+                    key={employee.uid || employee.id}
                     onClick={() => {
-                      handleDspSelect(dsp);
+                      handleDspSelect(employee);
                       clearError("assignedDsp");
                     }}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
                   >
-                    <p className="text-[14px] font-normal text-black">{dsp.name}</p>
-                    <p className="text-[12px] font-normal text-[#808081]">Billing Rate: {dsp.billingRate}</p>
+                    <p className="text-[14px] font-normal text-black">{employee.fullName}</p>
+                    <p className="text-[12px] font-normal text-[#808081]">{employee.email}</p>
                   </button>
                 ))}
               </div>

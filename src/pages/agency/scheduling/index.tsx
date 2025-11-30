@@ -2,13 +2,15 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Plus, ChevronLeft, ChevronRight, Check, X, ArrowUpRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus } from "@/lib/api/shift-management";
+import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, deleteShift, CreateShiftRequest } from "@/lib/api/shift-management";
+import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import AddScheduleModal, { ScheduleFormData } from "./components/AddScheduleModal";
 import ScheduleSuccessModal from "./components/ScheduleSuccessModal";
 import ScheduleSavedModal from "./components/ScheduleSavedModal";
+import { seedClients } from "@/lib/api/clients";
 
 // Sample data for pending approvals
 const samplePendingApprovals = [
@@ -59,7 +61,7 @@ const getStatusInfo = (status: ShiftStatus) => {
 
 export default function SchedulingPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -85,6 +87,7 @@ export default function SchedulingPage() {
   // API data states
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seedingClients, setSeedingClients] = useState(false);
   
   const itemsPerPage = 6;
   
@@ -97,6 +100,10 @@ export default function SchedulingPage() {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
 
+  useEffect(() => {
+    console.log("profile", profile);
+  }, [profile]);
+
   // Fetch all shifts for activity log
   useEffect(() => {
     const fetchShifts = async () => {
@@ -104,7 +111,9 @@ export default function SchedulingPage() {
         setLoading(true);
         const response = await listShifts({ 
           limit: 100,
-          agencyId: user?.uid,
+          agencyId: profile?.agency?.id,
+          client: true,
+          employee: true,
         });
         setShifts(response.shifts || []);
       } catch (error) {
@@ -119,9 +128,11 @@ export default function SchedulingPage() {
       }
     };
 
-    fetchShifts();
+    if (profile?.agency?.id) {
+      fetchShifts();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
+  }, [profile?.agency?.id]);
 
   // Calculate shift statistics
   const shiftStats = useMemo(() => {
@@ -183,11 +194,70 @@ export default function SchedulingPage() {
     // TODO: Implement actual cancellation API call
   };
 
-  const handleSave = (data: ScheduleFormData) => {
+  /**
+   * Build shift requests from form data
+   * Handles both one-time and recurring schedules
+   */
+  const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
+    if (!profile?.agency?.id || !data.assignedDspId) return [];
+
+    const requests: CreateShiftRequest[] = [];
+    const baseShiftData = {
+      employeeId: data.assignedDspId,
+      agencyId: profile?.agency?.id || "",
+      location: data.clientAddress || "",
+      startTime: data.clockInTime,
+      endTime: data.clockOutTime,
+      clientId: data.clientId,
+      additionalStatus: `Service: ${data.service} (${data.serviceCode}) - ${data.schedulingType}${data.ispOutcome ? ` - ISP: ${data.ispOutcome}` : ""} - DSP: ${data.assignedDsp}`,
+    };
+
+    console.log("baseShiftData", baseShiftData);
+
+    if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
+      // Create shifts for each day in the date range
+      const dateRange = eachDayOfIntervalDateFns({ start: data.startDate, end: data.endDate });
+      dateRange.forEach((date) => {
+        requests.push({
+          ...baseShiftData,
+          date: format(date, "yyyy-MM-dd"),
+          status: ShiftStatus.PENDING,
+          type: ShiftType.AUTOMATIC,
+          submissionStatus: SubmissionStatus.DRAFT,
+        });
+      });
+    } else if (data.date) {
+      // Single shift for one-time scheduling
+      requests.push({
+        ...baseShiftData,
+        date: format(data.date, "yyyy-MM-dd"),
+        status: ShiftStatus.PENDING,
+        type: ShiftType.AUTOMATIC,
+        submissionStatus: SubmissionStatus.DRAFT,
+      });
+    }
+
+    return requests;
+  };
+
+  /**
+   * Handle saving schedule as draft
+   * Similar to manual shift management save functionality
+   */
+  const handleSave = async (data: ScheduleFormData) => {
+    if (!profile?.agency?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "User not authenticated. Please log in and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Get the date for display
     const getDisplayDate = () => {
-      if (data.schedulingType === "recurring" && data.startDate) {
-        return format(data.startDate, "d MMMM");
+      if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
+        return `${format(data.startDate, "d MMMM")} - ${format(data.endDate, "d MMMM")}`;
       }
       if (data.date) {
         return format(data.date, "d MMMM");
@@ -195,24 +265,119 @@ export default function SchedulingPage() {
       return format(new Date(), "d MMMM");
     };
 
-    // Set saved shift info for saved modal
-    setSavedShiftInfo({
-      clientName: data.client || "Client",
-      dspName: data.assignedDsp || "DSP",
-      date: getDisplayDate(),
-    });
+    try {
+      // Step 1: Fetch existing draft shifts for this agency
+      const existingDraftsResponse = await listShifts({
+        agencyId: profile?.agency?.id || "",
+        type: ShiftType.AUTOMATIC,
+        submissionStatus: SubmissionStatus.DRAFT,
+        limit: 100,
+      });
 
-    // Show saved modal
-    setShowSavedModal(true);
+      const existingDrafts = existingDraftsResponse.shifts || [];
+      console.log(`📄 Found ${existingDrafts.length} existing draft(s)`);
 
-    // TODO: Implement actual save to drafts API call
+      // Step 2: Build shift requests as drafts
+      const shiftRequests = buildShiftRequests(data);
+
+      if (shiftRequests.length === 0) {
+        toast({
+          title: "No Valid Entries",
+          description: "Please fill in all required fields before saving.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Step 3: Update existing or create new shifts
+      const savePromises = shiftRequests.map(async (request) => {
+        // Try to find an existing draft for the same date
+        const existingShift = existingDrafts.find(
+          (draft) => draft.date === request.date
+        );
+
+        if (existingShift) {
+          // Update existing shift
+          console.log(`✏️ Updating existing draft for ${request.date}`);
+          return updateShift(existingShift.id, {
+            location: request.location,
+            startTime: request.startTime,
+            endTime: request.endTime,
+            additionalStatus: request.additionalStatus,
+            status: request.status,
+            submissionStatus: request.submissionStatus,
+            type: request.type,
+          });
+        } else {
+          // Create new shift
+          console.log(`➕ Creating new draft for ${request.date}`);
+          return createShift(request);
+        }
+      });
+
+      // Step 4: Execute all save operations
+      const results = await Promise.allSettled(savePromises);
+
+      // Check for failures
+      const failures = results.filter((r) => r.status === "rejected");
+      const successes = results.filter((r) => r.status === "fulfilled");
+
+      if (failures.length > 0) {
+        console.error("Failed to save some drafts:", failures);
+        if (successes.length > 0) {
+          toast({
+            title: "Partial Save",
+            description: `Saved ${successes.length} of ${shiftRequests.length} schedule(s) as drafts.`,
+          });
+        } else {
+          toast({
+            title: "Save Failed",
+            description: "Failed to save schedule drafts. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      if (successes.length > 0) {
+        // Set saved shift info for saved modal
+        setSavedShiftInfo({
+          clientName: data.client || "Client",
+          dspName: data.assignedDsp || "DSP",
+          date: getDisplayDate(),
+        });
+
+        // Show saved modal
+        setShowSavedModal(true);
+
+        // Refresh shifts list
+        const response = await listShifts({ 
+          limit: 100,
+          agencyId: profile?.agency?.id || "",
+          client: true,
+          employee: true,
+        });
+        setShifts(response.shifts || []);
+      }
+    } catch (error: any) {
+      console.error("Failed to save draft schedule:", error);
+      toast({
+        title: "Save Failed",
+        description: error?.response?.data?.error || "Failed to save draft. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
+  /**
+   * Handle scheduling (submitting) shifts
+   * Creates shifts with SUBMITTED status
+   */
   const handleSchedule = async (data: ScheduleFormData): Promise<boolean> => {
-    if (!user?.uid) {
+    if (!profile?.agency?.id) {
       toast({
-        title: "Error",
-        description: "User not authenticated.",
+        title: "Authentication Error",
+        description: "User not authenticated. Please log in and try again.",
         variant: "destructive",
       });
       return false;
@@ -247,8 +412,8 @@ export default function SchedulingPage() {
 
       // Get the date for display
       const getDisplayDate = () => {
-        if (data.schedulingType === "recurring" && data.startDate) {
-          return format(data.startDate, "d MMMM");
+        if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
+          return `${format(data.startDate, "d MMMM")} - ${format(data.endDate, "d MMMM")}`;
         }
         if (data.date) {
           return format(data.date, "d MMMM");
@@ -256,56 +421,124 @@ export default function SchedulingPage() {
         return format(new Date(), "d MMMM");
       };
 
-      // Create shift from form data
-      const shiftData = {
-        uid: user.uid,
-        agencyId: user.uid,
-        date: data.date ? format(data.date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
-        location: data.clientAddress,
-        startTime: data.clockInTime,
-        endTime: data.clockOutTime,
+      // Step 1: Build shift requests
+      const shiftRequests = buildShiftRequests(data);
+
+      if (shiftRequests.length === 0) {
+        toast({
+          title: "No Valid Entries",
+          description: "Please fill in all required fields before scheduling.",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      // Step 2: Set status to PENDING and submission status to SUBMITTED
+      const finalShiftRequests = shiftRequests.map(request => ({
+        ...request,
         status: ShiftStatus.PENDING,
-        type: ShiftType.MANUAL,
         submissionStatus: SubmissionStatus.SUBMITTED,
-        client: {
-          id: `client-${Date.now()}`,
-          name: data.client,
-        },
-        additionalStatus: `Service: ${data.service} (${data.serviceCode}) - ${data.schedulingType}`,
-      };
+        type: ShiftType.AUTOMATIC,
+      }));
 
-      await createShift(shiftData);
+      console.log(`📅 Scheduling ${finalShiftRequests.length} shift(s)`);
 
-      // Set scheduled shift info for success modal
-      setScheduledShiftInfo({
-        clientName: data.client || "Client",
-        dspName: data.assignedDsp || "DSP",
-        duration: calculateDuration(),
-        date: getDisplayDate(),
-      });
+      // Step 3: Submit all shifts in parallel
+      const results = await Promise.allSettled(
+        finalShiftRequests.map((request) => createShift(request))
+      );
 
-      // Show success modal
-      setShowSuccessModal(true);
+      // Check for failures
+      const failures = results.filter((r) => r.status === "rejected");
+      const successes = results.filter((r) => r.status === "fulfilled");
 
-      // Close the add schedule modal
-      setShowAddScheduleModal(false);
+      if (failures.length > 0) {
+        console.error("Failed to schedule some shifts:", failures);
+        if (successes.length > 0) {
+          toast({
+            title: "Partial Submission",
+            description: `Successfully scheduled ${successes.length} of ${finalShiftRequests.length} shifts. ${failures.length} failed.`,
+          });
+        } else {
+          toast({
+            title: "Scheduling Failed",
+            description: "Failed to schedule shifts. Please try again.",
+            variant: "destructive",
+          });
+          return false;
+        }
+      }
 
-      // Refresh shifts list
-      const response = await listShifts({ 
-        limit: 100,
-        agencyId: user.uid,
-      });
-      setShifts(response.shifts || []);
+      if (successes.length > 0) {
+        // Set scheduled shift info for success modal
+        setScheduledShiftInfo({
+          clientName: data.client || "Client",
+          dspName: data.assignedDsp || "DSP",
+          duration: calculateDuration(),
+          date: getDisplayDate(),
+        });
 
-      return true;
-    } catch (error) {
+        // Show success modal
+        setShowSuccessModal(true);
+
+        // Close the add schedule modal
+        setShowAddScheduleModal(false);
+
+        // Refresh shifts list
+        const response = await listShifts({ 
+          limit: 100,
+          agencyId: profile?.agency?.id || "",
+        });
+        setShifts(response.shifts || []);
+
+        toast({
+          title: "Schedule Created",
+          description: `Successfully scheduled ${successes.length} shift(s).`,
+        });
+
+        return true;
+      }
+
+      return false;
+    } catch (error: any) {
       console.error("Failed to create schedule:", error);
       toast({
-        title: "Error",
-        description: "Failed to create schedule. Please try again.",
+        title: "Scheduling Failed",
+        description: error?.response?.data?.error || "Failed to create schedule. Please try again.",
         variant: "destructive",
       });
       return false;
+    }
+  };
+
+  /**
+   * Handle seeding clients with dummy data
+   */
+  const handleSeedClients = async () => {
+    try {
+      setSeedingClients(true);
+      
+      const result = await seedClients({
+        activeCount: 5,
+        inactiveCount: 2,
+        pendingCount: 1,
+        archivedCount: 0,
+        overwrite: true,
+      });
+
+      toast({
+        title: "Clients Seeded",
+        description: `Successfully seeded ${result.count} client(s). ${result.message}`,
+      });
+    } catch (error: any) {
+      console.error("Failed to seed clients:", error);
+      toast({
+        title: "Seeding Failed",
+        description: error?.message || "Failed to seed clients. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSeedingClients(false);
     }
   };
 
@@ -317,13 +550,32 @@ export default function SchedulingPage() {
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
           Scheduling
         </h1>
-        <Button
-          onClick={() => setShowAddScheduleModal(true)}
-          className="flex items-center gap-3 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px]"
-        >
-          <Plus className="w-5 h-5" />
-          Add Schedule
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={handleSeedClients}
+            disabled={seedingClients}
+            className="flex items-center gap-3 bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {seedingClients ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Seeding...
+              </>
+            ) : (
+              <>
+                <Plus className="w-5 h-5" />
+                Seed Clients
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={() => setShowAddScheduleModal(true)}
+            className="flex items-center gap-3 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px]"
+          >
+            <Plus className="w-5 h-5" />
+            Add Schedule
+          </Button>
+        </div>
       </div>
 
       {/* Main Content Grid */}
@@ -685,6 +937,10 @@ export default function SchedulingPage() {
             ) : (
               paginatedShifts.map((shift) => {
                 const statusInfo = getStatusInfo(shift.status);
+                const clientName = shift.client 
+                  ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
+                  : "Unknown Client";
+                const employeeName = shift.employee?.fullName || "Unknown DSP";
                 
                 return (
                   <div
@@ -694,10 +950,10 @@ export default function SchedulingPage() {
                     {/* Client Info */}
                     <div className="flex items-center gap-4">
                       <div className="w-[52.5px] h-[60px] rounded-lg bg-[#e0e0e0] overflow-hidden flex-shrink-0">
-                        {shift.client?.avatar ? (
+                        {shift.client?.profileImage ? (
                           <img 
-                            src={shift.client.avatar} 
-                            alt={shift.client.name}
+                            src={shift.client.profileImage} 
+                            alt={clientName}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -706,7 +962,7 @@ export default function SchedulingPage() {
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[16px] font-semibold leading-[1.6] text-black">
-                          {shift.client?.name || "Unknown Client"}
+                          {clientName}
                         </span>
                         <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
                           Client
@@ -714,14 +970,22 @@ export default function SchedulingPage() {
                       </div>
                     </div>
 
-                    {/* DSP Info (using location as placeholder since we don't have DSP data) */}
+                    {/* DSP/Employee Info */}
                     <div className="flex items-center gap-4">
                       <div className="w-[52.5px] h-[60px] rounded-lg bg-[#e0e0e0] overflow-hidden flex-shrink-0">
-                        <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400" />
+                        {shift.employee?.profilePicture ? (
+                          <img 
+                            src={shift.employee.profilePicture} 
+                            alt={employeeName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400" />
+                        )}
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[16px] font-semibold leading-[1.6] text-black">
-                          {shift.location?.split(",")[0] || "Location"}
+                          {employeeName}
                         </span>
                         <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
                           DSP
