@@ -5,6 +5,8 @@ import AgencyActivitiesLogTemplate from "@/pages/agency/notes/components/activit
 import AgencyRespiteLog from "@/pages/agency/notes/components/respiteLog";
 import AgencySupportedEmploymentIntervention from "@/pages/agency/notes/components/supportedEmploymentIntervention";
 import {useGetSubmittedNoteDetailsQuery} from "@/pages/agency/notes/api";
+import {useNavigate} from "react-router";
+import {Routes} from "@/routes/constants";
 
 
 export default function AgencyEditNote(
@@ -17,7 +19,16 @@ export default function AgencyEditNote(
   const {data: submittedNote, isLoading} = useGetSubmittedNoteDetailsQuery(submissionId!, {
     skip: !submissionId
   });
-  const handleCancel = () => setIsOpen(false);
+  const navigate = useNavigate();
+
+  const handleCancel = () => {
+    navigate(Routes.agency.notes, {replace: true});
+    setIsOpen(false);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   if (!isOpen) return null;
 
@@ -95,19 +106,36 @@ export default function AgencyEditNote(
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur z-60"
-      onClick={() => setIsOpen(false)}
-    >
-      <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
-        <div
-          className="bg-white rounded-lg shadow-2xl w-full max-w-7xl max-h-[90vh] relative animate-fadeIn p-6 flex flex-col"
-          onClick={(e) => e.stopPropagation()}
-        >
+    <>
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print-content, .print-content * {
+            visibility: visible;
+          }
+          .print-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+        }
+      `}</style>
+      <div
+        className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur z-60"
+        onClick={() => setIsOpen(false)}
+      >
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-7xl max-h-[90vh] relative animate-fadeIn p-6 flex flex-col print:max-w-none print:max-h-none print:shadow-none print:rounded-none print:p-0 print-content"
+            onClick={(e) => e.stopPropagation()}
+          >
           {/* Header */}
-          <div className="flex space-x-3 items-center justify-end mb-3 flex-shrink-0">
+          <div className="flex space-x-3 items-center justify-end mb-3 flex-shrink-0 print:hidden">
             <button
-              onClick={handleCancel}
+              onClick={handlePrint}
               className="flex items-center space-x-3 cursor-pointer text-white hover:text-gray-600 transition-colors bg-[#B2B2B3] rounded-full px-4 py-3"
               aria-label="Print"
             >
@@ -125,11 +153,12 @@ export default function AgencyEditNote(
           </div>
 
           {/* Scrollable content area */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto print:overflow-visible">
             {renderNoteComponent()}
           </div>
         </div>
       </div>
     </div>
+    </>
   )
 }
