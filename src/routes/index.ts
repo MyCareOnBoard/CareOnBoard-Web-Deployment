@@ -19,13 +19,13 @@ import AuthLayout from "@/layouts/AuthLayout";
 import ApplicantDashboardLayout from "@/layouts/ApplicantDashboardLayout";
 import OnboardingLayout from "@/layouts/OnboardingLayout";
 import UserPanelDashboardLayout from "@/layouts/UserPanelLayout";
+import AgencyDashboardLayout from "@/layouts/AgencyLayout";
 import UserPanelDashboard from "@/pages/userPanel/dashboard";
 import UserPanelMileage from "@/pages/userPanel/mileage";
 import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
 import ManualShiftManagementPage from "@/pages/userPanel/manualShiftManagement";
 import ClientsAndServicesPage from "@/pages/userPanel/clientsAndServices";
 import PlanOfCarePage from "@/pages/userPanel/planOfCare";
-import NotesPage from "@/pages/userPanel/notes";
 import CommunityBasedPage from "@/pages/userPanel/notes/community-based";
 import CommunityInclusionPage from "@/pages/userPanel/notes/community-inclusion";
 import DayHabilitationPage from "@/pages/userPanel/notes/day-habilitation";
@@ -34,6 +34,18 @@ import RespiteLogPage from "@/pages/userPanel/notes/respite-log";
 import SupportedEmploymentInterventionPage from "@/pages/userPanel/notes/supported-employment-intervention";
 import SupportedEmploymentPrePage from "@/pages/userPanel/notes/supported-employment-pre";
 import Expenses from "@/pages/userPanel/expenses";
+import AgencyDashboardPage from "@/pages/agency/dashboard";
+import DSPManagementPage from "@/pages/agency/dsp-management";
+import ClientsPage from "@/pages/agency/clients";
+import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
+import SchedulingPage from "@/pages/agency/scheduling";
+import AnalyticsPage from "@/pages/agency/analytics";
+import ApplicantDirectoryPage from "@/pages/agency/applicant-directory";
+import ReportsPage from "@/pages/agency/reports";
+import ComplianceAlertsPage from "@/pages/agency/compliance-alerts";
+import ShiftsPage from "@/pages/agency/shifts";
+import NotesPage from "@/pages/userPanel/notes";
+import AgencyNotesPage from "@/pages/agency/notes";
 
 
 export const router = createBrowserRouter([
@@ -108,6 +120,67 @@ export const router = createBrowserRouter([
       },
       {
         path: Routes.applicant.profile,
+        Component: ProfilePage,
+      },
+    ],
+  },
+  {
+    Component: AgencyDashboardLayout,
+    children: [
+      {
+        path: Routes.agency.dashboard,
+        Component: AgencyDashboardPage,
+      },
+      {
+        path: Routes.agency.dspManagement,
+        Component: DSPManagementPage,
+      },
+      {
+        path: Routes.agency.clients,
+        Component: ClientsPage,
+      },
+      {
+        path: Routes.agency.billingAndApprovals,
+        Component: BillingAndApprovalsPage,
+      },
+      {
+        path: Routes.agency.scheduling,
+        Component: SchedulingPage,
+      },
+      {
+        path: Routes.agency.analytics,
+        Component: AnalyticsPage,
+      },
+      {
+        path: Routes.agency.applicantDirectory,
+        Component: ApplicantDirectoryPage,
+      },
+      {
+        path: Routes.agency.reports,
+        Component: ReportsPage,
+      },
+      {
+        path: Routes.agency.complianceAlerts,
+        Component: ComplianceAlertsPage,
+      },
+      {
+        path: Routes.agency.shifts,
+        Component: ShiftsPage,
+      },
+      {
+        path: Routes.agency.notes,
+        Component: AgencyNotesPage,
+      },
+      {
+        path: Routes.agency.helpCenter,
+        Component: HelpCenterPage,
+      },
+      {
+        path: Routes.agency.settings,
+        Component: SettingsPage,
+      },
+      {
+        path: Routes.agency.profile,
         Component: ProfilePage,
       },
     ],
