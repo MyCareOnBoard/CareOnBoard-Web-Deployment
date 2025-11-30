@@ -16,7 +16,7 @@ import {
 import { auth } from '@/lib/firebase'
 import type { AuthState, User, LoginCredentials, SignupCredentials } from '../types'
 import { transformFirebaseUser } from '@/utils/auth'
-import {UserProfile} from "@/lib/api/users";
+import { UserProfile } from "@/lib/api/users";
 
 // Initial state
 const initialState: AuthState = {
@@ -59,16 +59,16 @@ export const signupUser = createAsyncThunk(
         credentials.email,
         credentials.password
       )
-      
+
       // Update profile with display name
       await updateProfile(userCredential.user, {
         displayName: credentials.fullName,
       })
-      
+
       const user = transformFirebaseUser(userCredential.user)
       // Update name since we just set it
       user.fullName = credentials.fullName
-      
+
       return user
     } catch (error: any) {
       return rejectWithValue(error.message || 'Signup failed')
@@ -163,7 +163,7 @@ const authSlice = createSlice({
         state.isLoading = false
         state.error = action.payload as string
       })
-    
+
     // Signup
     builder
       .addCase(signupUser.pending, (state) => {
@@ -180,7 +180,7 @@ const authSlice = createSlice({
         state.isLoading = false
         state.error = action.payload as string
       })
-    
+
     // Logout
     builder
       .addCase(logoutUser.pending, (state) => {
@@ -196,7 +196,7 @@ const authSlice = createSlice({
         state.isLoading = false
         state.error = action.payload as string
       })
-    
+
     // Reset password
     builder
       .addCase(resetPassword.pending, (state) => {
@@ -211,7 +211,7 @@ const authSlice = createSlice({
         state.isLoading = false
         state.error = action.payload as string
       })
-    
+
     // Check auth state
     builder
       .addCase(checkAuthState.fulfilled, (state, action) => {

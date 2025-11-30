@@ -16,8 +16,10 @@ import {
   getSuccessMessage,
   getValidationMessage 
 } from "@/utils/auth/helpers/errorMessages"
-import {UserType} from "@/lib/api/users";
+import {UserType, UserProfile} from "@/lib/api/users";
 import {useDispatch} from "react-redux";
+import { listAgencies, seedAgency } from "@/lib/api/agencies";
+import { getCurrentEmployee } from "@/lib/api/employees";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -113,16 +115,11 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      console.log("🔐 Attempting login for:", email)
-      
       // Login with Firebase
       await login(email, password)
       
-      console.log("✅ Login successful, checking onboarding status...")
-      
       // Check if user has completed onboarding
       const onboardingStatus = await getOnboardingStatus()
-      console.log("📊 Onboarding status:", onboardingStatus)
       
       const successMsg = getSuccessMessage('login')
       toast({
@@ -131,7 +128,45 @@ export default function LoginPage() {
       })
 
       const profile = await getUserProfile()
-      dispatch(setProfile(profile))
+      
+      // Load user-specific data based on user type
+      let userData: Record<string, any> | undefined = undefined
+      
+      if (profile.userType === UserType.AGENCY) {
+        try {
+          const agenciesResponse = await listAgencies({ limit: 1 })
+          
+          // If no agencies exist, seed one
+          if (!agenciesResponse.agencies || agenciesResponse.agencies.length === 0) {
+            const agency = await seedAgency()
+            userData = agency
+          } else {
+            userData = agenciesResponse.agencies[0]
+          }
+        } catch (error: any) {
+          // If listing fails (e.g., 404), try to seed
+          if (error.response?.status === 404 || error.message?.includes('not found')) {
+            try {
+              const agency = await seedAgency()
+              userData = agency
+            } catch (seedError) {
+              // Failed to seed agency - continue without it
+            }
+          }
+        }
+      } else if (profile.userType === UserType.USER) {
+        // Fetch employee details for employee users
+        try {
+          const employee = await getCurrentEmployee()
+          userData = employee
+        } catch (error: any) {
+          // Continue without employee data - it might not exist yet
+        }
+      }
+      
+      // Dispatch profile with user-specific data
+      dispatch(setProfile({ ...profile, data: userData }))
+
       if (profile.userType !== UserType.APPLICANT) {
         navigate(dashboardRoutes[profile.userType as UserType], { replace: true })
         return
@@ -143,8 +178,6 @@ export default function LoginPage() {
       }
       navigate(Routes.onboarding.index)
     } catch (error: any) {
-      console.error("❌ Login error:", error)
-      
       const errorMessage = getAuthErrorMessage(error)
       
       toast({

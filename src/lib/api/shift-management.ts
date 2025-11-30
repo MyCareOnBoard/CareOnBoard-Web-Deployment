@@ -5,6 +5,9 @@
 
 import axiosClient from '../axios';
 import { ApiResponse } from '../api-types';
+import { Employee } from './employees';
+import { Client } from './clients';
+import { Agency } from './agencies';
 
 // API endpoint constants
 const SHIFT_BASE = '/shifts';
@@ -48,20 +51,11 @@ export enum SubmissionStatus {
 }
 
 /**
- * Client interface
- */
-export interface Client {
-    id: string;
-    name: string;
-    avatar?: string;
-}
-
-/**
  * Shift interface
  */
 export interface Shift {
     id: string;
-    client: Client;
+    client?: Client;
     date: string;
     location: string;
     startTime: string;
@@ -80,6 +74,8 @@ export interface Shift {
     agencyId?: string;
     createdAt?: string;
     updatedAt?: string;
+    employee?: Employee;
+    agency?: Agency;
 }
 
 // ==================== Request/Response Types ====================
@@ -88,8 +84,9 @@ export interface Shift {
  * Create Shift Request Data
  */
 export interface CreateShiftRequest {
-    uid: string;
+    employeeId: string;
     agencyId: string;
+    clientId?: string;
     date: string; // Format: YYYY-MM-DD
     location: string;
     startTime: string;
@@ -158,6 +155,14 @@ export interface ListShiftsParams {
     date?: string; // Format: YYYY-MM-DD
     limit?: number; // 1-100, default: 50
     agencyId?: string; // Filter by agency ID
+    employeeId?: string; // Filter by employee ID
+    clientId?: string; // Filter by client ID
+    location?: string; // Filter by location
+    startTime?: string; // Filter by start time
+    endTime?: string; // Filter by end time
+    client?: boolean; // Populate client data
+    employee?: boolean; // Populate employee data
+    agency?: boolean; // Populate agency data
 }
 
 /**
@@ -246,7 +251,7 @@ export interface ResetShiftsResponse {
 export const createShift = async (data: CreateShiftRequest): Promise<ShiftResponse> => {
     try {
         const response = await axiosClient.post<ShiftResponse>(
-            `${SHIFT_BASE}/create`,
+            `${SHIFT_BASE}`,
             data
         );
 

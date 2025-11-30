@@ -22,38 +22,6 @@ export enum SubmissionStatus {
   SUBMITTED = "submitted",
 }
 
-export interface Client {
-  id: string;
-  name: string;
-  avatar?: string;
-}
-
-export interface Shift {
-  id: string;
-  client: Client;
-  date: string;
-  location: string;
-  startTime: string;
-  endTime?: string;
-  availableAt?: string;
-  clockedInAt?: string;
-  clockedOutAt?: string;
-  status: ShiftStatus;
-  actionStatus?: ShiftActionStatus;
-  type?: ShiftType; // Default: automatic
-  submissionStatus?: SubmissionStatus; // Default: draft
-  timeRemaining?: number; // minutes remaining
-  sessionDuration?: string; // e.g., "2 hour session"
-  additionalStatus?: string; // e.g., "Expiring Soon", "Starts tomorrow"
-}
-
-export interface ShiftSectionProps {
-  title: string;
-  subtitle: string;
-  shifts: Shift[];
-  isExpanded?: boolean;
-  onExpandToggle?: () => void;
-  backgroundColor: string;
-  showExpandButton?: boolean;
-}
+// Note: Shift and related types are now imported from @/lib/api/shift-management
+// ShiftSectionProps is defined locally in index.tsx with additional properties
 

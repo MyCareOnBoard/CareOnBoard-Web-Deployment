@@ -44,6 +44,7 @@ import ApplicantDirectoryPage from "@/pages/agency/applicant-directory";
 import ReportsPage from "@/pages/agency/reports";
 import ComplianceAlertsPage from "@/pages/agency/compliance-alerts";
 import ShiftsPage from "@/pages/agency/shifts";
+import ShiftsListPage from "@/pages/agency/scheduling/shifts";
 import NotesPage from "@/pages/userPanel/notes";
 import AgencyNotesPage from "@/pages/agency/notes";
 
@@ -146,6 +147,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.agency.scheduling,
         Component: SchedulingPage,
+      },
+      {
+        path: Routes.agency.shiftsList,
+        Component: ShiftsListPage,
       },
       {
         path: Routes.agency.analytics,

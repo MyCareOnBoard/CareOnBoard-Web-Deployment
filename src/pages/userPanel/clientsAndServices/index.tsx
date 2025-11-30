@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
-import { getClients, type Client } from "@/lib/api/clients";
+import { listClients, type Client } from "@/lib/api/clients";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 import { toast } from "sonner";
-import { MOCK_PENDING_CLIENTS, MOCK_PAST_CLIENTS, USE_MOCK_DATA } from "@/constants/mockClients";
 import ExpandIcon from "@/assets/icons/arrow-expand-01.svg?react";
 import ServicesAvatar from "@/assets/icons/services-avatar.png";
 
@@ -30,20 +29,18 @@ export default function ClientsAndServicesPage() {
     try {
       setLoading(true);
       
-      if (USE_MOCK_DATA) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setPendingClients(MOCK_PENDING_CLIENTS);
-        setPastClients(MOCK_PAST_CLIENTS);
-        setTotalPages(1);
-      } else {
-        const response = await getClients(page, pageSize);
-        const pending = response.data.filter(c => c.isPending);
-        const past = response.data.filter(c => !c.isPending);
-        setPendingClients(pending);
-        setPastClients(past);
-        setTotalPages(Math.ceil(response.total / pageSize));
-      }
+      // Fetch all clients (both pending and active/past)
+      const allClients = await listClients({
+        limit: 100, // Get more clients to properly filter
+      });
+      
+      // Filter by status
+      const pending = allClients.filter(c => c.status === 'pending');
+      const past = allClients.filter(c => c.status !== 'pending' && c.status !== undefined);
+      
+      setPendingClients(pending);
+      setPastClients(past);
+      setTotalPages(Math.ceil(past.length / pageSize));
     } catch (error: any) {
       console.error("Failed to load clients:", error);
       toast.error("Failed to load clients", {
@@ -54,7 +51,15 @@ export default function ClientsAndServicesPage() {
     }
   };
 
-  const getInitials = (name: string) => {
+  const getClientName = (client: Client) => {
+    if (client.firstName && client.lastName) {
+      return `${client.firstName} ${client.lastName}`;
+    }
+    return client.id;
+  };
+
+  const getInitials = (client: Client) => {
+    const name = getClientName(client);
     return name
       .split(" ")
       .map((n) => n[0])
@@ -64,12 +69,12 @@ export default function ClientsAndServicesPage() {
   };
 
   const handleAccept = (client: Client) => {
-    setAcceptedClientName(client.fullName);
+    setAcceptedClientName(getClientName(client));
     setShowAcceptModal(true);
     
     // Remove from pending and add to past
     setPendingClients(prev => prev.filter(c => c.id !== client.id));
-    setPastClients(prev => [...prev, { ...client, isPending: false }]);
+    setPastClients(prev => [...prev, { ...client, status: 'active' }]);
     
     // Auto close modal after 3 seconds
     setTimeout(() => {
@@ -172,14 +177,14 @@ export default function ClientsAndServicesPage() {
                     {/* Client Info */}
                     <div className="col-span-2 flex items-center gap-3">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src={client.profileImage || ServicesAvatar} alt={client.fullName} />
+                        <AvatarImage src={client.profileImage || ServicesAvatar} alt={getClientName(client)} />
                         <AvatarFallback className="bg-gray-200 text-gray-700 text-sm font-medium">
-                          {getInitials(client.fullName)}
+                          {getInitials(client)}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-semibold text-gray-900 text-sm">
-                          {client.fullName}
+                          {getClientName(client)}
                         </p>
                         <p className="text-xs text-gray-500">Client</p>
                       </div>
@@ -189,7 +194,9 @@ export default function ClientsAndServicesPage() {
                     <div className="col-span-2 flex items-center">
                       <div>
                         <p className="text-xs text-gray-500 mb-0.5">Date</p>
-                        <p className="text-sm text-gray-900">{client.requestDate}</p>
+                        <p className="text-sm text-gray-900">
+                          {client.createdAt ? new Date(client.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
+                        </p>
                       </div>
                     </div>
 
@@ -209,10 +216,10 @@ export default function ClientsAndServicesPage() {
                       </div>
                     </div>
 
-                    {/* Sessions */}
+                    {/* Service Code */}
                     <div className="col-span-2 flex items-center">
                       <span className="inline-flex items-center px-3 py-1 rounded-md bg-gray-200 text-gray-700 text-xs font-medium">
-                        {client.sessionsCompleted} hour session
+                        {client.serviceCode || client.service}
                       </span>
                     </div>
 
@@ -270,14 +277,14 @@ export default function ClientsAndServicesPage() {
                       {/* Client Info */}
                       <div className="col-span-3 flex items-center gap-3">
                         <Avatar className="h-12 w-12">
-                          <AvatarImage src={client.profileImage || ServicesAvatar} alt={client.fullName} />
+                          <AvatarImage src={client.profileImage || ServicesAvatar} alt={getClientName(client)} />
                           <AvatarFallback className="bg-gray-200 text-gray-700 text-sm font-medium">
-                            {getInitials(client.fullName)}
+                            {getInitials(client)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="font-semibold text-gray-900 text-sm">
-                            {client.fullName}
+                            {getClientName(client)}
                           </p>
                           <p className="text-xs text-gray-500">Client</p>
                         </div>
@@ -302,7 +309,7 @@ export default function ClientsAndServicesPage() {
                       {/* Status */}
                       <div className="col-span-3 flex items-center justify-end">
                         <span className="inline-flex items-center px-3 py-1 rounded-md bg-gray-200 text-gray-700 text-xs font-medium">
-                          {client.sessionsCompleted} hour sessions completed
+                          {client.status || 'active'}
                         </span>
                       </div>
                     </div>
