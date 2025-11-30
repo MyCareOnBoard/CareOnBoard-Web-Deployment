@@ -128,11 +128,11 @@ export default function SchedulingPage() {
       }
     };
 
-    if (profile?.agency?.id) {
+    if (profile?.data?.id) {
       fetchShifts();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.agency?.id]);
+  }, [profile?.data?.id]);
 
   // Calculate shift statistics
   const shiftStats = useMemo(() => {

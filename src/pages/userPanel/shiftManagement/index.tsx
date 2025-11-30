@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Shift, ShiftStatus, ShiftActionStatus } from "./types";
+import { Shift, ShiftStatus, ShiftActionStatus } from "@/lib/api/shift-management";
+// ShiftSectionProps is defined locally below
 import { format } from "date-fns";
 import { ClockOutModal } from "./ClockOutModal";
 import { LocationErrorModal } from "./LocationErrorModal";
@@ -13,8 +14,6 @@ import {
   clockIn as apiClockIn,
   shiftStarted as apiShiftStarted,
   clockOut as apiClockOut,
-  updateShiftStatus,
-  seedShifts,
   getAvailableShifts,
   getPreviousShifts,
 } from "@/lib/api/shift-management";
@@ -73,6 +72,18 @@ const calculateRemainingMinutes = (clockedInAt: string, endTime: string, date: s
 };
 
 type ShiftPanel = 'today' | 'upcoming' | 'previous';
+
+// Helper function to get client name
+const getClientName = (client?: { firstName?: string; lastName?: string; name?: string }) => {
+  if (!client) return "Unknown Client";
+  if (client.firstName && client.lastName) {
+    return `${client.firstName} ${client.lastName}`;
+  }
+  if (client.name) {
+    return client.name;
+  }
+  return "Unknown Client";
+};
 
 const checkLocationMatch = (userLocation: string, shiftLocation: string): boolean => {
   const normalizedUserLocation = userLocation.toLowerCase().trim();
@@ -192,7 +203,7 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
           <div className="flex flex-col gap-0.5">
             <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Client</p>
             <p className="text-[13px] text-[#10141a] leading-[1.4] font-semibold whitespace-nowrap">
-              {shift.client.name}
+              {getClientName(shift.client)}
             </p>
           </div>
 
@@ -314,15 +325,15 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
       <div className="items-center hidden w-full gap-6 lg:flex">
         {/* Client Avatar */}
         <div className="w-[52.5px] h-[60px] rounded-[8px] overflow-hidden flex-shrink-0">
-          {shift.client.avatar ? (
+          {shift.client?.profileImage ? (
             <img
-              src={shift.client.avatar}
-              alt={shift.client.name}
+              src={shift.client.profileImage}
+              alt={getClientName(shift.client)}
               className="object-cover w-full h-full"
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-xl font-bold">
-              {shift.client.name.charAt(0)}
+              {getClientName(shift.client).charAt(0)}
             </div>
           )}
         </div>
@@ -332,7 +343,7 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
           {/* Client Name */}
           <div className="flex flex-col gap-1.5 flex-shrink-0">
             <p className="text-[16px] font-semibold text-[#10141a] leading-[1.6] whitespace-nowrap">
-              {shift.client.name}
+              {getClientName(shift.client)}
             </p>
             <p className="text-[14px] text-[#808081] leading-[1.4] whitespace-nowrap">Client</p>
           </div>
@@ -822,35 +833,6 @@ export default function ShiftManagementPage() {
       setShiftsLoading(false);
     }
   };
-  const handleSeedData = async () => {
-    try {
-      setSeedingData(true);
-      
-      const agencyId = user?.uid;
-      
-      if (!agencyId) {
-        toast.error('User not authenticated');
-        return;
-      }
-      
-      const response = await seedShifts({ agencyId });
-      
-      if (response.success) {
-        toast.success('Dummy data created successfully!', {
-          description: `Created ${response.summary.totalCount} shifts across all statuses`
-        });
-        
-        await loadShifts();
-      }
-    } catch (error: any) {
-      console.error('Failed to seed data:', error);
-      toast.error('Failed to create dummy data', {
-        description: error?.response?.data?.error || 'Please try again'
-      });
-    } finally {
-      setSeedingData(false);
-    }
-  };
 
   return (
     <div className="min-h-[calc(100vh-200px)] px-2 sm:px-0">
@@ -860,19 +842,6 @@ export default function ShiftManagementPage() {
         </h1>
 
         <div className="flex items-center gap-3">
-          <Button 
-            onClick={handleSeedData}
-            disabled={seedingData}
-            className="bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {seedingData ? (
-              <Loader2 size={20} className="animate-spin" />
-            ) : (
-              <Database size={20} />
-            )}
-            {seedingData ? 'Creating...' : 'Seed Data'}
-          </Button>
-
           <Button 
             onClick={() => navigate(Routes.userPanel.manualShiftManagement)}
             className="bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap"
