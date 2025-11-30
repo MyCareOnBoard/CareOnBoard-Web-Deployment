@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Shift, ShiftStatus, ShiftActionStatus } from "./types";
+import { Shift, ShiftStatus, ShiftActionStatus } from "@/lib/api/shift-management";
+// ShiftSectionProps is defined locally below
 import { format } from "date-fns";
 import { ClockOutModal } from "./ClockOutModal";
 import { LocationErrorModal } from "./LocationErrorModal";
@@ -73,6 +74,18 @@ const calculateRemainingMinutes = (clockedInAt: string, endTime: string, date: s
 };
 
 type ShiftPanel = 'today' | 'upcoming' | 'previous';
+
+// Helper function to get client name
+const getClientName = (client?: { firstName?: string; lastName?: string; name?: string }) => {
+  if (!client) return "Unknown Client";
+  if (client.firstName && client.lastName) {
+    return `${client.firstName} ${client.lastName}`;
+  }
+  if (client.name) {
+    return client.name;
+  }
+  return "Unknown Client";
+};
 
 const checkLocationMatch = (userLocation: string, shiftLocation: string): boolean => {
   const normalizedUserLocation = userLocation.toLowerCase().trim();
@@ -192,7 +205,7 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
           <div className="flex flex-col gap-0.5">
             <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Client</p>
             <p className="text-[13px] text-[#10141a] leading-[1.4] font-semibold whitespace-nowrap">
-              {shift.client.name}
+              {getClientName(shift.client)}
             </p>
           </div>
 
@@ -314,15 +327,15 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
       <div className="items-center hidden w-full gap-6 lg:flex">
         {/* Client Avatar */}
         <div className="w-[52.5px] h-[60px] rounded-[8px] overflow-hidden flex-shrink-0">
-          {shift.client.avatar ? (
+          {shift.client?.profileImage ? (
             <img
-              src={shift.client.avatar}
-              alt={shift.client.name}
+              src={shift.client.profileImage}
+              alt={getClientName(shift.client)}
               className="object-cover w-full h-full"
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-xl font-bold">
-              {shift.client.name.charAt(0)}
+              {getClientName(shift.client).charAt(0)}
             </div>
           )}
         </div>
@@ -332,7 +345,7 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
           {/* Client Name */}
           <div className="flex flex-col gap-1.5 flex-shrink-0">
             <p className="text-[16px] font-semibold text-[#10141a] leading-[1.6] whitespace-nowrap">
-              {shift.client.name}
+              {getClientName(shift.client)}
             </p>
             <p className="text-[14px] text-[#808081] leading-[1.4] whitespace-nowrap">Client</p>
           </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
@@ -15,13 +15,15 @@ import DigitalSignatureModal from "@/pages/applicant/application/components/Digi
 import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift } from "@/lib/api/shift-management";
 import { format, parse } from "date-fns";
 import { useSignDocumentMutation, useCheckSignatureStatusQuery } from "@/pages/applicant/application/api";
+import { searchClients, Client } from "@/lib/api/clients";
+import { useAuth } from "@/utils/auth";
 
 interface FormData {
   yourFirstName: string;
   yourLastName: string;
   yourEmail: string;
-  clientFirstName: string;
-  clientLastName: string;
+  client: string;
+  clientId: string;
   location: string;
 }
 
@@ -89,11 +91,8 @@ function buildManualShiftRequests(
           status: ShiftStatus.PENDING, // Default to PENDING, will be overridden by caller
           type: ShiftType.MANUAL,
           submissionStatus: SubmissionStatus.DRAFT, // Default to DRAFT, will be overridden by caller
-          client: {
-            id: `client-${employeeId}`,
-            name: `${formData.clientFirstName} ${formData.clientLastName}`.trim(),
-          },
-          additionalStatus: `Manual timesheet - Week ${weekIndex + 1} ${day} - ${sessionDuration} - ${signatureInfo}`,
+          clientId: formData.clientId || undefined,
+          additionalStatus: `Manual timesheet - Week ${weekIndex + 1} ${day} - Client: ${formData.client} - ${sessionDuration} - ${signatureInfo}`,
         };
 
         requests.push(request);
@@ -109,7 +108,8 @@ function buildManualShiftRequests(
 export default function ManualShiftManagementPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const profile = useSelector((state: RootState) => state.auth?.profile);
+  const { profile } = useAuth();
+  const profileRedux = useSelector((state: RootState) => state.auth?.profile);
   const user = useSelector((state: RootState) => state.auth?.user);
 
   const [loading, setLoading] = useState(true);
@@ -139,10 +139,17 @@ export default function ManualShiftManagementPage() {
     yourFirstName: "",
     yourLastName: "",
     yourEmail: "",
-    clientFirstName: "",
-    clientLastName: "",
+    client: "",
+    clientId: "",
     location: "",
   });
+
+  // Client search states
+  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [isSearchingClients, setIsSearchingClients] = useState(false);
+  const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const clientInputRef = useRef<HTMLDivElement>(null);
 
   const [week1Expanded, setWeek1Expanded] = useState(true);
   const [week2Expanded, setWeek2Expanded] = useState(false);
@@ -182,20 +189,26 @@ export default function ManualShiftManagementPage() {
     signatureData: string;
   } | null>(null);
 
-  // Handle clicks outside location dropdown
+  // Handle clicks outside location and client dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (locationInputRef.current && !locationInputRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
+      }
+      if (clientInputRef.current && !clientInputRef.current.contains(event.target as Node)) {
+        setShowClientDropdown(false);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      // Clear any pending search timeout
+      // Clear any pending search timeouts
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
+      }
+      if (clientSearchTimeoutRef.current) {
+        clearTimeout(clientSearchTimeoutRef.current);
       }
     };
   }, []);
@@ -267,18 +280,29 @@ export default function ManualShiftManagementPage() {
         // Parse drafts back into form structure
         const firstShift = draftShifts[0];
         
-        // Extract client name from first shift
-        if (firstShift.client?.name) {
-          const nameParts = firstShift.client.name.split(" ");
-          const clientFirstName = nameParts[0] || "";
-          const clientLastName = nameParts.slice(1).join(" ") || "";
+        // Extract client info from first shift
+        if (firstShift.client) {
+          const clientName = firstShift.client.firstName && firstShift.client.lastName
+            ? `${firstShift.client.firstName} ${firstShift.client.lastName}`
+            : firstShift.client.id || "";
           
           setFormData((prev) => ({
             ...prev,
-            clientFirstName,
-            clientLastName,
+            client: clientName,
+            clientId: firstShift.client?.id || "",
             location: firstShift.location || prev.location,
           }));
+        } else if (firstShift.additionalStatus) {
+          // Try to extract from additionalStatus if client object is not available
+          const clientMatch = firstShift.additionalStatus.match(/Client:\s*([^-\n]+)/);
+          if (clientMatch) {
+            const clientName = clientMatch[1].trim();
+            setFormData((prev) => ({
+              ...prev,
+              client: clientName,
+              location: firstShift.location || prev.location,
+            }));
+          }
         }
 
         // Group shifts by week and day
@@ -350,6 +374,61 @@ export default function ManualShiftManagementPage() {
     if (field === "location") {
       handleLocationSearch(value);
     }
+    
+    // If it's the client field, trigger client search
+    if (field === "client") {
+      handleClientSearch(value);
+    }
+  };
+
+  // Client search handler
+  const handleClientSearch = useCallback(async (query: string) => {
+    // Clear existing timeout
+    if (clientSearchTimeoutRef.current) {
+      clearTimeout(clientSearchTimeoutRef.current);
+    }
+
+    // If query is too short or no agency, hide dropdown
+    if (query.trim().length < 2 || !profile?.agency?.id) {
+      setShowClientDropdown(false);
+      setClientSearchResults([]);
+      return;
+    }
+
+    // Debounce the search
+    clientSearchTimeoutRef.current = setTimeout(async () => {
+      try {
+        setIsSearchingClients(true);
+        if (!profile?.agency?.id) {
+          setClientSearchResults([]);
+          setShowClientDropdown(false);
+          return;
+        }
+        const clients = await searchClients(query, profile.agency.id);
+        setClientSearchResults(clients);
+        setShowClientDropdown(clients.length > 0);
+      } catch (error) {
+        console.error("Failed to search clients:", error);
+        setClientSearchResults([]);
+        setShowClientDropdown(false);
+      } finally {
+        setIsSearchingClients(false);
+      }
+    }, 300); // 300ms debounce
+  }, [profile?.agency?.id]);
+
+  // Handle client selection
+  const handleClientSelect = (client: Client) => {
+    const clientName = client.firstName && client.lastName 
+      ? `${client.firstName} ${client.lastName}` 
+      : client.id;
+    setFormData((prev) => ({
+      ...prev,
+      client: clientName,
+      clientId: client.id,
+    }));
+    setShowClientDropdown(false);
+    setClientSearchResults([]);
   };
 
   const handleLocationSearch = async (query: string) => {
@@ -513,10 +592,10 @@ export default function ManualShiftManagementPage() {
     }
 
     // Validate client information
-    if (!formData.clientFirstName || !formData.clientLastName || !formData.location) {
+    if (!formData.clientId || !formData.location) {
       toast({
         title: "Client Information Required",
-        description: "Please fill in client name and location before saving.",
+        description: "Please select a client and enter location before saving.",
         variant: "destructive",
       });
       return;
@@ -709,10 +788,10 @@ export default function ManualShiftManagementPage() {
     }
 
     // Validate client information
-    if (!formData.clientFirstName || !formData.clientLastName || !formData.location) {
+    if (!formData.clientId || !formData.location) {
       toast({
         title: "Client Information Required",
-        description: "Please fill in client name and location before submitting.",
+        description: "Please select a client and enter location before submitting.",
         variant: "destructive",
       });
       return;
@@ -943,23 +1022,55 @@ export default function ManualShiftManagementPage() {
           <div className="grid grid-cols-3 gap-6 mb-8">
             <div>
               <label className="block mb-2 text-sm font-medium text-[#10141a]">
-                Client First Name
+                Client
               </label>
-              <Input
-                value={formData.clientFirstName}
-                onChange={(e) => handleInputChange("clientFirstName", e.target.value)}
-                className="border-[#e5e5e6] rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block mb-2 text-sm font-medium text-[#10141a]">
-                Client Last Name
-              </label>
-              <Input
-                value={formData.clientLastName}
-                onChange={(e) => handleInputChange("clientLastName", e.target.value)}
-                className="border-[#e5e5e6] rounded-md"
-              />
+              <div className="relative" ref={clientInputRef}>
+                <Input
+                  value={formData.client}
+                  onChange={(e) => handleInputChange("client", e.target.value)}
+                  onFocus={() => {
+                    if (clientSearchResults.length > 0) {
+                      setShowClientDropdown(true);
+                    }
+                  }}
+                  placeholder="Type to search for client..."
+                  className="border-[#e5e5e6] rounded-md"
+                />
+                
+                {/* Client Dropdown */}
+                {showClientDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                    {isSearchingClients && (
+                      <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#00b4b8]" />
+                        Searching...
+                      </div>
+                    )}
+                    {!isSearchingClients && clientSearchResults.length === 0 && formData.client.length >= 2 && (
+                      <div className="px-4 py-3 text-sm text-[#808081]">
+                        No clients found
+                      </div>
+                    )}
+                    {!isSearchingClients && clientSearchResults.map((client) => {
+                      const clientName = client.firstName && client.lastName
+                        ? `${client.firstName} ${client.lastName}`
+                        : client.id;
+                      return (
+                        <div
+                          key={client.id}
+                          onClick={() => handleClientSelect(client)}
+                          className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
+                        >
+                          <div className="font-medium">{clientName}</div>
+                          {client.location && (
+                            <div className="text-xs text-[#808081] mt-1">{client.location}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <label className="block mb-2 text-sm font-medium text-[#10141a]">

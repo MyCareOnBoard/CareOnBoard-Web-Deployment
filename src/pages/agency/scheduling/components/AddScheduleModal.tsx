@@ -212,7 +212,7 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
     setFormData(prev => ({
       ...prev,
       assignedDsp: employee.fullName,
-      assignedDspId: employee.id,
+      assignedDspId: employee.uid || employee.id,
       billingRate: "", // Billing rate would come from a different source
     }));
     setShowDspDropdown(false);

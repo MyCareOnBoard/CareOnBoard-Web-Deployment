@@ -184,11 +184,11 @@ export default function ShiftsListPage() {
   };
 
   // Calculate shift duration
-  const calculateDuration = (date: string, startTime?: string, endTime?: string): string => {
-    if (!date || !startTime || !endTime) return "2 hours";
+  const calculateDuration = (startTime?: string, endTime?: string): string => {
+    if (!startTime || !endTime) return "2 hours";
     try {
-      const start = new Date(`${date} ${startTime}`);
-      const end = new Date(`${date} ${endTime}`);
+      const start = new Date(`2000-01-01 ${startTime}`);
+      const end = new Date(`2000-01-01 ${endTime}`);
       const diffMs = end.getTime() - start.getTime();
       const hours = Math.floor(diffMs / (1000 * 60 * 60));
       const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
