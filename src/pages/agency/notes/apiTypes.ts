@@ -42,3 +42,22 @@ export interface SubmittedNotesQueryParams {
   timeInterval?: 'today' | 'this-month' | 'this-year' | 'all';
   status?: 'submitted' | 'approved';
 }
+
+export interface SubmittedNoteDetails {
+  id: string;
+  activityType: string;
+  description: string;
+  metadata: Record<string, any>;
+  notes: SubmittedNoteDetail[];
+  status: 'submitted' | 'approved';
+  submissionId: string;
+  submittedAt: string | null;
+  submittedBy: string;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
+  employee: {
+    id: string;
+    fullName: string;
+    email?: string;
+  };
+}

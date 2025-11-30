@@ -30,7 +30,7 @@ export default function AgencyNotesPage() {
   const filterScrollRef = useRef<HTMLDivElement>(null);
   const itemsPerPage = 10;
 
-  const activityLogId = new URLSearchParams(useLocation().search).get("id");
+  const submissionId = new URLSearchParams(useLocation().search).get("id");
 
   const navigate = useNavigate();
 
@@ -150,8 +150,8 @@ export default function AgencyNotesPage() {
   };
 
   useEffect(() => {
-    if (activityLogId) setIsViewMode(true);
-  }, [activityLogId]);
+    if (submissionId) setIsViewMode(true);
+  }, [submissionId]);
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -406,7 +406,7 @@ export default function AgencyNotesPage() {
                     <div className="flex items-center gap-2 justify-end">
                       <button
                         onClick={() => {
-                          navigate(Routes.agency.notes + `?id=${note.activityLogId}`)
+                          navigate(Routes.agency.notes + `?id=${note.id}`)
                           setIsViewMode(true)
                         }}
                         className="cursor-pointer px-4 py-1.5 text-[11px] rounded-full bg-[#B2B2B3] font-semibold text-white hover:bg-[#9a9a9b] transition-colors flex items-center gap-1"
@@ -421,6 +421,10 @@ export default function AgencyNotesPage() {
                       {statusTab === "submitted" && (
                         <>
                           <button
+                            onClick={() => {
+                              navigate(Routes.agency.notes + `?id=${note.id}`)
+                              setIsViewMode(true)
+                            }}
                             className="cursor-pointer px-4 py-1.5 text-[11px] rounded-full bg-[#B2B2B3] font-semibold text-white hover:bg-[#9a9a9b] transition-colors flex items-center gap-1">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  strokeWidth="2">
@@ -448,7 +452,7 @@ export default function AgencyNotesPage() {
                               (isApproving || isRejecting) ? 'opacity-50 cursor-not-allowed' : ''
                             }`}>
                             <CornerDownLeft size={14}/>
-                            {isRejecting ? 'Rejecting...' : 'Reject'}
+                            {isRejecting ? 'Returning...' : 'Return'}
                           </button>
                         </>
                       )}
@@ -505,7 +509,7 @@ export default function AgencyNotesPage() {
       <AgencyEditNote
         isOpen={isViewMode}
         setIsOpen={setIsViewMode}
-        activityLogId={activityLogId}
+        submissionId={submissionId}
       />
     </div>
   );

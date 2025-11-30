@@ -1,9 +1,7 @@
 import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Input} from "@/components/ui/input";
-import {Checkbox} from "@/components/ui/checkbox";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Calendar} from "@/components/ui/calendar";
-import TimePicker from "@/components/TimePicker";
 import ContentEditableCell from "@/components/ContentEditableCell";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import React, {useEffect, useState} from "react";
@@ -11,75 +9,44 @@ import {useUpdateSubmittedNoteMutation} from "@/pages/agency/notes/api";
 import {useDebounce} from "@/hooks/useDebounce";
 import {format} from "date-fns";
 import {SubmittedNoteDetails} from "@/pages/agency/notes/apiTypes";
+import InformationCircleIcon from "@/assets/icons/information-circle.svg?react";
 
 
 type ActivityRow = {
   id: string;
   date: Date | undefined;
-  startTime: string;
-  endTime: string;
-  activity: string;
-  description: string;
+  units: string;
+  strategies: string;
+  activities: string;
+  location: string;
+  notes: string;
 };
-
-type ServiceStrategy = {
-  id: string;
-  label: string;
-  checked: boolean;
-};
-
 
 const initialActivities = [
-  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
-  {id: "", date: undefined, startTime: "", endTime: "", activity: "", description: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
+  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
 ]
 
+interface AgencyActivitiesLogTemplateProps {
+  title: string;
+  submissionId: string | null;
+  isLoading: boolean;
+  submittedNote?: SubmittedNoteDetails;
+}
 
-export default function AgencyCommunityBasedNote(
-  {submissionId, isLoading, submittedNote}: {
-    submissionId: string | null;
-    isLoading: boolean;
-    submittedNote?: SubmittedNoteDetails;
-  }
+export default function AgencyActivitiesLogTemplate(
+  {title, submissionId, isLoading, submittedNote}: AgencyActivitiesLogTemplateProps
 ) {
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
 
   const [mutateNote] = useUpdateSubmittedNoteMutation();
 
   const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
-
-  const [serviceStrategies, setServiceStrategies] = useState<ServiceStrategy[]>([
-    {
-      id: "dailyLiving",
-      label: "Assistance with Activities of Daily Living (such as getting dressed, eating, personal hygiene, etc.)",
-      checked: false
-    },
-    {
-      id: "communityParticipation",
-      label: "Assistance with Increasing Community Participation (such as daily errands, attending events, restaurant, purchasing items, travel training, etc.)",
-      checked: false
-    },
-    {
-      id: "independence",
-      label: "Assistance with Increasing Independence (such as helping the individual learn to do laundry, cook, clean, dress, grocery shop, pay for items, etc.)",
-      checked: false
-    },
-    {
-      id: "support",
-      label: "Assistance with On-The-Job Support (such as safety awareness, using the restroom, attending to task, lunch/breaks, etc.)",
-      checked: false
-    },
-    {
-      id: "learning",
-      label: "Assistance with Learning Activities (such as basic tutoring – math, reading, writing; support in attending a class; etc.)",
-      checked: false
-    },
-  ]);
 
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
 
@@ -125,33 +92,32 @@ export default function AgencyCommunityBasedNote(
     };
 
     const date = newActivity.date;
-    const startTime = field === "startTime" ? value : newActivity.startTime;
-    const endTime = field === "endTime" ? value : newActivity.endTime;
+    const metadata = {
+      units: newActivity.units,
+      strategies: newActivity.strategies,
+      activities: newActivity.activities,
+      location: newActivity.location,
+      notes: newActivity.notes,
+    };
 
-    if (date && startTime && endTime && id === "") {
+    if (date && id === "") {
       await mutateNote({
         submissionId: submissionId!,
         data: {
           id: id,
-          startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
-          endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
-          metadata: {
-            activity: newActivity.activity,
-            description: newActivity.description,
-          }
+          startDate: format(date, "yyyy-MM-dd"),
+          endDate: format(date, "yyyy-MM-dd"),
+          metadata: metadata
         }
       }).unwrap();
-    } else if (date && startTime && endTime && id !== "") {
+    } else if (date && id !== "") {
       debouncedMutateNote({
         submissionId: submissionId!,
         data: {
           id: id,
-          startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
-          endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
-          metadata: {
-            activity: newActivity.activity,
-            description: newActivity.description,
-          }
+          startDate: format(date, "yyyy-MM-dd"),
+          endDate: format(date, "yyyy-MM-dd"),
+          metadata: metadata
         }
       });
     }
@@ -162,12 +128,6 @@ export default function AgencyCommunityBasedNote(
       return "";
     }
     return format(date, "dd.MM.yy");
-  };
-
-  const toggleStrategy = (id: string) => {
-    setServiceStrategies(serviceStrategies.map(strategy =>
-      strategy.id === id ? {...strategy, checked: !strategy.checked} : strategy
-    ));
   };
 
   useEffect(() => {
@@ -182,18 +142,11 @@ export default function AgencyCommunityBasedNote(
       const modifyActivityNotes = sortedNotes.map((note) => ({
         id: note.id,
         date: note.startDate?.split("T")?.[0] ? new Date(note.startDate?.split("T")?.[0]) : undefined,
-        startTime: note.startDate ? new Date(note.startDate).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        }) : "",
-        endTime: note.endDate ? new Date(note.endDate).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        }) : "",
-        activity: note.metadata?.activity || "",
-        description: note.metadata?.description || "",
+        units: note.metadata?.units || "",
+        strategies: note.metadata?.strategies || "",
+        activities: note.metadata?.activities || "",
+        location: note.metadata?.location || "",
+        notes: note.metadata?.notes || "",
       }));
       setActivities([
         ...modifyActivityNotes,
@@ -214,95 +167,22 @@ export default function AgencyCommunityBasedNote(
     );
   }
 
+  const displayTitle = title.replace(':serviceCode', submittedNote?.metadata?.serviceCode || '');
+
   return (
-    <VoiceRecordingProvider pageTitle="Community Based/Individual – Activities Log">
+    <VoiceRecordingProvider pageTitle={displayTitle}>
       <div className="min-h-[calc(100vh-200px)] pb-20">
         {/* Form Title */}
         <h2
-          className="text-[20px] font-semibold leading-[1.6] text-[#10141a] text-center mb-2 font-['Urbanist',sans-serif]">
-          Community Based/Individual – Activities Log ({submittedNote?.metadata?.serviceCode})
+          className="text-[20px] font-semibold leading-[1.6] text-[#10141a] text-center mb-8 font-['Urbanist',sans-serif]">
+          {displayTitle}
         </h2>
 
-        {/* Applicability Note */}
-        <p
-          className="text-[14px] font-semibold leading-[1.4] text-black text-center mb-8 font-['Urbanist',sans-serif]">
-          (Not applicable when delivering daily rate version of Individual Supports. Only used for 15 minute unit
-          version)
-        </p>
-
-        {/* Top Form Fields */}
-        <div className="flex gap-6 mb-6">
-          <div className="flex-1">
-            <label
-              className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-              Name
-            </label>
-            <Input
-              type="text"
-              value={submittedNote?.metadata?.individual || ""}
-              placeholder=""
-              className="w-full"
-              disabled={true}
-            />
-          </div>
-          <div className="flex-1">
-            <label
-              className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-              Service plan year
-            </label>
-            <Input
-              type="text"
-              value={submittedNote?.metadata?.serviceYear || ""}
-              placeholder=""
-              className="w-full"
-              disabled={true}
-            />
-          </div>
-          <div className="flex-1">
-            <label
-              className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-              Service Code
-            </label>
-            <Input
-              type="text"
-              value={submittedNote?.metadata?.serviceCode || ""}
-              disabled={true}
-              className="w-full"
-            />
-          </div>
-        </div>
-
-        {/* ISP Outcome */}
+        {/* Name of Individual */}
         <div className="mb-6">
-          <label
-            className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-            ISP Outcome
-          </label>
-          <Input
-            type="text"
-            value={submittedNote?.metadata?.ISPOutcome || ""}
-            placeholder=""
-            className="w-full"
-            disabled={true}
-          />
-        </div>
-
-        {/* Service Strategies */}
-        <div className="mb-6">
-          <p className="text-[14px] font-semibold leading-[1.4] text-black mb-3 font-['Urbanist',sans-serif]">
-            Service Strategies (check all that apply):
+          <p className="text-[14px] font-semibold leading-[1.4] text-black font-['Urbanist',sans-serif]">
+            Name of Individual : {submittedNote?.metadata?.individual}
           </p>
-          <div className="space-y-3">
-            {serviceStrategies.map((strategy) => (
-              <Checkbox
-                key={strategy.id}
-                checked={submittedNote?.metadata?.strategies?.includes(strategy.id) || strategy.checked}
-                onChange={() => toggleStrategy(strategy.id)}
-                label={strategy.label}
-                labelClassName="text-[14px] font-normal leading-[1.4] text-[#808081] font-['Urbanist',sans-serif]"
-              />
-            ))}
-          </div>
         </div>
 
         {/* Activities Log Table */}
@@ -310,34 +190,77 @@ export default function AgencyCommunityBasedNote(
           <div className="w-[1163px]">
             {/* Table Header */}
             <div className="border border-[#b2b2b3] rounded-tl-[2px] rounded-tr-[2px] overflow-hidden">
-              <div className="border-b border-[#b2b2b3] bg-white h-[71px]">
-                <div className="grid grid-cols-[112px_120px_120px_350px_1fr] gap-0 h-full">
+              <div className="border-b border-[#b2b2b3] bg-[#eef4f5] h-[71px]">
+                <div className="grid grid-cols-[112px_120px_160px_230px_140px_1fr] gap-0 h-full">
                   <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
                     <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
                       Date
                     </p>
                   </div>
                   <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
-                    <p
-                      className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                      {"Start\nTime"}
-                    </p>
-                  </div>
-                  <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
-                    <p
-                      className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                      {"End\nTime"}
-                    </p>
-                  </div>
-                  <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
                     <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-                      Individualized Activity
+                      # of Units
+                    </p>
+                  </div>
+                  <div
+                    className="relative px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button type="button" className="absolute top-2 right-2 h-4 w-4 cursor-pointer">
+                          <InformationCircleIcon className="h-4 w-4 text-[#10141a]"/>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="center"
+                        side="top"
+                        className="bg-white rounded-[6px] px-4 py-3 shadow-lg border-none w-[250px]"
+                        sideOffset={5}
+                      >
+                        <p className="text-[10px] font-normal leading-[1.6] text-black font-['Urbanist',sans-serif]">
+                          Strategies addressed from the Individual Service Plan (ISP)
+                        </p>
+                      </PopoverContent>
+                    </Popover>
+                    <p
+                      className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
+                      {"Strategies\nAddressed\nToday"}
+                    </p>
+                  </div>
+                  <div
+                    className="relative px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button type="button" className="absolute top-2 right-2 h-4 w-4 cursor-pointer">
+                          <InformationCircleIcon className="h-4 w-4 text-[#10141a]"/>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="center"
+                        side="top"
+                        className="bg-white rounded-[6px] px-4 py-3 shadow-lg border-none w-[250px]"
+                        sideOffset={5}
+                      >
+                        <p
+                          className="text-[10px] font-normal leading-[1.6] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
+                          {`can use calendars or other activity  lists that reflect today's activities, if  applicable`}
+                        </p>
+                      </PopoverContent>
+                    </Popover>
+                    <p
+                      className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
+                      {"Today\u2019s Activities to Address\nStrategies"}
+                    </p>
+                  </div>
+                  <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
+                    <p
+                      className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
+                      {"Location of\nActivities"}
                     </p>
                   </div>
                   <div className="px-4 py-3 flex items-center justify-center text-center">
                     <p
                       className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                      {"Tell us about the day, and how the activities will help\nthe individual reach the above outcome"}
+                      {"Notes Related to Today\u2019s Activities &\nProgress Toward Outcome(s)"}
                     </p>
                   </div>
                 </div>
@@ -350,7 +273,7 @@ export default function AgencyCommunityBasedNote(
                 {activities?.map((activity, index) => (
                   <div
                     key={index}
-                    className={`grid grid-cols-[112px_120px_120px_350px_1fr] gap-0 min-h-[71px] transition-colors ${
+                    className={`grid grid-cols-[112px_120px_160px_230px_140px_1fr] gap-0 min-h-[71px] transition-colors ${
                       index < activities?.length - 1 ? 'border-b border-[#b2b2b3]' : ''
                     } hover:bg-white`}
                   >
@@ -407,59 +330,78 @@ export default function AgencyCommunityBasedNote(
                         </span>
                       )}
                     </div>
-                    {/* Start Time */}
-                    <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
-                        <TimePicker
-                          value={activity.startTime}
-                          onChange={(value) => updateActivity(activity.id, index, 'startTime', value)}
-                        />
-                      ) : (
-                        <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
-                          {activity.startTime}
-                        </span>
-                      )}
-                    </div>
-                    {/* End Time */}
-                    <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
-                        <TimePicker
-                          value={activity.endTime}
-                          onChange={(value) => updateActivity(activity.id, index, 'endTime', value)}
-                        />
-                      ) : (
-                        <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
-                          {activity.endTime}
-                        </span>
-                      )}
-                    </div>
-                    {/* Activity */}
+                    {/* Units */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       {submittedNote?.status === "submitted" ? (
                         <ContentEditableCell
-                          value={activity.activity}
-                          onChange={(value) => updateActivity(activity.id, index, 'activity', value)}
-                          fieldName="Individualized Activity"
-                          pageTitle="Community Based/Individual – Activities Log"
+                          value={activity.units}
+                          onChange={(value) => updateActivity(activity.id, index, 'units', value)}
+                          fieldName="Units"
+                          pageTitle={displayTitle}
                         />
                       ) : (
                         <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
-                          {activity.activity}
+                          {activity.units}
                         </span>
                       )}
                     </div>
-                    {/* Description */}
+                    {/* Strategies */}
+                    <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
+                      {submittedNote?.status === "submitted" ? (
+                        <ContentEditableCell
+                          value={activity.strategies}
+                          onChange={(value) => updateActivity(activity.id, index, 'strategies', value)}
+                          fieldName="Strategies"
+                          pageTitle={displayTitle}
+                        />
+                      ) : (
+                        <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
+                          {activity.strategies}
+                        </span>
+                      )}
+                    </div>
+                    {/* Activities */}
+                    <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
+                      {submittedNote?.status === "submitted" ? (
+                        <ContentEditableCell
+                          value={activity.activities}
+                          onChange={(value) => updateActivity(activity.id, index, 'activities', value)}
+                          fieldName="Activities"
+                          pageTitle={displayTitle}
+                        />
+                      ) : (
+                        <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
+                          {activity.activities}
+                        </span>
+                      )}
+                    </div>
+                    {/* Location */}
+                    <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
+                      {submittedNote?.status === "submitted" ? (
+                        <ContentEditableCell
+                          value={activity.location}
+                          onChange={(value) => updateActivity(activity.id, index, 'location', value)}
+                          fieldName="Location"
+                          pageTitle={displayTitle}
+                        />
+                      ) : (
+                        <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
+                          {activity.location}
+                        </span>
+                      )}
+                    </div>
+                    {/* Notes */}
                     <div className="px-4 py-3 flex items-center justify-center">
                       {submittedNote?.status === "submitted" ? (
                         <ContentEditableCell
-                          value={activity.description}
-                          onChange={(value) => updateActivity(activity.id, index, 'description', value)}
-                          fieldName="Description"
-                          pageTitle="Community Based/Individual – Activities Log"
+                          value={activity.notes}
+                          onChange={(value) => updateActivity(activity.id, index, 'notes', value)}
+                          fieldName="Notes"
+                          pageTitle={displayTitle}
                         />
                       ) : (
                         <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
-                          {activity.description}
+                          {activity.notes}
                         </span>
                       )}
                     </div>
@@ -484,7 +426,11 @@ export default function AgencyCommunityBasedNote(
             className="max-w-md"
           />
           <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">
-            {submittedNote?.submittedAt ? new Date(submittedNote.submittedAt).toLocaleDateString("en-US", {month: "long", day: "numeric", year: "numeric"}) : currentDate}
+            {submittedNote?.submittedAt ? new Date(submittedNote.submittedAt).toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric"
+            }) : currentDate}
           </p>
         </div>
 

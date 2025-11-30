@@ -1,22 +1,98 @@
 import {Printer, X} from "lucide-react";
 import React from "react";
 import AgencyCommunityBasedNote from "@/pages/agency/notes/components/commnityBased";
-import {useGetSingleActivityLogQuery} from "@/pages/userPanel/notes/api";
+import AgencyActivitiesLogTemplate from "@/pages/agency/notes/components/activitiesLogTemplate";
+import AgencyRespiteLog from "@/pages/agency/notes/components/respiteLog";
+import AgencySupportedEmploymentIntervention from "@/pages/agency/notes/components/supportedEmploymentIntervention";
+import {useGetSubmittedNoteDetailsQuery} from "@/pages/agency/notes/api";
 
 
 export default function AgencyEditNote(
-  {isOpen, setIsOpen, activityLogId}: {
+  {isOpen, setIsOpen, submissionId}: {
     isOpen: boolean,
     setIsOpen: React.Dispatch<React.SetStateAction<boolean>>,
-    activityLogId: string | null
+    submissionId: string | null
   }
 ) {
-  const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
-    skip: !activityLogId
+  const {data: submittedNote, isLoading} = useGetSubmittedNoteDetailsQuery(submissionId!, {
+    skip: !submissionId
   });
   const handleCancel = () => setIsOpen(false);
 
   if (!isOpen) return null;
+
+  const renderNoteComponent = () => {
+    if (!submittedNote) return null;
+
+    switch (submittedNote.activityType) {
+      case 'community-based':
+        return (
+          <AgencyCommunityBasedNote
+            submissionId={submissionId}
+            isLoading={isLoading}
+            submittedNote={submittedNote}
+          />
+        );
+      case 'community-inclusion':
+        return (
+          <AgencyActivitiesLogTemplate
+            title="Community Inclusion Services – Activities Log (:serviceCode)"
+            submissionId={submissionId}
+            isLoading={isLoading}
+            submittedNote={submittedNote}
+          />
+        );
+      case 'day-habilitation':
+        return (
+          <AgencyActivitiesLogTemplate
+            title="Day Habilitation Services – Activities Log (:serviceCode)"
+            submissionId={submissionId}
+            isLoading={isLoading}
+            submittedNote={submittedNote}
+          />
+        );
+      case 'prevocational-training':
+        return (
+          <AgencyActivitiesLogTemplate
+            title="Prevocational Training Services – Activities Log (:serviceCode)"
+            submissionId={submissionId}
+            isLoading={isLoading}
+            submittedNote={submittedNote}
+          />
+        );
+      case 'supported-employment-pre':
+        return (
+          <AgencyActivitiesLogTemplate
+            title="Supported Employment Services – Pre‐Employment – Activities Log (:serviceCode)"
+            submissionId={submissionId}
+            isLoading={isLoading}
+            submittedNote={submittedNote}
+          />
+        );
+      case 'supported-employment-intervention':
+        return (
+          <AgencySupportedEmploymentIntervention
+            submissionId={submissionId}
+            isLoading={isLoading}
+            submittedNote={submittedNote}
+          />
+        );
+      case 'respite-log':
+        return (
+          <AgencyRespiteLog
+            submissionId={submissionId}
+            isLoading={isLoading}
+            submittedNote={submittedNote}
+          />
+        );
+      default:
+        return (
+          <div className="text-center py-8">
+            <p className="text-[#808081]">Unknown note type: {submittedNote.activityType}</p>
+          </div>
+        );
+    }
+  };
 
   return (
     <div
@@ -25,13 +101,15 @@ export default function AgencyEditNote(
     >
       <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
         <div
-          className="bg-white rounded-lg shadow-2xl w-full max-w-7xl max-h-[90vh] relative animate-fadeIn p-6 flex flex-col">
+          className="bg-white rounded-lg shadow-2xl w-full max-w-7xl max-h-[90vh] relative animate-fadeIn p-6 flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Header */}
           <div className="flex space-x-3 items-center justify-end mb-3 flex-shrink-0">
             <button
               onClick={handleCancel}
               className="flex items-center space-x-3 cursor-pointer text-white hover:text-gray-600 transition-colors bg-[#B2B2B3] rounded-full px-4 py-3"
-              aria-label="Close modal"
+              aria-label="Print"
             >
               <Printer className="w-6 h-6"/>
               <span>Print</span>
@@ -48,15 +126,7 @@ export default function AgencyEditNote(
 
           {/* Scrollable content area */}
           <div className="flex-1 overflow-y-auto">
-            {
-              activityLog?.activityType === 'community-based' && (
-                <AgencyCommunityBasedNote
-                  activityLogId={activityLogId}
-                  isLoading={isLoading}
-                  activityLog={activityLog}
-                />
-              )
-            }
+            {renderNoteComponent()}
           </div>
         </div>
       </div>
