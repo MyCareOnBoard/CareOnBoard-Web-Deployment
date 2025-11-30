@@ -1,24 +1,1105 @@
-import React from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { Plus, ChevronLeft, ChevronRight, Check, X, ArrowUpRight, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
+import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, deleteShift, CreateShiftRequest } from "@/lib/api/shift-management";
+import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router";
+import { Routes } from "@/routes/constants";
+import AddScheduleModal, { ScheduleFormData } from "./components/AddScheduleModal";
+import ScheduleSuccessModal from "./components/ScheduleSuccessModal";
+import ScheduleSavedModal from "./components/ScheduleSavedModal";
+import { seedClients } from "@/lib/api/clients";
+
+// Sample data for pending approvals
+const samplePendingApprovals = [
+  { id: "1", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
+  { id: "2", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
+  { id: "3", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
+  { id: "4", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
+  { id: "5", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
+  { id: "6", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
+];
+import { useAuth } from "@/utils/auth";
+
+// Helper function to format time for display
+const formatTime = (time?: string): string => {
+  if (!time) return "-";
+  try {
+    // If it's already in a readable format, return as-is
+    if (time.includes("AM") || time.includes("PM")) return time;
+    
+    // Try to parse and format
+    const [hours, minutes] = time.split(":");
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const formattedHour = hour % 12 || 12;
+    return `${formattedHour}.${minutes || "00"} ${ampm}`;
+  } catch {
+    return time;
+  }
+};
+
+// Helper function to get status display info
+const getStatusInfo = (status: ShiftStatus) => {
+  switch (status) {
+    case ShiftStatus.ONGOING:
+      return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
+    case ShiftStatus.COMPLETED:
+      return { label: "Completed", color: "#2B82FF", bgColor: "rgba(43,130,255,0.05)" };
+    case ShiftStatus.EXPIRED:
+      return { label: "Missed", color: "#D53411", bgColor: "rgba(213,52,17,0.05)" };
+    case ShiftStatus.PENDING:
+      return { label: "Pending", color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
+    case ShiftStatus.AVAILABLE:
+      return { label: "Available", color: "#00b4b8", bgColor: "rgba(0,180,184,0.05)" };
+    default:
+      return { label: status, color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
+  }
+};
 
 export default function SchedulingPage() {
+  const navigate = useNavigate();
+  const { user, profile } = useAuth();
+  const { toast } = useToast();
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [activityPage, setActivityPage] = useState(1);
+  const [approvalPage, setApprovalPage] = useState(1);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [showAddScheduleModal, setShowAddScheduleModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showSavedModal, setShowSavedModal] = useState(false);
+  const [scheduledShiftInfo, setScheduledShiftInfo] = useState<{
+    clientName: string;
+    dspName: string;
+    duration: string;
+    date: string;
+  } | null>(null);
+  const [savedShiftInfo, setSavedShiftInfo] = useState<{
+    clientName: string;
+    dspName: string;
+    date: string;
+  } | null>(null);
+  
+  // API data states
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [seedingClients, setSeedingClients] = useState(false);
+  
+  const itemsPerPage = 6;
+  
+  // Month and year options
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
+
+  useEffect(() => {
+    console.log("profile", profile);
+  }, [profile]);
+
+  // Fetch all shifts for activity log
+  useEffect(() => {
+    const fetchShifts = async () => {
+      try {
+        setLoading(true);
+        const response = await listShifts({ 
+          limit: 100,
+          agencyId: profile?.agency?.id,
+          client: true,
+          employee: true,
+        });
+        setShifts(response.shifts || []);
+      } catch (error) {
+        console.error("Failed to fetch shifts:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load shifts. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (profile?.agency?.id) {
+      fetchShifts();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.agency?.id]);
+
+  // Calculate shift statistics
+  const shiftStats = useMemo(() => {
+    const active = shifts.filter(s => s.status === ShiftStatus.ONGOING).length;
+    const completed = shifts.filter(s => s.status === ShiftStatus.COMPLETED).length;
+    const missed = shifts.filter(s => s.status === ShiftStatus.EXPIRED).length;
+    
+    return {
+      active,
+      completed,
+      missed,
+      date: format(new Date(), "d MMMM"),
+    };
+  }, [shifts]);
+
+  // Pagination calculations
+  const totalActivityPages = Math.max(1, Math.ceil(shifts.length / itemsPerPage));
+  const totalApprovalPages = Math.max(1, Math.ceil(samplePendingApprovals.length / itemsPerPage));
+
+  // Calendar days calculation
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 }); // Monday start
+    const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    
+    return eachDayOfInterval({ start: startDate, end: endDate });
+  }, [currentMonth]);
+
+  const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+  const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+  const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+
+  const paginatedShifts = shifts.slice(
+    (activityPage - 1) * itemsPerPage,
+    activityPage * itemsPerPage
+  );
+
+  const paginatedApprovals = samplePendingApprovals.slice(
+    (approvalPage - 1) * itemsPerPage,
+    approvalPage * itemsPerPage
+  );
+
+  const handleApprove = async (shiftId: string) => {
+    toast({
+      title: "Approval",
+      description: `Shift ${shiftId} approved successfully.`,
+    });
+    // TODO: Implement actual approval API call
+  };
+
+  const handleCancel = async (shiftId: string) => {
+    toast({
+      title: "Cancelled",
+      description: `Shift ${shiftId} has been cancelled.`,
+      variant: "destructive",
+    });
+    // TODO: Implement actual cancellation API call
+  };
+
+  /**
+   * Build shift requests from form data
+   * Handles both one-time and recurring schedules
+   */
+  const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
+    if (!profile?.agency?.id || !data.assignedDspId) return [];
+
+    const requests: CreateShiftRequest[] = [];
+    const baseShiftData = {
+      employeeId: data.assignedDspId,
+      agencyId: profile?.agency?.id || "",
+      location: data.clientAddress || "",
+      startTime: data.clockInTime,
+      endTime: data.clockOutTime,
+      clientId: data.clientId,
+      additionalStatus: `Service: ${data.service} (${data.serviceCode}) - ${data.schedulingType}${data.ispOutcome ? ` - ISP: ${data.ispOutcome}` : ""} - DSP: ${data.assignedDsp}`,
+    };
+
+    console.log("baseShiftData", baseShiftData);
+
+    if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
+      // Create shifts for each day in the date range
+      const dateRange = eachDayOfIntervalDateFns({ start: data.startDate, end: data.endDate });
+      dateRange.forEach((date) => {
+        requests.push({
+          ...baseShiftData,
+          date: format(date, "yyyy-MM-dd"),
+          status: ShiftStatus.PENDING,
+          type: ShiftType.AUTOMATIC,
+          submissionStatus: SubmissionStatus.DRAFT,
+        });
+      });
+    } else if (data.date) {
+      // Single shift for one-time scheduling
+      requests.push({
+        ...baseShiftData,
+        date: format(data.date, "yyyy-MM-dd"),
+        status: ShiftStatus.PENDING,
+        type: ShiftType.AUTOMATIC,
+        submissionStatus: SubmissionStatus.DRAFT,
+      });
+    }
+
+    return requests;
+  };
+
+  /**
+   * Handle saving schedule as draft
+   * Similar to manual shift management save functionality
+   */
+  const handleSave = async (data: ScheduleFormData) => {
+    if (!profile?.agency?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "User not authenticated. Please log in and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get the date for display
+    const getDisplayDate = () => {
+      if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
+        return `${format(data.startDate, "d MMMM")} - ${format(data.endDate, "d MMMM")}`;
+      }
+      if (data.date) {
+        return format(data.date, "d MMMM");
+      }
+      return format(new Date(), "d MMMM");
+    };
+
+    try {
+      // Step 1: Fetch existing draft shifts for this agency
+      const existingDraftsResponse = await listShifts({
+        agencyId: profile?.agency?.id || "",
+        type: ShiftType.AUTOMATIC,
+        submissionStatus: SubmissionStatus.DRAFT,
+        limit: 100,
+      });
+
+      const existingDrafts = existingDraftsResponse.shifts || [];
+      console.log(`📄 Found ${existingDrafts.length} existing draft(s)`);
+
+      // Step 2: Build shift requests as drafts
+      const shiftRequests = buildShiftRequests(data);
+
+      if (shiftRequests.length === 0) {
+        toast({
+          title: "No Valid Entries",
+          description: "Please fill in all required fields before saving.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Step 3: Update existing or create new shifts
+      const savePromises = shiftRequests.map(async (request) => {
+        // Try to find an existing draft for the same date
+        const existingShift = existingDrafts.find(
+          (draft) => draft.date === request.date
+        );
+
+        if (existingShift) {
+          // Update existing shift
+          console.log(`✏️ Updating existing draft for ${request.date}`);
+          return updateShift(existingShift.id, {
+            location: request.location,
+            startTime: request.startTime,
+            endTime: request.endTime,
+            additionalStatus: request.additionalStatus,
+            status: request.status,
+            submissionStatus: request.submissionStatus,
+            type: request.type,
+          });
+        } else {
+          // Create new shift
+          console.log(`➕ Creating new draft for ${request.date}`);
+          return createShift(request);
+        }
+      });
+
+      // Step 4: Execute all save operations
+      const results = await Promise.allSettled(savePromises);
+
+      // Check for failures
+      const failures = results.filter((r) => r.status === "rejected");
+      const successes = results.filter((r) => r.status === "fulfilled");
+
+      if (failures.length > 0) {
+        console.error("Failed to save some drafts:", failures);
+        if (successes.length > 0) {
+          toast({
+            title: "Partial Save",
+            description: `Saved ${successes.length} of ${shiftRequests.length} schedule(s) as drafts.`,
+          });
+        } else {
+          toast({
+            title: "Save Failed",
+            description: "Failed to save schedule drafts. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      if (successes.length > 0) {
+        // Set saved shift info for saved modal
+        setSavedShiftInfo({
+          clientName: data.client || "Client",
+          dspName: data.assignedDsp || "DSP",
+          date: getDisplayDate(),
+        });
+
+        // Show saved modal
+        setShowSavedModal(true);
+
+        // Refresh shifts list
+        const response = await listShifts({ 
+          limit: 100,
+          agencyId: profile?.agency?.id || "",
+          client: true,
+          employee: true,
+        });
+        setShifts(response.shifts || []);
+      }
+    } catch (error: any) {
+      console.error("Failed to save draft schedule:", error);
+      toast({
+        title: "Save Failed",
+        description: error?.response?.data?.error || "Failed to save draft. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  /**
+   * Handle scheduling (submitting) shifts
+   * Creates shifts with SUBMITTED status
+   */
+  const handleSchedule = async (data: ScheduleFormData): Promise<boolean> => {
+    if (!profile?.agency?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "User not authenticated. Please log in and try again.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      // Calculate duration from clock in/out times
+      const calculateDuration = () => {
+        if (!data.clockInTime || !data.clockOutTime) return "2 hours";
+        try {
+          const parseTime = (time: string) => {
+            const match = time.match(/(\d+)[.:](\d+):?(AM|PM)/i);
+            if (!match) return 0;
+            let hours = parseInt(match[1]);
+            const minutes = parseInt(match[2]);
+            const period = match[3].toUpperCase();
+            if (period === "PM" && hours !== 12) hours += 12;
+            if (period === "AM" && hours === 12) hours = 0;
+            return hours * 60 + minutes;
+          };
+          const startMinutes = parseTime(data.clockInTime);
+          const endMinutes = parseTime(data.clockOutTime);
+          const diffMinutes = endMinutes - startMinutes;
+          const hours = Math.floor(diffMinutes / 60);
+          const mins = diffMinutes % 60;
+          if (mins > 0) return `${hours} hours ${mins} minutes`;
+          return `${hours} hours`;
+        } catch {
+          return "2 hours";
+        }
+      };
+
+      // Get the date for display
+      const getDisplayDate = () => {
+        if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
+          return `${format(data.startDate, "d MMMM")} - ${format(data.endDate, "d MMMM")}`;
+        }
+        if (data.date) {
+          return format(data.date, "d MMMM");
+        }
+        return format(new Date(), "d MMMM");
+      };
+
+      // Step 1: Build shift requests
+      const shiftRequests = buildShiftRequests(data);
+
+      if (shiftRequests.length === 0) {
+        toast({
+          title: "No Valid Entries",
+          description: "Please fill in all required fields before scheduling.",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      // Step 2: Set status to PENDING and submission status to SUBMITTED
+      const finalShiftRequests = shiftRequests.map(request => ({
+        ...request,
+        status: ShiftStatus.PENDING,
+        submissionStatus: SubmissionStatus.SUBMITTED,
+        type: ShiftType.AUTOMATIC,
+      }));
+
+      console.log(`📅 Scheduling ${finalShiftRequests.length} shift(s)`);
+
+      // Step 3: Submit all shifts in parallel
+      const results = await Promise.allSettled(
+        finalShiftRequests.map((request) => createShift(request))
+      );
+
+      // Check for failures
+      const failures = results.filter((r) => r.status === "rejected");
+      const successes = results.filter((r) => r.status === "fulfilled");
+
+      if (failures.length > 0) {
+        console.error("Failed to schedule some shifts:", failures);
+        if (successes.length > 0) {
+          toast({
+            title: "Partial Submission",
+            description: `Successfully scheduled ${successes.length} of ${finalShiftRequests.length} shifts. ${failures.length} failed.`,
+          });
+        } else {
+          toast({
+            title: "Scheduling Failed",
+            description: "Failed to schedule shifts. Please try again.",
+            variant: "destructive",
+          });
+          return false;
+        }
+      }
+
+      if (successes.length > 0) {
+        // Set scheduled shift info for success modal
+        setScheduledShiftInfo({
+          clientName: data.client || "Client",
+          dspName: data.assignedDsp || "DSP",
+          duration: calculateDuration(),
+          date: getDisplayDate(),
+        });
+
+        // Show success modal
+        setShowSuccessModal(true);
+
+        // Close the add schedule modal
+        setShowAddScheduleModal(false);
+
+        // Refresh shifts list
+        const response = await listShifts({ 
+          limit: 100,
+          agencyId: profile?.agency?.id || "",
+        });
+        setShifts(response.shifts || []);
+
+        toast({
+          title: "Schedule Created",
+          description: `Successfully scheduled ${successes.length} shift(s).`,
+        });
+
+        return true;
+      }
+
+      return false;
+    } catch (error: any) {
+      console.error("Failed to create schedule:", error);
+      toast({
+        title: "Scheduling Failed",
+        description: error?.response?.data?.error || "Failed to create schedule. Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  /**
+   * Handle seeding clients with dummy data
+   */
+  const handleSeedClients = async () => {
+    try {
+      setSeedingClients(true);
+      
+      const result = await seedClients({
+        activeCount: 5,
+        inactiveCount: 2,
+        pendingCount: 1,
+        archivedCount: 0,
+        overwrite: true,
+      });
+
+      toast({
+        title: "Clients Seeded",
+        description: `Successfully seeded ${result.count} client(s). ${result.message}`,
+      });
+    } catch (error: any) {
+      console.error("Failed to seed clients:", error);
+      toast({
+        title: "Seeding Failed",
+        description: error?.message || "Failed to seed clients. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSeedingClients(false);
+    }
+  };
+
   return (
+    <>
     <div className="min-h-[calc(100vh-200px)]">
-      <div className="mb-8">
-        <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
           Scheduling
         </h1>
-        <p className="text-[14px] font-medium text-[#808081] mt-2">
-          Manage shifts and schedules for your team
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={handleSeedClients}
+            disabled={seedingClients}
+            className="flex items-center gap-3 bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {seedingClients ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Seeding...
+              </>
+            ) : (
+              <>
+                <Plus className="w-5 h-5" />
+                Seed Clients
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={() => setShowAddScheduleModal(true)}
+            className="flex items-center gap-3 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px]"
+          >
+            <Plus className="w-5 h-5" />
+            Add Schedule
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_527px] gap-5">
+        {/* Left Column */}
+        <div className="space-y-5">
+          {/* Shifts Summary Card */}
+          <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)]">
+            {/* Glassmorphism background */}
+            <div className="absolute inset-0 backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)]" />
+            
+            <div className="relative px-5 py-4 flex items-center gap-2">
+              {/* Title Section */}
+              <div className="flex flex-col gap-1 w-[214px]">
+                <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
+                  Shifts ({shiftStats.date})
+                </h2>
+                <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                  Shifts data of {shiftStats.date}
         </p>
       </div>
 
-      <div className="rounded-[20px] bg-white p-8 shadow-sm border border-[#e5e5e6]">
-        <div className="text-center py-12">
-          <p className="text-[16px] font-medium text-[#808081]">
-            Scheduling content coming soon
-          </p>
+              {/* Stats Section */}
+              <div className="flex gap-12 px-6">
+                {/* Active */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[40px] font-semibold leading-normal text-[#10141a]">
+                    {loading ? "-" : shiftStats.active}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-[#0EAF52]" />
+                    <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                      Active
+                    </span>
+                  </div>
+                </div>
+
+                {/* Completed */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[40px] font-semibold leading-normal text-[#10141a]">
+                    {loading ? "-" : shiftStats.completed}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-[#2B82FF]" />
+                    <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                      Completed
+                    </span>
+                  </div>
+                </div>
+
+                {/* Missed */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[40px] font-semibold leading-normal text-[#10141a]">
+                    {loading ? "-" : shiftStats.missed}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-[#D53411]" />
+                    <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                      Missed
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expand Button */}
+              <button 
+                onClick={() => navigate(Routes.agency.shiftsList)}
+                className="ml-auto bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full w-[38px] h-[38px] flex items-center justify-center hover:bg-white/70 transition-colors cursor-pointer"
+              >
+                <ArrowUpRight className="w-4 h-4 text-[#10141a]" />
+              </button>
+            </div>
+          </div>
+
+          {/* Calendar Card */}
+          <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
+            <div className="p-5">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
+                    Shifts Calander View
+                  </h2>
+                  <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                    These are your Pending Billing Approvals
+                  </p>
+                </div>
+              </div>
+
+              {/* Calendar */}
+              <div className="flex flex-col rounded-[12px] overflow-hidden w-full max-w-[575px] mx-auto">
+                {/* Month Navigation */}
+                <div className="flex items-center justify-center gap-2.5 px-5 py-2 relative">
+                  <button
+                    onClick={handlePrevMonth}
+                    className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft className="w-5 h-5 text-[#808081]" />
+                  </button>
+                  <div className="flex-1 flex items-center justify-center gap-1 relative">
+                    {/* Month Selector */}
+                    <button
+                      onClick={() => {
+                        setShowMonthPicker(!showMonthPicker);
+                        setShowYearPicker(false);
+                      }}
+                      className="text-[16px] font-semibold leading-[1.6] text-[#10141a] hover:text-[#2B82FF] cursor-pointer transition-colors"
+                    >
+                      {format(currentMonth, "MMMM")}
+                    </button>
+                    {/* Year Selector */}
+                    <button
+                      onClick={() => {
+                        setShowYearPicker(!showYearPicker);
+                        setShowMonthPicker(false);
+                      }}
+                      className="text-[16px] font-semibold leading-[1.6] text-[#10141a] hover:text-[#2B82FF] cursor-pointer transition-colors"
+                    >
+                      {format(currentMonth, "yyyy")}
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleNextMonth}
+                    className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                  >
+                    <ChevronRight className="w-5 h-5 text-[#10141a]" />
+                  </button>
+                  
+                  {/* Month Picker Dropdown */}
+                  {showMonthPicker && (
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-[12px] shadow-lg border border-[#e5e5e6] p-3 z-50 grid grid-cols-3 gap-2 w-[280px]">
+                      {months.map((month, index) => (
+                        <button
+                          key={month}
+                          onClick={() => {
+                            const newDate = new Date(currentMonth);
+                            newDate.setMonth(index);
+                            setCurrentMonth(newDate);
+                            setShowMonthPicker(false);
+                          }}
+                          className={`
+                            px-3 py-2 text-[14px] font-medium rounded-[6px] cursor-pointer transition-colors
+                            ${currentMonth.getMonth() === index 
+                              ? "bg-[#2B82FF] text-white" 
+                              : "text-[#10141a] hover:bg-[#e5e5e6]"
+                            }
+                          `}
+                        >
+                          {month.slice(0, 3)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Year Picker Dropdown */}
+                  {showYearPicker && (
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-[12px] shadow-lg border border-[#e5e5e6] p-3 z-50 grid grid-cols-2 gap-2 w-[180px]">
+                      {years.map((year) => (
+                        <button
+                          key={year}
+                          onClick={() => {
+                            const newDate = new Date(currentMonth);
+                            newDate.setFullYear(year);
+                            setCurrentMonth(newDate);
+                            setShowYearPicker(false);
+                          }}
+                          className={`
+                            px-3 py-2 text-[14px] font-medium rounded-[6px] cursor-pointer transition-colors
+                            ${currentMonth.getFullYear() === year 
+                              ? "bg-[#2B82FF] text-white" 
+                              : "text-[#10141a] hover:bg-[#e5e5e6]"
+                            }
+                          `}
+                        >
+                          {year}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Divider */}
+                <div className="h-px bg-[#e5e5e6] w-full" />
+
+                {/* Week Days Header */}
+                <div className="flex items-center justify-center pt-2 w-full">
+                  {weekDays.map((day) => (
+                    <div
+                      key={day}
+                      className="flex-1 px-2 py-0.5 text-center text-[12px] font-medium text-[#10141a]"
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar Grid */}
+                <div className="flex flex-col w-full">
+                  {/* Split calendar days into weeks */}
+                  {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, weekIndex) => (
+                    <div key={weekIndex} className="flex items-center justify-center py-1 w-full">
+                      {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => {
+                        const isCurrentMonth = isSameMonth(day, currentMonth);
+                        const isToday = isSameDay(day, new Date());
+                        const isSelected = selectedDate && isSameDay(day, selectedDate);
+                        
+                        // Check if there are shifts on this day
+                        const dayStr = format(day, "yyyy-MM-dd");
+                        const hasShifts = shifts.some(s => s.date === dayStr);
+
+                        return (
+                          <button
+                            key={dayIndex}
+                            onClick={() => setSelectedDate(day)}
+                            className={`
+                              flex-1 flex flex-col items-center justify-center p-2 text-center transition-colors relative cursor-pointer
+                              ${isSelected 
+                                ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold" 
+                                : isCurrentMonth 
+                                  ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]" 
+                                  : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
+                              }
+                            `}
+                          >
+                            <span className="text-[14px] leading-[1.4]">
+                              {format(day, "d")}
+                            </span>
+                            {hasShifts && !isSelected && (
+                              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#2B82FF]" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Pending Approvals */}
+        <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
+          <div className="p-5 h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-6">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
+                  Pending Approvals
+                </h2>
+                <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                  These are your Pending Billing Approvals
+                </p>
+              </div>
+              <button className="backdrop-blur-[22px] bg-[rgba(178,178,179,0.1)] rounded-full px-4 py-2 flex items-center gap-2 hover:bg-[rgba(178,178,179,0.2)] transition-colors">
+                <ArrowUpRight className="w-4 h-4 text-[#808081]" />
+                <span className="text-[12px] font-normal text-[#808081]">Expand</span>
+              </button>
+            </div>
+
+            {/* Approval Items */}
+            <div className="flex-1 space-y-4">
+              {paginatedApprovals.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-[14px] text-[#808081]">No pending approvals</p>
+                </div>
+              ) : (
+                paginatedApprovals.map((approval) => (
+                  <div
+                    key={approval.id}
+                    className="flex items-center gap-5 backdrop-blur-[20px] rounded-[20px]"
+                  >
+                    <div className="flex items-center gap-5 w-[256px]">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[14px] font-semibold leading-[1.6] text-black">
+                          {approval.name}
+                        </span>
+                      </div>
+                      <div className="text-[12px] font-medium leading-[1.4] text-[#808081]">
+                        <p>Location</p>
+                        <p className="text-[#10141a]">{approval.location}</p>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 ml-auto">
+                      <Button
+                        size="sm"
+                        onClick={() => handleApprove(approval.id)}
+                        className="bg-[#0EAF52] hover:bg-[#0d9a48] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
+                      >
+                        <Check className="w-4 h-4" />
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleCancel(approval.id)}
+                        className="bg-[#D53411] hover:bg-[#c02e0f] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
+                      >
+                        <X className="w-3 h-3" />
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Pagination */}
+            {samplePendingApprovals.length > 0 && (
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <span className="text-[16px] font-medium leading-[1.6] text-[#10141a]">
+                  {approvalPage}
+                  <span className="text-[14px] text-[#808081]">/{totalApprovalPages}</span>
+                </span>
+                <button
+                  onClick={() => setApprovalPage(Math.max(1, approvalPage - 1))}
+                  disabled={approvalPage === 1}
+                  className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full p-1.5 disabled:opacity-50 hover:bg-white/70 transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5 text-[#10141a]" />
+                </button>
+                <button
+                  onClick={() => setApprovalPage(Math.min(totalApprovalPages, approvalPage + 1))}
+                  disabled={approvalPage === totalApprovalPages}
+                  className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full p-1.5 disabled:opacity-50 hover:bg-white/70 transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5 text-[#10141a]" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Activity Log Section */}
+      <div className="mt-5 relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
+        <div className="p-5">
+          {/* Header */}
+          <div className="flex flex-col gap-1 mb-6">
+            <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
+              Activity Log
+            </h2>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              Recent shift activities
+            </p>
+          </div>
+
+          {/* Activity Items */}
+          <div className="space-y-3">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-[#00b4b8]" />
+              </div>
+            ) : paginatedShifts.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-[14px] text-[#808081]">No shifts found</p>
+              </div>
+            ) : (
+              paginatedShifts.map((shift) => {
+                const statusInfo = getStatusInfo(shift.status);
+                const clientName = shift.client 
+                  ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
+                  : "Unknown Client";
+                const employeeName = shift.employee?.fullName || "Unknown DSP";
+                
+                return (
+                  <div
+                    key={shift.id}
+                    className="flex items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
+                  >
+                    {/* Client Info */}
+                    <div className="flex items-center gap-4">
+                      <div className="w-[52.5px] h-[60px] rounded-lg bg-[#e0e0e0] overflow-hidden flex-shrink-0">
+                        {shift.client?.profileImage ? (
+                          <img 
+                            src={shift.client.profileImage} 
+                            alt={clientName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[16px] font-semibold leading-[1.6] text-black">
+                          {clientName}
+                        </span>
+                        <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                          Client
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* DSP/Employee Info */}
+                    <div className="flex items-center gap-4">
+                      <div className="w-[52.5px] h-[60px] rounded-lg bg-[#e0e0e0] overflow-hidden flex-shrink-0">
+                        {shift.employee?.profilePicture ? (
+                          <img 
+                            src={shift.employee.profilePicture} 
+                            alt={employeeName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[16px] font-semibold leading-[1.6] text-black">
+                          {employeeName}
+                        </span>
+                        <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                          DSP
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Status & Times */}
+                    <div className="flex items-center gap-16 flex-1">
+                      {/* Status Badge */}
+                      <div 
+                        className="rounded-full px-2.5 py-2.5"
+                        style={{ 
+                          backgroundColor: statusInfo.bgColor,
+                          border: `1px solid ${statusInfo.color}`
+                        }}
+                      >
+                        <span 
+                          className="text-[12px] font-semibold"
+                          style={{ color: statusInfo.color }}
+                        >
+                          {statusInfo.label}
+                        </span>
+                      </div>
+
+                      {/* Clocked In */}
+                      <div className="text-[14px] font-medium leading-[1.4]">
+                        <span className="text-[#808081]">Clocked In </span>
+                        <span className="text-[#10141a]">{formatTime(shift.clockedInAt || shift.startTime)}</span>
+                      </div>
+
+                      {/* Clocked Out */}
+                      <div className="text-[14px] font-medium leading-[1.4]">
+                        <span className="text-[#808081]">Clocked Out </span>
+                        <span className="text-[#10141a]">{formatTime(shift.clockedOutAt || shift.endTime)}</span>
+                      </div>
+                    </div>
+
+                    {/* Details Button */}
+                    <Button
+                      variant="outline"
+                      className="bg-[#b2b2b3] border-[#b2b2b3] text-white rounded-full px-6 py-2.5 h-[36px] w-[121px] text-[14px] font-semibold hover:bg-[#9a9a9b] hover:text-white"
+                    >
+                      Details
+                    </Button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Pagination */}
+          {shifts.length > 0 && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <span className="text-[16px] font-medium leading-[1.6] text-[#10141a]">
+                {activityPage}
+                <span className="text-[14px] text-[#808081]">/{totalActivityPages}</span>
+              </span>
+              <button
+                onClick={() => setActivityPage(Math.max(1, activityPage - 1))}
+                disabled={activityPage === 1}
+                className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full p-1.5 disabled:opacity-50 hover:bg-white/70 transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5 text-[#10141a]" />
+              </button>
+              <button
+                onClick={() => setActivityPage(Math.min(totalActivityPages, activityPage + 1))}
+                disabled={activityPage === totalActivityPages}
+                className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full p-1.5 disabled:opacity-50 hover:bg-white/70 transition-colors"
+              >
+                <ChevronRight className="w-5 h-5 text-[#10141a]" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
+
+    {/* Add Schedule Modal */}
+    <AddScheduleModal
+      isOpen={showAddScheduleModal}
+      onClose={() => setShowAddScheduleModal(false)}
+      onSchedule={handleSchedule}
+      onSave={handleSave}
+    />
+
+    {/* Schedule Success Modal */}
+    {scheduledShiftInfo && (
+      <ScheduleSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          setScheduledShiftInfo(null);
+        }}
+        clientName={scheduledShiftInfo.clientName}
+        dspName={scheduledShiftInfo.dspName}
+        duration={scheduledShiftInfo.duration}
+        date={scheduledShiftInfo.date}
+      />
+    )}
+
+    {/* Schedule Saved Modal */}
+    {savedShiftInfo && (
+      <ScheduleSavedModal
+        isOpen={showSavedModal}
+        onClose={() => {
+          setShowSavedModal(false);
+          setSavedShiftInfo(null);
+        }}
+        clientName={savedShiftInfo.clientName}
+        dspName={savedShiftInfo.dspName}
+        date={savedShiftInfo.date}
+      />
+    )}
+    </>
   );
 }

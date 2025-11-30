@@ -1,7 +1,7 @@
 import type React from "react"
 import {createContext, useContext, useEffect, useState} from "react"
 import {useDispatch, useSelector} from "react-redux"
-import {setUser, setProfile} from "@/utils/auth"
+import {setUser, setProfile, selectProfile} from "@/utils/auth"
 import type {AppDispatch, RootState} from "@/store/redux/store"
 import {
   loginWithEmail,
@@ -13,12 +13,13 @@ import {
 import type {User} from "../types"
 import {createUser as createBackendUser} from "../api/client"
 import {PageLoader} from "@/components/ui/loader"
-import {UserProfileResponse} from "@/lib/api/users";
+import {UserProfileResponse, UserProfile} from "@/lib/api/users";
 import axiosClient from "@/lib/axios";
 import {auth} from "@/lib/firebase";
 
 interface AuthContextType {
   user: User | null
+  profile: UserProfile | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, password: string, fullName: string) => Promise<void>
@@ -44,6 +45,7 @@ export const useAuth = () => useContext(AuthContext)
 export function AuthProvider({children}: { children: React.ReactNode }) {
   const dispatch = useDispatch<AppDispatch>()
   const reduxUser = useSelector((state: RootState) => state.auth?.user)
+  const reduxProfile = useSelector(selectProfile)
   const [user, setUserState] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
@@ -197,6 +199,7 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
 
   const value = {
     user,
+    profile: reduxProfile,
     loading,
     login,
     signup,
