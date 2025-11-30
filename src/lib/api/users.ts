@@ -43,6 +43,7 @@ export interface UserProfile {
   profilePicture?: string
   dateOfBirth?: string;
   agency?: Agency;
+  data?: Record<string, any>; // UserType-specific data (e.g., agency for AGENCY users)
 }
 
 /**

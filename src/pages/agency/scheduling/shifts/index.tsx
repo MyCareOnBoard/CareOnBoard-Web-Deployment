@@ -133,7 +133,7 @@ export default function ShiftsListPage() {
     try {
       const shiftData = {
         employeeId: data.assignedDspId,
-        agencyId: profile.agency.id,
+        agencyId: profile.data?.id,
         date: data.date ? format(data.date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
         location: data.clientAddress,
         startTime: data.clockInTime,
@@ -155,7 +155,7 @@ export default function ShiftsListPage() {
       // Refresh shifts list
       const response = await listShifts({ 
         limit: 100,
-        agencyId: profile.agency.id,
+        agencyId: profile?.data?.id,
         client: true,
         employee: true,
       });

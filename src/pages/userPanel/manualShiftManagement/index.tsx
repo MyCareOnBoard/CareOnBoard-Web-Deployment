@@ -48,6 +48,7 @@ function buildManualShiftRequests(
   week2Data: WeekData,
   employeeId: string,
   agencyId: string,
+  clientId: string,
   clientSignature: { signatureType: string; signatureData: string } | null,
   userSignature: { signatureType: string; signatureData: string } | null
 ): CreateShiftRequest[] {
@@ -91,7 +92,7 @@ function buildManualShiftRequests(
           status: ShiftStatus.PENDING, // Default to PENDING, will be overridden by caller
           type: ShiftType.MANUAL,
           submissionStatus: SubmissionStatus.DRAFT, // Default to DRAFT, will be overridden by caller
-          clientId: formData.clientId || undefined,
+          clientId: clientId || undefined,
           additionalStatus: `Manual timesheet - Week ${weekIndex + 1} ${day} - Client: ${formData.client} - ${sessionDuration} - ${signatureInfo}`,
         };
 
@@ -108,10 +109,7 @@ function buildManualShiftRequests(
 export default function ManualShiftManagementPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { profile } = useAuth();
-  const profileRedux = useSelector((state: RootState) => state.auth?.profile);
-  const user = useSelector((state: RootState) => state.auth?.user);
-
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -259,12 +257,12 @@ export default function ManualShiftManagementPage() {
   // Load saved draft shifts
   useEffect(() => {
     const loadDraftShifts = async () => {
-      if (!user?.uid) return;
+      if (!profile?.data?.agencyId) return;
 
       try {
         // Fetch manual draft shifts
         const response = await listShifts({
-          agencyId: user.uid,
+          agencyId: profile?.data?.agencyId,
           type: ShiftType.MANUAL,
           submissionStatus: SubmissionStatus.DRAFT,
           limit: 100,
@@ -344,7 +342,7 @@ export default function ManualShiftManagementPage() {
     };
 
     loadDraftShifts();
-  }, [user?.uid]); // Only run when user changes
+  }, [profile?.data?.agencyId]); // Only run when user changes
 
   // Load existing signatures if available
   useEffect(() => {
@@ -399,12 +397,12 @@ export default function ManualShiftManagementPage() {
     clientSearchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearchingClients(true);
-        if (!profile?.agency?.id) {
+        if (!profile?.data?.agencyId) {
           setClientSearchResults([]);
           setShowClientDropdown(false);
           return;
         }
-        const clients = await searchClients(query, profile.agency.id);
+        const clients = await searchClients(query, profile?.data?.agencyId);
         setClientSearchResults(clients);
         setShowClientDropdown(clients.length > 0);
       } catch (error) {
@@ -415,7 +413,7 @@ export default function ManualShiftManagementPage() {
         setIsSearchingClients(false);
       }
     }, 300); // 300ms debounce
-  }, [profile?.agency?.id]);
+  }, [profile?.data?.agencyId]);
 
   // Handle client selection
   const handleClientSelect = (client: Client) => {
@@ -651,7 +649,8 @@ export default function ManualShiftManagementPage() {
 
       // Step 1: Fetch existing draft shifts
       const existingDraftsResponse = await listShifts({
-        agencyId: user.uid,
+        agencyId: profile?.data?.agencyId,
+        employeeId: profile?.data?.id,
         type: ShiftType.MANUAL,
         submissionStatus: SubmissionStatus.DRAFT,
         limit: 100,
@@ -666,8 +665,9 @@ export default function ManualShiftManagementPage() {
         formData,
         week1Data,
         week2Data,
-        user.uid,
-        user.uid,
+        profile?.data?.id,
+        profile?.data?.agencyId,
+        formData.clientId,
         clientSignature,
         userSignature
       );
@@ -859,8 +859,9 @@ export default function ManualShiftManagementPage() {
         formData,
         week1Data,
         week2Data,
-        user.uid,
-        user.uid, // Using uid as agencyId for now
+        profile?.data?.id,
+        profile?.data?.agencyId,
+        formData.clientId,
         clientSignature,
         userSignature
       );
