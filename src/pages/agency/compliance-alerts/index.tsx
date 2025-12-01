@@ -4,6 +4,7 @@ import {useNavigate} from "react-router";
 import {Button} from "@/components/ui/button";
 import {Routes} from "@/routes/constants";
 import {useGetExpiredDocumentsQuery} from "./api";
+import {useAuth} from "@/utils/auth";
 
 export default function ComplianceAlertsPage() {
   const navigate = useNavigate();
@@ -12,8 +13,13 @@ export default function ComplianceAlertsPage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("active");
   const itemsPerPage = 10;
 
+  const {profile} = useAuth();
+
   // Fetch expired documents
-  const {data, isLoading, isError} = useGetExpiredDocumentsQuery();
+  const {data, isLoading, isError} = useGetExpiredDocumentsQuery(profile?.data?.id, {
+    skip: !profile?.data?.id,
+    refetchOnMountOrArgChange: true
+  });
   const expiredDocuments = data?.data || [];
 
   // Transform to match component structure

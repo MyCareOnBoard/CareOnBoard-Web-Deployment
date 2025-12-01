@@ -1,9 +1,10 @@
-import React, {useState, useMemo, useRef, useEffect} from "react";
+import React, {useState, useMemo, useRef} from "react";
 import {ArrowLeft, ChevronLeft, ChevronRight} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Routes} from "@/routes/constants";
 import {useNavigate} from "react-router";
-import { getShiftStats } from "@/lib/api/shift-management";
+import {useGetShiftStatsQuery} from "@/pages/agency/dashboard/api";
+import {useAuth} from "@/utils/auth";
 
 type TimeFilter = "lastWeek" | "thisMonth" | "thisYear";
 
@@ -14,68 +15,54 @@ export default function ShiftsPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const navigate = useNavigate();
+  const {profile} = useAuth();
 
-  useEffect(() => {
-    const fetchShiftStats = async () => {
-      const response = await getShiftStats();
-      console.log("response", response);
-    };
-    fetchShiftStats();
-  }, []);
-
-  // Generate data based on filter
-  const shiftsData = useMemo(() => {
-    switch (timeFilter) {
-      case "lastWeek":
-        return [
-          {day: "SUN", scheduled: 100, completed: 80, date: "5 January"},
-          {day: "MON", scheduled: 150, completed: 120, date: "6 January"},
-          {day: "TUE", scheduled: 180, completed: 160, date: "7 January"},
-          {day: "WED", scheduled: 220, completed: 200, date: "8 January"},
-          {day: "THUR", scheduled: 160, completed: 140, date: "9 January"},
-          {day: "FRI", scheduled: 300, completed: 280, date: "10 January"},
-          {day: "SAT", scheduled: 340, completed: 320, date: "11 January"},
-        ];
-      case "thisMonth":
-        return [
-          {day: "JAN 1", scheduled: 120, completed: 100, date: "1 January"},
-          {day: "JAN 8", scheduled: 180, completed: 150, date: "8 January"},
-          {day: "JAN 15", scheduled: 200, completed: 170, date: "15 January"},
-          {day: "JAN 22", scheduled: 190, completed: 160, date: "22 January"},
-          {day: "JAN 29", scheduled: 210, completed: 180, date: "29 January"},
-          {day: "FEB 5", scheduled: 230, completed: 200, date: "5 February"},
-          {day: "FEB 12", scheduled: 220, completed: 190, date: "12 February"},
-          {day: "FEB 19", scheduled: 240, completed: 210, date: "19 February"},
-          {day: "FEB 26", scheduled: 250, completed: 220, date: "26 February"},
-          {day: "MAR 5", scheduled: 260, completed: 230, date: "5 March"},
-          {day: "MAR 12", scheduled: 260, completed: 230, date: "5 March"},
-          {day: "MAR 26", scheduled: 260, completed: 230, date: "5 March"},
-          {day: "JUN 5", scheduled: 260, completed: 230, date: "5 March"},
-          {day: "JUN 14", scheduled: 260, completed: 230, date: "5 March"},
-        ];
-      case "thisYear":
-        return [
-          {day: "JAN", scheduled: 800, completed: 650, date: "January"},
-          {day: "FEB", scheduled: 850, completed: 700, date: "February"},
-          {day: "MAR", scheduled: 900, completed: 750, date: "March"},
-          {day: "APR", scheduled: 920, completed: 780, date: "April"},
-          {day: "MAY", scheduled: 950, completed: 800, date: "May"},
-          {day: "JUN", scheduled: 980, completed: 820, date: "June"},
-          {day: "JUL", scheduled: 1000, completed: 850, date: "July"},
-          {day: "AUG", scheduled: 1020, completed: 870, date: "August"},
-          {day: "SEP", scheduled: 1050, completed: 900, date: "September"},
-          {day: "OCT", scheduled: 0, completed: 0, date: "October"},
-          {day: "NOV", scheduled: 0, completed: 0, date: "November"},
-          {day: "DEC", scheduled: 0, completed: 0, date: "December"},
-        ];
-      default:
-        return [];
-    }
-  }, [timeFilter]);
-
-  const maxShiftValue = Math.max(
-    ...shiftsData.map((d) => Math.max(d.scheduled, d.completed))
+  // Fetch shift stats with current filter
+  const {data: shiftStatsData, isLoading} = useGetShiftStatsQuery(
+    {agencyId: profile?.data?.id || '', range: timeFilter},
+    {skip: !profile?.data?.id}
   );
+  const shifts = shiftStatsData?.buckets || [];
+
+  // Transform API data based on filter
+  const shiftsData = useMemo(() => {
+    if (shifts.length === 0) return [];
+
+    return shifts.map(bucket => {
+      const date = new Date(bucket.date);
+      const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THUR', 'FRI', 'SAT'];
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+      
+      let dayLabel = '';
+      let dateLabel = '';
+
+      switch (timeFilter) {
+        case 'lastWeek':
+          dayLabel = dayNames[date.getDay()];
+          dateLabel = `${date.getDate()} ${monthNames[date.getMonth()]}`;
+          break;
+        case 'thisMonth':
+          dayLabel = `${monthNames[date.getMonth()].toUpperCase()} ${date.getDate()}`;
+          dateLabel = `${date.getDate()} ${monthNames[date.getMonth()]}`;
+          break;
+        case 'thisYear':
+          dayLabel = monthNames[date.getMonth()].toUpperCase();
+          dateLabel = monthNames[date.getMonth()];
+          break;
+      }
+
+      return {
+        day: dayLabel,
+        scheduled: bucket.scheduled,
+        completed: bucket.completed,
+        date: dateLabel
+      };
+    });
+  }, [shifts, timeFilter]);
+
+  const maxShiftValue = shiftsData.length > 0 
+    ? Math.max(...shiftsData.map((d) => Math.max(d.scheduled, d.completed)), 1)
+    : 1;
 
   const totalScheduled = shiftsData.reduce((sum, shift) => sum + shift.scheduled, 0);
   const totalCompleted = shiftsData.reduce((sum, shift) => sum + shift.completed, 0);
@@ -187,39 +174,55 @@ export default function ShiftsPage() {
 
         {/* Chart */}
         <div className="relative mt-20">
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex items-center justify-center h-[280px]">
+              <p className="text-[14px] text-[#808081]">Loading shift data...</p>
+            </div>
+          )}
+          
+          {/* No Data State */}
+          {!isLoading && shiftsData.length === 0 && (
+            <div className="flex items-center justify-center h-[280px]">
+              <p className="text-[14px] text-[#808081]">No shift data available for this period.</p>
+            </div>
+          )}
+
           {/* Tooltips Container (positioned outside scroll) */}
-          <div className="absolute inset-0 pointer-events-none z-50 overflow-visible">
-            {hoveredShift !== null && shiftsData[hoveredShift]?.scheduled > 0 ? (
-              <div
-                key={`tooltip-${shiftsData[hoveredShift].day}`}
-                className="absolute bottom-full mb-2"
-                style={{
-                  left: `${tooltipPosition - (scrollContainerRef.current?.scrollLeft || 0)}px`,
-                  transform: 'translateX(-50%)',
-                }}
-              >
-                <div className="rounded bg-white text-black px-4 py-3 whitespace-nowrap shadow-lg">
-                  <div className="mb-1 text-sm font-semibold">
-                    Report for {shiftsData[hoveredShift].date}
-                  </div>
-                  <div className="flex justify-between items-center gap-4">
-                    <div className="text-[#808081] text-xs">Scheduled View</div>
-                    <div className="text-black text-xs font-semibold">
-                      {shiftsData[hoveredShift].scheduled}
+          {!isLoading && shiftsData.length > 0 && (
+          <>
+            <div className="absolute inset-0 pointer-events-none z-50 overflow-visible">
+              {hoveredShift !== null && shiftsData[hoveredShift]?.scheduled > 0 ? (
+                <div
+                  key={`tooltip-${shiftsData[hoveredShift].day}`}
+                  className="absolute bottom-full mb-2"
+                  style={{
+                    left: `${tooltipPosition - (scrollContainerRef.current?.scrollLeft || 0)}px`,
+                    transform: 'translateX(-50%)',
+                  }}
+                >
+                  <div className="rounded bg-white text-black px-4 py-3 whitespace-nowrap shadow-lg">
+                    <div className="mb-1 text-sm font-semibold">
+                      Report for {shiftsData[hoveredShift].date}
                     </div>
-                  </div>
-                  <div className="flex justify-between items-center gap-4">
-                    <div className="text-[#808081] text-xs">Visit Completed</div>
-                    <div className="text-black text-xs font-semibold">
-                      {shiftsData[hoveredShift].completed}
+                    <div className="flex justify-between items-center gap-4">
+                      <div className="text-[#808081] text-xs">Scheduled</div>
+                      <div className="text-black text-xs font-semibold">
+                        {shiftsData[hoveredShift].scheduled}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center gap-4">
+                      <div className="text-[#808081] text-xs">Visit Completed</div>
+                      <div className="text-black text-xs font-semibold">
+                        {shiftsData[hoveredShift].completed}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
 
-          <div
+            <div
             ref={scrollContainerRef}
             className={`flex items-end gap-3 h-[280px] relative pb-4 ${
               timeFilter === "thisMonth" ? "overflow-x-auto scrollbar-hide" : "justify-between overflow-visible"
@@ -253,7 +256,7 @@ export default function ShiftsPage() {
                           height: `${(shift.scheduled / maxShiftValue) * 100}%`,
                           minHeight: "30px",
                         }}
-                      >5
+                      >{shift.scheduled}
                       </div>
                       {/* Completed Bar */}
                       <div
@@ -262,7 +265,7 @@ export default function ShiftsPage() {
                           height: `${(shift.completed / maxShiftValue) * 100}%`,
                           minHeight: "30px",
                         }}
-                      >5
+                      >{shift.completed}
                       </div>
                     </>
                   ) : (
@@ -282,20 +285,22 @@ export default function ShiftsPage() {
             ))}
           </div>
 
-          {/* Scroll Arrows for This Month */}
-          {timeFilter === "thisMonth" && (
-            <>
-              <button
-                onClick={() => handleScroll("left")}
-                className="absolute left-0 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-colors z-10 cursor-pointer">
-                <ChevronLeft size={20} className="text-[#10141a]"/>
-              </button>
-              <button
-                onClick={() => handleScroll("right")}
-                className="absolute right-0 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-colors z-10 cursor-pointer">
-                <ChevronRight size={20} className="text-[#10141a]"/>
-              </button>
-            </>
+            {/* Scroll Arrows for This Month */}
+            {timeFilter === "thisMonth" && (
+              <>
+                <button
+                  onClick={() => handleScroll("left")}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-colors z-10 cursor-pointer">
+                  <ChevronLeft size={20} className="text-[#10141a]"/>
+                </button>
+                <button
+                  onClick={() => handleScroll("right")}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-colors z-10 cursor-pointer">
+                  <ChevronRight size={20} className="text-[#10141a]"/>
+                </button>
+              </>
+            )}
+          </>
           )}
         </div>
       </div>
