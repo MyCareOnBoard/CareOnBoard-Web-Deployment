@@ -61,7 +61,7 @@ export async function getUserProfile(): Promise<UserProfile> {
  */
 export async function createUserProfile(profileData: CreateUserProfileData): Promise<UserProfile> {
     try {
-        const response = await axiosClient.post<UserProfileResponse>("/users/create", profileData);
+        const response = await axiosClient.post<UserProfileResponse>("/users", profileData);
 
         if (!response.data.success || !response.data.user) {
             throw new Error("Invalid response format from server");

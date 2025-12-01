@@ -133,7 +133,7 @@ export interface SeedClientsRequest {
 
 /**
  * ✅ Create a new client
- * Endpoint: POST /clients/create
+ * Endpoint: POST /clients
  * Agencies default to their own agencyId
  * Employees must supply agencyId
  */

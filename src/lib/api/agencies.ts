@@ -109,7 +109,7 @@ export interface UpdateAgencyRequest {
 
 /**
  * ✅ Create a new agency
- * Endpoint: POST /agencies/create
+ * Endpoint: POST /agencies
  * Uses authenticated user's UID automatically
  * One agency per user
  */
