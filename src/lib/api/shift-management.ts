@@ -184,6 +184,32 @@ export interface ListShiftsResponse {
 }
 
 /**
+ * Shift statistics bucket for a single day
+ */
+export interface ShiftStatsBucket {
+    date: string;      // YYYY-MM-DD
+    scheduled: number; // pending | available | ongoing
+    completed: number; // completed
+    total: number;     // scheduled + completed
+}
+
+/**
+ * Allowed ranges for shift statistics
+ */
+export type ShiftStatsRange = "lastWeek" | "thisMonth" | "thisYear" | "day";
+
+/**
+ * Shift statistics API response
+ */
+export interface ShiftStatsResponse {
+    success: boolean;
+    range: ShiftStatsRange;
+    startDate: string; // YYYY-MM-DD
+    endDate: string;   // YYYY-MM-DD
+    buckets: ShiftStatsBucket[];
+}
+
+/**
  * Delete Shift Response
  */
 export interface DeleteShiftResponse {
@@ -295,6 +321,37 @@ export const listShifts = async (params?: ListShiftsParams): Promise<ListShiftsR
         return response.data;
     } catch (error) {
         console.error('Failed to fetch shifts:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get shift statistics for charting (scheduled vs completed per day)
+ * Endpoint: GET /shifts/stats
+ * @param range - Time range ("lastWeek" | "thisMonth" | "thisYear" | "day"), defaults to "lastWeek"
+ * @param date - Specific date (YYYY-MM-DD) required when range is "day"
+ * @param agencyId - Optional agency ID (ignored for agency users, required for others)
+ */
+export const getShiftStats = async (
+    range: ShiftStatsRange = "lastWeek",
+    agencyId?: string,
+    date?: string
+): Promise<ShiftStatsResponse> => {
+    try {
+        const response = await axiosClient.get<ShiftStatsResponse>(
+            `${SHIFT_BASE}/stats`,
+            {
+                params: {
+                    range,
+                    agencyId,
+                    date,
+                },
+            }
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch shift stats:', error);
         throw error;
     }
 };
@@ -446,11 +503,11 @@ export const updateShiftStatus = async (
  * @param agencyId - Optional agency ID to filter by
  * @returns Promise with today's shifts (converted to array format)
  */
-export const getTodayShifts = async (agencyId?: string): Promise<ShiftResponse> => {
+export const getTodayShifts = async (agencyId?: string, employeeId?: string): Promise<ShiftResponse> => {
     try {
         const response = await axiosClient.get<ShiftResponse>(
             `${SHIFT_BASE}/today`,
-            { params: { agencyId } }
+            { params: { agencyId, employeeId } }
         );
 
         return response.data
@@ -466,11 +523,11 @@ export const getTodayShifts = async (agencyId?: string): Promise<ShiftResponse> 
  * @param agencyId - Optional agency ID to filter by
  * @returns Promise with available shifts
  */
-export const getAvailableShifts = async (limit: number = 20, agencyId?: string): Promise<ListShiftsResponse> => {
+export const getAvailableShifts = async (limit: number = 20, agencyId?: string, employeeId?: string): Promise<ListShiftsResponse> => {
     try {
         const response = await axiosClient.get<ListShiftsResponse>(
             `${SHIFT_BASE}/upcoming`,
-            { params: { agencyId, limit } }
+            { params: { agencyId, limit, employeeId } }
         );
         return response.data;
     } catch (error) {
@@ -484,7 +541,7 @@ export const getAvailableShifts = async (limit: number = 20, agencyId?: string):
  * @param agencyId - Optional agency ID to filter by
  * @returns Promise with ongoing shifts
  */
-export const getOngoingShifts = async (agencyId?: string): Promise<ListShiftsResponse> => {
+export const getOngoingShifts = async (agencyId?: string, employeeId?: string): Promise<ListShiftsResponse> => {
     return listShifts({ status: ShiftStatus.ONGOING, agencyId });
 };
 
@@ -494,8 +551,8 @@ export const getOngoingShifts = async (agencyId?: string): Promise<ListShiftsRes
  * @param agencyId - Optional agency ID to filter by
  * @returns Promise with completed shifts
  */
-export const getCompletedShifts = async (limit?: number, agencyId?: string): Promise<ListShiftsResponse> => {
-    return listShifts({ status: ShiftStatus.COMPLETED, limit, agencyId });
+export const getCompletedShifts = async (limit?: number, agencyId?: string, employeeId?: string): Promise<ListShiftsResponse> => {
+    return listShifts({ status: ShiftStatus.COMPLETED, limit, agencyId, employeeId });
 };
 
 /**
@@ -504,11 +561,11 @@ export const getCompletedShifts = async (limit?: number, agencyId?: string): Pro
  * @param agencyId - Optional agency ID to filter by
  * @returns Promise with previous shifts
  */
-export const getPreviousShifts = async (limit: number = 30, agencyId?: string): Promise<ListShiftsResponse> => {
+export const getPreviousShifts = async (limit: number = 30, agencyId?: string, employeeId?: string): Promise<ListShiftsResponse> => {
     try {
         const response = await axiosClient.get<ListShiftsResponse>(
             `${SHIFT_BASE}/previous`,
-            { params: { agencyId, limit } }
+            { params: { agencyId, limit, employeeId } }
         );
         return response.data;
     } catch (error) {
@@ -523,8 +580,8 @@ export const getPreviousShifts = async (limit: number = 30, agencyId?: string): 
  * @param agencyId - Optional agency ID to filter by
  * @returns Promise with pending shifts
  */
-export const getPendingShifts = async (limit?: number, agencyId?: string): Promise<ListShiftsResponse> => {
-    return listShifts({ status: ShiftStatus.PENDING, limit, agencyId });
+export const getPendingShifts = async (limit?: number, agencyId?: string, employeeId?: string): Promise<ListShiftsResponse> => {
+    return listShifts({ status: ShiftStatus.PENDING, limit, agencyId, employeeId });
 };
 
 // ==================== Seed/Test Data Functions ====================

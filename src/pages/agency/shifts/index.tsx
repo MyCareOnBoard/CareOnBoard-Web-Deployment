@@ -1,8 +1,9 @@
-import React, {useState, useMemo, useRef} from "react";
+import React, {useState, useMemo, useRef, useEffect} from "react";
 import {ArrowLeft, ChevronLeft, ChevronRight} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Routes} from "@/routes/constants";
 import {useNavigate} from "react-router";
+import { getShiftStats } from "@/lib/api/shift-management";
 
 type TimeFilter = "lastWeek" | "thisMonth" | "thisYear";
 
@@ -13,6 +14,14 @@ export default function ShiftsPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchShiftStats = async () => {
+      const response = await getShiftStats();
+      console.log("response", response);
+    };
+    fetchShiftStats();
+  }, []);
 
   // Generate data based on filter
   const shiftsData = useMemo(() => {
