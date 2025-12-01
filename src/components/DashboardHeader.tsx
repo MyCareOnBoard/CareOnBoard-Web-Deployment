@@ -80,7 +80,7 @@ export default function DashboardHeader(
   const makeCommonRoute = (route: string) => {
     const userTypeKeys = {
       [UserType.APPLICANT]: "applicant",
-      [UserType.USER]: "user-panel",
+      [UserType.EMPLOYEE]: "user-panel",
       [UserType.AGENCY]: "agency",
     }
     return route.replace(':userType', userTypeKeys[userType as UserType] || 'applicant');

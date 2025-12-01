@@ -70,6 +70,23 @@ export interface ClientsResponse {
 }
 
 /**
+ * Client statistics
+ */
+export interface ClientStats {
+  active: number;
+  inactive: number;
+  total: number;
+}
+
+/**
+ * Client statistics API response
+ */
+export interface ClientStatsResponse {
+  success: boolean;
+  stats: ClientStats;
+}
+
+/**
  * List Clients Query Parameters
  */
 export interface ListClientsParams {
@@ -315,5 +332,27 @@ export async function seedClients(data: SeedClientsRequest): Promise<{ success: 
   } catch (err: any) {
     console.error('seedClients error:', err);
     throw new Error(err.message || 'Failed to seed clients');
+  }
+}
+
+/**
+ * ✅ Get client statistics for an agency
+ * Endpoint: GET /clients/stats
+ * Query params: agencyId (optional)
+ */
+export async function getClientStats(agencyId?: string): Promise<ClientStats> {
+  try {
+    const response = await axiosClient.get<ClientStatsResponse>('/clients/stats', {
+      params: agencyId ? { agencyId } : undefined,
+    });
+
+    if (!response.data.success) {
+      throw new Error('Failed to fetch client stats');
+    }
+
+    return response.data.stats;
+  } catch (err: any) {
+    console.error('getClientStats error:', err);
+    throw new Error(err.message || 'Failed to fetch client stats');
   }
 }

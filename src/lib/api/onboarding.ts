@@ -4,7 +4,9 @@
  */
 
 import axiosClient from '../axios';
-import type { FirebaseTimestamp, UserProfile, UserProfileResponse } from './users';
+import { listAgencies, seedAgency } from './agencies';
+import { UserType, type FirebaseTimestamp, type UserProfile, type UserProfileResponse } from './users';
+import { listEmployees } from './employees';
 
 function firebaseTimestampToISOString(timestamp?: FirebaseTimestamp): string | undefined {
     if (!timestamp) {
@@ -42,7 +44,22 @@ export async function getUserProfile(): Promise<UserProfile> {
             throw new Error("Invalid response format from server");
         }
 
-        return response.data.user;
+        let profile = response.data.user
+
+        // Load user-specific data based on user type
+        let userData: Record<string, any> | undefined = undefined
+
+        if (profile.userType === UserType.AGENCY && !profile?.data) {
+            try {
+                const agency = await seedAgency()
+                profile.data = agency
+
+            } catch (error: any) {
+
+            }
+        }
+
+        return profile;
     } catch (err: any) {
         // Re-throw with more context
         if (err.response?.status === 404) {

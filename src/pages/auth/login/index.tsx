@@ -19,7 +19,7 @@ import {
 import {UserType, UserProfile} from "@/lib/api/users";
 import {useDispatch} from "react-redux";
 import { listAgencies, seedAgency } from "@/lib/api/agencies";
-import { getCurrentEmployee } from "@/lib/api/employees";
+import { getCurrentEmployee, listEmployees } from "@/lib/api/employees";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -88,7 +88,7 @@ export default function LoginPage() {
 
   const dashboardRoutes = {
     [UserType.APPLICANT]: Routes.applicant.dashboard,
-    [UserType.USER]: Routes.userPanel.dashboard,
+    [UserType.EMPLOYEE]: Routes.userPanel.dashboard,
     [UserType.AGENCY]: Routes.agency.dashboard,
   }
 
@@ -129,43 +129,8 @@ export default function LoginPage() {
 
       const profile = await getUserProfile()
       
-      // Load user-specific data based on user type
-      let userData: Record<string, any> | undefined = undefined
-      
-      if (profile.userType === UserType.AGENCY) {
-        try {
-          const agenciesResponse = await listAgencies({ limit: 1 })
-          
-          // If no agencies exist, seed one
-          if (!agenciesResponse.agencies || agenciesResponse.agencies.length === 0) {
-            const agency = await seedAgency()
-            userData = agency
-          } else {
-            userData = agenciesResponse.agencies[0]
-          }
-        } catch (error: any) {
-          // If listing fails (e.g., 404), try to seed
-          if (error.response?.status === 404 || error.message?.includes('not found')) {
-            try {
-              const agency = await seedAgency()
-              userData = agency
-            } catch (seedError) {
-              // Failed to seed agency - continue without it
-            }
-          }
-        }
-      } else if (profile.userType === UserType.USER) {
-        // Fetch employee details for employee users
-        try {
-          const employee = await getCurrentEmployee()
-          userData = employee
-        } catch (error: any) {
-          // Continue without employee data - it might not exist yet
-        }
-      }
-      
       // Dispatch profile with user-specific data
-      dispatch(setProfile({ ...profile, data: userData }))
+      dispatch(setProfile({ ...profile }))
 
       if (profile.userType !== UserType.APPLICANT) {
         navigate(dashboardRoutes[profile.userType as UserType], { replace: true })

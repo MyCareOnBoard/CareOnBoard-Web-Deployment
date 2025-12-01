@@ -1,11 +1,44 @@
-import React, {useState} from "react";
+import React, {useState, useEffect} from "react";
 import {ChevronRight, ArrowUpRight, ChevronLeft} from "lucide-react";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {useGetExpiredDocumentsQuery} from "@/pages/agency/compliance-alerts/api";
+import { useAuth } from "@/utils/auth";
+import { getShiftStats, listShifts } from "@/lib/api/shift-management";
+import { getClientStats } from "@/lib/api/clients";
+import { getEmployeeStats } from "@/lib/api/employees";
+
 
 export default function AgencyDashboardPage() {
   const navigate = useNavigate();
+  const { profile, user } = useAuth();
+
+  useEffect(() => {
+    const fetchShiftStats = async () => {
+      const response = await getShiftStats();
+      console.log("response", response);
+    };
+
+    if (profile?.data?.id) {
+      fetchShiftStats();
+    }
+  }, [profile?.data?.id]);
+
+  useEffect(() => {
+    const fetchDspStats = async () => {
+      const response = await getEmployeeStats();
+      console.log("response", response);
+    };
+    fetchDspStats();
+  }, [profile?.data?.id]);
+
+  useEffect(() => {
+    const fetchClientStats = async () => {
+      const response = await getClientStats()
+      console.log("response", response);
+    };
+    fetchClientStats();
+  }, [profile?.data?.id]);
   
   // Sample data for the dashboard
   const dspStats = {
