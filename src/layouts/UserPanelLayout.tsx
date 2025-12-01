@@ -55,7 +55,7 @@ export default function UserPanelDashboardLayout({children}: { children?: ReactN
   };
 
   useEffect(() => {
-    if (!user || (profile && profile.userType !== UserType.USER)) {
+    if (!user || (profile && profile.userType !== UserType.EMPLOYEE)) {
       navigate(Routes.auth.login, {replace: true});
     }
   }, [user, profile]);

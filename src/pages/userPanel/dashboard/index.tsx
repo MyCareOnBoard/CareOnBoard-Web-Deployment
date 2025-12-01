@@ -15,9 +15,11 @@ import {
 } from "@/pages/userPanel/dashboard/api";
 import {userPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
 import {Routes} from "@/routes/constants";
+import { useAuth } from "@/utils/auth/context/AuthContext";
 
 
 export default function UserPanelDashboardPage() {
+  const { profile, user } = useAuth();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<boolean>(false);
   const [locationError, setLocationError] = useState<boolean>(false);
@@ -29,18 +31,38 @@ export default function UserPanelDashboardPage() {
   const itemsPerPage = 5;
 
   const {data: employeeDocuments = []} = useGetEmployeeDocumentsQuery();
-  const {data: employeeInfo, isLoading} = useGetEmployeeInfoQuery();
   const {data: trainings = []} = useGetEmployeeTrainingsQuery();
   const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
+  const employeeInfo = profile?.data;
 
   const navigate = useNavigate();
 
   const currentUser = auth.currentUser;
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {day: "numeric", month: "long", year: "numeric"});
+  const formatDate = (value?: any) => {
+    if (!value) return "N/A";
+
+    let date: Date;
+
+    // Handle Firestore/Firebase Timestamp-like object: { _seconds, _nanoseconds }
+    if (typeof value === "object" && typeof value._seconds === "number") {
+      const millis = value._seconds * 1000 + Math.floor((value._nanoseconds || 0) / 1e6);
+      date = new Date(millis);
+    } else if (value instanceof Date) {
+      date = value;
+    } else if (typeof value === "string" || typeof value === "number") {
+      date = new Date(value);
+    } else {
+      return "N/A";
+    }
+
+    if (Number.isNaN(date.getTime())) return "N/A";
+
+    return date.toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
   };
 
   const getDocument = useCallback((documentType: string) => {
@@ -134,18 +156,6 @@ export default function UserPanelDashboardPage() {
     }
   }, [employeeInfo])
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="text-center">
-          <div
-            className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
-          <p className="text-sm text-[#808081]">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-[calc(100vh-200px)]">
       {/* Header */}
@@ -204,7 +214,7 @@ export default function UserPanelDashboardPage() {
                   {employeeInfo?.fullName || "User Name"}
                 </h2>
                 <p className="text-[14px] text-[#808081]">
-                  {employeeInfo?.role || "No role assigned"} • {employeeInfo?.dateOfBirth ? calculateAge(employeeInfo?.dateOfBirth) + ' yrs old' : ''}
+                  {employeeInfo?.role?.toUpperCase() || "No role assigned"} • {employeeInfo?.dateOfBirth ? calculateAge(employeeInfo?.dateOfBirth) + ' yrs old' : ''}
                 </p>
                 <p className="text-[14px] text-[#808081]">
                   {employeeInfo?.hireDate

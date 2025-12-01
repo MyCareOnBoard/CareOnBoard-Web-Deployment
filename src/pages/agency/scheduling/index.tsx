@@ -100,10 +100,6 @@ export default function SchedulingPage() {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
 
-  useEffect(() => {
-    console.log("profile", profile);
-  }, [profile]);
-
   // Fetch all shifts for activity log
   useEffect(() => {
     const fetchShifts = async () => {
@@ -111,7 +107,7 @@ export default function SchedulingPage() {
         setLoading(true);
         const response = await listShifts({ 
           limit: 100,
-          agencyId: profile?.agency?.id,
+          agencyId: profile?.data?.id,
           client: true,
           employee: true,
         });
@@ -199,12 +195,12 @@ export default function SchedulingPage() {
    * Handles both one-time and recurring schedules
    */
   const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
-    if (!profile?.agency?.id || !data.assignedDspId) return [];
+    if (!profile?.data?.id || !data.assignedDspId) return [];
 
     const requests: CreateShiftRequest[] = [];
     const baseShiftData = {
       employeeId: data.assignedDspId,
-      agencyId: profile?.agency?.id || "",
+      agencyId: profile?.data?.id || "",
       location: data.clientAddress || "",
       startTime: data.clockInTime,
       endTime: data.clockOutTime,
@@ -245,7 +241,7 @@ export default function SchedulingPage() {
    * Similar to manual shift management save functionality
    */
   const handleSave = async (data: ScheduleFormData) => {
-    if (!profile?.agency?.id) {
+    if (!profile?.data?.id) {
       toast({
         title: "Authentication Error",
         description: "User not authenticated. Please log in and try again.",
@@ -268,7 +264,7 @@ export default function SchedulingPage() {
     try {
       // Step 1: Fetch existing draft shifts for this agency
       const existingDraftsResponse = await listShifts({
-        agencyId: profile?.agency?.id || "",
+        agencyId: profile?.data?.id || "",
         type: ShiftType.AUTOMATIC,
         submissionStatus: SubmissionStatus.DRAFT,
         limit: 100,
@@ -353,7 +349,7 @@ export default function SchedulingPage() {
         // Refresh shifts list
         const response = await listShifts({ 
           limit: 100,
-          agencyId: profile?.agency?.id || "",
+          agencyId: profile?.data?.id || "",
           client: true,
           employee: true,
         });
@@ -374,7 +370,7 @@ export default function SchedulingPage() {
    * Creates shifts with SUBMITTED status
    */
   const handleSchedule = async (data: ScheduleFormData): Promise<boolean> => {
-    if (!profile?.agency?.id) {
+    if (!profile?.data?.id) {
       toast({
         title: "Authentication Error",
         description: "User not authenticated. Please log in and try again.",
@@ -487,7 +483,7 @@ export default function SchedulingPage() {
         // Refresh shifts list
         const response = await listShifts({ 
           limit: 100,
-          agencyId: profile?.agency?.id || "",
+          agencyId: profile?.data?.id || "",
         });
         setShifts(response.shifts || []);
 

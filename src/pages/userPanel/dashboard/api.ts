@@ -1,5 +1,5 @@
-import {createApi} from "@reduxjs/toolkit/query/react";
-import {customBaseQuery} from "@/lib/baseQuery";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { customBaseQuery } from "@/lib/baseQuery";
 import {
   UploadDocumentPayload,
   UploadDocumentResponse
@@ -17,14 +17,14 @@ export const userPanelDashboardApi = createApi({
   endpoints: (builder) => ({
     getEmployeeDocuments: builder.query<GetEmployeeDocumentsResponse[], void>({
       query: () => ({
-        url: `/employeeDocuments`,
+        url: `/documents`,
         method: "GET",
         requiresAuth: true
       }),
       providesTags: ['EmployeeDocuments']
     }),
     uploadDocument: builder.mutation<UploadDocumentResponse, UploadDocumentPayload>({
-      query: ({data}: UploadDocumentPayload) => ({
+      query: ({ data }: UploadDocumentPayload) => ({
         url: `/uploads/others`,
         method: "POST",
         data: data,
@@ -33,16 +33,16 @@ export const userPanelDashboardApi = createApi({
     }),
     saveDocument: builder.mutation<void, SaveEmployeeDocumentPayload>({
       query: (data) => ({
-        url: `/employeeDocuments`,
+        url: `/documents`,
         method: "PUT",
         requiresAuth: true,
         data
       }),
       invalidatesTags: ['EmployeeDocuments']
     }),
-    getEmployeeInfo: builder.query<GetEmployeeInfoResponse, void>({
-      query: () => ({
-        url: `/employees/me`,
+    getEmployeeInfo: builder.query<GetEmployeeInfoResponse, string>({
+      query: (employeeId: string) => ({
+        url: `/employees/${employeeId}`,
         method: "GET",
         requiresAuth: true,
       }),
@@ -50,7 +50,7 @@ export const userPanelDashboardApi = createApi({
     }),
     updateEmployeeInfo: builder.mutation<void, UpdateEmployeeInfoPayload>({
       query: (data) => ({
-        url: `/employees/employee`,
+        url: `/employees`,
         method: "PATCH",
         requiresAuth: true,
         data
@@ -59,7 +59,7 @@ export const userPanelDashboardApi = createApi({
     }),
     getEmployeeTrainings: builder.query<GetEmployeeTrainingsResponse[], void>({
       query: () => ({
-        url: `/employees/employee/trainings`,
+        url: `/employees/trainings`,
         method: "GET",
         requiresAuth: true,
       }),

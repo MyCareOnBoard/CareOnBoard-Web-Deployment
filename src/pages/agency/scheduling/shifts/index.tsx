@@ -37,6 +37,7 @@ export default function ShiftsListPage() {
           employee: true,
         });
         setShifts(response.shifts || []);
+        setLoading(false);
       } catch (error) {
         console.error("Failed to fetch shifts:", error);
         toast({
@@ -44,7 +45,6 @@ export default function ShiftsListPage() {
           description: "Failed to load shifts. Please try again.",
           variant: "destructive",
         });
-      } finally {
         setLoading(false);
       }
     };

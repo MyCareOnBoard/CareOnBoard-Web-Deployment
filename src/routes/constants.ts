@@ -21,7 +21,7 @@ export const Routes = {
     applicantDirectory: "/agency/applicant-directory",
     reports: "/agency/reports",
     complianceAlerts: "/agency/compliance-alerts",
-    shifts: "/agency/shifts",
+    shifts: "/agency/dashboard/shifts",
     shiftsList: "/agency/scheduling/shifts",
     notes: "/agency/notes",
     helpCenter: "/agency/help-center",
