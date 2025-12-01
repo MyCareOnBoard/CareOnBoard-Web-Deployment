@@ -7,41 +7,18 @@ export const complianceAlertsApi = createApi({
     baseQuery: customBaseQuery,
     tagTypes: ['ExpiredDocuments'],
     endpoints: (builder) => ({
-        getExpiredDocuments: builder.query<ExpiredDocumentsResponse, void>({
-            query: () => ({
-                url: `/documents/expired`,
+        getExpiredDocuments: builder.query<ExpiredDocumentsResponse, string>({
+            query: (agencyId) => ({
+                url: `/documents/expired?agencyId=${agencyId}`,
                 method: "GET",
                 requiresAuth: true
             }),
             providesTags: ['ExpiredDocuments']
         }),
-        getDSPStats: builder.query<any, string>({
-            query: (agencyId) => ({
-                url: `/employees/stats?agencyId=${agencyId}`,
-                method: "GET",
-                requiresAuth: true
-            })
-        }),
-        getShiftStats: builder.query<any, string>({
-            query: (agencyId) => ({
-                url: `/shifts/stats?agencyId=${agencyId}`,
-                method: "GET",
-                requiresAuth: true
-            })
-        }),
-        getClientStats: builder.query<any, string>({
-            query: (agencyId) => ({
-                url: `/clients/stats?agencyId=${agencyId}`,
-                method: "GET",
-                requiresAuth: true
-            })
-        })
+
     }),
 });
 
 export const {
     useGetExpiredDocumentsQuery,
-    useGetDSPStatsQuery,
-    useGetShiftStatsQuery,
-    useGetClientStatsQuery,
 } = complianceAlertsApi;

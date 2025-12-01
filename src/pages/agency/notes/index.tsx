@@ -169,7 +169,7 @@ export default function AgencyNotesPage() {
         <div className="flex items-center gap-3 mb-6 border-b border-[#e5e5e6] pb-4">
           <button
             onClick={() => setStatusTab("submitted")}
-            className={`px-6 py-2 text-[14px] font-semibold transition-all relative ${
+            className={`cursor-pointer px-6 py-2 text-[14px] font-semibold transition-all relative ${
               statusTab === "submitted"
                 ? "text-[#2B82FF]"
                 : "text-[#808081] hover:text-[#10141a]"
@@ -182,7 +182,7 @@ export default function AgencyNotesPage() {
           </button>
           <button
             onClick={() => setStatusTab("approved")}
-            className={`px-6 py-2 text-[14px] font-semibold transition-all relative ${
+            className={`cursor-pointer px-6 py-2 text-[14px] font-semibold transition-all relative ${
               statusTab === "approved"
                 ? "text-[#2B82FF]"
                 : "text-[#808081] hover:text-[#10141a]"

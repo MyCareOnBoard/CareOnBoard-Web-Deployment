@@ -17,6 +17,7 @@ import {userPanelDashboardApi} from "@/pages/userPanel/dashboard/api";
 import {userPanelNotesApi} from "@/pages/userPanel/notes/api";
 import {agencyNotesApi} from "@/pages/agency/notes/api";
 import {complianceAlertsApi} from "@/pages/agency/compliance-alerts/api";
+import {agencyDashboardApi} from "@/pages/agency/dashboard/api";
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -25,6 +26,7 @@ const rootReducer = combineReducers({
   [userPanelDashboardApi.reducerPath]: userPanelDashboardApi.reducer,
   [userPanelNotesApi.reducerPath]: userPanelNotesApi.reducer,
   [agencyNotesApi.reducerPath]: agencyNotesApi.reducer,
+  [agencyDashboardApi.reducerPath]: agencyDashboardApi.reducer,
   [complianceAlertsApi.reducerPath]: complianceAlertsApi.reducer,
 });
 
@@ -49,6 +51,7 @@ export const store = configureStore({
       .concat(userPanelDashboardApi.middleware)
       .concat(userPanelNotesApi.middleware)
       .concat(agencyNotesApi.middleware)
+      .concat(agencyDashboardApi.middleware)
       .concat(complianceAlertsApi.middleware),
   devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });

@@ -1,13 +1,12 @@
-import React, {useState, useEffect} from "react";
+import React, {useState} from "react";
 import {ChevronRight, ArrowUpRight, ChevronLeft} from "lucide-react";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {
-    useGetClientStatsQuery,
-    useGetDSPStatsQuery,
-    useGetExpiredDocumentsQuery, useGetShiftStatsQuery
+    useGetExpiredDocumentsQuery
 } from "@/pages/agency/compliance-alerts/api";
 import {useAuth} from "@/utils/auth";
+import {useGetClientStatsQuery, useGetDSPStatsQuery, useGetShiftStatsQuery} from "@/pages/agency/dashboard/api";
 
 export default function AgencyDashboardPage() {
     const navigate = useNavigate();
@@ -16,37 +15,52 @@ export default function AgencyDashboardPage() {
     const itemsPerPage = 10;
 
     const shiftsData = [
-        {day: "SUN", scheduled: 100, completed: 80, date: "5 January"},
-        {day: "MON", scheduled: 150, completed: 120, date: "6 January"},
-        {day: "TUE", scheduled: 180, completed: 160, date: "7 January"},
-        {day: "WED", scheduled: 220, completed: 200, date: "8 January"},
-        {day: "THUR", scheduled: 160, completed: 140, date: "9 January"},
-        {day: "FRI", scheduled: 300, completed: 280, date: "10 January"},
-        {day: "SAT", scheduled: 340, completed: 320, date: "11 January"},
+        {day: "SUN", scheduled: 0, completed: 0, date: "5 January"},
+        {day: "MON", scheduled: 0, completed: 0, date: "6 January"},
+        {day: "TUE", scheduled: 0, completed: 0, date: "7 January"},
+        {day: "WED", scheduled: 0, completed: 0, date: "8 January"},
+        {day: "THUR", scheduled: 0, completed: 0, date: "9 January"},
+        {day: "FRI", scheduled: 0, completed: 0, date: "10 January"},
+        {day: "SAT", scheduled: 0, completed: 0, date: "11 January"},
     ];
 
     const [hoveredShift, setHoveredShift] = useState<number | null>(null);
-
-    // Fetch expired documents for compliance alerts
-    const {data: expiredDocsData, isLoading: isLoadingAlerts} = useGetExpiredDocumentsQuery();
+    const {data: expiredDocsData, isLoading: isLoadingAlerts} = useGetExpiredDocumentsQuery(profile?.data?.id, {
+        skip: !profile?.data?.id,
+        refetchOnMountOrArgChange: true
+    });
     const expiredDocuments = expiredDocsData?.data || [];
-
-    console.log("profile", profile);
 
     const {data: clientStatsData} = useGetClientStatsQuery(profile?.data?.id, {
         skip: !profile?.data?.id,
+        refetchOnMountOrArgChange: true
     });
-    const clients = clientStatsData?.stats || [];
+    const clients = clientStatsData?.stats || {active: 0, inactive: 0, total: 0};
 
     const {data: dspStatsData} = useGetDSPStatsQuery(profile?.data?.id, {
         skip: !profile?.data?.id,
+        refetchOnMountOrArgChange: true
     });
-    const dspStats = dspStatsData?.stats || [];
+    const dspStats = dspStatsData?.stats || {active: 0, inactive: 0, total: 0};
 
-    const {data: shiftStatsData} = useGetShiftStatsQuery(profile?.data?.id, {
-        skip: !profile?.data?.id,
-    })
-    const shifts = shiftStatsData?.stats || [];
+    const {data: shiftStatsData} = useGetShiftStatsQuery(
+        {agencyId: profile?.data?.id || '', range: 'lastWeek'}, 
+        {skip: !profile?.data?.id, refetchOnMountOrArgChange: true}
+    )
+    const shifts = shiftStatsData?.buckets || [];
+
+    // Transform shifts data to dashboard format
+    const transformedShifts = shifts.length > 0 ? shifts.map(bucket => {
+        const date = new Date(bucket.date);
+        const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THUR', 'FRI', 'SAT'];
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+        return {
+            day: dayNames[date.getDay()],
+            scheduled: bucket.scheduled,
+            completed: bucket.completed,
+            date: `${date.getDate()} ${monthNames[date.getMonth()]}`
+        };
+    }) : shiftsData;
 
     // Transform to dashboard format and limit to first 10
     const complianceAlerts = expiredDocuments.slice(0, 10).map(doc => ({
@@ -57,7 +71,7 @@ export default function AgencyDashboardPage() {
         status: `Expired (${doc.daysExpired} day${doc.daysExpired !== 1 ? 's' : ''} ago)`,
     }));
 
-    const maxShiftValue = Math.max(...shiftsData.map((d) => Math.max(d.scheduled, d.completed)));
+    const maxShiftValue = Math.max(...transformedShifts.map((d) => Math.max(d.scheduled, d.completed)));
 
     return (
         <div className="min-h-[calc(100vh-200px)]">
@@ -127,7 +141,7 @@ export default function AgencyDashboardPage() {
                         </div>
                         <div className="grid grid-cols-3 gap-4">
                             <div className="text-center">
-                                <div className="text-[32px] font-bold text-[#10141a]">{clients.total}</div>
+                                <div className="text-[32px] font-bold text-[#10141a]">{clients.active}</div>
                                 <div className="flex items-center justify-center gap-1.5 mt-1">
                                     <div className={"flex"}>
                                         <div className="w-2 h-2 rounded-full bg-[#0EAF52]"></div>
@@ -136,7 +150,7 @@ export default function AgencyDashboardPage() {
                                 </div>
                             </div>
                             <div className="text-center">
-                                <div className="text-[32px] font-bold text-[#10141a]">{clients.active}</div>
+                                <div className="text-[32px] font-bold text-[#10141a]">{clients.inactive}</div>
                                 <div className="flex items-center justify-center gap-1.5 mt-1">
                                     <div className={"flex"}>
                                         <div className="w-2 h-2 rounded-full bg-[#2B82FF]"></div>
@@ -145,7 +159,7 @@ export default function AgencyDashboardPage() {
                                 </div>
                             </div>
                             <div className="text-center">
-                                <div className="text-[32px] font-bold text-[#10141a]">{clients.inactive}</div>
+                                <div className="text-[32px] font-bold text-[#10141a]">{clients.total}</div>
                                 <div className="flex items-center justify-center gap-1.5 mt-1">
                                     <div className={"flex"}>
                                         <div className="w-2 h-2 rounded-full bg-[#808081]"></div>
@@ -194,9 +208,9 @@ export default function AgencyDashboardPage() {
                             </div>
 
                             <div className="flex items-end justify-between gap-3 h-[200px] relative">
-                                {shiftsData.map((shift, index) => (
+                                {transformedShifts.map((shift, index) => (
                                     <div
-                                        key={shift.day}
+                                        key={`${shift.day}-${index}`}
                                         className="flex flex-col items-center flex-1 h-full justify-end relative"
                                         onMouseEnter={() => setHoveredShift(index)}
                                         onMouseLeave={() => setHoveredShift(null)}
@@ -207,13 +221,13 @@ export default function AgencyDashboardPage() {
                                                 className="rounded absolute bottom-full mb-2 bg-white text-black px-4 py-3 whitespace-nowrap z-10 shadow-lg">
                                                 <div className="mb-1 text-sm font-semibold">Report
                                                     for {shift.date}</div>
-                                                <div className={"flex justify-between items-center"}>
-                                                    <div className="text-[#808081] text-xs">Scheduled View</div>
-                                                    <div className="text-black text-xs">20</div>
+                                                <div className={"flex justify-between items-center gap-4"}>
+                                                    <div className="text-[#808081] text-xs">Scheduled</div>
+                                                    <div className="text-black text-xs">{shift.scheduled}</div>
                                                 </div>
-                                                <div className={"flex justify-between items-center"}>
+                                                <div className={"flex justify-between items-center gap-4"}>
                                                     <div className="text-[#808081] text-xs">Visit Completed</div>
-                                                    <div className="text-black text-xs">14</div>
+                                                    <div className="text-black text-xs">{shift.completed}</div>
                                                 </div>
                                             </div>
                                         )}
@@ -226,7 +240,7 @@ export default function AgencyDashboardPage() {
                                                     height: `${(shift.scheduled / maxShiftValue) * 100}%`,
                                                     minHeight: "30px",
                                                 }}
-                                            >12
+                                            >{shift.scheduled}
                                             </div>
                                             {/* Completed Bar */}
                                             <div
@@ -235,7 +249,7 @@ export default function AgencyDashboardPage() {
                                                     height: `${(shift.completed / maxShiftValue) * 100}%`,
                                                     minHeight: "30px",
                                                 }}
-                                            >11
+                                            >{shift.completed}
                                             </div>
                                         </div>
                                         {/* Day Label */}
