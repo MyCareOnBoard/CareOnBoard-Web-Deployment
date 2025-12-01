@@ -30,14 +30,14 @@ export default function ShiftsListPage() {
     const fetchShifts = async () => {
       try {
         setLoading(true);
-        const response = await listShifts({ 
+        const response = await listShifts({
           limit: 100,
-          agencyId: profile?.agency?.id,
+          // For agency users the backend can infer agencyId, but we pass profile.data.id when available
+          agencyId: profile?.data?.id,
           client: true,
           employee: true,
         });
         setShifts(response.shifts || []);
-        setLoading(false);
       } catch (error) {
         console.error("Failed to fetch shifts:", error);
         toast({
@@ -45,15 +45,20 @@ export default function ShiftsListPage() {
           description: "Failed to load shifts. Please try again.",
           variant: "destructive",
         });
+      } finally {
         setLoading(false);
       }
     };
 
-    if (profile?.agency?.id) {
+    // Always attempt to fetch when profile is present; loading will be cleared in finally
+    if (profile) {
       fetchShifts();
+    } else {
+      // If there is no profile yet, don't get stuck in loading
+      setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.agency?.id]);
+  }, [profile?.data?.id]);
 
   // Calendar days calculation
   const calendarDays = useMemo(() => {
@@ -121,7 +126,7 @@ export default function ShiftsListPage() {
   };
 
   const handleSchedule = async (data: ScheduleFormData): Promise<boolean> => {
-    if (!profile?.agency?.id) {
+    if (!profile?.data?.id) {
       toast({
         title: "Error",
         description: "Agency not found.",
