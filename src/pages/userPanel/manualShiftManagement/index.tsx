@@ -39,7 +39,7 @@ interface WeekData {
  * Helper function to transform week data into CreateShiftRequest[]
  * 
  * Note: Signatures are uploaded separately via POST /signature endpoint before shift submission.
- * Signature metadata (type and status) is included in additionalStatus for reference.
+ * Signature information (type and status) is included in signatureInfo field for reference.
  * The backend stores the full signature data in the signatures collection.
  */
 function buildManualShiftRequests(
@@ -93,7 +93,10 @@ function buildManualShiftRequests(
           type: ShiftType.MANUAL,
           submissionStatus: SubmissionStatus.DRAFT, // Default to DRAFT, will be overridden by caller
           clientId: clientId || undefined,
-          additionalStatus: `Manual timesheet - Week ${weekIndex + 1} ${day} - Client: ${formData.client} - ${sessionDuration} - ${signatureInfo}`,
+          week: weekIndex + 1,
+          day: day,
+          sessionDuration: sessionDuration,
+          signatureInfo: signatureInfo,
         };
 
         requests.push(request);
@@ -290,17 +293,16 @@ export default function ManualShiftManagementPage() {
             clientId: firstShift.client?.id || "",
             location: firstShift.location || prev.location,
           }));
-        } else if (firstShift.additionalStatus) {
-          // Try to extract from additionalStatus if client object is not available
-          const clientMatch = firstShift.additionalStatus.match(/Client:\s*([^-\n]+)/);
-          if (clientMatch) {
-            const clientName = clientMatch[1].trim();
-            setFormData((prev) => ({
-              ...prev,
-              client: clientName,
-              location: firstShift.location || prev.location,
-            }));
-          }
+        } else if (firstShift.client) {
+          // Client object is available
+          const clientName = firstShift.client.firstName && firstShift.client.lastName
+            ? `${firstShift.client.firstName} ${firstShift.client.lastName}`
+            : firstShift.client.id || "";
+          setFormData((prev) => ({
+            ...prev,
+            client: clientName,
+            location: firstShift.location || prev.location,
+          }));
         }
 
         // Group shifts by week and day
@@ -308,12 +310,10 @@ export default function ManualShiftManagementPage() {
         const newWeek2Data = { ...week2Data };
         
         draftShifts.forEach((shift) => {
-          // Parse the additionalStatus to determine week number
-          const weekMatch = shift.additionalStatus?.match(/Week (\d+) (\w+)/);
-          if (!weekMatch) return;
-
-          const weekNum = parseInt(weekMatch[1]);
-          const dayName = weekMatch[2];
+          // Get week number and day name from shift fields
+          const weekNum = shift.week;
+          const dayName = shift.day;
+          if (!weekNum || !dayName) return;
 
           // Parse date to display format (e.g., "19 January")
           const shiftDate = new Date(shift.date);
@@ -707,7 +707,10 @@ export default function ManualShiftManagementPage() {
             endTime: request.endTime,
             clockedInAt: request.clockedInAt,
             clockedOutAt: request.clockedOutAt,
-            additionalStatus: request.additionalStatus,
+            week: request.week,
+            day: request.day,
+            sessionDuration: request.sessionDuration,
+            signatureInfo: request.signatureInfo,
             status: request.status,
             submissionStatus: request.submissionStatus,
             type: request.type,

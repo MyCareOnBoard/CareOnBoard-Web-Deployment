@@ -35,6 +35,7 @@ export interface ScheduleFormData {
   billingRate: string;
   service: string;
   serviceCode: string;
+  notesType: string;
   schedulingType: "one-time" | "recurring" | "";
   date: Date | null;
   startDate: Date | null;
@@ -62,6 +63,15 @@ const serviceOptions = [
   "Respite Care",
 ];
 
+const notesTypeOptions = [
+  "Community Based Support",
+  "Day Habilitation",
+  "Respite Care",
+  "Personal Care",
+  "Behavioral Support",
+  "Nursing Services",
+];
+
 const initialFormData: ScheduleFormData = {
   client: "",
   clientId: "",
@@ -71,6 +81,7 @@ const initialFormData: ScheduleFormData = {
   billingRate: "",
   service: "General Practitioners",
   serviceCode: "183535",
+  notesType: "",
   schedulingType: "",
   date: null,
   startDate: null,
@@ -92,6 +103,7 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+  const [showNotesTypeDropdown, setShowNotesTypeDropdown] = useState(false);
   const [customClockIn, setCustomClockIn] = useState("");
   const [customClockOut, setCustomClockOut] = useState("");
   const [showCustomClockIn, setShowCustomClockIn] = useState(false);
@@ -496,7 +508,10 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
             <div className="flex-1 flex flex-col gap-1 relative">
               <label className="text-[12px] font-normal text-[#10141a]">Service</label>
               <button
-                onClick={() => setShowServiceDropdown(!showServiceDropdown)}
+                onClick={() => {
+                  setShowServiceDropdown(!showServiceDropdown);
+                  setShowNotesTypeDropdown(false);
+                }}
                 className="bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 flex items-center gap-3 cursor-pointer"
               >
                 <span className="flex-1 text-left text-[14px] font-normal text-[#10141a]">
@@ -535,6 +550,40 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
                 />
               </div>
             </div>
+          </div>
+
+          {/* Notes Type */}
+          <div className="flex flex-col gap-1 relative">
+            <label className="text-[12px] font-normal text-[#10141a]">Notes Type</label>
+            <button
+              onClick={() => {
+                setShowNotesTypeDropdown(!showNotesTypeDropdown);
+                setShowServiceDropdown(false);
+              }}
+              className="bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 flex items-center gap-3 cursor-pointer"
+            >
+              <span className="flex-1 text-left text-[14px] font-normal text-black">
+                {formData.notesType || "Select notes type"}
+              </span>
+              <ChevronDown className="w-5 h-5 text-[#10141a]" />
+            </button>
+            
+            {showNotesTypeDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-[12px] shadow-lg z-10">
+                {notesTypeOptions.map((notesType) => (
+                  <button
+                    key={notesType}
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, notesType }));
+                      setShowNotesTypeDropdown(false);
+                    }}
+                    className="w-full px-4 py-3 text-left text-[14px] font-normal text-[#10141a] hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer"
+                  >
+                    {notesType}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Scheduling Type */}
