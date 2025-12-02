@@ -8,6 +8,7 @@ import { listShifts, Shift, deleteShift, createShift, ShiftStatus, ShiftType, Su
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
+import { createEmployeeActivityLog } from "@/lib/api/employees";
 
 export default function ShiftsListPage() {
   const navigate = useNavigate();
@@ -147,10 +148,41 @@ export default function ShiftsListPage() {
         type: ShiftType.MANUAL,
         submissionStatus: SubmissionStatus.SUBMITTED,
         clientId: data.clientId,
-        additionalStatus: `Service: ${data.service} (${data.serviceCode}) - ${data.schedulingType}`,
+        notesType: data.notesType || undefined,
+        service: data.service,
+        serviceCode: data.serviceCode,
+        schedulingType: data.schedulingType,
+        ispOutcome: data.ispOutcome || undefined,
+        assignedDsp: data.assignedDsp,
       };
 
-      await createShift(shiftData);
+      const createdShift = await createShift(shiftData);
+      const shiftId = createdShift.shift?.id;
+
+      // Create activity log if notesType is provided
+      if (data.notesType && shiftId && data.assignedDspId) {
+        try {
+          const shiftDate = data.date ? new Date(data.date) : new Date();
+          const clientName = data.client || "Unknown Client";
+          
+          await createEmployeeActivityLog({
+            activityType: data.notesType,
+            shiftId: shiftId,
+            employeeId: data.assignedDspId,
+            description: "",
+            metadata: {
+              individual: clientName,
+              serviceYear: shiftDate.getFullYear(),
+              serviceCode: data.serviceCode || "",
+              ISPOutcome: data.ispOutcome || "",
+              strategies: [],
+            },
+          });
+        } catch (activityLogError) {
+          console.error("Failed to create activity log:", activityLogError);
+          // Don't fail the entire operation if activity log creation fails
+        }
+      }
 
       toast({
         title: "Schedule Created",

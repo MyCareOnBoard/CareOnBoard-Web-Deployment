@@ -11,6 +11,7 @@ import AddScheduleModal, { ScheduleFormData } from "./components/AddScheduleModa
 import ScheduleSuccessModal from "./components/ScheduleSuccessModal";
 import ScheduleSavedModal from "./components/ScheduleSavedModal";
 import { seedClients } from "@/lib/api/clients";
+import { createEmployeeActivityLog } from "@/lib/api/employees";
 
 // Sample data for pending approvals
 const samplePendingApprovals = [
@@ -205,7 +206,12 @@ export default function SchedulingPage() {
       startTime: data.clockInTime,
       endTime: data.clockOutTime,
       clientId: data.clientId,
-      additionalStatus: `Service: ${data.service} (${data.serviceCode}) - ${data.schedulingType}${data.ispOutcome ? ` - ISP: ${data.ispOutcome}` : ""} - DSP: ${data.assignedDsp}`,
+      notesType: data.notesType || undefined,
+      service: data.service,
+      serviceCode: data.serviceCode,
+      schedulingType: data.schedulingType,
+      ispOutcome: data.ispOutcome || undefined,
+      assignedDsp: data.assignedDsp,
     };
 
     console.log("baseShiftData", baseShiftData);
@@ -299,7 +305,12 @@ export default function SchedulingPage() {
             location: request.location,
             startTime: request.startTime,
             endTime: request.endTime,
-            additionalStatus: request.additionalStatus,
+            notesType: request.notesType,
+            service: request.service,
+            serviceCode: request.serviceCode,
+            schedulingType: request.schedulingType,
+            ispOutcome: request.ispOutcome,
+            assignedDsp: request.assignedDsp,
             status: request.status,
             submissionStatus: request.submissionStatus,
             type: request.type,
@@ -443,6 +454,46 @@ export default function SchedulingPage() {
       const results = await Promise.allSettled(
         finalShiftRequests.map((request) => createShift(request))
       );
+
+      // Step 4: Create activity logs for successfully created shifts
+      const activityLogPromises = results
+        .map((result, index) => {
+          if (result.status === "fulfilled" && data.notesType && data.assignedDspId) {
+            const createdShift = result.value;
+            const shiftId = createdShift.shift?.id;
+            if (shiftId) {
+              const shiftDate = finalShiftRequests[index].date 
+                ? new Date(finalShiftRequests[index].date) 
+                : new Date();
+              const clientName = data.client || "Unknown Client";
+              
+              return createEmployeeActivityLog({
+                activityType: data.notesType,
+                shiftId: shiftId,
+                employeeId: data.assignedDspId,
+                description: "",
+                metadata: {
+                  individual: clientName,
+                  serviceYear: shiftDate.getFullYear(),
+                  serviceCode: data.serviceCode || "",
+                  ISPOutcome: data.ispOutcome || "",
+                  strategies: [],
+                },
+              }).catch((error) => {
+                console.error("Failed to create activity log for shift:", shiftId, error);
+                // Don't fail the entire operation if activity log creation fails
+                return null;
+              });
+            }
+          }
+          return null;
+        })
+        .filter((promise) => promise !== null);
+
+      // Wait for all activity logs to be created (but don't fail if they don't)
+      if (activityLogPromises.length > 0) {
+        await Promise.allSettled(activityLogPromises);
+      }
 
       // Check for failures
       const failures = results.filter((r) => r.status === "rejected");

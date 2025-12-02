@@ -69,7 +69,14 @@ export interface Shift {
     submissionStatus?: SubmissionStatus; // Default: draft
     timeRemaining?: number; // minutes remaining
     sessionDuration?: string; // e.g., "2 hour session"
-    additionalStatus?: string; // e.g., "Expiring Soon", "Starts tomorrow"
+    service?: string;
+    serviceCode?: string;
+    schedulingType?: string;
+    ispOutcome?: string;
+    assignedDsp?: string; // Name of assigned DSP
+    week?: number; // Week number for manual shifts
+    day?: string; // Day name for manual shifts
+    signatureInfo?: string; // Signature information for manual shifts
     uid?: string;
     agencyId?: string;
     createdAt?: string;
@@ -95,7 +102,16 @@ export interface CreateShiftRequest {
     clockedOutAt?: string;
     status: ShiftStatus;
     availableAt?: string;
-    additionalStatus?: string;
+    notesType?: string;
+    service?: string;
+    serviceCode?: string;
+    schedulingType?: string;
+    ispOutcome?: string;
+    assignedDsp?: string; // Name of assigned DSP
+    week?: number; // Week number for manual shifts
+    day?: string; // Day name for manual shifts
+    sessionDuration?: string; // Session duration for manual shifts
+    signatureInfo?: string; // Signature information for manual shifts
     client?: Client;
     type?: ShiftType; // Default: automatic
     submissionStatus?: SubmissionStatus; // Default: draft
@@ -112,7 +128,15 @@ export interface UpdateShiftRequest {
     availableAt?: string;
     status?: ShiftStatus;
     actionStatus?: ShiftActionStatus | null;
-    additionalStatus?: string;
+    notesType?: string;
+    service?: string;
+    serviceCode?: string;
+    schedulingType?: string;
+    ispOutcome?: string;
+    assignedDsp?: string; // Name of assigned DSP
+    week?: number; // Week number for manual shifts
+    day?: string; // Day name for manual shifts
+    signatureInfo?: string; // Signature information for manual shifts
     timeRemaining?: number;
     sessionDuration?: string;
     clockedInAt?: string;
