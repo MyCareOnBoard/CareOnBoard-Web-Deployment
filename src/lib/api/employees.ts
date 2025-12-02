@@ -318,3 +318,134 @@ export async function getEmployeeStats(agencyId?: string): Promise<EmployeeStats
   }
 }
 
+// ==================== Activity Log Types ====================
+
+/**
+ * Create Activity Log Request
+ */
+export interface CreateActivityLogRequest {
+  activityType: string;
+  shiftId: string;
+  employeeId: string;
+  description?: string;
+  metadata?: {
+    individual?: string;
+    serviceYear?: number;
+    serviceCode?: string;
+    ISPOutcome?: string;
+    strategies?: string[];
+    [key: string]: any;
+  };
+}
+
+/**
+ * Activity Log Response
+ */
+export interface ActivityLogResponse {
+  success: boolean;
+  message?: string;
+  data?: any;
+}
+
+/**
+ * Activity Log interface
+ */
+export interface ActivityLog {
+  id: string;
+  activityType: string;
+  shiftId?: string;
+  employeeId: string;
+  description?: string;
+  metadata?: {
+    individual?: string;
+    serviceYear?: number;
+    serviceCode?: string;
+    ISPOutcome?: string;
+    strategies?: string[];
+    [key: string]: any;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * List Activity Logs Query Parameters
+ */
+export interface ListActivityLogsParams {
+  employeeId?: string;
+  activityType?: string;
+  shiftId?: string;
+  startDate?: string; // Format: YYYY-MM-DD
+  endDate?: string; // Format: YYYY-MM-DD
+  limit?: number;
+  page?: number;
+}
+
+/**
+ * List Activity Logs Response
+ */
+export interface ListActivityLogsResponse {
+  success: boolean;
+  count?: number;
+  total?: number;
+  data?: ActivityLog[];
+  activityLogs?: ActivityLog[];
+}
+
+// ==================== Activity Log Functions ====================
+
+/**
+ * Create an activity log for an employee
+ * Endpoint: POST /employees/activity-logs
+ */
+export async function createEmployeeActivityLog(
+  data: CreateActivityLogRequest
+): Promise<ActivityLogResponse> {
+  try {
+    const response = await axiosClient.post<ActivityLogResponse>(
+      '/employees/activity-logs',
+      data
+    );
+    return response.data;
+  } catch (err: any) {
+    console.error('createEmployeeActivityLog error:', err);
+    throw new Error(err.message || 'Failed to create activity log');
+  }
+}
+
+/**
+ * ✅ List employee activity logs
+ * Endpoint: GET /employees/activity-logs
+ * Query params: employeeId, activityType, shiftId, startDate, endDate, limit, page
+ */
+export async function listEmployeeActivityLogs(
+  params?: ListActivityLogsParams
+): Promise<ActivityLog[]> {
+  try {
+    const response = await axiosClient.get<ListActivityLogsResponse>(
+      '/employees/activity-logs',
+      {
+        params: {
+          employeeId: params?.employeeId,
+          activityType: params?.activityType,
+          shiftId: params?.shiftId,
+          startDate: params?.startDate,
+          endDate: params?.endDate,
+          limit: params?.limit,
+          page: params?.page,
+        },
+      }
+    );
+
+    if (!response.data.success) {
+      throw new Error('Failed to fetch activity logs');
+    }
+
+    // Handle different response formats
+    return response.data.data || response.data.activityLogs || [];
+  } catch (err: any) {
+    console.error('listEmployeeActivityLogs error:', err);
+    throw new Error(err.message || 'Failed to fetch activity logs');
+  }
+}
+

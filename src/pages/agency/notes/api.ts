@@ -19,7 +19,7 @@ export const agencyNotesApi = createApi({
         if (params.status) queryParams.append('status', params.status);
         
         return {
-          url: `/employees/employee/submitted-notes?${queryParams.toString()}`,
+          url: `/employees/submitted-notes?${queryParams.toString()}`,
           method: "GET",
           requiresAuth: true
         };
@@ -28,7 +28,7 @@ export const agencyNotesApi = createApi({
     }),
     approveSubmittedNotes: builder.mutation<void, string>({
       query: (submissionId) => ({
-        url: `/employees/employee/submitted-notes/${submissionId}/approve`,
+        url: `/employees/submitted-notes/${submissionId}/approve`,
         method: "POST",
         requiresAuth: true
       }),
@@ -36,7 +36,7 @@ export const agencyNotesApi = createApi({
     }),
     rejectSubmittedNotes: builder.mutation<void, string>({
       query: (submissionId) => ({
-        url: `/employees/employee/submitted-notes/${submissionId}/reject`,
+        url: `/employees/submitted-notes/${submissionId}/reject`,
         method: "POST",
         requiresAuth: true
       }),
@@ -44,7 +44,7 @@ export const agencyNotesApi = createApi({
     }),
     getSubmittedNoteDetails: builder.query<SubmittedNoteDetails, string>({
       query: (submissionId) => ({
-        url: `/employees/employee/submitted-notes/${submissionId}`,
+        url: `/employees/submitted-notes/${submissionId}`,
         method: "GET",
         requiresAuth: true
       }),
@@ -52,7 +52,7 @@ export const agencyNotesApi = createApi({
     }),
     updateSubmittedNote: builder.mutation<any, { submissionId: string, data: any }>({
       query: ({submissionId, data}) => ({
-        url: `/employees/employee/submitted-notes/${submissionId}/notes`,
+        url: `/employees/submitted-notes/${submissionId}/notes`,
         method: "PUT",
         requiresAuth: true,
         data
