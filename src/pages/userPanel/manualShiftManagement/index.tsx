@@ -283,24 +283,15 @@ export default function ManualShiftManagementPage() {
         
         // Extract client info from first shift
         if (firstShift.client) {
-          const clientName = firstShift.client.firstName && firstShift.client.lastName
-            ? `${firstShift.client.firstName} ${firstShift.client.lastName}`
-            : firstShift.client.id || "";
+          const client = firstShift.client as Client;
+          const clientName = (client.firstName && client.lastName)
+            ? `${client.firstName} ${client.lastName}`
+            : client.id || "";
           
           setFormData((prev) => ({
             ...prev,
             client: clientName,
-            clientId: firstShift.client?.id || "",
-            location: firstShift.location || prev.location,
-          }));
-        } else if (firstShift.client) {
-          // Client object is available
-          const clientName = firstShift.client.firstName && firstShift.client.lastName
-            ? `${firstShift.client.firstName} ${firstShift.client.lastName}`
-            : firstShift.client.id || "";
-          setFormData((prev) => ({
-            ...prev,
-            client: clientName,
+            clientId: client.id || "",
             location: firstShift.location || prev.location,
           }));
         }
