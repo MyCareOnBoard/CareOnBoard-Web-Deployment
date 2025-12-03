@@ -12,8 +12,6 @@ import {
 } from "../services/authService"
 import {createUser as createBackendUser} from "../api/client"
 import {PageLoader} from "@/components/ui/loader"
-import {getUserProfile} from "@/lib/api/users";
-import axiosClient from "@/lib/axios";
 import {auth} from "@/lib/firebase";
 import type { UserProfile } from "../types/user.types"
 
@@ -55,9 +53,7 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
-
       
-
       if (reduxUser) {
         setUserState(reduxUser)
         setIsInitialized(true)
