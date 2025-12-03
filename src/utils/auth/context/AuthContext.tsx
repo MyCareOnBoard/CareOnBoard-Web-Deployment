@@ -22,7 +22,12 @@ interface AuthContextType {
   profile: UserProfile | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  signup: (email: string, password: string, fullName: string) => Promise<void>
+  signup: (
+    email: string,
+    password: string,
+    fullName: string,
+    agencyId?: string
+  ) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   createUser: (fullName: string) => Promise<void>
@@ -127,7 +132,12 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
   /**
    * Register new user
    */
-  const signup = async (email: string, password: string, fullName: string) => {
+  const signup = async (
+    email: string,
+    password: string,
+    fullName: string,
+    agencyId?: string
+  ) => {
     console.log('[AuthContext] Signup attempt for:', email)
     const response = await registerWithEmail(fullName, email, password)
 
@@ -147,7 +157,7 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
 
     // Create user in backend
     try {
-      await createBackendUser(fullName)
+      await createBackendUser(fullName, agencyId)
       console.log('[signup] User created in backend successfully')
     } catch (error: any) {
       console.error('[signup] Failed to create user in backend:', error)

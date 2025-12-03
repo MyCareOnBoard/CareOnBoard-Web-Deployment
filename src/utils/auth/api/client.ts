@@ -150,7 +150,7 @@ export async function uploadFile(
   return await response.json();
 }
 
-export async function createUser(fullName: string): Promise<any> {
+export async function createUser(fullName: string, agencyId?: string): Promise<any> {
   const auth = getAuth();
   const token = await auth.currentUser?.getIdToken();
 
@@ -167,7 +167,7 @@ export async function createUser(fullName: string): Promise<any> {
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ fullName }),
+    body: JSON.stringify({ fullName, agencyId }),
   });
 
   if (!response.ok) {
