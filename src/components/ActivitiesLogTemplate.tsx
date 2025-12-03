@@ -17,8 +17,7 @@ import {
   useSubmitActivityLogNotesMutation
 } from "@/pages/userPanel/notes/api";
 import {useDebounce} from "@/hooks/useDebounce";
-import {useSelector} from "react-redux";
-import {RootState} from "@/store/redux/store";
+import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";
 
 const initialActivities = [
@@ -48,7 +47,7 @@ interface ActivitiesLogTemplateProps {
 export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProps) {
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
   const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
-  const profile = useSelector((store: RootState) => store?.auth?.profile);
+  const {user} = useAuth();
 
   const debouncedMutateNote = useDebounce(
     async (params: any) => {
@@ -457,7 +456,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
           </label>
           <Input
             type="text"
-            value={profile?.fullName ?? ""}
+            value={user?.fullName ?? ""}
             placeholder="Enter name"
             className="max-w-md"
             disabled={true}

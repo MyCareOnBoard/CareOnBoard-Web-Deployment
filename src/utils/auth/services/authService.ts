@@ -16,19 +16,19 @@ import {
   confirmPasswordReset,
   type User as FirebaseUser,
 } from 'firebase/auth'
-import type { User } from '../types'
+import type { UserProfile } from '../types/user.types'
 import { getAuthErrorMessage } from '@/utils/auth'
 
 export interface AuthResponse {
   success: boolean
-  user?: User
+  user?: UserProfile
   error?: string
 }
 
 /**
  * Transform Firebase User to our User type
  */
-export function transformFirebaseUser(firebaseUser: FirebaseUser): User {
+export function transformFirebaseUser(firebaseUser: FirebaseUser): UserProfile {
   return {
     uid: firebaseUser.uid,
     email: firebaseUser.email || '',
@@ -131,16 +131,16 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
 export async function verifyResetCode(code: string): Promise<{ success: boolean; email?: string; error?: string }> {
   try {
     const email = await verifyPasswordResetCode(auth, code)
-    
+
     return {
       success: true,
       email,
     }
   } catch (error: any) {
     console.error('Reset code verification error:', error)
-    
+
     let errorMessage = 'Invalid or expired reset code'
-    
+
     switch (error.code) {
       case 'auth/expired-action-code':
         errorMessage = 'This reset link has expired. Please request a new one.'
@@ -157,7 +157,7 @@ export async function verifyResetCode(code: string): Promise<{ success: boolean;
       default:
         errorMessage = error.message || 'Invalid or expired reset code'
     }
-    
+
     return {
       success: false,
       error: errorMessage,
@@ -172,15 +172,15 @@ export async function verifyResetCode(code: string): Promise<{ success: boolean;
 export async function confirmReset(code: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
   try {
     await confirmPasswordReset(auth, code, newPassword)
-    
+
     return {
       success: true,
     }
   } catch (error: any) {
     console.error('Password reset confirmation error:', error)
-    
+
     let errorMessage = 'Failed to reset password'
-    
+
     switch (error.code) {
       case 'auth/expired-action-code':
         errorMessage = 'This reset link has expired. Please request a new one.'
@@ -194,7 +194,7 @@ export async function confirmReset(code: string, newPassword: string): Promise<{
       default:
         errorMessage = error.message || 'Failed to reset password'
     }
-    
+
     return {
       success: false,
       error: errorMessage,
@@ -217,7 +217,7 @@ export async function logout(): Promise<void> {
 /**
  * Get current authenticated user
  */
-export async function getCurrentUser(): Promise<User | null> {
+export async function getCurrentUser(): Promise<UserProfile | null> {
   return new Promise((resolve) => {
     // Use Firebase auth state observer
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
@@ -277,7 +277,7 @@ export async function getIdToken(forceRefresh = false): Promise<string | null> {
 /**
  * Store user data in localStorage
  */
-export function storeUserData(user: User): void {
+export function storeUserData(user: UserProfile): void {
   try {
     localStorage.setItem('auth_user', JSON.stringify(user))
   } catch (error) {
@@ -303,7 +303,7 @@ export function removeUserData(): void {
 export const syncAuthState = createAsyncThunk(
   'auth/syncState',
   async (_, { rejectWithValue }) => {
-    return new Promise<User | null>((resolve) => {
+    return new Promise<UserProfile | null>((resolve) => {
       const unsubscribe = auth.onAuthStateChanged(
         (firebaseUser) => {
           unsubscribe()

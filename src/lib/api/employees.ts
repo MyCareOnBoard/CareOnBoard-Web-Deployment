@@ -4,7 +4,7 @@
  */
 
 import axiosClient from '../axios';
-import { UserProfile } from './users';
+import { UserProfile } from '@/utils/auth/types/user.types';
 
 /**
  * Employee interface

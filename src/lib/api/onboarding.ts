@@ -3,9 +3,11 @@
  * Handles all API calls related to user onboarding and profile setup
  */
 
-import axiosClient, {axiosClientWithoutAuth} from '../axios';
-import { seedAgency } from './agencies';
-import { UserType, type FirebaseTimestamp, type UserProfile, type UserProfileResponse } from './users';
+import axiosClient, { axiosClientWithoutAuth } from '../axios';
+import type { UserProfile } from '@/utils/auth/types/user.types';
+import type { UserProfileResponse } from '@/lib/api/users';
+import { getUserProfile } from '@/lib/api/users';
+import type { FirebaseTimestamp } from '@/utils/auth/types/user.types';
 
 function firebaseTimestampToISOString(timestamp?: FirebaseTimestamp): string | undefined {
     if (!timestamp) {
@@ -30,44 +32,7 @@ export interface CreateUserProfileData {
     uid: string;
 }
 
-/**
- * Get the authenticated user's profile
- * Used during onboarding to check if profile exists
- * @returns Promise with user profile data
- */
-export async function getUserProfile(): Promise<UserProfile> {
-    try {
-        const response = await axiosClient.get<UserProfileResponse>("/users/profile");
 
-        if (!response.data.success || !response.data.user) {
-            throw new Error("Invalid response format from server");
-        }
-
-        let profile = response.data.user
-
-        // Load user-specific data based on user type
-        let userData: Record<string, any> | undefined = undefined
-
-        if (profile.userType === UserType.AGENCY && !profile?.data) {
-            try {
-                const agency = await seedAgency()
-                profile.data = agency
-
-            } catch (error: any) {
-
-            }
-        }
-
-        return profile;
-    } catch (err: any) {
-        // Re-throw with more context
-        if (err.response?.status === 404) {
-            throw new Error("Profile not found. Please complete your onboarding first.");
-        }
-        console.error('Failed to get user profile:', err);
-        throw err;
-    }
-}
 
 /**
  * Create a new user profile
@@ -154,11 +119,11 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus> {
 }
 
 export async function getAgencyInfo(agencyId: string): Promise<any> {
-  try {
-    const agency = await axiosClientWithoutAuth.get(`/agencies/info/${agencyId}`);
-    return agency.data;
-  } catch (error: any) {
-    console.error('Failed to fetch agency info:', error);
-    return null;
-  }
+    try {
+        const agency = await axiosClientWithoutAuth.get(`/agencies/info/${agencyId}`);
+        return agency.data;
+    } catch (error: any) {
+        console.error('Failed to fetch agency info:', error);
+        return null;
+    }
 }

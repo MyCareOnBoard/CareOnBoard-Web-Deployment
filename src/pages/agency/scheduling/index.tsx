@@ -68,7 +68,7 @@ const getInitialsFromName = (name: string) => {
 
 export default function SchedulingPage() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -101,7 +101,7 @@ export default function SchedulingPage() {
         setLoading(true);
         const response = await listShifts({ 
           limit: 100,
-          agencyId: profile?.data?.id,
+          agencyId: user?.profile?.id,
           client: true,
           employee: true,
         });
@@ -118,11 +118,11 @@ export default function SchedulingPage() {
       }
     };
 
-    if (profile?.data?.id) {
+    if (user?.profile?.id) {
       fetchShifts();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.data?.id]);
+  }, [user?.profile?.id]);
 
   // Calculate shift statistics
   const shiftStats = useMemo(() => {

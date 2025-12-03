@@ -5,9 +5,7 @@ import {useAuth} from "@/utils/auth";
 import {Routes} from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, {NavItem} from "@/components/DashboardSidebar";
-import {UserProfile, UserType} from "@/lib/api/users";
-import {useSelector} from "react-redux";
-import type {RootState} from "@/store/redux/store";
+import {UserType} from "@/utils/auth/types/user.types";
 import QuestionIcon from "@/assets/icons/question-mark-circle.svg?react";
 import CogIcon from "@/assets/icons/cog.svg?react";
 import HomeIcon from "@/assets/icons/home.svg?react";
@@ -42,7 +40,6 @@ const navItems: NavItem[] = [
 
 export default function UserPanelDashboardLayout({children}: { children?: ReactNode }) {
   const {user, logout} = useAuth();
-  const profile: UserProfile | null = useSelector((state: RootState) => state?.auth?.profile)
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -55,10 +52,10 @@ export default function UserPanelDashboardLayout({children}: { children?: ReactN
   };
 
   useEffect(() => {
-    if (!user || (profile && profile.userType !== UserType.EMPLOYEE)) {
+    if (!user || (user?.userType !== UserType.EMPLOYEE)) {
       navigate(Routes.auth.login, {replace: true});
     }
-  }, [user, profile]);
+  }, [user]);
 
   return (
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
@@ -66,7 +63,7 @@ export default function UserPanelDashboardLayout({children}: { children?: ReactN
         userName={user?.fullName}
         userImage={(user as any)?.profileImage || user?.photoURL}
         userRole={(user as any)?.role || 'DSP'}
-        userType={profile?.userType || UserType.APPLICANT}
+        userType={user?.userType || UserType.APPLICANT}
         onLogout={handleLogout}
       />
       <DashboardSidebar navItems={navItems}/>

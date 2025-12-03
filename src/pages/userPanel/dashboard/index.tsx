@@ -15,11 +15,11 @@ import {
 } from "@/pages/userPanel/dashboard/api";
 import {userPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
 import {Routes} from "@/routes/constants";
-import { useAuth } from "@/utils/auth/context/AuthContext";
+import { useAuth } from "@/utils/auth";
 
 
 export default function UserPanelDashboardPage() {
-  const { profile, user } = useAuth();
+  const { user } = useAuth();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<boolean>(false);
   const [locationError, setLocationError] = useState<boolean>(false);
@@ -33,7 +33,7 @@ export default function UserPanelDashboardPage() {
   const {data: employeeDocuments = []} = useGetEmployeeDocumentsQuery();
   const {data: trainings = []} = useGetEmployeeTrainingsQuery();
   const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
-  const employeeInfo = profile?.data;
+  const employeeInfo = user?.profile;
 
   const navigate = useNavigate();
 

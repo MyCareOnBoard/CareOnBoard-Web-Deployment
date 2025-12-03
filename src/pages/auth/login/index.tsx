@@ -6,17 +6,18 @@ import {Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
 import {Checkbox} from "@/components/ui/checkbox"
-import {setProfile, useAuth} from "@/utils/auth"
+import { setUser, useAuth } from "@/utils/auth"
 import {useToast} from "@/hooks/use-toast"
 import {ButtonLoader} from "@/components/ui/loader"
 import {Routes} from "@/routes/constants"
-import {getUserProfile, getOnboardingStatus} from "@/lib/api/onboarding"
+import {getUserProfile} from "@/lib/api/users"
+import {getOnboardingStatus} from "@/lib/api/onboarding"
 import {
   getAuthErrorMessage,
   getSuccessMessage,
   getValidationMessage
 } from "@/utils/auth/helpers/errorMessages"
-import {UserType} from "@/lib/api/users";
+import { UserType } from "@/utils/auth/types/user.types";
 import {useDispatch} from "react-redux";
 
 export default function LoginPage() {
@@ -30,7 +31,7 @@ export default function LoginPage() {
     password?: string
   }>({})
 
-  const {login} = useAuth()
+  const { login } = useAuth()
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const {toast} = useToast();
@@ -130,7 +131,7 @@ export default function LoginPage() {
       const profile = await getUserProfile()
 
       // Dispatch profile with user-specific data
-      dispatch(setProfile({...profile}))
+      dispatch(setUser(profile))
 
       if (profile.userType !== UserType.APPLICANT) {
         navigate(dashboardRoutes[profile.userType as UserType], {replace: true})
