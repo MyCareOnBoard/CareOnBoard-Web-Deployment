@@ -1,9 +1,13 @@
-
-
-export interface GetActivityLogsResponse {
+interface ActivityLog {
   id: string;
   activityType: string;
   description: string;
+}
+
+export interface GetActivityLogsResponse {
+  data: ActivityLog[];
+  success: boolean;
+  message: string;
 }
 
 export interface ActivityLogNote {

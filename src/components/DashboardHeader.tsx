@@ -12,7 +12,7 @@ import CogIcon from "@/assets/icons/cog.svg?react";
 import LogoNameIcon from "@/assets/icons/green-black-logo.svg?react";
 import { ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {UserType} from "@/lib/api/users";
+import {UserType} from "@/utils/auth/types/user.types";
 
 
 function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: ComponentType<{ className?: string }>; ariaLabel: string; onClick?: () => void }) {

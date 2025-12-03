@@ -600,7 +600,7 @@ function ShiftSection({
 }
 
 export default function ShiftManagementPage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [previousExpanded, setPreviousExpanded] = useState(false);
@@ -621,10 +621,10 @@ export default function ShiftManagementPage() {
   const currentDate = new Date();
 
   useEffect(() => {
-    if (profile?.data?.id) {
+    if (user?.profile?.id) {
       loadShifts();
     }
-  }, [profile?.data?.id]);
+  }, [user?.profile?.id]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -640,8 +640,8 @@ export default function ShiftManagementPage() {
   }, []);
 
   const loadShifts = async () => {
-    const agencyId = profile?.data?.agencyId;
-    const employeeId = profile?.data?.id;
+    const agencyId = user?.profile?.agencyId;
+    const employeeId = user?.profile?.id;
     
     if (!agencyId) {
       console.warn('No user ID available for fetching shifts');
@@ -826,8 +826,8 @@ export default function ShiftManagementPage() {
         setClockOutShiftId(null);
         toast.success('Clocked out successfully');
         
-        const agencyId = profile?.data?.agencyId;
-        const employeeId = profile?.data?.id;
+        const agencyId = user?.profile?.agencyId;
+        const employeeId = user?.profile?.id;
         if (agencyId && employeeId) {
           const todayResponse = await getTodayShifts(agencyId, employeeId);
           if (todayResponse.success) {

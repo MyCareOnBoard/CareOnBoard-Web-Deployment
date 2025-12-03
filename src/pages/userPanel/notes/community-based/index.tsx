@@ -17,10 +17,9 @@ import {
   useGetSingleActivityLogQuery,
   useSubmitActivityLogNotesMutation
 } from "@/pages/userPanel/notes/api";
-import {useSelector} from "react-redux";
-import {RootState} from "@/store/redux/store";
 import {toast} from "sonner";
 import {useDebounce} from "@/hooks/useDebounce";
+import { useAuth } from "@/utils/auth";
 
 type ActivityRow = {
   id: string;
@@ -52,7 +51,7 @@ export default function CommunityBasedPage() {
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const profile = useSelector((store: RootState) => store?.auth?.profile);
+  const { user } = useAuth();
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
 
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
@@ -515,7 +514,7 @@ export default function CommunityBasedPage() {
           </label>
           <Input
             type="text"
-            value={profile?.fullName || ""}
+            value={user?.fullName || ""}
             placeholder=""
             disabled={true}
             className="max-w-md"

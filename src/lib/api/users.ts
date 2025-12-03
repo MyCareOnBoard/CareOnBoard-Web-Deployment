@@ -1,50 +1,8 @@
+
 import axiosClient from '../axios';
-import { Agency } from './agencies';
-
-/**
- * Firebase Timestamp structure
- */
-export interface FirebaseTimestamp {
-  _seconds: number
-  _nanoseconds: number
-}
-
-export enum UserType {
-  APPLICANT = "applicant",
-  EMPLOYEE = "employee",
-  AGENCY = "agency",
-}
-
-/**
- * User Profile data shape matching backend API response
- */
-export interface UserProfile {
-  id: string
-  uid: string
-  email: string
-  fullName: string
-  emailVerified: boolean
-  userType?: UserType
-  otpVerified?: boolean
-  otpVerifiedAt?: FirebaseTimestamp
-  onboardingCompleted?: boolean
-  createdAt: FirebaseTimestamp
-  updatedAt: FirebaseTimestamp
-  // Profile-specific fields
-  phone?: string
-  address?: string
-  gender?: "Male" | "Female" | "Other" | string
-  summary?: string
-  joiningDate?: string
-  photo?: string
-  photoURL?: string
-  phoneNumber?: string
-  role?: string
-  profilePicture?: string
-  dateOfBirth?: string;
-  agency?: Agency;
-  data?: Record<string, any>; // UserType-specific data (e.g., agency for AGENCY users)
-}
+import { UserProfile } from '@/utils/auth/types/user.types';
+import { UserType } from '@/utils/auth/types/user.types';
+import { seedAgency } from './agencies';
 
 /**
  * API Response wrapper for user profile
@@ -79,8 +37,9 @@ export interface ListUsersResponse {
 }
 
 /**
- * ✅ Get the authenticated user's profile
- * Endpoint: GET /users/profile
+ * Get the authenticated user's profile
+ * Used during onboarding to check if profile exists
+ * @returns Promise with user profile data
  */
 export async function getUserProfile(): Promise<UserProfile> {
   try {
@@ -90,7 +49,22 @@ export async function getUserProfile(): Promise<UserProfile> {
       throw new Error("Invalid response format from server");
     }
 
-    return response.data.user;
+    let user = response.data.user
+
+    // Load user-specific data based on user type
+    let userData: Record<string, any> | undefined = undefined
+
+    if (user.userType === UserType.AGENCY && !user?.profile) {
+      try {
+        const agency = await seedAgency()
+        user.profile = agency
+
+      } catch (error: any) {
+
+      }
+    }
+
+    return user;
   } catch (err: any) {
     // Re-throw with more context
     if (err.response?.status === 404) {

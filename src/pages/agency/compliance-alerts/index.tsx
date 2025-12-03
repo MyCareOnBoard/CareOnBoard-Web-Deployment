@@ -13,11 +13,11 @@ export default function ComplianceAlertsPage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("active");
   const itemsPerPage = 10;
 
-  const {profile} = useAuth();
+  const {user} = useAuth();
 
   // Fetch expired documents
-  const {data, isLoading, isError} = useGetExpiredDocumentsQuery(profile?.data?.id, {
-    skip: !profile?.data?.id,
+  const {data, isLoading, isError} = useGetExpiredDocumentsQuery(user?.profile?.id, {
+    skip: !user?.profile?.id,
     refetchOnMountOrArgChange: true
   });
   const expiredDocuments = data?.data || [];

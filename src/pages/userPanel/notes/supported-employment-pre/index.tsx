@@ -23,6 +23,7 @@ import {useSelector} from "react-redux";
 import {RootState} from "@/store/redux/store";
 import {useDebounce} from "@/hooks/useDebounce";
 import {toast} from "sonner";
+import { useAuth } from "@/utils/auth";
 
 type ServiceRow = {
   id: string;
@@ -93,7 +94,7 @@ export default function SupportedEmploymentPrePage() {
   const [isStartDateOpen, setIsStartDateOpen] = useState(false);
   const [isEndDateOpen, setIsEndDateOpen] = useState(false);
   const [openServiceDateId, setOpenServiceDateId] = useState<string | null>(null);
-  const profile = useSelector((store: RootState) => store?.auth?.profile);
+  const { user } = useAuth();
 
   const navigate = useNavigate();
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
@@ -465,7 +466,7 @@ export default function SupportedEmploymentPrePage() {
           </label>
           <Input
             type="text"
-            value={profile?.fullName ?? ""}
+            value={user?.fullName ?? ""}
             disabled={true}
             className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4 w-full"
           />

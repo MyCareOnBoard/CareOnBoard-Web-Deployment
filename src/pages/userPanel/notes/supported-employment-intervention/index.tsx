@@ -21,9 +21,8 @@ import {
   useSubmitActivityLogNotesMutation
 } from "@/pages/userPanel/notes/api";
 import {useDebounce} from "@/hooks/useDebounce";
-import {useSelector} from "react-redux";
-import {RootState} from "@/store/redux/store";
 import {toast} from "sonner";
+import { useAuth } from "@/utils/auth";
 
 type InterventionRow = {
   id: string;
@@ -88,7 +87,7 @@ export default function SupportedEmploymentInterventionPage() {
   const [isStartDateOpen, setIsStartDateOpen] = useState(false);
   const [isEndDateOpen, setIsEndDateOpen] = useState(false);
   const [openServiceDateId, setOpenServiceDateId] = useState<string | null>(null);
-  const profile = useSelector((store: RootState) => store?.auth?.profile);
+  const { user } = useAuth();
 
   const navigate = useNavigate();
 
@@ -620,7 +619,7 @@ export default function SupportedEmploymentInterventionPage() {
           </label>
           <Input
             type="text"
-            value={profile?.fullName ?? ""}
+            value={user?.fullName ?? ""}
             disabled={true}
             className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4 w-full"
           />

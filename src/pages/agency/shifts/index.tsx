@@ -15,12 +15,12 @@ export default function ShiftsPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const navigate = useNavigate();
-  const {profile} = useAuth();
+  const {user} = useAuth();
 
   // Fetch shift stats with current filter
   const {data: shiftStatsData, isLoading} = useGetShiftStatsQuery(
-    {agencyId: profile?.data?.id || '', range: timeFilter},
-    {skip: !profile?.data?.id}
+    {agencyId: user?.profile?.id || '', range: timeFilter},
+    {skip: !user?.profile?.id}
   );
   const shifts = shiftStatsData?.buckets || [];
 

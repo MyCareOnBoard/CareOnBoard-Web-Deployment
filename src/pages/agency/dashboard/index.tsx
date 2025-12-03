@@ -12,7 +12,7 @@ import {toast} from "sonner";
 
 export default function AgencyDashboardPage() {
   const navigate = useNavigate();
-  const {profile} = useAuth();
+  const { user } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -27,27 +27,27 @@ export default function AgencyDashboardPage() {
   ];
 
   const [hoveredShift, setHoveredShift] = useState<number | null>(null);
-  const {data: expiredDocsData, isLoading: isLoadingAlerts} = useGetExpiredDocumentsQuery(profile?.data?.id, {
-    skip: !profile?.data?.id,
+  const {data: expiredDocsData, isLoading: isLoadingAlerts} = useGetExpiredDocumentsQuery(user?.profile?.id, {
+    skip: !user?.profile?.id,
     refetchOnMountOrArgChange: true
   });
   const expiredDocuments = expiredDocsData?.data || [];
 
-  const {data: clientStatsData} = useGetClientStatsQuery(profile?.data?.id, {
-    skip: !profile?.data?.id,
+  const {data: clientStatsData} = useGetClientStatsQuery(user?.profile?.id, {
+    skip: !user?.profile?.id,
     refetchOnMountOrArgChange: true
   });
   const clients = clientStatsData?.stats || {active: 0, inactive: 0, total: 0};
 
-  const {data: dspStatsData} = useGetDSPStatsQuery(profile?.data?.id, {
-    skip: !profile?.data?.id,
+  const {data: dspStatsData} = useGetDSPStatsQuery(user?.profile?.id, {
+    skip: !user?.profile?.id,
     refetchOnMountOrArgChange: true
   });
   const dspStats = dspStatsData?.stats || {active: 0, inactive: 0, total: 0};
 
   const {data: shiftStatsData} = useGetShiftStatsQuery(
-    {agencyId: profile?.data?.id || '', range: 'lastWeek'},
-    {skip: !profile?.data?.id, refetchOnMountOrArgChange: true}
+    {agencyId: user?.profile?.id || '', range: 'lastWeek'},
+    {skip: !user?.profile?.id, refetchOnMountOrArgChange: true}
   )
   const shifts = shiftStatsData?.buckets || [];
 
@@ -77,7 +77,7 @@ export default function AgencyDashboardPage() {
 
   const copyToClipboard = async () => {
     const domain = window.location.origin;
-    const url = `${domain}/${profile?.data?.id}`;
+    const url = `${domain}/${user?.profile?.id}`;
     await navigator.clipboard.writeText(url);
     toast.success("Copied to clipboard!");
   }

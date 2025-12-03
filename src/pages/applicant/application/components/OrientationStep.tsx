@@ -8,8 +8,8 @@ import {
     useSubmitOfficialHireMutation
 } from "@/pages/applicant/application/api";
 import {useDispatch} from "react-redux";
-import {getUserProfile} from "@/lib/api/onboarding";
-import {setProfile} from "@/utils/auth";
+import {getUserProfile} from "@/lib/api/users";
+import {setUser} from "@/utils/auth";
 
 export default function OrientationStep() {
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -36,7 +36,7 @@ export default function OrientationStep() {
     const handleProfileRetrieve = async () => {
       try {
         const profile = await getUserProfile();
-        dispatch(setProfile(profile));
+        dispatch(setUser(profile));
       } catch (error) {
         console.error(error);
       }
