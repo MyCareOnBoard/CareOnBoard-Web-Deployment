@@ -9,6 +9,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+const getInitialsFromName = (name: string) => {
+  const parts = name.split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  const first = parts[0].charAt(0);
+  const last = parts[parts.length - 1].charAt(0);
+  return `${first}${last}`.toUpperCase();
+};
 
 export default function ShiftsListPage() {
   const navigate = useNavigate();
@@ -220,15 +230,39 @@ export default function ShiftsListPage() {
     setCurrentPage(1);
   };
 
-  // Calculate shift duration
-  const calculateDuration = (startTime?: string, endTime?: string): string => {
+  // Calculate shift duration from 12-hour times like "09:00:AM" or "11.30:AM"
+  const calculateDuration = (date: string, startTime?: string, endTime?: string): string => {
+    // Keep date in the signature for future use, but duration is based on time strings only
     if (!startTime || !endTime) return "2 hours";
+
+    const parseTimeToMinutes = (time: string): number | null => {
+      // Supports "HH:MM:AM", "HH.MM:AM", etc.
+      const match = time.match(/(\d+)[.:](\d+):?(AM|PM)/i);
+      if (!match) return null;
+
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const period = match[3].toUpperCase();
+
+      if (period === "PM" && hours !== 12) hours += 12;
+      if (period === "AM" && hours === 12) hours = 0;
+
+      return hours * 60 + minutes;
+    };
+
     try {
-      const start = new Date(`2000-01-01 ${startTime}`);
-      const end = new Date(`2000-01-01 ${endTime}`);
-      const diffMs = end.getTime() - start.getTime();
-      const hours = Math.floor(diffMs / (1000 * 60 * 60));
-      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const startMinutes = parseTimeToMinutes(startTime);
+      const endMinutes = parseTimeToMinutes(endTime);
+
+      if (startMinutes == null || endMinutes == null) return "2 hours";
+
+      let diffMinutes = endMinutes - startMinutes;
+      // If negative or zero (e.g. overnight shift), fall back to default
+      if (diffMinutes <= 0) return "2 hours";
+
+      const hours = Math.floor(diffMinutes / 60);
+      const minutes = diffMinutes % 60;
+
       if (minutes > 0) {
         return `${hours}h ${minutes}m`;
       }
@@ -277,7 +311,7 @@ export default function ShiftsListPage() {
                   onClick={() => setShowDatePicker(!showDatePicker)}
                   className="flex items-center gap-3 bg-white border border-[rgba(255,255,255,0.3)] rounded-[12px] px-4 py-2 h-[36px] cursor-pointer hover:bg-gray-50 transition-colors"
                 >
-                  <span className="text-[14px] font-normal text-[#10141a]">
+                  <span className="text-[14px] font-normal text-[#10141a] whitespace-nowrap">
                     {selectedDate ? format(selectedDate, "MMM d, yyyy") : "Select date"}
                   </span>
                   <Calendar className="w-5 h-5 text-[#10141a]" />
@@ -393,26 +427,27 @@ export default function ShiftsListPage() {
                 const employeeName = apiShift.employee?.fullName || "Unknown DSP";
                 const employeeAvatar = apiShift.employee?.profilePicture;
                 const location = apiShift.location || "Unknown Location";
-                const duration = calculateDuration(apiShift.startTime, apiShift.endTime);
+                const duration = calculateDuration(apiShift.date, apiShift.startTime, apiShift.endTime);
 
                 return (
                   <div
                     key={apiShift.id}
-                    className="flex items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
+                    className="flex flex-wrap items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
                   >
                     {/* Client Info */}
-                    <div className="flex items-center gap-4">
-                      <div className="w-[52.5px] h-[60px] rounded-[8px] bg-[#e0e0e0] overflow-hidden flex-shrink-0">
-                        {clientAvatar ? (
-                          <img 
-                            src={clientAvatar} 
+                    <div className="flex items-center gap-4 w-[256px]">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                        {clientAvatar && (
+                          <AvatarImage
+                            src={clientAvatar}
                             alt={clientName}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover aspect-auto"
                           />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
                         )}
-                      </div>
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                          {getInitialsFromName(clientName)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[16px] font-semibold leading-[1.6] text-black">
                           {clientName}
@@ -424,18 +459,19 @@ export default function ShiftsListPage() {
                     </div>
 
                     {/* DSP/Employee Info */}
-                    <div className="flex items-center gap-4">
-                      <div className="w-[52.5px] h-[60px] rounded-[8px] bg-[#e0e0e0] overflow-hidden flex-shrink-0">
-                        {employeeAvatar ? (
-                          <img 
-                            src={employeeAvatar} 
+                    <div className="flex items-center gap-4 w-[256px]">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                        {employeeAvatar && (
+                          <AvatarImage
+                            src={employeeAvatar}
                             alt={employeeName}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover aspect-auto"
                           />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400" />
                         )}
-                      </div>
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                          {getInitialsFromName(employeeName)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[16px] font-semibold leading-[1.6] text-black">
                           {employeeName}
@@ -447,21 +483,22 @@ export default function ShiftsListPage() {
                     </div>
 
                     {/* Location */}
-                    <div className="flex-1 flex items-center gap-[55px]">
+                    <div className="flex-1 flex items-center gap-[55px] w-[256px]">
                       <div className="text-[12px] font-medium leading-[1.4] w-[123px]">
                         <p className="text-[#808081]">Location</p>
                         <p className="text-[#10141a]">{location}</p>
                       </div>
 
                       {/* Duration Badge */}
-                      <div className="bg-[rgba(14,175,82,0.05)] border border-[#0eaf52] rounded-full px-2.5 py-2.5">
+                      <div className="bg-[rgba(14,175,82,0.05)] border border-[#0eaf52] rounded-full min-w-[59px] min-h-[28px] flex items-center justify-center gap-[4px] px-2.5">
                         <span className="text-[12px] font-semibold text-[#0eaf52]">
                           {duration}
                         </span>
                       </div>
-
+                    </div>
+                    <div className="flex-1 flex items-center gap-[55px] w-[256px]">
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-2 ml-auto">
+                      <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           onClick={() => handleEdit(apiShift.id)}

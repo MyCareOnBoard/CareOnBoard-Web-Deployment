@@ -48,12 +48,12 @@ export interface ScheduleFormData {
 
 const clockInTimeOptions = [
   "08:00:AM", "08:30:AM", "09:00:AM", "09:30:AM", "10.00:AM",
-  "10.30:AM", "11.30:AM", "12.00:PM", "12.00:PM"
+  "10.30:AM", "11.30:AM", "12.00:PM", "12.30:PM"
 ];
 
 const clockOutTimeOptions = [
   "08:00:AM", "08:30:AM", "09:00:AM", "09:30:AM", "10.00:AM",
-  "10.30:AM", "11.30:AM", "12.00:PM", "12.00:PM"
+  "10.30:AM", "11.30:AM", "12.00:PM", "12.30:PM"
 ];
 
 const serviceOptions = [
@@ -162,7 +162,7 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
     clientSearchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearchingClients(true);
-        const results = await searchClients(query);
+        const results = await searchClients(query, profile?.data?.id);
         setClientSearchResults(results);
         setShowClientDropdown(results.length > 0);
       } catch (error) {
@@ -189,7 +189,7 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
     }
 
     // Get agencyId from profile or user
-    const agencyId = profile?.agency?.id || user?.uid;
+    const agencyId = profile?.data?.id || user?.uid;
 
     // Debounce the search
     dspSearchTimeoutRef.current = setTimeout(async () => {
@@ -221,10 +221,11 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
   };
 
   const handleDspSelect = (employee: Employee) => {
+    console.log("employee", employee);
     setFormData(prev => ({
       ...prev,
       assignedDsp: employee.fullName,
-      assignedDspId: employee.uid || employee.id,
+      assignedDspId: employee.id,
       billingRate: "", // Billing rate would come from a different source
     }));
     setShowDspDropdown(false);
@@ -574,7 +575,7 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
                   <button
                     key={notesType}
                     onClick={() => {
-                      setFormData(prev => ({ ...prev, notesType }));
+                      setFormData(prev => ({ ...prev, notesType: notesType.toLowerCase().replace(/ /g, "-") }));
                       setShowNotesTypeDropdown(false);
                     }}
                     className="w-full px-4 py-3 text-left text-[14px] font-normal text-[#10141a] hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer"

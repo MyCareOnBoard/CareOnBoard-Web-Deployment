@@ -12,6 +12,7 @@ import ScheduleSuccessModal from "./components/ScheduleSuccessModal";
 import ScheduleSavedModal from "./components/ScheduleSavedModal";
 import { seedClients } from "@/lib/api/clients";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // Sample data for pending approvals
 const samplePendingApprovals = [
@@ -58,6 +59,15 @@ const getStatusInfo = (status: ShiftStatus) => {
     default:
       return { label: status, color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
   }
+};
+
+const getInitialsFromName = (name: string) => {
+  const parts = name.split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  const first = parts[0].charAt(0);
+  const last = parts[parts.length - 1].charAt(0);
+  return `${first}${last}`.toUpperCase();
 };
 
 export default function SchedulingPage() {
@@ -219,6 +229,7 @@ export default function SchedulingPage() {
     if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
       // Create shifts for each day in the date range
       const dateRange = eachDayOfIntervalDateFns({ start: data.startDate, end: data.endDate });
+      console.log("dateRange", dateRange);
       dateRange.forEach((date) => {
         requests.push({
           ...baseShiftData,
@@ -473,7 +484,8 @@ export default function SchedulingPage() {
                 employeeId: data.assignedDspId,
                 description: "",
                 metadata: {
-                  individual: clientName,
+                  clientId: data.clientId,
+                  client: clientName,
                   serviceYear: shiftDate.getFullYear(),
                   serviceCode: data.serviceCode || "",
                   ISPOutcome: data.ispOutcome || "",
@@ -992,21 +1004,22 @@ export default function SchedulingPage() {
                 return (
                   <div
                     key={shift.id}
-                    className="flex items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
+                    className="flex flex-wrap items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
                   >
                     {/* Client Info */}
-                    <div className="flex items-center gap-4">
-                      <div className="w-[52.5px] h-[60px] rounded-lg bg-[#e0e0e0] overflow-hidden flex-shrink-0">
-                        {shift.client?.profileImage ? (
-                          <img 
-                            src={shift.client.profileImage} 
+                    <div className="flex items-center gap-4 w-[256px]">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                        {shift.client?.profileImage && (
+                          <AvatarImage
+                            src={shift.client.profileImage}
                             alt={clientName}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover aspect-auto"
                           />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
                         )}
-                      </div>
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                          {getInitialsFromName(clientName)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[16px] font-semibold leading-[1.6] text-black">
                           {clientName}
@@ -1018,18 +1031,19 @@ export default function SchedulingPage() {
                     </div>
 
                     {/* DSP/Employee Info */}
-                    <div className="flex items-center gap-4">
-                      <div className="w-[52.5px] h-[60px] rounded-lg bg-[#e0e0e0] overflow-hidden flex-shrink-0">
-                        {shift.employee?.profilePicture ? (
-                          <img 
-                            src={shift.employee.profilePicture} 
+                    <div className="flex items-center gap-4 w-[256px]">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                        {shift.employee?.profilePicture && (
+                          <AvatarImage
+                            src={shift.employee.profilePicture}
                             alt={employeeName}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover aspect-auto"
                           />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400" />
                         )}
-                      </div>
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                          {getInitialsFromName(employeeName)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[16px] font-semibold leading-[1.6] text-black">
                           {employeeName}
@@ -1041,10 +1055,10 @@ export default function SchedulingPage() {
                     </div>
 
                     {/* Status & Times */}
-                    <div className="flex items-center gap-16 flex-1">
+                    <div className="flex items-center gap-16 flex-1 w-[256px]">
                       {/* Status Badge */}
                       <div 
-                        className="rounded-full px-2.5 py-2.5"
+                        className="rounded-full min-w-[54px] min-h-[28px] flex items-center justify-center gap-[4px] px-2.5"
                         style={{ 
                           backgroundColor: statusInfo.bgColor,
                           border: `1px solid ${statusInfo.color}`
@@ -1059,14 +1073,14 @@ export default function SchedulingPage() {
                       </div>
 
                       {/* Clocked In */}
-                      <div className="text-[14px] font-medium leading-[1.4]">
-                        <span className="text-[#808081]">Clocked In </span>
+                      <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
+                        <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
                         <span className="text-[#10141a]">{formatTime(shift.clockedInAt || shift.startTime)}</span>
                       </div>
 
                       {/* Clocked Out */}
-                      <div className="text-[14px] font-medium leading-[1.4]">
-                        <span className="text-[#808081]">Clocked Out </span>
+                      <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
+                        <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
                         <span className="text-[#10141a]">{formatTime(shift.clockedOutAt || shift.endTime)}</span>
                       </div>
                     </div>
