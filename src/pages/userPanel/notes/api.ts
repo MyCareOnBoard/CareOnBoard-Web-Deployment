@@ -14,7 +14,7 @@ export const userPanelNotesApi = createApi({
   endpoints: (builder) => ({
     getAllActivityLogs: builder.query<GetActivityLogsResponse[], void>({
       query: () => ({
-        url: `/employees/employee/activity-logs`,
+        url: `/employees/activity-logs`,
         method: "GET",
         requiresAuth: true
       }),
@@ -22,7 +22,7 @@ export const userPanelNotesApi = createApi({
     }),
     getSingleActivityLog: builder.query<GetActivityLogResponse, string>({
       query: (activityLog) => ({
-        url: `/employees/employee/activity-logs/${activityLog}`,
+        url: `/employees/activity-logs/${activityLog}`,
         method: "GET",
         requiresAuth: true
       }),
@@ -30,7 +30,7 @@ export const userPanelNotesApi = createApi({
     }),
     createOrUpdateActivityLog: builder.mutation<{ data: GetActivityLogResponse }, { activityLog: string, data: CreateActivityLogPayload }>({
       query: ({activityLog, data}) => ({
-        url: `/employees/employee/activity-logs/${activityLog}/notes`,
+        url: `/employees/activity-logs/${activityLog}/notes`,
         method: "PUT",
         requiresAuth: true,
         data
@@ -39,7 +39,7 @@ export const userPanelNotesApi = createApi({
     }),
     submitActivityLogNotes: builder.mutation<void, { activityLog: string, logNoteIds: string[] }>({
       query: ({activityLog, logNoteIds}) => ({
-        url: `/employees/employee/activity-logs/${activityLog}/notes/submit`,
+        url: `/employees/activity-logs/${activityLog}/notes/submit`,
         method: "POST",
         requiresAuth: true,
         data: { logNoteIds }
@@ -48,7 +48,7 @@ export const userPanelNotesApi = createApi({
     }),
     seedActivityLogs: builder.mutation<void, Record<string, any>[]>({
       query: (data) => ({
-        url: `/employees/employee/activity-logs/seed`,
+        url: `/employees/activity-logs/seed`,
         method: "POST",
         requiresAuth: true,
         data

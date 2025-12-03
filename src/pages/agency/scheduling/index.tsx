@@ -466,6 +466,8 @@ export default function SchedulingPage() {
                 ? new Date(finalShiftRequests[index].date) 
                 : new Date();
               const clientName = data.client || "Unknown Client";
+
+              console.log("data", data);
               
               return createEmployeeActivityLog({
                 activityType: data.notesType,
