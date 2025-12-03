@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, ChevronLeft, ChevronRight, Search, Pencil, X, Calendar, Loader2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Search, Pencil, X, Calendar, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { listShifts, Shift, deleteShift } from "@/lib/api/shift-management";
+import { listShifts, Shift, deleteShift } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
-import AddScheduleModal from "../components/AddScheduleModal";
+import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const getInitialsFromName = (name: string) => {
   const parts = name.split(" ").filter(Boolean);
@@ -32,6 +40,18 @@ export default function ShiftsListPage() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddScheduleModal, setShowAddScheduleModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [shiftToCancel, setShiftToCancel] = useState<Shift | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [showCancelledModal, setShowCancelledModal] = useState(false);
+  const [cancelledShiftInfo, setCancelledShiftInfo] = useState<{
+    clientName: string;
+    dspName: string;
+    duration: string;
+    date: string;
+  } | null>(null);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [editFormData, setEditFormData] = useState<ScheduleFormData | null>(null);
   
   const itemsPerPage = 7;
 
@@ -110,29 +130,90 @@ export default function ShiftsListPage() {
     currentPage * itemsPerPage
   );
 
-  const handleEdit = (shiftId: string) => {
-    toast({
-      title: "Edit",
-      description: `Editing shift ${shiftId}`,
-    });
-    // TODO: Implement edit functionality
+  const handleEdit = (shift: Shift) => {
+    const clientName = shift.client
+      ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
+      : "Unknown Client";
+    const employeeName = shift.employee?.fullName || "";
+    const anyShift = shift as any;
+
+    const formData: ScheduleFormData = {
+      client: clientName,
+      clientId: shift.client?.id || "",
+      clientAddress: shift.location || "",
+      assignedDsp: employeeName,
+      assignedDspId: (shift.employee as any)?.id || "",
+      billingRate: "",
+      service: shift.service || "General Practitioners",
+      serviceCode: shift.serviceCode || "183535",
+      notesType: anyShift.notesType || "",
+      schedulingType: (shift.schedulingType as "one-time" | "recurring" | "") || "one-time",
+      date: shift.date ? new Date(shift.date) : null,
+      startDate: null,
+      endDate: null,
+      clockInTime: shift.startTime,
+      clockOutTime: shift.endTime || "",
+      ispOutcome: shift.ispOutcome || "",
+      planOfCare: null,
+    } as ScheduleFormData;
+
+    (formData as any).shiftId = shift.id;
+
+    setEditFormData(formData);
+    setModalMode("edit");
+    setShowAddScheduleModal(true);
   };
 
-  const handleCancel = async (shiftId: string) => {
+  const confirmCancelShift = async (shiftId: string) => {
     try {
+      setIsCancelling(true);
+
+      // Capture info for success modal before we remove the shift
+      if (shiftToCancel) {
+        const clientName = shiftToCancel.client
+          ? `${shiftToCancel.client.firstName || ""} ${shiftToCancel.client.lastName || ""}`.trim() || "Unknown Client"
+          : "Unknown Client";
+        const dspName = shiftToCancel.employee?.fullName || "Unknown DSP";
+        const duration = calculateDuration(
+          shiftToCancel.date,
+          shiftToCancel.startTime,
+          shiftToCancel.endTime
+        );
+        const dateLabel = shiftToCancel.date
+          ? format(new Date(shiftToCancel.date), "d MMMM")
+          : format(new Date(), "d MMMM");
+
+        setCancelledShiftInfo({
+          clientName,
+          dspName,
+          duration,
+          date: dateLabel,
+        });
+      }
+
       await deleteShift(shiftId);
       setShifts(prev => prev.filter(s => s.id !== shiftId));
       toast({
         title: "Cancelled",
         description: "Shift has been cancelled successfully.",
       });
+      setShowCancelledModal(true);
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to cancel shift. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsCancelling(false);
+      setShowCancelModal(false);
+      setShiftToCancel(null);
     }
+  };
+
+  const handleCancel = (shift: Shift) => {
+    setShiftToCancel(shift);
+    setShowCancelModal(true);
   };
 
   const handleDateSelect = (date: Date) => {
@@ -197,7 +278,11 @@ export default function ShiftsListPage() {
           Scheduling
         </h1>
         <Button
-          onClick={() => setShowAddScheduleModal(true)}
+          onClick={() => {
+            setModalMode("create");
+            setEditFormData(null);
+            setShowAddScheduleModal(true);
+          }}
           className="flex items-center gap-3 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px]"
         >
           <Plus className="w-5 h-5" />
@@ -407,7 +492,7 @@ export default function ShiftsListPage() {
 
                       {/* Duration Badge */}
                       <div className="bg-[rgba(14,175,82,0.05)] border border-[#0eaf52] rounded-full min-w-[59px] min-h-[28px] flex items-center justify-center gap-[4px] px-2.5">
-                        <span className="text-[12px] font-semibold text-[#0eaf52]">
+                        <span className="text-[12px] font-semibold text-[#0eaf52] whitespace-nowrap">
                           {duration}
                         </span>
                       </div>
@@ -417,7 +502,7 @@ export default function ShiftsListPage() {
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
-                          onClick={() => handleEdit(apiShift.id)}
+                          onClick={() => handleEdit(apiShift)}
                           className="bg-[#b2b2b3] hover:bg-[#9a9a9b] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
                         >
                           <Pencil className="w-4 h-4" />
@@ -425,7 +510,7 @@ export default function ShiftsListPage() {
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => handleCancel(apiShift.id)}
+                          onClick={() => handleCancel(apiShift)}
                           className="bg-[#d53411] hover:bg-[#c02e0f] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
                         >
                           <X className="w-3 h-3" />
@@ -469,9 +554,104 @@ export default function ShiftsListPage() {
     {/* Add Schedule Modal */}
     <AddScheduleModal
       isOpen={showAddScheduleModal}
-      onClose={() => setShowAddScheduleModal(false)}
+      onClose={() => {
+        setShowAddScheduleModal(false);
+        setModalMode("create");
+        setEditFormData(null);
+      }}
       onShiftsUpdated={(updatedShifts) => setShifts(updatedShifts)}
+      mode={modalMode}
+      editData={editFormData || undefined}
     />
+
+    {/* Cancel Shift Confirmation Dialog */}
+    <Dialog
+      open={showCancelModal && !!shiftToCancel}
+      onOpenChange={(open) => {
+        if (isCancelling) return;
+        setShowCancelModal(open);
+        if (!open) {
+          setShiftToCancel(null);
+        }
+      }}
+    >
+      <DialogContent showCloseButton={false} className="items-stretch text-left max-w-[400px]">
+        {shiftToCancel && (
+          <>
+            <DialogHeader className="items-start text-left gap-2">
+              <DialogTitle className="text-[20px] font-semibold leading-normal text-[#10141a]">
+                Cancel shift?
+              </DialogTitle>
+              <DialogDescription className="text-[14px] leading-[1.6] text-[#808081]">
+                Are you sure you want to cancel this shift for{" "}
+                <span className="font-semibold text-[#10141a]">
+                  {shiftToCancel.client
+                    ? `${shiftToCancel.client.firstName || ""} ${shiftToCancel.client.lastName || ""}`.trim() || "Unknown Client"
+                    : "Unknown Client"}
+                </span>
+                ? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex justify-end gap-3 mt-2">
+              <Button
+                variant="outline"
+                disabled={isCancelling}
+                onClick={() => setShowCancelModal(false)}
+                className="rounded-full px-4 py-2 h-auto text-[14px]"
+              >
+                Keep Shift
+              </Button>
+              <Button
+                disabled={isCancelling}
+                onClick={() => confirmCancelShift(shiftToCancel.id)}
+                className="bg-[#d53411] hover:bg-[#c02e0f] text-white rounded-full px-4 py-2 h-auto text-[14px] font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCancelling && <Loader2 className="w-4 h-4 animate-spin" />}
+                Cancel Shift
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+
+    {/* Shift Cancelled Success Dialog */}
+    <Dialog
+      open={showCancelledModal && !!cancelledShiftInfo}
+      onOpenChange={(open) => {
+        setShowCancelledModal(open);
+        if (!open) {
+          setCancelledShiftInfo(null);
+        }
+      }}
+    >
+      <DialogContent showCloseButton={false} className="max-w-[438px]">
+        {cancelledShiftInfo && (
+          <>
+            {/* Icon */}
+            <div className="relative">
+              <div className="w-[100px] h-[100px] rounded-full bg-[#fff0ec] flex items-center justify-center">
+                <div className="w-[72px] h-[72px] rounded-full bg-[#d53411] flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-white" strokeWidth={3} />
+                </div>
+              </div>
+            </div>
+
+            {/* Header & Description */}
+            <DialogHeader>
+              <DialogTitle className="text-[32px] font-semibold leading-normal text-[#10141a]">
+                Cancelled
+              </DialogTitle>
+              <DialogDescription className="text-[16px] font-medium leading-[1.6] text-[#808081] max-w-[304px] mx-auto">
+                You have cancelled a shift between {cancelledShiftInfo.clientName} (Client) &{" "}
+                {cancelledShiftInfo.dspName} (DSP) for {cancelledShiftInfo.duration} on{" "}
+                {cancelledShiftInfo.date}
+              </DialogDescription>
+            </DialogHeader>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

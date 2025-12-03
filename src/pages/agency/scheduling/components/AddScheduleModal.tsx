@@ -6,7 +6,7 @@ import { searchClients, Client } from "@/lib/api/clients";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
-import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest } from "@/lib/api/shift-management";
+import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest } from "@/lib/api/shifts";
 import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
@@ -32,6 +32,7 @@ interface FormErrors {
 }
 
 export interface ScheduleFormData {
+  shiftId?: string;
   client: string;
   clientId: string;
   clientAddress: string;
@@ -139,6 +140,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const [savedShiftInfo, setSavedShiftInfo] = useState<{
     clientName: string;
     dspName: string;
+    date: string;
+  } | null>(null);
+  const [showUpdatedModal, setShowUpdatedModal] = useState(false);
+  const [updatedShiftInfo, setUpdatedShiftInfo] = useState<{
+    clientName: string;
+    dspName: string;
+    duration: string;
     date: string;
   } | null>(null);
 
@@ -599,6 +607,54 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         return format(new Date(), "d MMMM");
       };
 
+      // Edit existing shift
+      if (mode === "edit" && formData.shiftId) {
+        const updatePayload: any = {
+          location: formData.clientAddress,
+          startTime: formData.clockInTime,
+          endTime: formData.clockOutTime,
+          notesType: formData.notesType || undefined,
+          service: formData.service,
+          serviceCode: formData.serviceCode,
+          schedulingType: formData.schedulingType,
+          ispOutcome: formData.ispOutcome,
+          assignedDsp: formData.assignedDsp,
+          employeeId: formData.assignedDspId || undefined,
+          clientId: formData.clientId || undefined,
+        };
+
+        if (formData.date) {
+          updatePayload.date = format(formData.date, "yyyy-MM-dd");
+        }
+
+        await updateShift(formData.shiftId, updatePayload);
+
+        setUpdatedShiftInfo({
+          clientName: formData.client || "Client",
+          dspName: formData.assignedDsp || "DSP",
+          duration: calculateDuration(),
+          date: getDisplayDate(),
+        });
+        setShowUpdatedModal(true);
+
+        const response = await listShifts({
+          limit: 100,
+          agencyId: profile?.data?.id || "",
+          client: true,
+          employee: true,
+        });
+        onShiftsUpdated?.(response.shifts || []);
+
+        toast({
+          title: "Changes Saved",
+          description: "Shift has been updated successfully.",
+        });
+
+        onClose();
+        return;
+      }
+
+      // Create new shifts (existing behaviour)
       const shiftRequests = buildShiftRequests(formData);
 
       if (shiftRequests.length === 0) {
@@ -1378,30 +1434,49 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         </div>
 
         {/* Action Buttons - Fixed */}
-        <div className="flex gap-3 p-5 pt-0 flex-shrink-0">
-          <Button
-            onClick={handleSaveDraft}
-            disabled={isSubmitting}
-            variant="outline"
-            className="flex-1 border-[#2b82ff] text-[#2b82ff] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Save and Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !isFormValid}
-            className="flex-1 bg-[#2b82ff] hover:bg-[#1a6fe0] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                {mode === "edit" ? "Updating..." : "Scheduling..."}
-              </>
-            ) : (
-              mode === "edit" ? "Update" : "Schedule"
-            )}
-          </Button>
-        </div>
+        {mode === "edit" ? (
+          <div className="flex gap-3 p-5 pt-0 flex-shrink-0">
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || !isFormValid}
+              className="flex-1 bg-[#2b82ff] hover:bg-[#1a6fe0] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-3 p-5 pt-0 flex-shrink-0">
+            <Button
+              onClick={handleSaveDraft}
+              disabled={isSubmitting}
+              variant="outline"
+              className="flex-1 border-[#2b82ff] text-[#2b82ff] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save and Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || !isFormValid}
+              className="flex-1 bg-[#2b82ff] hover:bg-[#1a6fe0] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Scheduling...
+                </>
+              ) : (
+                "Schedule"
+              )}
+            </Button>
+          </div>
+        )}
       </div>
       </div>
     )}
@@ -1432,6 +1507,21 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         clientName={savedShiftInfo.clientName}
         dspName={savedShiftInfo.dspName}
         date={savedShiftInfo.date}
+      />
+    )}
+
+    {/* Schedule Updated Modal */}
+    {updatedShiftInfo && (
+      <ScheduleSuccessModal
+        isOpen={showUpdatedModal}
+        onClose={() => {
+          setShowUpdatedModal(false);
+          setUpdatedShiftInfo(null);
+        }}
+        clientName={updatedShiftInfo.clientName}
+        dspName={updatedShiftInfo.dspName}
+        duration={updatedShiftInfo.duration}
+        date={updatedShiftInfo.date}
       />
     )}
     </>

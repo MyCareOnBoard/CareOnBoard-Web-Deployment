@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Plus, ChevronLeft, ChevronRight, Check, X, ArrowUpRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { listShifts, Shift, ShiftStatus, deleteShift } from "@/lib/api/shift-management";
+import { listShifts, Shift, ShiftStatus, deleteShift } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";

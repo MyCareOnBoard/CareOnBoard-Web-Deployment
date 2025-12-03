@@ -1,8 +1,8 @@
-import {createApi} from "@reduxjs/toolkit/query/react";
-import {customBaseQuery} from "@/lib/baseQuery";
-import {ClientStatsResponse} from "@/lib/api/clients";
-import {EmployeeStatsResponse} from "@/lib/api/employees";
-import {ShiftStatsResponse} from "@/lib/api/shift-management";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { customBaseQuery } from "@/lib/baseQuery";
+import { ClientStatsResponse } from "@/lib/api/clients";
+import { EmployeeStatsResponse } from "@/lib/api/employees";
+import { ShiftStatsResponse } from "@/lib/api/shifts";
 
 export const agencyDashboardApi = createApi({
   reducerPath: "agencyDashboardApi",
@@ -16,9 +16,9 @@ export const agencyDashboardApi = createApi({
         requiresAuth: true
       })
     }),
-    getShiftStats: builder.query<ShiftStatsResponse, {agencyId: string, range?: string, date?: string}>({
-      query: ({agencyId, range = 'lastWeek', date}) => {
-        const params = new URLSearchParams({agencyId, range});
+    getShiftStats: builder.query<ShiftStatsResponse, { agencyId: string, range?: string, date?: string }>({
+      query: ({ agencyId, range = 'lastWeek', date }) => {
+        const params = new URLSearchParams({ agencyId, range });
         if (date) params.append('date', date);
         return {
           url: `/shifts/stats?${params.toString()}`,

@@ -12,7 +12,7 @@ import type { RootState } from "@/store/redux/store";
 import { getUserProfile, UserProfile } from "@/lib/api/users";
 import { Routes } from "@/routes/constants";
 import DigitalSignatureModal from "@/pages/applicant/application/components/DigitalSignature";
-import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift } from "@/lib/api/shift-management";
+import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift } from "@/lib/api/shifts";
 import { format, parse } from "date-fns";
 import { useSignDocumentMutation, useCheckSignatureStatusQuery } from "@/pages/applicant/application/api";
 import { searchClients, Client } from "@/lib/api/clients";

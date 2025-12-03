@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Shift, ShiftStatus, ShiftActionStatus } from "@/lib/api/shift-management";
+import { Shift, ShiftStatus, ShiftActionStatus } from "@/lib/api/shifts";
 // ShiftSectionProps is defined locally below
 import { format } from "date-fns";
 import { ClockOutModal } from "./ClockOutModal";
@@ -16,7 +16,7 @@ import {
   clockOut as apiClockOut,
   getAvailableShifts,
   getPreviousShifts,
-} from "@/lib/api/shift-management";
+} from "@/lib/api/shifts";
 import { toast } from "sonner";
 import { useAuth } from "@/utils/auth/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
