@@ -5,12 +5,17 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { searchClients, Client } from "@/lib/api/clients";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
+import { useToast } from "@/hooks/use-toast";
+import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest } from "@/lib/api/shift-management";
+import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
+import { createEmployeeActivityLog } from "@/lib/api/employees";
+import ScheduleSuccessModal from "./ScheduleSuccessModal";
+import ScheduleSavedModal from "./ScheduleSavedModal";
 
 interface AddScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSchedule: (data: ScheduleFormData) => Promise<boolean>; // Returns true if successful
-  onSave?: (data: ScheduleFormData) => void;
+  onShiftsUpdated?: (shifts: Shift[]) => void;
   editData?: ScheduleFormData | null; // For edit mode
   mode?: "create" | "edit";
 }
@@ -92,8 +97,9 @@ const initialFormData: ScheduleFormData = {
   planOfCare: null,
 };
 
-export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, editData, mode = "create" }: AddScheduleModalProps) {
+export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, editData, mode = "create" }: AddScheduleModalProps) {
   const { user, profile } = useAuth();
+  const { toast } = useToast();
   const [formData, setFormData] = useState<ScheduleFormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -121,6 +127,21 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Success / saved modals state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showSavedModal, setShowSavedModal] = useState(false);
+  const [scheduledShiftInfo, setScheduledShiftInfo] = useState<{
+    clientName: string;
+    dspName: string;
+    duration: string;
+    date: string;
+  } | null>(null);
+  const [savedShiftInfo, setSavedShiftInfo] = useState<{
+    clientName: string;
+    dspName: string;
+    date: string;
+  } | null>(null);
+
   // Reset form when modal opens/closes or when editData changes
   useEffect(() => {
     if (isOpen) {
@@ -143,6 +164,53 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
       if (dspSearchTimeoutRef.current) clearTimeout(dspSearchTimeoutRef.current);
     };
   }, []);
+
+  /**
+   * Build shift requests from form data
+   * Handles both one-time and recurring schedules
+   */
+  const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
+    if (!profile?.data?.id || !data.assignedDspId) return [];
+
+    const requests: CreateShiftRequest[] = [];
+    const baseShiftData = {
+      employeeId: data.assignedDspId,
+      agencyId: profile?.data?.id || "",
+      location: data.clientAddress || "",
+      startTime: data.clockInTime,
+      endTime: data.clockOutTime,
+      clientId: data.clientId,
+      notesType: data.notesType || undefined,
+      service: data.service,
+      serviceCode: data.serviceCode,
+      schedulingType: data.schedulingType,
+      ispOutcome: data.ispOutcome || undefined,
+      assignedDsp: data.assignedDsp,
+    };
+
+    if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
+      const dateRange = eachDayOfIntervalDateFns({ start: data.startDate, end: data.endDate });
+      dateRange.forEach((date) => {
+        requests.push({
+          ...baseShiftData,
+          date: format(date, "yyyy-MM-dd"),
+          status: ShiftStatus.PENDING,
+          type: ShiftType.AUTOMATIC,
+          submissionStatus: SubmissionStatus.DRAFT,
+        });
+      });
+    } else if (data.date) {
+      requests.push({
+        ...baseShiftData,
+        date: format(data.date, "yyyy-MM-dd"),
+        status: ShiftStatus.PENDING,
+        type: ShiftType.AUTOMATIC,
+        submissionStatus: SubmissionStatus.DRAFT,
+      });
+    }
+
+    return requests;
+  };
 
   // Search clients with debouncing
   const handleClientSearch = useCallback(async (query: string) => {
@@ -357,7 +425,138 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
     return true;
   }, [formData]);
 
+  // Handle saving schedule as draft
+  const handleSaveDraft = async () => {
+    if (!profile?.data?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "User not authenticated. Please log in and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate form before saving
+    if (!validateForm()) {
+      return;
+    }
+
+    // Get the date for display
+    const getDisplayDate = () => {
+      if (formData.schedulingType === "recurring" && formData.startDate && formData.endDate) {
+        return `${format(formData.startDate, "d MMMM")} - ${format(formData.endDate, "d MMMM")}`;
+      }
+      if (formData.date) {
+        return format(formData.date, "d MMMM");
+      }
+      return format(new Date(), "d MMMM");
+    };
+
+    setIsSubmitting(true);
+    try {
+      const existingDraftsResponse = await listShifts({
+        agencyId: profile?.data?.id || "",
+        type: ShiftType.AUTOMATIC,
+        submissionStatus: SubmissionStatus.DRAFT,
+        limit: 100,
+      });
+
+      const existingDrafts = existingDraftsResponse.shifts || [];
+
+      const shiftRequests = buildShiftRequests(formData);
+
+      if (shiftRequests.length === 0) {
+        toast({
+          title: "No Valid Entries",
+          description: "Please fill in all required fields before saving.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const savePromises = shiftRequests.map(async (request) => {
+        const existingShift = existingDrafts.find((draft) => draft.date === request.date);
+
+        if (existingShift) {
+          return updateShift(existingShift.id, {
+            location: request.location,
+            startTime: request.startTime,
+            endTime: request.endTime,
+            notesType: request.notesType,
+            service: request.service,
+            serviceCode: request.serviceCode,
+            schedulingType: request.schedulingType,
+            ispOutcome: request.ispOutcome,
+            assignedDsp: request.assignedDsp,
+            status: request.status,
+            submissionStatus: request.submissionStatus,
+            type: request.type,
+          });
+        }
+
+        return createShift(request);
+      });
+
+      const results = await Promise.allSettled(savePromises);
+
+      const failures = results.filter((r) => r.status === "rejected");
+      const successes = results.filter((r) => r.status === "fulfilled");
+
+      if (failures.length > 0) {
+        if (successes.length > 0) {
+          toast({
+            title: "Partial Save",
+            description: `Saved ${successes.length} of ${shiftRequests.length} schedule(s) as drafts.`,
+          });
+        } else {
+          toast({
+            title: "Save Failed",
+            description: "Failed to save schedule drafts. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      if (successes.length > 0) {
+        setSavedShiftInfo({
+          clientName: formData.client || "Client",
+          dspName: formData.assignedDsp || "DSP",
+          date: getDisplayDate(),
+        });
+        setShowSavedModal(true);
+
+        const response = await listShifts({
+          limit: 100,
+          agencyId: profile?.data?.id || "",
+          client: true,
+          employee: true,
+        });
+        onShiftsUpdated?.(response.shifts || []);
+      }
+    } catch (error: any) {
+      console.error("Failed to save draft schedule:", error);
+      toast({
+        title: "Save Failed",
+        description: error?.response?.data?.error || "Failed to save draft. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle scheduling (submitting) shifts
   const handleSubmit = async () => {
+    if (!profile?.data?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "User not authenticated. Please log in and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validate form
     if (!validateForm()) {
       return;
@@ -365,31 +564,171 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
 
     setIsSubmitting(true);
     try {
-      const success = await onSchedule(formData);
-      if (success) {
+      const calculateDuration = () => {
+        if (!formData.clockInTime || !formData.clockOutTime) return "2 hours";
+        try {
+          const parseTime = (time: string) => {
+            const match = time.match(/(\d+)[.:](\d+):?(AM|PM)/i);
+            if (!match) return 0;
+            let hours = parseInt(match[1], 10);
+            const minutes = parseInt(match[2], 10);
+            const period = match[3].toUpperCase();
+            if (period === "PM" && hours !== 12) hours += 12;
+            if (period === "AM" && hours === 12) hours = 0;
+            return hours * 60 + minutes;
+          };
+          const startMinutes = parseTime(formData.clockInTime);
+          const endMinutes = parseTime(formData.clockOutTime);
+          const diffMinutes = endMinutes - startMinutes;
+          const hours = Math.floor(diffMinutes / 60);
+          const mins = diffMinutes % 60;
+          if (mins > 0) return `${hours} hours ${mins} minutes`;
+          return `${hours} hours`;
+        } catch {
+          return "2 hours";
+        }
+      };
+
+      const getDisplayDate = () => {
+        if (formData.schedulingType === "recurring" && formData.startDate && formData.endDate) {
+          return `${format(formData.startDate, "d MMMM")} - ${format(formData.endDate, "d MMMM")}`;
+        }
+        if (formData.date) {
+          return format(formData.date, "d MMMM");
+        }
+        return format(new Date(), "d MMMM");
+      };
+
+      const shiftRequests = buildShiftRequests(formData);
+
+      if (shiftRequests.length === 0) {
+        toast({
+          title: "No Valid Entries",
+          description: "Please fill in all required fields before scheduling.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const finalShiftRequests = shiftRequests.map((request) => ({
+        ...request,
+        status: ShiftStatus.PENDING,
+        submissionStatus: SubmissionStatus.SUBMITTED,
+        type: ShiftType.AUTOMATIC,
+      }));
+
+      const results = await Promise.allSettled(
+        finalShiftRequests.map((request) => createShift(request))
+      );
+
+      const activityLogPromises = results
+        .map((result, index) => {
+          if (result.status === "fulfilled" && formData.notesType && formData.assignedDspId) {
+            const createdShift = result.value;
+            const shiftId = createdShift.shift?.id;
+            if (shiftId) {
+              const shiftDate = finalShiftRequests[index].date
+                ? new Date(finalShiftRequests[index].date)
+                : new Date();
+              const clientName = formData.client || "Unknown Client";
+
+              return createEmployeeActivityLog({
+                activityType: formData.notesType,
+                shiftId: shiftId,
+                employeeId: formData.assignedDspId,
+                description: "",
+                metadata: {
+                  clientId: formData.clientId,
+                  client: clientName,
+                  serviceYear: shiftDate.getFullYear(),
+                  serviceCode: formData.serviceCode || "",
+                  ISPOutcome: formData.ispOutcome || "",
+                  strategies: [],
+                },
+              }).catch((error) => {
+                console.error("Failed to create activity log for shift:", shiftId, error);
+                return null;
+              });
+            }
+          }
+          return null;
+        })
+        .filter((promise) => promise !== null);
+
+      if (activityLogPromises.length > 0) {
+        await Promise.allSettled(activityLogPromises as Promise<unknown>[]);
+      }
+
+      const failures = results.filter((r) => r.status === "rejected");
+      const successes = results.filter((r) => r.status === "fulfilled");
+
+      if (failures.length > 0) {
+        console.error("Failed to schedule some shifts:", failures);
+        if (successes.length > 0) {
+          toast({
+            title: "Partial Submission",
+            description: `Successfully scheduled ${successes.length} of ${finalShiftRequests.length} shifts. ${failures.length} failed.`,
+          });
+        } else {
+          toast({
+            title: "Scheduling Failed",
+            description: "Failed to schedule shifts. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      if (successes.length > 0) {
+        setScheduledShiftInfo({
+          clientName: formData.client || "Client",
+          dspName: formData.assignedDsp || "DSP",
+          duration: calculateDuration(),
+          date: getDisplayDate(),
+        });
+        setShowSuccessModal(true);
+
+        const response = await listShifts({
+          limit: 100,
+          agencyId: profile?.data?.id || "",
+          client: true,
+          employee: true,
+        });
+        onShiftsUpdated?.(response.shifts || []);
+
+        toast({
+          title: "Schedule Created",
+          description: `Successfully scheduled ${successes.length} shift(s).`,
+        });
+
         onClose();
       }
-    } catch (error) {
-      console.error("Failed to schedule:", error);
+    } catch (error: any) {
+      console.error("Failed to create schedule:", error);
+      toast({
+        title: "Scheduling Failed",
+        description: error?.response?.data?.error || "Failed to create schedule. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end pr-8">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      {/* Modal */}
-      <div 
-        className="relative bg-white rounded-[30px] border border-[rgba(255,255,255,0.3)] w-full max-w-[500px] max-h-[90vh] shadow-xl flex flex-col"
-      >
+    <>
+    {isOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-end pr-8">
+        {/* Backdrop */}
+        <div 
+          className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+          onClick={onClose}
+        />
+        
+        {/* Modal */}
+        <div 
+          className="relative bg-white rounded-[30px] border border-[rgba(255,255,255,0.3)] w-full max-w-[500px] max-h-[90vh] shadow-xl flex flex-col"
+        >
         {/* Title Bar - Fixed */}
         <div className="flex items-center justify-between p-5 pb-0 flex-shrink-0">
           <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
@@ -1041,12 +1380,7 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
         {/* Action Buttons - Fixed */}
         <div className="flex gap-3 p-5 pt-0 flex-shrink-0">
           <Button
-            onClick={() => {
-              if (onSave) {
-                onSave(formData);
-              }
-              onClose();
-            }}
+            onClick={handleSaveDraft}
             disabled={isSubmitting}
             variant="outline"
             className="flex-1 border-[#2b82ff] text-[#2b82ff] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1069,6 +1403,37 @@ export default function AddScheduleModal({ isOpen, onClose, onSchedule, onSave, 
           </Button>
         </div>
       </div>
-    </div>
+      </div>
+    )}
+
+    {/* Schedule Success Modal */}
+    {scheduledShiftInfo && (
+      <ScheduleSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          setScheduledShiftInfo(null);
+        }}
+        clientName={scheduledShiftInfo.clientName}
+        dspName={scheduledShiftInfo.dspName}
+        duration={scheduledShiftInfo.duration}
+        date={scheduledShiftInfo.date}
+      />
+    )}
+
+    {/* Schedule Saved Modal */}
+    {savedShiftInfo && (
+      <ScheduleSavedModal
+        isOpen={showSavedModal}
+        onClose={() => {
+          setShowSavedModal(false);
+          setSavedShiftInfo(null);
+        }}
+        clientName={savedShiftInfo.clientName}
+        dspName={savedShiftInfo.dspName}
+        date={savedShiftInfo.date}
+      />
+    )}
+    </>
   );
 }

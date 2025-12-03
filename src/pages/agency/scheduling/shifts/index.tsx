@@ -4,11 +4,10 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { listShifts, Shift, deleteShift, createShift, ShiftStatus, ShiftType, SubmissionStatus } from "@/lib/api/shift-management";
+import { listShifts, Shift, deleteShift } from "@/lib/api/shift-management";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
-import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
-import { createEmployeeActivityLog } from "@/lib/api/employees";
+import AddScheduleModal from "../components/AddScheduleModal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const getInitialsFromName = (name: string) => {
@@ -133,89 +132,6 @@ export default function ShiftsListPage() {
         description: "Failed to cancel shift. Please try again.",
         variant: "destructive",
       });
-    }
-  };
-
-  const handleSchedule = async (data: ScheduleFormData): Promise<boolean> => {
-    if (!profile?.data?.id) {
-      toast({
-        title: "Error",
-        description: "Agency not found.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    try {
-      const shiftData = {
-        employeeId: data.assignedDspId,
-        agencyId: profile.data?.id,
-        date: data.date ? format(data.date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
-        location: data.clientAddress,
-        startTime: data.clockInTime,
-        endTime: data.clockOutTime,
-        status: ShiftStatus.PENDING,
-        type: ShiftType.MANUAL,
-        submissionStatus: SubmissionStatus.SUBMITTED,
-        clientId: data.clientId,
-        notesType: data.notesType || undefined,
-        service: data.service,
-        serviceCode: data.serviceCode,
-        schedulingType: data.schedulingType,
-        ispOutcome: data.ispOutcome || undefined,
-        assignedDsp: data.assignedDsp,
-      };
-
-      const createdShift = await createShift(shiftData);
-      const shiftId = createdShift.shift?.id;
-
-      // Create activity log if notesType is provided
-      if (data.notesType && shiftId && data.assignedDspId) {
-        try {
-          const shiftDate = data.date ? new Date(data.date) : new Date();
-          const clientName = data.client || "Unknown Client";
-          
-          await createEmployeeActivityLog({
-            activityType: data.notesType,
-            shiftId: shiftId,
-            employeeId: data.assignedDspId,
-            description: "",
-            metadata: {
-              individual: clientName,
-              serviceYear: shiftDate.getFullYear(),
-              serviceCode: data.serviceCode || "",
-              ISPOutcome: data.ispOutcome || "",
-              strategies: [],
-            },
-          });
-        } catch (activityLogError) {
-          console.error("Failed to create activity log:", activityLogError);
-          // Don't fail the entire operation if activity log creation fails
-        }
-      }
-
-      toast({
-        title: "Schedule Created",
-        description: "New schedule has been created successfully.",
-      });
-
-      // Refresh shifts list
-      const response = await listShifts({ 
-        limit: 100,
-        agencyId: profile?.data?.id,
-        client: true,
-        employee: true,
-      });
-      setShifts(response.shifts || []);
-      return true;
-    } catch (error) {
-      console.error("Failed to create schedule:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create schedule. Please try again.",
-        variant: "destructive",
-      });
-      return false;
     }
   };
 
@@ -554,7 +470,7 @@ export default function ShiftsListPage() {
     <AddScheduleModal
       isOpen={showAddScheduleModal}
       onClose={() => setShowAddScheduleModal(false)}
-      onSchedule={handleSchedule}
+      onShiftsUpdated={(updatedShifts) => setShifts(updatedShifts)}
     />
     </>
   );
