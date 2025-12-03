@@ -1,7 +1,7 @@
 import type React from "react"
 import {createContext, useContext, useEffect, useState} from "react"
 import {useDispatch, useSelector} from "react-redux"
-import {setUser, setProfile, selectProfile} from "@/utils/auth"
+import {setUser, selectProfile} from "@/utils/auth"
 import type {AppDispatch, RootState} from "@/store/redux/store"
 import {
   loginWithEmail,
@@ -13,8 +13,7 @@ import {
 import type {User} from "../types"
 import {createUser as createBackendUser} from "../api/client"
 import {PageLoader} from "@/components/ui/loader"
-import {UserProfileResponse, UserProfile} from "@/lib/api/users";
-import axiosClient from "@/lib/axios";
+import {UserProfile} from "@/lib/api/users";
 import {auth} from "@/lib/firebase";
 
 interface AuthContextType {
@@ -57,16 +56,6 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
-
-      try {
-        const profile = await axiosClient.get<UserProfileResponse>("/users/profile");
-        if (profile.data.success || profile.data.user) {
-          dispatch(setProfile(profile.data.user))
-        }
-      } catch (error) {
-        console.error('[AuthContext] Error fetching user profile:', error)
-      }
-
       if (reduxUser) {
         setUserState(reduxUser)
         setIsInitialized(true)
