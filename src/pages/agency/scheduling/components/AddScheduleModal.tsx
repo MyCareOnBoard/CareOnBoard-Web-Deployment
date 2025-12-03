@@ -5,6 +5,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { searchClients, Client } from "@/lib/api/clients";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
+import {Routes} from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
 import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest } from "@/lib/api/shifts";
 import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
@@ -69,14 +70,37 @@ const serviceOptions = [
   "Respite Care",
 ];
 
-const notesTypeOptions = [
-  "Community Based Support",
-  "Day Habilitation",
-  "Respite Care",
-  "Personal Care",
-  "Behavioral Support",
-  "Nursing Services",
+const noteTypes: {id: string, title: string}[] = [
+  {
+    id: "community-based",
+    title: "Community Based / Individual Supports",
+  },
+  {
+    id: "community-inclusion",
+    title: "Community Inclusion Services – Activities Log",
+  },
+  {
+    id: "day-habilitation",
+    title: "Day Habilitation Services – Activities Log",
+  },
+  {
+    id: "prevocational-training",
+    title: "Prevocational Training Services – Activities Log",
+  },
+  {
+    id: "supported-employment-intervention",
+    title: "Supported Employment Services – Intervention Plan and Service Log",
+  },
+  {
+    id: "supported-employment-pre",
+    title: "Supported Employment Services – Pre‐Employment Service Log",
+  },
+  {
+    id: "respite-log",
+    title: "Respite Log",
+  },
 ];
+
 
 const initialFormData: ScheduleFormData = {
   client: "",
@@ -959,23 +983,26 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               className="bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 flex items-center gap-3 cursor-pointer"
             >
               <span className="flex-1 text-left text-[14px] font-normal text-black">
-                {formData.notesType || "Select notes type"}
+                {formData.notesType
+                  ? noteTypes.find((elt) => elt.id === formData.notesType)?.title
+                  : "Select notes type"
+                }
               </span>
               <ChevronDown className="w-5 h-5 text-[#10141a]" />
             </button>
             
             {showNotesTypeDropdown && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-[12px] shadow-lg z-10">
-                {notesTypeOptions.map((notesType) => (
+                {noteTypes.map((notesType) => (
                   <button
-                    key={notesType}
+                    key={notesType.id}
                     onClick={() => {
-                      setFormData(prev => ({ ...prev, notesType: notesType.toLowerCase().replace(/ /g, "-") }));
+                      setFormData(prev => ({ ...prev, notesType: notesType.id }));
                       setShowNotesTypeDropdown(false);
                     }}
                     className="w-full px-4 py-3 text-left text-[14px] font-normal text-[#10141a] hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer"
                   >
-                    {notesType}
+                    {notesType.title}
                   </button>
                 ))}
               </div>
