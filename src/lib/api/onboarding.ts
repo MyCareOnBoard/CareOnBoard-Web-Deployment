@@ -3,10 +3,9 @@
  * Handles all API calls related to user onboarding and profile setup
  */
 
-import axiosClient from '../axios';
-import { listAgencies, seedAgency } from './agencies';
+import axiosClient, {axiosClientWithoutAuth} from '../axios';
+import { seedAgency } from './agencies';
 import { UserType, type FirebaseTimestamp, type UserProfile, type UserProfileResponse } from './users';
-import { listEmployees } from './employees';
 
 function firebaseTimestampToISOString(timestamp?: FirebaseTimestamp): string | undefined {
     if (!timestamp) {
@@ -152,4 +151,14 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus> {
         console.warn('⚠️ [Onboarding] API call failed:', error.message)
         throw error;
     }
+}
+
+export async function getAgencyInfo(agencyId: string): Promise<any> {
+  try {
+    const agency = await axiosClientWithoutAuth.get(`/agencies/info/${agencyId}`);
+    return agency.data;
+  } catch (error: any) {
+    console.error('Failed to fetch agency info:', error);
+    return null;
+  }
 }

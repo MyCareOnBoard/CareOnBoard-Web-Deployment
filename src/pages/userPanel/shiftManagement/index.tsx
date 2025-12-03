@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Shift, ShiftStatus, ShiftActionStatus } from "@/lib/api/shift-management";
+import { Shift, ShiftStatus, ShiftActionStatus } from "@/lib/api/shifts";
 // ShiftSectionProps is defined locally below
 import { format } from "date-fns";
 import { ClockOutModal } from "./ClockOutModal";
@@ -16,9 +16,10 @@ import {
   clockOut as apiClockOut,
   getAvailableShifts,
   getPreviousShifts,
-} from "@/lib/api/shift-management";
+} from "@/lib/api/shifts";
 import { toast } from "sonner";
 import { useAuth } from "@/utils/auth/context/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const convertTimeToISODate = (timeString: string, dateString: string): Date => {
   const timeMatch = timeString.match(/(\d+):(\d+)\s*(AM|PM)/i);
@@ -83,6 +84,15 @@ const getClientName = (client?: { firstName?: string; lastName?: string; name?: 
     return client.name;
   }
   return "Unknown Client";
+};
+
+const getInitialsFromName = (name: string) => {
+  const parts = name.split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  const first = parts[0].charAt(0);
+  const last = parts[parts.length - 1].charAt(0);
+  return `${first}${last}`.toUpperCase();
 };
 
 const checkLocationMatch = (userLocation: string, shiftLocation: string): boolean => {
@@ -324,19 +334,18 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
       {/* Desktop Layout */}
       <div className="items-center hidden w-full gap-6 lg:flex">
         {/* Client Avatar */}
-        <div className="w-[52.5px] h-[60px] rounded-[8px] overflow-hidden flex-shrink-0">
-          {shift.client?.profileImage ? (
-            <img
+        <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+          {shift.client?.profileImage && (
+            <AvatarImage
               src={shift.client.profileImage}
               alt={getClientName(shift.client)}
-              className="object-cover w-full h-full"
+              className="object-cover w-full h-full aspect-auto"
             />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-xl font-bold">
-              {getClientName(shift.client).charAt(0)}
-            </div>
           )}
-        </div>
+          <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-bold">
+            {getInitialsFromName(getClientName(shift.client))}
+          </AvatarFallback>
+        </Avatar>
 
         {/* Shift Details */}
         <div className="flex items-center flex-1 min-w-0 gap-16">

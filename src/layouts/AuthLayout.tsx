@@ -1,7 +1,8 @@
-import { Outlet } from "react-router";
+import {Outlet, useLocation} from "react-router";
 
-import type React from "react"
-import { useState, useEffect } from "react"
+import React, {useLayoutEffect} from "react"
+import {useState, useEffect} from "react"
+import {getAgencyInfo} from "@/lib/api/onboarding";
 
 interface Quote {
   text: string
@@ -28,7 +29,24 @@ const quotes: Quote[] = [
 ]
 
 export default function AuthLayout() {
-  const [currentQuote, setCurrentQuote] = useState(0)
+  const [currentQuote, setCurrentQuote] = useState(0);
+
+  const [agency, setAgency] = useState<string>("");
+
+  const agencyId = new URLSearchParams(useLocation().search).get('agencyId');
+
+  const fetchAgencyInfo = async () => {
+    const agency = await getAgencyInfo(agencyId as string);
+    if (agency) {
+      setAgency(agency?.agency?.name)
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (agencyId) {
+      fetchAgencyInfo();
+    }
+  }, []);
 
   // Auto-rotate quotes every 5 seconds
   useEffect(() => {
@@ -42,19 +60,19 @@ export default function AuthLayout() {
   return (
     <div className="flex items-center justify-between p-[30px] min-h-screen bg-white">
       {/* Left Banner - Teal branding section */}
-      <div 
+      <div
         className="hidden lg:flex bg-[#00b4b8] flex-col h-[calc(100vh-60px)] justify-between p-[60px] rounded-[8px] w-[528px] relative overflow-hidden"
       >
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 overflow-hidden opacity-40">
-            <img 
-              alt="" 
+            <img
+              alt=""
               className="absolute h-full left-[-14.67%] max-w-none top-[-8.3%] w-[121.76%] object-cover"
               src="/login-bg-main.jpg"
             />
           </div>
-          <div 
+          <div
             className="absolute inset-0"
             style={{
               background: 'linear-gradient(180deg, rgba(0, 180, 184, 0) 18.309%, #00b4b8 88.547%, #00b4b8 113.69%)'
@@ -67,28 +85,29 @@ export default function AuthLayout() {
           {/* Logo */}
           <div className="flex gap-[11.563px] items-center">
             <div className="w-[37px] h-[37px] flex items-center justify-center">
-              <img 
-                src="/logo.svg" 
-                alt="Care on Board" 
+              <img
+                src="/logo.svg"
+                alt="Care on Board"
                 className="w-full h-full"
               />
             </div>
-            <p className="font-bold text-[27.75px] text-white tracking-[0.2775px]" style={{ fontFamily: 'Urbanist, sans-serif' }}>
+            <p className="font-bold text-[27.75px] text-white tracking-[0.2775px]"
+               style={{fontFamily: 'Urbanist, sans-serif'}}>
               Care on Board
             </p>
           </div>
 
           {/* Heading */}
           <div className="flex flex-col gap-[24px] w-full">
-            <h1 
-              className="font-bold text-[40px] leading-[1.4] text-white w-full" 
-              style={{ fontFamily: 'Urbanist, sans-serif' }}
+            <h1
+              className="font-bold text-[40px] leading-[1.4] text-white w-full"
+              style={{fontFamily: 'Urbanist, sans-serif'}}
             >
-              Welcome to [Agency Name] Application Portal
+              Welcome to {agency ? agency : "Care On Board"} Application Portal
             </h1>
-            <p 
+            <p
               className="font-normal text-[20px] leading-[1.6] text-[#f3f6f7] w-full"
-              style={{ fontFamily: 'Urbanist, sans-serif' }}
+              style={{fontFamily: 'Urbanist, sans-serif'}}
             >
               Helping adults with developmental disabilities live full and meaningful lives.
             </p>
@@ -101,22 +120,25 @@ export default function AuthLayout() {
                 {/* Quote Mark */}
                 <div className="h-[17px] w-[20px]">
                   <svg width="20" height="17" viewBox="0 0 20 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M0 16.5V8.5C0 3.8 2.4 0 8 0V3C5.2 3 3.6 4.6 3.2 7.5C3.8 7.3 4.4 7.2 5 7.2C7.2 7.2 9 9 9 11.2V16.5H0ZM11 16.5V8.5C11 3.8 13.4 0 19 0V3C16.2 3 14.6 4.6 14.2 7.5C14.8 7.3 15.4 7.2 16 7.2C18.2 7.2 20 9 20 11.2V16.5H11Z" fill="white"/>
+                    <path
+                      d="M0 16.5V8.5C0 3.8 2.4 0 8 0V3C5.2 3 3.6 4.6 3.2 7.5C3.8 7.3 4.4 7.2 5 7.2C7.2 7.2 9 9 9 11.2V16.5H0ZM11 16.5V8.5C11 3.8 13.4 0 19 0V3C16.2 3 14.6 4.6 14.2 7.5C14.8 7.3 15.4 7.2 16 7.2C18.2 7.2 20 9 20 11.2V16.5H11Z"
+                      fill="white"/>
                   </svg>
                 </div>
                 {/* Quote Text */}
-                <p 
+                <p
                   className="font-semibold text-[20px] leading-[1.6] text-white"
-                  style={{ fontFamily: 'Urbanist, sans-serif' }}
+                  style={{fontFamily: 'Urbanist, sans-serif'}}
                 >
                   {quotes[currentQuote].text}
                 </p>
               </div>
               {/* Author Badge */}
-              <div className="inline-flex bg-[rgba(213,230,255,0.1)] border border-[#e5effa] items-center justify-center px-[18px] py-[8px] rounded-[99px] self-start">
-                <p 
+              <div
+                className="inline-flex bg-[rgba(213,230,255,0.1)] border border-[#e5effa] items-center justify-center px-[18px] py-[8px] rounded-[99px] self-start">
+                <p
                   className="font-medium text-[14px] leading-[1.4] text-white"
-                  style={{ fontFamily: 'Urbanist, sans-serif' }}
+                  style={{fontFamily: 'Urbanist, sans-serif'}}
                 >
                   {quotes[currentQuote].author}
                 </p>
@@ -143,7 +165,7 @@ export default function AuthLayout() {
       {/* Right Content - Form area */}
       <div className="flex flex-1 flex-col gap-[10px] h-[calc(100vh-60px)] items-center justify-center min-w-0">
         <div className="flex flex-col gap-[48px] items-start justify-center rounded-[16px] w-full max-w-[496px]">
-          <Outlet />
+          <Outlet/>
         </div>
       </div>
     </div>
