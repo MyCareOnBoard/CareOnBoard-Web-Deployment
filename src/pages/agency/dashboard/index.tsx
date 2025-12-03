@@ -247,7 +247,7 @@ export default function AgencyDashboardPage() {
 
                     <div className="relative w-full flex gap-1 items-end justify-center h-full">
                       {/* Scheduled Bar */}
-                      {shift.scheduled && <div
+                      {shift.scheduled > 0 && <div
                         className="flex-1 text-center text-white text-sm rounded-t-[6px] rounded-b-[6px] bg-[#2B82FF] transition-all duration-300"
                         style={{
                           height: `${(shift.scheduled / maxShiftValue) * 100}%`,
@@ -256,11 +256,11 @@ export default function AgencyDashboardPage() {
                       >{shift.scheduled}
                       </div>}
                       {/* Completed Bar */}
-                       {shift.scheduled && <div
+                       {shift.completed > 0 && <div
                         className="flex-1 text-center text-white text-sm rounded-t-[6px] rounded-b-[6px] bg-[#2B82FF]/40 transition-all duration-300"
                         style={{
                           height: `${(shift.completed / maxShiftValue) * 100}%`,
-                          minHeight: shift.scheduled ? "30px" : "0px",
+                          minHeight: shift.completed ? "30px" : "0px",
                         }}
                       >{shift.completed}
                       </div>}
