@@ -123,7 +123,7 @@ const initialFormData: ScheduleFormData = {
 };
 
 export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, editData, mode = "create" }: AddScheduleModalProps) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [formData, setFormData] = useState<ScheduleFormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -202,12 +202,12 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
    * Handles both one-time and recurring schedules
    */
   const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
-    if (!profile?.data?.id || !data.assignedDspId) return [];
+    if (!user?.profile?.id || !data.assignedDspId) return [];
 
     const requests: CreateShiftRequest[] = [];
     const baseShiftData = {
       employeeId: data.assignedDspId,
-      agencyId: profile?.data?.id || "",
+      agencyId: user?.profile?.id || "",
       location: data.clientAddress || "",
       startTime: data.clockInTime,
       endTime: data.clockOutTime,
@@ -262,7 +262,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     clientSearchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearchingClients(true);
-        const results = await searchClients(query, profile?.data?.id);
+        const results = await searchClients(query, user?.profile?.id);
         setClientSearchResults(results);
         setShowClientDropdown(results.length > 0);
       } catch (error) {
@@ -289,7 +289,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     }
 
     // Get agencyId from profile or user
-    const agencyId = profile?.data?.id || user?.uid;
+    const agencyId = user?.profile?.id || user?.uid;
 
     // Debounce the search
     dspSearchTimeoutRef.current = setTimeout(async () => {
@@ -305,7 +305,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         setIsSearchingDsps(false);
       }
     }, 300);
-  }, [profile?.agency?.id, user?.uid]);
+  }, [user?.profile?.id, user?.uid]);
 
   const handleClientSelect = (client: Client) => {
     setFormData(prev => ({
@@ -459,7 +459,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
   // Handle saving schedule as draft
   const handleSaveDraft = async () => {
-    if (!profile?.data?.id) {
+    if (!user?.profile?.id) {
       toast({
         title: "Authentication Error",
         description: "User not authenticated. Please log in and try again.",
@@ -487,7 +487,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     setIsSubmitting(true);
     try {
       const existingDraftsResponse = await listShifts({
-        agencyId: profile?.data?.id || "",
+        agencyId: user?.profile?.id || "",
         type: ShiftType.AUTOMATIC,
         submissionStatus: SubmissionStatus.DRAFT,
         limit: 100,
@@ -560,7 +560,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
         const response = await listShifts({
           limit: 100,
-          agencyId: profile?.data?.id || "",
+          agencyId: user?.profile?.id || "",
           client: true,
           employee: true,
         });
@@ -580,7 +580,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
   // Handle scheduling (submitting) shifts
   const handleSubmit = async () => {
-    if (!profile?.data?.id) {
+    if (!user?.profile?.id) {
       toast({
         title: "Authentication Error",
         description: "User not authenticated. Please log in and try again.",
@@ -663,7 +663,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
         const response = await listShifts({
           limit: 100,
-          agencyId: profile?.data?.id || "",
+          agencyId: user?.profile?.id || "",
           client: true,
           employee: true,
         });
@@ -770,7 +770,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
         const response = await listShifts({
           limit: 100,
-          agencyId: profile?.data?.id || "",
+          agencyId: user?.profile?.id || "",
           client: true,
           employee: true,
         });

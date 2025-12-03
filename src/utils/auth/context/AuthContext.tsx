@@ -1,7 +1,7 @@
 import type React from "react"
 import {createContext, useContext, useEffect, useState} from "react"
 import {useDispatch, useSelector} from "react-redux"
-import {setUser, setProfile, selectProfile} from "@/utils/auth"
+import { setUser } from "@/utils/auth"
 import type {AppDispatch, RootState} from "@/store/redux/store"
 import {
   loginWithEmail,
@@ -10,16 +10,13 @@ import {
   logout as logoutUser,
   getIdToken,
 } from "../services/authService"
-import type {User} from "../types"
 import {createUser as createBackendUser} from "../api/client"
 import {PageLoader} from "@/components/ui/loader"
-import {UserProfileResponse, UserProfile} from "@/lib/api/users";
-import axiosClient from "@/lib/axios";
 import {auth} from "@/lib/firebase";
+import type { UserProfile } from "../types/user.types"
 
 interface AuthContextType {
-  user: User | null
-  profile: UserProfile | null
+  user: UserProfile | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   signup: (
@@ -50,22 +47,14 @@ export const useAuth = () => useContext(AuthContext)
 export function AuthProvider({children}: { children: React.ReactNode }) {
   const dispatch = useDispatch<AppDispatch>()
   const reduxUser = useSelector((state: RootState) => state.auth?.user)
-  const reduxProfile = useSelector(selectProfile)
-  const [user, setUserState] = useState<User | null>(null)
+  const [user, setUserState] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
     const initAuth = async () => {
 
-      try {
-        const profile = await axiosClient.get<UserProfileResponse>("/users/profile");
-        if (profile.data.success || profile.data.user) {
-          dispatch(setProfile(profile.data.user))
-        }
-      } catch (error) {
-        console.error('[AuthContext] Error fetching user profile:', error)
-      }
+      
 
       if (reduxUser) {
         setUserState(reduxUser)
@@ -209,7 +198,6 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
 
   const value = {
     user,
-    profile: reduxProfile,
     loading,
     login,
     signup,

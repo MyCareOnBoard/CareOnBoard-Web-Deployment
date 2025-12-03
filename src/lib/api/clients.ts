@@ -54,7 +54,7 @@ export interface Client {
  */
 export interface ListClientsResponse {
   success: boolean;
-  data: Client[];
+  clients: Client[];
   total: number;
   count: number;
 }
@@ -190,7 +190,7 @@ export async function listClients(params?: ListClientsParams): Promise<Client[]>
       throw new Error('Failed to fetch clients');
     }
 
-    return response.data.data;
+    return response.data.clients || [];
   } catch (error) {
     console.error('Failed to fetch clients:', error);
     throw error;

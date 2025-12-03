@@ -14,9 +14,9 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
-import type { AuthState, User, LoginCredentials, SignupCredentials } from '../types'
+import type { AuthState, LoginCredentials, SignupCredentials } from '../types'
 import { transformFirebaseUser } from '@/utils/auth'
-import { UserProfile } from "@/lib/api/users";
+import type { UserProfile } from '../types/user.types'
 
 // Initial state
 const initialState: AuthState = {
@@ -24,7 +24,6 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   error: null,
-  profile: null
 }
 
 /**
@@ -110,7 +109,7 @@ export const resetPassword = createAsyncThunk(
 export const checkAuthState = createAsyncThunk(
   'auth/checkState',
   async (_, { rejectWithValue }) => {
-    return new Promise<User | null>((resolve) => {
+    return new Promise<UserProfile | null>((resolve) => {
       const unsubscribe = auth.onAuthStateChanged(
         (firebaseUser: FirebaseUser | null) => {
           unsubscribe()
@@ -138,12 +137,9 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null
     },
-    setUser: (state, action: PayloadAction<User | null>) => {
+    setUser: (state, action: PayloadAction<UserProfile | null>) => {
       state.user = action.payload
       state.isAuthenticated = !!action.payload
-    },
-    setProfile: (state, action: PayloadAction<UserProfile | null>) => {
-      state.profile = action.payload
     }
   },
   extraReducers: (builder) => {
@@ -222,5 +218,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { clearError, setUser, setProfile } = authSlice.actions
+export const { clearError, setUser } = authSlice.actions
 export default authSlice.reducer

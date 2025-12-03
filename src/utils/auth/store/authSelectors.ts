@@ -25,8 +25,3 @@ export const selectIsLoading = (state: RootState) => state.auth?.isLoading ?? fa
  * Select error state
  */
 export const selectError = (state: RootState) => state.auth?.error ?? null
-
-/**
- * Select user profile
- */
-export const selectProfile = (state: RootState) => state.auth?.profile ?? null

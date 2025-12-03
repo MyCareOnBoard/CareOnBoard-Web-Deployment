@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useSelector } from "react-redux";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +7,6 @@ import TimesheetWeek from "./components/TimesheetWeek";
 import ConfirmShiftModal from "./components/ConfirmShiftModal";
 import SuccessModal from "./components/SuccessModal";
 import { useToast } from "@/hooks/use-toast";
-import type { RootState } from "@/store/redux/store";
-import { getUserProfile, UserProfile } from "@/lib/api/users";
 import { Routes } from "@/routes/constants";
 import DigitalSignatureModal from "@/pages/applicant/application/components/DigitalSignature";
 import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift } from "@/lib/api/shifts";
@@ -112,12 +109,11 @@ function buildManualShiftRequests(
 export default function ManualShiftManagementPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [locationSuggestions, setLocationSuggestions] = useState<Array<{ display_name: string; place_id: string }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchingLocation, setSearchingLocation] = useState(false);
@@ -214,58 +210,16 @@ export default function ManualShiftManagementPage() {
     };
   }, []);
 
-  // Fetch user profile and populate form
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        setLoading(true);
-        const profileData = await getUserProfile();
-        setUserProfile(profileData);
-
-        // Extract first and last name from fullName
-        const fullName = profileData.fullName || user?.fullName || "";
-        const nameParts = fullName.trim().split(" ");
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
-
-        // Update form data with user information
-        setFormData((prev) => ({
-          ...prev,
-          yourFirstName: firstName,
-          yourLastName: lastName,
-          yourEmail: profileData.email || user?.email || "",
-        }));
-      } catch (error) {
-        console.error("❌ Failed to fetch user profile:", error);
-        // Fallback to auth state if API fails
-        const fullName = user?.fullName || "";
-        const nameParts = fullName.trim().split(" ");
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
-
-        setFormData((prev) => ({
-          ...prev,
-          yourFirstName: firstName,
-          yourLastName: lastName,
-          yourEmail: user?.email || "",
-        }));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserProfile();
-  }, [user]);
-
   // Load saved draft shifts
   useEffect(() => {
     const loadDraftShifts = async () => {
-      if (!profile?.data?.agencyId) return;
+      if (!user?.profile?.agencyId) return;
 
       try {
+        setLoading(true);
         // Fetch manual draft shifts
         const response = await listShifts({
-          agencyId: profile?.data?.agencyId,
+          agencyId: user?.profile?.agencyId,
           type: ShiftType.MANUAL,
           submissionStatus: SubmissionStatus.DRAFT,
           limit: 100,
@@ -329,11 +283,13 @@ export default function ManualShiftManagementPage() {
       } catch (error) {
         console.error("❌ Failed to load draft shifts:", error);
         // Silent fail - don't show error toast as this is optional functionality
+      } finally {
+        setLoading(false);
       }
     };
 
     loadDraftShifts();
-  }, [profile?.data?.agencyId]); // Only run when user changes
+  }, [user?.profile?.agencyId, user?.profile?.id]); // Only run when user changes
 
   // Load existing signatures if available
   useEffect(() => {
@@ -378,7 +334,7 @@ export default function ManualShiftManagementPage() {
     }
 
     // If query is too short or no agency, hide dropdown
-    if (query.trim().length < 2 || !profile?.agency?.id) {
+    if (query.trim().length < 2 || !user?.profile?.agencyId) {
       setShowClientDropdown(false);
       setClientSearchResults([]);
       return;
@@ -388,12 +344,12 @@ export default function ManualShiftManagementPage() {
     clientSearchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearchingClients(true);
-        if (!profile?.data?.agencyId) {
+        if (!user?.profile?.agencyId) {
           setClientSearchResults([]);
           setShowClientDropdown(false);
           return;
         }
-        const clients = await searchClients(query, profile?.data?.agencyId);
+        const clients = await searchClients(query, user?.profile?.agencyId);
         setClientSearchResults(clients);
         setShowClientDropdown(clients.length > 0);
       } catch (error) {
@@ -404,7 +360,7 @@ export default function ManualShiftManagementPage() {
         setIsSearchingClients(false);
       }
     }, 300); // 300ms debounce
-  }, [profile?.data?.agencyId]);
+  }, [user?.profile?.agencyId]);
 
   // Handle client selection
   const handleClientSelect = (client: Client) => {
@@ -640,8 +596,8 @@ export default function ManualShiftManagementPage() {
 
       // Step 1: Fetch existing draft shifts
       const existingDraftsResponse = await listShifts({
-        agencyId: profile?.data?.agencyId,
-        employeeId: profile?.data?.id,
+        agencyId: user?.profile?.agencyId,
+        employeeId: user?.profile?.id,
         type: ShiftType.MANUAL,
         submissionStatus: SubmissionStatus.DRAFT,
         limit: 100,
@@ -656,8 +612,8 @@ export default function ManualShiftManagementPage() {
         formData,
         week1Data,
         week2Data,
-        profile?.data?.id,
-        profile?.data?.agencyId,
+        user?.profile?.id,
+        user?.profile?.agencyId,
         formData.clientId,
         clientSignature,
         userSignature
@@ -853,8 +809,8 @@ export default function ManualShiftManagementPage() {
         formData,
         week1Data,
         week2Data,
-        profile?.data?.id,
-        profile?.data?.agencyId,
+        user?.profile?.id,
+        user?.profile?.agencyId,
         formData.clientId,
         clientSignature,
         userSignature

@@ -1,5 +1,5 @@
-import {createApi} from "@reduxjs/toolkit/query/react";
-import {customBaseQuery} from "@/lib/baseQuery";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { customBaseQuery } from "@/lib/baseQuery";
 import {
   CreateActivityLogPayload,
   GetActivityLogResponse,
@@ -12,7 +12,7 @@ export const userPanelNotesApi = createApi({
   baseQuery: customBaseQuery,
   tagTypes: ['ActivityLogs', 'SingleActivityLog'],
   endpoints: (builder) => ({
-    getAllActivityLogs: builder.query<GetActivityLogsResponse[], void>({
+    getAllActivityLogs: builder.query<GetActivityLogsResponse, void>({
       query: () => ({
         url: `/employees/activity-logs`,
         method: "GET",
@@ -29,7 +29,7 @@ export const userPanelNotesApi = createApi({
       providesTags: ['SingleActivityLog']
     }),
     createOrUpdateActivityLog: builder.mutation<{ data: GetActivityLogResponse }, { activityLog: string, data: CreateActivityLogPayload }>({
-      query: ({activityLog, data}) => ({
+      query: ({ activityLog, data }) => ({
         url: `/employees/activity-logs/${activityLog}/notes`,
         method: "PUT",
         requiresAuth: true,
@@ -38,7 +38,7 @@ export const userPanelNotesApi = createApi({
       invalidatesTags: ['SingleActivityLog']
     }),
     submitActivityLogNotes: builder.mutation<void, { activityLog: string, logNoteIds: string[] }>({
-      query: ({activityLog, logNoteIds}) => ({
+      query: ({ activityLog, logNoteIds }) => ({
         url: `/employees/activity-logs/${activityLog}/notes/submit`,
         method: "POST",
         requiresAuth: true,
