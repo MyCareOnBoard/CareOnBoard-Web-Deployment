@@ -143,6 +143,8 @@ export interface UpdateShiftRequest {
     clockedOutAt?: string;
     type?: ShiftType;
     submissionStatus?: SubmissionStatus;
+    employeeId?: string;
+    clientId?: string;
 }
 
 /**
