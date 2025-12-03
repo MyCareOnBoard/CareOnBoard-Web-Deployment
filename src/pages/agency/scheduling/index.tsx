@@ -2,16 +2,13 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Plus, ChevronLeft, ChevronRight, Check, X, ArrowUpRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, deleteShift, CreateShiftRequest } from "@/lib/api/shift-management";
-import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
+import { listShifts, Shift, ShiftStatus, deleteShift } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
-import AddScheduleModal, { ScheduleFormData } from "./components/AddScheduleModal";
-import ScheduleSuccessModal from "./components/ScheduleSuccessModal";
-import ScheduleSavedModal from "./components/ScheduleSavedModal";
+import AddScheduleModal from "./components/AddScheduleModal";
 import { seedClients } from "@/lib/api/clients";
-import { createEmployeeActivityLog } from "@/lib/api/employees";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // Sample data for pending approvals
 const samplePendingApprovals = [
@@ -60,6 +57,15 @@ const getStatusInfo = (status: ShiftStatus) => {
   }
 };
 
+const getInitialsFromName = (name: string) => {
+  const parts = name.split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  const first = parts[0].charAt(0);
+  const last = parts[parts.length - 1].charAt(0);
+  return `${first}${last}`.toUpperCase();
+};
+
 export default function SchedulingPage() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -71,19 +77,6 @@ export default function SchedulingPage() {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [showAddScheduleModal, setShowAddScheduleModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showSavedModal, setShowSavedModal] = useState(false);
-  const [scheduledShiftInfo, setScheduledShiftInfo] = useState<{
-    clientName: string;
-    dspName: string;
-    duration: string;
-    date: string;
-  } | null>(null);
-  const [savedShiftInfo, setSavedShiftInfo] = useState<{
-    clientName: string;
-    dspName: string;
-    date: string;
-  } | null>(null);
   
   // API data states
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -189,375 +182,6 @@ export default function SchedulingPage() {
       variant: "destructive",
     });
     // TODO: Implement actual cancellation API call
-  };
-
-  /**
-   * Build shift requests from form data
-   * Handles both one-time and recurring schedules
-   */
-  const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
-    if (!profile?.data?.id || !data.assignedDspId) return [];
-
-    const requests: CreateShiftRequest[] = [];
-    const baseShiftData = {
-      employeeId: data.assignedDspId,
-      agencyId: profile?.data?.id || "",
-      location: data.clientAddress || "",
-      startTime: data.clockInTime,
-      endTime: data.clockOutTime,
-      clientId: data.clientId,
-      notesType: data.notesType || undefined,
-      service: data.service,
-      serviceCode: data.serviceCode,
-      schedulingType: data.schedulingType,
-      ispOutcome: data.ispOutcome || undefined,
-      assignedDsp: data.assignedDsp,
-    };
-
-    console.log("baseShiftData", baseShiftData);
-
-    if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
-      // Create shifts for each day in the date range
-      const dateRange = eachDayOfIntervalDateFns({ start: data.startDate, end: data.endDate });
-      dateRange.forEach((date) => {
-        requests.push({
-          ...baseShiftData,
-          date: format(date, "yyyy-MM-dd"),
-          status: ShiftStatus.PENDING,
-          type: ShiftType.AUTOMATIC,
-          submissionStatus: SubmissionStatus.DRAFT,
-        });
-      });
-    } else if (data.date) {
-      // Single shift for one-time scheduling
-      requests.push({
-        ...baseShiftData,
-        date: format(data.date, "yyyy-MM-dd"),
-        status: ShiftStatus.PENDING,
-        type: ShiftType.AUTOMATIC,
-        submissionStatus: SubmissionStatus.DRAFT,
-      });
-    }
-
-    return requests;
-  };
-
-  /**
-   * Handle saving schedule as draft
-   * Similar to manual shift management save functionality
-   */
-  const handleSave = async (data: ScheduleFormData) => {
-    if (!profile?.data?.id) {
-      toast({
-        title: "Authentication Error",
-        description: "User not authenticated. Please log in and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Get the date for display
-    const getDisplayDate = () => {
-      if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
-        return `${format(data.startDate, "d MMMM")} - ${format(data.endDate, "d MMMM")}`;
-      }
-      if (data.date) {
-        return format(data.date, "d MMMM");
-      }
-      return format(new Date(), "d MMMM");
-    };
-
-    try {
-      // Step 1: Fetch existing draft shifts for this agency
-      const existingDraftsResponse = await listShifts({
-        agencyId: profile?.data?.id || "",
-        type: ShiftType.AUTOMATIC,
-        submissionStatus: SubmissionStatus.DRAFT,
-        limit: 100,
-      });
-
-      const existingDrafts = existingDraftsResponse.shifts || [];
-      console.log(`📄 Found ${existingDrafts.length} existing draft(s)`);
-
-      // Step 2: Build shift requests as drafts
-      const shiftRequests = buildShiftRequests(data);
-
-      if (shiftRequests.length === 0) {
-        toast({
-          title: "No Valid Entries",
-          description: "Please fill in all required fields before saving.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Step 3: Update existing or create new shifts
-      const savePromises = shiftRequests.map(async (request) => {
-        // Try to find an existing draft for the same date
-        const existingShift = existingDrafts.find(
-          (draft) => draft.date === request.date
-        );
-
-        if (existingShift) {
-          // Update existing shift
-          console.log(`✏️ Updating existing draft for ${request.date}`);
-          return updateShift(existingShift.id, {
-            location: request.location,
-            startTime: request.startTime,
-            endTime: request.endTime,
-            notesType: request.notesType,
-            service: request.service,
-            serviceCode: request.serviceCode,
-            schedulingType: request.schedulingType,
-            ispOutcome: request.ispOutcome,
-            assignedDsp: request.assignedDsp,
-            status: request.status,
-            submissionStatus: request.submissionStatus,
-            type: request.type,
-          });
-        } else {
-          // Create new shift
-          console.log(`➕ Creating new draft for ${request.date}`);
-          return createShift(request);
-        }
-      });
-
-      // Step 4: Execute all save operations
-      const results = await Promise.allSettled(savePromises);
-
-      // Check for failures
-      const failures = results.filter((r) => r.status === "rejected");
-      const successes = results.filter((r) => r.status === "fulfilled");
-
-      if (failures.length > 0) {
-        console.error("Failed to save some drafts:", failures);
-        if (successes.length > 0) {
-          toast({
-            title: "Partial Save",
-            description: `Saved ${successes.length} of ${shiftRequests.length} schedule(s) as drafts.`,
-          });
-        } else {
-          toast({
-            title: "Save Failed",
-            description: "Failed to save schedule drafts. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-
-      if (successes.length > 0) {
-        // Set saved shift info for saved modal
-        setSavedShiftInfo({
-          clientName: data.client || "Client",
-          dspName: data.assignedDsp || "DSP",
-          date: getDisplayDate(),
-        });
-
-        // Show saved modal
-        setShowSavedModal(true);
-
-        // Refresh shifts list
-        const response = await listShifts({ 
-          limit: 100,
-          agencyId: profile?.data?.id || "",
-          client: true,
-          employee: true,
-        });
-        setShifts(response.shifts || []);
-      }
-    } catch (error: any) {
-      console.error("Failed to save draft schedule:", error);
-      toast({
-        title: "Save Failed",
-        description: error?.response?.data?.error || "Failed to save draft. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  /**
-   * Handle scheduling (submitting) shifts
-   * Creates shifts with SUBMITTED status
-   */
-  const handleSchedule = async (data: ScheduleFormData): Promise<boolean> => {
-    if (!profile?.data?.id) {
-      toast({
-        title: "Authentication Error",
-        description: "User not authenticated. Please log in and try again.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    try {
-      // Calculate duration from clock in/out times
-      const calculateDuration = () => {
-        if (!data.clockInTime || !data.clockOutTime) return "2 hours";
-        try {
-          const parseTime = (time: string) => {
-            const match = time.match(/(\d+)[.:](\d+):?(AM|PM)/i);
-            if (!match) return 0;
-            let hours = parseInt(match[1]);
-            const minutes = parseInt(match[2]);
-            const period = match[3].toUpperCase();
-            if (period === "PM" && hours !== 12) hours += 12;
-            if (period === "AM" && hours === 12) hours = 0;
-            return hours * 60 + minutes;
-          };
-          const startMinutes = parseTime(data.clockInTime);
-          const endMinutes = parseTime(data.clockOutTime);
-          const diffMinutes = endMinutes - startMinutes;
-          const hours = Math.floor(diffMinutes / 60);
-          const mins = diffMinutes % 60;
-          if (mins > 0) return `${hours} hours ${mins} minutes`;
-          return `${hours} hours`;
-        } catch {
-          return "2 hours";
-        }
-      };
-
-      // Get the date for display
-      const getDisplayDate = () => {
-        if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
-          return `${format(data.startDate, "d MMMM")} - ${format(data.endDate, "d MMMM")}`;
-        }
-        if (data.date) {
-          return format(data.date, "d MMMM");
-        }
-        return format(new Date(), "d MMMM");
-      };
-
-      // Step 1: Build shift requests
-      const shiftRequests = buildShiftRequests(data);
-
-      if (shiftRequests.length === 0) {
-        toast({
-          title: "No Valid Entries",
-          description: "Please fill in all required fields before scheduling.",
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      // Step 2: Set status to PENDING and submission status to SUBMITTED
-      const finalShiftRequests = shiftRequests.map(request => ({
-        ...request,
-        status: ShiftStatus.PENDING,
-        submissionStatus: SubmissionStatus.SUBMITTED,
-        type: ShiftType.AUTOMATIC,
-      }));
-
-      console.log(`📅 Scheduling ${finalShiftRequests.length} shift(s)`);
-
-      // Step 3: Submit all shifts in parallel
-      const results = await Promise.allSettled(
-        finalShiftRequests.map((request) => createShift(request))
-      );
-
-      // Step 4: Create activity logs for successfully created shifts
-      const activityLogPromises = results
-        .map((result, index) => {
-          if (result.status === "fulfilled" && data.notesType && data.assignedDspId) {
-            const createdShift = result.value;
-            const shiftId = createdShift.shift?.id;
-            if (shiftId) {
-              const shiftDate = finalShiftRequests[index].date 
-                ? new Date(finalShiftRequests[index].date) 
-                : new Date();
-              const clientName = data.client || "Unknown Client";
-
-              console.log("data", data);
-              
-              return createEmployeeActivityLog({
-                activityType: data.notesType,
-                shiftId: shiftId,
-                employeeId: data.assignedDspId,
-                description: "",
-                metadata: {
-                  individual: clientName,
-                  serviceYear: shiftDate.getFullYear(),
-                  serviceCode: data.serviceCode || "",
-                  ISPOutcome: data.ispOutcome || "",
-                  strategies: [],
-                },
-              }).catch((error) => {
-                console.error("Failed to create activity log for shift:", shiftId, error);
-                // Don't fail the entire operation if activity log creation fails
-                return null;
-              });
-            }
-          }
-          return null;
-        })
-        .filter((promise) => promise !== null);
-
-      // Wait for all activity logs to be created (but don't fail if they don't)
-      if (activityLogPromises.length > 0) {
-        await Promise.allSettled(activityLogPromises);
-      }
-
-      // Check for failures
-      const failures = results.filter((r) => r.status === "rejected");
-      const successes = results.filter((r) => r.status === "fulfilled");
-
-      if (failures.length > 0) {
-        console.error("Failed to schedule some shifts:", failures);
-        if (successes.length > 0) {
-          toast({
-            title: "Partial Submission",
-            description: `Successfully scheduled ${successes.length} of ${finalShiftRequests.length} shifts. ${failures.length} failed.`,
-          });
-        } else {
-          toast({
-            title: "Scheduling Failed",
-            description: "Failed to schedule shifts. Please try again.",
-            variant: "destructive",
-          });
-          return false;
-        }
-      }
-
-      if (successes.length > 0) {
-        // Set scheduled shift info for success modal
-        setScheduledShiftInfo({
-          clientName: data.client || "Client",
-          dspName: data.assignedDsp || "DSP",
-          duration: calculateDuration(),
-          date: getDisplayDate(),
-        });
-
-        // Show success modal
-        setShowSuccessModal(true);
-
-        // Close the add schedule modal
-        setShowAddScheduleModal(false);
-
-        // Refresh shifts list
-        const response = await listShifts({ 
-          limit: 100,
-          agencyId: profile?.data?.id || "",
-        });
-        setShifts(response.shifts || []);
-
-        toast({
-          title: "Schedule Created",
-          description: `Successfully scheduled ${successes.length} shift(s).`,
-        });
-
-        return true;
-      }
-
-      return false;
-    } catch (error: any) {
-      console.error("Failed to create schedule:", error);
-      toast({
-        title: "Scheduling Failed",
-        description: error?.response?.data?.error || "Failed to create schedule. Please try again.",
-        variant: "destructive",
-      });
-      return false;
-    }
   };
 
   /**
@@ -994,21 +618,22 @@ export default function SchedulingPage() {
                 return (
                   <div
                     key={shift.id}
-                    className="flex items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
+                    className="flex flex-wrap items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
                   >
                     {/* Client Info */}
-                    <div className="flex items-center gap-4">
-                      <div className="w-[52.5px] h-[60px] rounded-lg bg-[#e0e0e0] overflow-hidden flex-shrink-0">
-                        {shift.client?.profileImage ? (
-                          <img 
-                            src={shift.client.profileImage} 
+                    <div className="flex items-center gap-4 w-[256px]">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                        {shift.client?.profileImage && (
+                          <AvatarImage
+                            src={shift.client.profileImage}
                             alt={clientName}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover aspect-auto"
                           />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
                         )}
-                      </div>
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                          {getInitialsFromName(clientName)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[16px] font-semibold leading-[1.6] text-black">
                           {clientName}
@@ -1020,18 +645,19 @@ export default function SchedulingPage() {
                     </div>
 
                     {/* DSP/Employee Info */}
-                    <div className="flex items-center gap-4">
-                      <div className="w-[52.5px] h-[60px] rounded-lg bg-[#e0e0e0] overflow-hidden flex-shrink-0">
-                        {shift.employee?.profilePicture ? (
-                          <img 
-                            src={shift.employee.profilePicture} 
+                    <div className="flex items-center gap-4 w-[256px]">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                        {shift.employee?.profilePicture && (
+                          <AvatarImage
+                            src={shift.employee.profilePicture}
                             alt={employeeName}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover aspect-auto"
                           />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400" />
                         )}
-                      </div>
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                          {getInitialsFromName(employeeName)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[16px] font-semibold leading-[1.6] text-black">
                           {employeeName}
@@ -1043,10 +669,10 @@ export default function SchedulingPage() {
                     </div>
 
                     {/* Status & Times */}
-                    <div className="flex items-center gap-16 flex-1">
+                    <div className="flex items-center gap-16 flex-1 w-[256px]">
                       {/* Status Badge */}
                       <div 
-                        className="rounded-full px-2.5 py-2.5"
+                        className="rounded-full min-w-[54px] min-h-[28px] flex items-center justify-center gap-[4px] px-2.5"
                         style={{ 
                           backgroundColor: statusInfo.bgColor,
                           border: `1px solid ${statusInfo.color}`
@@ -1061,14 +687,14 @@ export default function SchedulingPage() {
                       </div>
 
                       {/* Clocked In */}
-                      <div className="text-[14px] font-medium leading-[1.4]">
-                        <span className="text-[#808081]">Clocked In </span>
+                      <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
+                        <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
                         <span className="text-[#10141a]">{formatTime(shift.clockedInAt || shift.startTime)}</span>
                       </div>
 
                       {/* Clocked Out */}
-                      <div className="text-[14px] font-medium leading-[1.4]">
-                        <span className="text-[#808081]">Clocked Out </span>
+                      <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
+                        <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
                         <span className="text-[#10141a]">{formatTime(shift.clockedOutAt || shift.endTime)}</span>
                       </div>
                     </div>
@@ -1117,38 +743,8 @@ export default function SchedulingPage() {
     <AddScheduleModal
       isOpen={showAddScheduleModal}
       onClose={() => setShowAddScheduleModal(false)}
-      onSchedule={handleSchedule}
-      onSave={handleSave}
+      onShiftsUpdated={(updatedShifts) => setShifts(updatedShifts)}
     />
-
-    {/* Schedule Success Modal */}
-    {scheduledShiftInfo && (
-      <ScheduleSuccessModal
-        isOpen={showSuccessModal}
-        onClose={() => {
-          setShowSuccessModal(false);
-          setScheduledShiftInfo(null);
-        }}
-        clientName={scheduledShiftInfo.clientName}
-        dspName={scheduledShiftInfo.dspName}
-        duration={scheduledShiftInfo.duration}
-        date={scheduledShiftInfo.date}
-      />
-    )}
-
-    {/* Schedule Saved Modal */}
-    {savedShiftInfo && (
-      <ScheduleSavedModal
-        isOpen={showSavedModal}
-        onClose={() => {
-          setShowSavedModal(false);
-          setSavedShiftInfo(null);
-        }}
-        clientName={savedShiftInfo.clientName}
-        dspName={savedShiftInfo.dspName}
-        date={savedShiftInfo.date}
-      />
-    )}
     </>
   );
 }
