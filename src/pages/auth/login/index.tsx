@@ -1,25 +1,23 @@
-import type React from "react"
-import { useState } from "react"
-import { useNavigate, Link } from "react-router"
-import { Eye, EyeOff } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
+import React from "react"
+import {useState} from "react"
+import {useNavigate, Link, useLocation} from "react-router"
+import {Eye, EyeOff} from "lucide-react"
+import {Button} from "@/components/ui/button"
+import {Input} from "@/components/ui/input"
+import {Label} from "@/components/ui/label"
+import {Checkbox} from "@/components/ui/checkbox"
 import {setProfile, useAuth} from "@/utils/auth"
-import { useToast } from "@/hooks/use-toast"
-import { ButtonLoader } from "@/components/ui/loader"
-import { Routes } from "@/routes/constants"
-import { getUserProfile, getOnboardingStatus } from "@/lib/api/onboarding"
-import { 
-  getAuthErrorMessage, 
+import {useToast} from "@/hooks/use-toast"
+import {ButtonLoader} from "@/components/ui/loader"
+import {Routes} from "@/routes/constants"
+import {getUserProfile, getOnboardingStatus} from "@/lib/api/onboarding"
+import {
+  getAuthErrorMessage,
   getSuccessMessage,
-  getValidationMessage 
+  getValidationMessage
 } from "@/utils/auth/helpers/errorMessages"
-import {UserType, UserProfile} from "@/lib/api/users";
+import {UserType} from "@/lib/api/users";
 import {useDispatch} from "react-redux";
-import { listAgencies, seedAgency } from "@/lib/api/agencies";
-import { getCurrentEmployee, listEmployees } from "@/lib/api/employees";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -32,10 +30,12 @@ export default function LoginPage() {
     password?: string
   }>({})
 
-  const { login } = useAuth()
+  const {login} = useAuth()
   const navigate = useNavigate()
   const dispatch = useDispatch()
-  const { toast } = useToast()
+  const {toast} = useToast();
+
+  const agencyId = new URLSearchParams(useLocation().search).get('agencyId');
 
   // Validate email format
   const validateEmail = (email: string) => {
@@ -63,26 +63,26 @@ export default function LoginPage() {
   // Real-time validation on blur
   const handleEmailBlur = () => {
     const emailError = validateEmail(email)
-    setErrors(prev => ({ ...prev, email: emailError }))
+    setErrors(prev => ({...prev, email: emailError}))
   }
 
   const handlePasswordBlur = () => {
     const passwordError = validatePassword(password)
-    setErrors(prev => ({ ...prev, password: passwordError }))
+    setErrors(prev => ({...prev, password: passwordError}))
   }
 
   // Clear errors on input
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value)
     if (errors.email) {
-      setErrors(prev => ({ ...prev, email: "" }))
+      setErrors(prev => ({...prev, email: ""}))
     }
   }
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value)
     if (errors.password) {
-      setErrors(prev => ({ ...prev, password: "" }))
+      setErrors(prev => ({...prev, password: ""}))
     }
   }
 
@@ -94,7 +94,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validate all fields
     const emailError = validateEmail(email)
     const passwordError = validatePassword(password)
@@ -117,10 +117,10 @@ export default function LoginPage() {
     try {
       // Login with Firebase
       await login(email, password)
-      
+
       // Check if user has completed onboarding
       const onboardingStatus = await getOnboardingStatus()
-      
+
       const successMsg = getSuccessMessage('login')
       toast({
         title: successMsg.title,
@@ -128,23 +128,23 @@ export default function LoginPage() {
       })
 
       const profile = await getUserProfile()
-      
+
       // Dispatch profile with user-specific data
-      dispatch(setProfile({ ...profile }))
+      dispatch(setProfile({...profile}))
 
       if (profile.userType !== UserType.APPLICANT) {
-        navigate(dashboardRoutes[profile.userType as UserType], { replace: true })
+        navigate(dashboardRoutes[profile.userType as UserType], {replace: true})
         return
       }
       // Check if onboarding is already completed
       if (profile.onboardingCompleted) {
-        navigate(dashboardRoutes[UserType.APPLICANT], { replace: true })
+        navigate(dashboardRoutes[UserType.APPLICANT], {replace: true})
         return
       }
       navigate(Routes.onboarding.index)
     } catch (error: any) {
       const errorMessage = getAuthErrorMessage(error)
-      
+
       toast({
         title: "Unable to log in",
         description: errorMessage,
@@ -213,7 +213,7 @@ export default function LoginPage() {
               className="absolute text-gray-600 -translate-y-1/2 right-4 top-1/2 hover:text-gray-900"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
             </button>
           </div>
           {errors.password && (
@@ -247,7 +247,7 @@ export default function LoginPage() {
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
-              <ButtonLoader />
+              <ButtonLoader/>
               Logging in...
             </span>
           ) : (
@@ -258,7 +258,10 @@ export default function LoginPage() {
 
       <p className="pt-2 text-sm text-center text-gray-600">
         Don't have an account?{" "}
-        <Link to={Routes.auth.signup} className="text-[#00B4B8] hover:text-[#148a9c] font-semibold">
+        <Link
+          to={Routes.auth.signup + (agencyId ? `?agencyId=${agencyId}` : "")}
+          className="text-[#00B4B8] hover:text-[#148a9c] font-semibold"
+        >
           Sign Up
         </Link>
       </p>

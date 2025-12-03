@@ -55,6 +55,10 @@ export const router = createBrowserRouter([
     Component: SplashScreen,
   },
   {
+    path: Routes.agencySplash,
+    Component: SplashScreen,
+  },
+  {
     Component: OnboardingLayout,
     children: [
       {

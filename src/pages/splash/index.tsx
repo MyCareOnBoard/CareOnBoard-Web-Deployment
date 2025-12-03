@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router"
+import {useNavigate, useParams} from "react-router"
 import { Routes } from "@/routes/constants"
 
 export default function SplashScreen() {
   const navigate = useNavigate()
   const [isAnimating, setIsAnimating] = useState(true)
 
+  const {id} = useParams<{id: string}>();
+  console.log("id", id)
+
   useEffect(() => {
     // Navigate to login after animation completes
     const timer = setTimeout(() => {
       setIsAnimating(false)
       setTimeout(() => {
-        navigate(Routes.auth.login)
+        navigate(Routes.auth.login + `?agencyId=${id}`)
       }, 600)
     }, 4000)
 
