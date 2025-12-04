@@ -18,11 +18,11 @@ import {useLocation, useNavigate} from "react-router";
 import {
   useCreateOrUpdateActivityLogMutation,
   useGetSingleActivityLogQuery,
-  useSubmitActivityLogNotesMutation
+  useSubmitActivityLogNotesMutation, useUpdateActivityLogMutation
 } from "@/pages/userPanel/notes/api";
 import {useDebounce} from "@/hooks/useDebounce";
 import {toast} from "sonner";
-import { useAuth } from "@/utils/auth";
+import {useAuth} from "@/utils/auth";
 
 type InterventionRow = {
   id: string;
@@ -81,13 +81,10 @@ const initialInterventions = [
 
 export default function SupportedEmploymentInterventionPage() {
   const pageTitle = "Supported Employment Services – Intervention Plan and Service Log";
-
-  const [reportingStartDate, setReportingStartDate] = useState<Date | undefined>(undefined);
-  const [reportingEndDate, setReportingEndDate] = useState<Date | undefined>(undefined);
   const [isStartDateOpen, setIsStartDateOpen] = useState(false);
   const [isEndDateOpen, setIsEndDateOpen] = useState(false);
   const [openServiceDateId, setOpenServiceDateId] = useState<string | null>(null);
-  const { user } = useAuth();
+  const {user} = useAuth();
 
   const navigate = useNavigate();
 
@@ -96,10 +93,19 @@ export default function SupportedEmploymentInterventionPage() {
 
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
+  const [updateLog] = useUpdateActivityLogMutation();
   const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId
   });
+
+  const [noteInfo, setNoteInfo] = useState({
+    jobType: "",
+    ISPOutcome: "",
+    totalHours: "",
+    reportingStartDate: new Date(),
+    reportingEndDate: new Date(),
+  })
 
   const debouncedMutateNote = useDebounce(
     async (params: any) => {
@@ -109,6 +115,15 @@ export default function SupportedEmploymentInterventionPage() {
     },
     500
   );
+
+  const debounceUpdateNote = useDebounce(
+    async (params: any) => {
+      await updateLog(params).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
+      });
+    },
+    500
+  )
 
   const updateIntervention = async (
     id: string,
@@ -317,6 +332,35 @@ export default function SupportedEmploymentInterventionPage() {
     }
   }
 
+  const handleNoteInfoChange = (name: string, value: any) => {
+    setNoteInfo((prevState) => {
+      const updateNoteInfo = {
+        ...prevState,
+        [name]: value
+      }
+
+      const modifiedNoteInfo = {
+        ...updateNoteInfo,
+        reportingStartDate: updateNoteInfo?.reportingStartDate?.toISOString()?.slice(0, 10),
+        reportingEndDate: updateNoteInfo?.reportingEndDate?.toISOString()?.slice(0, 10)
+      }
+
+      if (["jobType", "ISPOutcome", "totalHours"].includes(name)) {
+        debounceUpdateNote({
+          activityLog: activityLogId!,
+          data: modifiedNoteInfo
+        })
+      } else {
+        updateLog({
+          activityLog: activityLogId!,
+          data: modifiedNoteInfo
+        }).unwrap();
+      }
+
+      return updateNoteInfo;
+    })
+  }
+
   useEffect(() => {
     if (!isLoading && activityLog && activityLog.notes.length > 0) {
       if (services.some((service) => service.id)) {
@@ -376,6 +420,20 @@ export default function SupportedEmploymentInterventionPage() {
           ...initialInterventions.slice(formattedInterventionNotes.length)
         ]);
       }
+    }
+
+    if (!isLoading && activityLog && Object.keys(activityLog?.metadata)?.length > 0) {
+      setNoteInfo({
+        reportingStartDate: activityLog.metadata?.reportingStartDate
+        ? new Date(activityLog.metadata?.reportingStartDate)
+        : new Date(),
+        reportingEndDate: activityLog.metadata?.reportingEndDate
+        ? new Date(activityLog.metadata?.reportingEndDate)
+        : new Date(),
+        jobType: activityLog.metadata?.jobType,
+        ISPOutcome: activityLog.metadata?.ISPOutcome,
+        totalHours: activityLog.metadata?.totalHours,
+      })
     }
   }, [isLoading, activityLog])
 
@@ -451,7 +509,7 @@ export default function SupportedEmploymentInterventionPage() {
             </label>
             <Input
               type="text"
-              value={activityLog?.metadata?.employer ?? ""}
+              value={user?.agency?.name ?? ""}
               disabled={true}
               className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
             />
@@ -465,12 +523,11 @@ export default function SupportedEmploymentInterventionPage() {
             Type of job (brief description of the work generally performed by the individual)
           </label>
           <VoiceEnabledTextarea
-            value={activityLog?.metadata?.jobType ?? ""}
+            value={noteInfo.jobType}
             className="min-h-[80px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
             placeholder=""
             fieldName="Type of Job"
-            disabled={true}
-            onChange={() => console.log("changed")}
+            onChange={(e) => handleNoteInfoChange("jobType", e)}
             pageTitle={pageTitle}
           />
         </div>
@@ -482,11 +539,10 @@ export default function SupportedEmploymentInterventionPage() {
             Applicable ISP Outcome(s)
           </label>
           <VoiceEnabledTextarea
-            value={activityLog?.metadata?.ISPOutcome ?? ""}
+            value={noteInfo.ISPOutcome}
             className="min-h-[80px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
             placeholder=""
-            disabled={true}
-            onChange={() => console.log("changed")}
+            onChange={(e) => handleNoteInfoChange("ISPOutcome", e)}
             fieldName="Applicable ISP Outcomes"
             pageTitle={pageTitle}
           />
@@ -500,8 +556,8 @@ export default function SupportedEmploymentInterventionPage() {
             </label>
             <Input
               type="text"
-              value={activityLog?.metadata?.totalHours ?? ""}
-              disabled={true}
+              value={noteInfo.totalHours}
+              onChange={(e) => handleNoteInfoChange("totalHours", e.target.value)}
               className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
             />
           </div>
@@ -514,12 +570,8 @@ export default function SupportedEmploymentInterventionPage() {
                 <button type="button" className="w-full focus:outline-none">
                   <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                     <InputGroupInput
-                      value={activityLog?.metadata?.reportingStartDate
-                        ? format(activityLog?.metadata?.reportingStartDate, "MMMM d, yyyy")
-                        : ""
-                      }
+                      value={noteInfo.reportingStartDate ? format(noteInfo.reportingStartDate, "MMMM d, yyyy") : ""}
                       placeholder="Select date"
-                      readOnly
                       className="text-[#10141a] border-0 bg-transparent"
                     />
                     <InputGroupAddon align="inline-end">
@@ -533,13 +585,13 @@ export default function SupportedEmploymentInterventionPage() {
                   mode="single"
                   className="bg-white"
                   captionLayout="dropdown"
+                  defaultMonth={noteInfo.reportingStartDate ?? new Date()}
                   startMonth={new Date(1924, 0)}
                   endMonth={new Date()}
-                  selected={activityLog?.metadata?.reportingStartDate ? new Date(activityLog?.metadata?.reportingStartDate) : undefined}
-                  defaultMonth={reportingStartDate ?? new Date()}
+                  selected={noteInfo.reportingStartDate}
                   onSelect={(selectedDate) => {
                     if (selectedDate) {
-                      setReportingStartDate(selectedDate);
+                      handleNoteInfoChange("reportingStartDate", selectedDate);
                       setIsStartDateOpen(false);
                     }
                   }}
@@ -552,7 +604,6 @@ export default function SupportedEmploymentInterventionPage() {
                     caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
                   }}
                   autoFocus={true}
-                  disabled={true}
                 />
               </PopoverContent>
             </Popover>
@@ -566,12 +617,8 @@ export default function SupportedEmploymentInterventionPage() {
                 <button type="button" className="w-full focus:outline-none">
                   <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                     <InputGroupInput
-                      value={activityLog?.metadata?.reportingEndDate
-                        ? format(activityLog?.metadata?.reportingEndDate, "MMMM d, yyyy")
-                        : ""
-                      }
+                      value={noteInfo.reportingEndDate ? format(noteInfo.reportingEndDate, "MMMM d, yyyy") : ""}
                       placeholder="Select date"
-                      readOnly
                       className="text-[#10141a] border-0 bg-transparent"
                     />
                     <InputGroupAddon align="inline-end">
@@ -587,13 +634,11 @@ export default function SupportedEmploymentInterventionPage() {
                   captionLayout="dropdown"
                   startMonth={new Date(1924, 0)}
                   endMonth={new Date()}
-                  selected={activityLog?.metadata?.reportingEndDate
-                    ? new Date(activityLog?.metadata?.reportingEndDate)
-                    : undefined}
-                  defaultMonth={reportingEndDate ?? new Date()}
+                  selected={noteInfo.reportingEndDate ?? new Date()}
+                  defaultMonth={noteInfo.reportingEndDate ?? new Date()}
                   onSelect={(selectedDate) => {
                     if (selectedDate) {
-                      setReportingEndDate(selectedDate);
+                      handleNoteInfoChange("reportingEndDate", selectedDate);
                       setIsEndDateOpen(false);
                     }
                   }}

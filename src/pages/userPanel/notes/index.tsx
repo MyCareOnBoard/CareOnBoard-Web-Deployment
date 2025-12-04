@@ -111,8 +111,9 @@ function NoteCard({note, noteId}: { note: NoteCardType, noteId: string | undefin
 }
 
 export default function NotesPage() {
-  const {data: responseData, isLoading} = useGetAllActivityLogsQuery();
-  const notes = responseData?.data || [];
+  const {data: notes = [], isLoading} = useGetAllActivityLogsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
 
   const [seedData, {isLoading: seedingData}] = useSeedActivityLogsMutation();
 
