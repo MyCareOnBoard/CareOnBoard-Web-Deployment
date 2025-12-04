@@ -87,8 +87,6 @@ const initialServices: ServiceRow[] = [
 
 export default function SupportedEmploymentPrePage() {
   const pageTitle = "Supported Employment Services – Pre-Employment Service Log";
-  const [reportingStartDate, setReportingStartDate] = useState<Date | undefined>(undefined);
-  const [reportingEndDate, setReportingEndDate] = useState<Date | undefined>(undefined);
   const [isStartDateOpen, setIsStartDateOpen] = useState(false);
   const [isEndDateOpen, setIsEndDateOpen] = useState(false);
   const [openServiceDateId, setOpenServiceDateId] = useState<string | null>(null);
@@ -104,12 +102,14 @@ export default function SupportedEmploymentPrePage() {
   });
 
   const [services, setServices] = useState<ServiceRow[]>(initialServices);
-  const [noteInfo, setNoteInfo] = useState({
-    jobType: "",
-    ISPOutcome: "",
+  const [noteInfo, setNoteInfo] = useState<{
+    totalHours: string;
+    reportingStartDate: Date | null;
+    reportingEndDate: Date | null;
+  }>({
     totalHours: "",
-    reportingStartDate: new Date(),
-    reportingEndDate: new Date(),
+    reportingStartDate: null,
+    reportingEndDate: null,
   })
 
   const debouncedMutateNote = useDebounce(
@@ -235,6 +235,21 @@ export default function SupportedEmploymentPrePage() {
 
   const handleSubmit = async () => {
     try {
+      if (!noteInfo.totalHours || !noteInfo.totalHours.trim()) {
+        toast.error('Please fill in the "Total Hours of SE Services" field');
+        return;
+      }
+
+      if (!noteInfo.reportingStartDate) {
+        toast.error('Please select the "Reporting Period Start Date"');
+        return;
+      }
+
+      if (!noteInfo.reportingEndDate) {
+        toast.error('Please select the "Reporting Period End Date"');
+        return;
+      }
+
       const errors = services.filter((service) => !service.id);
       if (errors.length > 0) {
         toast.error(`Please fill in all required fields for these dates ${errors.map(service => service.datesOfSeServices.date).toString()}`);
@@ -261,8 +276,12 @@ export default function SupportedEmploymentPrePage() {
 
       const modifiedNoteInfo = {
         ...updateNoteInfo,
-        reportingStartDate: updateNoteInfo?.reportingStartDate?.toISOString()?.slice(0, 10),
-        reportingEndDate: updateNoteInfo?.reportingEndDate?.toISOString()?.slice(0, 10)
+        reportingStartDate: updateNoteInfo?.reportingStartDate
+          ? updateNoteInfo?.reportingStartDate?.toISOString()?.slice(0, 10)
+          : "",
+        reportingEndDate: updateNoteInfo?.reportingEndDate
+          ? updateNoteInfo?.reportingEndDate?.toISOString()?.slice(0, 10)
+          : ""
       }
 
       if (["jobType", "ISPOutcome", "totalHours"].includes(name)) {
@@ -319,13 +338,11 @@ export default function SupportedEmploymentPrePage() {
     if (!isLoading && activityLog && Object.keys(activityLog?.metadata)?.length > 0) {
       setNoteInfo({
         reportingStartDate: activityLog.metadata?.reportingStartDate
-        ? new Date(activityLog.metadata?.reportingStartDate)
-        : new Date(),
+          ? new Date(activityLog.metadata?.reportingStartDate)
+          : new Date(),
         reportingEndDate: activityLog.metadata?.reportingEndDate
-        ? new Date(activityLog.metadata?.reportingEndDate)
-        : new Date(),
-        jobType: activityLog.metadata?.jobType,
-        ISPOutcome: activityLog.metadata?.ISPOutcome,
+          ? new Date(activityLog.metadata?.reportingEndDate)
+          : new Date(),
         totalHours: activityLog.metadata?.totalHours,
       })
     }

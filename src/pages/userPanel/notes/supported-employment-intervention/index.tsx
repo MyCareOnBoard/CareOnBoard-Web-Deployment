@@ -99,12 +99,18 @@ export default function SupportedEmploymentInterventionPage() {
     skip: !activityLogId
   });
 
-  const [noteInfo, setNoteInfo] = useState({
+  const [noteInfo, setNoteInfo] = useState<{
+    jobType: string;
+    ISPOutcome: string;
+    totalHours: string;
+    reportingStartDate: Date | null;
+    reportingEndDate: Date | null;
+  }>({
     jobType: "",
     ISPOutcome: "",
     totalHours: "",
-    reportingStartDate: new Date(),
-    reportingEndDate: new Date(),
+    reportingStartDate: null,
+    reportingEndDate: null,
   })
 
   const debouncedMutateNote = useDebounce(
@@ -298,6 +304,32 @@ export default function SupportedEmploymentInterventionPage() {
 
   const handleSubmit = async () => {
     try {
+      // Validate noteInfo fields
+      if (!noteInfo.jobType || !noteInfo.jobType.trim()) {
+        toast.error('Please fill in the "Type of job" field');
+        return;
+      }
+
+      if (!noteInfo.ISPOutcome || !noteInfo.ISPOutcome.trim()) {
+        toast.error('Please fill in the "Applicable ISP Outcome(s)" field');
+        return;
+      }
+
+      if (!noteInfo.totalHours || !noteInfo.totalHours.trim()) {
+        toast.error('Please fill in the "Total Hours of SE Services" field');
+        return;
+      }
+
+      if (!noteInfo.reportingStartDate) {
+        toast.error('Please select the "Reporting Period Start Date"');
+        return;
+      }
+
+      if (!noteInfo.reportingEndDate) {
+        toast.error('Please select the "Reporting Period End Date"');
+        return;
+      }
+
       // Validate interventions
       const interventionErrors = interventions.filter((intervention) => !intervention.id);
       if (interventionErrors.length > 0) {
@@ -341,8 +373,12 @@ export default function SupportedEmploymentInterventionPage() {
 
       const modifiedNoteInfo = {
         ...updateNoteInfo,
-        reportingStartDate: updateNoteInfo?.reportingStartDate?.toISOString()?.slice(0, 10),
-        reportingEndDate: updateNoteInfo?.reportingEndDate?.toISOString()?.slice(0, 10)
+        reportingStartDate: updateNoteInfo?.reportingStartDate
+          ? updateNoteInfo?.reportingStartDate?.toISOString()?.slice(0, 10)
+          : "",
+        reportingEndDate: updateNoteInfo?.reportingEndDate
+          ? updateNoteInfo?.reportingEndDate?.toISOString()?.slice(0, 10)
+          : ""
       }
 
       if (["jobType", "ISPOutcome", "totalHours"].includes(name)) {
@@ -425,11 +461,11 @@ export default function SupportedEmploymentInterventionPage() {
     if (!isLoading && activityLog && Object.keys(activityLog?.metadata)?.length > 0) {
       setNoteInfo({
         reportingStartDate: activityLog.metadata?.reportingStartDate
-        ? new Date(activityLog.metadata?.reportingStartDate)
-        : new Date(),
+          ? new Date(activityLog.metadata?.reportingStartDate)
+          : new Date(),
         reportingEndDate: activityLog.metadata?.reportingEndDate
-        ? new Date(activityLog.metadata?.reportingEndDate)
-        : new Date(),
+          ? new Date(activityLog.metadata?.reportingEndDate)
+          : new Date(),
         jobType: activityLog.metadata?.jobType,
         ISPOutcome: activityLog.metadata?.ISPOutcome,
         totalHours: activityLog.metadata?.totalHours,
@@ -588,7 +624,7 @@ export default function SupportedEmploymentInterventionPage() {
                   defaultMonth={noteInfo.reportingStartDate ?? new Date()}
                   startMonth={new Date(1924, 0)}
                   endMonth={new Date()}
-                  selected={noteInfo.reportingStartDate}
+                  selected={noteInfo.reportingStartDate ?? undefined}
                   onSelect={(selectedDate) => {
                     if (selectedDate) {
                       handleNoteInfoChange("reportingStartDate", selectedDate);
