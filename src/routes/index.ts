@@ -49,6 +49,8 @@ import ShiftsListPage from "@/pages/agency/scheduling/shifts";
 import ApprovalsPage from "@/pages/agency/scheduling/approvals";
 import NotesPage from "@/pages/userPanel/notes";
 import AgencyNotesPage from "@/pages/agency/notes";
+import SuperAdminLayout from "@/layouts/SuperAdminLayout";
+import AgenciesPage from "@/pages/super-admin/agencies";
 
 
 export const router = createBrowserRouter([
@@ -167,6 +169,10 @@ export const router = createBrowserRouter([
         Component: ApprovalsPage,
       },
       {
+        path: Routes.agency.support,
+        Component: SupportPage,
+      },
+      {
         path: Routes.agency.analytics,
         Component: AnalyticsPage,
       },
@@ -278,6 +284,15 @@ export const router = createBrowserRouter([
       {
         path: Routes.userPanel.expenses,
         Component: Expenses,
+      },
+    ],
+  },
+  {
+    Component: SuperAdminLayout,
+    children: [
+      {
+        path: Routes.superAdmin.agencies,
+        Component: AgenciesPage,
       },
     ],
   },

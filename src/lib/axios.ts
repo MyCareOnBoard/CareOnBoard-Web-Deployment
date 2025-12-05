@@ -100,7 +100,7 @@ const getAgencyId = (): string => {
   const cached = localStorage.getItem('agencyId');
   if (cached) return cached;
 
-  return '1';
+  return '';
 };
 
 axiosClient.interceptors.response.use(
