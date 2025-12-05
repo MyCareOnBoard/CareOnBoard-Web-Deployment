@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Plus, ChevronLeft, ChevronRight, Check, X, ArrowUpRight, Loader2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, ArrowUpRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { listShifts, Shift, ShiftStatus, deleteShift } from "@/lib/api/shifts";
@@ -9,16 +9,6 @@ import { Routes } from "@/routes/constants";
 import AddScheduleModal from "./components/AddScheduleModal";
 import { seedClients } from "@/lib/api/clients";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
-// Sample data for pending approvals
-const samplePendingApprovals = [
-  { id: "1", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
-  { id: "2", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
-  { id: "3", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
-  { id: "4", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
-  { id: "5", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
-  { id: "6", name: "DR.Brooklyn Simmons", location: "221/B Baker Street" },
-];
 import { useAuth } from "@/utils/auth";
 
 // Helper function to format time for display
@@ -139,9 +129,17 @@ export default function SchedulingPage() {
     };
   }, [shifts]);
 
+  // Get pending approvals (completed shifts that need approval)
+  const pendingApprovals = useMemo(() => {
+    return shifts.filter(shift => 
+      shift.status === ShiftStatus.COMPLETED && 
+      (shift.approved === false || shift.approved === null || shift.approved === undefined)
+    );
+  }, [shifts]);
+
   // Pagination calculations
   const totalActivityPages = Math.max(1, Math.ceil(shifts.length / itemsPerPage));
-  const totalApprovalPages = Math.max(1, Math.ceil(samplePendingApprovals.length / itemsPerPage));
+  const totalApprovalPages = Math.max(1, Math.ceil(pendingApprovals.length / itemsPerPage));
 
   // Calendar days calculation
   const calendarDays = useMemo(() => {
@@ -163,27 +161,50 @@ export default function SchedulingPage() {
     activityPage * itemsPerPage
   );
 
-  const paginatedApprovals = samplePendingApprovals.slice(
+  const paginatedApprovals = pendingApprovals.slice(
     (approvalPage - 1) * itemsPerPage,
     approvalPage * itemsPerPage
   );
 
-  const handleApprove = async (shiftId: string) => {
-    toast({
-      title: "Approval",
-      description: `Shift ${shiftId} approved successfully.`,
-    });
-    // TODO: Implement actual approval API call
+  // Calculate shift duration
+  const calculateDuration = (date: string, startTime?: string, endTime?: string): string => {
+    if (!startTime || !endTime) return "2 hours";
+
+    const parseTimeToMinutes = (time: string): number | null => {
+      const match = time.match(/(\d+)[.:](\d+):?(AM|PM)/i);
+      if (!match) return null;
+
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const period = match[3].toUpperCase();
+
+      if (period === "PM" && hours !== 12) hours += 12;
+      if (period === "AM" && hours === 12) hours = 0;
+
+      return hours * 60 + minutes;
+    };
+
+    try {
+      const startMinutes = parseTimeToMinutes(startTime);
+      const endMinutes = parseTimeToMinutes(endTime);
+
+      if (startMinutes == null || endMinutes == null) return "2 hours";
+
+      let diffMinutes = endMinutes - startMinutes;
+      if (diffMinutes <= 0) return "2 hours";
+
+      const hours = Math.floor(diffMinutes / 60);
+      const minutes = diffMinutes % 60;
+
+      if (minutes > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${hours} hours`;
+    } catch {
+      return "2 hours";
+    }
   };
 
-  const handleCancel = async (shiftId: string) => {
-    toast({
-      title: "Cancelled",
-      description: `Shift ${shiftId} has been cancelled.`,
-      variant: "destructive",
-    });
-    // TODO: Implement actual cancellation API call
-  };
 
   /**
    * Handle seeding clients with dummy data
@@ -343,10 +364,10 @@ export default function SchedulingPage() {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex flex-col gap-1">
                   <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-                    Shifts Calander View
+                    Shifts Calendar View
                   </h2>
                   <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                    These are your Pending Billing Approvals
+                    View and manage your scheduled shifts by date.
                   </p>
                 </div>
               </div>
@@ -513,65 +534,113 @@ export default function SchedulingPage() {
                   Pending Approvals
                 </h2>
                 <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                  These are your Pending Billing Approvals
+                  Completed shifts awaiting approval. Click Expand to manage.
                 </p>
               </div>
-              <button className="backdrop-blur-[22px] bg-[rgba(178,178,179,0.1)] rounded-full px-4 py-2 flex items-center gap-2 hover:bg-[rgba(178,178,179,0.2)] transition-colors">
+              <button 
+                onClick={() => navigate(Routes.agency.approvals)}
+                className="backdrop-blur-[22px] bg-[rgba(178,178,179,0.1)] rounded-full px-4 py-2 flex items-center gap-2 hover:bg-[rgba(178,178,179,0.2)] transition-colors cursor-pointer"
+              >
                 <ArrowUpRight className="w-4 h-4 text-[#808081]" />
-                <span className="text-[12px] font-normal text-[#808081]">Expand</span>
               </button>
             </div>
 
             {/* Approval Items */}
-            <div className="flex-1 space-y-4">
-              {paginatedApprovals.length === 0 ? (
+            <div className="flex-1 space-y-3">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#00b4b8]" />
+                </div>
+              ) : paginatedApprovals.length === 0 ? (
                 <div className="flex items-center justify-center py-8">
                   <p className="text-[14px] text-[#808081]">No pending approvals</p>
                 </div>
               ) : (
-                paginatedApprovals.map((approval) => (
-                  <div
-                    key={approval.id}
-                    className="flex items-center gap-5 backdrop-blur-[20px] rounded-[20px]"
-                  >
-                    <div className="flex items-center gap-5 w-[256px]">
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-[14px] font-semibold leading-[1.6] text-black">
-                          {approval.name}
-                        </span>
-                      </div>
-                      <div className="text-[12px] font-medium leading-[1.4] text-[#808081]">
-                        <p>Location</p>
-                        <p className="text-[#10141a]">{approval.location}</p>
-                      </div>
-                    </div>
+                paginatedApprovals.map((shift) => {
+                  const clientName = shift.client 
+                    ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
+                    : "Unknown Client";
+                  const clientAvatar = shift.client?.profileImage;
+                  const employeeName = shift.employee?.fullName || "Unknown DSP";
+                  const employeeAvatar = shift.employee?.profilePicture;
+                  const location = shift.location || "Unknown Location";
+                  const duration = calculateDuration(shift.date, shift.startTime, shift.endTime);
 
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2 ml-auto">
-                      <Button
-                        size="sm"
-                        onClick={() => handleApprove(approval.id)}
-                        className="bg-[#0EAF52] hover:bg-[#0d9a48] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
-                      >
-                        <Check className="w-4 h-4" />
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleCancel(approval.id)}
-                        className="bg-[#D53411] hover:bg-[#c02e0f] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
-                      >
-                        <X className="w-3 h-3" />
-                        Cancel
-                      </Button>
+                  return (
+                    <div
+                      key={shift.id}
+                      className="flex flex-wrap items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
+                    >
+                      {/* Client Info */}
+                      <div className="flex items-center gap-4 w-[256px]">
+                        <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                          {clientAvatar && (
+                            <AvatarImage
+                              src={clientAvatar}
+                              alt={clientName}
+                              className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                            />
+                          )}
+                          <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                            {getInitialsFromName(clientName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[16px] font-semibold leading-[1.6] text-black">
+                            {clientName}
+                          </span>
+                          <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                            Client
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* DSP/Employee Info */}
+                      <div className="flex items-center gap-4 w-[256px]">
+                        <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                          {employeeAvatar && (
+                            <AvatarImage
+                              src={employeeAvatar}
+                              alt={employeeName}
+                              className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                            />
+                          )}
+                          <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                            {getInitialsFromName(employeeName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[16px] font-semibold leading-[1.6] text-black">
+                            {employeeName}
+                          </span>
+                          <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                            DSP
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Location */}
+                      <div className="flex-1 flex items-center gap-[55px] w-[256px]">
+                        <div className="w-[123px]">
+                          <p className="text-[12px] font-medium leading-[1.4] text-[#808081] mb-0">Location</p>
+                          <p className="text-[12px] font-medium leading-[1.4] text-[#10141a]">{location}</p>
+                        </div>
+
+                        {/* Duration Badge */}
+                        <div className="bg-[rgba(14,175,82,0.05)] border-[0.5px] border-[#0eaf52] rounded-[60px] px-[10px] py-[6px] min-w-[59px] flex items-center justify-center">
+                          <span className="text-[12px] font-semibold text-[#0eaf52] whitespace-nowrap">
+                            {duration}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
             {/* Pagination */}
-            {samplePendingApprovals.length > 0 && (
+            {pendingApprovals.length > 0 && (
               <div className="flex items-center justify-center gap-2 mt-4">
                 <span className="text-[16px] font-medium leading-[1.6] text-[#10141a]">
                   {approvalPage}

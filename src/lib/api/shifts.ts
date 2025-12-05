@@ -67,6 +67,7 @@ export interface Shift {
     actionStatus?: ShiftActionStatus;
     type?: ShiftType; // Default: automatic
     submissionStatus?: SubmissionStatus; // Default: draft
+    approved?: boolean; // Whether the shift is approved
     timeRemaining?: number; // minutes remaining
     sessionDuration?: string; // e.g., "2 hour session"
     service?: string;
@@ -145,6 +146,7 @@ export interface UpdateShiftRequest {
     submissionStatus?: SubmissionStatus;
     employeeId?: string;
     clientId?: string;
+    approved?: boolean;
 }
 
 /**

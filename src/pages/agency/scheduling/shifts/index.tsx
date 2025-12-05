@@ -340,7 +340,7 @@ export default function ShiftsListPage() {
                 Shifts ( {selectedDate ? format(selectedDate, "d MMMM") : format(new Date(), "d MMMM")} )
               </h2>
               <p className="text-[14px] font-medium leading-[1.4] text-[#808081] capitalize">
-                Number of expiring or missing documents/training.
+                All scheduled shifts for your agency.
               </p>
             </div>
 
