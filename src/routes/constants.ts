@@ -18,6 +18,7 @@ export const Routes = {
     billingAndApprovals: "/agency/billing-and-approvals",
     aiAutomation: "/agency/automations",
     scheduling: "/agency/scheduling",
+    support: "/agency/support",
     analytics: "/agency/analytics",
     applicantDirectory: "/agency/applicant-directory",
     reports: "/agency/reports",
