@@ -1,14 +1,16 @@
 import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Input} from "@/components/ui/input";
+import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Calendar} from "@/components/ui/calendar";
+import CalendarDaysIcon from "@/assets/icons/calendar-days.svg?react";
 import InformationCircleIcon from "@/assets/icons/information-circle.svg?react";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import ContentEditableCell from "@/components/ContentEditableCell";
 import TimePicker from "@/components/TimePicker";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import React, {useEffect, useState} from "react";
-import {useUpdateSubmittedNoteMutation} from "@/pages/agency/notes/api";
+import {useUpdateSubmittedNoteMutation, useUpdateActivityLogMutation} from "@/pages/agency/notes/api";
 import {useDebounce} from "@/hooks/useDebounce";
 import {format} from "date-fns";
 import {SubmittedNoteDetails} from "@/pages/agency/notes/apiTypes";
@@ -80,11 +82,28 @@ export default function AgencySupportedEmploymentIntervention(
 ) {
   const pageTitle = "Supported Employment Services – Intervention Plan and Service Log";
 
+  const [isStartDateOpen, setIsStartDateOpen] = useState(false);
+  const [isEndDateOpen, setIsEndDateOpen] = useState(false);
   const [openServiceDateId, setOpenServiceDateId] = useState<string | null>(null);
   const [interventions, setInterventions] = useState<InterventionRow[]>(initialInterventions);
   const [services, setServices] = useState<ServiceRow[]>(initialServices);
 
+  const [noteInfo, setNoteInfo] = useState<{
+    jobType: string;
+    ISPOutcome: string;
+    totalHours: string;
+    reportingStartDate: Date | null;
+    reportingEndDate: Date | null;
+  }>({
+    jobType: "",
+    ISPOutcome: "",
+    totalHours: "",
+    reportingStartDate: null,
+    reportingEndDate: null,
+  })
+
   const [mutateNote] = useUpdateSubmittedNoteMutation();
+  const [updateLog] = useUpdateActivityLogMutation();
 
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric", year: "numeric"});
 
@@ -96,6 +115,15 @@ export default function AgencySupportedEmploymentIntervention(
     },
     500
   );
+
+  const debounceUpdateNote = useDebounce(
+    async (params: any) => {
+      await updateLog(params).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
+      });
+    },
+    500
+  )
 
   const updateIntervention = async (
     id: string,
@@ -267,6 +295,39 @@ export default function AgencySupportedEmploymentIntervention(
     return `${hours}h ${minutes}m`;
   };
 
+  const handleNoteInfoChange = (name: string, value: any) => {
+    setNoteInfo((prevState) => {
+      const updateNoteInfo = {
+        ...prevState,
+        [name]: value
+      }
+
+      const modifiedNoteInfo = {
+        ...updateNoteInfo,
+        reportingStartDate: updateNoteInfo?.reportingStartDate
+          ? updateNoteInfo?.reportingStartDate?.toISOString()?.slice(0, 10)
+          : "",
+        reportingEndDate: updateNoteInfo?.reportingEndDate
+          ? updateNoteInfo?.reportingEndDate?.toISOString()?.slice(0, 10)
+          : ""
+      }
+
+      if (["jobType", "ISPOutcome", "totalHours"].includes(name)) {
+        debounceUpdateNote({
+          submissionId: submissionId!,
+          data: modifiedNoteInfo
+        })
+      } else {
+        updateLog({
+          submissionId: submissionId!,
+          data: modifiedNoteInfo
+        }).unwrap();
+      }
+
+      return updateNoteInfo;
+    })
+  }
+
   useEffect(() => {
     if (!isLoading && submittedNote && submittedNote.notes.length > 0) {
       const serviceNotes = submittedNote.notes.filter((note) => note.metadata?.type === "service");
@@ -300,6 +361,20 @@ export default function AgencySupportedEmploymentIntervention(
         ...formattedInterventionNotes,
         ...initialInterventions.slice(formattedInterventionNotes.length)
       ]);
+    }
+
+    if (!isLoading && submittedNote && Object.keys(submittedNote?.metadata)?.length > 0) {
+      setNoteInfo({
+        reportingStartDate: submittedNote.metadata?.reportingStartDate
+          ? new Date(submittedNote.metadata?.reportingStartDate)
+          : null,
+        reportingEndDate: submittedNote.metadata?.reportingEndDate
+          ? new Date(submittedNote.metadata?.reportingEndDate)
+          : null,
+        jobType: submittedNote.metadata?.jobType || "",
+        ISPOutcome: submittedNote.metadata?.ISPOutcome || "",
+        totalHours: submittedNote.metadata?.totalHours || "",
+      })
     }
   }, [isLoading, submittedNote]);
 
@@ -359,12 +434,12 @@ export default function AgencySupportedEmploymentIntervention(
             Type of job (brief description of the work generally performed by the individual)
           </label>
           <VoiceEnabledTextarea
-            value={submittedNote?.metadata?.jobType ?? ""}
+            value={noteInfo.jobType}
             className="min-h-[80px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
             placeholder=""
             fieldName="Type of Job"
-            disabled={true}
-            onChange={() => console.log("changed")}
+            disabled={!isEditable}
+            onChange={(e) => handleNoteInfoChange("jobType", e)}
             pageTitle={pageTitle}
           />
         </div>
@@ -376,11 +451,11 @@ export default function AgencySupportedEmploymentIntervention(
             Applicable ISP Outcome(s)
           </label>
           <VoiceEnabledTextarea
-            value={submittedNote?.metadata?.ISPOutcome ?? ""}
+            value={noteInfo.ISPOutcome}
             className="min-h-[80px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
             placeholder=""
-            disabled={true}
-            onChange={() => console.log("changed")}
+            disabled={!isEditable}
+            onChange={(e) => handleNoteInfoChange("ISPOutcome", e)}
             fieldName="Applicable ISP Outcomes"
             pageTitle={pageTitle}
           />
@@ -394,8 +469,9 @@ export default function AgencySupportedEmploymentIntervention(
             </label>
             <Input
               type="text"
-              value={submittedNote?.metadata?.totalHours ?? ""}
-              disabled={true}
+              value={noteInfo.totalHours}
+              onChange={(e) => handleNoteInfoChange("totalHours", e.target.value)}
+              disabled={!isEditable}
               className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
             />
           </div>
@@ -403,29 +479,97 @@ export default function AgencySupportedEmploymentIntervention(
             <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
               Reporting Period Start Date
             </label>
-            <Input
-              type="text"
-              value={submittedNote?.metadata?.reportingStartDate
-                ? format(new Date(submittedNote?.metadata?.reportingStartDate), "MMMM d, yyyy")
-                : ""
-              }
-              disabled={true}
-              className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
-            />
+            <Popover open={isStartDateOpen} onOpenChange={setIsStartDateOpen}>
+              <PopoverTrigger asChild>
+                <button type="button" className="w-full focus:outline-none" disabled={!isEditable}>
+                  <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                    <InputGroupInput
+                      value={noteInfo.reportingStartDate ? format(noteInfo.reportingStartDate, "MMMM d, yyyy") : ""}
+                      placeholder="Select date"
+                      className="text-[#10141a] border-0 bg-transparent"
+                      readOnly
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <CalendarDaysIcon className="h-5 w-5 text-[#808081]"/>
+                    </InputGroupAddon>
+                  </InputGroup>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                <Calendar
+                  mode="single"
+                  className="bg-white"
+                  captionLayout="dropdown"
+                  defaultMonth={noteInfo.reportingStartDate ?? new Date()}
+                  startMonth={new Date(1924, 0)}
+                  endMonth={new Date()}
+                  selected={noteInfo.reportingStartDate ?? undefined}
+                  onSelect={(selectedDate) => {
+                    if (selectedDate) {
+                      handleNoteInfoChange("reportingStartDate", selectedDate);
+                      setIsStartDateOpen(false);
+                    }
+                  }}
+                  formatters={{
+                    formatMonthDropdown: (date) =>
+                      date.toLocaleString("default", {month: "long"}),
+                  }}
+                  classNames={{
+                    dropdown_root: "relative border-none shadow-none has-focus:ring-0",
+                    caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
+                  }}
+                  autoFocus={true}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
               Reporting Period End Date
             </label>
-            <Input
-              type="text"
-              value={submittedNote?.metadata?.reportingEndDate
-                ? format(new Date(submittedNote?.metadata?.reportingEndDate), "MMMM d, yyyy")
-                : ""
-              }
-              disabled={true}
-              className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
-            />
+            <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
+              <PopoverTrigger asChild>
+                <button type="button" className="w-full focus:outline-none" disabled={!isEditable}>
+                  <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                    <InputGroupInput
+                      value={noteInfo.reportingEndDate ? format(noteInfo.reportingEndDate, "MMMM d, yyyy") : ""}
+                      placeholder="Select date"
+                      className="text-[#10141a] border-0 bg-transparent"
+                      readOnly
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <CalendarDaysIcon className="h-5 w-5 text-[#808081]"/>
+                    </InputGroupAddon>
+                  </InputGroup>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                <Calendar
+                  mode="single"
+                  className="bg-white"
+                  captionLayout="dropdown"
+                  startMonth={new Date(1924, 0)}
+                  endMonth={new Date()}
+                  selected={noteInfo.reportingEndDate ?? new Date()}
+                  defaultMonth={noteInfo.reportingEndDate ?? new Date()}
+                  onSelect={(selectedDate) => {
+                    if (selectedDate) {
+                      handleNoteInfoChange("reportingEndDate", selectedDate);
+                      setIsEndDateOpen(false);
+                    }
+                  }}
+                  formatters={{
+                    formatMonthDropdown: (date) =>
+                      date.toLocaleString("default", {month: "long"}),
+                  }}
+                  classNames={{
+                    dropdown_root: "relative border-none shadow-none has-focus:ring-0",
+                    caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
+                  }}
+                  autoFocus={true}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 

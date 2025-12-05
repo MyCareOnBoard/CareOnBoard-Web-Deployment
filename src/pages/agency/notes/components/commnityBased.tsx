@@ -7,7 +7,7 @@ import TimePicker from "@/components/TimePicker";
 import ContentEditableCell from "@/components/ContentEditableCell";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import React, {useEffect, useState} from "react";
-import {useUpdateSubmittedNoteMutation} from "@/pages/agency/notes/api";
+import {useUpdateSubmittedNoteMutation, useUpdateActivityLogMutation} from "@/pages/agency/notes/api";
 import {useDebounce} from "@/hooks/useDebounce";
 import {format} from "date-fns";
 import {SubmittedNoteDetails} from "@/pages/agency/notes/apiTypes";
@@ -50,6 +50,7 @@ export default function AgencyCommunityBasedNote(
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
 
   const [mutateNote] = useUpdateSubmittedNoteMutation();
+  const [updateLog] = useUpdateActivityLogMutation();
 
   const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
 
@@ -165,9 +166,20 @@ export default function AgencyCommunityBasedNote(
   };
 
   const toggleStrategy = (id: string) => {
-    setServiceStrategies(serviceStrategies.map(strategy =>
+    const newServiceStrategies = serviceStrategies.map(strategy =>
       strategy.id === id ? {...strategy, checked: !strategy.checked} : strategy
-    ));
+    );
+    setServiceStrategies(newServiceStrategies);
+
+    if (submissionId) {
+      const strategies = newServiceStrategies.filter(strategy => strategy.checked).map(strategy => strategy.id);
+      updateLog({
+        submissionId: submissionId,
+        data: {
+          strategies
+        }
+      }).unwrap();
+    }
   };
 
   useEffect(() => {
@@ -298,6 +310,7 @@ export default function AgencyCommunityBasedNote(
                 key={strategy.id}
                 checked={submittedNote?.metadata?.strategies?.includes(strategy.id) || strategy.checked}
                 onChange={() => toggleStrategy(strategy.id)}
+                disabled={submittedNote?.status !== "submitted"}
                 label={strategy.label}
                 labelClassName="text-[14px] font-normal leading-[1.4] text-[#808081] font-['Urbanist',sans-serif]"
               />

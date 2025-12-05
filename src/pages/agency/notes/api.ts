@@ -59,6 +59,15 @@ export const agencyNotesApi = createApi({
       }),
       invalidatesTags: ['SubmittedNoteDetails']
     }),
+    updateActivityLog: builder.mutation<any, { submissionId: string, data: any }>({
+      query: ({submissionId, data}) => ({
+        url: `/employees/submitted-notes/${submissionId}`,
+        method: "PATCH",
+        requiresAuth: true,
+        data
+      }),
+      invalidatesTags: ['SubmittedNoteDetails']
+    }),
   }),
 });
 
@@ -68,4 +77,5 @@ export const {
   useRejectSubmittedNotesMutation,
   useGetSubmittedNoteDetailsQuery,
   useUpdateSubmittedNoteMutation,
+  useUpdateActivityLogMutation,
 } = agencyNotesApi;

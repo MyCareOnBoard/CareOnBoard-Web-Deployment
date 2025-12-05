@@ -30,6 +30,7 @@ export default function RespiteLogPage() {
   const [selectedMeals, setSelectedMeals] = useState<MealType[]>(["breakfast"]);
   const [activities, setActivities] = useState("");
   const [comments, setComments] = useState("");
+  const [toileting, setToileting] = useState("");
   const [healthConcerns, setHealthConcerns] = useState("");
   const [suppliesNeeded, setSuppliesNeeded] = useState("");
   const [selectedActivity, setSelectedActivity] = useState<string>("");
@@ -65,6 +66,7 @@ export default function RespiteLogPage() {
             meals: selectedMeals,
             activities: activities,
             comments: comments,
+            toileting: toileting,
             healthConcerns: healthConcerns,
             suppliesNeeded: suppliesNeeded,
             medicationTime: medicationTime
@@ -94,6 +96,7 @@ export default function RespiteLogPage() {
             meals: selectedMeals,
             activities: activities,
             comments: comments,
+            toileting: toileting,
             healthConcerns: healthConcerns,
             suppliesNeeded: suppliesNeeded,
             medicationTime: medicationTime
@@ -113,6 +116,7 @@ export default function RespiteLogPage() {
       setComments("");
       setHealthConcerns("");
       setSuppliesNeeded("");
+      setToileting("");
       setSelectedActivity("");
     } catch (error) {
       console.error("Error saving activity log:", error);
@@ -131,6 +135,7 @@ export default function RespiteLogPage() {
       setHealthConcerns(note?.metadata?.healthConcerns ?? "");
       setSuppliesNeeded(note?.metadata?.suppliesNeeded ?? "");
       setSelectedActivity(note.id);
+      setToileting(note?.metadata?.toileting ?? "");
     }
   }, [activityLog]);
 
@@ -200,8 +205,8 @@ export default function RespiteLogPage() {
               </label>
               <Input
                 type="text"
-                value={activityLog?.metadata?.toileting ?? ""}
-                disabled={true}
+                value={toileting}
+                onChange={(e) => setToileting(e.target.value)}
                 className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
               />
             </div>

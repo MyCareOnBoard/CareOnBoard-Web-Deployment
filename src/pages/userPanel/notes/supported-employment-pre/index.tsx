@@ -17,13 +17,11 @@ import {useLocation, useNavigate} from "react-router";
 import {
   useCreateOrUpdateActivityLogMutation,
   useGetSingleActivityLogQuery,
-  useSubmitActivityLogNotesMutation
+  useSubmitActivityLogNotesMutation, useUpdateActivityLogMutation
 } from "@/pages/userPanel/notes/api";
-import {useSelector} from "react-redux";
-import {RootState} from "@/store/redux/store";
 import {useDebounce} from "@/hooks/useDebounce";
 import {toast} from "sonner";
-import { useAuth } from "@/utils/auth";
+import {useAuth} from "@/utils/auth";
 
 type ServiceRow = {
   id: string;
@@ -89,22 +87,30 @@ const initialServices: ServiceRow[] = [
 
 export default function SupportedEmploymentPrePage() {
   const pageTitle = "Supported Employment Services – Pre-Employment Service Log";
-  const [reportingStartDate, setReportingStartDate] = useState<Date | undefined>(undefined);
-  const [reportingEndDate, setReportingEndDate] = useState<Date | undefined>(undefined);
   const [isStartDateOpen, setIsStartDateOpen] = useState(false);
   const [isEndDateOpen, setIsEndDateOpen] = useState(false);
   const [openServiceDateId, setOpenServiceDateId] = useState<string | null>(null);
-  const { user } = useAuth();
+  const {user} = useAuth();
 
   const navigate = useNavigate();
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
+  const [updateLog] = useUpdateActivityLogMutation();
   const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId
   });
 
   const [services, setServices] = useState<ServiceRow[]>(initialServices);
+  const [noteInfo, setNoteInfo] = useState<{
+    totalHours: string;
+    reportingStartDate: Date | null;
+    reportingEndDate: Date | null;
+  }>({
+    totalHours: "",
+    reportingStartDate: null,
+    reportingEndDate: null,
+  })
 
   const debouncedMutateNote = useDebounce(
     async (params: any) => {
@@ -114,6 +120,16 @@ export default function SupportedEmploymentPrePage() {
     },
     500
   );
+
+  const debounceUpdateNote = useDebounce(
+    async (params: any) => {
+      await updateLog(params).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
+      });
+    },
+    500
+  )
+
 
   const updateService = async (
     id: string,
@@ -219,6 +235,21 @@ export default function SupportedEmploymentPrePage() {
 
   const handleSubmit = async () => {
     try {
+      if (!noteInfo.totalHours || !noteInfo.totalHours.trim()) {
+        toast.error('Please fill in the "Total Hours of SE Services" field');
+        return;
+      }
+
+      if (!noteInfo.reportingStartDate) {
+        toast.error('Please select the "Reporting Period Start Date"');
+        return;
+      }
+
+      if (!noteInfo.reportingEndDate) {
+        toast.error('Please select the "Reporting Period End Date"');
+        return;
+      }
+
       const errors = services.filter((service) => !service.id);
       if (errors.length > 0) {
         toast.error(`Please fill in all required fields for these dates ${errors.map(service => service.datesOfSeServices.date).toString()}`);
@@ -234,6 +265,39 @@ export default function SupportedEmploymentPrePage() {
       console.error('Error submitting activity log:', error);
       toast.error(error?.data?.message || 'Failed to submit activity log.');
     }
+  }
+
+  const handleNoteInfoChange = (name: string, value: any) => {
+    setNoteInfo((prevState) => {
+      const updateNoteInfo = {
+        ...prevState,
+        [name]: value
+      }
+
+      const modifiedNoteInfo = {
+        ...updateNoteInfo,
+        reportingStartDate: updateNoteInfo?.reportingStartDate
+          ? updateNoteInfo?.reportingStartDate?.toISOString()?.slice(0, 10)
+          : "",
+        reportingEndDate: updateNoteInfo?.reportingEndDate
+          ? updateNoteInfo?.reportingEndDate?.toISOString()?.slice(0, 10)
+          : ""
+      }
+
+      if (["jobType", "ISPOutcome", "totalHours"].includes(name)) {
+        debounceUpdateNote({
+          activityLog: activityLogId!,
+          data: modifiedNoteInfo
+        })
+      } else {
+        updateLog({
+          activityLog: activityLogId!,
+          data: modifiedNoteInfo
+        }).unwrap();
+      }
+
+      return updateNoteInfo;
+    })
   }
 
   useEffect(() => {
@@ -269,6 +333,18 @@ export default function SupportedEmploymentPrePage() {
           ...initialServices.slice(formattedNotes.length)
         ]);
       }
+    }
+
+    if (!isLoading && activityLog && Object.keys(activityLog?.metadata)?.length > 0) {
+      setNoteInfo({
+        reportingStartDate: activityLog.metadata?.reportingStartDate
+          ? new Date(activityLog.metadata?.reportingStartDate)
+          : new Date(),
+        reportingEndDate: activityLog.metadata?.reportingEndDate
+          ? new Date(activityLog.metadata?.reportingEndDate)
+          : new Date(),
+        totalHours: activityLog.metadata?.totalHours,
+      })
     }
   }, [isLoading, activityLog])
 
@@ -346,8 +422,8 @@ export default function SupportedEmploymentPrePage() {
             </label>
             <Input
               type="text"
-              value={activityLog?.metadata?.totalHours || ""}
-              disabled={true}
+              value={noteInfo?.totalHours}
+              onChange={(event) => handleNoteInfoChange("totalHours", event.target.value)}
               className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
             />
           </div>
@@ -360,12 +436,11 @@ export default function SupportedEmploymentPrePage() {
                 <button type="button" className="w-full focus:outline-none">
                   <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                     <InputGroupInput
-                      value={activityLog?.metadata?.reportingStartDate
-                        ? format(activityLog?.metadata?.reportingStartDate, "MMMM d, yyyy")
+                      value={noteInfo?.reportingStartDate
+                        ? format(noteInfo?.reportingStartDate, "MMMM d, yyyy")
                         : ""
                       }
                       placeholder="Select date"
-                      readOnly
                       className="text-[#10141a] border-0 bg-transparent"
                     />
                     <InputGroupAddon align="inline-end">
@@ -381,11 +456,11 @@ export default function SupportedEmploymentPrePage() {
                   captionLayout="dropdown"
                   startMonth={new Date(1924, 0)}
                   endMonth={new Date()}
-                  selected={activityLog?.metadata?.reportingStartDate ? new Date(activityLog?.metadata?.reportingStartDate) : undefined}
-                  defaultMonth={reportingStartDate ?? new Date()}
+                  selected={noteInfo?.reportingStartDate ? new Date(noteInfo?.reportingStartDate) : undefined}
+                  defaultMonth={noteInfo?.reportingStartDate ?? new Date()}
                   onSelect={(selectedDate) => {
                     if (selectedDate) {
-                      setReportingStartDate(selectedDate);
+                      handleNoteInfoChange("reportingStartDate", selectedDate);
                       setIsStartDateOpen(false);
                     }
                   }}
@@ -397,7 +472,6 @@ export default function SupportedEmploymentPrePage() {
                     dropdown_root: "relative border-none shadow-none has-focus:ring-0",
                     caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
                   }}
-                  disabled={true}
                   autoFocus={true}
                 />
               </PopoverContent>
@@ -412,8 +486,8 @@ export default function SupportedEmploymentPrePage() {
                 <button type="button" className="w-full focus:outline-none">
                   <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                     <InputGroupInput
-                      value={activityLog?.metadata?.reportingEndDate
-                        ? format(activityLog?.metadata?.reportingEndDate, "MMMM d, yyyy")
+                      value={noteInfo?.reportingEndDate
+                        ? format(noteInfo?.reportingEndDate, "MMMM d, yyyy")
                         : ""
                       }
                       placeholder="Select date"
@@ -433,14 +507,13 @@ export default function SupportedEmploymentPrePage() {
                   captionLayout="dropdown"
                   startMonth={new Date(1924, 0)}
                   endMonth={new Date()}
-                  selected={activityLog?.metadata?.reportingEndDate
-                    ? new Date(activityLog?.metadata?.reportingEndDate)
+                  selected={noteInfo?.reportingEndDate
+                    ? new Date(noteInfo?.reportingEndDate)
                     : undefined}
-                  disabled={true}
-                  defaultMonth={reportingEndDate ?? new Date()}
+                  defaultMonth={noteInfo?.reportingEndDate ?? new Date()}
                   onSelect={(selectedDate) => {
                     if (selectedDate) {
-                      setReportingEndDate(selectedDate);
+                      handleNoteInfoChange("reportingEndDate", selectedDate);
                       setIsEndDateOpen(false);
                     }
                   }}

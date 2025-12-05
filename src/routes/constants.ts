@@ -25,6 +25,7 @@ export const Routes = {
     complianceAlerts: "/agency/compliance-alerts",
     shifts: "/agency/dashboard/shifts",
     shiftsList: "/agency/scheduling/shifts",
+    approvals: "/agency/scheduling/approvals",
     notes: "/agency/notes",
     helpCenter: "/agency/help-center",
     settings: "/agency/settings",
