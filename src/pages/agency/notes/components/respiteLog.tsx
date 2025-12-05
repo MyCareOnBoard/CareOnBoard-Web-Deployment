@@ -30,6 +30,7 @@ export default function AgencyRespiteLog(
   const [selectedMeals, setSelectedMeals] = useState<MealType[]>([]);
   const [activities, setActivities] = useState("");
   const [comments, setComments] = useState("");
+  const [toileting, setToileting] = useState("");
   const [healthConcerns, setHealthConcerns] = useState("");
   const [suppliesNeeded, setSuppliesNeeded] = useState("");
   const [noteId, setNoteId] = useState<string>("");
@@ -61,6 +62,7 @@ export default function AgencyRespiteLog(
             meals: selectedMeals,
             activities: activities,
             comments: comments,
+            toileting: toileting,
             healthConcerns: healthConcerns,
             suppliesNeeded: suppliesNeeded,
             medicationTime: medicationTime
@@ -84,7 +86,7 @@ export default function AgencyRespiteLog(
 
   useEffect(() => {
     if (!isLoading && submittedNote && submittedNote.notes.length > 0) {
-      const note = submittedNote.notes[0]; // Respite log typically has one note
+      const note = submittedNote.notes[0];
       setNoteId(note.id);
       setDate(note?.startDate ? new Date(note.startDate) : undefined);
       setMedication(note?.metadata?.medication ?? "");
@@ -94,6 +96,7 @@ export default function AgencyRespiteLog(
       setComments(note?.metadata?.comments ?? "");
       setHealthConcerns(note?.metadata?.healthConcerns ?? "");
       setSuppliesNeeded(note?.metadata?.suppliesNeeded ?? "");
+      setToileting(note?.metadata?.toileting ?? "");
     }
   }, [isLoading, submittedNote]);
 
@@ -151,8 +154,8 @@ export default function AgencyRespiteLog(
               </label>
               <Input
                 type="text"
-                value={submittedNote?.metadata?.toileting ?? ""}
-                disabled={true}
+                value={toileting}
+                onChange={(e) => setToileting(e.target.value)}
                 className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
               />
             </div>

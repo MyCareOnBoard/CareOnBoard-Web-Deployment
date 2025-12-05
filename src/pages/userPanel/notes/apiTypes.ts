@@ -36,3 +36,12 @@ export interface CreateActivityLogPayload {
   metadata?: Record<string, any>;
   index?: number;
 }
+
+export interface UpdateActivityLogPayload {
+  strategies?: string[];
+  jobType?: string;
+  ISPOutcome?: string;
+  totalHours?: string;
+  reportingStartDate?: string;
+  reportingEndDate?: string;
+}
