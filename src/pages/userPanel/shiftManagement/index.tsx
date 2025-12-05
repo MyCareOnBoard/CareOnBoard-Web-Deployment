@@ -173,6 +173,7 @@ function ShiftCard({ shift, panel, showDate = false, showAction = true, onAction
   };
 
   const getActionButton = () => {
+    console.log("shift", shift.actionStatus);
     if (!showAction || !shift.actionStatus) return null;
 
     const buttonConfig = {
