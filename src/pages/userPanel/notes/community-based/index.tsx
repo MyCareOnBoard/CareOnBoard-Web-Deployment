@@ -15,11 +15,11 @@ import {useLocation, useNavigate} from "react-router";
 import {
   useCreateOrUpdateActivityLogMutation,
   useGetSingleActivityLogQuery,
-  useSubmitActivityLogNotesMutation
+  useSubmitActivityLogNotesMutation, useUpdateActivityLogMutation
 } from "@/pages/userPanel/notes/api";
 import {toast} from "sonner";
 import {useDebounce} from "@/hooks/useDebounce";
-import { useAuth } from "@/utils/auth";
+import {useAuth} from "@/utils/auth";
 
 type ActivityRow = {
   id: string;
@@ -51,13 +51,14 @@ export default function CommunityBasedPage() {
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const {user} = useAuth();
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
 
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId
   });
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
+  const [updateLog] = useUpdateActivityLogMutation();
   const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
 
   const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
@@ -174,9 +175,23 @@ export default function CommunityBasedPage() {
   };
 
   const toggleStrategy = (id: string) => {
-    setServiceStrategies(serviceStrategies.map(strategy =>
-      strategy.id === id ? {...strategy, checked: !strategy.checked} : strategy
-    ));
+    setServiceStrategies((prevState) => {
+      const newServiceStrategies = prevState.map(strategy =>
+        strategy.id === id ? {...strategy, checked: !strategy.checked} : strategy
+      )
+
+      if (activityLogId) {
+        const strategies = newServiceStrategies.filter(strategy => strategy.checked).map(strategy => strategy.id);
+        updateLog({
+          activityLog: activityLogId,
+          data: {
+            strategies
+          }
+        }).unwrap();
+      }
+
+      return newServiceStrategies
+    });
   };
 
   const handleSubmit = async () => {
@@ -232,6 +247,13 @@ export default function CommunityBasedPage() {
           ...initialActivities.slice(modifyActivityNotes.length)
         ]);
       }
+    }
+
+    if (!isLoading && activityLog && activityLog.metadata?.strategies?.length > 0) {
+      setServiceStrategies((prevState) => prevState.map((strategy) => ({
+        ...strategy,
+        checked: activityLog.metadata?.strategies?.includes(strategy.id)
+      })))
     }
   }, [isLoading, activityLog]);
 

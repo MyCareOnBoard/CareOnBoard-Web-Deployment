@@ -2,9 +2,9 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import {
   CreateActivityLogPayload,
-  GetActivityLogResponse,
-  GetActivityLogsResponse
+  GetActivityLogResponse, UpdateActivityLogPayload,
 } from "@/pages/userPanel/notes/apiTypes";
+import {ActivityLog} from "@/lib/api/employees";
 
 
 export const userPanelNotesApi = createApi({
@@ -12,7 +12,7 @@ export const userPanelNotesApi = createApi({
   baseQuery: customBaseQuery,
   tagTypes: ['ActivityLogs', 'SingleActivityLog'],
   endpoints: (builder) => ({
-    getAllActivityLogs: builder.query<GetActivityLogsResponse, void>({
+    getAllActivityLogs: builder.query<ActivityLog[], void>({
       query: () => ({
         url: `/employees/activity-logs`,
         method: "GET",
@@ -32,6 +32,15 @@ export const userPanelNotesApi = createApi({
       query: ({ activityLog, data }) => ({
         url: `/employees/activity-logs/${activityLog}/notes`,
         method: "PUT",
+        requiresAuth: true,
+        data
+      }),
+      invalidatesTags: ['SingleActivityLog']
+    }),
+    updateActivityLog: builder.mutation<{ data: GetActivityLogResponse }, { activityLog: string, data: UpdateActivityLogPayload }>({
+      query: ({ activityLog, data }) => ({
+        url: `/employees/activity-logs/${activityLog}`,
+        method: "PATCH",
         requiresAuth: true,
         data
       }),
@@ -63,5 +72,6 @@ export const {
   useGetSingleActivityLogQuery,
   useCreateOrUpdateActivityLogMutation,
   useSubmitActivityLogNotesMutation,
-  useSeedActivityLogsMutation
+  useSeedActivityLogsMutation,
+  useUpdateActivityLogMutation
 } = userPanelNotesApi;
