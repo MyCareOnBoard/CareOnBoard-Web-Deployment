@@ -53,6 +53,9 @@ export const Routes = {
     settings: "/user-panel/settings",
     profile: "/user-panel/profile",
   },
+  superAdmin: {
+    agencies: "/super-admin/agencies",
+  },
   auth: {
     login: "/auth/login",
     signup: "/auth/signup",
