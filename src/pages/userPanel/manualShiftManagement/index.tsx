@@ -16,9 +16,6 @@ import { searchClients, Client } from "@/lib/api/clients";
 import { useAuth } from "@/utils/auth";
 
 interface FormData {
-  yourFirstName: string;
-  yourLastName: string;
-  yourEmail: string;
   client: string;
   clientId: string;
   location: string;
@@ -120,7 +117,6 @@ export default function ManualShiftManagementPage() {
   
   const locationInputRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   // Signature upload mutation
   const [signDocument] = useSignDocumentMutation();
 
@@ -133,13 +129,15 @@ export default function ManualShiftManagementPage() {
   });
 
   const [formData, setFormData] = useState<FormData>({
-    yourFirstName: "",
-    yourLastName: "",
-    yourEmail: "",
     client: "",
     clientId: "",
     location: "",
   });
+  const employeeName =
+    user?.profile?.fullName ||
+    [user?.profile?.firstName, user?.profile?.lastName].filter(Boolean).join(" ").trim() ||
+    "";
+  const agencyName = user?.agency?.name || "";
 
   // Client search states
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
@@ -932,38 +930,26 @@ export default function ManualShiftManagementPage() {
         {/* Form Container */}
         <div className="">
           {/* Personal Information */}
-          <div className="grid grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-2 gap-6 mb-8">
             <div>
               <label className="block mb-2 text-sm font-medium text-[#10141a]">
-                Your First Name
+                Employee
               </label>
               <Input
-                value={formData.yourFirstName}
-                onChange={(e) => handleInputChange("yourFirstName", e.target.value)}
-                className="border-[#e5e5e6] rounded-md"
-                disabled
-              />
-            </div>
-            <div>
-              <label className="block mb-2 text-sm font-medium text-[#10141a]">
-                Your Last Name
-              </label>
-              <Input
-                value={formData.yourLastName}
-                onChange={(e) => handleInputChange("yourLastName", e.target.value)}
-                className="border-[#e5e5e6] rounded-md"
-                disabled
-              />
-            </div>
-            <div>
-              <label className="block mb-2 text-sm font-medium text-[#10141a]">
-                Your Email
-              </label>
-              <Input
-                value={formData.yourEmail}
-                onChange={(e) => handleInputChange("yourEmail", e.target.value)}
+                value={employeeName}
                 className="border-[#e5e5e6] rounded-md bg-[#f8f9fa] cursor-not-allowed"
-                placeholder="youremail@long.agency"
+                placeholder="Employee"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block mb-2 text-sm font-medium text-[#10141a]">
+                Agency
+              </label>
+              <Input
+                value={agencyName}
+                className="border-[#e5e5e6] rounded-md bg-[#f8f9fa] cursor-not-allowed"
+                placeholder="Agency"
                 disabled
               />
             </div>

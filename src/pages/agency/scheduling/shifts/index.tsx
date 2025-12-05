@@ -193,10 +193,6 @@ export default function ShiftsListPage() {
 
       await deleteShift(shiftId);
       setShifts(prev => prev.filter(s => s.id !== shiftId));
-      toast({
-        title: "Cancelled",
-        description: "Shift has been cancelled successfully.",
-      });
       setShowCancelledModal(true);
     } catch (error) {
       toast({
