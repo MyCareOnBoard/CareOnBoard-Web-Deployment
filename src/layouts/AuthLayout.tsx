@@ -43,7 +43,7 @@ export default function AuthLayout() {
   }
 
   useLayoutEffect(() => {
-    if (agencyId !== "undefined") {
+    if (agencyId && agencyId !== "undefined") {
       fetchAgencyInfo();
     }
   }, []);
