@@ -272,7 +272,7 @@ export default function SchedulingPage() {
       </div>
 
               {/* Stats Section */}
-              <div className="flex gap-12 px-6">
+              <div className="flex gap-12 px-6 cursor-pointer" onClick={() => navigate(Routes.agency.shiftsList)}>
                 {/* Active */}
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[40px] font-semibold leading-normal text-[#10141a]">
@@ -315,7 +315,6 @@ export default function SchedulingPage() {
 
               {/* Expand Button */}
               <button 
-                onClick={() => navigate(Routes.agency.shiftsList)}
                 className="ml-auto bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full w-[38px] h-[38px] flex items-center justify-center hover:bg-white/70 transition-colors cursor-pointer"
               >
                 <ArrowUpRight className="w-4 h-4 text-[#10141a]" />

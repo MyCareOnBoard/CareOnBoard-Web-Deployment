@@ -327,6 +327,7 @@ export interface CreateActivityLogRequest {
   activityType: string;
   shiftId: string;
   employeeId: string;
+  agencyId: string;
   description?: string;
   metadata?: {
     individual?: string;

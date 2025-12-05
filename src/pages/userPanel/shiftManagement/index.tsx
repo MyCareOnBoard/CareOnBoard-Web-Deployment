@@ -22,7 +22,8 @@ import { useAuth } from "@/utils/auth/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const convertTimeToISODate = (timeString: string, dateString: string): Date => {
-  const timeMatch = timeString.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  timeString = timeString.replace(".", ":");
+  const timeMatch = timeString.match(/(\d+):(\d+):?\s*(AM|PM)/i);
   if (!timeMatch) {
     throw new Error(`Invalid time format: ${timeString}`);
   }
