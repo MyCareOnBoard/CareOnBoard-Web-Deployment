@@ -6,11 +6,9 @@ import WrenchIcon from "@/assets/icons/wrench-heroicon.svg?react";
 import PhoneIcon from "@/assets/icons/phone-heroicon.svg?react";
 import ShieldIcon from "@/assets/icons/shield-heroicon.svg?react";
 import ChatEllipsisIcon from "@/assets/icons/chat-ellipsis-heroicon.svg?react";
-import {useGetAllActivityLogsQuery, useSeedActivityLogsMutation} from "@/pages/userPanel/notes/api";
+import {useGetAllActivityLogsQuery} from "@/pages/userPanel/notes/api";
 import {Routes} from "@/routes/constants";
 import {cn} from "@/lib/utils";
-import {Button} from "@/components/ui/button";
-import {Database, Loader2} from "lucide-react";
 
 type NoteCardType = {
   id: string;
@@ -18,6 +16,8 @@ type NoteCardType = {
   title: string;
   description: string;
   path: string;
+  client?: string;
+  createdAt?: string;
 };
 
 const noteTypes: NoteCardType[] = [
@@ -84,9 +84,14 @@ function NoteCard({note, noteId}: { note: NoteCardType, noteId: string | undefin
       )}
     >
       {/* Icon */}
-      <div
-        className="bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full h-10 w-10 flex items-center justify-center">
-        <Icon className="w-5 h-5 text-[#10141a] [&_*]:fill-[#10141a] [&_path]:fill-[#10141a]"/>
+      <div className={"flex justify-between items-center"}>
+        <div
+          className="flex space-x-2 bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full flex items-center justify-center"
+        >
+          <Icon className="w-5 h-5 text-[#10141a] [&_*]:fill-[#10141a] [&_path]:fill-[#10141a]"/>
+          <span className={"w-full"}>{note?.client}</span>
+        </div>
+        <span className={"text-sm text-[#808081]"}>{note?.createdAt ? new Date(note.createdAt).toDateString() : ""}</span>
       </div>
 
       {/* Title and Description */}
@@ -115,99 +120,6 @@ export default function NotesPage() {
     refetchOnMountOrArgChange: true,
   });
 
-  const [seedData, {isLoading: seedingData}] = useSeedActivityLogsMutation();
-
-  const noteKeys = notes?.reduce((acc: Record<string, string>, note) => {
-    acc[note.activityType] = note.id;
-    return acc;
-  }, {}) || {};
-
-  const seedInfo = [
-    {
-      "activityType": "community-based",
-      "description": "",
-      "metadata": {
-        "individual": "Alex Johnson",
-        "serviceYear": 2025,
-        "serviceCode": "TDHJ/3421",
-        "ISPOutcome": "Proceed to generate",
-        "strategies": [
-          "dailyLiving",
-          "comunityParticipation",
-          "independence",
-          "support",
-          "learning"
-        ]
-      }
-    },
-    {
-      "activityType": "community-inclusion",
-      "description": "",
-      "metadata": {
-        "individual": "John Doe",
-        "serviceCode": "TDHJ/3422"
-      }
-    },
-    {
-      "activityType": "day-habilitation",
-      "description": "",
-      "metadata": {
-        "individual": "Jane Doe",
-        "serviceCode": "TDHJ/3423"
-      }
-    },
-    {
-      "activityType": "prevocational-training",
-      "description": "",
-      "metadata": {
-        "individual": "Andrews Doe",
-        "serviceCode": "TDHJ/3424"
-      }
-    },
-    {
-      "activityType": "respite-log",
-      "description": "",
-      "metadata": {
-        "individual": "Andrews Doe",
-        "serviceCode": "TDHJ/3424",
-        "toileting": "Test"
-      }
-    },
-    {
-      "activityType": "supported-employment-pre",
-      "description": "",
-      "metadata": {
-        "individual": "Andrews Doe",
-        "serviceCode": "TDHJ/3424",
-        "totalHours": "4",
-        "reportingStartDate": "2025-11-20",
-        "reportingEndDate": "2025-11-30"
-      }
-    },
-    {
-      "activityType": "supported-employment-intervention",
-      "description": "",
-      "metadata": {
-        "individual": "Andrews Doe",
-        "employer": "Downtown Inc",
-        "jobType": "Menial Work",
-        "ISPOutcome": "All good",
-        "serviceCode": "TDHJ/3426",
-        "totalHours": "4",
-        "reportingStartDate": "2025-11-20",
-        "reportingEndDate": "2025-11-30"
-      }
-    }
-  ]
-
-  const handleSeedData = async () => {
-    try {
-      await seedData(seedInfo).unwrap();
-    } catch (error) {
-      console.error("Error seeding data:", error);
-    }
-  }
-
   if (isLoading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -228,20 +140,6 @@ export default function NotesPage() {
           Notes
         </h1>
         <div className={"flex items-center space-x-4"}>
-          {!isLoading && (
-            <Button
-              onClick={handleSeedData}
-              disabled={seedingData}
-              className="bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {seedingData ? (
-                <Loader2 size={20} className="animate-spin"/>
-              ) : (
-                <Database size={20}/>
-              )}
-              {seedingData ? 'Creating...' : 'Seed Data'}
-            </Button>
-          )}
           <p className="text-[20px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
             Total Mileage : 0KM
           </p>
@@ -250,9 +148,20 @@ export default function NotesPage() {
 
       {/* Notes Grid */}
       <div className="flex flex-wrap gap-3">
-        {noteTypes.map((note) => (
-          <NoteCard key={note.id} noteId={noteKeys[note.id]} note={note}/>
-        ))}
+        {notes.map((note) => {
+          const noteModified = {
+            ...(noteTypes.find((n) => n.id === note.activityType) || noteTypes[0]),
+            client: note?.metadata?.individual,
+            createdAt: note?.createdAt,
+          };
+          return (
+            <NoteCard
+              key={note.id}
+              noteId={note.id}
+              note={noteModified}
+            />
+          )
+        })}
       </div>
     </div>
   );
