@@ -1,4 +1,4 @@
-import React, {useState, useMemo, useRef} from "react";
+import React, {useState, useMemo, useRef, useEffect} from "react";
 import {ArrowLeft, ChevronLeft, ChevronRight} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Routes} from "@/routes/constants";
@@ -18,9 +18,9 @@ export default function ShiftsPage() {
   const {user} = useAuth();
 
   // Fetch shift stats with current filter
-  const {data: shiftStatsData, isLoading} = useGetShiftStatsQuery(
+  const {data: shiftStatsData, refetch, isLoading} = useGetShiftStatsQuery(
     {agencyId: user?.profile?.id || '', range: timeFilter},
-    {skip: !user?.profile?.id}
+    {skip: !user?.profile?.id, refetchOnMountOrArgChange: true}
   );
   const shifts = shiftStatsData?.buckets || [];
 
@@ -28,10 +28,41 @@ export default function ShiftsPage() {
   const shiftsData = useMemo(() => {
     if (shifts.length === 0) return [];
 
+    const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THUR', 'FRI', 'SAT'];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+
+    // For thisYear, aggregate data by month
+    if (timeFilter === 'thisYear') {
+      const monthlyData = new Map<string, { scheduled: number; completed: number; month: number }>();
+      
+      shifts.forEach(bucket => {
+        const date = new Date(bucket.date);
+        const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+        
+        if (!monthlyData.has(monthKey)) {
+          monthlyData.set(monthKey, {
+            scheduled: 0,
+            completed: 0,
+            month: date.getMonth()
+          });
+        }
+        
+        const data = monthlyData.get(monthKey)!;
+        data.scheduled += bucket.scheduled;
+        data.completed += bucket.completed;
+      });
+
+      return Array.from(monthlyData.values()).map(data => ({
+        day: monthNames[data.month].toUpperCase(),
+        scheduled: data.scheduled,
+        completed: data.completed,
+        date: monthNames[data.month]
+      }));
+    }
+
+    // For lastWeek and thisMonth, use daily data
     return shifts.map(bucket => {
       const date = new Date(bucket.date);
-      const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THUR', 'FRI', 'SAT'];
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
       
       let dayLabel = '';
       let dateLabel = '';
@@ -44,10 +75,6 @@ export default function ShiftsPage() {
         case 'thisMonth':
           dayLabel = `${monthNames[date.getMonth()].toUpperCase()} ${date.getDate()}`;
           dateLabel = `${date.getDate()} ${monthNames[date.getMonth()]}`;
-          break;
-        case 'thisYear':
-          dayLabel = monthNames[date.getMonth()].toUpperCase();
-          dateLabel = monthNames[date.getMonth()];
           break;
       }
 
@@ -63,6 +90,9 @@ export default function ShiftsPage() {
   const maxShiftValue = shiftsData.length > 0 
     ? Math.max(...shiftsData.map((d) => Math.max(d.scheduled, d.completed)), 1)
     : 1;
+
+  // Check if scrolling is needed for thisMonth
+  const needsScroll = timeFilter === "thisMonth" && shiftsData.length > 10;
 
   const totalScheduled = shiftsData.reduce((sum, shift) => sum + shift.scheduled, 0);
   const totalCompleted = shiftsData.reduce((sum, shift) => sum + shift.completed, 0);
@@ -94,6 +124,10 @@ export default function ShiftsPage() {
       });
     }
   };
+
+  useEffect(() => {
+    if (timeFilter) refetch()
+  }, [timeFilter]);
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -192,7 +226,7 @@ export default function ShiftsPage() {
           {!isLoading && shiftsData.length > 0 && (
           <>
             <div className="absolute inset-0 pointer-events-none z-50 overflow-visible">
-              {hoveredShift !== null && shiftsData[hoveredShift]?.scheduled > 0 ? (
+              {hoveredShift !== null && (shiftsData[hoveredShift]?.scheduled > 0 || shiftsData[hoveredShift]?.completed > 0) ? (
                 <div
                   key={`tooltip-${shiftsData[hoveredShift].day}`}
                   className="absolute bottom-full mb-2"
@@ -225,15 +259,15 @@ export default function ShiftsPage() {
             <div
             ref={scrollContainerRef}
             className={`flex items-end gap-3 h-[280px] relative pb-4 ${
-              timeFilter === "thisMonth" ? "overflow-x-auto scrollbar-hide" : "justify-between overflow-visible"
+              needsScroll ? "overflow-x-auto scrollbar-hide" : "justify-between overflow-visible"
             }`}
             style={{overflowY: 'visible'}}
           >
             {shiftsData.map((shift, index) => (
               <div
-                key={shift.day}
+                key={`shift-${index}-${shift.day}`}
                 className={`flex flex-col items-center h-full justify-end relative ${
-                  timeFilter === "thisMonth" ? "min-w-[80px] flex-shrink-0" : "flex-1 min-w-[60px]"
+                  needsScroll ? "min-w-[80px] flex-shrink-0" : "flex-1 min-w-[60px]"
                 }`}
                 onMouseEnter={(e) => {
                   setHoveredShift(index);
@@ -241,32 +275,32 @@ export default function ShiftsPage() {
                     const containerRect = scrollContainerRef.current.getBoundingClientRect();
                     const elementRect = e.currentTarget.getBoundingClientRect();
                     const relativeLeft = elementRect.left - containerRect.left + scrollContainerRef.current.scrollLeft;
-                    setTooltipPosition(relativeLeft + (timeFilter === "thisMonth" ? 40 : elementRect.width / 2));
+                    setTooltipPosition(relativeLeft + (needsScroll ? 40 : elementRect.width / 2));
                   }
                 }}
                 onMouseLeave={() => setHoveredShift(null)}
               >
                 <div className="relative w-full flex gap-1 items-end justify-center h-full">
-                  {shift.scheduled > 0 ? (
+                  {shift.scheduled > 0 || shift.completed > 0 ? (
                     <>
                       {/* Scheduled Bar */}
-                      <div
+                      {shift.scheduled > 0 && <div
                         className="flex-1 text-center text-white text-sm rounded-t-[6px] rounded-b-[6px] bg-[#2B82FF] transition-all duration-300"
                         style={{
-                          height: `${(shift.scheduled / maxShiftValue) * 100}%`,
+                          height: shift.scheduled > 0 ? `${(shift.scheduled / maxShiftValue) * 100}%` : "30px",
                           minHeight: "30px",
                         }}
                       >{shift.scheduled}
-                      </div>
+                      </div>}
                       {/* Completed Bar */}
-                      <div
+                      {shift.completed > 0 && <div
                         className="flex-1 text-center text-white text-sm rounded-t-[6px] rounded-b-[6px] bg-[#2B82FF]/40 transition-all duration-300"
                         style={{
-                          height: `${(shift.completed / maxShiftValue) * 100}%`,
+                          height: shift.completed > 0 ? `${(shift.completed / maxShiftValue) * 100}%` : "30px",
                           minHeight: "30px",
                         }}
                       >{shift.completed}
-                      </div>
+                      </div>}
                     </>
                   ) : (
                     <div className="flex-1 h-[30px] rounded-t-[6px] bg-[#e5e5e6]/30"></div>
@@ -286,7 +320,7 @@ export default function ShiftsPage() {
           </div>
 
             {/* Scroll Arrows for This Month */}
-            {timeFilter === "thisMonth" && (
+            {needsScroll && (
               <>
                 <button
                   onClick={() => handleScroll("left")}

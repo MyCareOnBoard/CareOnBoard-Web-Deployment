@@ -91,6 +91,7 @@ export default function LoginPage() {
     [UserType.APPLICANT]: Routes.applicant.dashboard,
     [UserType.EMPLOYEE]: Routes.userPanel.dashboard,
     [UserType.AGENCY]: Routes.agency.dashboard,
+    [UserType.SUPER_ADMIN]: Routes.superAdmin.agencies,
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
