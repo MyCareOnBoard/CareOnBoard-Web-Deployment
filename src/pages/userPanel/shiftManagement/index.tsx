@@ -179,6 +179,7 @@ function ShiftCard({
   };
 
   const getActionButton = () => {
+    console.log("shift", shift.actionStatus);
     if (!showAction || !shift.actionStatus) return null;
 
     const buttonConfig = {

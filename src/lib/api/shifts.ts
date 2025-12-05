@@ -217,6 +217,7 @@ export interface ShiftStatsBucket {
     scheduled: number; // pending | available | ongoing
     completed: number; // completed
     total: number;     // scheduled + completed
+    expired: number;   // expired
 }
 
 /**

@@ -139,11 +139,6 @@ export default function NotesPage() {
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
           Notes
         </h1>
-        <div className={"flex items-center space-x-4"}>
-          <p className="text-[20px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
-            Total Mileage : 0KM
-          </p>
-        </div>
       </div>
 
       {/* Notes Grid */}

@@ -7,7 +7,7 @@ import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import {Routes} from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
-import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest } from "@/lib/api/shifts";
+import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus } from "@/lib/api/shifts";
 import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
@@ -36,7 +36,7 @@ export interface ScheduleFormData {
   shiftId?: string;
   client: string;
   clientId: string;
-  clientAddress: string;
+  clientLocation: string;
   assignedDsp: string;
   assignedDspId: string;
   billingRate: string;
@@ -105,7 +105,7 @@ const noteTypes: {id: string, title: string}[] = [
 const initialFormData: ScheduleFormData = {
   client: "",
   clientId: "",
-  clientAddress: "",
+  clientLocation: "",
   assignedDsp: "",
   assignedDspId: "",
   billingRate: "",
@@ -208,7 +208,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     const baseShiftData = {
       employeeId: data.assignedDspId,
       agencyId: user?.profile?.id || "",
-      location: data.clientAddress || "",
+      location: data.clientLocation || "",
       startTime: data.clockInTime,
       endTime: data.clockOutTime,
       clientId: data.clientId,
@@ -218,6 +218,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       schedulingType: data.schedulingType,
       ispOutcome: data.ispOutcome || undefined,
       assignedDsp: data.assignedDsp,
+      status: ShiftStatus.PENDING,
+      type: ShiftType.AUTOMATIC,
+      submissionStatus: SubmissionStatus.DRAFT,
     };
 
     if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
@@ -225,19 +228,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       dateRange.forEach((date) => {
         requests.push({
           ...baseShiftData,
-          date: format(date, "yyyy-MM-dd"),
-          status: ShiftStatus.PENDING,
-          type: ShiftType.AUTOMATIC,
-          submissionStatus: SubmissionStatus.DRAFT,
+          date: format(date, "yyyy-MM-dd")
         });
       });
     } else if (data.date) {
       requests.push({
         ...baseShiftData,
-        date: format(data.date, "yyyy-MM-dd"),
-        status: ShiftStatus.PENDING,
-        type: ShiftType.AUTOMATIC,
-        submissionStatus: SubmissionStatus.DRAFT,
+        date: format(data.date, "yyyy-MM-dd")
       });
     }
 
@@ -314,14 +311,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         ? `${client.firstName} ${client.lastName}` 
         : client.id,
       clientId: client.id,
-      clientAddress: client.address || client.location || "",
+      clientLocation: client.location || "",
     }));
     setShowClientDropdown(false);
     setClientSearchResults([]);
   };
 
   const handleDspSelect = (employee: Employee) => {
-    console.log("employee", employee);
     setFormData(prev => ({
       ...prev,
       assignedDsp: employee.fullName,
@@ -486,14 +482,61 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
     setIsSubmitting(true);
     try {
-      const existingDraftsResponse = await listShifts({
-        agencyId: user?.profile?.id || "",
-        type: ShiftType.AUTOMATIC,
-        submissionStatus: SubmissionStatus.DRAFT,
-        limit: 100,
-      });
+      // Edit existing shift as draft
+      if (mode === "edit" && formData.shiftId) {
+        setIsSubmitting(true);
+        try {
+          const updatePayload: any = {
+            location: formData.clientLocation,
+            startTime: formData.clockInTime,
+            endTime: formData.clockOutTime,
+            notesType: formData.notesType || undefined,
+            service: formData.service,
+            serviceCode: formData.serviceCode,
+            schedulingType: formData.schedulingType,
+            ispOutcome: formData.ispOutcome,
+            assignedDsp: formData.assignedDsp,
+            employeeId: formData.assignedDspId || undefined,
+            clientId: formData.clientId || undefined
+          };
 
-      const existingDrafts = existingDraftsResponse.shifts || [];
+          if (formData.date) {
+            updatePayload.date = format(formData.date, "yyyy-MM-dd");
+          }
+
+          await updateShift(formData.shiftId, updatePayload);
+
+          setSavedShiftInfo({
+            clientName: formData.client || "Client",
+            dspName: formData.assignedDsp || "DSP",
+            date: getDisplayDate(),
+          });
+          setShowSavedModal(true);
+
+          const response = await listShifts({
+            limit: 100,
+            agencyId: user?.profile?.id || "",
+            client: true,
+            employee: true,
+          });
+          onShiftsUpdated?.(response.shifts || []);
+
+          toast({
+            title: "Changes Saved",
+            description: "Shift has been saved as draft successfully.",
+          });
+        } catch (error: any) {
+          console.error("Failed to save draft schedule:", error);
+          toast({
+            title: "Save Failed",
+            description: error?.response?.data?.error || "Failed to save draft. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsSubmitting(false);
+        }
+        return;
+      }
 
       const shiftRequests = buildShiftRequests(formData);
 
@@ -507,25 +550,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       }
 
       const savePromises = shiftRequests.map(async (request) => {
-        const existingShift = existingDrafts.find((draft) => draft.date === request.date);
-
-        if (existingShift) {
-          return updateShift(existingShift.id, {
-            location: request.location,
-            startTime: request.startTime,
-            endTime: request.endTime,
-            notesType: request.notesType,
-            service: request.service,
-            serviceCode: request.serviceCode,
-            schedulingType: request.schedulingType,
-            ispOutcome: request.ispOutcome,
-            assignedDsp: request.assignedDsp,
-            status: request.status,
-            submissionStatus: request.submissionStatus,
-            type: request.type,
-          });
-        }
-
         return createShift(request);
       });
 
@@ -631,10 +655,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         return format(new Date(), "d MMMM");
       };
 
-      // Edit existing shift
+      // Edit existing shift - schedule (submit)
       if (mode === "edit" && formData.shiftId) {
         const updatePayload: any = {
-          location: formData.clientAddress,
+          location: formData.clientLocation,
           startTime: formData.clockInTime,
           endTime: formData.clockOutTime,
           notesType: formData.notesType || undefined,
@@ -645,6 +669,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           assignedDsp: formData.assignedDsp,
           employeeId: formData.assignedDspId || undefined,
           clientId: formData.clientId || undefined,
+          submissionStatus: SubmissionStatus.SUBMITTED
         };
 
         if (formData.date) {
@@ -692,8 +717,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
       const finalShiftRequests = shiftRequests.map((request) => ({
         ...request,
-        status: ShiftStatus.PENDING,
+        status: ShiftStatus.AVAILABLE,
         submissionStatus: SubmissionStatus.SUBMITTED,
+        actionStatus: ShiftActionStatus.CLOCK_IN,
         type: ShiftType.AUTOMATIC,
       }));
 
@@ -703,7 +729,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
       const activityLogPromises = results
         .map((result, index) => {
-          if (result.status === "fulfilled" && formData.notesType && formData.assignedDspId) {
+          if (result.status === "fulfilled" && result.value.success) {
             const createdShift = result.value;
             const shiftId = createdShift.shift?.id;
             if (shiftId) {
@@ -716,10 +742,12 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 activityType: formData.notesType,
                 shiftId: shiftId,
                 employeeId: formData.assignedDspId,
+                agencyId: user?.profile?.id || "",
                 description: "",
                 metadata: {
-                  clientId: formData.clientId,
-                  client: clientName,
+                  employee: formData.assignedDsp,
+                  individual: clientName,
+                  agency: user?.profile?.name || "",
                   serviceYear: shiftDate.getFullYear(),
                   serviceCode: formData.serviceCode || "",
                   ISPOutcome: formData.ispOutcome || "",
@@ -835,7 +863,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 value={formData.client}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setFormData(prev => ({ ...prev, client: value, clientId: "", clientAddress: "" }));
+                  setFormData(prev => ({ ...prev, client: value, clientId: "", clientLocation: "" }));
                   handleClientSearch(value);
                   clearError("client");
                 }}
@@ -1460,50 +1488,31 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           </div>
         </div>
 
-        {/* Action Buttons - Fixed */}
-        {mode === "edit" ? (
-          <div className="flex gap-3 p-5 pt-0 flex-shrink-0">
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !isFormValid}
-              className="flex-1 bg-[#2b82ff] hover:bg-[#1a6fe0] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save"
-              )}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex gap-3 p-5 pt-0 flex-shrink-0">
-            <Button
-              onClick={handleSaveDraft}
-              disabled={isSubmitting}
-              variant="outline"
-              className="flex-1 border-[#2b82ff] text-[#2b82ff] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Save and Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !isFormValid}
-              className="flex-1 bg-[#2b82ff] hover:bg-[#1a6fe0] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Scheduling...
-                </>
-              ) : (
-                "Schedule"
-              )}
-            </Button>
-          </div>
-        )}
+        {/* Action Buttons - Fixed (used for both create and edit) */}
+        <div className="flex gap-3 p-5 pt-0 flex-shrink-0">
+          <Button
+            onClick={handleSaveDraft}
+            disabled={isSubmitting}
+            variant="outline"
+            className="flex-1 border-[#2b82ff] text-[#2b82ff] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Save
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !isFormValid}
+            className="flex-1 bg-[#2b82ff] hover:bg-[#1a6fe0] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Scheduling...
+              </>
+            ) : (
+              "Schedule"
+            )}
+          </Button>
+        </div>
       </div>
       </div>
     )}
