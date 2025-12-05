@@ -82,6 +82,7 @@ export default function DashboardHeader(
       [UserType.APPLICANT]: "applicant",
       [UserType.EMPLOYEE]: "user-panel",
       [UserType.AGENCY]: "agency",
+      [UserType.SUPER_ADMIN]: "super-admin",
     }
     return route.replace(':userType', userTypeKeys[userType as UserType] || 'applicant');
   }
