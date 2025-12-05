@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, ChevronLeft, ChevronRight, Search, Pencil, X, Calendar, Loader2, Trash2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Search, Pencil, X, Calendar, Loader2, Trash2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { listShifts, Shift, deleteShift } from "@/lib/api/shifts";
+import { listShifts, Shift, deleteShift, updateShift, ShiftType, SubmissionStatus } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
@@ -52,6 +52,9 @@ export default function ShiftsListPage() {
   } | null>(null);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [editFormData, setEditFormData] = useState<ScheduleFormData | null>(null);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [shiftToApprove, setShiftToApprove] = useState<Shift | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
   
   const itemsPerPage = 7;
 
@@ -67,7 +70,11 @@ export default function ShiftsListPage() {
           client: true,
           employee: true,
         });
-        setShifts(response.shifts || []);
+        // Filter out shifts with type="manual" and submissionStatus="draft"
+        const filteredShifts = (response.shifts || []).filter(shift => 
+          !(shift.type === ShiftType.MANUAL && shift.submissionStatus === SubmissionStatus.DRAFT)
+        );
+        setShifts(filteredShifts);
       } catch (error) {
         console.error("Failed to fetch shifts:", error);
         toast({
@@ -140,7 +147,7 @@ export default function ShiftsListPage() {
     const formData: ScheduleFormData = {
       client: clientName,
       clientId: shift.client?.id || "",
-      clientAddress: shift.location || "",
+      clientLocation: shift.location || "",
       assignedDsp: employeeName,
       assignedDspId: (shift.employee as any)?.id || "",
       billingRate: "",
@@ -210,6 +217,43 @@ export default function ShiftsListPage() {
   const handleCancel = (shift: Shift) => {
     setShiftToCancel(shift);
     setShowCancelModal(true);
+  };
+
+  const handleApprove = (shift: Shift) => {
+    setShiftToApprove(shift);
+    setShowApproveModal(true);
+  };
+
+  const confirmApproveShift = async (shiftId: string) => {
+    try {
+      setIsApproving(true);
+      await updateShift(shiftId, { type: ShiftType.AUTOMATIC });
+      
+      // Update the shift in the local state
+      setShifts(prev => prev.map(shift => 
+        shift.id === shiftId 
+          ? { ...shift, type: ShiftType.AUTOMATIC }
+          : shift
+      ));
+      
+      toast({
+        title: "Success",
+        description: "Shift has been approved and converted to automatic.",
+        variant: "default",
+      });
+      
+      setShowApproveModal(false);
+      setShiftToApprove(null);
+    } catch (error) {
+      console.error("Failed to approve shift:", error);
+      toast({
+        title: "Error",
+        description: "Failed to approve shift. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   const handleDateSelect = (date: Date) => {
@@ -504,6 +548,16 @@ export default function ShiftsListPage() {
                           <Pencil className="w-4 h-4" />
                           Edit
                         </Button>
+                        {apiShift.type === ShiftType.MANUAL && apiShift.submissionStatus === SubmissionStatus.SUBMITTED && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleApprove(apiShift)}
+                            className="bg-[#0eaf52] hover:bg-[#0d9a47] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Approve
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           onClick={() => handleCancel(apiShift)}
@@ -644,6 +698,57 @@ export default function ShiftsListPage() {
                 {cancelledShiftInfo.date}
               </DialogDescription>
             </DialogHeader>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+
+    {/* Approve Shift Confirmation Dialog */}
+    <Dialog
+      open={showApproveModal && !!shiftToApprove}
+      onOpenChange={(open) => {
+        if (isApproving) return;
+        setShowApproveModal(open);
+        if (!open) {
+          setShiftToApprove(null);
+        }
+      }}
+    >
+      <DialogContent showCloseButton={false} className="items-stretch text-left max-w-[400px]">
+        {shiftToApprove && (
+          <>
+            <DialogHeader className="items-start text-left gap-2">
+              <DialogTitle className="text-[20px] font-semibold leading-normal text-[#10141a]">
+                Approve shift?
+              </DialogTitle>
+              <DialogDescription className="text-[14px] leading-[1.6] text-[#808081]">
+                Are you sure you want to approve this manual shift for{" "}
+                <span className="font-semibold text-[#10141a]">
+                  {shiftToApprove.client
+                    ? `${shiftToApprove.client.firstName || ""} ${shiftToApprove.client.lastName || ""}`.trim() || "Unknown Client"
+                    : "Unknown Client"}
+                </span>
+                ? This will convert it to an automatic shift.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex justify-end gap-3 mt-2">
+              <Button
+                variant="outline"
+                disabled={isApproving}
+                onClick={() => setShowApproveModal(false)}
+                className="rounded-full px-4 py-2 h-auto text-[14px]"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={isApproving}
+                onClick={() => confirmApproveShift(shiftToApprove.id)}
+                className="bg-[#0eaf52] hover:bg-[#0d9a47] text-white rounded-full px-4 py-2 h-auto text-[14px] font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isApproving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Approve Shift
+              </Button>
+            </DialogFooter>
           </>
         )}
       </DialogContent>

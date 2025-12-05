@@ -7,7 +7,7 @@ import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import {Routes} from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
-import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest } from "@/lib/api/shifts";
+import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus } from "@/lib/api/shifts";
 import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
@@ -36,7 +36,7 @@ export interface ScheduleFormData {
   shiftId?: string;
   client: string;
   clientId: string;
-  clientAddress: string;
+  clientLocation: string;
   assignedDsp: string;
   assignedDspId: string;
   billingRate: string;
@@ -105,7 +105,7 @@ const noteTypes: {id: string, title: string}[] = [
 const initialFormData: ScheduleFormData = {
   client: "",
   clientId: "",
-  clientAddress: "",
+  clientLocation: "",
   assignedDsp: "",
   assignedDspId: "",
   billingRate: "",
@@ -208,7 +208,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     const baseShiftData = {
       employeeId: data.assignedDspId,
       agencyId: user?.profile?.id || "",
-      location: data.clientAddress || "",
+      location: data.clientLocation || "",
       startTime: data.clockInTime,
       endTime: data.clockOutTime,
       clientId: data.clientId,
@@ -311,7 +311,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         ? `${client.firstName} ${client.lastName}` 
         : client.id,
       clientId: client.id,
-      clientAddress: client.address || client.location || "",
+      clientLocation: client.location || "",
     }));
     setShowClientDropdown(false);
     setClientSearchResults([]);
@@ -487,7 +487,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         setIsSubmitting(true);
         try {
           const updatePayload: any = {
-            location: formData.clientAddress,
+            location: formData.clientLocation,
             startTime: formData.clockInTime,
             endTime: formData.clockOutTime,
             notesType: formData.notesType || undefined,
@@ -658,7 +658,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       // Edit existing shift - schedule (submit)
       if (mode === "edit" && formData.shiftId) {
         const updatePayload: any = {
-          location: formData.clientAddress,
+          location: formData.clientLocation,
           startTime: formData.clockInTime,
           endTime: formData.clockOutTime,
           notesType: formData.notesType || undefined,
@@ -717,8 +717,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
       const finalShiftRequests = shiftRequests.map((request) => ({
         ...request,
-        status: ShiftStatus.PENDING,
+        status: ShiftStatus.AVAILABLE,
         submissionStatus: SubmissionStatus.SUBMITTED,
+        actionStatus: ShiftActionStatus.CLOCK_IN,
         type: ShiftType.AUTOMATIC,
       }));
 
@@ -745,7 +746,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 description: "",
                 metadata: {
                   employee: formData.assignedDsp,
-                  client: clientName,
+                  individual: clientName,
                   agency: user?.profile?.name || "",
                   serviceYear: shiftDate.getFullYear(),
                   serviceCode: formData.serviceCode || "",
@@ -862,7 +863,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 value={formData.client}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setFormData(prev => ({ ...prev, client: value, clientId: "", clientAddress: "" }));
+                  setFormData(prev => ({ ...prev, client: value, clientId: "", clientLocation: "" }));
                   handleClientSearch(value);
                   clearError("client");
                 }}

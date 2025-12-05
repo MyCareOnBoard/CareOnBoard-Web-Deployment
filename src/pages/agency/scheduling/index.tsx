@@ -135,6 +135,7 @@ export default function SchedulingPage() {
       completed,
       missed,
       date: format(new Date(), "d MMMM"),
+      total: shifts.length,
     };
   }, [shifts]);
 
@@ -308,6 +309,19 @@ export default function SchedulingPage() {
                     <div className="w-3 h-3 rounded-full bg-[#D53411]" />
                     <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
                       Missed
+                    </span>
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[40px] font-semibold leading-normal text-[#10141a]">
+                    {loading ? "-" : shiftStats.total}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-[#808081]" />
+                    <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                      Total
                     </span>
                   </div>
                 </div>

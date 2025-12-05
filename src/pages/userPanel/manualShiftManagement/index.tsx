@@ -9,7 +9,7 @@ import SuccessModal from "./components/SuccessModal";
 import { useToast } from "@/hooks/use-toast";
 import { Routes } from "@/routes/constants";
 import DigitalSignatureModal from "@/pages/applicant/application/components/DigitalSignature";
-import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift } from "@/lib/api/shifts";
+import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift, ShiftActionStatus } from "@/lib/api/shifts";
 import { format, parse } from "date-fns";
 import { useSignDocumentMutation, useCheckSignatureStatusQuery } from "@/pages/applicant/application/api";
 import { searchClients, Client } from "@/lib/api/clients";
@@ -111,10 +111,10 @@ export default function ManualShiftManagementPage() {
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
-  const [locationSuggestions, setLocationSuggestions] = useState<Array<{ display_name: string; place_id: string }>>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<Array<{ display_name?: string; place_id: string; lat: string; lon: string }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchingLocation, setSearchingLocation] = useState(false);
-  
+  const [selectedLocation, setSelectedLocation] = useState<{ display_name?: string; place_id?: string; lat?: string; lon?: string } | null>(null);
   const locationInputRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Signature upload mutation
@@ -413,8 +413,9 @@ export default function ManualShiftManagementPage() {
     }, 500); // 500ms debounce
   };
 
-  const handleSelectSuggestion = (suggestion: { display_name: string; place_id: string }) => {
-    setFormData((prev) => ({ ...prev, location: suggestion.display_name }));
+  const handleSelectSuggestion = (suggestion: { display_name?: string; place_id?: string; lat?: string; lon?: string }) => {
+    setFormData((prev) => ({ ...prev, location: suggestion.display_name || '' }));
+    setSelectedLocation(suggestion);
     setShowSuggestions(false);
     setLocationSuggestions([]);
   };
@@ -603,8 +604,6 @@ export default function ManualShiftManagementPage() {
 
       const existingDrafts = existingDraftsResponse.shifts
 
-      console.log(`📄 Found ${existingDrafts.length} existing draft(s)`);
-
       // Step 2: Build shift requests as drafts (no signatures required)
       const shiftRequests = buildManualShiftRequests(
         formData,
@@ -620,6 +619,7 @@ export default function ManualShiftManagementPage() {
       // Step 3: Override submission status to DRAFT and set clocked times
       const draftRequests = shiftRequests.map(request => ({
         ...request,
+        location: `${selectedLocation?.lat},${selectedLocation?.lon}` || request.location,
         submissionStatus: SubmissionStatus.DRAFT,
         status: ShiftStatus.PENDING, // Use PENDING for drafts instead of COMPLETED
         type: ShiftType.MANUAL, // Ensure type is set to manual
@@ -645,9 +645,8 @@ export default function ManualShiftManagementPage() {
 
         if (existingShift) {
           // Update existing shift
-          console.log(`✏️ Updating existing shift for ${request.date}`);
           return updateShift(existingShift.id, {
-            location: request.location,
+            location: `${selectedLocation?.lat},${selectedLocation?.lon}` || request.location,
             startTime: request.startTime,
             endTime: request.endTime,
             clockedInAt: request.clockedInAt,
@@ -663,7 +662,10 @@ export default function ManualShiftManagementPage() {
         } else {
           // Create new shift
           console.log(`➕ Creating new shift for ${request.date}`);
-          return createShift(request);
+          return createShift({
+            ...request,
+            location: `${selectedLocation?.lat},${selectedLocation?.lon}` || request.location,
+          });
         }
       });
 
@@ -828,8 +830,10 @@ export default function ManualShiftManagementPage() {
       // Step 3: Set status to COMPLETED and add clockedInAt/clockedOutAt for submission
       const finalShiftRequests = shiftRequests.map(request => ({
         ...request,
+        location: `${selectedLocation?.lat},${selectedLocation?.lon}` || request.location,
         status: ShiftStatus.COMPLETED, // Set to COMPLETED only on submit
         submissionStatus: SubmissionStatus.SUBMITTED, // Set to SUBMITTED only on submit
+        actionStatus: ShiftActionStatus.CLOCK_IN,
         clockedInAt: request.startTime, // Set clockedInAt from startTime
         clockedOutAt: request.endTime, // Set clockedOutAt from endTime
         type: ShiftType.MANUAL, // Ensure type is set to manual

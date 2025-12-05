@@ -115,98 +115,10 @@ export default function NotesPage() {
     refetchOnMountOrArgChange: true,
   });
 
-  const [seedData, {isLoading: seedingData}] = useSeedActivityLogsMutation();
-
   const noteKeys = notes?.reduce((acc: Record<string, string>, note) => {
     acc[note.activityType] = note.id;
     return acc;
   }, {}) || {};
-
-  const seedInfo = [
-    {
-      "activityType": "community-based",
-      "description": "",
-      "metadata": {
-        "individual": "Alex Johnson",
-        "serviceYear": 2025,
-        "serviceCode": "TDHJ/3421",
-        "ISPOutcome": "Proceed to generate",
-        "strategies": [
-          "dailyLiving",
-          "comunityParticipation",
-          "independence",
-          "support",
-          "learning"
-        ]
-      }
-    },
-    {
-      "activityType": "community-inclusion",
-      "description": "",
-      "metadata": {
-        "individual": "John Doe",
-        "serviceCode": "TDHJ/3422"
-      }
-    },
-    {
-      "activityType": "day-habilitation",
-      "description": "",
-      "metadata": {
-        "individual": "Jane Doe",
-        "serviceCode": "TDHJ/3423"
-      }
-    },
-    {
-      "activityType": "prevocational-training",
-      "description": "",
-      "metadata": {
-        "individual": "Andrews Doe",
-        "serviceCode": "TDHJ/3424"
-      }
-    },
-    {
-      "activityType": "respite-log",
-      "description": "",
-      "metadata": {
-        "individual": "Andrews Doe",
-        "serviceCode": "TDHJ/3424",
-        "toileting": "Test"
-      }
-    },
-    {
-      "activityType": "supported-employment-pre",
-      "description": "",
-      "metadata": {
-        "individual": "Andrews Doe",
-        "serviceCode": "TDHJ/3424",
-        "totalHours": "4",
-        "reportingStartDate": "2025-11-20",
-        "reportingEndDate": "2025-11-30"
-      }
-    },
-    {
-      "activityType": "supported-employment-intervention",
-      "description": "",
-      "metadata": {
-        "individual": "Andrews Doe",
-        "employer": "Downtown Inc",
-        "jobType": "Menial Work",
-        "ISPOutcome": "All good",
-        "serviceCode": "TDHJ/3426",
-        "totalHours": "4",
-        "reportingStartDate": "2025-11-20",
-        "reportingEndDate": "2025-11-30"
-      }
-    }
-  ]
-
-  const handleSeedData = async () => {
-    try {
-      await seedData(seedInfo).unwrap();
-    } catch (error) {
-      console.error("Error seeding data:", error);
-    }
-  }
 
   if (isLoading) {
     return (
@@ -227,25 +139,6 @@ export default function NotesPage() {
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
           Notes
         </h1>
-        <div className={"flex items-center space-x-4"}>
-          {!isLoading && (
-            <Button
-              onClick={handleSeedData}
-              disabled={seedingData}
-              className="bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {seedingData ? (
-                <Loader2 size={20} className="animate-spin"/>
-              ) : (
-                <Database size={20}/>
-              )}
-              {seedingData ? 'Creating...' : 'Seed Data'}
-            </Button>
-          )}
-          <p className="text-[20px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
-            Total Mileage : 0KM
-          </p>
-        </div>
       </div>
 
       {/* Notes Grid */}
