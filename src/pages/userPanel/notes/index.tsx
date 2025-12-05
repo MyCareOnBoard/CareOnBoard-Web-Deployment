@@ -6,11 +6,9 @@ import WrenchIcon from "@/assets/icons/wrench-heroicon.svg?react";
 import PhoneIcon from "@/assets/icons/phone-heroicon.svg?react";
 import ShieldIcon from "@/assets/icons/shield-heroicon.svg?react";
 import ChatEllipsisIcon from "@/assets/icons/chat-ellipsis-heroicon.svg?react";
-import {useGetAllActivityLogsQuery, useSeedActivityLogsMutation} from "@/pages/userPanel/notes/api";
+import {useGetAllActivityLogsQuery} from "@/pages/userPanel/notes/api";
 import {Routes} from "@/routes/constants";
 import {cn} from "@/lib/utils";
-import {Button} from "@/components/ui/button";
-import {Database, Loader2} from "lucide-react";
 
 type NoteCardType = {
   id: string;
@@ -18,6 +16,8 @@ type NoteCardType = {
   title: string;
   description: string;
   path: string;
+  client?: string;
+  createdAt?: string;
 };
 
 const noteTypes: NoteCardType[] = [
@@ -84,9 +84,14 @@ function NoteCard({note, noteId}: { note: NoteCardType, noteId: string | undefin
       )}
     >
       {/* Icon */}
-      <div
-        className="bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full h-10 w-10 flex items-center justify-center">
-        <Icon className="w-5 h-5 text-[#10141a] [&_*]:fill-[#10141a] [&_path]:fill-[#10141a]"/>
+      <div className={"flex justify-between items-center"}>
+        <div
+          className="flex space-x-2 bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full flex items-center justify-center"
+        >
+          <Icon className="w-5 h-5 text-[#10141a] [&_*]:fill-[#10141a] [&_path]:fill-[#10141a]"/>
+          <span className={"w-full"}>{note?.client}</span>
+        </div>
+        <span className={"text-sm text-[#808081]"}>{note?.createdAt ? new Date(note.createdAt).toDateString() : ""}</span>
       </div>
 
       {/* Title and Description */}
@@ -115,11 +120,6 @@ export default function NotesPage() {
     refetchOnMountOrArgChange: true,
   });
 
-  const noteKeys = notes?.reduce((acc: Record<string, string>, note) => {
-    acc[note.activityType] = note.id;
-    return acc;
-  }, {}) || {};
-
   if (isLoading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -143,9 +143,20 @@ export default function NotesPage() {
 
       {/* Notes Grid */}
       <div className="flex flex-wrap gap-3">
-        {noteTypes.map((note) => (
-          <NoteCard key={note.id} noteId={noteKeys[note.id]} note={note}/>
-        ))}
+        {notes.map((note) => {
+          const noteModified = {
+            ...(noteTypes.find((n) => n.id === note.activityType) || noteTypes[0]),
+            client: note?.metadata?.individual,
+            createdAt: note?.createdAt,
+          };
+          return (
+            <NoteCard
+              key={note.id}
+              noteId={note.id}
+              note={noteModified}
+            />
+          )
+        })}
       </div>
     </div>
   );

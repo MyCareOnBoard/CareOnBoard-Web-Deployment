@@ -55,7 +55,8 @@ export default function CommunityBasedPage() {
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
 
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
-    skip: !activityLogId
+    skip: !activityLogId,
+    refetchOnMountOrArgChange: true
   });
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
   const [updateLog] = useUpdateActivityLogMutation();
