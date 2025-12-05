@@ -39,6 +39,7 @@ import DSPManagementPage from "@/pages/agency/dsp-management";
 import ClientsPage from "@/pages/agency/clients";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import SchedulingPage from "@/pages/agency/scheduling";
+import SupportPage from "@/pages/agency/support";
 import AnalyticsPage from "@/pages/agency/analytics";
 import ApplicantDirectoryPage from "@/pages/agency/applicant-directory";
 import ReportsPage from "@/pages/agency/reports";
@@ -158,7 +159,11 @@ export const router = createBrowserRouter([
         Component: ShiftsListPage,
       },
       {
-        path: Routes.agency.approvals,
+        path: Routes.agency.support,
+        Component: SupportPage,
+      },
+      {
+      path: Routes.agency.approvals,
         Component: ApprovalsPage,
       },
       {

@@ -29,7 +29,7 @@ const navItems: NavItem[] = [
   {label: "Notes", path: Routes.agency.notes, icon: CalendarDays},
   {label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText},
   {label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon},
-  {label: "Support", path: Routes.agency.analytics, icon: SupportIcon},
+  {label: "Support", path: Routes.agency.support, icon: SupportIcon},
   {label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon},
   {label: "Applicant Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon},
   {label: "Reports", path: Routes.agency.reports, icon: ReportIcon},
