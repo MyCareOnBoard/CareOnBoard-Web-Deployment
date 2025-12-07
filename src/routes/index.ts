@@ -52,6 +52,7 @@ import NotesPage from "@/pages/userPanel/notes";
 import AgencyNotesPage from "@/pages/agency/notes";
 import SuperAdminLayout from "@/layouts/SuperAdminLayout";
 import AgenciesPage from "@/pages/super-admin/agencies";
+import DSPClaimsPage from "@/pages/agency/billing-and-approvals/dsp-info";
 
 
 export const router = createBrowserRouter([
@@ -156,6 +157,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.agency.clientClaims,
         Component: ClientClaimsPage,
+      },
+      {
+        path: Routes.agency.dspClaims,
+        Component: DSPClaimsPage,
       },
       {
         path: Routes.agency.scheduling,
