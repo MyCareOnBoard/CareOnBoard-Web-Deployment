@@ -10,10 +10,11 @@ import {Routes} from "@/routes/constants";
 
 
 export default function AgencyEditNote(
-  {isOpen, setIsOpen, submissionId}: {
+  {isOpen, setIsOpen, submissionId, reRoute = true}: {
     isOpen: boolean,
     setIsOpen: React.Dispatch<React.SetStateAction<boolean>>,
-    submissionId: string | null
+    submissionId: string | null,
+    reRoute?: boolean
   }
 ) {
   const {data: submittedNote, isLoading} = useGetSubmittedNoteDetailsQuery(submissionId!, {
@@ -22,7 +23,7 @@ export default function AgencyEditNote(
   const navigate = useNavigate();
 
   const handleCancel = () => {
-    navigate(Routes.agency.notes, {replace: true});
+    if (reRoute) navigate(Routes.agency.notes, {replace: true});
     setIsOpen(false);
   };
 

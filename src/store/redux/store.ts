@@ -19,6 +19,7 @@ import {agencyNotesApi} from "@/pages/agency/notes/api";
 import {complianceAlertsApi} from "@/pages/agency/compliance-alerts/api";
 import {agencyDashboardApi} from "@/pages/agency/dashboard/api";
 import {superAdminApi} from "@/pages/super-admin/agencies/api";
+import {billingApi} from "@/pages/agency/billing-and-approvals/api";
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -30,6 +31,7 @@ const rootReducer = combineReducers({
   [agencyDashboardApi.reducerPath]: agencyDashboardApi.reducer,
   [complianceAlertsApi.reducerPath]: complianceAlertsApi.reducer,
   [superAdminApi.reducerPath]: superAdminApi.reducer,
+  [billingApi.reducerPath]: billingApi.reducer,
 });
 
 const persistConfig = {
@@ -55,7 +57,8 @@ export const store = configureStore({
       .concat(agencyNotesApi.middleware)
       .concat(agencyDashboardApi.middleware)
       .concat(complianceAlertsApi.middleware)
-      .concat(superAdminApi.middleware),
+      .concat(superAdminApi.middleware)
+      .concat(billingApi.middleware),
   devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
 

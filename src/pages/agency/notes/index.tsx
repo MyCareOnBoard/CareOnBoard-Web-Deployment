@@ -5,6 +5,7 @@ import {formatDistanceToNow} from "date-fns";
 import AgencyEditNote from "@/pages/agency/notes/editNote";
 import {useLocation, useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
+import {useAuth} from "@/utils/auth";
 
 type NoteStatus = "submitted" | "approved" | "rejected";
 type FilterType =
@@ -20,6 +21,7 @@ type TimeIntervalType = "all" | "today" | "this-month" | "this-year";
 type StatusTabType = "submitted" | "approved";
 
 export default function AgencyNotesPage() {
+  const {user} = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -45,12 +47,15 @@ export default function AgencyNotesPage() {
   }, [searchQuery]);
 
   const {data, isLoading, isFetching, isError, refetch} = useGetAllSubmittedNotesQuery({
+    agencyId: user?.profile?.id || "",
     page: currentPage,
     limit: itemsPerPage,
     activityType: activeFilter,
     search: debouncedSearch,
     timeInterval: timeInterval,
     status: statusTab
+  }, {
+    skip: !user?.profile?.id
   });
 
   const [approveNotes, {isLoading: isApproving}] = useApproveSubmittedNotesMutation();

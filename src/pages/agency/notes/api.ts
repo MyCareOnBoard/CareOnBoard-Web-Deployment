@@ -8,9 +8,10 @@ export const agencyNotesApi = createApi({
   tagTypes: ['SubmittedNotes', 'SubmittedNoteDetails'],
   endpoints: (builder) => ({
     getAllSubmittedNotes: builder.query<SubmittedNotesResponse, SubmittedNotesQueryParams>({
-      query: (params = {}) => {
+      query: (params) => {
         const queryParams = new URLSearchParams();
         
+        queryParams.append('agencyId', params.agencyId);
         if (params.page) queryParams.append('page', params.page.toString());
         if (params.limit) queryParams.append('limit', params.limit.toString());
         if (params.activityType) queryParams.append('activityType', params.activityType);
