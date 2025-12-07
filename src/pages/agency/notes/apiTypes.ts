@@ -35,6 +35,7 @@ export interface SubmittedNotesResponse {
 }
 
 export interface SubmittedNotesQueryParams {
+  agencyId: string;
   page?: number;
   limit?: number;
   activityType?: string;
