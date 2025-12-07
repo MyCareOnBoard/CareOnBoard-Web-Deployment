@@ -63,11 +63,16 @@ export default function BillingAndApprovalsPage() {
     setCurrentPage(1);
   }, [activeTab]);
 
-  const handleGenerateReport = async (clientId: string) => {
-    if (!clientId) return;
-    
-    // Navigate to client claims page
-    navigate(Routes.agency.clientClaims.replace(':clientId', clientId));
+  const handleGenerateReport = async (
+    itemId: string
+  ) => {
+    if (!itemId) return;
+
+    if (activeTab === "client") {
+      navigate(Routes.agency.clientClaims.replace(':clientId', itemId));
+    } else {
+      navigate(Routes.agency.dspClaims.replace(':dsp', itemId));
+    }
   };
 
   const currentRecords = billingData?.records || [];
@@ -313,7 +318,7 @@ export default function BillingAndApprovalsPage() {
                   {/* Generate Report Button */}
                   <div className="flex items-center">
                     <Button
-                      onClick={() => handleGenerateReport(record.client?.id || record.id)}
+                      onClick={() => handleGenerateReport(activeTab === "client" ? record.client?.id : record.employee?.id)}
                       className="bg-[#B2B2B3] hover:bg-[#B2B2B3] text-white rounded-full px-6 py-2 h-auto font-medium transition-all duration-200"
                     >
                       Generate Report

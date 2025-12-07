@@ -85,10 +85,30 @@ export interface ServiceLog {
 
 export interface DspNote {
   id: string;
-  employeeName: string;
+  employeeName?: string;
   activityType: string;
   approvedAt: string | null;
   noteCount: number;
+  description?: string;
+}
+
+export interface ClientService {
+  id: string;
+  client: {
+    id: string;
+    fullName: string;
+    profileImage?: string;
+  } | null;
+  date: string;
+  clockedIn: string;
+  clockedOut: string;
+  hours: number;
+  units: number;
+  notes: string;
+  service?: string;
+  serviceCode?: string;
+  payRate?: number;
+  shiftPeriod: string;
 }
 
 export interface ClientClaimsData {
@@ -120,6 +140,37 @@ export interface ClientClaimsData {
 export interface ClientClaimsResponse {
   success: boolean;
   data: ClientClaimsData;
+}
+
+export interface DspClaimsData {
+  dsp: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+    payrate: string;
+    email?: string;
+    phone?: string;
+    profileImage?: string;
+    role?: string;
+    status?: string;
+  };
+  clientServices: ClientService[];
+  billingSummary: {
+    totalHoursWorked: number;
+    totalUnits: number;
+    ratePerHour: number;
+    totalPayRate: number;
+    totalMileage: number;
+    totalExpenses: number;
+    totalAmount: number;
+  };
+  dspNotes: DspNote[];
+}
+
+export interface DspClaimsResponse {
+  success: boolean;
+  data: DspClaimsData;
 }
 
 export const billingApi = createApi({
@@ -160,6 +211,14 @@ export const billingApi = createApi({
         requiresAuth: true
       }),
       providesTags: ['BillingRecords']
+    }),
+    getDspClaims: builder.query<DspClaimsResponse, { dspId: string; agencyId: string }>({
+      query: ({ dspId, agencyId }) => ({
+        url: `/billing/dsp/${dspId}?agencyId=${agencyId}`,
+        method: "GET",
+        requiresAuth: true
+      }),
+      providesTags: ['BillingRecords']
     })
   }),
 });
@@ -168,4 +227,5 @@ export const {
   useGetBillingRecordsQuery,
   useGenerateReportMutation,
   useGetClientClaimsQuery,
+  useGetDspClaimsQuery,
 } = billingApi;
