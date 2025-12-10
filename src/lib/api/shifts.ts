@@ -70,7 +70,6 @@ export interface Shift {
     approved?: boolean; // Whether the shift is approved
     timeRemaining?: number; // minutes remaining
     sessionDuration?: string; // e.g., "2 hour session"
-    service?: string;
     serviceCode?: string;
     schedulingType?: string;
     ispOutcome?: string;
@@ -104,7 +103,6 @@ export interface CreateShiftRequest {
     status: ShiftStatus;
     availableAt?: string;
     notesType?: string;
-    service?: string;
     serviceCode?: string;
     schedulingType?: string;
     ispOutcome?: string;
@@ -130,7 +128,6 @@ export interface UpdateShiftRequest {
     status?: ShiftStatus;
     actionStatus?: ShiftActionStatus | null;
     notesType?: string;
-    service?: string;
     serviceCode?: string;
     schedulingType?: string;
     ispOutcome?: string;

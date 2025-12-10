@@ -40,7 +40,6 @@ export interface ScheduleFormData {
   assignedDsp: string;
   assignedDspId: string;
   billingRate: string;
-  service: string;
   serviceCode: string;
   notesType: string;
   schedulingType: "one-time" | "recurring" | "";
@@ -61,13 +60,6 @@ const clockInTimeOptions = [
 const clockOutTimeOptions = [
   "08:00:AM", "08:30:AM", "09:00:AM", "09:30:AM", "10.00:AM",
   "10.30:AM", "11.30:AM", "12.00:PM", "12.30:PM"
-];
-
-const serviceOptions = [
-  "General Practitioners",
-  "Community Based",
-  "Day Habilitation",
-  "Respite Care",
 ];
 
 const noteTypes: {id: string, title: string}[] = [
@@ -109,7 +101,6 @@ const initialFormData: ScheduleFormData = {
   assignedDsp: "",
   assignedDspId: "",
   billingRate: "",
-  service: "General Practitioners",
   serviceCode: "183535",
   notesType: "",
   schedulingType: "",
@@ -133,7 +124,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
   const [showNotesTypeDropdown, setShowNotesTypeDropdown] = useState(false);
   const [customClockIn, setCustomClockIn] = useState("");
   const [customClockOut, setCustomClockOut] = useState("");
@@ -213,7 +203,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       endTime: data.clockOutTime,
       clientId: data.clientId,
       notesType: data.notesType || undefined,
-      service: data.service,
       serviceCode: data.serviceCode,
       schedulingType: data.schedulingType,
       ispOutcome: data.ispOutcome || undefined,
@@ -491,7 +480,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             startTime: formData.clockInTime,
             endTime: formData.clockOutTime,
             notesType: formData.notesType || undefined,
-            service: formData.service,
             serviceCode: formData.serviceCode,
             schedulingType: formData.schedulingType,
             ispOutcome: formData.ispOutcome,
@@ -662,7 +650,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           startTime: formData.clockInTime,
           endTime: formData.clockOutTime,
           notesType: formData.notesType || undefined,
-          service: formData.service,
           serviceCode: formData.serviceCode,
           schedulingType: formData.schedulingType,
           ispOutcome: formData.ispOutcome,
@@ -950,53 +937,16 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             )}
           </div>
 
-          {/* Service & Service Code Row */}
-          <div className="flex gap-4">
-            {/* Service Dropdown */}
-            <div className="flex-1 flex flex-col gap-1 relative">
-              <label className="text-[12px] font-normal text-[#10141a]">Service</label>
-              <button
-                onClick={() => {
-                  setShowServiceDropdown(!showServiceDropdown);
-                  setShowNotesTypeDropdown(false);
-                }}
-                className="bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 flex items-center gap-3 cursor-pointer"
-              >
-                <span className="flex-1 text-left text-[14px] font-normal text-[#10141a]">
-                  {formData.service}
-                </span>
-                <ChevronDown className="w-5 h-5 text-[#10141a]" />
-              </button>
-              
-              {showServiceDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-[12px] shadow-lg z-10">
-                  {serviceOptions.map((service) => (
-                    <button
-                      key={service}
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, service }));
-                        setShowServiceDropdown(false);
-                      }}
-                      className="w-full px-4 py-3 text-left text-[14px] font-normal text-[#10141a] hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer"
-                    >
-                      {service}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Service Code */}
-            <div className="flex-1 flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">Service Code</label>
-              <div className="bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 flex items-center">
-                <input
-                  type="text"
-                  value={formData.serviceCode}
-                  onChange={(e) => setFormData(prev => ({ ...prev, serviceCode: e.target.value }))}
-                  className="flex-1 text-[14px] font-normal text-black outline-none bg-transparent"
-                />
-              </div>
+          {/* Service Code */}
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Service Code</label>
+            <div className="bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 flex items-center">
+              <input
+                type="text"
+                value={formData.serviceCode}
+                onChange={(e) => setFormData(prev => ({ ...prev, serviceCode: e.target.value }))}
+                className="flex-1 text-[14px] font-normal text-black outline-none bg-transparent"
+              />
             </div>
           </div>
 
@@ -1006,7 +956,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             <button
               onClick={() => {
                 setShowNotesTypeDropdown(!showNotesTypeDropdown);
-                setShowServiceDropdown(false);
               }}
               className="bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 flex items-center gap-3 cursor-pointer"
             >
