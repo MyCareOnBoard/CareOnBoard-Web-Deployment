@@ -205,38 +205,6 @@ export default function SchedulingPage() {
     }
   };
 
-
-  /**
-   * Handle seeding clients with dummy data
-   */
-  const handleSeedClients = async () => {
-    try {
-      setSeedingClients(true);
-      
-      const result = await seedClients({
-        activeCount: 5,
-        inactiveCount: 2,
-        pendingCount: 1,
-        archivedCount: 0,
-        overwrite: true,
-      });
-
-      toast({
-        title: "Clients Seeded",
-        description: `Successfully seeded ${result.count} client(s). ${result.message}`,
-      });
-    } catch (error: any) {
-      console.error("Failed to seed clients:", error);
-      toast({
-        title: "Seeding Failed",
-        description: error?.message || "Failed to seed clients. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setSeedingClients(false);
-    }
-  };
-
   return (
     <>
     <div className="min-h-[calc(100vh-200px)]">
@@ -246,23 +214,6 @@ export default function SchedulingPage() {
           Scheduling
         </h1>
         <div className="flex items-center gap-3">
-          <Button
-            onClick={handleSeedClients}
-            disabled={seedingClients}
-            className="flex items-center gap-3 bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {seedingClients ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Seeding...
-              </>
-            ) : (
-              <>
-                <Plus className="w-5 h-5" />
-                Seed Clients
-              </>
-            )}
-          </Button>
           <Button
             onClick={() => setShowAddScheduleModal(true)}
             className="flex items-center gap-3 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px]"
