@@ -103,7 +103,7 @@ const initialFormData: ScheduleFormData = {
   billingRate: "",
   serviceCode: "",
   notesType: "",
-  schedulingType: "",
+  schedulingType: "one-time",
   date: null,
   startDate: null,
   endDate: null,
