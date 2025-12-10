@@ -43,6 +43,8 @@ import SchedulingPage from "@/pages/agency/scheduling";
 import SupportPage from "@/pages/agency/support";
 import AnalyticsPage from "@/pages/agency/analytics";
 import ApplicantDirectoryPage from "@/pages/agency/applicant-directory";
+import ClearanceHiringList from "@/pages/agency/applicant-directory/ClearanceHiringList";
+import ApplicantProfilePage from "@/pages/agency/applicant-directory/ApplicantProfilePage";
 import ReportsPage from "@/pages/agency/reports";
 import ComplianceAlertsPage from "@/pages/agency/compliance-alerts";
 import ShiftsPage from "@/pages/agency/shifts";
@@ -189,6 +191,14 @@ export const router = createBrowserRouter([
       {
         path: Routes.agency.applicantDirectory,
         Component: ApplicantDirectoryPage,
+      },
+      {
+        path: Routes.agency.applicantClearanceHiring,
+        Component: ClearanceHiringList,
+      },
+      {
+        path: Routes.agency.applicantProfile,
+        Component: ApplicantProfilePage,
       },
       {
         path: Routes.agency.reports,
