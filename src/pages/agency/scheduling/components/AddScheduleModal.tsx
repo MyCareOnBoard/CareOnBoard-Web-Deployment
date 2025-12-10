@@ -101,7 +101,7 @@ const initialFormData: ScheduleFormData = {
   assignedDsp: "",
   assignedDspId: "",
   billingRate: "",
-  serviceCode: "183535",
+  serviceCode: "",
   notesType: "",
   schedulingType: "",
   date: null,
@@ -890,7 +890,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
           {/* Assigned DSP Field */}
           <div className="flex flex-col gap-1 relative">
-            <label className="text-[12px] font-normal text-[#10141a]">Assigned DSP</label>
+            <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
             <div className={`bg-white border rounded-[12px] h-[44px] px-4 flex items-center ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}>
               <input
                 type="text"
