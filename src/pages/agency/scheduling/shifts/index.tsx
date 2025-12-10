@@ -151,7 +151,6 @@ export default function ShiftsListPage() {
       assignedDsp: employeeName,
       assignedDspId: (shift.employee as any)?.id || "",
       billingRate: "",
-      service: shift.service || "General Practitioners",
       serviceCode: shift.serviceCode || "183535",
       notesType: anyShift.notesType || "",
       schedulingType: (shift.schedulingType as "one-time" | "recurring" | "") || "one-time",
