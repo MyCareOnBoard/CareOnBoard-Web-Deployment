@@ -1,12 +1,15 @@
 import React, { useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { Routes } from "@/routes/constants";
 
 export default function ClientsPage() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -276,7 +279,14 @@ export default function ClientsPage() {
                     </div>
                   </div>
 
-                  <Button className="h-9 w-[140px] px-4 py-2 text-[14px] font-semibold">
+                  <Button
+                    className="h-9 w-[140px] px-4 py-2 text-[14px] font-semibold"
+                    onClick={() =>
+                      navigate(
+                        Routes.agency.clientDetails.replace(":clientId", client.id)
+                      )
+                    }
+                  >
                     Client Details
                   </Button>
                 </div>

@@ -37,6 +37,7 @@ import Expenses from "@/pages/userPanel/expenses";
 import AgencyDashboardPage from "@/pages/agency/dashboard";
 import DSPManagementPage from "@/pages/agency/dsp-management";
 import ClientsPage from "@/pages/agency/clients-management";
+import ClientDetailsPage from "@/pages/agency/client-details";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import ClientClaimsPage from "@/pages/agency/billing-and-approvals/client-claims";
 import SchedulingPage from "@/pages/agency/scheduling";
@@ -151,6 +152,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.agency.clients,
         Component: ClientsPage,
+      },
+      {
+        path: Routes.agency.clientDetails,
+        Component: ClientDetailsPage,
       },
       {
         path: Routes.agency.billingAndApprovals,
