@@ -102,7 +102,7 @@ export default function ClientDetailsPage() {
             type="button"
             onClick={() => setActiveTab("activity")}
             className={[
-              "h-[36px] w-[80px] rounded-[60px] px-[16px] py-[8px] text-[12px] font-medium leading-[1.4] backdrop-blur-[22px]",
+              "h-[36px] w-[80px] rounded-[60px] px-[16px] py-[8px] text-[12px] font-medium leading-[1.4] backdrop-blur-[22px] cursor-pointer",
               activeTab === "activity"
                 ? "bg-[#00b4b8] border border-[#00b4b8] text-white"
                 : "border border-[#b2b2b3] text-[#b2b2b3]",
@@ -114,7 +114,7 @@ export default function ClientDetailsPage() {
             type="button"
             onClick={() => setActiveTab("profile")}
             className={[
-              "h-[36px] w-[80px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium leading-[1.4] backdrop-blur-[22px]",
+              "h-[36px] w-[80px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium leading-[1.4] backdrop-blur-[22px] cursor-pointer",
               activeTab === "profile"
                 ? "bg-[#00b4b8] border border-[#00b4b8] text-white"
                 : "border border-[#b2b2b3] text-[#b2b2b3]",
@@ -126,7 +126,7 @@ export default function ClientDetailsPage() {
             type="button"
             onClick={() => setActiveTab("documents")}
             className={[
-              "h-[36px] w-[100px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium leading-[1.4] backdrop-blur-[22px]",
+              "h-[36px] w-[100px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium leading-[1.4] backdrop-blur-[22px] cursor-pointer",
               activeTab === "documents"
                 ? "bg-[#00b4b8] border border-[#00b4b8] text-white"
                 : "border border-[#b2b2b3] text-[#b2b2b3]",
