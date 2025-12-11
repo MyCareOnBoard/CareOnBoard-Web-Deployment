@@ -65,11 +65,7 @@ export default function ResetPasswordPage() {
       const userEmail = await verifyPasswordResetCode(auth, oobCode)
       setEmail(userEmail)
       setIsValidCode(true)
-      setVerifying(false)
-      console.log("[ResetPassword] Code verified for email:", userEmail)
-    } catch (error: any) {
-      console.error("[ResetPassword] Code verification error:", error)
-
+      setVerifying(false)    } catch (error: any) {
       const errorMessage = getAuthErrorMessage(error)
       toast.error(errorMessage)
       setVerifying(false)
@@ -159,8 +155,7 @@ export default function ResetPasswordPage() {
     try {
       // Confirm the password reset with the new password
       await confirmPasswordReset(auth, oobCode, password)
-
-      console.log("[ResetPassword] Password reset successful")
+      
       const successMsg = getSuccessMessage('passwordResetComplete')
       toast.success(successMsg.description)
 
@@ -169,8 +164,6 @@ export default function ResetPasswordPage() {
         navigate(Routes.auth.login)
       }, 2000)
     } catch (error: any) {
-      console.error("[ResetPassword] Password reset error:", error)
-
       const errorMessage = getAuthErrorMessage(error)
       toast.error(errorMessage)
     } finally {

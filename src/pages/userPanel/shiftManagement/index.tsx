@@ -66,9 +66,7 @@ const calculateRemainingMinutes = (endTime: string, date: string): number => {
     const diffInMs = endDateTime.getTime() - now.getTime();
     const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
     return Math.max(0, diffInMinutes);
-  } catch (error) {
-    console.error('Error calculating remaining minutes:', error);
-    return 0;
+  } catch (error) {    return 0;
   }
 };
 
@@ -113,9 +111,7 @@ const isShiftExpiringSoon = (startTime: string, endTime: string, date: string): 
 
     const threshold = totalDuration * 0.25;
     return elapsed >= threshold;
-  } catch (error) {
-    console.error('Error calculating if shift is expiring soon:', error);
-    return false;
+  } catch (error) {    return false;
   }
 };
 
@@ -142,9 +138,7 @@ const calculateTimeUntilStart = (startTime: string, date: string): string => {
     }
 
     return `Starts in ${hours}h ${minutes}min`;
-  } catch (error) {
-    console.error('Error calculating time until start:', error);
-    return 'Starting soon';
+  } catch (error) {    return 'Starting soon';
   }
 };
 
@@ -178,9 +172,7 @@ function ShiftCard({
     return "bg-[rgba(178,178,179,0.1)] border-[#b2b2b3] border-[0.5px] text-[#565656]";
   };
 
-  const getActionButton = () => {
-    console.log("shift", shift.actionStatus);
-    if (!showAction || !shift.actionStatus) return null;
+  const getActionButton = () => {    if (!showAction || !shift.actionStatus) return null;
 
     const buttonConfig = {
       [ShiftActionStatus.CLOCK_IN]: {
@@ -673,9 +665,7 @@ export default function ShiftManagementPage() {
     const agencyId = user?.agencyId;
     const employeeId = user?.id;
 
-    if (!agencyId) {
-      console.warn('No user ID available for fetching shifts');
-      return;
+    if (!agencyId) {      return;
     }
 
     const loadTodayShifts = async () => {
@@ -685,9 +675,7 @@ export default function ShiftManagementPage() {
         if (todayResponse.success) {
           setTodayShift(todayResponse.shift);
         }
-      } catch (error: any) {
-        console.error('Failed to load today shifts:', error);
-        toast.error('Failed to load today shifts', {
+      } catch (error: any) {        toast.error('Failed to load today shifts', {
           description: error?.response?.data?.error || 'Please try again later'
         });
       } finally {
@@ -702,9 +690,7 @@ export default function ShiftManagementPage() {
         if (upcomingResponse.success) {
           setUpcomingShifts(upcomingResponse.shifts);
         }
-      } catch (error: any) {
-        console.error('Failed to load upcoming shifts:', error);
-        toast.error('Failed to load upcoming shifts', {
+      } catch (error: any) {        toast.error('Failed to load upcoming shifts', {
           description: error?.response?.data?.error || 'Please try again later'
         });
       } finally {
@@ -719,9 +705,7 @@ export default function ShiftManagementPage() {
         if (previousResponse.success) {
           setPreviousShifts(previousResponse.shifts);
         }
-      } catch (error: any) {
-        console.error('Failed to load previous shifts:', error);
-        toast.error('Failed to load previous shifts', {
+      } catch (error: any) {        toast.error('Failed to load previous shifts', {
           description: error?.response?.data?.error || 'Please try again later'
         });
       } finally {
@@ -829,9 +813,7 @@ export default function ShiftManagementPage() {
         setTodayShift(response.shift);
         toast.success('Action completed successfully');
       }
-    } catch (error: any) {
-      console.error('Failed to perform shift action:', error);
-      toast.error('Action failed', {
+    } catch (error: any) {      toast.error('Action failed', {
         description: error?.response?.data?.error || 'Please try again'
       });
     } finally {
@@ -865,9 +847,7 @@ export default function ShiftManagementPage() {
           }
         }
       }
-    } catch (error: any) {
-      console.error('Failed to clock out:', error);
-      toast.error('Clock out failed', {
+    } catch (error: any) {      toast.error('Clock out failed', {
         description: error?.response?.data?.error || 'Please try again'
       });
     } finally {

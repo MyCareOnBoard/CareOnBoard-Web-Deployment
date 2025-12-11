@@ -66,11 +66,7 @@ export default function VerifyOTP() {
       
       // Step 2: Update user profile to mark onboarding as completed
       try {
-        await completeOnboarding()
-        console.log("✅ Onboarding marked as completed")
-      } catch (updateErr: any) {
-        console.warn("⚠️ Could not update onboarding status:", updateErr)
-        // Don't block navigation if update fails
+        await completeOnboarding()      } catch (updateErr: any) {        // Don't block navigation if update fails
       }
 
       nav(Routes.onboarding.success, { replace: true })

@@ -45,14 +45,8 @@ export default function AssemblyAITranscription({
         try {
           hasConnected.current = true;
           onError("");
-          onConnecting(true);
-
-          console.log("Getting AssemblyAI token...");
-          // Get token from server
-          const token = await getAssemblyAIToken();
-
-          console.log("Connecting to AssemblyAI WebSocket...");
-          // Connect to AssemblyAI WebSocket v3 with parameters
+          onConnecting(true);          // Get token from server
+          const token = await getAssemblyAIToken();          // Connect to AssemblyAI WebSocket v3 with parameters
           const connectionParams = {
             sample_rate: "16000",
             formatted_finals: "true",
@@ -67,15 +61,11 @@ export default function AssemblyAITranscription({
           socketRef.current = socket;
 
           // Handle WebSocket open
-          socket.onopen = async () => {
-            console.log("AssemblyAI WebSocket connected");
-            
+          socket.onopen = async () => {            
             onConnecting(false);
             onConnectionChange(true);
 
-            try {
-              console.log("Getting microphone access...");
-              // Get microphone access
+            try {              // Get microphone access
               const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                   channelCount: 1,
@@ -110,9 +100,7 @@ export default function AssemblyAITranscription({
                 workletNode.connect(audioContext.destination);
                 
                 (processorRef.current as any) = workletNode;
-              } catch (workletError) {
-                console.warn("AudioWorklet failed, falling back to ScriptProcessor", workletError);
-                const processor = audioContext.createScriptProcessor(4096, 1, 1);
+              } catch (workletError) {                const processor = audioContext.createScriptProcessor(4096, 1, 1);
                 processorRef.current = processor;
                 
                 let audioBufferQueue = new Int16Array(0);
@@ -142,12 +130,7 @@ export default function AssemblyAITranscription({
 
                 source.connect(processor);
                 processor.connect(audioContext.destination);
-              }
-
-              console.log("AssemblyAI transcription started");
-            } catch (err) {
-              console.error("Failed to get microphone access:", err);
-              onError(err instanceof Error ? err.message : "Failed to access microphone");
+              }            } catch (err) {              onError(err instanceof Error ? err.message : "Failed to access microphone");
               onConnecting(false);
               socket.close();
             }
@@ -171,28 +154,18 @@ export default function AssemblyAITranscription({
               speechTimeoutRef.current = setTimeout(() => {
                 onSpeechDetected(false);
               }, 500);
-            } else if (data.message_type === "SessionBegins") {
-              console.log("AssemblyAI session started:", data.session_id);
-            } else if (data.message_type === "SessionTerminated") {
-              console.log("AssemblyAI session terminated");
-            }
+            } else if (data.message_type === "SessionBegins") {            } else if (data.message_type === "SessionTerminated") {            }
           };
 
           // Handle WebSocket errors
-          socket.onerror = (error) => {
-            console.error("AssemblyAI WebSocket error:", error);
-            onError("WebSocket connection error");
+          socket.onerror = (error) => {            onError("WebSocket connection error");
             onConnectionChange(false);
           };
 
           // Handle WebSocket close
-          socket.onclose = (event) => {
-            console.log("AssemblyAI WebSocket closed:", event.code, event.reason);
-            onConnectionChange(false);
+          socket.onclose = (event) => {            onConnectionChange(false);
           };
-        } catch (err) {
-          console.error("Failed to start AssemblyAI transcription:", err);
-          onError(err instanceof Error ? err.message : "Failed to connect to transcription service");
+        } catch (err) {          onError(err instanceof Error ? err.message : "Failed to connect to transcription service");
           onConnecting(false);
           hasConnected.current = false;
           onStopRecording();
@@ -207,8 +180,6 @@ export default function AssemblyAITranscription({
   // Cleanup when component unmounts
   useEffect(() => {
     return () => {
-      console.log("Cleaning up AssemblyAI transcription...");
-
       // Clear speech timeout
       if (speechTimeoutRef.current) {
         clearTimeout(speechTimeoutRef.current);
@@ -251,8 +222,6 @@ export default function AssemblyAITranscription({
   // Handle stop recording
   useEffect(() => {
     if (!isRecording && hasConnected.current) {
-      console.log("Stopping AssemblyAI transcription...");
-
       // Clear speech timeout
       if (speechTimeoutRef.current) {
         clearTimeout(speechTimeoutRef.current);

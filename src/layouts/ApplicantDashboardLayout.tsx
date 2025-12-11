@@ -21,9 +21,7 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
     try {
       await logout();
       navigate(Routes.auth.login, {replace: true});
-    } catch (error) {
-      console.error('[DashboardLayout] Logout failed:', error);
-    }
+    } catch (error) {    }
   };
 
   const navItems: NavItem[] = [

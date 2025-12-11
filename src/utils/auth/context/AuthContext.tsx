@@ -13,10 +13,10 @@ import {
 import {createUser as createBackendUser} from "../api/client"
 import {PageLoader} from "@/components/ui/loader"
 import {auth} from "@/lib/firebase";
-import type { UserProfile } from "../types/user.types"
+import type { User } from "../types/user.types"
 
 interface AuthContextType {
-  user: UserProfile | null
+  user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   signup: (
@@ -47,7 +47,7 @@ export const useAuth = () => useContext(AuthContext)
 export function AuthProvider({children}: { children: React.ReactNode }) {
   const dispatch = useDispatch<AppDispatch>()
   const reduxUser = useSelector((state: RootState) => state.auth?.user)
-  const [user, setUserState] = useState<UserProfile | null>(null)
+  const [user, setUserState] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
 
@@ -98,22 +98,15 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
    * Login user with email and password
    */
   const login = async (email: string, password: string) => {
-    console.log('[AuthContext] Login attempt for:', email)
     const response = await loginWithEmail(email, password)
 
     if (!response.success || !response.user) {
-      console.error('[AuthContext] Login failed:', response.error)
       throw new Error(response.error || "Login failed")
     }
-
-    console.log('[AuthContext] Login successful, updating state and Redux')
-    console.log('[AuthContext] User object:', response.user)
 
     // Update local state and Redux
     setUserState(response.user)
     dispatch(setUser(response.user))
-
-    console.log('[AuthContext] User dispatched to Redux')
   }
 
   /**
@@ -125,29 +118,20 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
     fullName: string,
     agencyId?: string
   ) => {
-    console.log('[AuthContext] Signup attempt for:', email)
     const response = await registerWithEmail(fullName, email, password)
 
     if (!response.success || !response.user) {
-      console.error('[AuthContext] Signup failed:', response.error)
       throw new Error(response.error || "Registration failed")
     }
-
-    console.log('[AuthContext] Signup successful, updating state and Redux')
-    console.log('[AuthContext] User object:', response.user)
 
     // Update local state and Redux
     setUserState(response.user)
     dispatch(setUser(response.user))
 
-    console.log('[AuthContext] User dispatched to Redux')
-
     // Create user in backend
     try {
       await createBackendUser(fullName, agencyId)
-      console.log('[signup] User created in backend successfully')
     } catch (error: any) {
-      console.error('[signup] Failed to create user in backend:', error)
       // Don't throw - Firebase account is already created, just log the error
     }
   }
@@ -158,9 +142,7 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
   const createUser = async (fullName: string) => {
     try {
       await createBackendUser(fullName)
-      console.log('[createUser] User created in backend successfully')
     } catch (error: any) {
-      console.error('[createUser] Failed to create user in backend:', error)
       throw error
     }
   }
@@ -169,11 +151,9 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
    * Logout current user
    */
   const logout = async () => {
-    console.log('[AuthContext] Logging out user')
     await logoutUser()
     setUserState(null)
     dispatch(setUser(null))
-    console.log('[AuthContext] User logged out, Redux cleared')
   }
 
   /**

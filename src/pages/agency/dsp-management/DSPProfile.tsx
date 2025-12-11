@@ -29,11 +29,9 @@ export function DSPProfile({ dsp, shifts, documents, onBack, onChatClick }: DSPP
   };
 
   const handleDeactivateUser = () => {
-    console.log("Deactivate user");
   };
 
   const handleActivateUser = () => {
-    console.log("Activate user");
   };
 
   return (

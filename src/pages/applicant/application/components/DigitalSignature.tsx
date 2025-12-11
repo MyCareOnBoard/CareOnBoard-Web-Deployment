@@ -127,9 +127,7 @@ const DigitalSignatureModal = ({
         onSave?.(signatureData);
         proceed?.();
         setIsOpen(false);
-      } catch (error) {
-        console.error('Failed to save signature:', error);
-        alert('Failed to save signature. Please try again.');
+      } catch (error) {        alert('Failed to save signature. Please try again.');
       }
     } else {
       alert('Please provide a signature before proceeding.');

@@ -163,9 +163,7 @@ export async function createClient(data: CreateClientRequest): Promise<Client> {
     }
 
     return response.data.data;
-  } catch (err: any) {
-    console.error('createClient error:', err);
-    throw new Error(err.message || 'Failed to create client');
+  } catch (err: any) {    throw new Error(err.message || 'Failed to create client');
   }
 }
 
@@ -191,9 +189,7 @@ export async function listClients(params?: ListClientsParams): Promise<Client[]>
     }
 
     return response.data.clients || [];
-  } catch (error) {
-    console.error('Failed to fetch clients:', error);
-    throw error;
+  } catch (error) {    throw error;
   }
 }
 
@@ -217,9 +213,7 @@ export async function getClients(page: number = 1, pageSize: number = 10): Promi
       page: page,
       pageSize: pageSize,
     };
-  } catch (error) {
-    console.error('Failed to fetch clients:', error);
-    throw error;
+  } catch (error) {    throw error;
   }
 }
 
@@ -239,9 +233,7 @@ export async function getClientById(clientId: string, agencyId?: string): Promis
     }
 
     return response.data.data;
-  } catch (error) {
-    console.error(`Failed to fetch client ${clientId}:`, error);
-    throw error;
+  } catch (error) {    throw error;
   }
 }
 
@@ -262,9 +254,7 @@ export async function updateClient(clientId: string, data: UpdateClientRequest, 
     }
 
     return response.data.data;
-  } catch (err: any) {
-    console.error('updateClient error:', err);
-    throw new Error(err.message || 'Failed to update client');
+  } catch (err: any) {    throw new Error(err.message || 'Failed to update client');
   }
 }
 
@@ -284,9 +274,7 @@ export async function deleteClient(clientId: string, agencyId?: string): Promise
     }
 
     return response.data;
-  } catch (err: any) {
-    console.error('deleteClient error:', err);
-    throw new Error(err.message || 'Failed to delete client');
+  } catch (err: any) {    throw new Error(err.message || 'Failed to delete client');
   }
 }
 
@@ -308,9 +296,7 @@ export async function searchClients(query: string, agencyId?: string): Promise<C
     }
 
     return response.data.clients || [];
-  } catch (error) {
-    console.error('Failed to search clients:', error);
-    throw error;
+  } catch (error) {    throw error;
   }
 }
 
@@ -329,9 +315,7 @@ export async function seedClients(data: SeedClientsRequest): Promise<{ success: 
     }
 
     return response.data;
-  } catch (err: any) {
-    console.error('seedClients error:', err);
-    throw new Error(err.message || 'Failed to seed clients');
+  } catch (err: any) {    throw new Error(err.message || 'Failed to seed clients');
   }
 }
 
@@ -351,8 +335,6 @@ export async function getClientStats(agencyId?: string): Promise<ClientStats> {
     }
 
     return response.data.stats;
-  } catch (err: any) {
-    console.error('getClientStats error:', err);
-    throw new Error(err.message || 'Failed to fetch client stats');
+  } catch (err: any) {    throw new Error(err.message || 'Failed to fetch client stats');
   }
 }

@@ -37,9 +37,7 @@ export default function OrientationStep() {
       try {
         const user = await getUser();
         dispatch(setUser(user));
-      } catch (error) {
-        console.error(error);
-      }
+      } catch (error) {      }
     }
 
     const handleModalOpen = async () => {
@@ -60,9 +58,7 @@ export default function OrientationStep() {
             setIsEmployeeModalOpen(true);
             refetchSignatureStatus();
             refetchOfficialHireStatus();
-        } catch (error) {
-            console.error(error);
-        }
+        } catch (error) {        }
     }
 
     const buttonText = () => {

@@ -150,9 +150,7 @@ export default function ApplicantDirectory() {
       // const response = await fetch(`/api/applicants?period=${tab}`);
       // const data = await response.json();
       // setApplicants(data);
-    } catch (error) {
-      console.error("Error fetching applicants:", error);
-    } finally {
+    } catch (error) {    } finally {
       setIsLoading(false);
     }
   };
@@ -166,9 +164,7 @@ export default function ApplicantDirectory() {
         title: "Approved",
         description: "Applicant has been approved successfully.",
       });
-    } catch (error) {
-      console.error("Error approving:", error);
-      toast({
+    } catch (error) {      toast({
         title: "Error",
         description: "Failed to approve applicant. Please try again.",
         variant: "destructive",
@@ -185,9 +181,7 @@ export default function ApplicantDirectory() {
         title: "Cancelled",
         description: "Applicant approval has been cancelled.",
       });
-    } catch (error) {
-      console.error("Error canceling:", error);
-      toast({
+    } catch (error) {      toast({
         title: "Error",
         description: "Failed to cancel approval. Please try again.",
         variant: "destructive",

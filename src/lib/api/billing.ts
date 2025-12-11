@@ -43,9 +43,7 @@ export const listBillingRecords = async (params?: ListBillingRecordsParams): Pro
     }
 
     return response.data;
-  } catch (error) {
-    console.error('Failed to fetch billing records:', error);
-    throw error;
+  } catch (error) {    throw error;
   }
 };
 
@@ -60,8 +58,6 @@ export const generateBillingReport = async (recordIds: string[]): Promise<{ succ
     }
 
     return response.data;
-  } catch (error) {
-    console.error('Failed to generate billing report:', error);
-    throw error;
+  } catch (error) {    throw error;
   }
 };

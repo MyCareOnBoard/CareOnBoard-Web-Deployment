@@ -86,9 +86,7 @@ export default function AgencyCommunityBasedNote(
 
   const debouncedMutateNote = useDebounce(
     async (params: any) => {
-      await mutateNote(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
+      await mutateNote(params).unwrap().catch(error => {      });
     },
     500
   );

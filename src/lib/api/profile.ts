@@ -107,9 +107,7 @@ export async function getProfileInfo(): Promise<ProfileInfo> {
     const response = await axiosClient.get('/userProfile/account-info')
     const data = resolveProfileSource(response.data)
     return mapToProfileInfo(data)
-  } catch (error) {
-    console.error('Failed to fetch profile info:', error)
-    throw error
+  } catch (error) {    throw error
   }
 }
 
@@ -158,9 +156,7 @@ export async function updateProfileInfo(data: Partial<ProfileInfo>): Promise<Pro
     const responseData = resolveProfileSource(response.data)
 
     return mapToProfileInfo(responseData, data)
-  } catch (error) {
-    console.error('Failed to update profile info:', error)
-    throw error
+  } catch (error) {    throw error
   }
 }
 
@@ -198,9 +194,7 @@ export async function uploadProfilePicture(file: File): Promise<{ url: string }>
     }
 
     return { url: imageUrl }
-  } catch (error) {
-    console.error('Failed to upload profile picture:', error)
-    throw error
+  } catch (error) {    throw error
   }
 }
 
@@ -217,8 +211,6 @@ export async function uploadProfilePicture(file: File): Promise<{ url: string }>
 export async function deleteAccount(): Promise<void> {
   try {
     await axiosClient.delete('/userProfile/account')
-  } catch (error) {
-    console.error('Failed to delete account:', error)
-    throw error
+  } catch (error) {    throw error
   }
 }

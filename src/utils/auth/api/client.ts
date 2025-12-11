@@ -7,18 +7,14 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 export async function getAuthToken(): Promise<string | null> {
   const user = auth.currentUser;
 
-  if (!user) {
-    console.warn('No authenticated user found');
-    return null;
+  if (!user) {    return null;
   }
 
   try {
     // Get fresh ID token (automatically refreshes if expired)
     const token = await user.getIdToken();
     return token;
-  } catch (error) {
-    console.error('Error getting auth token:', error);
-    return null;
+  } catch (error) {    return null;
   }
 }
 
@@ -52,9 +48,7 @@ export async function apiRequest<T = any>(
     }
 
     return await response.json();
-  } catch (error) {
-    console.error('API request failed:', error);
-    throw error;
+  } catch (error) {    throw error;
   }
 }
 

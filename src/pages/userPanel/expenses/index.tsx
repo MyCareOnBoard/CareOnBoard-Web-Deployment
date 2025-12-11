@@ -81,9 +81,7 @@ export default function ExpensesPage() {
       const fileInput = document.getElementById('receipt-upload') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
 
-    } catch (error) {
-      console.error("Failed to submit expense:", error);
-      toast({
+    } catch (error) {      toast({
         title: "Submission failed",
         description: "There was an error submitting your expense. Please try again.",
         variant: "destructive",

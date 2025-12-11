@@ -136,9 +136,7 @@ export default function UserPanelDashboardPage() {
       updateEmployeeInfo({
         workAvailability: !employeeInfo?.workAvailability
       }).unwrap();
-    } catch (error) {
-      console.error("Error updating work availability:", error);
-    }
+    } catch (error) {    }
   }
 
   const goToProfile = () => {

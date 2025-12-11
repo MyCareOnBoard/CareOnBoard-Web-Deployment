@@ -55,9 +55,7 @@ function UserAvatar({ userName, userImage }: { userName?: string; userImage?: st
       src={userImage}
       alt="User profile"
       className="h-[34px] w-[34px] rounded-full object-cover"
-      onError={() => {
-        console.warn('⚠️ Failed to load profile image:', userImage);
-        setImageError(true);
+      onError={() => {        setImageError(true);
       }}
     />
   );

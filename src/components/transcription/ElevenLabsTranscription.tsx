@@ -56,18 +56,14 @@ export default function ElevenLabsTranscription({
         }, 500);
       }
     },
-    onCommittedTranscript: (data: any) => {
-      console.log("Committed transcript:", data);
-      onCommittedTranscript(data.text);
+    onCommittedTranscript: (data: any) => {      onCommittedTranscript(data.text);
       
       // Set detected language if available
       if (data.language_code) {
         onLanguageDetected(data.language_code);
       }
     },
-    onError: (error) => {
-      console.error("Scribe error:", error);
-      const errorMessage = error instanceof Error ? error.message : "An error occurred during transcription";
+    onError: (error) => {      const errorMessage = error instanceof Error ? error.message : "An error occurred during transcription";
       onError(errorMessage);
     },
   });
@@ -95,14 +91,9 @@ export default function ElevenLabsTranscription({
             vadThreshold: 0.5,
             vadSilenceThresholdSecs: 1.0,
             commitStrategy: CommitStrategy.VAD,
-          });
-          
-          console.log("Connected to ElevenLabs Scribe");
-          onConnecting(false);
+          });          onConnecting(false);
           onConnectionChange(true);
-        } catch (err) {
-          console.error("Failed to connect to Scribe:", err);
-          onError(err instanceof Error ? err.message : "Failed to connect to transcription service");
+        } catch (err) {          onError(err instanceof Error ? err.message : "Failed to connect to transcription service");
           onConnecting(false);
           hasConnected.current = false;
           onStopRecording();

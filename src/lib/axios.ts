@@ -116,23 +116,11 @@ axiosClient.interceptors.response.use(
             window.location.href = Routes.auth.login + `?agencyId=${agencyId}`;
           }
           break;
-        case 403:
-          console.error('Access forbidden:', error.response.data);
-          break;
-        case 404:
-          console.error('Resource not found:', error.response.data);
-          break;
-        case 500:
-          console.error('Server error:', error.response.data);
-          break;
-        default:
-          console.error('API error:', error.response.data);
-      }
-    } else if (error.request) {
-      console.error('Network error:', error.request);
-    } else {
-      console.error('Error:', error.message);
-    }
+        case 403:          break;
+        case 404:          break;
+        case 500:          break;
+        default:      }
+    } else if (error.request) {    } else {    }
 
     return Promise.reject(error);
   }
@@ -142,23 +130,17 @@ axiosClient.interceptors.response.use(
  * @deprecated Use getIdToken from '@/utils/auth' instead
  * Firebase handles token management automatically
  */
-export const setAuthToken = (token: string): void => {
-  console.warn('setAuthToken is deprecated. Firebase manages tokens automatically.');
-};
+export const setAuthToken = (token: string): void => {};
 
 /**
  * @deprecated Firebase handles token management automatically
  */
-export const removeAuthToken = (): void => {
-  console.warn('removeAuthToken is deprecated. Use logout from auth context instead.');
-};
+export const removeAuthToken = (): void => {};
 
 /**
  * @deprecated Use getIdToken from '@/utils/auth' instead
  */
-export const getAuthToken = (): Promise<string | null> => {
-  console.warn('getAuthToken is deprecated. Use getIdToken from @/utils/auth instead.');
-  return getIdToken();
+export const getAuthToken = (): Promise<string | null> => {  return getIdToken();
 };
 
 export const setEnvironment = (env: string): void => {

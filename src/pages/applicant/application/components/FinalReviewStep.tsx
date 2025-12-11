@@ -108,9 +108,7 @@ export default function FinalReviewStep({ onBack, onNext }: FinalReviewStepProps
 
         setChecklist(mappedChecklist);
         setAllConfirmed(response.summary.allConfirmed);
-      } catch (err) {
-        console.error('Error fetching final review checklist:', err);
-        setError('Failed to load checklist. Please try again.');
+      } catch (err) {        setError('Failed to load checklist. Please try again.');
       } finally {
         setLoading(false);
       }

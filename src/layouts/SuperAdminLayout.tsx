@@ -20,9 +20,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
     try {
       await logout();
       navigate(Routes.auth.login, {replace: true});
-    } catch (error) {
-      console.error('[SuperAdminLayout] Logout failed:', error);
-    }
+    } catch (error) {    }
   };
 
   useEffect(() => {

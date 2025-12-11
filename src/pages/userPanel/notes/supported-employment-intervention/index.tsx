@@ -115,18 +115,14 @@ export default function SupportedEmploymentInterventionPage() {
 
   const debouncedMutateNote = useDebounce(
     async (params: any) => {
-      await mutateNote(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
+      await mutateNote(params).unwrap().catch(error => {      });
     },
     500
   );
 
   const debounceUpdateNote = useDebounce(
     async (params: any) => {
-      await updateLog(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
+      await updateLog(params).unwrap().catch(error => {      });
     },
     500
   )
@@ -358,9 +354,7 @@ export default function SupportedEmploymentInterventionPage() {
       setInterventions(initialInterventions);
       setServices(initialServices);
       toast.success('Intervention Plan and Service Log submitted successfully!');
-    } catch (error: any) {
-      console.error('Error submitting activity log:', error);
-      toast.error(error?.data?.message || 'Failed to submit activity log.');
+    } catch (error: any) {      toast.error(error?.data?.message || 'Failed to submit activity log.');
     }
   }
 

@@ -69,9 +69,7 @@ export const submitQuestion = async (data: SubmitQuestionRequest): Promise<Submi
         );
 
         return response.data;
-    } catch (error) {
-        console.error('Failed to submit question:', error);
-        throw error;
+    } catch (error) {        throw error;
     }
 };
 

@@ -16,19 +16,19 @@ import {
   confirmPasswordReset,
   type User as FirebaseUser,
 } from 'firebase/auth'
-import type { UserProfile } from '../types/user.types'
+import type { User } from '../types/user.types'
 import { getAuthErrorMessage } from '@/utils/auth'
 
 export interface AuthResponse {
   success: boolean
-  user?: UserProfile
+  user?: User
   error?: string
 }
 
 /**
  * Transform Firebase User to our User type
  */
-export function transformFirebaseUser(firebaseUser: FirebaseUser): UserProfile {
+export function transformFirebaseUser(firebaseUser: FirebaseUser): User {
   return {
     uid: firebaseUser.uid,
     email: firebaseUser.email || '',
@@ -56,8 +56,6 @@ export async function loginWithEmail(email: string, password: string): Promise<A
       user,
     }
   } catch (error: any) {
-    console.error('Login error:', error)
-
     return {
       success: false,
       error: getAuthErrorMessage(error),
@@ -95,8 +93,6 @@ export async function registerWithEmail(fullName: string, email: string, passwor
       user,
     }
   } catch (error: any) {
-    console.error('Registration error:', error)
-
     return {
       success: false,
       error: getAuthErrorMessage(error),
@@ -115,8 +111,6 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
       success: true,
     }
   } catch (error: any) {
-    console.error('Password reset error:', error)
-
     return {
       success: false,
       error: getAuthErrorMessage(error),
@@ -137,8 +131,6 @@ export async function verifyResetCode(code: string): Promise<{ success: boolean;
       email,
     }
   } catch (error: any) {
-    console.error('Reset code verification error:', error)
-
     let errorMessage = 'Invalid or expired reset code'
 
     switch (error.code) {
@@ -177,8 +169,6 @@ export async function confirmReset(code: string, newPassword: string): Promise<{
       success: true,
     }
   } catch (error: any) {
-    console.error('Password reset confirmation error:', error)
-
     let errorMessage = 'Failed to reset password'
 
     switch (error.code) {
@@ -208,16 +198,14 @@ export async function confirmReset(code: string, newPassword: string): Promise<{
 export async function logout(): Promise<void> {
   try {
     await signOut(auth)
-  } catch (error) {
-    console.error('Logout error:', error)
-    throw error
+  } catch (error) {    throw error
   }
 }
 
 /**
  * Get current authenticated user
  */
-export async function getCurrentUser(): Promise<UserProfile | null> {
+export async function getCurrentUser(): Promise<User | null> {
   return new Promise((resolve) => {
     // Use Firebase auth state observer
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
@@ -248,9 +236,7 @@ export async function getIdToken(forceRefresh = false): Promise<string | null> {
 
   try {
     return await user.getIdToken(forceRefresh)
-  } catch (error) {
-    console.error('Error getting ID token:', error)
-    return null
+  } catch (error) {    return null
   }
 }
 
@@ -261,7 +247,7 @@ export async function getIdToken(forceRefresh = false): Promise<string | null> {
 // export function saveUserSession(user: User): void {
 //   // Firebase handles session persistence automatically
 //   // This function is kept for backward compatibility
-//   console.log('User session saved (handled by Firebase)', user.uid)
+//', user.uid)
 // }
 
 /**
@@ -271,18 +257,16 @@ export async function getIdToken(forceRefresh = false): Promise<string | null> {
 // export function clearUserSession(): void {
 // //   // Firebase handles session clearing automatically via signOut
 // //   // This function is kept for backward compatibility
-// //   console.log('User session cleared (handled by Firebase)')
+// //')
 // }
 
 /**
  * Store user data in localStorage
  */
-export function storeUserData(user: UserProfile): void {
+export function storeUserData(user: User): void {
   try {
     localStorage.setItem('auth_user', JSON.stringify(user))
-  } catch (error) {
-    console.error('Failed to store user data:', error)
-  }
+  } catch (error) {  }
 }
 
 /**
@@ -291,9 +275,7 @@ export function storeUserData(user: UserProfile): void {
 export function removeUserData(): void {
   try {
     localStorage.removeItem('auth_user')
-  } catch (error) {
-    console.error('Failed to remove user data:', error)
-  }
+  } catch (error) {  }
 }
 
 /**
@@ -303,7 +285,7 @@ export function removeUserData(): void {
 export const syncAuthState = createAsyncThunk(
   'auth/syncState',
   async (_, { rejectWithValue }) => {
-    return new Promise<UserProfile | null>((resolve) => {
+    return new Promise<User | null>((resolve) => {
       const unsubscribe = auth.onAuthStateChanged(
         (firebaseUser) => {
           unsubscribe()
@@ -316,7 +298,6 @@ export const syncAuthState = createAsyncThunk(
         },
         (error) => {
           unsubscribe()
-          console.error('Auth state sync error:', error)
           resolve(null)
         }
       )

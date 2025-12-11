@@ -7,7 +7,6 @@ export default function SplashScreen() {
   const [isAnimating, setIsAnimating] = useState(true)
 
   const {id} = useParams<{id: string}>();
-  console.log("id", id)
 
   useEffect(() => {
     // Navigate to login after animation completes
