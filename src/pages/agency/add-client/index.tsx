@@ -6,6 +6,7 @@ import { Stage2GuardianAndFunding } from "@/pages/agency/add-client/stages/Stage
 import { Stage3HealthcareAndDocuments } from "@/pages/agency/add-client/stages/Stage3HealthcareAndDocuments";
 import { Stage4EvvAndVisitConfig } from "@/pages/agency/add-client/stages/Stage4EvvAndVisitConfig";
 import { Stage5StaffAssignmentAndRestrictions } from "@/pages/agency/add-client/stages/Stage5StaffAssignmentAndRestrictions";
+import { Stage6GoalsAndEmergency } from "@/pages/agency/add-client/stages/Stage6GoalsAndEmergency";
 
 export default function AddClientPage() {
   const navigate = useNavigate();
@@ -56,7 +57,23 @@ export default function AddClientPage() {
     );
   }
 
-  if (stage !== 1 && stage !== 2 && stage !== 3 && stage !== 4 && stage !== 5) {
+  if (stage === 6) {
+    return (
+      <Stage6GoalsAndEmergency
+        onCancel={() => navigate(Routes.agency.clients)}
+        onNext={() => setStage(7)}
+      />
+    );
+  }
+
+  if (
+    stage !== 1 &&
+    stage !== 2 &&
+    stage !== 3 &&
+    stage !== 4 &&
+    stage !== 5 &&
+    stage !== 6
+  ) {
     return (
       <div className="min-h-[calc(100vh-200px)]">
         <div className="mb-10">
