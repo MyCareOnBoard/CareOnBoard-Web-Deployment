@@ -32,6 +32,20 @@ export interface Profile {
   professionalSummary?: string
 }
 
+/**
+ * Lightweight embedded agency shape (some endpoints embed agency details on the user)
+ */
+export interface UserAgency {
+  id?: string
+  name?: string
+  email?: string
+  phone?: string
+  address?: string
+  city?: string
+  state?: string
+  zipCode?: string
+}
+
 
 /**
  * User Profile data shape matching backend API response
@@ -62,8 +76,14 @@ export interface User {
   role?: string
   profilePicture?: string
   dateOfBirth?: string
+  // Employee/DSP fields (used in user panel + employee endpoints)
+  workAvailability?: boolean
+  tagId?: string
+  hireDate?: string | FirebaseTimestamp | Date | null
   // Agency reference 
   agencyId?: string
+  // Some endpoints embed agency details rather than only agencyId
+  agency?: UserAgency
   // Profile sub-object containing all profile-related data
   profile?: Profile
 }

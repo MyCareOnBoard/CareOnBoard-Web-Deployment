@@ -152,7 +152,7 @@ export default function UserPanelDashboardPage() {
 
   useEffect(() => {
     if (employeeInfo) {
-      setWorkAvailability(employeeInfo?.workAvailability);
+      setWorkAvailability(employeeInfo?.workAvailability ?? false);
     }
   }, [employeeInfo])
 
