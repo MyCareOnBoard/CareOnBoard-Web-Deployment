@@ -39,7 +39,7 @@ export interface ListUsersResponse {
 /**
  * Get the authenticated user's data
  * Used during onboarding to check if data exists
- * @returns Promise with user data data
+ * @returns Promise with user data
  */
 export async function getUser(): Promise<User> {
   try {
@@ -49,48 +49,55 @@ export async function getUser(): Promise<User> {
       throw new Error("Invalid response format from server");
     }
 
-    let user = response.data.user as any;
+    const backendUser = response.data.user as any;
 
-    // Handle backend response - extract nested profile data if present
-    if (user.profile && typeof user.profile === 'object') {
-      const profileData = user.profile;
+    // Build clean User object with profile data in the correct location
+    const user: User = {
+      // Core user fields only
+      id: backendUser.id || backendUser.uid,
+      uid: backendUser.uid,
+      email: backendUser.email,
+      fullName: backendUser.fullName,
+      emailVerified: backendUser.emailVerified || false,
+      userType: backendUser.userType,
+      otpVerified: backendUser.otpVerified,
+      otpVerifiedAt: backendUser.otpVerifiedAt,
+      onboardingCompleted: backendUser.onboardingCompleted,
+      createdAt: backendUser.createdAt,
+      updatedAt: backendUser.updatedAt,
+      agencyId: backendUser.agencyId,
       
-      // Extract critical fields to top level for easy access
-      if (profileData.agencyId && !user.agencyId) {
-        user.agencyId = profileData.agencyId;
-      }
-      if (profileData.id && !user.id) {
-        user.id = profileData.id;
-      }
-      
-      // Keep profile as a clean sub-object (not the entire agency)
-      user.profile = {
-        email: profileData.email,
-        fullName: profileData.fullName,
-        name: profileData.name,
-        phoneNumber: profileData.phoneNumber || profileData.phone,
-        address: profileData.address,
-        city: profileData.city,
-        state: profileData.state,
-        zipCode: profileData.zipCode,
-        gender: profileData.gender,
-        dateOfBirth: profileData.dateOfBirth,
-        profilePicture: profileData.profilePicture,
-        professionalSummary: profileData.professionalSummary,
-        agencyId: profileData.agencyId
-      };
-    }
+      // Profile data goes ONLY in profile sub-object
+      profile: {}
+    };
+
+    // Extract profile data from backend response
+    const profileSource = backendUser.profile || backendUser;
+    
+    // Build profile sub-object from available data
+    user.profile = {
+      email: profileSource.email || backendUser.email,
+      fullName: profileSource.fullName || backendUser.fullName,
+      name: profileSource.name || backendUser.displayName,
+      phoneNumber: profileSource.phoneNumber || profileSource.phone,
+      address: profileSource.address,
+      city: profileSource.city,
+      state: profileSource.state,
+      zipCode: profileSource.zipCode,
+      gender: profileSource.gender,
+      dateOfBirth: profileSource.dateOfBirth,
+      profilePicture: profileSource.profilePicture || profileSource.photo || profileSource.photoURL,
+      professionalSummary: profileSource.professionalSummary || profileSource.summary,
+    };
 
     // Load agency data for agency users if needed
     if (user.userType === UserType.AGENCY && !user.agencyId) {
       try {
         const agency = await seedAgency();
-        // Set agencyId at top level (single source of truth)
         user.agencyId = agency.id;
-        // Store only agency name in profile for display
+        // Update profile with agency details
         user.profile = {
           ...user.profile,
-          agencyId: agency.id,
           name: agency.name,
           email: agency.email,
           phoneNumber: agency.phone,
@@ -104,7 +111,7 @@ export async function getUser(): Promise<User> {
       }
     }
 
-    return user as User;
+    return user;
   } catch (err: any) {
     // Re-throw with more context
     if (err.response?.status === 404) {
