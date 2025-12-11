@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { Stage1ClientIdentityAndContact } from "@/pages/agency/add-client/stages/Stage1ClientIdentityAndContact";
 import { Stage2GuardianAndFunding } from "@/pages/agency/add-client/stages/Stage2GuardianAndFunding";
+import { Stage3HealthcareAndDocuments } from "@/pages/agency/add-client/stages/Stage3HealthcareAndDocuments";
 
 export default function AddClientPage() {
   const navigate = useNavigate();
@@ -26,7 +27,16 @@ export default function AddClientPage() {
     );
   }
 
-  if (stage !== 1 && stage !== 2) {
+  if (stage === 3) {
+    return (
+      <Stage3HealthcareAndDocuments
+        onCancel={() => navigate(Routes.agency.clients)}
+        onNext={() => setStage(4)}
+      />
+    );
+  }
+
+  if (stage !== 1 && stage !== 2 && stage !== 3) {
     return (
       <div className="min-h-[calc(100vh-200px)]">
         <div className="mb-10">
