@@ -65,7 +65,11 @@ export default function ClientsPage() {
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
           Client Management
         </h1>
-        <Button size="lg" className="h-[52px] px-[16px] py-[12px]">
+        <Button
+          size="lg"
+          className="h-[52px] px-[16px] py-[12px]"
+          onClick={() => navigate(Routes.agency.addClient)}
+        >
           <Plus className="w-5 h-5 text-white" />
           Add Client
         </Button>

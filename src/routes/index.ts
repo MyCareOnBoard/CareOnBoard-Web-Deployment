@@ -38,6 +38,7 @@ import AgencyDashboardPage from "@/pages/agency/dashboard";
 import DSPManagementPage from "@/pages/agency/dsp-management";
 import ClientsPage from "@/pages/agency/clients-management";
 import ClientDetailsPage from "@/pages/agency/client-details";
+import AddClientPage from "@/pages/agency/add-client";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import ClientClaimsPage from "@/pages/agency/billing-and-approvals/client-claims";
 import SchedulingPage from "@/pages/agency/scheduling";
@@ -152,6 +153,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.agency.clients,
         Component: ClientsPage,
+      },
+      {
+        path: Routes.agency.addClient,
+        Component: AddClientPage,
       },
       {
         path: Routes.agency.clientDetails,

@@ -15,6 +15,7 @@ export const Routes = {
     dashboard: "/agency/dashboard",
     dspManagement: "/agency/dsp-management",
     clients: "/agency/clients",
+    addClient: "/agency/clients/add",
     clientDetails: "/agency/clients/:clientId",
     billingAndApprovals: "/agency/billing-and-approvals",
     clientClaims: "/agency/billing-and-approvals/client/:clientId",
