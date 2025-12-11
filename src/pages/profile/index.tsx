@@ -1,5 +1,8 @@
 import { useRef, useState, useEffect } from "react"
 import { useNavigate } from "react-router"
+import { useDispatch } from "react-redux"
+import { updateUserProfile } from "@/utils/auth/store/authSlice"
+import type { AppDispatch } from "@/store/redux/store"
 import { Button } from "@/components/ui/button"
 import {
   User,
@@ -74,6 +77,7 @@ function formatFullAddress(profile: ProfileInfo): string {
 
 export default function ProfilePage() {
   const navigate = useNavigate()
+  const dispatch = useDispatch<AppDispatch>()
   const [showEdit, setShowEdit] = useState(false)
   const [formData, setFormData] = useState<Partial<ProfileInfo>>({})
   const [saving, setSaving] = useState(false)
@@ -318,6 +322,20 @@ export default function ProfilePage() {
       }
 
       await updateProfileInfo(updateData)
+
+      // Update Redux state - save ONLY in profile sub-object
+      dispatch(updateUserProfile({
+        fullName: updateData.fullName,
+        phoneNumber: updateData.phone,
+        address: updateData.address,
+        city: updateData.city,
+        state: updateData.state,
+        zipCode: updateData.zipCode,
+        gender: updateData.gender,
+        dateOfBirth: updateData.dateOfBirth,
+        professionalSummary: updateData.summary,
+        profilePicture: photoPreview,
+      }));
 
       // Reload profile data to ensure sync
       await loadProfileData()

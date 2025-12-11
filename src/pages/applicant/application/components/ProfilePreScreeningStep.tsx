@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useDispatch } from "react-redux";
+import { updateUserProfile } from "@/utils/auth/store/authSlice";
+import type { AppDispatch } from "@/store/redux/store";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -86,6 +89,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const dispatch = useDispatch<AppDispatch>();
 
   const form = useForm<ProfilePreScreeningFormValues>({
     resolver: zodResolver(profilePreScreeningSchema),
@@ -161,7 +165,31 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
       // Submit pre-screening data to backend
       setIsSubmitting(true);
       try {
-        const response = await submitPreScreening(preScreeningData);        
+        const response = await submitPreScreening(preScreeningData);
+        
+        // Update user profile with application data
+        try {
+          const { updateProfileInfo } = await import('@/lib/api/profile');
+          await updateProfileInfo({
+            fullName: values.fullName,
+            email: values.email,
+            dateOfBirth: format(values.dateOfBirth, 'yyyy-MM-dd'),
+            address: values.address,
+            gender: values.gender,
+          });
+          
+          // Update Redux state - save ONLY in profile sub-object
+          dispatch(updateUserProfile({
+            fullName: values.fullName,
+            email: values.email,
+            dateOfBirth: format(values.dateOfBirth, 'yyyy-MM-dd'),
+            address: values.address,
+            gender: values.gender,
+          }));
+        } catch (profileUpdateError) {
+          console.warn('Failed to update user profile:', profileUpdateError);
+        }
+        
         // Proceed to next step with form data
         onNext();
       } catch (error) {
@@ -385,7 +413,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
             const selectedFileName = value && value.length > 0 ? value[0]?.name : undefined;
 
             return (
-              <FormItem className="w-[1152px] space-y-3">
+              <FormItem className="w-6xl space-y-3">
                 <FormLabel className="block text-xs font-normal text-[#10141a]">Upload Resume</FormLabel>
                 <FormControl className="mb-0">
                   <FileUpload

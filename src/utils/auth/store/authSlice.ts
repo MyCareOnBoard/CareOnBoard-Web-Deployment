@@ -140,6 +140,32 @@ const authSlice = createSlice({
     setUser: (state, action: PayloadAction<User | null>) => {
       state.user = action.payload
       state.isAuthenticated = !!action.payload
+    },
+    /**
+     * Update user profile data in Redux state
+     * Saves profile data ONLY in the nested profile sub-object
+     * Matches /userProfile/account-info response structure
+     */
+    updateUserProfile: (state, action: PayloadAction<{
+      fullName?: string
+      email?: string
+      profilePicture?: string
+      dateOfBirth?: string
+      phoneNumber?: string
+      address?: string
+      city?: string
+      state?: string
+      zipCode?: string
+      professionalSummary?: string
+      gender?: string
+    }>) => {
+      if (state.user) {
+        // Update ONLY the profile sub-object, not top-level fields
+        state.user.profile = {
+          ...state.user.profile,
+          ...action.payload,
+        }
+      }
     }
   },
   extraReducers: (builder) => {
@@ -218,5 +244,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { clearError, setUser } = authSlice.actions
+export const { clearError, setUser, updateUserProfile } = authSlice.actions
 export default authSlice.reducer
