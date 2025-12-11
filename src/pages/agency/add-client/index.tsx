@@ -7,6 +7,7 @@ import { Stage3HealthcareAndDocuments } from "@/pages/agency/add-client/stages/S
 import { Stage4EvvAndVisitConfig } from "@/pages/agency/add-client/stages/Stage4EvvAndVisitConfig";
 import { Stage5StaffAssignmentAndRestrictions } from "@/pages/agency/add-client/stages/Stage5StaffAssignmentAndRestrictions";
 import { Stage6GoalsAndEmergency } from "@/pages/agency/add-client/stages/Stage6GoalsAndEmergency";
+import { Stage7SystemAiAndAudit } from "@/pages/agency/add-client/stages/Stage7SystemAiAndAudit";
 
 export default function AddClientPage() {
   const navigate = useNavigate();
@@ -66,13 +67,23 @@ export default function AddClientPage() {
     );
   }
 
+  if (stage === 7) {
+    return (
+      <Stage7SystemAiAndAudit
+        onCancel={() => navigate(Routes.agency.clients)}
+        onNext={() => navigate(Routes.agency.clients)}
+      />
+    );
+  }
+
   if (
     stage !== 1 &&
     stage !== 2 &&
     stage !== 3 &&
     stage !== 4 &&
     stage !== 5 &&
-    stage !== 6
+    stage !== 6 &&
+    stage !== 7
   ) {
     return (
       <div className="min-h-[calc(100vh-200px)]">
