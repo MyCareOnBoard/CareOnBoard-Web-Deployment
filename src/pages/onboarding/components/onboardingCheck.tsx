@@ -32,7 +32,9 @@ export function OnboardingCheck({ children }: OnboardingCheckProps) {
         Routes.auth.resetPassword
       ].includes(location.pathname)
       
-      if (isOnboardingPage || isAuthPage) {        setChecking(false)
+      if (isOnboardingPage || isAuthPage) {
+        console.log('[OnboardingCheck] Already on onboarding/auth page, skipping check')
+        setChecking(false)
         return
       }
 
@@ -41,15 +43,29 @@ export function OnboardingCheck({ children }: OnboardingCheckProps) {
       await auth.authStateReady?.()
       const currentUser = auth.currentUser
 
-      if (!currentUser) {        setChecking(false)
+      if (!currentUser) {
+        console.log('[OnboardingCheck] User not authenticated, skipping check')
+        setChecking(false)
         return
       }
+
+      console.log('[OnboardingCheck] Checking onboarding status for user:', currentUser.uid)
+
       // Get onboarding status from API
       const status = await getOnboardingStatus()
-      if (!status.completed) {        navigate(Routes.onboarding.index, { replace: true })
-      } else {        setChecking(false)
+      
+      console.log('[OnboardingCheck] Onboarding status:', status)
+
+      if (!status.completed) {
+        console.log('[OnboardingCheck] Onboarding not completed, redirecting to /onboarding')
+        navigate(Routes.onboarding.index, { replace: true })
+      } else {
+        console.log('[OnboardingCheck] Onboarding already completed, allowing access')
+        setChecking(false)
       }
-    } catch (error) {      // On error, allow access (fail open to prevent blocking users)
+    } catch (error) {
+      console.error('[OnboardingCheck] Failed to check onboarding status:', error)
+      // On error, allow access (fail open to prevent blocking users)
       setChecking(false)
     }
   }

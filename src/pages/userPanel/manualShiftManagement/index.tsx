@@ -94,7 +94,9 @@ function buildManualShiftRequests(
         };
 
         requests.push(request);
-      } catch (error) {      }
+      } catch (error) {
+        console.error(`Failed to parse date for ${day}:`, error);
+      }
     });
   });
 
@@ -273,7 +275,9 @@ export default function ManualShiftManagementPage() {
 
         setWeek1Data(newWeek1Data);
         setWeek2Data(newWeek2Data);
-      } catch (error) {        // Silent fail - don't show error toast as this is optional functionality
+      } catch (error) {
+        console.error("❌ Failed to load draft shifts:", error);
+        // Silent fail - don't show error toast as this is optional functionality
       } finally {
         setLoading(false);
       }
@@ -343,7 +347,9 @@ export default function ManualShiftManagementPage() {
         const clients = await searchClients(query, user?.agencyId);
         setClientSearchResults(clients);
         setShowClientDropdown(clients.length > 0);
-      } catch (error) {        setClientSearchResults([]);
+      } catch (error) {
+        console.error("Failed to search clients:", error);
+        setClientSearchResults([]);
         setShowClientDropdown(false);
       } finally {
         setIsSearchingClients(false);
@@ -394,7 +400,9 @@ export default function ManualShiftManagementPage() {
         const data = await response.json();
         setLocationSuggestions(data);
         setShowSuggestions(data.length > 0);
-      } catch (error) {        setLocationSuggestions([]);
+      } catch (error) {
+        console.error("Failed to fetch location suggestions:", error);
+        setLocationSuggestions([]);
         setShowSuggestions(false);
       } finally {
         setSearchingLocation(false);
@@ -446,7 +454,9 @@ export default function ManualShiftManagementPage() {
             title: "Location Retrieved",
             description: "Your current location has been added.",
           });
-        } catch (error) {          // Fallback to coordinates if reverse geocoding fails
+        } catch (error) {
+          console.error("Failed to get address:", error);
+          // Fallback to coordinates if reverse geocoding fails
           setFormData((prev) => ({ 
             ...prev, 
             location: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` 
@@ -460,7 +470,9 @@ export default function ManualShiftManagementPage() {
           setGettingLocation(false);
         }
       },
-      (error) => {        setGettingLocation(false);
+      (error) => {
+        console.error("Geolocation error:", error);
+        setGettingLocation(false);
         
         let errorMessage = "Failed to get your location.";
         switch (error.code) {
@@ -487,7 +499,9 @@ export default function ManualShiftManagementPage() {
   const handleClientSignatureSave = (signatureData: {
     signatureType: string;
     signatureData: string;
-  }) => {    setClientSignature(signatureData);
+  }) => {
+    console.log("Client signature saved:", signatureData);
+    setClientSignature(signatureData);
     setClientSignatureModalOpen(false);
     toast({
       title: "Signature Added",
@@ -498,7 +512,9 @@ export default function ManualShiftManagementPage() {
   const handleUserSignatureSave = (signatureData: {
     signatureType: string;
     signatureData: string;
-  }) => {    setUserSignature(signatureData);
+  }) => {
+    console.log("User signature saved:", signatureData);
+    setUserSignature(signatureData);
     setUserSignatureModalOpen(false);
     toast({
       title: "Signature Added",
@@ -558,15 +574,19 @@ export default function ManualShiftManagementPage() {
           await signDocument({
             context: "manual-timesheet-client",
             data: clientSignature,
-          }).unwrap();        }
+          }).unwrap();
+          console.log("✅ Uploaded client signature");
+        }
 
         if (userSignature) {
           await signDocument({
             context: "manual-timesheet-user",
             data: userSignature,
           }).unwrap();
+          console.log("✅ Uploaded user signature");
         }
       } catch (signatureError: any) {
+        console.warn("⚠️ Failed to upload signatures during save (continuing anyway):", signatureError);
         // Don't block saving if signature upload fails - signatures are optional for drafts
       }
 
@@ -648,6 +668,7 @@ export default function ManualShiftManagementPage() {
           });
         } else {
           // Create new shift
+          console.log(`➕ Creating new shift for ${request.date}`);
           return createShift({
             ...request,
             location: `${selectedLocation?.lat},${selectedLocation?.lon}` || request.location,
@@ -662,6 +683,7 @@ export default function ManualShiftManagementPage() {
       );
 
       const deletePromises = shiftsToDelete.map((shift) => {
+        console.log(`🗑️ Deleting removed draft for ${shift.date}`);
         return deleteShift(shift.id);
       });
 
@@ -679,6 +701,7 @@ export default function ManualShiftManagementPage() {
       const successes = results.filter((r) => r.status === "fulfilled");
 
       if (failures.length > 0) {
+        console.error("Failed to save some shifts:", failures);
         toast({
           title: "Partial Save",
           description: `Saved timesheet entries as drafts.`,
@@ -699,6 +722,7 @@ export default function ManualShiftManagementPage() {
         });
       }
     } catch (error: any) {
+      console.error("Failed to save draft timesheet:", error);
       toast({
         title: "Save Failed",
         description: error?.response?.data?.error || "Failed to save draft. Please try again.",
@@ -775,7 +799,9 @@ export default function ManualShiftManagementPage() {
             data: userSignature,
           }).unwrap();
         }
-      } catch (signatureError: any) {        setConfirmModalOpen(false);
+      } catch (signatureError: any) {
+        console.error("Failed to upload signatures:", signatureError);
+        setConfirmModalOpen(false);
         toast({
           title: "Signature Upload Failed",
           description: "Failed to upload signatures. Please try again.",
@@ -841,7 +867,9 @@ export default function ManualShiftManagementPage() {
       const failures = results.filter((r) => r.status === "rejected");
       const successes = results.filter((r) => r.status === "fulfilled");
 
-      if (failures.length > 0) {        toast({
+      if (failures.length > 0) {
+        console.error("Failed to submit some shifts:", failures);
+        toast({
           title: "Partial Submission",
           description: `Successfully submitted ${successes.length} of ${shiftRequests.length} shifts. ${failures.length} failed.`,
           variant: failures.length === results.length ? "destructive" : "default",
@@ -863,7 +891,9 @@ export default function ManualShiftManagementPage() {
         setClientSignature(null);
         setUserSignature(null);
       }
-    } catch (error: any) {      setConfirmModalOpen(false);
+    } catch (error: any) {
+      console.error("Failed to submit manual timesheet:", error);
+      setConfirmModalOpen(false);
       toast({
         title: "Submission Failed",
         description: error?.response?.data?.error || "Failed to submit timesheet. Please try again.",

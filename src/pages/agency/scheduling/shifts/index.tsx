@@ -75,7 +75,9 @@ export default function ShiftsListPage() {
           !(shift.type === ShiftType.MANUAL && shift.submissionStatus === SubmissionStatus.DRAFT)
         );
         setShifts(filteredShifts);
-      } catch (error) {        toast({
+      } catch (error) {
+        console.error("Failed to fetch shifts:", error);
+        toast({
           title: "Error",
           description: "Failed to load shifts. Please try again.",
           variant: "destructive",
@@ -241,7 +243,9 @@ export default function ShiftsListPage() {
       
       setShowApproveModal(false);
       setShiftToApprove(null);
-    } catch (error) {      toast({
+    } catch (error) {
+      console.error("Failed to approve shift:", error);
+      toast({
         title: "Error",
         description: "Failed to approve shift. Please try again.",
         variant: "destructive",

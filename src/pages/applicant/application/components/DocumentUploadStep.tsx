@@ -119,7 +119,9 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
           fileType: documentType
         }
       ]);
-    } catch (error) {    }
+    } catch (error) {
+      console.error("Error uploading file:", error);
+    }
   };
 
   const handleSubmit = async (
@@ -142,8 +144,12 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
           declarationAgreed: value
         },
         method: eligibilityVerificationData ? "PUT" : "POST"
-      }).unwrap();      onNext?.();
-    } catch (error) {    }
+      }).unwrap();
+      console.log(response);
+      onNext?.();
+    } catch (error) {
+      console.error("Error submitting document upload and eligibility verification:", error);
+    }
   };
 
   useEffect(() => {

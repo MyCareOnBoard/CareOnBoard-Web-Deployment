@@ -308,7 +308,9 @@ export const createShift = async (data: CreateShiftRequest): Promise<ShiftRespon
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to create shift:', error);
+        throw error;
     }
 };
 
@@ -324,7 +326,9 @@ export const getShiftById = async (shiftId: string): Promise<ShiftResponse> => {
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to fetch shift:', error);
+        throw error;
     }
 };
 
@@ -341,7 +345,9 @@ export const listShifts = async (params?: ListShiftsParams): Promise<ListShiftsR
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to fetch shifts:', error);
+        throw error;
     }
 };
 
@@ -370,7 +376,9 @@ export const getShiftStats = async (
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to fetch shift stats:', error);
+        throw error;
     }
 };
 
@@ -391,7 +399,9 @@ export const updateShift = async (
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to update shift:', error);
+        throw error;
     }
 };
 
@@ -407,7 +417,9 @@ export const deleteShift = async (shiftId: string): Promise<DeleteShiftResponse>
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to delete shift:', error);
+        throw error;
     }
 };
 
@@ -429,7 +441,9 @@ export const clockIn = async (
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to clock in:', error);
+        throw error;
     }
 };
 
@@ -454,7 +468,9 @@ export const shiftStarted = async (
         const response = await axiosClient.post<ShiftResponse>(url, data);
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to mark shift as started:', error);
+        throw error;
     }
 };
 
@@ -477,7 +493,9 @@ export const clockOut = async (
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to clock out:', error);
+        throw error;
     }
 };
 
@@ -498,7 +516,9 @@ export const updateShiftStatus = async (
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to update shift status:', error);
+        throw error;
     }
 };
 
@@ -517,7 +537,9 @@ export const getTodayShifts = async (agencyId?: string, employeeId?: string): Pr
         );
 
         return response.data
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to fetch today\'s shifts:', error);
+        throw error;
     }
 };
 
@@ -534,7 +556,9 @@ export const getAvailableShifts = async (limit: number = 20, agencyId?: string, 
             { params: { agencyId, limit, employeeId } }
         );
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to fetch upcoming shifts:', error);
+        throw error;
     }
 };
 
@@ -570,7 +594,9 @@ export const getPreviousShifts = async (limit: number = 30, agencyId?: string, e
             { params: { agencyId, limit, employeeId } }
         );
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to fetch previous shifts:', error);
+        throw error;
     }
 };
 
@@ -599,7 +625,9 @@ export const seedShifts = async (data: SeedShiftsRequest = {}): Promise<SeedShif
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to seed shifts:', error);
+        throw error;
     }
 };
 
@@ -614,7 +642,9 @@ export const clearShifts = async (): Promise<ClearShiftsResponse> => {
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to clear shifts:', error);
+        throw error;
     }
 };
 
@@ -631,7 +661,9 @@ export const resetShifts = async (data: SeedShiftsRequest = {}): Promise<ResetSh
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to reset shifts:', error);
+        throw error;
     }
 };
 

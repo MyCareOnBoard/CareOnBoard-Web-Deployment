@@ -55,6 +55,8 @@ export async function loginWithEmail(email: string, password: string): Promise<A
       user,
     };
   } catch (error: any) {
+    console.error('Login error:', error);
+
     return {
       success: false,
       error: getAuthErrorMessage(error),
@@ -92,6 +94,8 @@ export async function registerWithEmail(name: string, email: string, password: s
       user,
     };
   } catch (error: any) {
+    console.error('Registration error:', error);
+
     return {
       success: false,
       error: getAuthErrorMessage(error),
@@ -110,6 +114,8 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
       success: true,
     };
   } catch (error: any) {
+    console.error('Password reset error:', error);
+
     return {
       success: false,
       error: getAuthErrorMessage(error),
@@ -123,7 +129,9 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
 export async function logout(): Promise<void> {
   try {
     await signOut(auth);
-  } catch (error) {    throw error;
+  } catch (error) {
+    console.error('Logout error:', error);
+    throw error;
   }
 }
 
@@ -161,7 +169,9 @@ export async function getIdToken(forceRefresh = false): Promise<string | null> {
 
   try {
     return await user.getIdToken(forceRefresh);
-  } catch (error) {    return null;
+  } catch (error) {
+    console.error('Error getting ID token:', error);
+    return null;
   }
 }
 

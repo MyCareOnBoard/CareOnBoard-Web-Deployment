@@ -30,8 +30,14 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 export const auth = getAuth(app)
 
 // Connect to Firebase Emulators in development mode
-if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {  try {
-    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })  } catch (error) {  }
+if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {
+  console.log('🔥 Firebase Emulators enabled')
+  try {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
+    console.log('✅ Connected to Auth Emulator on port 9099')
+  } catch (error) {
+    console.warn('⚠️ Auth emulator connection may already be established')
+  }
 }
 
 // Helper to get fresh ID token
@@ -40,7 +46,9 @@ export async function getFreshIdToken(forceRefresh = true): Promise<string | nul
     const user = auth.currentUser
     if (!user) return null
     return await user.getIdToken(forceRefresh)
-  } catch (error) {    return null
+  } catch (error) {
+    console.error("Error getting fresh ID token:", error)
+    return null
   }
 }
 

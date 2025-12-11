@@ -97,7 +97,9 @@ export default function AgencyNotesPage() {
     try {
       await approveNotes(submissionId).unwrap();
       // Success - the query will automatically refetch due to invalidatesTags
-    } catch (error) {      alert('Failed to approve notes. Please try again.');
+    } catch (error) {
+      console.error('Failed to approve notes:', error);
+      alert('Failed to approve notes. Please try again.');
     }
   };
 
@@ -105,7 +107,9 @@ export default function AgencyNotesPage() {
     try {
       await rejectNotes(submissionId).unwrap();
       // Success - the query will automatically refetch due to invalidatesTags
-    } catch (error) {      alert('Failed to reject notes. Please try again.');
+    } catch (error) {
+      console.error('Failed to reject notes:', error);
+      alert('Failed to reject notes. Please try again.');
     }
   };
 

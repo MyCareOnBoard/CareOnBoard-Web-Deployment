@@ -74,7 +74,9 @@ export default function RespiteLogPage() {
         }
       }).unwrap();
       toast.success("Respite Log saved successfully!");
-    } catch (error) {    }
+    } catch (error) {
+      console.error("Error saving activity log:", error);
+    }
   };
 
   const handleSubmit = async () => {
@@ -116,7 +118,9 @@ export default function RespiteLogPage() {
       setSuppliesNeeded("");
       setToileting("");
       setSelectedActivity("");
-    } catch (error) {    }
+    } catch (error) {
+      console.error("Error saving activity log:", error);
+    }
   };
 
   useEffect(() => {

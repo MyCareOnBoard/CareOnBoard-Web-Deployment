@@ -79,7 +79,9 @@ export default function ComplianceStep({
       if (onNext) {
         onNext();
       }
-    } catch (error) {      toast.error("Failed to submit compliance requirements", {
+    } catch (error) {
+      console.error("Failed to finalize conditional hire:", error);
+      toast.error("Failed to submit compliance requirements", {
         description: "Please try again or contact support.",
         duration: 4000,
       });

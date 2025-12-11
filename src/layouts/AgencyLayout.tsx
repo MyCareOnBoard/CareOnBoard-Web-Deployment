@@ -44,7 +44,9 @@ export default function AgencyDashboardLayout({children}: { children?: ReactNode
     try {
       await logout();
       navigate(Routes.auth.login, {replace: true});
-    } catch (error) {    }
+    } catch (error) {
+      console.error('[DashboardLayout] Logout failed:', error);
+    }
   };
 
   useEffect(() => {

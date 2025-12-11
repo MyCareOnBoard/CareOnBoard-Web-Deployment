@@ -49,7 +49,9 @@ export async function createUser(userData: CreateUserData): Promise<User> {
         }
 
         return response.data.user;
-    } catch (err: any) {        throw new Error(err.response?.data?.message || err.message || "Failed to create user");
+    } catch (err: any) {
+        console.error('Failed to create user:', err);
+        throw new Error(err.response?.data?.message || err.message || "Failed to create user");
     }
 }
 
@@ -69,7 +71,9 @@ export async function completeOnboarding(): Promise<User> {
         }
 
         return response.data.user;
-    } catch (err: any) {        throw new Error(err.response?.data?.message || err.message || "Failed to complete onboarding");
+    } catch (err: any) {
+        console.error('Failed to complete onboarding:', err);
+        throw new Error(err.response?.data?.message || err.message || "Failed to complete onboarding");
     }
 }
 
@@ -99,6 +103,8 @@ export const checkProfileStatus = checkUserStatus;
  */
 export async function getOnboardingStatus(): Promise<OnboardingStatus> {
     try {
+        console.log('🔄 [Onboarding] Fetching onboarding status...')
+
         // Get user data which includes onboardingCompleted field
         const user = await getUser()
 
@@ -106,7 +112,9 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus> {
             completed: user.onboardingCompleted || false,
             completedAt: firebaseTimestampToISOString(user.otpVerifiedAt), // Use OTP verification time as proxy for completion time
         }
-    } catch (error: any) {        throw error;
+    } catch (error: any) {
+        console.warn('⚠️ [Onboarding] API call failed:', error.message)
+        throw error;
     }
 }
 
@@ -114,6 +122,8 @@ export async function getAgencyInfo(agencyId: string): Promise<any> {
     try {
         const agency = await axiosClientWithoutAuth.get(`/agencies/info/${agencyId}`);
         return agency.data;
-    } catch (error: any) {        return null;
+    } catch (error: any) {
+        console.error('Failed to fetch agency info:', error);
+        return null;
     }
 }

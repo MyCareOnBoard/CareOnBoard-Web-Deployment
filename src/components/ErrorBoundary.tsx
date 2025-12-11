@@ -28,7 +28,9 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error }
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {    
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('[ErrorBoundary] Caught error:', error, errorInfo)
+    
     // Call optional error handler
     if (this.props.onError) {
       this.props.onError(error, errorInfo)
@@ -112,6 +114,7 @@ export function AsyncErrorBoundary({ children }: { children: ReactNode }) {
     <ErrorBoundary
       onError={(error, errorInfo) => {
         // Log to error reporting service
+        console.error('[AsyncErrorBoundary]', error, errorInfo)
       }}
     >
       {children}

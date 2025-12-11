@@ -251,7 +251,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         const results = await searchClients(query, user?.agencyId);
         setClientSearchResults(results);
         setShowClientDropdown(results.length > 0);
-      } catch (error) {        setClientSearchResults([]);
+      } catch (error) {
+        console.error("Failed to search clients:", error);
+        setClientSearchResults([]);
       } finally {
         setIsSearchingClients(false);
       }
@@ -282,7 +284,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         const results = await searchEmployees(query, agencyId);
         setDspSearchResults(results);
         setShowDspDropdown(results.length > 0);
-      } catch (error) {        setDspSearchResults([]);
+      } catch (error) {
+        console.error("Failed to search employees:", error);
+        setDspSearchResults([]);
       } finally {
         setIsSearchingDsps(false);
       }
@@ -509,7 +513,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             title: "Changes Saved",
             description: "Shift has been saved as draft successfully.",
           });
-        } catch (error: any) {          toast({
+        } catch (error: any) {
+          console.error("Failed to save draft schedule:", error);
+          toast({
             title: "Save Failed",
             description: error?.response?.data?.error || "Failed to save draft. Please try again.",
             variant: "destructive",
@@ -572,7 +578,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         });
         onShiftsUpdated?.(response.shifts || []);
       }
-    } catch (error: any) {      toast({
+    } catch (error: any) {
+      console.error("Failed to save draft schedule:", error);
+      toast({
         title: "Save Failed",
         description: error?.response?.data?.error || "Failed to save draft. Please try again.",
         variant: "destructive",
@@ -732,7 +740,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   ISPOutcome: formData.ispOutcome || "",
                   strategies: [],
                 },
-              }).catch((error) => {                return null;
+              }).catch((error) => {
+                console.error("Failed to create activity log for shift:", shiftId, error);
+                return null;
               });
             }
           }
@@ -747,7 +757,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       const failures = results.filter((r) => r.status === "rejected");
       const successes = results.filter((r) => r.status === "fulfilled");
 
-      if (failures.length > 0) {        if (successes.length > 0) {
+      if (failures.length > 0) {
+        console.error("Failed to schedule some shifts:", failures);
+        if (successes.length > 0) {
           toast({
             title: "Partial Submission",
             description: `Successfully scheduled ${successes.length} of ${finalShiftRequests.length} shifts. ${failures.length} failed.`,
@@ -786,7 +798,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
         onClose();
       }
-    } catch (error: any) {      toast({
+    } catch (error: any) {
+      console.error("Failed to create schedule:", error);
+      toast({
         title: "Scheduling Failed",
         description: error?.response?.data?.error || "Failed to create schedule. Please try again.",
         variant: "destructive",

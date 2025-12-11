@@ -39,7 +39,9 @@ const UserPanelDocumentUpload = (
       if (!files) return;
       const file = files[0];
       setFormData({...formData, file});
-    } catch (error) {    }
+    } catch (error) {
+      console.error("Error uploading file:", error);
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -58,7 +60,9 @@ const UserPanelDocumentUpload = (
       }).unwrap();
       setFormData({type: '', file: null});
       onComplete();
-    } catch (error) {      onError();
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      onError();
     }
   }
 

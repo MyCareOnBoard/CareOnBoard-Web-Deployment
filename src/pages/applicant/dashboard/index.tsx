@@ -55,11 +55,13 @@ export default function ApplicantDashboardPage() {
         setApplicationStarted(hasStarted);
         
         if (hasStarted && currentStep !== null) {
+          console.log("🔍 Setting application stage to:", APPLICATION_STEP_NAMES.indexOf(currentStep));
           setApplicationStage(applicationStages[APPLICATION_STEP_NAMES.indexOf(currentStep)]);
         }
       }
 
     } catch (error) {
+      console.error("❌ Failed to fetch application status:", error);
       setApplicationStage(applicationStages[0]);
     } finally {
       setLoading(false);

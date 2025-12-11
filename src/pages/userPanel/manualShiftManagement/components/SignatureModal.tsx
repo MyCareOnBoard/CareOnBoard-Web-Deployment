@@ -108,6 +108,7 @@ export default function SignatureModal({
     }
 
     if (signatureData) {
+      console.log("Signature saved:", signatureData);
       onSave(signatureData);
       // Reset state
       setTypedSignature("");

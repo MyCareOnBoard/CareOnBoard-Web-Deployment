@@ -96,7 +96,9 @@ export default function CommunityBasedPage() {
 
   const debouncedMutateNote = useDebounce(
     async (params: any) => {
-      await mutateNote(params).unwrap().catch(error => {      });
+      await mutateNote(params).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
+      });
     },
     500
   );
@@ -206,7 +208,9 @@ export default function CommunityBasedPage() {
       }).unwrap();
       setActivities(initialActivities);
       toast.success('Note submitted successfully!');
-    } catch (error: any) {      toast.error(error?.data?.message || 'Failed to submit activity log.');
+    } catch (error: any) {
+      console.error('Error submitting activity log:', error);
+      toast.error(error?.data?.message || 'Failed to submit activity log.');
     }
   }
 

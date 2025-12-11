@@ -91,7 +91,9 @@ export async function createAgency(data: CreateAgencyRequest): Promise<Agency> {
         }
 
         return response.data.agency;
-    } catch (err: any) {        throw new Error(err.message || 'Failed to create agency');
+    } catch (err: any) {
+        console.error('createAgency error:', err);
+        throw new Error(err.message || 'Failed to create agency');
     }
 }
 
@@ -108,7 +110,9 @@ export async function getAgencyById(agencyId: string): Promise<Agency> {
         }
 
         return response.data.agency;
-    } catch (err: any) {        throw new Error(err.message || 'Failed to get agency');
+    } catch (err: any) {
+        console.error('getAgencyById error:', err);
+        throw new Error(err.message || 'Failed to get agency');
     }
 }
 
@@ -125,7 +129,9 @@ export async function updateAgency(agencyId: string, data: UpdateAgencyRequest):
         }
 
         return response.data.agency;
-    } catch (err: any) {        throw new Error(err.message || 'Failed to update agency');
+    } catch (err: any) {
+        console.error('updateAgency error:', err);
+        throw new Error(err.message || 'Failed to update agency');
     }
 }
 
@@ -151,7 +157,9 @@ export async function listAgencies(params?: ListAgenciesParams): Promise<ListAge
         }
 
         return response.data;
-    } catch (err: any) {        throw new Error(err.message || 'Failed to list agencies');
+    } catch (err: any) {
+        console.error('listAgencies error:', err);
+        throw new Error(err.message || 'Failed to list agencies');
     }
 }
 
@@ -170,7 +178,9 @@ export async function deleteAgency(agencyId: string): Promise<{ success: boolean
         }
 
         return response.data;
-    } catch (err: any) {        throw new Error(err.message || 'Failed to delete agency');
+    } catch (err: any) {
+        console.error('deleteAgency error:', err);
+        throw new Error(err.message || 'Failed to delete agency');
     }
 }
 
@@ -195,7 +205,9 @@ export async function seedAgency(params?: SeedAgencyRequest): Promise<Agency> {
         }
 
         return response.data.agency;
-    } catch (err: any) {        throw new Error(err.message || 'Failed to seed agency');
+    } catch (err: any) {
+        console.error('seedAgency error:', err);
+        throw new Error(err.message || 'Failed to seed agency');
     }
 }
 

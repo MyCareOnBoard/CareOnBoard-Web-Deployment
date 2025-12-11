@@ -148,7 +148,9 @@ export async function createEmployee(data: CreateEmployeeRequest): Promise<Emplo
     }
 
     return response.data.employee;
-  } catch (err: any) {    throw new Error(err.message || 'Failed to create employee');
+  } catch (err: any) {
+    console.error('createEmployee error:', err);
+    throw new Error(err.message || 'Failed to create employee');
   }
 }
 
@@ -174,7 +176,9 @@ export async function listEmployees(params?: ListEmployeesParams): Promise<ListE
     }
 
     return response.data;
-  } catch (err: any) {    throw new Error(err.message || 'Failed to list employees');
+  } catch (err: any) {
+    console.error('listEmployees error:', err);
+    throw new Error(err.message || 'Failed to list employees');
   }
 }
 
@@ -191,7 +195,9 @@ export async function getCurrentEmployee(): Promise<Employee> {
     }
 
     return response.data.employee;
-  } catch (err: any) {    throw new Error(err.message || 'Failed to get current employee');
+  } catch (err: any) {
+    console.error('getCurrentEmployee error:', err);
+    throw new Error(err.message || 'Failed to get current employee');
   }
 }
 
@@ -208,7 +214,9 @@ export async function getEmployeeById(employeeId: string): Promise<Employee> {
     }
 
     return response.data.employee;
-  } catch (err: any) {    throw new Error(err.message || 'Failed to get employee');
+  } catch (err: any) {
+    console.error('getEmployeeById error:', err);
+    throw new Error(err.message || 'Failed to get employee');
   }
 }
 
@@ -225,7 +233,9 @@ export async function updateEmployee(employeeId: string, data: UpdateEmployeeReq
     }
 
     return response.data.employee;
-  } catch (err: any) {    throw new Error(err.message || 'Failed to update employee');
+  } catch (err: any) {
+    console.error('updateEmployee error:', err);
+    throw new Error(err.message || 'Failed to update employee');
   }
 }
 
@@ -242,7 +252,9 @@ export async function deleteEmployee(employeeId: string): Promise<{ success: boo
     }
 
     return response.data;
-  } catch (err: any) {    throw new Error(err.message || 'Failed to delete employee');
+  } catch (err: any) {
+    console.error('deleteEmployee error:', err);
+    throw new Error(err.message || 'Failed to delete employee');
   }
 }
 
@@ -261,7 +273,9 @@ export async function getEmployeeTrainings(employeeId?: string): Promise<Employe
     }
 
     return response.data.trainings;
-  } catch (err: any) {    throw new Error(err.message || 'Failed to fetch trainings');
+  } catch (err: any) {
+    console.error('getEmployeeTrainings error:', err);
+    throw new Error(err.message || 'Failed to fetch trainings');
   }
 }
 
@@ -278,7 +292,9 @@ export async function searchEmployees(query: string, agencyId?: string): Promise
     });
 
     return response.employees;
-  } catch (err: any) {    throw new Error(err.message || 'Failed to search employees');
+  } catch (err: any) {
+    console.error('searchEmployees error:', err);
+    throw new Error(err.message || 'Failed to search employees');
   }
 }
 
@@ -298,7 +314,9 @@ export async function getEmployeeStats(agencyId?: string): Promise<EmployeeStats
     }
 
     return response.data.stats;
-  } catch (err: any) {    throw new Error(err.message || 'Failed to fetch employee stats');
+  } catch (err: any) {
+    console.error('getEmployeeStats error:', err);
+    throw new Error(err.message || 'Failed to fetch employee stats');
   }
 }
 
@@ -392,7 +410,9 @@ export async function createEmployeeActivityLog(
       data
     );
     return response.data;
-  } catch (err: any) {    throw new Error(err.message || 'Failed to create activity log');
+  } catch (err: any) {
+    console.error('createEmployeeActivityLog error:', err);
+    throw new Error(err.message || 'Failed to create activity log');
   }
 }
 
@@ -426,7 +446,9 @@ export async function listEmployeeActivityLogs(
 
     // Handle different response formats
     return response.data.data || response.data.activityLogs || [];
-  } catch (err: any) {    throw new Error(err.message || 'Failed to fetch activity logs');
+  } catch (err: any) {
+    console.error('listEmployeeActivityLogs error:', err);
+    throw new Error(err.message || 'Failed to fetch activity logs');
   }
 }
 

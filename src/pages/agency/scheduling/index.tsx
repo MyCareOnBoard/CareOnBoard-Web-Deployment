@@ -96,7 +96,9 @@ export default function SchedulingPage() {
           employee: true,
         });
         setShifts(response.shifts || []);
-      } catch (error) {        toast({
+      } catch (error) {
+        console.error("Failed to fetch shifts:", error);
+        toast({
           title: "Error",
           description: "Failed to load shifts. Please try again.",
           variant: "destructive",

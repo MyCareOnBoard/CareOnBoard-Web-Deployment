@@ -37,7 +37,9 @@ export const uploadResume = async (file: File): Promise<ApiResponse<ResumeUpload
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to upload resume:', error);
+        throw error;
     }
 };
 
@@ -72,7 +74,9 @@ export const submitPreScreening = async (data: PreScreeningData): Promise<ApiRes
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to submit pre-screening:', error);
+        throw error;
     }
 };
 
@@ -124,7 +128,9 @@ export const getApplicationStatus = async (): Promise<ApplicationStatusResponse>
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to fetch application status:', error);
+        throw error;
     }
 };
 
@@ -148,7 +154,9 @@ export const updateApplicationStatus = async (
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to update application status:', error);
+        throw error;
     }
 };
 
@@ -165,7 +173,9 @@ export const submitJobApplication = async (applicationData: any): Promise<ApiRes
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to submit job application:', error);
+        throw error;
     }
 };
 
@@ -211,7 +221,9 @@ export const getFinalReviewChecklist = async (): Promise<FinalReviewResponse> =>
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to fetch final review checklist:', error);
+        throw error;
     }
 };
 
@@ -244,7 +256,9 @@ export const cancelApplication = async (): Promise<CancelApplicationResponse> =>
         );
 
         return response.data;
-    } catch (error) {        throw error;
+    } catch (error) {
+        console.error('Failed to cancel application:', error);
+        throw error;
     }
 };
 

@@ -106,7 +106,11 @@ export default function ProfilePage() {
     try {
       setLoading(true)
       setError("")
+      
+      console.log('🔄 Loading profile data...')
       const data = await getProfileInfo()
+      
+      console.log('📥 API returned:', data)
       
       // Fallback to Firebase auth if data is missing
       let fullName = data.fullName || ""
@@ -119,12 +123,15 @@ export default function ProfilePage() {
       const currentUser = auth.currentUser
       
       if (!fullName && currentUser?.displayName) {
+        console.log("⚠️ Using Firebase displayName as fallback:", currentUser.displayName)
         fullName = currentUser.displayName
       }
       if (!email && currentUser?.email) {
+        console.log("⚠️ Using Firebase email as fallback:", currentUser.email)
         email = currentUser.email
       }
       if (!profilePicture && currentUser?.photoURL) {
+        console.log("⚠️ Using Firebase photoURL as fallback:", currentUser.photoURL)
         profilePicture = currentUser.photoURL
       }
       
@@ -132,6 +139,7 @@ export default function ProfilePage() {
       if (!joiningDate && currentUser?.metadata?.creationTime) {
         const creationDate = new Date(currentUser.metadata.creationTime)
         joiningDate = creationDate.toISOString().split('T')[0]
+        console.log("⚠️ Using Firebase account creation date as joining date:", joiningDate)
       }
 
       const mergedProfile: ProfileInfo = {
@@ -142,10 +150,13 @@ export default function ProfilePage() {
         profilePicture,
       }
 
+      console.log("✅ Merged profile data:", mergedProfile)
+
       setProfile(mergedProfile)
 
       // Set photo preview
       setPhotoPreview(profilePicture)
+      console.log("🖼️ Set photo preview to:", profilePicture || "(empty - will show placeholder)")
 
       // Initialize form data
       const initialData: Partial<ProfileInfo> = {
@@ -173,6 +184,7 @@ export default function ProfilePage() {
         }
       }
     } catch (err: any) {
+      console.error("❌ Failed to load profile:", err)
       setError(err?.message || "Failed to load profile information")
     } finally {
       setLoading(false)
@@ -181,6 +193,7 @@ export default function ProfilePage() {
 
   const handleEditClick = () => {
     if (!profile) {
+      console.warn("⚠️ No profile data available")
       return
     }
 
@@ -217,6 +230,8 @@ export default function ProfilePage() {
         setSelectedDate(dateObj)
       }
     }
+
+    console.log("📝 Edit form initialized:", editFormData)
   }
 
   const handleImageClick = () => {
@@ -226,6 +241,8 @@ export default function ProfilePage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    console.log("📷 Image selected:", file.name, file.size, "bytes")
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
@@ -245,6 +262,7 @@ export default function ProfilePage() {
     const reader = new FileReader()
     reader.onloadend = () => {
       const result = reader.result as string
+      console.log("🖼️ Image preview created")
       setTempImage(result)
       setPhotoPreview(result)
     }
@@ -255,6 +273,9 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     if (!profile) return
+
+    console.log("💾 Starting save process...")
+    console.log("💾 Has image file:", !!imageFile)
 
     // Validate required fields
     if (!formData.phone?.trim()) {
@@ -292,9 +313,11 @@ export default function ProfilePage() {
     try {
       // Step 1: If image changed, upload it via Settings API (same as AccountTab)
       if (imageFile) {
+        console.log("📤 Uploading profile picture via Settings API...")
         const accountResult = await updateAccountInfo({
           profilePictureFile: imageFile,
         })
+        console.log("✅ Image uploaded, new URL:", accountResult.profilePicture)
         
         // Update local state with new image URL
         if (accountResult.profilePicture) {
@@ -320,6 +343,8 @@ export default function ProfilePage() {
       if (formData.fullName !== undefined && formData.fullName !== profile.fullName) {
         updateData.fullName = formData.fullName.trim()
       }
+
+      console.log("📤 Updating profile data:", updateData)
 
       await updateProfileInfo(updateData)
 
@@ -351,6 +376,7 @@ export default function ProfilePage() {
         setSuccess(false)
       }, 2000)
     } catch (err: any) {
+      console.error("❌ Save failed:", err)
       setError(err?.message || "Failed to save changes")
     } finally {
       setSaving(false)
@@ -367,12 +393,14 @@ export default function ProfilePage() {
 
     try {
       await deleteAccount()
+      console.log("✅ Account deleted successfully")
       
       localStorage.clear()
       sessionStorage.clear()
       
       navigate(Routes.auth.login, { replace: true })
     } catch (err: any) {
+      console.error("❌ Delete failed:", err)
       setError(err?.message || "Failed to delete account. Please try again or contact support.")
       setDeleting(false)
       setShowDeleteConfirm(false)
@@ -462,6 +490,7 @@ export default function ProfilePage() {
                   alt="Profile"
                   className="object-cover border border-gray-100 w-28 h-28 md:w-32 md:h-32 rounded-2xl"
                   onError={() => {
+                    console.error("❌ Image failed to load:", photoPreview)
                     setPhotoPreview("")
                   }}
                 />

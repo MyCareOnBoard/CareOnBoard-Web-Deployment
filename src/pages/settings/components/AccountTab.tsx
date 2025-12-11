@@ -45,26 +45,37 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
 
   const fullNameValue = form.watch("fullName")
 
-  const load = useCallback(async () => {    setLoading(true)
+  const load = useCallback(async () => {
+    console.log("🔄 Loading account info...")
+    setLoading(true)
     setError("")
     try {
       const data = await getAccountInfo()
+      console.log("✅ Loaded account info:", data)
+
       let fullName = data.fullName || ""
       let email = data.email || ""
       const auth = getAuth()
       await auth.authStateReady?.()
       const current = auth.currentUser
       
-      if (!fullName && current?.displayName) {        fullName = current.displayName
+      if (!fullName && current?.displayName) {
+        console.log("⚠️ Using Firebase displayName as fallback:", current.displayName)
+        fullName = current.displayName
       }
-      if (!email && current?.email) {        email = current.email
+      if (!email && current?.email) {
+        console.log("⚠️ Using Firebase email as fallback:", current.email)
+        email = current.email
       }
 
       const merged: AccountInfo = {
         email,
         fullName,
         profilePicture: data.profilePicture,
-      }      
+      }
+
+      console.log("✅ Merged account info:", merged)
+      
       setInfo(merged)
       setInitialFullName(merged.fullName)
       setInitialImage(merged.profilePicture || "")
@@ -74,9 +85,13 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
         { keepDefaultValues: false }
       )
       
-      if (merged.profilePicture) {        setSelectedImage(merged.profilePicture)
+      if (merged.profilePicture) {
+        console.log("🖼️ Setting profile picture:", merged.profilePicture)
+        setSelectedImage(merged.profilePicture)
       }
-    } catch (e: any) {      setError(e.message || "Failed to load account info")
+    } catch (e: any) {
+      console.error("❌ Failed to load account info:", e)
+      setError(e.message || "Failed to load account info")
     } finally {
       setLoading(false)
     }
@@ -88,7 +103,9 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {      if (file.size > 2 * 1024 * 1024) {
+    if (file) {
+      console.log("🖼️ Image selected:", file.name, file.size, "bytes", file.type)
+      if (file.size > 2 * 1024 * 1024) {
         setError("Image must be under 2MB")
         return
       }
@@ -101,6 +118,7 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       const reader = new FileReader()
       reader.onloadend = () => {
         const preview = reader.result as string
+        console.log("🖼️ Preview generated")
         setTempImage(preview)
       }
       reader.readAsDataURL(file)
@@ -111,7 +129,9 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
   const imageChanged = !!imageFile
   const hasChanges = nameChanged || imageChanged
 
-  const handleSave = async (data: AccountFormValues) => {    
+  const handleSave = async (data: AccountFormValues) => {
+    console.log("💾 Save triggered")
+    
     if (!hasChanges) {
       setError("No changes to save")
       return
@@ -126,16 +146,25 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
     setError("")
     
     try {
+      console.log("🚀 Calling updateAccountInfo...")
+      console.log("📤 Name:", nameChanged ? data.fullName.trim() : "unchanged")
+      console.log("📤 Image:", imageChanged ? imageFile!.name : "unchanged")
+      
       const result = await updateAccountInfo({
         fullName: nameChanged ? data.fullName.trim() : undefined,
         profilePictureFile: imageChanged ? imageFile! : undefined,
       })
+
+      console.log("✅ Save result:", result)
+
       // Update state with exact API response
       setInfo(result)
       setInitialFullName(result.fullName)
       
       // Update image states if new image was uploaded
-      if (result.profilePicture) {        setInitialImage(result.profilePicture)
+      if (result.profilePicture) {
+        console.log("🖼️ Updating profile picture to:", result.profilePicture)
+        setInitialImage(result.profilePicture)
         setSelectedImage(result.profilePicture)
       }
       
@@ -148,7 +177,8 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
         { fullName: result.fullName, email: result.email },
         { keepDefaultValues: false }
       )
-      
+
+      console.log("✅ Save completed successfully")
       onSaved?.(result)
       
       // Set success message
@@ -161,7 +191,9 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       }
       
       setIsModalVisible(true)
-    } catch (e: any) {      
+    } catch (e: any) {
+      console.error("❌ Save failed:", e)
+      
       let errorMessage = e.message || "Failed to save changes"
       
       if (errorMessage.includes("Image upload requires server connection")) {
@@ -185,16 +217,23 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
     setDeleting(true)
     setError("")
 
-    try {      
+    try {
+      console.log("🗑️ [AccountTab] Deleting account using profile endpoint...")
+      
       // Use deleteAccount from @/lib/api/profile (same as ProfilePage)
-      await deleteAccount()      
+      await deleteAccount()
+      
+      console.log("✅ [AccountTab] Account deleted successfully")
+      
       // Clear auth and storage (matches ProfilePage)
       localStorage.clear()
       sessionStorage.clear()
       
       // Redirect to login (matches ProfilePage)
       navigate(Routes.auth.login, { replace: true })
-    } catch (err: any) {      
+    } catch (err: any) {
+      console.error("❌ [AccountTab] Delete failed:", err)
+      
       // Show error message (matches ProfilePage)
       setError(err?.message || "Failed to delete account. Please try again or contact support.")
       setDeleting(false)
@@ -206,7 +245,9 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
     setShowDeleteConfirm(false)
   }
 
-  const handleCancel = () => {    setTempImage(null)
+  const handleCancel = () => {
+    console.log("❌ Cancel clicked - resetting to initial values")
+    setTempImage(null)
     setImageFile(null)
     setError("")
     
@@ -287,7 +328,9 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
                 {tempImage && (
                   <button
                     type="button"
-                    onClick={() => {                      setTempImage(null)
+                    onClick={() => {
+                      console.log("🗑️ Clearing temp image")
+                      setTempImage(null)
                       setImageFile(null)
                     }}
                     disabled={saving}

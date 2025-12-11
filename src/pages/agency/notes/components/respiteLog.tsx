@@ -69,7 +69,9 @@ export default function AgencyRespiteLog(
           }
         }
       }).unwrap();
-    } catch (error) {    }
+    } catch (error) {
+      console.error("Error saving respite log:", error);
+    }
   };
 
   // Auto-save when fields change (only for submitted status)

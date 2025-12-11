@@ -137,7 +137,9 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         const file = values.resume[0];
         
         try {
-          const uploadResponse = await uploadResume(file);          resumeUrl = uploadResponse.data.url;
+          const uploadResponse = await uploadResume(file);
+          console.log('Resume uploaded successfully:', uploadResponse);
+          resumeUrl = uploadResponse.data.url;
         } catch (error) {
           setUploadError('Failed to upload resume. Please try again.');
           return; // Don't proceed if upload fails
@@ -193,10 +195,14 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         // Proceed to next step with form data
         onNext();
       } catch (error) {
-        setUploadError('Failed to submit application. Please try again.');      } finally {
+        setUploadError('Failed to submit application. Please try again.');
+        console.error('Error submitting pre-screening:', error);
+      } finally {
         setIsSubmitting(false);
       }
-    } catch (error) {      setUploadError('An unexpected error occurred. Please try again.');
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setUploadError('An unexpected error occurred. Please try again.');
       setIsUploading(false);
       setIsSubmitting(false);
     }

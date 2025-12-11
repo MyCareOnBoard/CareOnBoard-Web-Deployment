@@ -74,7 +74,9 @@ export default function ApprovalsPage() {
           shift.status === ShiftStatus.COMPLETED
         );
         setShifts(completedShifts);
-      } catch (error) {        toast({
+      } catch (error) {
+        console.error("Failed to fetch shifts:", error);
+        toast({
           title: "Error",
           description: "Failed to load shifts. Please try again.",
           variant: "destructive",
@@ -175,7 +177,9 @@ export default function ApprovalsPage() {
       setShowApproveModal(false);
       setShiftToApprove(null);
       setShowSuccessModal(true);
-    } catch (error) {      toast({
+    } catch (error) {
+      console.error("Failed to approve shift:", error);
+      toast({
         title: "Error",
         description: "Failed to approve shift. Please try again.",
         variant: "destructive",
@@ -224,7 +228,9 @@ export default function ApprovalsPage() {
       setShowRejectModal(false);
       setShiftToApprove(null);
       setShowCancelSuccessModal(true);
-    } catch (error) {      toast({
+    } catch (error) {
+      console.error("Failed to reject shift:", error);
+      toast({
         title: "Error",
         description: "Failed to reject shift. Please try again.",
         variant: "destructive",

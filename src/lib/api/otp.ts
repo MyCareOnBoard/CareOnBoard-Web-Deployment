@@ -7,14 +7,20 @@ import { AxiosRequestConfig } from 'axios';
  */
 async function axiosFetchWithFallback(endpoints: string[], config?: AxiosRequestConfig) {
   let lastErr: any;
+  console.log(`🔄 Trying ${endpoints.length} endpoints:`, endpoints);
+
   for (const endpoint of endpoints) {
     try {
       const response = await axiosClient.request({
         ...config,
         url: endpoint,
-      });      return response.data;
+      });
+      console.log(`✅ Success with endpoint: ${endpoint}`);
+      return response.data;
     } catch (e: any) {
       const status = e.response?.status;
+      console.warn(`⚠️ Failed: ${endpoint} - Status ${status}`);
+
       // Only continue on 404 errors, throw others immediately
       if (status === 404) {
         lastErr = e;
@@ -24,7 +30,10 @@ async function axiosFetchWithFallback(endpoints: string[], config?: AxiosRequest
       // For other errors, throw immediately
       throw e;
     }
-  }  throw lastErr || new Error("All API endpoints are unavailable. Please contact support.");
+  }
+
+  console.error("❌ All endpoints failed");
+  throw lastErr || new Error("All API endpoints are unavailable. Please contact support.");
 }
 
 /**

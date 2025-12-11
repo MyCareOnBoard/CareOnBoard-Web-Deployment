@@ -78,7 +78,9 @@ function ApplicationContent() {
         } else {
           setActiveStep(0);
         }
-      } catch (error) {      } finally {
+      } catch (error) {
+        console.error('Error fetching application status:', error);
+      } finally {
         setIsLoading(false);
       }
     };
@@ -143,7 +145,9 @@ function ApplicationContent() {
           navigate(Routes.applicant.dashboard);
         }, 1500);
       }
-    } catch (error) {      toast({
+    } catch (error) {
+      console.error('Error cancelling application:', error);
+      toast({
         title: "Error",
         description: "Failed to cancel application. Please try again.",
         variant: "destructive",

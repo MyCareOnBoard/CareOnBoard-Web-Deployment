@@ -40,11 +40,19 @@ export default function OnboardingSlider() {
       setCompleting(true);
       setError("");
 
-      try {        await completeOnboarding();
+      try {
+        console.log("✅ [OnboardingSlider] Completing onboarding...");
+        await completeOnboarding();
+        console.log("✅ [OnboardingSlider] Onboarding completed successfully");
+
         // Redirect to email verification
         navigate(Routes.onboarding.email, { replace: true });
       } catch (error: any) {
-        // Since localStorage fallback was set, we can still proceed        navigate(Routes.onboarding.email, { replace: true });
+        console.error("❌ [OnboardingSlider] Failed to complete onboarding:", error);
+
+        // Since localStorage fallback was set, we can still proceed
+        console.log("⚠️ [OnboardingSlider] Proceeding with localStorage fallback");
+        navigate(Routes.onboarding.email, { replace: true });
       } finally {
         setCompleting(false);
       }

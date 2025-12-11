@@ -99,7 +99,9 @@ export async function getUser(): Promise<User> {
           state: agency.state,
           zipCode: agency.zipCode
         };
-      } catch (error: any) {      }
+      } catch (error: any) {
+        console.error('Failed to seed agency:', error);
+      }
     }
 
     return user as User;
@@ -107,7 +109,9 @@ export async function getUser(): Promise<User> {
     // Re-throw with more context
     if (err.response?.status === 404) {
       throw new Error("Profile not found. Please complete your onboarding first.");
-    }    throw err;
+    }
+    console.error('Failed to get user profile:', err);
+    throw err;
   }
 }
 
@@ -124,7 +128,9 @@ export async function updateUser(userData: Partial<User>): Promise<User> {
     }
 
     return response.data.user;
-  } catch (err: any) {    throw new Error(err.message || "Failed to update user data");
+  } catch (err: any) {
+    console.error("updateUser error:", err);
+    throw new Error(err.message || "Failed to update user data");
   }
 }
 
@@ -149,7 +155,9 @@ export async function uploadUserPhoto(file: File): Promise<{ url: string }> {
     }
 
     return response.data;
-  } catch (err: any) {    throw new Error(err.message || "Failed to upload photo");
+  } catch (err: any) {
+    console.error("uploadUserPhoto error:", err);
+    throw new Error(err.message || "Failed to upload photo");
   }
 }
 
@@ -177,7 +185,9 @@ export async function listUsers(params?: ListUsersParams): Promise<ListUsersResp
     }
 
     return response.data;
-  } catch (err: any) {    throw new Error(err.message || "Failed to list users");
+  } catch (err: any) {
+    console.error("listUsers error:", err);
+    throw new Error(err.message || "Failed to list users");
   }
 }
 
@@ -193,7 +203,9 @@ export async function searchUsers(query: string): Promise<User[]> {
       params: { q: query }
     });
     return response.data.data;
-  } catch (error) {    throw error;
+  } catch (error) {
+    console.error('Failed to search users:', error);
+    throw error;
   }
 }
 
@@ -215,7 +227,9 @@ export async function getUserById(userId: string): Promise<User> {
   } catch (err: any) {
     if (err.response?.status === 404) {
       throw new Error("User not found");
-    }    throw new Error(err.message || "Failed to get user");
+    }
+    console.error("getUserById error:", err);
+    throw new Error(err.message || "Failed to get user");
   }
 }
 
@@ -243,6 +257,8 @@ export async function getAgencyEmployees(
     }
 
     return response.data.users;
-  } catch (err: any) {    throw new Error(err.message || "Failed to fetch employees");
+  } catch (err: any) {
+    console.error("getAgencyEmployees error:", err);
+    throw new Error(err.message || "Failed to fetch employees");
   }
 }

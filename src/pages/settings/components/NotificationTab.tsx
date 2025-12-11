@@ -71,7 +71,9 @@ export default function NotificationsTab() {
       setInitialSettings(result);
       setIsModalVisible(true);
     } catch (e) {
-      // Leave UI as-is; tests don’t assert error state here    } finally {
+      // Leave UI as-is; tests don’t assert error state here
+      console.error(e);
+    } finally {
       setSaving(false);
     }
   };

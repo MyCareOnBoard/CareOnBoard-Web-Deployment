@@ -51,7 +51,9 @@ export default function ConditionalHireStep({
           });
           setShowCompliancePage(true);
           setShowLetterModal(false);
-        } catch (error) {          toast.error("Failed to submit conditional hire", {
+        } catch (error) {
+          console.error("[ConditionalHireStep] Auto-submit failed:", error);
+          toast.error("Failed to submit conditional hire", {
             description: "Please try again.",
             duration: 4000,
           });
@@ -102,6 +104,11 @@ export default function ConditionalHireStep({
       // Show compliance page
       setShowCompliancePage(true);
     } catch (error) {
+      console.error(
+        "[ConditionalHireStep] Failed to submit conditional hire:",
+        error
+      );
+
       // Reset submission flag
       setSubmissionSuccessful(false);
 

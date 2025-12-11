@@ -41,7 +41,9 @@ export default function ClientsAndServicesPage() {
       setPendingClients(pending);
       setPastClients(past);
       setTotalPages(Math.ceil(past.length / pageSize));
-    } catch (error: any) {      toast.error("Failed to load clients", {
+    } catch (error: any) {
+      console.error("Failed to load clients:", error);
+      toast.error("Failed to load clients", {
         description: error.message || "Please try again later",
       });
     } finally {
