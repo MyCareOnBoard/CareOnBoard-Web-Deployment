@@ -15,9 +15,9 @@ export enum UserType {
 }
 
 
-
-
 export interface Profile {
+  id?: string
+  uid?: string
   email?: string
   fullName?: string
   name?: string  // Agency name or user display name

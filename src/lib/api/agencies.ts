@@ -4,9 +4,40 @@
  */
 
 import axiosClient from '../axios';
-import { Agency } from '@/utils/auth/types/user.types';
+import { User } from '@/utils/auth/types/user.types';
 
+/**
+ * Agency interface
+ * Represents an agency in the system
+ */
+export interface Agency {
+    id: string;
+    uid: string; // Links to the user account who created/manages the agency
+    name: string;
+    email: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    logo?: string;
+    website?: string;
+    description?: string;
 
+    // Business details
+    taxId?: string;
+    npi?: string;
+    licenseNumber?: string;
+
+    // Status and timestamps
+    status: 'active' | 'inactive' | 'pending' | 'suspended';
+    isVerified: boolean;
+    createdAt: string;
+    updatedAt: string;
+
+    // Optional owner profile
+    owner?: User;
+}
 
 /**
  * Agency Response

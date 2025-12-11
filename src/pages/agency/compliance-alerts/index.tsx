@@ -16,7 +16,7 @@ export default function ComplianceAlertsPage() {
   const {user} = useAuth();
 
   // Fetch expired documents
-  const {data, isLoading, isError} = useGetExpiredDocumentsQuery(user?.agencyId, {
+  const {data, isLoading, isError} = useGetExpiredDocumentsQuery(user?.agencyId ?? '', {
     skip: !user?.agencyId,
     refetchOnMountOrArgChange: true
   });
