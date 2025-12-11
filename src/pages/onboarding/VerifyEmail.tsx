@@ -3,7 +3,7 @@ import { useNavigate } from "react-router"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { sendOtp } from "@/lib/api/otp"
-import { checkProfileStatus } from "@/lib/api/onboarding"
+import { checkUserStatus } from "@/lib/api/onboarding"
 import { useAuth } from "@/utils/auth"
 import LogoHeader from "./components/LogoHeader"
 import { Routes } from "@/routes/constants"
@@ -18,7 +18,7 @@ export default function VerifyEmail() {
 
   // 🔹 Check profile status and auto-extract email
   useEffect(() => {
-    const checkProfile = async () => {
+    const checkUser = async () => {
       // Wait for auth to be initialized
       if (authLoading) {
         return
@@ -32,12 +32,12 @@ export default function VerifyEmail() {
         // Auto-populate email from authenticated user
         setEmail(user.email)
 
-        // Check if profile exists
-        const profile = await checkProfileStatus()
+        // Check if user data exists
+        const userData = await checkUserStatus()
         
-        if (profile) {
+        if (userData) {
           // Only redirect if BOTH onboarding is completed AND OTP is verified
-          if (profile.onboardingCompleted && profile.otpVerified) {
+          if (userData.onboardingCompleted && userData.otpVerified) {
             nav(Routes.applicant.dashboard, { replace: true })
             return
           }
@@ -45,18 +45,18 @@ export default function VerifyEmail() {
           // If only OTP is verified but onboarding not completed, stay on this page
           // If neither is verified, stay on this page to verify OTP
         } else {
-          // Profile doesn't exist yet - user must complete OTP verification first
+          // User data doesn't exist yet - user must complete OTP verification first
           // Don't redirect, stay on this page
         }
       } catch (err: any) {
         // Don't redirect on error - user needs to complete OTP verification
-        setError(err?.message || "Unable to load profile")
+        setError(err?.message || "Unable to load user data")
       } finally {
         setLoading(false)
       }
     }
 
-    checkProfile()
+    checkUser()
   }, [user, authLoading, nav])
 
   // 🔹 Send OTP and navigate to OTP verification

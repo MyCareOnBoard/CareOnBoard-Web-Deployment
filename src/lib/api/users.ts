@@ -5,9 +5,9 @@ import { UserType } from '@/utils/auth/types/user.types';
 import { seedAgency } from './agencies';
 
 /**
- * API Response wrapper for user profile
+ * API Response wrapper for user data
  */
-export interface UserProfileResponse {
+export interface UserResponse {
   success: boolean
   user: User
 }
@@ -37,34 +37,74 @@ export interface ListUsersResponse {
 }
 
 /**
- * Get the authenticated user's profile
- * Used during onboarding to check if profile exists
- * @returns Promise with user profile data
+ * Get the authenticated user's data
+ * Used during onboarding to check if data exists
+ * @returns Promise with user data data
  */
-export async function getUserProfile(): Promise<User> {
+export async function getUser(): Promise<User> {
   try {
-    const response = await axiosClient.get<UserProfileResponse>("/users/profile");
+    const response = await axiosClient.get<UserResponse>("/users/profile");
 
     if (!response.data.success || !response.data.user) {
       throw new Error("Invalid response format from server");
     }
 
-    let user = response.data.user
+    let user = response.data.user as any;
 
-    // Load user-specific data based on user type
-    let userData: Record<string, any> | undefined = undefined
+    // Handle backend response - extract nested profile data if present
+    if (user.profile && typeof user.profile === 'object') {
+      const profileData = user.profile;
+      
+      // Extract critical fields to top level for easy access
+      if (profileData.agencyId && !user.agencyId) {
+        user.agencyId = profileData.agencyId;
+      }
+      if (profileData.id && !user.id) {
+        user.id = profileData.id;
+      }
+      
+      // Keep profile as a clean sub-object (not the entire agency)
+      user.profile = {
+        email: profileData.email,
+        fullName: profileData.fullName,
+        name: profileData.name,
+        phoneNumber: profileData.phoneNumber || profileData.phone,
+        address: profileData.address,
+        city: profileData.city,
+        state: profileData.state,
+        zipCode: profileData.zipCode,
+        gender: profileData.gender,
+        dateOfBirth: profileData.dateOfBirth,
+        profilePicture: profileData.profilePicture,
+        professionalSummary: profileData.professionalSummary,
+        agencyId: profileData.agencyId
+      };
+    }
 
-    if (user.userType === UserType.AGENCY && !user?.profile) {
+    // Load agency data for agency users if needed
+    if (user.userType === UserType.AGENCY && !user.agencyId) {
       try {
-        const agency = await seedAgency()
-        user.profile = agency
-
+        const agency = await seedAgency();
+        // Set agencyId at top level (single source of truth)
+        user.agencyId = agency.id;
+        // Store only agency name in profile for display
+        user.profile = {
+          ...user.profile,
+          agencyId: agency.id,
+          name: agency.name,
+          email: agency.email,
+          phoneNumber: agency.phone,
+          address: agency.address,
+          city: agency.city,
+          state: agency.state,
+          zipCode: agency.zipCode
+        };
       } catch (error: any) {
-
+        console.error('Failed to seed agency:', error);
       }
     }
 
-    return user;
+    return user as User;
   } catch (err: any) {
     // Re-throw with more context
     if (err.response?.status === 404) {
@@ -76,12 +116,12 @@ export async function getUserProfile(): Promise<User> {
 }
 
 /**
- * ✅ Update the authenticated user's profile
+ * ✅ Update the authenticated user's data
  * Endpoint: PUT /users/profile
  */
-export async function updateUserProfile(profileData: Partial<User>): Promise<User> {
+export async function updateUser(userData: Partial<User>): Promise<User> {
   try {
-    const response = await axiosClient.put<UserProfileResponse>("/users/profile", profileData);
+    const response = await axiosClient.put<UserResponse>("/users/profile", userData);
 
     if (!response.data.success || !response.data.user) {
       throw new Error("Invalid response format from server");
@@ -89,8 +129,8 @@ export async function updateUserProfile(profileData: Partial<User>): Promise<Use
 
     return response.data.user;
   } catch (err: any) {
-    console.error("updateUserProfile error:", err);
-    throw new Error(err.message || "Failed to update user profile");
+    console.error("updateUser error:", err);
+    throw new Error(err.message || "Failed to update user data");
   }
 }
 
@@ -173,11 +213,11 @@ export async function searchUsers(query: string): Promise<User[]> {
  * ✅ Get a user by ID
  * Endpoint: GET /users/:id
  * @param userId - The user ID
- * @returns Promise with user profile
+ * @returns Promise with user data
  */
 export async function getUserById(userId: string): Promise<User> {
   try {
-    const response = await axiosClient.get<UserProfileResponse>(`/users/${userId}`);
+    const response = await axiosClient.get<UserResponse>(`/users/${userId}`);
 
     if (!response.data.success || !response.data.user) {
       throw new Error("User not found");

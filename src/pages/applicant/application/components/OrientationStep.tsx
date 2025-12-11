@@ -8,7 +8,7 @@ import {
     useSubmitOfficialHireMutation
 } from "@/pages/applicant/application/api";
 import {useDispatch} from "react-redux";
-import {getUserProfile} from "@/lib/api/users";
+import {getUser} from "@/lib/api/users";
 import {setUser} from "@/utils/auth";
 
 export default function OrientationStep() {
@@ -35,8 +35,8 @@ export default function OrientationStep() {
 
     const handleProfileRetrieve = async () => {
       try {
-        const profile = await getUserProfile();
-        dispatch(setUser(profile));
+        const user = await getUser();
+        dispatch(setUser(user));
       } catch (error) {
         console.error(error);
       }

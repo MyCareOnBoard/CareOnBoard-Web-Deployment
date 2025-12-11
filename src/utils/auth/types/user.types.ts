@@ -20,7 +20,7 @@ export enum UserType {
 export interface Profile {
   email?: string
   fullName?: string
-  name?: string  // Agency name
+  name?: string  // Agency name or user display name
   phoneNumber?: string
   address?: string
   city?: string
