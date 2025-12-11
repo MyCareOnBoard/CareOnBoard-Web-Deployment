@@ -1,52 +1,44 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import StopRideModal from "./modals/StopRideModal";
 import StartRideModal from "./modals/StartRideModal";
 import CancelRideModal from "./modals/CancelRideModal";
+import { MileageRide } from "@/lib/api/mileage";
 
 interface CurrentRideProps {
-  clientName?: string;
-  location?: string;
-  time?: string;
-  distance?: string;
-  distanceCovered?: string;
-  rideId?: string;
-  hasActiveRide?: boolean;
+  ride?: MileageRide | null;
+  onStart: (rideId: string) => Promise<void> | void;
+  onStop: (rideId: string) => Promise<void> | void;
+  onCancel: (rideId: string) => Promise<void> | void;
+  actionLoading?: boolean;
 }
 
-export default function CurrentRide({
-  clientName = "DR.Brooklyn Simmons",
-  location = "221/B Baker Street",
-  time = "2:30 PM",
-  distance = "2Km",
-  distanceCovered = "2.08Km",
-  rideId = "3223",
-  hasActiveRide = false,
-}: CurrentRideProps) {
+const formatTime = (iso?: string | null) => {
+  if (!iso) return "--";
+  const date = new Date(iso);
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+};
+
+export default function CurrentRide({ ride, onStart, onStop, onCancel, actionLoading }: CurrentRideProps) {
   const [isStopModalOpen, setIsStopModalOpen] = useState(false);
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [rideStatus, setRideStatus] = useState<"scheduled" | "ongoing" | "cancelled">(
-    hasActiveRide ? "ongoing" : "scheduled"
-  );
 
-  const handleStartRide = () => {
-    setRideStatus("ongoing");
-    setIsStartModalOpen(false);
-  };
+  const status = ride?.status;
 
-  const handleStopRide = () => {
-    setRideStatus("scheduled");
-    setIsStopModalOpen(false);
-  };
+  const distanceLabel = useMemo(() => {
+    if (!ride) return "--";
+    if (ride.actualDistance != null) return `${ride.actualDistance}Km`;
+    if (ride.estimatedDistance != null) return `${ride.estimatedDistance}Km`;
+    return "--";
+  }, [ride]);
 
-  const handleCancelRide = () => {
-    setRideStatus("cancelled");
-    setIsCancelModalOpen(false);
-  };
-
-  if (rideStatus === "cancelled") {
-    return null;
+  if (!ride || status === "cancelled") {
+    return (
+      <div className="bg-[#f8f9fa] rounded-2xl p-4 mb-6 border border-dashed border-gray-200 text-center text-sm text-[#808081]">
+        No active ride at the moment.
+      </div>
+    );
   }
 
   return (
@@ -57,14 +49,14 @@ export default function CurrentRide({
             <h2 className="text-xl font-bold text-[#10141a] mb-1">Current Ride</h2>
             <p className="text-sm text-[#808081]">Here is your upcoming ride</p>
           </div>
-          {rideStatus === "ongoing" && (
+          {status === "in_progress" && (
             <span className="inline-flex items-center px-4 py-2 text-sm font-medium text-[#00b4b8] bg-white rounded-full border border-[#00b4b8]/20">
-              Distance covered : {distanceCovered}
+              Distance covered : {distanceLabel}
             </span>
           )}
-          {rideStatus === "scheduled" && (
+          {status === "scheduled" && (
             <span className="inline-flex items-center px-4 py-2 text-sm font-medium text-[#00b4b8] bg-white rounded-full border border-[#00b4b8]/20">
-              ID- {rideId}
+              ID- {ride.id}
             </span>
           )}
         </div>
@@ -73,11 +65,11 @@ export default function CurrentRide({
           <div className="flex items-center ">
             <img
               src="https://api.dicebear.com/7.x/avataaars/svg?seed=Brooklyn"
-              alt={clientName}
+              alt={ride.clientName}
               className="rounded-full w-14 h-14"
             />
             <div>
-              <h3 className="text-base font-semibold text-[#10141a]">{clientName}</h3>
+              <h3 className="text-base font-semibold text-[#10141a]">{ride.clientName}</h3>
               <p className="text-sm text-[#808081]">Client</p>
             </div>
           </div>
@@ -85,23 +77,23 @@ export default function CurrentRide({
           <div className="flex items-center gap-8">
             <div>
               <p className="text-xs text-[#808081] mb-1">Location</p>
-              <p className="text-sm font-medium text-[#10141a]">{location}</p>
+              <p className="text-sm font-medium text-[#10141a]">{ride.location}</p>
             </div>
 
             <div>
               <p className="text-xs text-[#808081] mb-1">
-                {rideStatus === "ongoing" ? "Started at" : "Available at"}
+                {status === "in_progress" ? "Started at" : "Scheduled at"}
               </p>
-              <p className="text-sm font-medium text-[#10141a]">{time}</p>
+              <p className="text-sm font-medium text-[#10141a]">{formatTime(status === "in_progress" ? ride.startedAt : ride.scheduledStartTime)}</p>
             </div>
 
             <div>
               <p className="text-xs text-[#808081] mb-1">Distance</p>
-              <p className="text-sm font-medium text-[#10141a]">{distance}</p>
+              <p className="text-sm font-medium text-[#10141a]">{distanceLabel}</p>
             </div>
 
             <div className="flex items-center gap-3">
-              {rideStatus === "scheduled" && (
+              {status === "scheduled" && (
                 <>
                   <span
                     className="inline-block px-3 py-1 text-xs font-medium text-green-700 border border-green-300 rounded-full"
@@ -110,6 +102,7 @@ export default function CurrentRide({
                   </span>
                   <Button
                     onClick={() => setIsStartModalOpen(true)}
+                    disabled={actionLoading}
                     className="bg-[#22c55e] hover:bg-[#16a34a] text-white rounded-full px-5 py-2 h-auto font-medium text-sm flex items-center gap-2"
                   >
                     <svg
@@ -129,6 +122,7 @@ export default function CurrentRide({
                   </Button>
                   <Button
                     onClick={() => setIsCancelModalOpen(true)}
+                    disabled={actionLoading}
                     className="bg-[#ef4444] hover:bg-[#dc2626] text-white rounded-full px-5 py-2 h-auto font-medium text-sm flex items-center gap-2"
                   >
                     <svg
@@ -149,13 +143,14 @@ export default function CurrentRide({
                 </>
               )}
 
-              {rideStatus === "ongoing" && (
+              {status === "in_progress" && (
                 <>
                   <span className="inline-flex items-center px-4 py-2 text-sm font-medium text-[#22c55e] bg-[#22c55e]/10 rounded-full">
                     Currently ongoing
                   </span>
                   <Button
                     onClick={() => setIsStopModalOpen(true)}
+                    disabled={actionLoading}
                     className="bg-[#ef4444] hover:bg-[#dc2626] text-white rounded-full px-5 py-2 h-auto font-medium text-sm flex items-center gap-2"
                   >
                     <svg
@@ -183,17 +178,26 @@ export default function CurrentRide({
       <StopRideModal
         open={isStopModalOpen}
         onOpenChange={setIsStopModalOpen}
-        onConfirm={handleStopRide}
+        onConfirm={() => {
+          setIsStopModalOpen(false);
+          onStop(ride.id);
+        }}
       />
       <StartRideModal
         open={isStartModalOpen}
         onOpenChange={setIsStartModalOpen}
-        onConfirm={handleStartRide}
+        onConfirm={() => {
+          setIsStartModalOpen(false);
+          onStart(ride.id);
+        }}
       />
       <CancelRideModal
         open={isCancelModalOpen}
         onOpenChange={setIsCancelModalOpen}
-        onConfirm={handleCancelRide}
+        onConfirm={() => {
+          setIsCancelModalOpen(false);
+          onCancel(ride.id);
+        }}
       />
     </>
   );
