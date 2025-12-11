@@ -15,10 +15,10 @@ export default function DSPClaimsPage() {
   const {data, isLoading, error} = useGetDspClaimsQuery(
     {
       dspId: dsp || "",
-      agencyId: user?.profile?.id || "",
+      agencyId: user?.agencyId || "",
     },
     {
-      skip: !dsp || !user?.profile?.id,
+      skip: !dsp || !user?.agencyId,
     }
   );
 
@@ -82,9 +82,9 @@ export default function DSPClaimsPage() {
 
 
         {/* DSP Info Card */}
-        <div className="rounded-[12px] p-4 flex items-start gap-4 mb-6">
+        <div className="rounded-xl p-4 flex items-start gap-4 mb-6">
           <div
-            className="w-28 h-28 rounded bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-[24px] font-bold flex-shrink-0">
+            className="w-28 h-28 rounded bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-[24px] font-bold shrink-0">
             {dspInfo.fullName.charAt(0)}
           </div>
           <div className={"flex flex-col max-w-lg w-full"}>
@@ -129,7 +129,7 @@ export default function DSPClaimsPage() {
                 {/* DSP Info */}
                 <div className="col-span-1 flex items-center gap-3">
                   <div
-                    className="w-10 h-10 rounded bg-gradient-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-[14px] font-bold">
+                    className="w-10 h-10 rounded bg-linear-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-[14px] font-bold">
                     {service.client?.fullName?.charAt(0) || "?"}
                   </div>
                   <div>
@@ -249,7 +249,7 @@ export default function DSPClaimsPage() {
         <div className="bg-[#0EAF521A] rounded-lg p-4 flex items-center justify-between">
           <div className={"flex items-center gap-2"}>
             <div className={"bg-[#B2B2B3] rounded-full py-2 px-3 flex items-center justify-center space-x-1"}>
-              <Banknote className="w-6 h-6 text-white flex-shrink-0"/>
+              <Banknote className="w-6 h-6 text-white shrink-0"/>
               <span className={"text-white"}>$35</span>
             </div>
             <p className="text-[13px] text-[#808081]">
@@ -297,13 +297,13 @@ export default function DSPClaimsPage() {
               <label className="text-[12px] text-[#808081] mb-2 block">
                 DSP Signature
               </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-[12px] h-[40px]"></div>
+              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
             </div>
             <div>
               <label className="text-[12px] text-[#808081] mb-2 block">
                 Date
               </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-[12px] h-[40px]"></div>
+              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
             </div>
           </div>
 
@@ -313,13 +313,13 @@ export default function DSPClaimsPage() {
               <label className="text-[12px] text-[#808081] mb-2 block">
                 Client Signature
               </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-[12px] h-[40px]"></div>
+              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
             </div>
             <div>
               <label className="text-[12px] text-[#808081] mb-2 block">
                 Date
               </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-[12px] h-[40px]"></div>
+              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
             </div>
           </div>
 
@@ -329,13 +329,13 @@ export default function DSPClaimsPage() {
               <label className="text-[12px] text-[#808081] mb-2 block">
                 Admin Approval
               </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-[12px] h-[40px]"></div>
+              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
             </div>
             <div>
               <label className="text-[12px] text-[#808081] mb-2 block">
                 Date
               </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-[12px] h-[40px]"></div>
+              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
             </div>
           </div>
         </div>

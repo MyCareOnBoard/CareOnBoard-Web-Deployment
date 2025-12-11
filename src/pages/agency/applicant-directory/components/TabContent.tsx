@@ -70,7 +70,7 @@ export function TabContent({ selectedTab, applicant, onSendLetter }: TabContentP
           ))}
 
           {applicant.details.resume && (
-            <div className="flex items-center justify-between p-4 bg-white rounded-[12px] border border-[#e5e5e6]">
+            <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-[#e5e5e6]">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-[#f8f9fa] flex items-center justify-center">
                   <FileText className="w-5 h-5 text-[#808081]" />
@@ -90,7 +90,7 @@ export function TabContent({ selectedTab, applicant, onSendLetter }: TabContentP
           {applicant.documents.map((doc) => (
             <div
               key={doc.id}
-              className="flex items-center justify-between p-4 bg-white rounded-[12px] border border-[#e5e5e6]"
+              className="flex items-center justify-between p-4 bg-white rounded-xl border border-[#e5e5e6]"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-[#f8f9fa] flex items-center justify-center">
@@ -109,7 +109,7 @@ export function TabContent({ selectedTab, applicant, onSendLetter }: TabContentP
             <h3 className="text-lg font-semibold text-[#10141a] mb-4">References</h3>
             <div className="grid grid-cols-2 gap-4">
               {applicant.references?.map((ref, index) => (
-                <div key={index} className="p-4 bg-[#f8f9fa] rounded-[12px]">
+                <div key={index} className="p-4 bg-[#f8f9fa] rounded-xl">
                   <h4 className="text-sm font-semibold text-[#10141a] mb-1">{ref.name}</h4>
                   <p className="text-xs text-[#808081] mb-3">{ref.role}</p>
                   <div className="grid grid-cols-2 gap-4">
@@ -132,7 +132,7 @@ export function TabContent({ selectedTab, applicant, onSendLetter }: TabContentP
       {selectedTab === "conditional" && applicant.conditionalHire && (
         <div>
           {applicant.conditionalHire.signed ? (
-            <div className="flex items-center justify-between p-5 bg-[#d1fae5] rounded-[12px]">
+            <div className="flex items-center justify-between p-5 bg-[#d1fae5] rounded-xl">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-[#10b981] flex items-center justify-center">
                   <Check className="w-6 h-6 text-white" strokeWidth={2.5} />
@@ -164,7 +164,7 @@ export function TabContent({ selectedTab, applicant, onSendLetter }: TabContentP
           {applicant.authorizations.map((auth) => (
             <div
               key={auth.id}
-              className="flex items-center justify-between p-4 border border-[#e5e5e6] rounded-[12px]"
+              className="flex items-center justify-between p-4 border border-[#e5e5e6] rounded-xl"
             >
               <span className="text-sm text-[#10141a] flex-1 pr-4">{auth.name}</span>
               <div className="flex items-center gap-3">

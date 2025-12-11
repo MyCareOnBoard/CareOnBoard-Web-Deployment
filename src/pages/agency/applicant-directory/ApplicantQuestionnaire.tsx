@@ -9,7 +9,7 @@ export function ApplicantQuestionnaire() {
       <Card className="p-8">
         <div className="flex items-start justify-between">
           <div className="flex gap-6">
-            <div className="w-32 h-32 bg-gray-300 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-32 h-32 bg-gray-300 rounded-lg flex items-center justify-center shrink-0">
               <span className="text-gray-600 font-bold text-3xl">BD</span>
             </div>
             <div>

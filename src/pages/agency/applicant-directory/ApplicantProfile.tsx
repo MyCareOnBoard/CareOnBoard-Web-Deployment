@@ -22,7 +22,7 @@ export function ApplicantProfile() {
       <Card className="p-8">
         <div className="flex items-start justify-between">
           <div className="flex gap-6">
-            <div className="flex items-center justify-center flex-shrink-0 w-32 h-32 bg-gray-300 rounded-lg">
+            <div className="flex items-center justify-center shrink-0 w-32 h-32 bg-gray-300 rounded-lg">
               <span className="text-3xl font-bold text-gray-600">BD</span>
             </div>
             <div>

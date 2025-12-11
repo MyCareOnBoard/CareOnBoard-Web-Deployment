@@ -3,15 +3,15 @@ export interface DSP {
   id: string;
   fullName: string;
   role: string;
-  age: number;
+  age?: number;
   status: "Active" | "Deactivated";
   email: string;
-  phone: string;
-  address: string;
+  phone?: string;
+  address?: string;
   joiningDate: string;
   professionalSummary: string;
   profileImage?: string;
-  gender: "Male" | "Female" | "Other";
+  gender?: "Male" | "Female" | "Other" | string;
 }
 
 export interface Shift {

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { verifyOtp, resendOtp } from "@/lib/api/otp"
 import { completeOnboarding } from "@/lib/api/onboarding"
-import { getUserProfile } from "@/lib/api/users"
+import { getUser } from "@/lib/api/users"
 import { useAuth } from "@/utils/auth"
 import LogoHeader from "./components/LogoHeader"
 import { Routes } from "@/routes/constants"
@@ -41,11 +41,11 @@ export default function VerifyOTP() {
           return
         }
         
-        // Fallback to profile endpoint
-        const profile = await getUserProfile()
-        const profEmail = profile?.email
-        if (!profEmail) throw new Error("User not found. Please create a profile first.")
-        setEmail(profEmail)
+        // Fallback to user data endpoint
+        const userData = await getUser()
+        const userEmail = userData?.email
+        if (!userEmail) throw new Error("User not found. Please create a user account first.")
+        setEmail(userEmail)
       } catch (e: any) {
         setError(e.message || "Unable to fetch your email.")
       } finally {
