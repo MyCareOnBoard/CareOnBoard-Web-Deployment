@@ -4,6 +4,7 @@ import { Routes } from "@/routes/constants";
 import { Stage1ClientIdentityAndContact } from "@/pages/agency/add-client/stages/Stage1ClientIdentityAndContact";
 import { Stage2GuardianAndFunding } from "@/pages/agency/add-client/stages/Stage2GuardianAndFunding";
 import { Stage3HealthcareAndDocuments } from "@/pages/agency/add-client/stages/Stage3HealthcareAndDocuments";
+import { Stage4EvvAndVisitConfig } from "@/pages/agency/add-client/stages/Stage4EvvAndVisitConfig";
 
 export default function AddClientPage() {
   const navigate = useNavigate();
@@ -36,7 +37,16 @@ export default function AddClientPage() {
     );
   }
 
-  if (stage !== 1 && stage !== 2 && stage !== 3) {
+  if (stage === 4) {
+    return (
+      <Stage4EvvAndVisitConfig
+        onCancel={() => navigate(Routes.agency.clients)}
+        onNext={() => setStage(5)}
+      />
+    );
+  }
+
+  if (stage !== 1 && stage !== 2 && stage !== 3 && stage !== 4) {
     return (
       <div className="min-h-[calc(100vh-200px)]">
         <div className="mb-10">
