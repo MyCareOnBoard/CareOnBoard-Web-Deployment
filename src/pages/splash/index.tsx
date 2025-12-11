@@ -39,7 +39,7 @@ export default function SplashScreen() {
           {/* Logo and text in horizontal layout */}
           <div className="flex items-center gap-4 sm:gap-6">
             {/* Logo with subtle animations */}
-            <div className="relative flex-shrink-0">
+            <div className="relative shrink-0">
               {/* Glow effect behind logo */}
               <div
                 className="absolute inset-0 blur-2xl bg-[#00B4B8]/20 rounded-full scale-150 animate-pulse-slow"

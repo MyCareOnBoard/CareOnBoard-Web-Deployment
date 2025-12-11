@@ -438,7 +438,7 @@ export default function SupportPage() {
                 }`}
               >
                 <div className="relative">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
+                  <div className="w-12 h-12 rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
                     {contact.avatar}
                   </div>
                   {contact.hasNotification && (
@@ -448,12 +448,12 @@ export default function SupportPage() {
                 <div className="flex-1 min-w-0 text-left">
                   <div className="flex items-center justify-between mb-1">
                     <h3 className="font-semibold text-[#10141a] truncate">{contact.name}</h3>
-                    <span className="text-xs text-[#808081] flex-shrink-0 ml-2">{contact.timestamp}</span>
+                    <span className="text-xs text-[#808081] shrink-0 ml-2">{contact.timestamp}</span>
                   </div>
                   <p className="text-sm text-[#808081] truncate">{contact.lastMessage || contact.role}</p>
                 </div>
                 {contact.unread && contact.unread > 0 && (
-                  <div className="w-6 h-6 rounded-full bg-[#ef4444] flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-[#ef4444] flex items-center justify-center text-white text-xs font-semibold shrink-0">
                     {contact.unread}
                   </div>
                 )}
@@ -468,7 +468,7 @@ export default function SupportPage() {
             <>
               {/* Chat Header */}
               <div className="p-6 border-b border-[#e5e5e6] flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
+                <div className="w-12 h-12 rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
                   {selectedContactData.avatar}
                 </div>
                 <div>
@@ -488,7 +488,7 @@ export default function SupportPage() {
                       className={`flex gap-3 ${message.isOwn ? "justify-end" : ""}`}
                     >
                       {!message.isOwn && (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold flex-shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold shrink-0">
                           {message.avatar}
                         </div>
                       )}
@@ -542,7 +542,7 @@ export default function SupportPage() {
                         </div>
                       </div>
                       {message.isOwn && (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold flex-shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold shrink-0">
                           {message.avatar}
                         </div>
                       )}
@@ -705,7 +705,7 @@ export default function SupportPage() {
                       className="flex items-center justify-between px-3 py-3 hover:bg-[#f8f9fa] rounded-[10px] cursor-pointer transition-colors group"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center flex-shrink-0">
+                        <div className="w-11 h-11 rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center shrink-0">
                           <span className="text-[15px] font-semibold text-[#10141a]">
                             {user.avatar}
                           </span>

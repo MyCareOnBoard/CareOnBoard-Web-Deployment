@@ -322,7 +322,7 @@ export default function ApplicantDirectory() {
                           Total doctors who have collaborated
                         </p>
                       </div>
-                      <button className="flex-shrink-0 text-gray-400 transition-colors hover:text-gray-600">
+                      <button className="shrink-0 text-gray-400 transition-colors hover:text-gray-600">
                         <ArrowUpRight className="w-4 h-4" />
                       </button>
                     </div>
@@ -345,7 +345,7 @@ export default function ApplicantDirectory() {
                         3.5% Have increased from yesterday
                       </p>
                     </div>
-                    <button className="flex-shrink-0 text-gray-400 transition-colors hover:text-gray-600">
+                    <button className="shrink-0 text-gray-400 transition-colors hover:text-gray-600">
                       <ArrowUpRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -399,7 +399,7 @@ export default function ApplicantDirectory() {
                           />
                         </div>
                       </div>
-                      <div className="flex items-center flex-shrink-0 gap-2">
+                      <div className="flex items-center shrink-0 gap-2">
                         <Button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -530,11 +530,11 @@ export default function ApplicantDirectory() {
                       className="flex items-center gap-6 p-4 transition bg-gray-100 rounded-lg hover:bg-gray-200"
                     >
                       {/* Profile Section */}
-                      <div className="flex items-center gap-3 min-w-[220px] flex-shrink-0">
+                      <div className="flex items-center gap-3 min-w-[220px] shrink-0">
                         <img
                           src={applicant.avatar}
                           alt={applicant.name}
-                          className="flex-shrink-0 w-12 h-12 rounded-full"
+                          className="shrink-0 w-12 h-12 rounded-full"
                         />
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-gray-900">
@@ -593,7 +593,7 @@ export default function ApplicantDirectory() {
                       {/* Action Button */}
                       <Button 
                         onClick={() => handleViewDetails(applicant.id)}
-                        className="flex-shrink-0 px-6 py-2 text-xs font-medium text-gray-600 bg-gray-300 rounded-full hover:bg-gray-400"
+                        className="shrink-0 px-6 py-2 text-xs font-medium text-gray-600 bg-gray-300 rounded-full hover:bg-gray-400"
                       >
                         Details
                       </Button>

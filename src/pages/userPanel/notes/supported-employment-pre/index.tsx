@@ -404,7 +404,7 @@ export default function SupportedEmploymentPrePage() {
             type="text"
             value={activityLog?.metadata?.individual || ""}
             disabled={true}
-            className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
+            className="h-11 bg-white border border-[#cccccd] rounded-xl px-4"
           />
         </div>
 
@@ -418,7 +418,7 @@ export default function SupportedEmploymentPrePage() {
               type="text"
               value={noteInfo?.totalHours}
               onChange={(event) => handleNoteInfoChange("totalHours", event.target.value)}
-              className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
+              className="h-11 bg-white border border-[#cccccd] rounded-xl px-4"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -428,7 +428,7 @@ export default function SupportedEmploymentPrePage() {
             <Popover open={isStartDateOpen} onOpenChange={setIsStartDateOpen}>
               <PopoverTrigger asChild>
                 <button type="button" className="w-full focus:outline-none">
-                  <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                  <InputGroup className="h-11 bg-white border border-[#cccccd] rounded-xl px-4">
                     <InputGroupInput
                       value={noteInfo?.reportingStartDate
                         ? format(noteInfo?.reportingStartDate, "MMMM d, yyyy")
@@ -478,7 +478,7 @@ export default function SupportedEmploymentPrePage() {
             <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
               <PopoverTrigger asChild>
                 <button type="button" className="w-full focus:outline-none">
-                  <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                  <InputGroup className="h-11 bg-white border border-[#cccccd] rounded-xl px-4">
                     <InputGroupInput
                       value={noteInfo?.reportingEndDate
                         ? format(noteInfo?.reportingEndDate, "MMMM d, yyyy")
@@ -535,7 +535,7 @@ export default function SupportedEmploymentPrePage() {
             type="text"
             value={user?.fullName ?? ""}
             disabled={true}
-            className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4 w-full"
+            className="h-11 bg-white border border-[#cccccd] rounded-xl px-4 w-full"
           />
         </div>
 
@@ -691,7 +691,7 @@ export default function SupportedEmploymentPrePage() {
                             value={service.activityConducted}
                             onValueChange={(value) => updateService(service.id, index, 'activityConducted', value)}
                           >
-                            <SelectTrigger className="w-full h-[44px] bg-white border border-[#cccccd] rounded-[12px]">
+                            <SelectTrigger className="w-full h-11 bg-white border border-[#cccccd] rounded-xl">
                               <SelectValue placeholder="Please select"/>
                             </SelectTrigger>
                             <SelectContent>

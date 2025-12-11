@@ -134,7 +134,7 @@ export default function AgencyEditNote(
             onClick={(e) => e.stopPropagation()}
           >
           {/* Header */}
-          <div className="flex space-x-3 items-center justify-end mb-3 flex-shrink-0 print:hidden">
+          <div className="flex space-x-3 items-center justify-end mb-3 shrink-0 print:hidden">
             <button
               onClick={handlePrint}
               className="flex items-center space-x-3 cursor-pointer text-white hover:text-gray-600 transition-colors bg-[#B2B2B3] rounded-full px-4 py-3"

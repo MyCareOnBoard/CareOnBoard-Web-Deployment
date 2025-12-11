@@ -97,7 +97,7 @@ export default function NewMessageModal({
                 >
                   <div className="flex items-center gap-3">
                     {/* Avatar */}
-                    <div className="relative flex-shrink-0 w-11 h-11">
+                    <div className="relative shrink-0 w-11 h-11">
                       {user.image ? (
                         <img
                           src={user.image}
@@ -105,7 +105,7 @@ export default function NewMessageModal({
                           className="object-cover w-full h-full rounded-full"
                         />
                       ) : (
-                        <div className="w-full h-full rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center">
+                        <div className="w-full h-full rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center">
                           <span className="text-[15px] font-semibold text-[#10141a]">
                             {user.avatar}
                           </span>

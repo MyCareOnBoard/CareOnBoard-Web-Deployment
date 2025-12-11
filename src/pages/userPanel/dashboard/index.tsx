@@ -177,12 +177,12 @@ export default function UserPanelDashboardPage() {
                     <img
                       src={currentUser?.photoURL}
                       alt={employeeInfo?.fullName}
-                      className="w-[180px] h-full rounded-[12px] object-cover"
+                      className="w-[180px] h-full rounded-xl object-cover"
                     />
                   </div>
                 ) : (
                   <div
-                    className="w-[180px] h-full rounded-[12px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-6xl font-bold">
+                    className="w-[180px] h-full rounded-xl bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-6xl font-bold">
                     {employeeInfo?.fullName?.charAt(0) || "U"}
                   </div>
                 )}
@@ -253,7 +253,7 @@ export default function UserPanelDashboardPage() {
                   trainings.map((training) => (
                     <div
                       key={training.id}
-                      className="flex items-center justify-between p-3 rounded-[12px] border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
+                      className="flex items-center justify-between p-3 rounded-xl border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <img
@@ -315,7 +315,7 @@ export default function UserPanelDashboardPage() {
                 <div
                   key={document.value}
                   onClick={() => handleOpenDocument(getDocument(document.value)?.fileUrl)}
-                  className="cursor-pointer flex items-center justify-between p-4 rounded-[12px] border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
+                  className="cursor-pointer flex items-center justify-between p-4 rounded-xl border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <img

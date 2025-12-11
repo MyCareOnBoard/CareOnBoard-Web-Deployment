@@ -61,7 +61,7 @@ export default function AuthLayout() {
     <div className="flex items-center justify-between p-[30px] min-h-screen bg-white">
       {/* Left Banner - Teal branding section */}
       <div
-        className="hidden lg:flex bg-[#00b4b8] flex-col h-[calc(100vh-60px)] justify-between p-[60px] rounded-[8px] w-[528px] relative overflow-hidden"
+        className="hidden lg:flex bg-[#00b4b8] flex-col h-[calc(100vh-60px)] justify-between p-[60px] rounded-lg w-[528px] relative overflow-hidden"
       >
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 pointer-events-none">

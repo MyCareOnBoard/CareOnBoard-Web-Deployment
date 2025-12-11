@@ -44,7 +44,7 @@ function UserAvatar({ userName, userImage }: { userName?: string; userImage?: st
   // Show initials if no image or image failed to load
   if (!userImage || imageError) {
     return (
-      <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xs font-semibold">
+      <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-xs font-semibold">
         {getInitials(userName)}
       </div>
     );
@@ -112,7 +112,7 @@ export default function DashboardHeader(
                   {/* <span className="absolute right-[9px] top-[9px] block h-[10px] w-[10px] rounded-full bg-[#d53411]" /> */}
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[320px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-[12px] p-0 backdrop-blur-sm">
+              <DropdownMenuContent align="end" className="w-[320px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-xl p-0 backdrop-blur-sm">
                 {/* Notifications Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(239,239,239,0.08)]">
                   <h3 className="text-[16px] font-semibold text-[#10141a]">Notifications</h3>
@@ -160,7 +160,7 @@ export default function DashboardHeader(
                   )}
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[214px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-[12px] p-0 backdrop-blur-sm">
+              <DropdownMenuContent align="end" className="w-[214px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-xl p-0 backdrop-blur-sm">
                 <div className="py-0">
                   <DropdownMenuItem 
                     className={cn(

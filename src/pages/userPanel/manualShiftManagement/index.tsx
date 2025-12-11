@@ -1046,7 +1046,7 @@ export default function ManualShiftManagementPage() {
                         className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
                       >
                         <div className="flex items-start gap-2">
-                          <MapPin className="w-4 h-4 text-[#00b4b8] flex-shrink-0 mt-0.5" />
+                          <MapPin className="w-4 h-4 text-[#00b4b8] shrink-0 mt-0.5" />
                           <span className="line-clamp-2">{suggestion.display_name}</span>
                         </div>
                       </div>

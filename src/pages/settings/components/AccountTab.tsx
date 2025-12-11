@@ -241,7 +241,7 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
 
       {error && (
         <div className="flex items-start gap-2 p-3 text-sm text-red-600 rounded-lg bg-red-50">
-          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}

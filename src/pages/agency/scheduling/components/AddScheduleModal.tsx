@@ -811,7 +811,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           className="relative bg-white rounded-[30px] border border-[rgba(255,255,255,0.3)] w-full max-w-[500px] max-h-[90vh] shadow-xl flex flex-col"
         >
         {/* Title Bar - Fixed */}
-        <div className="flex items-center justify-between p-5 pb-0 flex-shrink-0">
+        <div className="flex items-center justify-between p-5 pb-0 shrink-0">
           <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
             {mode === "edit" ? "Edit Schedule" : "Add new Schedule"}
           </h2>
@@ -830,7 +830,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           {/* Client Field */}
           <div className="flex flex-col gap-1 relative">
             <label className="text-[12px] font-normal text-[#10141a]">Client</label>
-            <div className={`bg-white border rounded-[12px] h-[44px] px-4 flex items-center ${errors.client ? "border-[#D53411]" : "border-[#cccccd]"}`}>
+            <div className={`bg-white border rounded-xl h-11 px-4 flex items-center ${errors.client ? "border-[#D53411]" : "border-[#cccccd]"}`}>
               <input
                 type="text"
                 value={formData.client}
@@ -852,7 +852,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             )}
             {/* Client Dropdown */}
             {showClientDropdown && clientSearchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-[12px] shadow-lg z-20 max-h-[200px] overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                 {clientSearchResults.map((client) => (
                   <button
                     key={client.id}
@@ -877,7 +877,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           {/* Assigned DSP Field */}
           <div className="flex flex-col gap-1 relative">
             <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
-            <div className={`bg-white border rounded-[12px] h-[44px] px-4 flex items-center ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}>
+            <div className={`bg-white border rounded-xl h-11 px-4 flex items-center ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}>
               <input
                 type="text"
                 value={formData.assignedDsp}
@@ -899,7 +899,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             )}
             {/* DSP Dropdown */}
             {showDspDropdown && dspSearchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-[12px] shadow-lg z-20 max-h-[200px] overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                 {dspSearchResults.map((employee) => (
                   <button
                     key={employee.uid || employee.id}
@@ -926,7 +926,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           {/* Service Code */}
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Service Code</label>
-            <div className="bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 flex items-center">
+            <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
               <input
                 type="text"
                 value={formData.serviceCode}
@@ -943,7 +943,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               onClick={() => {
                 setShowNotesTypeDropdown(!showNotesTypeDropdown);
               }}
-              className="bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 flex items-center gap-3 cursor-pointer"
+              className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer"
             >
               <span className="flex-1 text-left text-[14px] font-normal text-black">
                 {formData.notesType
@@ -955,7 +955,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             </button>
             
             {showNotesTypeDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-[12px] shadow-lg z-10">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-10">
                 {noteTypes.map((notesType) => (
                   <button
                     key={notesType.id}
@@ -1023,7 +1023,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                     setShowStartDatePicker(!showStartDatePicker);
                     setShowEndDatePicker(false);
                   }}
-                  className={`bg-white border rounded-[12px] h-[44px] px-4 flex items-center gap-3 cursor-pointer ${
+                  className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${
                     errors.startDate ? "border-[#D53411]" : showStartDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
                   }`}
                 >
@@ -1038,7 +1038,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
                 {/* Start Date Picker Dropdown */}
                 {showStartDatePicker && (
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-[12px] border border-[#cccccd] z-10 overflow-hidden w-[320px]">
+                  <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
                     {/* Month Navigation */}
                     <div className="flex items-center justify-center gap-2.5 px-5 py-2">
                       <button
@@ -1110,7 +1110,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                     setShowEndDatePicker(!showEndDatePicker);
                     setShowStartDatePicker(false);
                   }}
-                  className={`bg-white border rounded-[12px] h-[44px] px-4 flex items-center gap-3 cursor-pointer ${
+                  className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${
                     errors.endDate ? "border-[#D53411]" : showEndDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
                   }`}
                 >
@@ -1125,7 +1125,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
                 {/* End Date Picker Dropdown */}
                 {showEndDatePicker && (
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-[12px] border border-[#cccccd] z-10 overflow-hidden w-[320px]">
+                  <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
                     {/* Month Navigation */}
                     <div className="flex items-center justify-center gap-2.5 px-5 py-2">
                       <button
@@ -1195,7 +1195,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               <label className="text-[12px] font-normal text-[#10141a]">Select Date</label>
               <button
                 onClick={() => setShowDatePicker(!showDatePicker)}
-                className={`bg-white border rounded-[12px] h-[44px] px-4 flex items-center gap-3 cursor-pointer ${
+                className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${
                   errors.date ? "border-[#D53411]" : showDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
                 }`}
               >
@@ -1210,7 +1210,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
               {/* Date Picker Dropdown */}
               {showDatePicker && (
-                <div className="absolute top-full right-0 mt-1 bg-white rounded-[12px] border border-[#cccccd] z-10 overflow-hidden w-[320px]">
+                <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
                   {/* Month Navigation */}
                   <div className="flex items-center justify-center gap-2.5 px-5 py-2">
                     <button
@@ -1323,7 +1323,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   setFormData(prev => ({ ...prev, clockInTime: e.target.value }));
                   clearError("clockInTime");
                 }}
-                className="mt-2 bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 text-[14px] font-normal text-[#10141a] outline-none"
+                className="mt-2 bg-white border border-[#cccccd] rounded-xl h-11 px-4 text-[14px] font-normal text-[#10141a] outline-none"
               />
             )}
           </div>
@@ -1376,7 +1376,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   setFormData(prev => ({ ...prev, clockOutTime: e.target.value }));
                   clearError("clockOutTime");
                 }}
-                className="mt-2 bg-white border border-[#cccccd] rounded-[12px] h-[44px] px-4 text-[14px] font-normal text-[#10141a] outline-none"
+                className="mt-2 bg-white border border-[#cccccd] rounded-xl h-11 px-4 text-[14px] font-normal text-[#10141a] outline-none"
               />
             )}
           </div>
@@ -1384,7 +1384,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           {/* ISP Outcome */}
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">ISP Outcome</label>
-            <div className="bg-white border border-[#b2b2b3] rounded-[12px] h-[44px] px-4 flex items-center">
+            <div className="bg-white border border-[#b2b2b3] rounded-xl h-11 px-4 flex items-center">
               <input
                 type="text"
                 value={formData.ispOutcome}
@@ -1398,7 +1398,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           {/* Plan of Care */}
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Plan of care</label>
-            <label className="bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 flex items-center justify-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
+            <label className="bg-white border border-[#cccccd] rounded-xl px-4 py-3 flex items-center justify-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
               <Upload className="w-5 h-5 text-[#b2b2b3]" />
               <span className="text-[14px] font-normal text-[#b2b2b3]">
                 Upload plan of care
@@ -1412,7 +1412,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             </label>
             {/* Selected File Chip */}
             {formData.planOfCare && (
-              <div className="flex items-center gap-2 bg-[rgba(0,216,65,0.08)] rounded-[8px] h-[36px] px-2 mt-1">
+              <div className="flex items-center gap-2 bg-[rgba(0,216,65,0.08)] rounded-lg h-[36px] px-2 mt-1">
                 <FileText className="w-5 h-5 text-[#00d841]" />
                 <span className="text-[14px] font-medium text-[#10141a]">
                   {formData.planOfCare.name || "Plan of care PDF"}
@@ -1424,7 +1424,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         </div>
 
         {/* Action Buttons - Fixed (used for both create and edit) */}
-        <div className="flex gap-3 p-5 pt-0 flex-shrink-0">
+        <div className="flex gap-3 p-5 pt-0 shrink-0">
           <Button
             onClick={handleSaveDraft}
             disabled={isSubmitting}

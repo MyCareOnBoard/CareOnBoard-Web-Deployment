@@ -267,7 +267,7 @@ export default function ShiftsPage() {
               <div
                 key={`shift-${index}-${shift.day}`}
                 className={`flex flex-col items-center h-full justify-end relative ${
-                  needsScroll ? "min-w-[80px] flex-shrink-0" : "flex-1 min-w-[60px]"
+                  needsScroll ? "min-w-20 shrink-0" : "flex-1 min-w-[60px]"
                 }`}
                 onMouseEnter={(e) => {
                   setHoveredShift(index);
@@ -285,7 +285,7 @@ export default function ShiftsPage() {
                     <>
                       {/* Scheduled Bar */}
                       {shift.scheduled > 0 && <div
-                        className="flex-1 text-center text-white text-sm rounded-t-[6px] rounded-b-[6px] bg-[#2B82FF] transition-all duration-300"
+                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#2B82FF] transition-all duration-300"
                         style={{
                           height: shift.scheduled > 0 ? `${(shift.scheduled / maxShiftValue) * 100}%` : "30px",
                           minHeight: "30px",
@@ -294,7 +294,7 @@ export default function ShiftsPage() {
                       </div>}
                       {/* Completed Bar */}
                       {shift.completed > 0 && <div
-                        className="flex-1 text-center text-white text-sm rounded-t-[6px] rounded-b-[6px] bg-[#2B82FF]/40 transition-all duration-300"
+                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#2B82FF]/40 transition-all duration-300"
                         style={{
                           height: shift.completed > 0 ? `${(shift.completed / maxShiftValue) * 100}%` : "30px",
                           minHeight: "30px",
@@ -303,7 +303,7 @@ export default function ShiftsPage() {
                       </div>}
                     </>
                   ) : (
-                    <div className="flex-1 h-[30px] rounded-t-[6px] bg-[#e5e5e6]/30"></div>
+                    <div className="flex-1 h-[30px] rounded-t-md bg-[#e5e5e6]/30"></div>
                   )}
                 </div>
                 {/* Day Label */}

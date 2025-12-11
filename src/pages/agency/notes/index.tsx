@@ -202,7 +202,7 @@ export default function AgencyNotesPage() {
           <div className="flex items-center gap-2 flex-1 min-w-0 mr-4">
             <button
               onClick={() => handleFilterScroll("left")}
-              className="cursor-pointer flex-shrink-0 p-1 rounded-full hover:bg-white/50 transition-colors"
+              className="cursor-pointer shrink-0 p-1 rounded-full hover:bg-white/50 transition-colors"
             >
               <ChevronLeft size={20} className="text-[#10141a]"/>
             </button>
@@ -294,7 +294,7 @@ export default function AgencyNotesPage() {
             </div>
             <button
               onClick={() => handleFilterScroll("right")}
-              className="cursor-pointer flex-shrink-0 p-1 rounded-full hover:bg-white/50 transition-colors"
+              className="cursor-pointer shrink-0 p-1 rounded-full hover:bg-white/50 transition-colors"
             >
               <ChevronRight size={20} className="text-[#10141a]"/>
             </button>

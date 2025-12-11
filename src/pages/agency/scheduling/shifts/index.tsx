@@ -345,7 +345,7 @@ export default function ShiftsListPage() {
               <div className="relative">
                 <button
                   onClick={() => setShowDatePicker(!showDatePicker)}
-                  className="flex items-center gap-3 bg-white border border-[rgba(255,255,255,0.3)] rounded-[12px] px-4 py-2 h-[36px] cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-3 bg-white border border-[rgba(255,255,255,0.3)] rounded-xl px-4 py-2 h-[36px] cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <span className="text-[14px] font-normal text-[#10141a] whitespace-nowrap">
                     {selectedDate ? format(selectedDate, "MMM d, yyyy") : "Select date"}
@@ -355,7 +355,7 @@ export default function ShiftsListPage() {
 
                 {/* Date Picker Dropdown */}
                 {showDatePicker && (
-                  <div className="absolute top-full right-0 mt-2 bg-white rounded-[12px] shadow-lg border border-[#e5e5e6] p-4 z-50 w-[280px]">
+                  <div className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-lg border border-[#e5e5e6] p-4 z-50 w-[280px]">
                     {/* Month Navigation */}
                     <div className="flex items-center justify-between mb-3">
                       <button
@@ -472,7 +472,7 @@ export default function ShiftsListPage() {
                   >
                     {/* Client Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
                         {clientAvatar && (
                           <AvatarImage
                             src={clientAvatar}
@@ -480,7 +480,7 @@ export default function ShiftsListPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(clientName)}
                         </AvatarFallback>
                       </Avatar>
@@ -496,7 +496,7 @@ export default function ShiftsListPage() {
 
                     {/* DSP/Employee Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
                         {employeeAvatar && (
                           <AvatarImage
                             src={employeeAvatar}
@@ -504,7 +504,7 @@ export default function ShiftsListPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(employeeName)}
                         </AvatarFallback>
                       </Avatar>

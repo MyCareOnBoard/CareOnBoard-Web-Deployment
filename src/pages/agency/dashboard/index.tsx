@@ -27,19 +27,19 @@ export default function AgencyDashboardPage() {
   ];
 
   const [hoveredShift, setHoveredShift] = useState<number | null>(null);
-  const {data: expiredDocsData, isLoading: isLoadingAlerts} = useGetExpiredDocumentsQuery(user?.agencyId, {
+  const {data: expiredDocsData, isLoading: isLoadingAlerts} = useGetExpiredDocumentsQuery(user?.agencyId || '', {
     skip: !user?.agencyId,
     refetchOnMountOrArgChange: true
   });
   const expiredDocuments = expiredDocsData?.data || [];
 
-  const {data: clientStatsData} = useGetClientStatsQuery(user?.agencyId, {
+  const {data: clientStatsData} = useGetClientStatsQuery(user?.agencyId || '', {
     skip: !user?.agencyId,
     refetchOnMountOrArgChange: true
   });
   const clients = clientStatsData?.stats || {active: 0, inactive: 0, total: 0};
 
-  const {data: dspStatsData} = useGetDSPStatsQuery(user?.agencyId, {
+  const {data: dspStatsData} = useGetDSPStatsQuery(user?.agencyId || '', {
     skip: !user?.agencyId,
     refetchOnMountOrArgChange: true
   });
@@ -248,7 +248,7 @@ export default function AgencyDashboardPage() {
                     <div className="relative w-full flex gap-1 items-end justify-center h-full">
                       {/* Scheduled Bar */}
                       {shift.scheduled > 0 && <div
-                        className="flex-1 text-center text-white text-sm rounded-t-[6px] rounded-b-[6px] bg-[#2B82FF] transition-all duration-300"
+                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#2B82FF] transition-all duration-300"
                         style={{
                           height: `${(shift.scheduled / maxShiftValue) * 100}%`,
                           minHeight: shift.scheduled ? "30px" : "0px",
@@ -257,7 +257,7 @@ export default function AgencyDashboardPage() {
                       </div>}
                       {/* Completed Bar */}
                        {shift.completed > 0 && <div
-                        className="flex-1 text-center text-white text-sm rounded-t-[6px] rounded-b-[6px] bg-[#2B82FF]/40 transition-all duration-300"
+                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#2B82FF]/40 transition-all duration-300"
                         style={{
                           height: `${(shift.completed / maxShiftValue) * 100}%`,
                           minHeight: shift.completed ? "30px" : "0px",
@@ -322,7 +322,7 @@ export default function AgencyDashboardPage() {
                         <div
                           className="text-[14px] font-medium text-[#d53411]">{alert.status}</div>
                       </div>
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         <button
                           className="cursor-pointer px-4 py-2 text-[13px] rounded-full bg-[#B2B2B31A] border border-[#B2B2B3] font-semibold text-[#565656] transition-colors">
                           Send Alert
