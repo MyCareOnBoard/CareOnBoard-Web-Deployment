@@ -91,7 +91,7 @@ export default function SchedulingPage() {
         setLoading(true);
         const response = await listShifts({ 
           limit: 100,
-          agencyId: user?.profile?.id,
+          agencyId: user?.agencyId,
           client: true,
           employee: true,
         });
@@ -108,11 +108,11 @@ export default function SchedulingPage() {
       }
     };
 
-    if (user?.profile?.id) {
+    if (user?.agencyId) {
       fetchShifts();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.profile?.id]);
+  }, [user?.agencyId]);
 
   // Calculate shift statistics
   const shiftStats = useMemo(() => {

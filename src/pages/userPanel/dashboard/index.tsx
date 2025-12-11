@@ -33,7 +33,7 @@ export default function UserPanelDashboardPage() {
   const {data: employeeDocuments = []} = useGetEmployeeDocumentsQuery();
   const {data: trainings = []} = useGetEmployeeTrainingsQuery();
   const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
-  const employeeInfo = user?.profile;
+  const employeeInfo = user;
 
   const navigate = useNavigate();
 

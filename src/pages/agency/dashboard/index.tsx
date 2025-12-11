@@ -27,27 +27,27 @@ export default function AgencyDashboardPage() {
   ];
 
   const [hoveredShift, setHoveredShift] = useState<number | null>(null);
-  const {data: expiredDocsData, isLoading: isLoadingAlerts} = useGetExpiredDocumentsQuery(user?.profile?.id, {
-    skip: !user?.profile?.id,
+  const {data: expiredDocsData, isLoading: isLoadingAlerts} = useGetExpiredDocumentsQuery(user?.agencyId, {
+    skip: !user?.agencyId,
     refetchOnMountOrArgChange: true
   });
   const expiredDocuments = expiredDocsData?.data || [];
 
-  const {data: clientStatsData} = useGetClientStatsQuery(user?.profile?.id, {
-    skip: !user?.profile?.id,
+  const {data: clientStatsData} = useGetClientStatsQuery(user?.agencyId, {
+    skip: !user?.agencyId,
     refetchOnMountOrArgChange: true
   });
   const clients = clientStatsData?.stats || {active: 0, inactive: 0, total: 0};
 
-  const {data: dspStatsData} = useGetDSPStatsQuery(user?.profile?.id, {
-    skip: !user?.profile?.id,
+  const {data: dspStatsData} = useGetDSPStatsQuery(user?.agencyId, {
+    skip: !user?.agencyId,
     refetchOnMountOrArgChange: true
   });
   const dspStats = dspStatsData?.stats || {active: 0, inactive: 0, total: 0};
 
   const {data: shiftStatsData} = useGetShiftStatsQuery(
-    {agencyId: user?.profile?.id || '', range: 'lastWeek'},
-    {skip: !user?.profile?.id, refetchOnMountOrArgChange: true}
+    {agencyId: user?.agencyId || '', range: 'lastWeek'},
+    {skip: !user?.agencyId, refetchOnMountOrArgChange: true}
   )
   const shifts = shiftStatsData?.buckets || [];
 
@@ -77,7 +77,7 @@ export default function AgencyDashboardPage() {
 
   const copyToClipboard = async () => {
     const domain = window.location.origin;
-    const url = `${domain}/${user?.profile?.id}`;
+    const url = `${domain}/${user?.agencyId}`;
     await navigator.clipboard.writeText(url);
     toast.success("Copied to clipboard!");
   }

@@ -42,7 +42,7 @@ export default function BillingAndApprovalsPage() {
 
   const {data: billingData, isLoading, isFetching, refetch} = useGetBillingRecordsQuery(
     {
-      agencyId: user?.profile?.id || '',
+      agencyId: user?.agencyId || '', 
       billingStatus: selectedBillingStatus,
       date: selectedDate,
       serviceType: selectedServiceType,
@@ -51,7 +51,7 @@ export default function BillingAndApprovalsPage() {
       groupBy: activeTab === "client" ? "client" : "dsp",
     },
     {
-      skip: !user?.profile?.id,
+      skip: !user?.agencyId,
       refetchOnMountOrArgChange: true,
     }
   );

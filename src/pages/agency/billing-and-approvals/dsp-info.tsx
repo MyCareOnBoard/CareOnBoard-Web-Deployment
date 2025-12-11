@@ -15,10 +15,10 @@ export default function DSPClaimsPage() {
   const {data, isLoading, error} = useGetDspClaimsQuery(
     {
       dspId: dsp || "",
-      agencyId: user?.profile?.id || "",
+      agencyId: user?.agencyId || "",
     },
     {
-      skip: !dsp || !user?.profile?.id,
+      skip: !dsp || !user?.agencyId,
     }
   );
 

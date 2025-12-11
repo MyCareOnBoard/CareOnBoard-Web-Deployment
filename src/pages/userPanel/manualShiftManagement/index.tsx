@@ -133,11 +133,8 @@ export default function ManualShiftManagementPage() {
     clientId: "",
     location: "",
   });
-  const employeeName =
-    user?.profile?.fullName ||
-    [user?.profile?.firstName, user?.profile?.lastName].filter(Boolean).join(" ").trim() ||
-    "";
-  const agencyName = user?.agency?.name || "";
+  const employeeName = user?.fullName || "";
+  const agencyName = user?.profile?.name || "";
 
   // Client search states
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
@@ -211,13 +208,13 @@ export default function ManualShiftManagementPage() {
   // Load saved draft shifts
   useEffect(() => {
     const loadDraftShifts = async () => {
-      if (!user?.profile?.agencyId) return;
+      if (!user?.agencyId) return;
 
       try {
         setLoading(true);
         // Fetch manual draft shifts
         const response = await listShifts({
-          agencyId: user?.profile?.agencyId,
+          agencyId: user?.agencyId,
           type: ShiftType.MANUAL,
           submissionStatus: SubmissionStatus.DRAFT,
           limit: 100,
@@ -287,7 +284,7 @@ export default function ManualShiftManagementPage() {
     };
 
     loadDraftShifts();
-  }, [user?.profile?.agencyId, user?.profile?.id]); // Only run when user changes
+  }, [user?.agencyId, user?.id]); // Only run when user changes
 
   // Load existing signatures if available
   useEffect(() => {
@@ -332,7 +329,7 @@ export default function ManualShiftManagementPage() {
     }
 
     // If query is too short or no agency, hide dropdown
-    if (query.trim().length < 2 || !user?.profile?.agencyId) {
+    if (query.trim().length < 2 || !user?.agencyId) {
       setShowClientDropdown(false);
       setClientSearchResults([]);
       return;
@@ -342,12 +339,12 @@ export default function ManualShiftManagementPage() {
     clientSearchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearchingClients(true);
-        if (!user?.profile?.agencyId) {
+        if (!user?.agencyId) {
           setClientSearchResults([]);
           setShowClientDropdown(false);
           return;
         }
-        const clients = await searchClients(query, user?.profile?.agencyId);
+        const clients = await searchClients(query, user?.agencyId);
         setClientSearchResults(clients);
         setShowClientDropdown(clients.length > 0);
       } catch (error) {
@@ -358,7 +355,7 @@ export default function ManualShiftManagementPage() {
         setIsSearchingClients(false);
       }
     }, 300); // 300ms debounce
-  }, [user?.profile?.agencyId]);
+  }, [user?.agencyId]);
 
   // Handle client selection
   const handleClientSelect = (client: Client) => {
@@ -595,8 +592,8 @@ export default function ManualShiftManagementPage() {
 
       // Step 1: Fetch existing draft shifts
       const existingDraftsResponse = await listShifts({
-        agencyId: user?.profile?.agencyId,
-        employeeId: user?.profile?.id,
+        agencyId: user?.agencyId,
+        employeeId: user?.id,
         type: ShiftType.MANUAL,
         submissionStatus: SubmissionStatus.DRAFT,
         limit: 100,
@@ -604,13 +601,23 @@ export default function ManualShiftManagementPage() {
 
       const existingDrafts = existingDraftsResponse.shifts
 
+      // Validate required user fields
+      if (!user?.id || !user?.agencyId) {
+        toast({
+          title: "Error",
+          description: "User information is incomplete. Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Step 2: Build shift requests as drafts (no signatures required)
       const shiftRequests = buildManualShiftRequests(
         formData,
         week1Data,
         week2Data,
-        user?.profile?.id,
-        user?.profile?.agencyId,
+        user.id,
+        user.agencyId,
         formData.clientId,
         clientSignature,
         userSignature
@@ -804,13 +811,25 @@ export default function ManualShiftManagementPage() {
         return;
       }
 
+      // Validate required user fields
+      if (!user?.id || !user?.agencyId) {
+        setConfirmModalOpen(false);
+        toast({
+          title: "Error",
+          description: "User information is incomplete. Please log in again.",
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
+
       // Step 2: Build shift requests from form data
       const shiftRequests = buildManualShiftRequests(
         formData,
         week1Data,
         week2Data,
-        user?.profile?.id,
-        user?.profile?.agencyId,
+        user.id,
+        user.agencyId,
         formData.clientId,
         clientSignature,
         userSignature

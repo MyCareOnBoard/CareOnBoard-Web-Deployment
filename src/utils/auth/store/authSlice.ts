@@ -16,7 +16,7 @@ import {
 import { auth } from '@/lib/firebase'
 import type { AuthState, LoginCredentials, SignupCredentials } from '../types'
 import { transformFirebaseUser } from '@/utils/auth'
-import type { UserProfile } from '../types/user.types'
+import type { User } from '../types/user.types'
 
 // Initial state
 const initialState: AuthState = {
@@ -109,7 +109,7 @@ export const resetPassword = createAsyncThunk(
 export const checkAuthState = createAsyncThunk(
   'auth/checkState',
   async (_, { rejectWithValue }) => {
-    return new Promise<UserProfile | null>((resolve) => {
+    return new Promise<User | null>((resolve) => {
       const unsubscribe = auth.onAuthStateChanged(
         (firebaseUser: FirebaseUser | null) => {
           unsubscribe()
@@ -137,7 +137,7 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null
     },
-    setUser: (state, action: PayloadAction<UserProfile | null>) => {
+    setUser: (state, action: PayloadAction<User | null>) => {
       state.user = action.payload
       state.isAuthenticated = !!action.payload
     }

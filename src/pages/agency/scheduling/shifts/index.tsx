@@ -66,7 +66,7 @@ export default function ShiftsListPage() {
         const response = await listShifts({
           limit: 100,
           // For agency users the backend can infer agencyId, but we pass profile.data.id when available
-          agencyId: user?.profile?.id,
+          agencyId: user?.agencyId,
           client: true,
           employee: true,
         });
@@ -88,14 +88,14 @@ export default function ShiftsListPage() {
     };
 
     // Always attempt to fetch when profile is present; loading will be cleared in finally
-    if (user?.profile?.id) {
+    if (user?.agencyId) {
       fetchShifts();
     } else {
       // If there is no profile yet, don't get stuck in loading
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.profile?.id]);
+  }, [user?.agencyId]);
 
   // Calendar days calculation
   const calendarDays = useMemo(() => {

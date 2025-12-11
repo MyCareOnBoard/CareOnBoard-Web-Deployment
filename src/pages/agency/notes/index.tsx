@@ -47,7 +47,7 @@ export default function AgencyNotesPage() {
   }, [searchQuery]);
 
   const {data, isLoading, isFetching, isError, refetch} = useGetAllSubmittedNotesQuery({
-    agencyId: user?.profile?.id || "",
+    agencyId: user?.agencyId || "",
     page: currentPage,
     limit: itemsPerPage,
     activityType: activeFilter,
@@ -55,7 +55,7 @@ export default function AgencyNotesPage() {
     timeInterval: timeInterval,
     status: statusTab
   }, {
-    skip: !user?.profile?.id
+    skip: !user?.agencyId
   });
 
   const [approveNotes, {isLoading: isApproving}] = useApproveSubmittedNotesMutation();

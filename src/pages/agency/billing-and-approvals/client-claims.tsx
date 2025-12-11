@@ -15,10 +15,10 @@ export default function ClientClaimsPage() {
   const {data, isLoading, error} = useGetClientClaimsQuery(
     {
       clientId: clientId || "",
-      agencyId: user?.profile?.id || "",
+      agencyId: user?.agencyId || "",
     },
     {
-      skip: !clientId || !user?.profile?.id,
+      skip: !clientId || !user?.agencyId,
     }
   );
 
