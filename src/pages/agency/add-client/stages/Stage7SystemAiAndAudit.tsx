@@ -1,18 +1,14 @@
 import React, { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 
 type AuditCycle = "monthly" | "quarterly";
 
 export function Stage7SystemAiAndAudit({
-  onCancel,
-  onNext,
+  footer,
 }: {
-  onCancel: () => void;
-  onNext: () => void;
+  footer: React.ReactNode;
 }) {
-  const [declared, setDeclared] = useState(false);
 
   // 11. System & AI Settings
   const [aiNotesReview, setAiNotesReview] = useState(true);
@@ -172,14 +168,7 @@ export function Stage7SystemAiAndAudit({
         </div>
       </div>
 
-      <StageFooter
-        declared={declared}
-        setDeclared={setDeclared}
-        onCancel={onCancel}
-        onNext={onNext}
-        requireDeclaration={true}
-        nextLabel="Next"
-      />
+      {footer}
     </div>
   );
 }

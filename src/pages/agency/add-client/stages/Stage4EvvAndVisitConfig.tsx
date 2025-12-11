@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 
 function YesNoRadio({
   label,
@@ -34,13 +33,10 @@ function YesNoRadio({
 }
 
 export function Stage4EvvAndVisitConfig({
-  onCancel,
-  onNext,
+  footer,
 }: {
-  onCancel: () => void;
-  onNext: () => void;
+  footer: React.ReactNode;
 }) {
-  const [declared, setDeclared] = useState(false);
 
   const [evvRequirement, setEvvRequirement] = useState<"yes" | "no" | "">("");
   const [primaryVisitLocationGps, setPrimaryVisitLocationGps] = useState<"yes" | "no" | "">("");
@@ -136,13 +132,7 @@ export function Stage4EvvAndVisitConfig({
         </div>
       </div>
 
-      <StageFooter
-        declared={declared}
-        setDeclared={setDeclared}
-        onCancel={onCancel}
-        onNext={onNext}
-        requireDeclaration={true}
-      />
+      {footer}
     </div>
   );
 }

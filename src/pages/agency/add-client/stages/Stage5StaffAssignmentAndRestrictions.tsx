@@ -8,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 
@@ -45,14 +44,11 @@ function YesNoRadio({
 type AutoCheckKey = "compliance" | "training" | "background" | "expired";
 
 export function Stage5StaffAssignmentAndRestrictions({
-  onCancel,
-  onNext,
+  footer,
 }: {
-  onCancel: () => void;
-  onNext: () => void;
+  footer: React.ReactNode;
 }) {
   const { user } = useAuth();
-  const [declared, setDeclared] = useState(false);
 
   const [primaryDspAssigned, setPrimaryDspAssigned] = useState("");
   const [primaryDspId, setPrimaryDspId] = useState("");
@@ -394,13 +390,7 @@ export function Stage5StaffAssignmentAndRestrictions({
         </div>
       </div>
 
-      <StageFooter
-        declared={declared}
-        setDeclared={setDeclared}
-        onCancel={onCancel}
-        onNext={onNext}
-        requireDeclaration={true}
-      />
+      {footer}
     </div>
   );
 }

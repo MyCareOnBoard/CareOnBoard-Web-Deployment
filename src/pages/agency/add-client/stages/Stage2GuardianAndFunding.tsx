@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 
 type ServiceAuthorization = {
   id: string;
@@ -277,13 +276,10 @@ function ServiceAuthorizationFields({
 }
 
 export function Stage2GuardianAndFunding({
-  onCancel,
-  onNext,
+  footer,
 }: {
-  onCancel: () => void;
-  onNext: () => void;
+  footer: React.ReactNode;
 }) {
-  const [declared, setDeclared] = useState(false);
 
   // Address autocomplete (same pattern as manual shift "location" field)
   const [guardianAddress, setGuardianAddress] = useState("");
@@ -579,13 +575,7 @@ export function Stage2GuardianAndFunding({
         </div>
       </div>
 
-      <StageFooter
-        declared={declared}
-        setDeclared={setDeclared}
-        onCancel={onCancel}
-        onNext={onNext}
-        requireDeclaration={true}
-      />
+      {footer}
     </div>
   );
 }

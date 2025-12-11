@@ -1,26 +1,26 @@
 import React from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export function StageFooter({
   declared,
   setDeclared,
-  onCancel,
-  onNext,
+  isFirst,
+  isLast,
+  onPrev,
+  onPrimary,
   requireDeclaration = true,
-  cancelLabel = "Cancel",
-  nextLabel = "Next",
 }: {
   declared: boolean;
   setDeclared: (next: boolean) => void;
-  onCancel: () => void;
-  onNext: () => void;
+  isFirst: boolean;
+  isLast: boolean;
+  onPrev: () => void;
+  onPrimary: () => void;
   requireDeclaration?: boolean;
-  cancelLabel?: string;
-  nextLabel?: string;
 }) {
-  const nextDisabled = requireDeclaration ? !declared : false;
+  const primaryDisabled = requireDeclaration ? !declared : false;
 
   return (
     <div className="mt-6 flex flex-col gap-4">
@@ -35,22 +35,30 @@ export function StageFooter({
       )}
 
       <div className="flex items-center gap-4">
+        {!isFirst && (
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold"
+            onClick={onPrev}
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Previous
+          </Button>
+        )}
+
         <Button
           type="button"
-          variant="secondary"
           className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold"
-          onClick={onCancel}
+          onClick={onPrimary}
+          disabled={primaryDisabled}
         >
-          {cancelLabel}
-        </Button>
-        <Button
-          type="button"
-          className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold"
-          onClick={onNext}
-          disabled={nextDisabled}
-        >
-          {nextLabel}
-          <ArrowRight className="w-5 h-5 text-white" />
+          {isLast ? "Save Client" : "Next"}
+          {isLast ? (
+            <Save className="w-5 h-5 text-white" />
+          ) : (
+            <ArrowRight className="w-5 h-5 text-white" />
+          )}
         </Button>
       </div>
     </div>

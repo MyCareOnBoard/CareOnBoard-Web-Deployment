@@ -7,16 +7,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 
 export function Stage6GoalsAndEmergency({
-  onCancel,
-  onNext,
+  footer,
 }: {
-  onCancel: () => void;
-  onNext: () => void;
+  footer: React.ReactNode;
 }) {
-  const [declared, setDeclared] = useState(false);
 
   // 9. Goals & Outcomes Setup
   const [clientGoals, setClientGoals] = useState("");
@@ -288,13 +284,7 @@ export function Stage6GoalsAndEmergency({
         </div>
       </div>
 
-      <StageFooter
-        declared={declared}
-        setDeclared={setDeclared}
-        onCancel={onCancel}
-        onNext={onNext}
-        requireDeclaration={true}
-      />
+      {footer}
     </div>
   );
 }

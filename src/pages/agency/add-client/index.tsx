@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { Stage1ClientIdentityAndContact } from "@/pages/agency/add-client/stages/Stage1ClientIdentityAndContact";
@@ -8,72 +8,69 @@ import { Stage4EvvAndVisitConfig } from "@/pages/agency/add-client/stages/Stage4
 import { Stage5StaffAssignmentAndRestrictions } from "@/pages/agency/add-client/stages/Stage5StaffAssignmentAndRestrictions";
 import { Stage6GoalsAndEmergency } from "@/pages/agency/add-client/stages/Stage6GoalsAndEmergency";
 import { Stage7SystemAiAndAudit } from "@/pages/agency/add-client/stages/Stage7SystemAiAndAudit";
+import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 
 export default function AddClientPage() {
   const navigate = useNavigate();
+  const totalStages = 7;
   const [stage, setStage] = useState<number>(1);
+  const [declared, setDeclared] = useState(false);
+
+  useEffect(() => {
+    // Require re-confirmation per stage, like the Figma flow.
+    setDeclared(false);
+  }, [stage]);
+
+  const isFirst = stage === 1;
+  const isLast = stage === totalStages;
+
+  const footer = useMemo(
+    () => (
+      <StageFooter
+        declared={declared}
+        setDeclared={setDeclared}
+        isFirst={isFirst}
+        isLast={isLast}
+        onPrev={() => setStage((s) => Math.max(1, s - 1))}
+        onPrimary={() => {
+          if (isLast) {
+            navigate(Routes.agency.clients);
+            return;
+          }
+          setStage((s) => Math.min(totalStages, s + 1));
+        }}
+        requireDeclaration={true}
+      />
+    ),
+    [declared, isFirst, isLast, navigate]
+  );
 
   if (stage === 1) {
-    return (
-      <Stage1ClientIdentityAndContact
-        onCancel={() => navigate(Routes.agency.clients)}
-        onNext={() => setStage(2)}
-      />
-    );
+    return <Stage1ClientIdentityAndContact footer={footer} />;
   }
 
   if (stage === 2) {
-    return (
-      <Stage2GuardianAndFunding
-        onCancel={() => navigate(Routes.agency.clients)}
-        onNext={() => setStage(3)}
-      />
-    );
+    return <Stage2GuardianAndFunding footer={footer} />;
   }
 
   if (stage === 3) {
-    return (
-      <Stage3HealthcareAndDocuments
-        onCancel={() => navigate(Routes.agency.clients)}
-        onNext={() => setStage(4)}
-      />
-    );
+    return <Stage3HealthcareAndDocuments footer={footer} />;
   }
 
   if (stage === 4) {
-    return (
-      <Stage4EvvAndVisitConfig
-        onCancel={() => navigate(Routes.agency.clients)}
-        onNext={() => setStage(5)}
-      />
-    );
+    return <Stage4EvvAndVisitConfig footer={footer} />;
   }
 
   if (stage === 5) {
-    return (
-      <Stage5StaffAssignmentAndRestrictions
-        onCancel={() => navigate(Routes.agency.clients)}
-        onNext={() => setStage(6)}
-      />
-    );
+    return <Stage5StaffAssignmentAndRestrictions footer={footer} />;
   }
 
   if (stage === 6) {
-    return (
-      <Stage6GoalsAndEmergency
-        onCancel={() => navigate(Routes.agency.clients)}
-        onNext={() => setStage(7)}
-      />
-    );
+    return <Stage6GoalsAndEmergency footer={footer} />;
   }
 
   if (stage === 7) {
-    return (
-      <Stage7SystemAiAndAudit
-        onCancel={() => navigate(Routes.agency.clients)}
-        onNext={() => navigate(Routes.agency.clients)}
-      />
-    );
+    return <Stage7SystemAiAndAudit footer={footer} />;
   }
 
   if (

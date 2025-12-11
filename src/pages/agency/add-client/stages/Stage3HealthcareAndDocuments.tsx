@@ -6,7 +6,6 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
-import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 
 type DocKey =
   | "isp"
@@ -73,14 +72,7 @@ function DatePickerInput({
   );
 }
 
-export function Stage3HealthcareAndDocuments({
-  onCancel,
-  onNext,
-}: {
-  onCancel: () => void;
-  onNext: () => void;
-}) {
-  const [declared, setDeclared] = useState(false);
+export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNode }) {
 
   // Section 5 fields
   const [medicalConditions, setMedicalConditions] = useState("");
@@ -321,13 +313,7 @@ export function Stage3HealthcareAndDocuments({
         </div>
       </div>
 
-      <StageFooter
-        declared={declared}
-        setDeclared={setDeclared}
-        onCancel={onCancel}
-        onNext={onNext}
-        requireDeclaration={true}
-      />
+      {footer}
     </div>
   );
 }

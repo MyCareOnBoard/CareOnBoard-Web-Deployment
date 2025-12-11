@@ -12,16 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 
-export function Stage1ClientIdentityAndContact({
-  onCancel,
-  onNext,
-}: {
-  onCancel: () => void;
-  onNext: () => void;
-}) {
-  const [declared, setDeclared] = useState(false);
+export function Stage1ClientIdentityAndContact({ footer }: { footer: React.ReactNode }) {
   const [dob, setDob] = useState<Date | undefined>();
   const [isDobOpen, setIsDobOpen] = useState(false);
 
@@ -367,13 +359,7 @@ export function Stage1ClientIdentityAndContact({
         </div>
       </div>
 
-      <StageFooter
-        declared={declared}
-        setDeclared={setDeclared}
-        onCancel={onCancel}
-        onNext={onNext}
-        requireDeclaration={true}
-      />
+      {footer}
     </div>
   );
 }
