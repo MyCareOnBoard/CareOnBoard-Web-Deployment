@@ -39,7 +39,7 @@ export interface Client {
   service: string;
   serviceCode?: string;
   billingRate?: string;
-  services?: ClientServiceAuthorization[];
+  services?: ClientService[];
 
   // Plan of care
   planOfCare?: {
@@ -73,9 +73,10 @@ export interface Client {
  * These mirror the fields collected in the Add Client flow.
  * NOTE: Backend support may be incremental; keep fields optional on requests.
  */
-export interface ClientServiceAuthorization {
+export interface ClientService {
   id: string;
-  authorizedService?: string;
+  authorizedService: string;
+  serviceCode: string;
   authorizedHoursPerWeek?: string;
   ratePerHour?: string;
   ispEffectiveDate?: string;
@@ -252,7 +253,7 @@ export interface CreateClientRequest {
   email?: string;
   phone?: string;
   dateOfBirth?: string;
-  location: string;
+  location?: { lat: string; lon: string };
   address?: string;
   city?: string;
   state?: string;
@@ -267,7 +268,7 @@ export interface CreateClientRequest {
   service: string;
   serviceCode?: string;
   billingRate?: string;
-  services?: ClientServiceAuthorization[];
+  services?: ClientService[];
   guardianInfo?: ClientGuardianInfo;
   healthcareSafety?: ClientHealthcareSafety;
   documents?: ClientDocument[];
@@ -304,7 +305,7 @@ export interface UpdateClientRequest {
   service?: string;
   serviceCode?: string;
   billingRate?: string;
-  services?: ClientServiceAuthorization[];
+  services?: ClientService[];
   guardianInfo?: ClientGuardianInfo | null;
   healthcareSafety?: ClientHealthcareSafety | null;
   documents?: ClientDocument[] | null;

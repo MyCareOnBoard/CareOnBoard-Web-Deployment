@@ -13,14 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AddClientFormData, ServiceAuthorization } from "@/pages/agency/add-client/formData";
+import { AddClientFormData, Service } from "@/pages/agency/add-client/formData";
 
 function ServiceAuthorizationFields({
   service,
   onChange,
 }: {
-  service: ServiceAuthorization;
-  onChange: (next: ServiceAuthorization) => void;
+  service: Service;
+  onChange: (next: Service) => void;
 }) {
   const [isIspOpen, setIsIspOpen] = useState(false);
   const [isStartOpen, setIsStartOpen] = useState(false);
@@ -35,8 +35,8 @@ function ServiceAuthorizationFields({
           Authorized Service
         </label>
         <Select
-          value={service.authorizedService}
-          onValueChange={(v) => onChange({ ...service, authorizedService: v })}
+          value={service.name}
+          onValueChange={(v) => onChange({ ...service, name: v })}
         >
           <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
             <SelectValue placeholder="Select service" />
@@ -58,9 +58,9 @@ function ServiceAuthorizationFields({
           inputMode="numeric"
           min={0}
           step={1}
-          value={service.authorizedHoursPerWeek}
+          value={service.hours}
           onChange={(e) =>
-            onChange({ ...service, authorizedHoursPerWeek: e.target.value })
+            onChange({ ...service, hours: e.target.value })
           }
           className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
           placeholder="Enter hours"
@@ -74,8 +74,8 @@ function ServiceAuthorizationFields({
           inputMode="decimal"
           min={0}
           step={0.01}
-          value={service.ratePerHour}
-          onChange={(e) => onChange({ ...service, ratePerHour: e.target.value })}
+          value={service.rate}
+          onChange={(e) => onChange({ ...service, rate: e.target.value })}
           className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
           placeholder="Enter rate"
         />
@@ -361,15 +361,16 @@ export function Stage2GuardianAndFunding({
         typeof crypto !== "undefined" && "randomUUID" in crypto
           ? `service-${crypto.randomUUID()}`
           : `service-${Math.random().toString(16).slice(2)}`,
-      authorizedService: undefined,
-      authorizedHoursPerWeek: "",
-      ratePerHour: "",
+      name: undefined,
+      code: undefined,
+      hours: "",
+      rate: "",
       ispEffectiveDate: undefined,
       startAuthDate: undefined,
       endAuthDate: undefined,
       pcptDate: undefined,
       sdrDate: undefined,
-    } as ServiceAuthorization),
+    } as Service),
     []
   );
 

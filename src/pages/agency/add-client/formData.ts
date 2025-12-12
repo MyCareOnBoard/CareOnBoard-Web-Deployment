@@ -11,7 +11,8 @@ export type Stage1ClientIdentityAndContactData = {
     nursingLevel?: string;
 
     // Contact
-    primaryAddress: string;
+    address: string;
+    location?: { lat: string; lon: string };
     countyState: string;
     zipCode: string;
     phone: string;
@@ -20,11 +21,12 @@ export type Stage1ClientIdentityAndContactData = {
     communicationMethod?: string;
 };
 
-export type ServiceAuthorization = {
+export type Service = {
     id: string;
-    authorizedService?: string;
-    authorizedHoursPerWeek: string;
-    ratePerHour: string;
+    name?: string;
+    code?: string;
+    hours?: string;
+    rate?: string;
     ispEffectiveDate?: Date;
     startAuthDate?: Date;
     endAuthDate?: Date;
@@ -41,7 +43,7 @@ export type Stage2GuardianAndFundingData = {
     supportCoordinatorName: string;
     supportCoordinatorAgency: string;
     supportCoordinatorContact: string;
-    services: ServiceAuthorization[];
+    services: Service[];
 };
 
 export type DocKey =
@@ -154,15 +156,16 @@ export type AddClientFormData = {
     stage7: Stage7SystemAiAndAuditData;
 };
 
-function createEmptyServiceAuthorization(): ServiceAuthorization {
+function createEmptyServiceAuthorization(): Service {
     return {
         id:
             typeof crypto !== "undefined" && "randomUUID" in crypto
                 ? `service-${crypto.randomUUID()}`
                 : `service-${Math.random().toString(16).slice(2)}`,
-        authorizedService: undefined,
-        authorizedHoursPerWeek: "",
-        ratePerHour: "",
+        name: undefined,
+        code: undefined,
+        hours: "",
+        rate: "",
         ispEffectiveDate: undefined,
         startAuthDate: undefined,
         endAuthDate: undefined,
@@ -230,7 +233,8 @@ export function createInitialAddClientFormData(): AddClientFormData {
             dddId: "",
             ssn: "",
             nursingLevel: undefined,
-            primaryAddress: "",
+            address: "",
+            location: undefined,
             countyState: "",
             zipCode: "",
             phone: "",

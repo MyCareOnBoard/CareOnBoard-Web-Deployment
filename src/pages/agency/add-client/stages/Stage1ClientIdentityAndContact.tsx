@@ -128,7 +128,8 @@ export function Stage1ClientIdentityAndContact({
       county && state ? `${county} / ${state}` : county || state;
 
     updateStage1({
-      primaryAddress: suggestion.display_name || "",
+      address: suggestion.display_name || "",
+      location: { lat: suggestion.lat, lon: suggestion.lon },
       countyState: countyStateValue,
       zipCode: postcode,
     });
@@ -299,10 +300,11 @@ export function Stage1ClientIdentityAndContact({
             <label className="text-[12px] font-normal text-[#10141a]">Primary Address</label>
             <div className="relative" ref={addressInputRef}>
               <Input
-                value={stage1.primaryAddress}
+                value={stage1.address}
                 onChange={(e) => {
                   const v = e.target.value;
-                  updateStage1({ primaryAddress: v });
+                  // If user edits after selecting a suggestion, clear coordinates until re-selected.
+                  updateStage1({ address: v, location: undefined });
                   handleAddressSearch(v);
                 }}
                 onFocus={() => {
