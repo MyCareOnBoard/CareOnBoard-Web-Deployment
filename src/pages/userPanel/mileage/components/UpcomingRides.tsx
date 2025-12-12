@@ -1,67 +1,19 @@
-import { useState } from "react";
 import RideCard from "./RideCard";
+import { MileageRide } from "@/lib/api/mileage";
 
-interface Ride {
-  id: string;
-  clientName: string;
-  location: string;
-  time: string;
-  distance: string;
+interface UpcomingRidesProps {
+  rides: MileageRide[];
+  onCancel: (rideId: string) => Promise<void> | void;
+  actionLoading?: boolean;
 }
 
-export default function UpcomingRides() {
-  const [rides] = useState<Ride[]>([
-    {
-      id: "1",
-      clientName: "Dr.Brooklyn Simmons",
-      location: "221/B Baker Street",
-      time: "2:30 PM",
-      distance: "2Km",
-    },
-    {
-      id: "2",
-      clientName: "Dr.Brooklyn Simmons",
-      location: "221/B Baker Street",
-      time: "2:30 PM",
-      distance: "2Km",
-    },
-    {
-      id: "3",
-      clientName: "Dr.Brooklyn Simmons",
-      location: "221/B Baker Street",
-      time: "2:30 PM",
-      distance: "2Km",
-    },
-    {
-      id: "4",
-      clientName: "Dr.Brooklyn Simmons",
-      location: "221/B Baker Street",
-      time: "2:30 PM",
-      distance: "2Km",
-    },
-    {
-      id: "5",
-      clientName: "Dr.Brooklyn Simmons",
-      location: "221/B Baker Street",
-      time: "2:30 PM",
-      distance: "2Km",
-    },
-    {
-      id: "6",
-      clientName: "Dr.Brooklyn Simmons",
-      location: "221/B Baker Street",
-      time: "2:30 PM",
-      distance: "2Km",
-    },
-    {
-      id: "7",
-      clientName: "Dr.Brooklyn Simmons",
-      location: "221/B Baker Street",
-      time: "2:30 PM",
-      distance: "2Km",
-    },
-  ]);
+const formatTime = (iso?: string | null) => {
+  if (!iso) return "--";
+  const date = new Date(iso);
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+};
 
+export default function UpcomingRides({ rides, onCancel, actionLoading }: UpcomingRidesProps) {
   return (
     <div className="p-6 bg-white rounded-2xl">
       <div className="mb-4">
@@ -70,8 +22,21 @@ export default function UpcomingRides() {
       </div>
 
       <div className="space-y-3">
+        {rides.length === 0 && (
+          <div className="text-sm text-[#808081] text-center py-4">No upcoming rides.</div>
+        )}
         {rides.map((ride) => (
-          <RideCard key={ride.id} {...ride} />
+          <RideCard
+            key={ride.id}
+            id={ride.id}
+            clientName={ride.clientName}
+            location={ride.location}
+            time={formatTime(ride.scheduledStartTime)}
+            distance={ride.estimatedDistance != null ? `${ride.estimatedDistance}Km` : "--"}
+            status={ride.status}
+            onCancel={onCancel}
+            actionLoading={actionLoading}
+          />
         ))}
       </div>
     </div>

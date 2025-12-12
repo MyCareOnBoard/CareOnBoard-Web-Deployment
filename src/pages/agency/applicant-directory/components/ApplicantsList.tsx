@@ -91,7 +91,7 @@ export function ApplicantsList({
           >
             <div className="flex items-center gap-4 flex-1">
               {/* Avatar */}
-              <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0">
+              <div className="w-14 h-14 rounded-full overflow-hidden shrink-0">
                 <img
                   src={`https://i.pravatar.cc/56?img=${applicant.id}`}
                   alt={applicant.name}
@@ -171,7 +171,7 @@ export function ApplicantsList({
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                 <Button
                   onClick={() => onApplicantSelect(applicant)}
                   className="bg-[#9ca3af] hover:bg-[#6b7280] text-white rounded-full px-5 h-9 text-sm font-medium shadow-none"

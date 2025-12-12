@@ -147,7 +147,7 @@ export default function ClearanceHiringList() {
           <div className="bg-white rounded-lg shadow-sm">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <h2 className="text-lg font-semibold text-gray-900">
                     Clearance & Hiring Toggle
                   </h2>
@@ -212,11 +212,11 @@ export default function ClearanceHiringList() {
                     className="flex items-center gap-4 p-4 transition bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:shadow-sm"
                   >
                     {/* Profile */}
-                    <div className="flex items-center gap-4 min-w-[200px] flex-shrink-0">
+                    <div className="flex items-center gap-4 min-w-[200px] shrink-0">
                       <img
                         src={applicant.avatar}
                         alt={applicant.name}
-                        className="flex-shrink-0 w-12 h-12 rounded-full"
+                        className="shrink-0 w-12 h-12 rounded-full"
                       />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900 truncate">
@@ -273,7 +273,7 @@ export default function ClearanceHiringList() {
                     {/* Action Button */}
                     <Button
                       onClick={() => handleVerifyDocuments(applicant.id)}
-                      className="flex-shrink-0 px-4 py-2 text-xs font-medium text-white bg-gray-400 rounded-lg hover:bg-gray-500"
+                      className="shrink-0 px-4 py-2 text-xs font-medium text-white bg-gray-400 rounded-lg hover:bg-gray-500"
                     >
                       Verify Documents
                     </Button>

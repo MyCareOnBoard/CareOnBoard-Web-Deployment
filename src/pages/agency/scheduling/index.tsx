@@ -91,7 +91,7 @@ export default function SchedulingPage() {
         setLoading(true);
         const response = await listShifts({ 
           limit: 100,
-          agencyId: user?.profile?.id,
+          agencyId: user?.agencyId,
           client: true,
           employee: true,
         });
@@ -108,11 +108,11 @@ export default function SchedulingPage() {
       }
     };
 
-    if (user?.profile?.id) {
+    if (user?.agencyId) {
       fetchShifts();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.profile?.id]);
+  }, [user?.agencyId]);
 
   // Calculate shift statistics
   const shiftStats = useMemo(() => {
@@ -205,38 +205,6 @@ export default function SchedulingPage() {
     }
   };
 
-
-  /**
-   * Handle seeding clients with dummy data
-   */
-  const handleSeedClients = async () => {
-    try {
-      setSeedingClients(true);
-      
-      const result = await seedClients({
-        activeCount: 5,
-        inactiveCount: 2,
-        pendingCount: 1,
-        archivedCount: 0,
-        overwrite: true,
-      });
-
-      toast({
-        title: "Clients Seeded",
-        description: `Successfully seeded ${result.count} client(s). ${result.message}`,
-      });
-    } catch (error: any) {
-      console.error("Failed to seed clients:", error);
-      toast({
-        title: "Seeding Failed",
-        description: error?.message || "Failed to seed clients. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setSeedingClients(false);
-    }
-  };
-
   return (
     <>
     <div className="min-h-[calc(100vh-200px)]">
@@ -246,23 +214,6 @@ export default function SchedulingPage() {
           Scheduling
         </h1>
         <div className="flex items-center gap-3">
-          <Button
-            onClick={handleSeedClients}
-            disabled={seedingClients}
-            className="flex items-center gap-3 bg-[#808081] hover:bg-[#6a6a6b] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {seedingClients ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Seeding...
-              </>
-            ) : (
-              <>
-                <Plus className="w-5 h-5" />
-                Seed Clients
-              </>
-            )}
-          </Button>
           <Button
             onClick={() => setShowAddScheduleModal(true)}
             className="flex items-center gap-3 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px]"
@@ -373,7 +324,7 @@ export default function SchedulingPage() {
               </div>
 
               {/* Calendar */}
-              <div className="flex flex-col rounded-[12px] overflow-hidden w-full max-w-[575px] mx-auto">
+              <div className="flex flex-col rounded-xl overflow-hidden w-full max-w-[575px] mx-auto">
                 {/* Month Navigation */}
                 <div className="flex items-center justify-center gap-2.5 px-5 py-2 relative">
                   <button
@@ -413,7 +364,7 @@ export default function SchedulingPage() {
                   
                   {/* Month Picker Dropdown */}
                   {showMonthPicker && (
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-[12px] shadow-lg border border-[#e5e5e6] p-3 z-50 grid grid-cols-3 gap-2 w-[280px]">
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-xl shadow-lg border border-[#e5e5e6] p-3 z-50 grid grid-cols-3 gap-2 w-[280px]">
                       {months.map((month, index) => (
                         <button
                           key={month}
@@ -424,7 +375,7 @@ export default function SchedulingPage() {
                             setShowMonthPicker(false);
                           }}
                           className={`
-                            px-3 py-2 text-[14px] font-medium rounded-[6px] cursor-pointer transition-colors
+                            px-3 py-2 text-[14px] font-medium rounded-md cursor-pointer transition-colors
                             ${currentMonth.getMonth() === index 
                               ? "bg-[#2B82FF] text-white" 
                               : "text-[#10141a] hover:bg-[#e5e5e6]"
@@ -439,7 +390,7 @@ export default function SchedulingPage() {
                   
                   {/* Year Picker Dropdown */}
                   {showYearPicker && (
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-[12px] shadow-lg border border-[#e5e5e6] p-3 z-50 grid grid-cols-2 gap-2 w-[180px]">
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-xl shadow-lg border border-[#e5e5e6] p-3 z-50 grid grid-cols-2 gap-2 w-[180px]">
                       {years.map((year) => (
                         <button
                           key={year}
@@ -450,7 +401,7 @@ export default function SchedulingPage() {
                             setShowYearPicker(false);
                           }}
                           className={`
-                            px-3 py-2 text-[14px] font-medium rounded-[6px] cursor-pointer transition-colors
+                            px-3 py-2 text-[14px] font-medium rounded-md cursor-pointer transition-colors
                             ${currentMonth.getFullYear() === year 
                               ? "bg-[#2B82FF] text-white" 
                               : "text-[#10141a] hover:bg-[#e5e5e6]"
@@ -500,10 +451,10 @@ export default function SchedulingPage() {
                             className={`
                               flex-1 flex flex-col items-center justify-center p-2 text-center transition-colors relative cursor-pointer
                               ${isSelected 
-                                ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold" 
+                                ? "bg-[#2B82FF] text-white rounded-md font-semibold" 
                                 : isCurrentMonth 
-                                  ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]" 
-                                  : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
+                                  ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-md" 
+                                  : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-md"
                               }
                             `}
                           >
@@ -573,15 +524,15 @@ export default function SchedulingPage() {
                     >
                       {/* Client Info */}
                       <div className="flex items-center gap-4 w-[256px]">
-                        <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                        <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
                           {clientAvatar && (
                             <AvatarImage
                               src={clientAvatar}
                               alt={clientName}
-                              className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                              className="w-full h-full object-cover aspect-auto rounded-lg"
                             />
                           )}
-                          <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                          <AvatarFallback className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                             {getInitialsFromName(clientName)}
                           </AvatarFallback>
                         </Avatar>
@@ -597,15 +548,15 @@ export default function SchedulingPage() {
 
                       {/* DSP/Employee Info */}
                       <div className="flex items-center gap-4 w-[256px]">
-                        <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                        <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
                           {employeeAvatar && (
                             <AvatarImage
                               src={employeeAvatar}
                               alt={employeeName}
-                              className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                              className="w-full h-full object-cover aspect-auto rounded-lg"
                             />
                           )}
-                          <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                          <AvatarFallback className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                             {getInitialsFromName(employeeName)}
                           </AvatarFallback>
                         </Avatar>
@@ -627,7 +578,7 @@ export default function SchedulingPage() {
                         </div>
 
                         {/* Duration Badge */}
-                        <div className="bg-[rgba(14,175,82,0.05)] border-[0.5px] border-[#0eaf52] rounded-[60px] px-[10px] py-[6px] min-w-[59px] flex items-center justify-center">
+                        <div className="bg-[rgba(14,175,82,0.05)] border-[0.5px] border-[#0eaf52] rounded-[60px] px-2.5 py-1.5 min-w-[59px] flex items-center justify-center">
                           <span className="text-[12px] font-semibold text-[#0eaf52] whitespace-nowrap">
                             {duration}
                           </span>
@@ -704,7 +655,7 @@ export default function SchedulingPage() {
                   >
                     {/* Client Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
                         {shift.client?.profileImage && (
                           <AvatarImage
                             src={shift.client.profileImage}
@@ -712,7 +663,7 @@ export default function SchedulingPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(clientName)}
                         </AvatarFallback>
                       </Avatar>
@@ -728,7 +679,7 @@ export default function SchedulingPage() {
 
                     {/* DSP/Employee Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
                         {shift.employee?.profilePicture && (
                           <AvatarImage
                             src={shift.employee.profilePicture}
@@ -736,7 +687,7 @@ export default function SchedulingPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(employeeName)}
                         </AvatarFallback>
                       </Avatar>
@@ -754,7 +705,7 @@ export default function SchedulingPage() {
                     <div className="flex items-center gap-16 flex-1 w-[256px]">
                       {/* Status Badge */}
                       <div 
-                        className="rounded-full min-w-[54px] min-h-[28px] flex items-center justify-center gap-[4px] px-2.5"
+                        className="rounded-full min-w-[54px] min-h-7 flex items-center justify-center gap-1 px-2.5"
                         style={{ 
                           backgroundColor: statusInfo.bgColor,
                           border: `1px solid ${statusInfo.color}`
@@ -784,7 +735,7 @@ export default function SchedulingPage() {
                     {/* Details Button */}
                     <Button
                       variant="outline"
-                      className="bg-[#b2b2b3] border-[#b2b2b3] text-white rounded-full px-6 py-2.5 h-[36px] w-[121px] text-[14px] font-semibold hover:bg-[#9a9a9b] hover:text-white"
+                      className="bg-[#b2b2b3] border-[#b2b2b3] text-white rounded-full px-6 py-2.5 h-9 w-[121px] text-[14px] font-semibold hover:bg-[#9a9a9b] hover:text-white"
                     >
                       Details
                     </Button>

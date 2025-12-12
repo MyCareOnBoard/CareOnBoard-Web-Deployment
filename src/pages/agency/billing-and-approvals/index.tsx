@@ -1,10 +1,10 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useMemo} from "react";
 import {ChevronLeft, ChevronRight} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {useAuth} from "@/utils/auth";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
-import {useGetBillingRecordsQuery, useGenerateReportMutation} from "./api";
+import {useGetBillingRecordsQuery, useGenerateReportMutation, BillingRecordGrouped} from "./api";
 
 interface BillingStatusFilter {
   value: string;
@@ -42,7 +42,7 @@ export default function BillingAndApprovalsPage() {
 
   const {data: billingData, isLoading, isFetching, refetch} = useGetBillingRecordsQuery(
     {
-      agencyId: user?.profile?.id || '',
+      agencyId: user?.agencyId || '', 
       billingStatus: selectedBillingStatus,
       date: selectedDate,
       serviceType: selectedServiceType,
@@ -51,7 +51,7 @@ export default function BillingAndApprovalsPage() {
       groupBy: activeTab === "client" ? "client" : "dsp",
     },
     {
-      skip: !user?.profile?.id,
+      skip: !user?.agencyId,
       refetchOnMountOrArgChange: true,
     }
   );
@@ -64,18 +64,19 @@ export default function BillingAndApprovalsPage() {
   }, [activeTab]);
 
   const handleGenerateReport = async (
-    itemId: string
+    data: { client?: string; serviceCode: string | undefined } | { employee: string },
   ) => {
-    if (!itemId) return;
+    if (Object.keys(data).length === 0) return;
 
-    if (activeTab === "client") {
-      navigate(Routes.agency.clientClaims.replace(':clientId', itemId));
-    } else {
-      navigate(Routes.agency.dspClaims.replace(':dsp', itemId));
+    if (activeTab === "client" && "client" in data) {
+      navigate(Routes.agency.clientClaims.replace(
+        ':clientId', data.client ?? ""
+      ).replace(':serviceCode', data.serviceCode ?? ""));
+    } else if (activeTab === "dsp" && "employee" in data) {
+      navigate(Routes.agency.dspClaims.replace(':dsp', data.employee ?? ""));
     }
   };
 
-  const currentRecords = billingData?.records || [];
   const totalRecords = billingData?.total || 0;
   const totalPages = Math.ceil(totalRecords / itemsPerPage);
   const loading = isLoading || isFetching;
@@ -95,6 +96,35 @@ export default function BillingAndApprovalsPage() {
   const formatCurrency = (amount: number) => {
     return `$${amount.toFixed(0)}`;
   };
+
+  const servicesGroupedByRole = useMemo(() => {
+    if (activeTab === "client") {
+      return billingData?.records?.reduce((acc: BillingRecordGrouped[], group) => {
+        group.employees?.forEach((employee) => {
+          const checkEmployeeGrouping = acc.findIndex((item) => {
+            return item.client?.id === group.client?.id
+              && item?.employees?.some((itemEmployee) =>
+                employee.serviceCode === itemEmployee.serviceCode
+              );
+          })
+
+          if (checkEmployeeGrouping === -1) {
+            acc.push({
+                ...group,
+                employees: [employee],
+              }
+            )
+          } else {
+            acc[checkEmployeeGrouping]?.employees?.push(employee);
+          }
+        })
+
+        return acc;
+      }, []) || [];
+    } else {
+      return billingData?.records || [];
+    }
+  }, [billingData?.records, activeTab]);
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -185,7 +215,7 @@ export default function BillingAndApprovalsPage() {
               <p className="text-sm text-[#808081]">Loading billing records...</p>
             </div>
           </div>
-        ) : currentRecords.length === 0 ? (
+        ) : servicesGroupedByRole.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-[16px] font-medium text-[#808081]">
               No billing records found
@@ -193,7 +223,7 @@ export default function BillingAndApprovalsPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {currentRecords.map((record) => {
+            {servicesGroupedByRole.map((record) => {
               const clientName = record.client
                 ? `${record.client.firstName || ''} ${record.client.lastName || ''}`.trim() || 'Unknown Client'
                 : 'Unknown Client';
@@ -281,13 +311,13 @@ export default function BillingAndApprovalsPage() {
                     </>
                   )}
 
-                  {/* Services Offered - Multiple rows */}
+                  {/* Service Code - Multiple rows */}
                   <div className="flex flex-col gap-4">
                     {(activeTab === "client" ? record.employees : record.clients)?.map((item) => (
                       <div key={item.id} className="flex flex-col justify-center h-[60px]">
-                        <p className="text-[14px] text-[#808081] mb-1">Services Offered</p>
+                        <p className="text-[14px] text-[#808081] mb-1">Service Code</p>
                         <p className="text-[16px] font-medium text-[#10141a]">
-                          {record.servicesOffered || 'Service Name'}
+                          {item.serviceCode || 'N/A'}
                         </p>
                       </div>
                     ))}
@@ -316,13 +346,19 @@ export default function BillingAndApprovalsPage() {
                   </div>
 
                   {/* Generate Report Button */}
-                  <div className="flex items-center">
-                    <Button
-                      onClick={() => handleGenerateReport(activeTab === "client" ? record.client?.id : record.employee?.id)}
-                      className="bg-[#B2B2B3] hover:bg-[#B2B2B3] text-white rounded-full px-6 py-2 h-auto font-medium transition-all duration-200"
-                    >
-                      Generate Report
-                    </Button>
+                  <div className={"flex flex-col gap-4"}>
+                    <div className="flex items-center h-[60px]">
+                      <Button
+                        onClick={() => handleGenerateReport(
+                          activeTab === "client"
+                            ? {client: record.client?.id, serviceCode: record?.employees?.[0]?.serviceCode}
+                            : {employee: record.employee?.id}
+                        )}
+                        className="bg-[#B2B2B3] hover:bg-[#B2B2B3] text-white rounded-full px-6 py-2 h-auto font-medium transition-all duration-200"
+                      >
+                        Generate Report
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );
@@ -331,7 +367,7 @@ export default function BillingAndApprovalsPage() {
         )}
 
         {/* Pagination */}
-        {!loading && currentRecords.length > 0 && (
+        {!loading && servicesGroupedByRole.length > 0 && (
           <div className="flex items-center justify-center gap-4 mt-6">
             <button
               onClick={handlePreviousPage}

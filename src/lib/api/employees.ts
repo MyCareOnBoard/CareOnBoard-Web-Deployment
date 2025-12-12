@@ -4,7 +4,7 @@
  */
 
 import axiosClient from '../axios';
-import { UserProfile } from '@/utils/auth/types/user.types';
+import { User } from '@/utils/auth/types/user.types';
 
 /**
  * Employee interface
@@ -28,7 +28,7 @@ export interface Employee {
   createdAt: string;
   updatedAt: string;
   // Optional user profile reference
-  user?: UserProfile;
+  user?: User;
 }
 
 /**
@@ -72,7 +72,9 @@ export interface EmployeeStatsResponse {
 export interface ListEmployeesParams {
   uid?: string;
   agencyId?: string;
-  status?: 'active' | 'inactive' | 'pending' | 'suspended';
+  role?: string;
+  workAvailability?: boolean;
+  status?: 'active' | 'inactive' | 'pending' | 'suspended' | 'terminated';
   search?: string;
   limit?: number;
   page?: number;

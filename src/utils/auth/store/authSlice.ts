@@ -16,7 +16,7 @@ import {
 import { auth } from '@/lib/firebase'
 import type { AuthState, LoginCredentials, SignupCredentials } from '../types'
 import { transformFirebaseUser } from '@/utils/auth'
-import type { UserProfile } from '../types/user.types'
+import type { User } from '../types/user.types'
 
 // Initial state
 const initialState: AuthState = {
@@ -109,7 +109,7 @@ export const resetPassword = createAsyncThunk(
 export const checkAuthState = createAsyncThunk(
   'auth/checkState',
   async (_, { rejectWithValue }) => {
-    return new Promise<UserProfile | null>((resolve) => {
+    return new Promise<User | null>((resolve) => {
       const unsubscribe = auth.onAuthStateChanged(
         (firebaseUser: FirebaseUser | null) => {
           unsubscribe()
@@ -137,9 +137,35 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null
     },
-    setUser: (state, action: PayloadAction<UserProfile | null>) => {
+    setUser: (state, action: PayloadAction<User | null>) => {
       state.user = action.payload
       state.isAuthenticated = !!action.payload
+    },
+    /**
+     * Update user profile data in Redux state
+     * Saves profile data ONLY in the nested profile sub-object
+     * Matches /userProfile/account-info response structure
+     */
+    updateUserProfile: (state, action: PayloadAction<{
+      fullName?: string
+      email?: string
+      profilePicture?: string
+      dateOfBirth?: string
+      phoneNumber?: string
+      address?: string
+      city?: string
+      state?: string
+      zipCode?: string
+      professionalSummary?: string
+      gender?: string
+    }>) => {
+      if (state.user) {
+        // Update ONLY the profile sub-object, not top-level fields
+        state.user.profile = {
+          ...state.user.profile,
+          ...action.payload,
+        }
+      }
     }
   },
   extraReducers: (builder) => {
@@ -218,5 +244,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { clearError, setUser } = authSlice.actions
+export const { clearError, setUser, updateUserProfile } = authSlice.actions
 export default authSlice.reducer

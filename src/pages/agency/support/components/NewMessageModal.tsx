@@ -97,7 +97,7 @@ export default function NewMessageModal({
                 >
                   <div className="flex items-center gap-3">
                     {/* Avatar */}
-                    <div className="relative flex-shrink-0 w-11 h-11">
+                    <div className="relative shrink-0 w-11 h-11">
                       {user.image ? (
                         <img
                           src={user.image}

@@ -204,7 +204,11 @@ export default function ClientsAndServicesPage() {
                     <div className="col-span-2 flex items-center">
                       <div>
                         <p className="text-xs text-gray-500 mb-0.5">Location</p>
-                        <p className="text-sm text-gray-900">{client.location}</p>
+                        <p className="text-sm text-gray-900">
+                          {typeof client.location === "object" && client.location
+                            ? `${client.location.lat}, ${client.location.lon}`
+                            : client.location || "-"}
+                        </p>
                       </div>
                     </div>
 
@@ -294,7 +298,11 @@ export default function ClientsAndServicesPage() {
                       <div className="col-span-3 flex items-center">
                         <div>
                           <p className="text-xs text-gray-500 mb-0.5">Location</p>
-                          <p className="text-sm text-gray-900">{client.location}</p>
+                          <p className="text-sm text-gray-900">
+                            {typeof client.location === "object" && client.location
+                              ? `${client.location.lat}, ${client.location.lon}`
+                              : client.location || "-"}
+                          </p>
                         </div>
                       </div>
 

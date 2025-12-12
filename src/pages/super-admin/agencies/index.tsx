@@ -163,7 +163,7 @@ export default function AgenciesPage() {
                 className="bg-white rounded-lg p-4 shadow-sm border border-[#e5e5e6]"
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-full bg-[#00b4b8]/10 flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-[#00b4b8]/10 flex items-center justify-center shrink-0">
                     <Building2 className="w-6 h-6 text-[#00b4b8]"/>
                   </div>
                   <div className="flex-1 min-w-0">

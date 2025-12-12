@@ -1,15 +1,15 @@
 
 import axiosClient from '../axios';
-import { UserProfile } from '@/utils/auth/types/user.types';
+import { User } from '@/utils/auth/types/user.types';
 import { UserType } from '@/utils/auth/types/user.types';
 import { seedAgency } from './agencies';
 
 /**
- * API Response wrapper for user profile
+ * API Response wrapper for user data
  */
-export interface UserProfileResponse {
+export interface UserResponse {
   success: boolean
-  user: UserProfile
+  user: User
 }
 
 /**
@@ -33,36 +33,62 @@ export interface ListUsersResponse {
   total: number;
   page: number;
   totalPages: number;
-  users: UserProfile[];
+  users: User[];
 }
 
 /**
- * Get the authenticated user's profile
- * Used during onboarding to check if profile exists
- * @returns Promise with user profile data
+ * Get the authenticated user's data
+ * Used during onboarding to check if data exists
+ * @returns Promise with user data
  */
-export async function getUserProfile(): Promise<UserProfile> {
+export async function getUser(): Promise<User> {
   try {
-    const response = await axiosClient.get<UserProfileResponse>("/users/profile");
+    const response = await axiosClient.get<UserResponse>("/users/profile");
 
     if (!response.data.success || !response.data.user) {
       throw new Error("Invalid response format from server");
     }
 
-    let user = response.data.user
+    const backendUser = response.data.user as any;
 
-    // Load user-specific data based on user type
-    let userData: Record<string, any> | undefined = undefined
+    // Build clean User object with profile data in the correct location
+    const user: User = {
+      // Core user fields only
+      id: backendUser.id || backendUser.uid,
+      uid: backendUser.uid,
+      email: backendUser.email,
+      fullName: backendUser.fullName,
+      emailVerified: backendUser.emailVerified || false,
+      userType: backendUser.userType,
+      otpVerified: backendUser.otpVerified,
+      otpVerifiedAt: backendUser.otpVerifiedAt,
+      onboardingCompleted: backendUser.onboardingCompleted,
+      createdAt: backendUser.createdAt,
+      updatedAt: backendUser.updatedAt,
+      agencyId: backendUser.agencyId,
 
-    if (user.userType === UserType.AGENCY && !user?.profile) {
-      try {
-        const agency = await seedAgency()
-        user.profile = agency
+      // Profile data goes ONLY in profile sub-object
+      profile: {}
+    };
 
-      } catch (error: any) {
+    // Extract profile data from backend response
+    const profileSource = backendUser.profile || backendUser;
 
-      }
-    }
+    // Build profile sub-object from available data
+    user.profile = {
+      email: profileSource.email || backendUser.email,
+      fullName: profileSource.fullName || backendUser.fullName,
+      name: profileSource.name || backendUser.displayName,
+      phoneNumber: profileSource.phoneNumber || profileSource.phone,
+      address: profileSource.address,
+      city: profileSource.city,
+      state: profileSource.state,
+      zipCode: profileSource.zipCode,
+      gender: profileSource.gender,
+      dateOfBirth: profileSource.dateOfBirth,
+      profilePicture: profileSource.profilePicture || profileSource.photo || profileSource.photoURL,
+      professionalSummary: profileSource.professionalSummary || profileSource.summary,
+    };
 
     return user;
   } catch (err: any) {
@@ -76,12 +102,12 @@ export async function getUserProfile(): Promise<UserProfile> {
 }
 
 /**
- * ✅ Update the authenticated user's profile
+ * ✅ Update the authenticated user's data
  * Endpoint: PUT /users/profile
  */
-export async function updateUserProfile(profileData: Partial<UserProfile>): Promise<UserProfile> {
+export async function updateUser(userData: Partial<User>): Promise<User> {
   try {
-    const response = await axiosClient.put<UserProfileResponse>("/users/profile", profileData);
+    const response = await axiosClient.put<UserResponse>("/users/profile", userData);
 
     if (!response.data.success || !response.data.user) {
       throw new Error("Invalid response format from server");
@@ -89,8 +115,8 @@ export async function updateUserProfile(profileData: Partial<UserProfile>): Prom
 
     return response.data.user;
   } catch (err: any) {
-    console.error("updateUserProfile error:", err);
-    throw new Error(err.message || "Failed to update user profile");
+    console.error("updateUser error:", err);
+    throw new Error(err.message || "Failed to update user data");
   }
 }
 
@@ -157,9 +183,9 @@ export async function listUsers(params?: ListUsersParams): Promise<ListUsersResp
  * @param query - Search query string
  * @returns Promise with matching users
  */
-export async function searchUsers(query: string): Promise<UserProfile[]> {
+export async function searchUsers(query: string): Promise<User[]> {
   try {
-    const response = await axiosClient.get<{ data: UserProfile[] }>('/users/search', {
+    const response = await axiosClient.get<{ data: User[] }>('/users/search', {
       params: { q: query }
     });
     return response.data.data;
@@ -173,11 +199,11 @@ export async function searchUsers(query: string): Promise<UserProfile[]> {
  * ✅ Get a user by ID
  * Endpoint: GET /users/:id
  * @param userId - The user ID
- * @returns Promise with user profile
+ * @returns Promise with user data
  */
-export async function getUserById(userId: string): Promise<UserProfile> {
+export async function getUserById(userId: string): Promise<User> {
   try {
-    const response = await axiosClient.get<UserProfileResponse>(`/users/${userId}`);
+    const response = await axiosClient.get<UserResponse>(`/users/${userId}`);
 
     if (!response.data.success || !response.data.user) {
       throw new Error("User not found");
@@ -203,9 +229,9 @@ export async function getUserById(userId: string): Promise<UserProfile> {
 export async function getAgencyEmployees(
   agencyId: string,
   search?: string
-): Promise<UserProfile[]> {
+): Promise<User[]> {
   try {
-    const response = await axiosClient.get<{ success: boolean; users: UserProfile[] }>("/users/employees", {
+    const response = await axiosClient.get<{ success: boolean; users: User[] }>("/users/employees", {
       params: {
         agencyId,
         search,

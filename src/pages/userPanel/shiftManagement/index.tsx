@@ -351,7 +351,7 @@ function ShiftCard({
       {/* Desktop Layout */}
       <div className="items-center hidden w-full gap-6 lg:flex">
         {/* Client Avatar */}
-        <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+        <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
           {shift.client?.profileImage && (
             <AvatarImage
               src={shift.client.profileImage}
@@ -360,7 +360,7 @@ function ShiftCard({
             />
           )}
           <AvatarFallback
-            className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-bold">
+            className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-bold">
             {getInitialsFromName(getClientName(shift.client))}
           </AvatarFallback>
         </Avatar>
@@ -368,7 +368,7 @@ function ShiftCard({
         {/* Shift Details */}
         <div className="flex items-center flex-1 min-w-0 gap-16">
           {/* Client Name */}
-          <div className="flex flex-col gap-1.5 flex-shrink-0">
+          <div className="flex flex-col gap-1.5 shrink-0">
             <p className="text-[16px] font-semibold text-[#10141a] leading-[1.6] whitespace-nowrap">
               {shift.client?.firstName} {shift.client?.lastName}
             </p>
@@ -378,7 +378,7 @@ function ShiftCard({
           {/* Info Grid */}
           <div className="flex flex-wrap gap-x-16 gap-y-2">
             {panel === 'previous' && (
-              <div className="flex flex-col flex-shrink-0 gap-1">
+              <div className="flex flex-col shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Date</p>
                 <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">
                   {format(new Date(shift.date), "dd MMMM")}
@@ -386,13 +386,13 @@ function ShiftCard({
               </div>
             )}
 
-            <div className="flex flex-col flex-shrink-0 gap-1">
+            <div className="flex flex-col shrink-0 gap-1">
               <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
               <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.location}</p>
             </div>
 
             {shift.startTime && (
-              <div className="flex flex-col flex-shrink-0 gap-1">
+              <div className="flex flex-col shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">
                   {shift.clockedInAt
                     ? (panel === 'previous' ? "Clocked In" : "Started at")
@@ -411,7 +411,7 @@ function ShiftCard({
             )}
 
             {shift.clockedInAt && !shift.startTime && (
-              <div className="flex flex-col flex-shrink-0 gap-1">
+              <div className="flex flex-col shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">
                   {panel === 'previous' ? "Clocked In" : (shift.clockedOutAt ? "Clocked In" : "Started at")}
                 </p>
@@ -421,7 +421,7 @@ function ShiftCard({
             )}
 
             {shift.clockedOutAt && (
-              <div className="flex flex-col flex-shrink-0 gap-1">
+              <div className="flex flex-col shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked Out</p>
                 <p
                   className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{format(new Date(shift.clockedOutAt), 'hh:mm a')}</p>
@@ -486,7 +486,7 @@ function ShiftCard({
             </>
           )}
           {/* Action Button - Desktop */}
-          {showAction && <div className="flex-shrink-0">{getActionButton()}</div>}
+          {showAction && <div className="shrink-0">{getActionButton()}</div>}
         </div>
 
       </div>
@@ -654,10 +654,10 @@ export default function ShiftManagementPage() {
   }
 
   useEffect(() => {
-    if (user?.profile?.id) {
+    if (user?.id) {
       loadShifts();
     }
-  }, [user?.profile?.id]);
+  }, [user?.id]);
 
   useEffect(() => {
     initiateTimeRemaining();
@@ -670,8 +670,8 @@ export default function ShiftManagementPage() {
   }, [todayShift]);
 
   const loadShifts = async () => {
-    const agencyId = user?.profile?.agencyId;
-    const employeeId = user?.profile?.id;
+    const agencyId = user?.agencyId;
+    const employeeId = user?.id;
 
     if (!agencyId) {
       console.warn('No user ID available for fetching shifts');
@@ -856,8 +856,8 @@ export default function ShiftManagementPage() {
         setClockOutShiftId(null);
         toast.success('Clocked out successfully');
 
-        const agencyId = user?.profile?.agencyId;
-        const employeeId = user?.profile?.id;
+        const agencyId = user?.agencyId;
+        const employeeId = user?.id;
         if (agencyId && employeeId) {
           const todayResponse = await getTodayShifts(agencyId, employeeId);
           if (todayResponse.success) {
@@ -900,7 +900,7 @@ export default function ShiftManagementPage() {
           className="flex bg-white/0 backdrop-blur rounded-[20px] min-h-[46px] mb-4 lg:mb-6 items-start flex-wrap gap-3 sm:gap-4 lg:gap-6">
           <div className="flex items-center gap-2 sm:gap-3">
             <div
-              className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center flex-shrink-0">
+              className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center shrink-0">
               <Calendar size={18} className="sm:w-5 sm:h-5"/>
             </div>
             <div>
@@ -914,7 +914,7 @@ export default function ShiftManagementPage() {
 
           <div className="flex items-center gap-2 sm:gap-3">
             <div
-              className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center flex-shrink-0">
+              className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center shrink-0">
               <Clock size={18} className="sm:w-5 sm:h-5"/>
             </div>
             <div>
@@ -928,7 +928,7 @@ export default function ShiftManagementPage() {
 
           <div className="flex items-center gap-2 sm:gap-3">
             <div
-              className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center flex-shrink-0">
+              className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center shrink-0">
               <MapPin size={18} className={`sm:w-5 sm:h-5 ${locationError ? "text-red-500" : ""}`}/>
             </div>
             <div className="max-w-[200px] sm:max-w-[250px]">
