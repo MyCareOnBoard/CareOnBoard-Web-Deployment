@@ -12,15 +12,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AddClientFormData } from "@/pages/agency/add-client/formData";
 
-export function Stage1ClientIdentityAndContact({ footer }: { footer: React.ReactNode }) {
-  const [dob, setDob] = useState<Date | undefined>();
+export function Stage1ClientIdentityAndContact({
+  footer,
+  formData,
+  setFormData,
+}: {
+  footer: React.ReactNode;
+  formData: AddClientFormData;
+  setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+}) {
+  const stage1 = formData.stage1;
+  const updateStage1 = (patch: Partial<AddClientFormData["stage1"]>) =>
+    setFormData((prev) => ({ ...prev, stage1: { ...prev.stage1, ...patch } }));
+
   const [isDobOpen, setIsDobOpen] = useState(false);
 
   // Address autocomplete (same pattern as manual shift "location" field)
-  const [primaryAddress, setPrimaryAddress] = useState("");
-  const [countyState, setCountyState] = useState("");
-  const [zipCode, setZipCode] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState<
     Array<{
       display_name?: string;
@@ -108,7 +117,6 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
       state_district?: string;
     };
   }) => {
-    setPrimaryAddress(suggestion.display_name || "");
     setShowAddressSuggestions(false);
     setAddressSuggestions([]);
 
@@ -119,8 +127,11 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
     const countyStateValue =
       county && state ? `${county} / ${state}` : county || state;
 
-    setCountyState(countyStateValue);
-    setZipCode(postcode);
+    updateStage1({
+      primaryAddress: suggestion.display_name || "",
+      countyState: countyStateValue,
+      zipCode: postcode,
+    });
   };
 
   return (
@@ -145,22 +156,37 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Client First Name</label>
-            <Input className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" placeholder="Enter first name" />
+            <Input
+              value={stage1.firstName}
+              onChange={(e) => updateStage1({ firstName: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Enter first name"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Client Last Name</label>
-            <Input className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" placeholder="Enter last name" />
+            <Input
+              value={stage1.lastName}
+              onChange={(e) => updateStage1({ lastName: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Enter last name"
+            />
           </div>
 
           <div className="flex flex-col gap-1 lg:col-span-1 xl:col-span-1">
             <label className="text-[12px] font-normal text-[#10141a]">Middle Name (optional)</label>
-            <Input className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" placeholder="Enter middle name" />
+            <Input
+              value={stage1.middleName}
+              onChange={(e) => updateStage1({ middleName: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Enter middle name"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Gender</label>
-            <Select>
+            <Select value={stage1.gender} onValueChange={(v) => updateStage1({ gender: v })}>
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
                 <SelectValue placeholder="Select gender type" />
               </SelectTrigger>
@@ -180,7 +206,7 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
                 <button type="button" className="w-full focus:outline-none">
                   <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                     <InputGroupInput
-                      value={dob ? format(dob, "MMM d, yyyy") : ""}
+                      value={stage1.dob ? format(stage1.dob, "MMM d, yyyy") : ""}
                       placeholder="Enter DOB"
                       readOnly
                       className="text-[#10141a]"
@@ -194,11 +220,11 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
               <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
                 <Calendar
                   mode="single"
-                  selected={dob}
-                  defaultMonth={dob ?? new Date()}
+                  selected={stage1.dob}
+                  defaultMonth={stage1.dob ?? new Date()}
                   onSelect={(d) => {
                     if (d) {
-                      setDob(d);
+                      updateStage1({ dob: d });
                       setIsDobOpen(false);
                     }
                   }}
@@ -209,17 +235,29 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Client Medicaid ID</label>
-            <Input className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" placeholder="Enter Medicaid ID" />
+            <Input
+              value={stage1.medicaidId}
+              onChange={(e) => updateStage1({ medicaidId: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Enter Medicaid ID"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Client DDD ID</label>
-            <Input className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" placeholder="Enter DDD ID" />
+            <Input
+              value={stage1.dddId}
+              onChange={(e) => updateStage1({ dddId: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Enter DDD ID"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Social Security Card number</label>
             <Input
+              value={stage1.ssn}
+              onChange={(e) => updateStage1({ ssn: e.target.value })}
               inputMode="numeric"
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter social security card"
@@ -228,7 +266,10 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Nursing Level</label>
-            <Select>
+            <Select
+              value={stage1.nursingLevel}
+              onValueChange={(v) => updateStage1({ nursingLevel: v })}
+            >
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
                 <SelectValue placeholder="Select level" />
               </SelectTrigger>
@@ -258,10 +299,10 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
             <label className="text-[12px] font-normal text-[#10141a]">Primary Address</label>
             <div className="relative" ref={addressInputRef}>
               <Input
-                value={primaryAddress}
+                value={stage1.primaryAddress}
                 onChange={(e) => {
                   const v = e.target.value;
-                  setPrimaryAddress(v);
+                  updateStage1({ primaryAddress: v });
                   handleAddressSearch(v);
                 }}
                 onFocus={() => {
@@ -301,8 +342,8 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">County / State</label>
             <Input
-              value={countyState}
-              onChange={(e) => setCountyState(e.target.value)}
+              value={stage1.countyState}
+              onChange={(e) => updateStage1({ countyState: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter County / State"
             />
@@ -311,8 +352,8 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Zip Code</label>
             <Input
-              value={zipCode}
-              onChange={(e) => setZipCode(e.target.value)}
+              value={stage1.zipCode}
+              onChange={(e) => updateStage1({ zipCode: e.target.value })}
               inputMode="numeric"
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Zip Code"
@@ -321,17 +362,27 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Phone Number</label>
-            <Input className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" placeholder="Enter phone number" />
+            <Input
+              value={stage1.phone}
+              onChange={(e) => updateStage1({ phone: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Enter phone number"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Email</label>
-            <Input className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" placeholder="Enter email" />
+            <Input
+              value={stage1.email}
+              onChange={(e) => updateStage1({ email: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Enter email"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Language preference</label>
-            <Select>
+            <Select value={stage1.language} onValueChange={(v) => updateStage1({ language: v })}>
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
                 <SelectValue placeholder="Select language" />
               </SelectTrigger>
@@ -345,7 +396,10 @@ export function Stage1ClientIdentityAndContact({ footer }: { footer: React.React
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Preferred communication method</label>
-            <Select>
+            <Select
+              value={stage1.communicationMethod}
+              onValueChange={(v) => updateStage1({ communicationMethod: v })}
+            >
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
                 <SelectValue placeholder="Select method" />
               </SelectTrigger>

@@ -9,7 +9,9 @@ export function StageFooter({
   isFirst,
   isLast,
   onPrev,
-  onPrimary,
+  onNext,
+  onSave,
+  primaryLoading = false,
   requireDeclaration = true,
 }: {
   declared: boolean;
@@ -17,7 +19,9 @@ export function StageFooter({
   isFirst: boolean;
   isLast: boolean;
   onPrev: () => void;
-  onPrimary: () => void;
+  onNext: () => void;
+  onSave: () => void;
+  primaryLoading?: boolean;
   requireDeclaration?: boolean;
 }) {
   const primaryDisabled = requireDeclaration ? !declared : false;
@@ -41,6 +45,7 @@ export function StageFooter({
             variant="secondary"
             className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold"
             onClick={onPrev}
+            disabled={primaryLoading}
           >
             <ArrowLeft className="w-5 h-5" />
             Previous
@@ -50,8 +55,8 @@ export function StageFooter({
         <Button
           type="button"
           className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold"
-          onClick={onPrimary}
-          disabled={primaryDisabled}
+          onClick={isLast ? onSave : onNext}
+          disabled={primaryDisabled || primaryLoading}
         >
           {isLast ? "Save Client" : "Next"}
           {isLast ? (

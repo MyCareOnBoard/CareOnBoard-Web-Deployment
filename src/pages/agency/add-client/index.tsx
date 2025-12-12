@@ -9,12 +9,18 @@ import { Stage5StaffAssignmentAndRestrictions } from "@/pages/agency/add-client/
 import { Stage6GoalsAndEmergency } from "@/pages/agency/add-client/stages/Stage6GoalsAndEmergency";
 import { Stage7SystemAiAndAudit } from "@/pages/agency/add-client/stages/Stage7SystemAiAndAudit";
 import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
+import { SaveClientSuccessModal } from "@/pages/agency/add-client/components/SaveClientSuccessModal";
+import { createInitialAddClientFormData } from "@/pages/agency/add-client/formData";
 
 export default function AddClientPage() {
   const navigate = useNavigate();
   const totalStages = 7;
   const [stage, setStage] = useState<number>(1);
   const [declared, setDeclared] = useState(false);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [savedClientName, setSavedClientName] = useState<string | undefined>(undefined);
+  const [formData, setFormData] = useState(() => createInitialAddClientFormData());
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     // Require re-confirmation per stage, like the Figma flow.
@@ -32,45 +38,61 @@ export default function AddClientPage() {
         isFirst={isFirst}
         isLast={isLast}
         onPrev={() => setStage((s) => Math.max(1, s - 1))}
-        onPrimary={() => {
-          if (isLast) {
-            navigate(Routes.agency.clients);
-            return;
+        onNext={() => setStage((s) => Math.min(totalStages, s + 1))}
+        onSave={async () => {
+          if (isSaving) return;
+          setIsSaving(true);
+          try {
+            // TODO: hook into real API save once backend payload mapping is finalized.
+            // For now, treat Save as successful and show the success modal.
+            const fullName = `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();
+            setSavedClientName(fullName.length > 0 ? fullName : undefined);
+            setShowSaveSuccess(true);
+          } finally {
+            setIsSaving(false);
           }
-          setStage((s) => Math.min(totalStages, s + 1));
         }}
+        primaryLoading={isSaving}
         requireDeclaration={true}
       />
     ),
-    [declared, isFirst, isLast, navigate]
+    [declared, formData.stage1.firstName, formData.stage1.lastName, isFirst, isLast, isSaving]
   );
 
-  if (stage === 1) {
-    return <Stage1ClientIdentityAndContact footer={footer} />;
-  }
+  const stageContent = (() => {
+    if (stage === 1)
+      return <Stage1ClientIdentityAndContact footer={footer} formData={formData} setFormData={setFormData} />;
+    if (stage === 2)
+      return <Stage2GuardianAndFunding footer={footer} formData={formData} setFormData={setFormData} />;
+    if (stage === 3)
+      return <Stage3HealthcareAndDocuments footer={footer} formData={formData} setFormData={setFormData} />;
+    if (stage === 4)
+      return <Stage4EvvAndVisitConfig footer={footer} formData={formData} setFormData={setFormData} />;
+    if (stage === 5)
+      return <Stage5StaffAssignmentAndRestrictions footer={footer} formData={formData} setFormData={setFormData} />;
+    if (stage === 6)
+      return <Stage6GoalsAndEmergency footer={footer} formData={formData} setFormData={setFormData} />;
+    if (stage === 7)
+      return <Stage7SystemAiAndAudit footer={footer} formData={formData} setFormData={setFormData} />;
+    return null;
+  })();
 
-  if (stage === 2) {
-    return <Stage2GuardianAndFunding footer={footer} />;
-  }
-
-  if (stage === 3) {
-    return <Stage3HealthcareAndDocuments footer={footer} />;
-  }
-
-  if (stage === 4) {
-    return <Stage4EvvAndVisitConfig footer={footer} />;
-  }
-
-  if (stage === 5) {
-    return <Stage5StaffAssignmentAndRestrictions footer={footer} />;
-  }
-
-  if (stage === 6) {
-    return <Stage6GoalsAndEmergency footer={footer} />;
-  }
-
-  if (stage === 7) {
-    return <Stage7SystemAiAndAudit footer={footer} />;
+  if (stageContent) {
+    return (
+      <>
+        {stageContent}
+        <SaveClientSuccessModal
+          open={showSaveSuccess}
+          onOpenChange={(open) => {
+            setShowSaveSuccess(open);
+            if (!open) {
+              navigate(Routes.agency.clients);
+            }
+          }}
+          clientName={savedClientName}
+        />
+      </>
+    );
   }
 
   if (

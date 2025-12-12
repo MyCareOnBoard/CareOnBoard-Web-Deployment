@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { AddClientFormData, YesNo } from "@/pages/agency/add-client/formData";
 
 function YesNoRadio({
   label,
@@ -8,7 +9,7 @@ function YesNoRadio({
   onChange,
 }: {
   label: string;
-  value: "yes" | "no" | "";
+  value: YesNo;
   onChange: (next: "yes" | "no") => void;
 }) {
   return (
@@ -34,18 +35,16 @@ function YesNoRadio({
 
 export function Stage4EvvAndVisitConfig({
   footer,
+  formData,
+  setFormData,
 }: {
   footer: React.ReactNode;
+  formData: AddClientFormData;
+  setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
 }) {
-
-  const [evvRequirement, setEvvRequirement] = useState<"yes" | "no" | "">("");
-  const [primaryVisitLocationGps, setPrimaryVisitLocationGps] = useState<"yes" | "no" | "">("");
-  const [allowedSecondaryLocations, setAllowedSecondaryLocations] = useState<"yes" | "no" | "">("");
-
-  const [minShiftLength, setMinShiftLength] = useState("");
-  const [maxShiftLength, setMaxShiftLength] = useState("");
-  const [backToBackAllowed, setBackToBackAllowed] = useState<"yes" | "no" | "">("");
-  const [travelTimeAllowed, setTravelTimeAllowed] = useState<"yes" | "no" | "">("");
+  const stage4 = formData.stage4;
+  const updateStage4 = (patch: Partial<AddClientFormData["stage4"]>) =>
+    setFormData((prev) => ({ ...prev, stage4: { ...prev.stage4, ...patch } }));
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -68,18 +67,18 @@ export function Stage4EvvAndVisitConfig({
         <div className="max-w-[720px] space-y-6">
           <YesNoRadio
             label="EVV Requirement"
-            value={evvRequirement}
-            onChange={setEvvRequirement}
+            value={stage4.evvRequirement}
+            onChange={(v) => updateStage4({ evvRequirement: v })}
           />
           <YesNoRadio
             label="Primary Visit Location (auto-GPS)"
-            value={primaryVisitLocationGps}
-            onChange={setPrimaryVisitLocationGps}
+            value={stage4.primaryVisitLocationGps}
+            onChange={(v) => updateStage4({ primaryVisitLocationGps: v })}
           />
           <YesNoRadio
             label="Allowed Secondary Locations (for Community Inclusion/Transportation)"
-            value={allowedSecondaryLocations}
-            onChange={setAllowedSecondaryLocations}
+            value={stage4.allowedSecondaryLocations}
+            onChange={(v) => updateStage4({ allowedSecondaryLocations: v })}
           />
         </div>
       </div>
@@ -98,8 +97,8 @@ export function Stage4EvvAndVisitConfig({
                 Minimum shift length
               </label>
               <Input
-                value={minShiftLength}
-                onChange={(e) => setMinShiftLength(e.target.value)}
+                value={stage4.minShiftLength}
+                onChange={(e) => updateStage4({ minShiftLength: e.target.value })}
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                 placeholder=""
               />
@@ -110,8 +109,8 @@ export function Stage4EvvAndVisitConfig({
                 Maximum shift length
               </label>
               <Input
-                value={maxShiftLength}
-                onChange={(e) => setMaxShiftLength(e.target.value)}
+                value={stage4.maxShiftLength}
+                onChange={(e) => updateStage4({ maxShiftLength: e.target.value })}
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                 placeholder=""
               />
@@ -120,14 +119,14 @@ export function Stage4EvvAndVisitConfig({
 
           <YesNoRadio
             label="Back-to-back visits allowed?"
-            value={backToBackAllowed}
-            onChange={setBackToBackAllowed}
+            value={stage4.backToBackAllowed}
+            onChange={(v) => updateStage4({ backToBackAllowed: v })}
           />
 
           <YesNoRadio
             label="Travel time allowed?"
-            value={travelTimeAllowed}
-            onChange={setTravelTimeAllowed}
+            value={stage4.travelTimeAllowed}
+            onChange={(v) => updateStage4({ travelTimeAllowed: v })}
           />
         </div>
       </div>

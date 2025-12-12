@@ -1,50 +1,56 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-
-type AuditCycle = "monthly" | "quarterly";
+import { AddClientFormData } from "@/pages/agency/add-client/formData";
 
 export function Stage7SystemAiAndAudit({
   footer,
+  formData,
+  setFormData,
 }: {
   footer: React.ReactNode;
+  formData: AddClientFormData;
+  setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
 }) {
-
-  // 11. System & AI Settings
-  const [aiNotesReview, setAiNotesReview] = useState(true);
-  const [aiPlanOfCareBuilder, setAiPlanOfCareBuilder] = useState(true);
-  const [aiGoalTracking, setAiGoalTracking] = useState(true);
-  const [expiringDocsReminder, setExpiringDocsReminder] = useState(true);
-  const [renewalsReminder, setRenewalsReminder] = useState(true);
-
-  // 12. Audit & Monitoring Setup
-  const [auditCycle, setAuditCycle] = useState<AuditCycle>("monthly");
-  const [assignedQaStaff, setAssignedQaStaff] = useState("");
-  const [requiredVisitDocumentation, setRequiredVisitDocumentation] = useState("");
-  const [notesReviewRules, setNotesReviewRules] = useState("");
-  const [billingValidationRules, setBillingValidationRules] = useState("");
+  const stage7 = formData.stage7;
+  const updateStage7 = (patch: Partial<AddClientFormData["stage7"]>) =>
+    setFormData((prev) => ({ ...prev, stage7: { ...prev.stage7, ...patch } }));
 
   const aiToggles = useMemo(
     () => [
-      { label: "AI Notes Review", value: aiNotesReview, set: setAiNotesReview },
+      {
+        label: "AI Notes Review",
+        value: stage7.aiNotesReview,
+        set: (v: boolean) => updateStage7({ aiNotesReview: v }),
+      },
       {
         label: "AI Plan of Care Builder",
-        value: aiPlanOfCareBuilder,
-        set: setAiPlanOfCareBuilder,
+        value: stage7.aiPlanOfCareBuilder,
+        set: (v: boolean) => updateStage7({ aiPlanOfCareBuilder: v }),
       },
-      { label: "AI Goal Tracking", value: aiGoalTracking, set: setAiGoalTracking },
+      {
+        label: "AI Goal Tracking",
+        value: stage7.aiGoalTracking,
+        set: (v: boolean) => updateStage7({ aiGoalTracking: v }),
+      },
       {
         label: "Expiring documents reminder",
-        value: expiringDocsReminder,
-        set: setExpiringDocsReminder,
+        value: stage7.expiringDocsReminder,
+        set: (v: boolean) => updateStage7({ expiringDocsReminder: v }),
       },
       {
         label: "ISP/PCPT/SDR renewals reminder",
-        value: renewalsReminder,
-        set: setRenewalsReminder,
+        value: stage7.renewalsReminder,
+        set: (v: boolean) => updateStage7({ renewalsReminder: v }),
       },
     ],
-    [aiGoalTracking, aiNotesReview, aiPlanOfCareBuilder, expiringDocsReminder, renewalsReminder]
+    [
+      stage7.aiGoalTracking,
+      stage7.aiNotesReview,
+      stage7.aiPlanOfCareBuilder,
+      stage7.expiringDocsReminder,
+      stage7.renewalsReminder,
+    ]
   );
 
   return (
@@ -92,10 +98,10 @@ export function Stage7SystemAiAndAudit({
           <div className="mt-3 flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => setAuditCycle("monthly")}
+              onClick={() => updateStage7({ auditCycle: "monthly" })}
               className={[
                 "cursor-pointer rounded-[6px] border px-[10px] py-[6px] text-[14px] font-medium leading-[1.4] capitalize transition-colors",
-                auditCycle === "monthly"
+                stage7.auditCycle === "monthly"
                   ? "bg-[#00b4b8] border-[#00b4b8] text-white"
                   : "border-[#808081] bg-transparent text-[#10141a]",
               ].join(" ")}
@@ -104,10 +110,10 @@ export function Stage7SystemAiAndAudit({
             </button>
             <button
               type="button"
-              onClick={() => setAuditCycle("quarterly")}
+              onClick={() => updateStage7({ auditCycle: "quarterly" })}
               className={[
                 "cursor-pointer rounded-[6px] border px-[10px] py-[6px] text-[14px] font-medium leading-[1.4] capitalize transition-colors",
-                auditCycle === "quarterly"
+                stage7.auditCycle === "quarterly"
                   ? "bg-[#00b4b8] border-[#00b4b8] text-white"
                   : "border-[#808081] bg-transparent text-[#10141a]",
               ].join(" ")}
@@ -123,8 +129,8 @@ export function Stage7SystemAiAndAudit({
               Assigned QA Staff
             </label>
             <Input
-              value={assignedQaStaff}
-              onChange={(e) => setAssignedQaStaff(e.target.value)}
+              value={stage7.assignedQaStaff}
+              onChange={(e) => updateStage7({ assignedQaStaff: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -135,8 +141,8 @@ export function Stage7SystemAiAndAudit({
               Required Visit Documentation
             </label>
             <Input
-              value={requiredVisitDocumentation}
-              onChange={(e) => setRequiredVisitDocumentation(e.target.value)}
+              value={stage7.requiredVisitDocumentation}
+              onChange={(e) => updateStage7({ requiredVisitDocumentation: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -147,8 +153,8 @@ export function Stage7SystemAiAndAudit({
               Notes Review Rules
             </label>
             <Input
-              value={notesReviewRules}
-              onChange={(e) => setNotesReviewRules(e.target.value)}
+              value={stage7.notesReviewRules}
+              onChange={(e) => updateStage7({ notesReviewRules: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -159,8 +165,8 @@ export function Stage7SystemAiAndAudit({
               Billing Validation Rules
             </label>
             <Input
-              value={billingValidationRules}
-              onChange={(e) => setBillingValidationRules(e.target.value)}
+              value={stage7.billingValidationRules}
+              onChange={(e) => updateStage7({ billingValidationRules: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />

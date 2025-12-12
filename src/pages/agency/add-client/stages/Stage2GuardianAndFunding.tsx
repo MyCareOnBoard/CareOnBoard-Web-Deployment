@@ -13,18 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-type ServiceAuthorization = {
-  id: string;
-  authorizedService?: string;
-  authorizedHoursPerWeek: string;
-  ratePerHour: string;
-  ispEffectiveDate?: Date;
-  startAuthDate?: Date;
-  endAuthDate?: Date;
-  pcptDate?: Date;
-  sdrDate?: Date;
-};
+import { AddClientFormData, ServiceAuthorization } from "@/pages/agency/add-client/formData";
 
 function ServiceAuthorizationFields({
   service,
@@ -277,12 +266,18 @@ function ServiceAuthorizationFields({
 
 export function Stage2GuardianAndFunding({
   footer,
+  formData,
+  setFormData,
 }: {
   footer: React.ReactNode;
+  formData: AddClientFormData;
+  setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
 }) {
+  const stage2 = formData.stage2;
+  const updateStage2 = (patch: Partial<AddClientFormData["stage2"]>) =>
+    setFormData((prev) => ({ ...prev, stage2: { ...prev.stage2, ...patch } }));
 
   // Address autocomplete (same pattern as manual shift "location" field)
-  const [guardianAddress, setGuardianAddress] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState<
     Array<{
       display_name?: string;
@@ -355,10 +350,11 @@ export function Stage2GuardianAndFunding({
     lat: string;
     lon: string;
   }) => {
-    setGuardianAddress(suggestion.display_name || "");
+    updateStage2({ guardianAddress: suggestion.display_name || "" });
     setShowAddressSuggestions(false);
     setAddressSuggestions([]);
   };
+
   const createEmptyService = useMemo(
     () => () => ({
       id:
@@ -373,13 +369,11 @@ export function Stage2GuardianAndFunding({
       endAuthDate: undefined,
       pcptDate: undefined,
       sdrDate: undefined,
-    }),
+    } as ServiceAuthorization),
     []
   );
 
-  const [services, setServices] = useState<ServiceAuthorization[]>(() => [
-    createEmptyService(),
-  ]);
+  const services = stage2.services;
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -405,14 +399,22 @@ export function Stage2GuardianAndFunding({
             <label className="text-[12px] font-normal text-[#10141a]">
               Guardian / Representative Name
             </label>
-            <Input className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" placeholder="Enter name" />
+            <Input
+              value={stage2.guardianName}
+              onChange={(e) => updateStage2({ guardianName: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Enter name"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">
               Relationship to client
             </label>
-            <Select>
+            <Select
+              value={stage2.guardianRelationship}
+              onValueChange={(v) => updateStage2({ guardianRelationship: v })}
+            >
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
                 <SelectValue placeholder="Select relationship" />
               </SelectTrigger>
@@ -427,12 +429,22 @@ export function Stage2GuardianAndFunding({
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Email</label>
-            <Input className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" placeholder="Enter email" />
+            <Input
+              value={stage2.guardianEmail}
+              onChange={(e) => updateStage2({ guardianEmail: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Enter email"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Phone number</label>
-            <Input className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" placeholder="Enter phone number" />
+            <Input
+              value={stage2.guardianPhone}
+              onChange={(e) => updateStage2({ guardianPhone: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Enter phone number"
+            />
           </div>
 
           <div className="flex flex-col gap-1">
@@ -441,10 +453,10 @@ export function Stage2GuardianAndFunding({
             </label>
             <div className="relative" ref={addressInputRef}>
               <Input
-                value={guardianAddress}
+                value={stage2.guardianAddress}
                 onChange={(e) => {
                   const v = e.target.value;
-                  setGuardianAddress(v);
+                  updateStage2({ guardianAddress: v });
                   handleAddressSearch(v);
                 }}
                 onFocus={() => {
@@ -484,6 +496,8 @@ export function Stage2GuardianAndFunding({
               Support Coordinator Name
             </label>
             <Input
+              value={stage2.supportCoordinatorName}
+              onChange={(e) => updateStage2({ supportCoordinatorName: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Support Coordinator Name"
             />
@@ -494,6 +508,8 @@ export function Stage2GuardianAndFunding({
               Support Coordinator Agency
             </label>
             <Input
+              value={stage2.supportCoordinatorAgency}
+              onChange={(e) => updateStage2({ supportCoordinatorAgency: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Support Coordinator Agency"
             />
@@ -504,6 +520,8 @@ export function Stage2GuardianAndFunding({
               Support Coordinator Phone/Email
             </label>
             <Input
+              value={stage2.supportCoordinatorContact}
+              onChange={(e) => updateStage2({ supportCoordinatorContact: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter phone number/email"
             />
@@ -527,7 +545,7 @@ export function Stage2GuardianAndFunding({
             type="button"
             variant="ghost"
             className="h-11 rounded-[60px] border border-[#b2b2b3] bg-white/40 px-5 text-[14px] font-semibold text-[#10141a] hover:bg-white/60"
-            onClick={() => setServices((prev) => [...prev, createEmptyService()])}
+            onClick={() => updateStage2({ services: [...services, createEmptyService()] })}
           >
             <Plus className="w-5 h-5 text-[#10141a]" />
             Add Service
@@ -553,7 +571,7 @@ export function Stage2GuardianAndFunding({
                     variant="ghost"
                     className="h-9 rounded-[60px] px-3 text-[14px] font-semibold text-[#10141a] hover:bg-white/60"
                     onClick={() =>
-                      setServices((prev) => prev.filter((s) => s.id !== service.id))
+                      updateStage2({ services: services.filter((s) => s.id !== service.id) })
                     }
                   >
                     <Trash2 className="w-4 h-4" />
@@ -565,9 +583,9 @@ export function Stage2GuardianAndFunding({
               <ServiceAuthorizationFields
                 service={service}
                 onChange={(next) =>
-                  setServices((prev) =>
-                    prev.map((s) => (s.id === service.id ? next : s))
-                  )
+                  updateStage2({
+                    services: services.map((s) => (s.id === service.id ? next : s)),
+                  })
                 }
               />
             </div>

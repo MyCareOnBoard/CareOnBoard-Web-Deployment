@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
+import { AddClientFormData, AutoCheckKey, YesNo } from "@/pages/agency/add-client/formData";
 
 function YesNoRadio({
   label,
@@ -17,7 +18,7 @@ function YesNoRadio({
   onChange,
 }: {
   label: string;
-  value: "yes" | "no" | "";
+  value: YesNo;
   onChange: (next: "yes" | "no") => void;
 }) {
   return (
@@ -41,28 +42,20 @@ function YesNoRadio({
   );
 }
 
-type AutoCheckKey = "compliance" | "training" | "background" | "expired";
-
 export function Stage5StaffAssignmentAndRestrictions({
   footer,
+  formData,
+  setFormData,
 }: {
   footer: React.ReactNode;
+  formData: AddClientFormData;
+  setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
 }) {
   const { user } = useAuth();
 
-  const [primaryDspAssigned, setPrimaryDspAssigned] = useState("");
-  const [primaryDspId, setPrimaryDspId] = useState("");
-  const [secondaryDsps, setSecondaryDsps] = useState("");
-  const [secondaryDspId, setSecondaryDspId] = useState("");
-  const [genderPreference, setGenderPreference] = useState<string | undefined>();
-  const [requiredCertifications, setRequiredCertifications] = useState("");
-  const [specialConditions, setSpecialConditions] = useState("");
-
-  const [prefersFamiliar, setPrefersFamiliar] = useState<"yes" | "no" | "">("");
-  const [noMaleFemaleStaff, setNoMaleFemaleStaff] = useState<"yes" | "no" | "">("");
-  const [medicalRestrictionsTrained, setMedicalRestrictionsTrained] = useState<
-    "yes" | "no" | ""
-  >("");
+  const stage5 = formData.stage5;
+  const updateStage5 = (patch: Partial<AddClientFormData["stage5"]>) =>
+    setFormData((prev) => ({ ...prev, stage5: { ...prev.stage5, ...patch } }));
 
   // DSP search (Primary/Secondary) — reuse AddScheduleModal pattern
   const [primarySearchResults, setPrimarySearchResults] = useState<Employee[]>([]);
@@ -166,15 +159,13 @@ export function Stage5StaffAssignmentAndRestrictions({
   );
 
   const handlePrimarySelect = (employee: Employee) => {
-    setPrimaryDspAssigned(employee.fullName);
-    setPrimaryDspId(employee.id);
+    updateStage5({ primaryDspAssigned: employee.fullName, primaryDspId: employee.id });
     setShowPrimaryDropdown(false);
     setPrimarySearchResults([]);
   };
 
   const handleSecondarySelect = (employee: Employee) => {
-    setSecondaryDsps(employee.fullName);
-    setSecondaryDspId(employee.id);
+    updateStage5({ secondaryDsps: employee.fullName, secondaryDspId: employee.id });
     setShowSecondaryDropdown(false);
     setSecondarySearchResults([]);
   };
@@ -189,13 +180,6 @@ export function Stage5StaffAssignmentAndRestrictions({
       ] as const,
     []
   );
-
-  const [autoChecks, setAutoChecks] = useState<Record<AutoCheckKey, boolean>>({
-    compliance: false,
-    training: false,
-    background: false,
-    expired: false,
-  });
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -221,11 +205,10 @@ export function Stage5StaffAssignmentAndRestrictions({
               Primary DSP Assigned
             </label>
             <Input
-              value={primaryDspAssigned}
+              value={stage5.primaryDspAssigned}
               onChange={(e) => {
                 const value = e.target.value;
-                setPrimaryDspAssigned(value);
-                setPrimaryDspId("");
+                updateStage5({ primaryDspAssigned: value, primaryDspId: "" });
                 handlePrimarySearch(value);
               }}
               onFocus={() => {
@@ -265,11 +248,10 @@ export function Stage5StaffAssignmentAndRestrictions({
               Secondary / Backup DSPs
             </label>
             <Input
-              value={secondaryDsps}
+              value={stage5.secondaryDsps}
               onChange={(e) => {
                 const value = e.target.value;
-                setSecondaryDsps(value);
-                setSecondaryDspId("");
+                updateStage5({ secondaryDsps: value, secondaryDspId: "" });
                 handleSecondarySearch(value);
               }}
               onFocus={() => {
@@ -308,7 +290,10 @@ export function Stage5StaffAssignmentAndRestrictions({
             <label className="text-[12px] font-normal text-[#10141a]">
               Gender Preference (if any)
             </label>
-            <Select value={genderPreference} onValueChange={setGenderPreference}>
+            <Select
+              value={stage5.genderPreference}
+              onValueChange={(v) => updateStage5({ genderPreference: v })}
+            >
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
                 <SelectValue placeholder="Select gender" />
               </SelectTrigger>
@@ -325,8 +310,8 @@ export function Stage5StaffAssignmentAndRestrictions({
               DSP Required Certifications
             </label>
             <Input
-              value={requiredCertifications}
-              onChange={(e) => setRequiredCertifications(e.target.value)}
+              value={stage5.requiredCertifications}
+              onChange={(e) => updateStage5({ requiredCertifications: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -337,8 +322,8 @@ export function Stage5StaffAssignmentAndRestrictions({
               Special Conditions
             </label>
             <Input
-              value={specialConditions}
-              onChange={(e) => setSpecialConditions(e.target.value)}
+              value={stage5.specialConditions}
+              onChange={(e) => updateStage5({ specialConditions: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -348,18 +333,18 @@ export function Stage5StaffAssignmentAndRestrictions({
         <div className="mt-8 max-w-[720px] space-y-6">
           <YesNoRadio
             label="Client prefers familiar DSP?"
-            value={prefersFamiliar}
-            onChange={setPrefersFamiliar}
+            value={stage5.prefersFamiliar}
+            onChange={(v) => updateStage5({ prefersFamiliar: v })}
           />
           <YesNoRadio
             label="No male/female staff?"
-            value={noMaleFemaleStaff}
-            onChange={setNoMaleFemaleStaff}
+            value={stage5.noMaleFemaleStaff}
+            onChange={(v) => updateStage5({ noMaleFemaleStaff: v })}
           />
           <YesNoRadio
             label="Medical restrictions requiring trained DSP?"
-            value={medicalRestrictionsTrained}
-            onChange={setMedicalRestrictionsTrained}
+            value={stage5.medicalRestrictionsTrained}
+            onChange={(v) => updateStage5({ medicalRestrictionsTrained: v })}
           />
 
           <div className="pt-2">
@@ -368,13 +353,15 @@ export function Stage5StaffAssignmentAndRestrictions({
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               {autoCheckOptions.map((opt) => {
-                const active = autoChecks[opt.key];
+                const active = stage5.autoChecks[opt.key];
                 return (
                   <button
                     key={opt.key}
                     type="button"
                     onClick={() =>
-                      setAutoChecks((prev) => ({ ...prev, [opt.key]: !prev[opt.key] }))
+                      updateStage5({
+                        autoChecks: { ...stage5.autoChecks, [opt.key]: !stage5.autoChecks[opt.key] },
+                      })
                     }
                     className={[
                       "cursor-pointer rounded-[6px] border border-[#808081] px-[10px] py-[6px] text-[14px] font-medium leading-[1.4] transition-colors",

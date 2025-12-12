@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { CalendarDays, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -6,26 +6,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
-
-type DocKey =
-  | "isp"
-  | "pcpt"
-  | "poc"
-  | "sdr"
-  | "bsp"
-  | "medicalDocs"
-  | "consents";
-
-type DocState = {
-  key: DocKey;
-  title: string;
-  uploadLabel: string;
-  file?: File;
-  fileName?: string;
-  uploadDate?: Date;
-  expiryDate?: Date;
-  autoReminder: boolean;
-};
+import { AddClientFormData, DocKey, DocState } from "@/pages/agency/add-client/formData";
 
 function DatePickerInput({
   value,
@@ -72,70 +53,23 @@ function DatePickerInput({
   );
 }
 
-export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNode }) {
-
-  // Section 5 fields
-  const [medicalConditions, setMedicalConditions] = useState("");
-  const [allergies, setAllergies] = useState("");
-  const [dietaryRestrictions, setDietaryRestrictions] = useState("");
-  const [seizurePlan, setSeizurePlan] = useState("");
-  const [mobilitySupportNeeds, setMobilitySupportNeeds] = useState("");
-  const [behaviorSupportPlan, setBehaviorSupportPlan] = useState("");
-  const [communicationNeeds, setCommunicationNeeds] = useState("");
-  const [emergencyProtocols, setEmergencyProtocols] = useState("");
-
-  const initialDocs = useMemo<DocState[]>(
-    () => [
-      {
-        key: "isp",
-        title: "ISP (Individualized Service Plan)",
-        uploadLabel: "Upload ISP (Individualized Service Plan)",
-        autoReminder: true,
-      },
-      {
-        key: "pcpt",
-        title: "PCPT (Person-Centered Planning Tool)",
-        uploadLabel: "Upload PCPT (Person-Centered Planning Tool)",
-        autoReminder: true,
-      },
-      {
-        key: "poc",
-        title: "Plan of Care (POC)",
-        uploadLabel: "Upload Plan of Care (POC)",
-        autoReminder: true,
-      },
-      {
-        key: "sdr",
-        title: "SDR (Service Detail Report)",
-        uploadLabel: "Upload SDR (Service Detail Report)",
-        autoReminder: true,
-      },
-      {
-        key: "bsp",
-        title: "Behavior Plan / BSP",
-        uploadLabel: "Upload Behavior Plan / BSP",
-        autoReminder: true,
-      },
-      {
-        key: "medicalDocs",
-        title: "Medical Documents (allergies, seizure plan, care notes)",
-        uploadLabel: "Upload Medical Documents (allergies, seizure plan, care notes)",
-        autoReminder: true,
-      },
-      {
-        key: "consents",
-        title: "Consents & Releases",
-        uploadLabel: "Upload Consents & Releases",
-        autoReminder: true,
-      },
-    ],
-    []
-  );
-
-  const [docs, setDocs] = useState<DocState[]>(() => initialDocs);
+export function Stage3HealthcareAndDocuments({
+  footer,
+  formData,
+  setFormData,
+}: {
+  footer: React.ReactNode;
+  formData: AddClientFormData;
+  setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+}) {
+  const stage3 = formData.stage3;
+  const updateStage3 = (patch: Partial<AddClientFormData["stage3"]>) =>
+    setFormData((prev) => ({ ...prev, stage3: { ...prev.stage3, ...patch } }));
 
   const updateDoc = (key: DocKey, patch: Partial<DocState>) => {
-    setDocs((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+    updateStage3({
+      docs: stage3.docs.map((d) => (d.key === key ? { ...d, ...patch } : d)),
+    });
   };
 
   return (
@@ -161,8 +95,8 @@ export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNo
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Medical Conditions</label>
             <Input
-              value={medicalConditions}
-              onChange={(e) => setMedicalConditions(e.target.value)}
+              value={stage3.medicalConditions}
+              onChange={(e) => updateStage3({ medicalConditions: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Medical Conditions"
             />
@@ -171,8 +105,8 @@ export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNo
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Allergies</label>
             <Input
-              value={allergies}
-              onChange={(e) => setAllergies(e.target.value)}
+              value={stage3.allergies}
+              onChange={(e) => updateStage3({ allergies: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Allergies"
             />
@@ -181,8 +115,8 @@ export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNo
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Behavior Support Plan (if any)</label>
             <Input
-              value={behaviorSupportPlan}
-              onChange={(e) => setBehaviorSupportPlan(e.target.value)}
+              value={stage3.behaviorSupportPlan}
+              onChange={(e) => updateStage3({ behaviorSupportPlan: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Behavior Support Plan"
             />
@@ -191,8 +125,8 @@ export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNo
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Dietary Restrictions</label>
             <Input
-              value={dietaryRestrictions}
-              onChange={(e) => setDietaryRestrictions(e.target.value)}
+              value={stage3.dietaryRestrictions}
+              onChange={(e) => updateStage3({ dietaryRestrictions: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Dietary Restrictions"
             />
@@ -201,8 +135,8 @@ export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNo
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Seizure Plan (if applicable)</label>
             <Input
-              value={seizurePlan}
-              onChange={(e) => setSeizurePlan(e.target.value)}
+              value={stage3.seizurePlan}
+              onChange={(e) => updateStage3({ seizurePlan: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Seizure Plan"
             />
@@ -211,8 +145,8 @@ export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNo
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Mobility Support Needs</label>
             <Input
-              value={mobilitySupportNeeds}
-              onChange={(e) => setMobilitySupportNeeds(e.target.value)}
+              value={stage3.mobilitySupportNeeds}
+              onChange={(e) => updateStage3({ mobilitySupportNeeds: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Mobility Support Needs"
             />
@@ -221,8 +155,8 @@ export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNo
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Communication Needs</label>
             <Input
-              value={communicationNeeds}
-              onChange={(e) => setCommunicationNeeds(e.target.value)}
+              value={stage3.communicationNeeds}
+              onChange={(e) => updateStage3({ communicationNeeds: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Communication Needs"
             />
@@ -231,8 +165,8 @@ export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNo
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Emergency Protocols</label>
             <Input
-              value={emergencyProtocols}
-              onChange={(e) => setEmergencyProtocols(e.target.value)}
+              value={stage3.emergencyProtocols}
+              onChange={(e) => updateStage3({ emergencyProtocols: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Emergency Protocols"
             />
@@ -252,7 +186,7 @@ export function Stage3HealthcareAndDocuments({ footer }: { footer: React.ReactNo
         </div>
 
         <div className="mt-6 space-y-8">
-          {docs.map((doc) => (
+          {stage3.docs.map((doc) => (
             <div key={doc.key}>
               <p className="text-[12px] font-normal text-[#10141a] mb-2">
                 {doc.title}

@@ -7,36 +7,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AddClientFormData } from "@/pages/agency/add-client/formData";
 
 export function Stage6GoalsAndEmergency({
   footer,
+  formData,
+  setFormData,
 }: {
   footer: React.ReactNode;
+  formData: AddClientFormData;
+  setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
 }) {
-
-  // 9. Goals & Outcomes Setup
-  const [clientGoals, setClientGoals] = useState("");
-  const [communityGoals, setCommunityGoals] = useState("");
-  const [dailyLivingGoals, setDailyLivingGoals] = useState("");
-  const [behavioralGoals, setBehavioralGoals] = useState("");
-  const [skillBuildingGoals, setSkillBuildingGoals] = useState("");
-  const [ispOutcomes, setIspOutcomes] = useState("");
-  const [targetBehaviors, setTargetBehaviors] = useState("");
-  const [supportStrategies, setSupportStrategies] = useState("");
+  const stage6 = formData.stage6;
+  const updateStage6 = (patch: Partial<AddClientFormData["stage6"]>) =>
+    setFormData((prev) => ({ ...prev, stage6: { ...prev.stage6, ...patch } }));
 
   const autoPopulateChips = useMemo(
     () => ["Service notes", "Goal progress", "AI notes review", "AI POC builder"],
     []
   );
-
-  // 10. Emergency / Critical Information
-  const [emergencyName, setEmergencyName] = useState("");
-  const [emergencyRelationship, setEmergencyRelationship] = useState<string | undefined>();
-  const [primaryPhone, setPrimaryPhone] = useState("");
-  const [secondaryPhone, setSecondaryPhone] = useState("");
-  const [hospitalPreference, setHospitalPreference] = useState("");
-  const [emergencyProtocol, setEmergencyProtocol] = useState("");
-  const [medicationList, setMedicationList] = useState("");
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -63,8 +52,8 @@ export function Stage6GoalsAndEmergency({
               Client Goals (from ISP)
             </label>
             <Input
-              value={clientGoals}
-              onChange={(e) => setClientGoals(e.target.value)}
+              value={stage6.clientGoals}
+              onChange={(e) => updateStage6({ clientGoals: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -75,8 +64,8 @@ export function Stage6GoalsAndEmergency({
               Community goals
             </label>
             <Input
-              value={communityGoals}
-              onChange={(e) => setCommunityGoals(e.target.value)}
+              value={stage6.communityGoals}
+              onChange={(e) => updateStage6({ communityGoals: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -87,8 +76,8 @@ export function Stage6GoalsAndEmergency({
               Daily living goals
             </label>
             <Input
-              value={dailyLivingGoals}
-              onChange={(e) => setDailyLivingGoals(e.target.value)}
+              value={stage6.dailyLivingGoals}
+              onChange={(e) => updateStage6({ dailyLivingGoals: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -99,8 +88,8 @@ export function Stage6GoalsAndEmergency({
               Behavioral goals
             </label>
             <Input
-              value={behavioralGoals}
-              onChange={(e) => setBehavioralGoals(e.target.value)}
+              value={stage6.behavioralGoals}
+              onChange={(e) => updateStage6({ behavioralGoals: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -111,8 +100,8 @@ export function Stage6GoalsAndEmergency({
               Skill-building goals
             </label>
             <Input
-              value={skillBuildingGoals}
-              onChange={(e) => setSkillBuildingGoals(e.target.value)}
+              value={stage6.skillBuildingGoals}
+              onChange={(e) => updateStage6({ skillBuildingGoals: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -121,8 +110,8 @@ export function Stage6GoalsAndEmergency({
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">ISP Outcomes</label>
             <Input
-              value={ispOutcomes}
-              onChange={(e) => setIspOutcomes(e.target.value)}
+              value={stage6.ispOutcomes}
+              onChange={(e) => updateStage6({ ispOutcomes: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -133,8 +122,8 @@ export function Stage6GoalsAndEmergency({
               Target Behaviors (if applicable)
             </label>
             <Input
-              value={targetBehaviors}
-              onChange={(e) => setTargetBehaviors(e.target.value)}
+              value={stage6.targetBehaviors}
+              onChange={(e) => updateStage6({ targetBehaviors: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -145,8 +134,8 @@ export function Stage6GoalsAndEmergency({
               Support Strategies
             </label>
             <Input
-              value={supportStrategies}
-              onChange={(e) => setSupportStrategies(e.target.value)}
+              value={stage6.supportStrategies}
+              onChange={(e) => updateStage6({ supportStrategies: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -191,8 +180,8 @@ export function Stage6GoalsAndEmergency({
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Name</label>
             <Input
-              value={emergencyName}
-              onChange={(e) => setEmergencyName(e.target.value)}
+              value={stage6.emergencyName}
+              onChange={(e) => updateStage6({ emergencyName: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter name"
             />
@@ -203,8 +192,8 @@ export function Stage6GoalsAndEmergency({
               Relationship to client
             </label>
             <Select
-              value={emergencyRelationship}
-              onValueChange={setEmergencyRelationship}
+              value={stage6.emergencyRelationship}
+              onValueChange={(v) => updateStage6({ emergencyRelationship: v })}
             >
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
                 <SelectValue placeholder="Select relationship" />
@@ -227,8 +216,8 @@ export function Stage6GoalsAndEmergency({
               Primary Phone number
             </label>
             <Input
-              value={primaryPhone}
-              onChange={(e) => setPrimaryPhone(e.target.value)}
+              value={stage6.primaryPhone}
+              onChange={(e) => updateStage6({ primaryPhone: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter phone number"
             />
@@ -239,8 +228,8 @@ export function Stage6GoalsAndEmergency({
               Secondary Phone number
             </label>
             <Input
-              value={secondaryPhone}
-              onChange={(e) => setSecondaryPhone(e.target.value)}
+              value={stage6.secondaryPhone}
+              onChange={(e) => updateStage6({ secondaryPhone: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter phone number"
             />
@@ -251,8 +240,8 @@ export function Stage6GoalsAndEmergency({
               Hospital Preference
             </label>
             <Input
-              value={hospitalPreference}
-              onChange={(e) => setHospitalPreference(e.target.value)}
+              value={stage6.hospitalPreference}
+              onChange={(e) => updateStage6({ hospitalPreference: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -263,8 +252,8 @@ export function Stage6GoalsAndEmergency({
               Emergency Protocol
             </label>
             <Input
-              value={emergencyProtocol}
-              onChange={(e) => setEmergencyProtocol(e.target.value)}
+              value={stage6.emergencyProtocol}
+              onChange={(e) => updateStage6({ emergencyProtocol: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
@@ -275,8 +264,8 @@ export function Stage6GoalsAndEmergency({
               Medication List (if allowed)
             </label>
             <Input
-              value={medicationList}
-              onChange={(e) => setMedicationList(e.target.value)}
+              value={stage6.medicationList}
+              onChange={(e) => updateStage6({ medicationList: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
