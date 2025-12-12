@@ -109,3 +109,12 @@ body {
 * {
     font-family: "Urbanist", system-ui, sans-serif;
 }
+
+.no-oklch * {
+  --tw-bg-opacity: 1 !important;
+  --tw-text-opacity: 1 !important;
+  --tw-prose-body: initial !important;
+  --tw-ring-color: initial !important;
+  --tw-shadow-color: initial !important;
+  color: black !important;
+}

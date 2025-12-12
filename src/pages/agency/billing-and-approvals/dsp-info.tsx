@@ -58,7 +58,7 @@ export default function DSPClaimsPage() {
     );
   }
 
-  const {dsp: dspInfo, clientServices, billingSummary, dspNotes} = data.data;
+  const {dsp: dspInfo, clientServicesGrouped, billingSummary} = data.data;
 
   return (
     <div className="min-h-screen bg-[#eef4f5] px-8">
@@ -119,50 +119,78 @@ export default function DSPClaimsPage() {
           Client Services
         </h2>
 
-        {clientServices.length > 0 ? (
-          <div className="space-y-3">
-            {clientServices.map((service) => (
-              <div
-                key={service.id}
-                className="grid grid-cols-7 gap-4 items-center py-3 border-b border-[#e5e5e6] last:border-b-0"
-              >
-                {/* DSP Info */}
-                <div className="col-span-1 flex items-center gap-3">
+        {clientServicesGrouped.length > 0 ? (
+          <div className="space-y-6">
+            {clientServicesGrouped.map((group, groupIndex) => (
+              <div key={`${group.client?.id}-${group.serviceCode}-${groupIndex}`} className="space-y-3">
+                <div className="bg-[#f9fafb] px-4 py-2 rounded-lg">
+                  <p className="text-[14px] font-semibold text-[#10141a]">
+                    {group.client?.fullName || "Unknown Client"} | Service: {group.service} ({group.serviceCode})
+                  </p>
+                </div>
+                
+                {group.services.map((service) => (
                   <div
-                    className="w-10 h-10 rounded bg-linear-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-[14px] font-bold">
-                    {service.client?.fullName?.charAt(0) || "?"}
+                    key={service.id}
+                    className="grid grid-cols-7 gap-4 items-center py-3 border-b border-[#e5e5e6] last:border-b-0 ml-4"
+                  >
+                    {/* Date */}
+                    <div className="col-span-1">
+                      <p className="text-[12px] text-[#808081] mb-1">Date</p>
+                      <p className="text-[14px] font-medium text-[#10141a]">
+                        {service.date}
+                      </p>
+                    </div>
+
+                    {/* Clocked In */}
+                    <div className="col-span-1">
+                      <p className="text-[12px] text-[#808081] mb-1">Clocked In</p>
+                      <p className="text-[14px] font-medium text-[#10141a]">
+                        {service.clockedIn}
+                      </p>
+                    </div>
+
+                    {/* Clocked Out */}
+                    <div className="col-span-1">
+                      <p className="text-[12px] text-[#808081] mb-1">Clocked Out</p>
+                      <p className="text-[14px] font-medium text-[#10141a]">
+                        {service.clockedOut}
+                      </p>
+                    </div>
+
+                    {/* Hours */}
+                    <div className="col-span-1">
+                      <p className="text-[12px] text-[#808081] mb-1">Hours</p>
+                      <p className="text-[14px] font-medium text-[#10141a]">
+                        {service.hours}
+                      </p>
+                    </div>
+
+                    {/* Units */}
+                    <div className="col-span-1">
+                      <p className="text-[12px] text-[#808081] mb-1">Units</p>
+                      <p className="text-[14px] font-medium text-[#10141a]">
+                        {service.units}
+                      </p>
+                    </div>
+
+                    {/* Pay Period */}
+                    <div className="col-span-1">
+                      <p className="text-[12px] text-[#808081] mb-1">Pay Period</p>
+                      <p className="text-[14px] font-medium text-[#10141a]">
+                        {service.shiftPeriod || "N/A"}
+                      </p>
+                    </div>
+
+                    {/* Notes */}
+                    <div className="col-span-1">
+                      <p className="text-[12px] text-[#808081] mb-1">Notes</p>
+                      <p className="text-[14px] font-medium text-[#10141a]">
+                        {service.notes}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[14px] font-bold text-[#10141a]">
-                      {service.client?.fullName || "Unknown DSP"}
-                    </p>
-                    <p className="text-[12px] text-[#808081]">Client</p>
-                  </div>
-                </div>
-
-                {/* Date */}
-                <div className="col-span-1">
-                  <p className="text-[12px] text-[#808081] mb-1">Service</p>
-                  <p className="text-[14px] font-medium text-[#10141a]">
-                    {service.service}
-                  </p>
-                </div>
-
-                {/* Clocked In */}
-                <div className="col-span-1">
-                  <p className="text-[12px] text-[#808081] mb-1">Total Hours</p>
-                  <p className="text-[14px] font-medium text-[#10141a]">
-                    {service.hours}
-                  </p>
-                </div>
-
-                {/* Clocked Out */}
-                <div className="col-span-1">
-                  <p className="text-[12px] text-[#808081] mb-1">Pay Period</p>
-                  <p className="text-[14px] font-medium text-[#10141a]">
-                    {"N/A"}
-                  </p>
-                </div>
+                ))}
               </div>
             ))}
           </div>
@@ -283,64 +311,6 @@ export default function DSPClaimsPage() {
           </div>
         </div>
       </div>
-
-      {/* Signatures */}
-      <div className="rounded-[20px] p-6">
-        <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-          Signatures
-        </h2>
-
-        <div className="space-y-4">
-          {/* DSP Signature */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                DSP Signature
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
-            </div>
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                Date
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
-            </div>
-          </div>
-
-          {/* Client Signature */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                Client Signature
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
-            </div>
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                Date
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
-            </div>
-          </div>
-
-          {/* Admin Approval */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                Admin Approval
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
-            </div>
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                Date
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Modal for viewing DSP notes */}
       <AgencyEditNote
         isOpen={isViewMode}
