@@ -75,7 +75,6 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^15.0.7",
     "@testing-library/user-event": "^14.6.1",
-    "@types/html2pdf.js": "^0.10.0",
     "@types/node": "^24.6.0",
     "@types/react": "^19.1.16",
     "@types/react-datepicker": "^7.0.0",
