@@ -84,7 +84,7 @@ export default function DSPClaimsPage() {
         {/* DSP Info Card */}
         <div className="rounded-xl p-4 flex items-start gap-4 mb-6">
           <div
-            className="w-28 h-28 rounded bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-[24px] font-bold shrink-0">
+            className="w-28 h-28 rounded bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-[24px] font-bold shrink-0">
             {dspInfo.fullName.charAt(0)}
           </div>
           <div className={"flex flex-col max-w-lg w-full"}>
@@ -129,7 +129,7 @@ export default function DSPClaimsPage() {
                 {/* DSP Info */}
                 <div className="col-span-1 flex items-center gap-3">
                   <div
-                    className="w-10 h-10 rounded bg-linear-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-[14px] font-bold">
+                    className="w-10 h-10 rounded bg-gradient-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-[14px] font-bold">
                     {service.client?.fullName?.charAt(0) || "?"}
                   </div>
                   <div>

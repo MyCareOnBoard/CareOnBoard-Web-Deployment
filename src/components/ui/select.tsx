@@ -113,13 +113,13 @@ function SelectItem({
       data-slot="select-item"
       className={cn(
         "relative flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-normal text-[var(--input-text)] outline-none transition-colors duration-150",
-        "focus:bg-[color-mix(in_oklab,var(--color-main)_12%,transparent)] focus:text-[var(--input-text)]",
+        "focus:bg-[color-mix(in_oklab,var(--main-color)_12%,transparent)] focus:text-[var(--input-text)]",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className
       )}
       {...props}
     >
-      <span className="absolute right-3 flex size-4 items-center justify-center text-[var(--color-main)]">
+      <span className="absolute right-3 flex size-4 items-center justify-center text-[var(--main-color)]">
         <SelectPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />
         </SelectPrimitive.ItemIndicator>

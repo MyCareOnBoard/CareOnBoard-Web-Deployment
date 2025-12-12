@@ -35,7 +35,7 @@ export default function AddClientPage() {
     const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
 
     const location = s1.location;
-    if (!location?.lat || !location?.lon) {
+    if (!location || !location.lat || !location.lon) {
       throw new Error("Please select an address from the suggestions so we can capture coordinates.");
     }
 

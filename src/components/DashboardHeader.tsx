@@ -44,7 +44,7 @@ function UserAvatar({ userName, userImage }: { userName?: string; userImage?: st
   // Show initials if no image or image failed to load
   if (!userImage || imageError) {
     return (
-      <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-xs font-semibold">
+      <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xs font-semibold">
         {getInitials(userName)}
       </div>
     );

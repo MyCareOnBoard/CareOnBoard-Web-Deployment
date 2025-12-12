@@ -67,7 +67,7 @@ export default function ClientDetailsPage() {
                 className="w-full h-full object-cover aspect-auto rounded-[12px]"
               />
             )}
-            <AvatarFallback className="w-full h-full rounded-[12px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-semibold">
+            <AvatarFallback className="w-full h-full rounded-[12px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-semibold">
               {client.name
                 .split(" ")
                 .filter(Boolean)

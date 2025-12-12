@@ -438,7 +438,7 @@ export default function SupportPage() {
                 }`}
               >
                 <div className="relative">
-                  <div className="w-12 h-12 rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
                     {contact.avatar}
                   </div>
                   {contact.hasNotification && (
@@ -468,7 +468,7 @@ export default function SupportPage() {
             <>
               {/* Chat Header */}
               <div className="p-6 border-b border-[#e5e5e6] flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
                   {selectedContactData.avatar}
                 </div>
                 <div>
@@ -488,7 +488,7 @@ export default function SupportPage() {
                       className={`flex gap-3 ${message.isOwn ? "justify-end" : ""}`}
                     >
                       {!message.isOwn && (
-                        <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold shrink-0">
                           {message.avatar}
                         </div>
                       )}
@@ -542,7 +542,7 @@ export default function SupportPage() {
                         </div>
                       </div>
                       {message.isOwn && (
-                        <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold shrink-0">
                           {message.avatar}
                         </div>
                       )}
@@ -705,7 +705,7 @@ export default function SupportPage() {
                       className="flex items-center justify-between px-3 py-3 hover:bg-[#f8f9fa] rounded-[10px] cursor-pointer transition-colors group"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-full bg-linear-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center shrink-0">
+                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center shrink-0">
                           <span className="text-[15px] font-semibold text-[#10141a]">
                             {user.avatar}
                           </span>

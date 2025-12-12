@@ -210,7 +210,7 @@ export default function BillingAndApprovalsPage() {
                       {/* Client Info */}
                       <div className="flex gap-4">
                         <div
-                          className="w-12 h-12 rounded-full bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-lg font-bold">
+                          className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-lg font-bold">
                           {clientName.charAt(0)}
                         </div>
                         <div>
@@ -226,7 +226,7 @@ export default function BillingAndApprovalsPage() {
                         {record.employees?.map((employee) => (
                           <div className="flex items-center gap-4 h-[60px]" key={employee.id}>
                             <div
-                              className="w-12 h-12 rounded-full bg-linear-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-lg font-bold">
+                              className="w-12 h-12 rounded-full bg-gradient-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-lg font-bold">
                               {employee.fullName?.charAt(0) || 'D'}
                             </div>
                             <div>
@@ -244,7 +244,7 @@ export default function BillingAndApprovalsPage() {
                       {/* DSP Info (First in DSP tab) */}
                       <div className="flex gap-4">
                         <div
-                          className="w-12 h-12 rounded-full bg-linear-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-lg font-bold">
+                          className="w-12 h-12 rounded-full bg-gradient-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-lg font-bold">
                           {dspName.charAt(0)}
                         </div>
                         <div>
@@ -265,7 +265,7 @@ export default function BillingAndApprovalsPage() {
                           return (
                             <div className="flex items-center gap-4 h-[60px]" key={client.id}>
                               <div
-                                className="w-12 h-12 rounded-full bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-lg font-bold">
+                                className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-lg font-bold">
                                 {clientDisplayName.charAt(0)}
                               </div>
                               <div>
