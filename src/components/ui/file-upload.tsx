@@ -12,7 +12,7 @@ const FileUpload = React.forwardRef<
   return (
     <label
       className={cn(
-        "group relative flex w-full max-w-[496px] cursor-pointer items-center justify-center rounded-[12px] border border-[var(--input-border)] bg-[var(--input-bg)] px-6 py-8 transition-colors duration-200",
+        "group relative flex w-full max-w-[496px] cursor-pointer items-center justify-center rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-6 py-8 transition-colors duration-200",
         "hover:border-primary/70 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/20",
         className
       )}

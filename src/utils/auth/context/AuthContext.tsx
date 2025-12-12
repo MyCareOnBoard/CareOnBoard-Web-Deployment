@@ -13,10 +13,10 @@ import {
 import {createUser as createBackendUser} from "../api/client"
 import {PageLoader} from "@/components/ui/loader"
 import {auth} from "@/lib/firebase";
-import type { UserProfile } from "../types/user.types"
+import type { User } from "../types/user.types"
 
 interface AuthContextType {
-  user: UserProfile | null
+  user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   signup: (
@@ -47,7 +47,7 @@ export const useAuth = () => useContext(AuthContext)
 export function AuthProvider({children}: { children: React.ReactNode }) {
   const dispatch = useDispatch<AppDispatch>()
   const reduxUser = useSelector((state: RootState) => state.auth?.user)
-  const [user, setUserState] = useState<UserProfile | null>(null)
+  const [user, setUserState] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
 

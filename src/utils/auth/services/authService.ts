@@ -16,19 +16,19 @@ import {
   confirmPasswordReset,
   type User as FirebaseUser,
 } from 'firebase/auth'
-import type { UserProfile } from '../types/user.types'
+import type { User } from '../types/user.types'
 import { getAuthErrorMessage } from '@/utils/auth'
 
 export interface AuthResponse {
   success: boolean
-  user?: UserProfile
+  user?: User
   error?: string
 }
 
 /**
  * Transform Firebase User to our User type
  */
-export function transformFirebaseUser(firebaseUser: FirebaseUser): UserProfile {
+export function transformFirebaseUser(firebaseUser: FirebaseUser): User {
   return {
     uid: firebaseUser.uid,
     email: firebaseUser.email || '',
@@ -217,7 +217,7 @@ export async function logout(): Promise<void> {
 /**
  * Get current authenticated user
  */
-export async function getCurrentUser(): Promise<UserProfile | null> {
+export async function getCurrentUser(): Promise<User | null> {
   return new Promise((resolve) => {
     // Use Firebase auth state observer
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
@@ -277,7 +277,7 @@ export async function getIdToken(forceRefresh = false): Promise<string | null> {
 /**
  * Store user data in localStorage
  */
-export function storeUserData(user: UserProfile): void {
+export function storeUserData(user: User): void {
   try {
     localStorage.setItem('auth_user', JSON.stringify(user))
   } catch (error) {
@@ -303,7 +303,7 @@ export function removeUserData(): void {
 export const syncAuthState = createAsyncThunk(
   'auth/syncState',
   async (_, { rejectWithValue }) => {
-    return new Promise<UserProfile | null>((resolve) => {
+    return new Promise<User | null>((resolve) => {
       const unsubscribe = auth.onAuthStateChanged(
         (firebaseUser) => {
           unsubscribe()

@@ -8,6 +8,9 @@ interface RideCardProps {
   location: string;
   time: string;
   distance: string;
+  status?: "scheduled" | "in_progress" | "completed" | "cancelled";
+  onCancel?: (rideId: string) => Promise<void> | void;
+  actionLoading?: boolean;
 }
 
 export default function RideCard({
@@ -16,16 +19,22 @@ export default function RideCard({
   location,
   time,
   distance,
+  status,
+  onCancel,
+  actionLoading,
 }: RideCardProps) {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCancelled, setIsCancelled] = useState(false);
 
-  const handleCancel = () => {
-    setIsCancelled(true);
+  const handleCancel = async () => {
     setIsCancelModalOpen(false);
+    if (onCancel) {
+      await onCancel(id);
+    }
+    setIsCancelled(true);
   };
 
-  if (isCancelled) {
+  if (isCancelled || status === "cancelled" || status === "completed") {
     return null;
   }
 
@@ -62,6 +71,7 @@ export default function RideCard({
 
           <Button
             onClick={() => setIsCancelModalOpen(true)}
+            disabled={actionLoading}
             className="bg-[#9ca3af] hover:bg-[#6b7280] text-white rounded-full px-4 py-2 h-auto font-medium text-sm flex items-center gap-2"
           >
             <svg

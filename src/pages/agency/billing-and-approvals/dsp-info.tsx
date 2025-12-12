@@ -15,10 +15,10 @@ export default function DSPClaimsPage() {
   const {data, isLoading, error} = useGetDspClaimsQuery(
     {
       dspId: dsp || "",
-      agencyId: user?.profile?.id || "",
+      agencyId: user?.agencyId || "",
     },
     {
-      skip: !dsp || !user?.profile?.id,
+      skip: !dsp || !user?.agencyId,
     }
   );
 
@@ -82,9 +82,9 @@ export default function DSPClaimsPage() {
 
 
         {/* DSP Info Card */}
-        <div className="rounded-[12px] p-4 flex items-start gap-4 mb-6">
+        <div className="rounded-xl p-4 flex items-start gap-4 mb-6">
           <div
-            className="w-28 h-28 rounded bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-[24px] font-bold flex-shrink-0">
+            className="w-28 h-28 rounded bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-[24px] font-bold shrink-0">
             {dspInfo.fullName.charAt(0)}
           </div>
           <div className={"flex flex-col max-w-lg w-full"}>
@@ -277,7 +277,7 @@ export default function DSPClaimsPage() {
         <div className="bg-[#0EAF521A] rounded-lg p-4 flex items-center justify-between">
           <div className={"flex items-center gap-2"}>
             <div className={"bg-[#B2B2B3] rounded-full py-2 px-3 flex items-center justify-center space-x-1"}>
-              <Banknote className="w-6 h-6 text-white flex-shrink-0"/>
+              <Banknote className="w-6 h-6 text-white shrink-0"/>
               <span className={"text-white"}>$35</span>
             </div>
             <p className="text-[13px] text-[#808081]">
@@ -311,7 +311,6 @@ export default function DSPClaimsPage() {
           </div>
         </div>
       </div>
-
       {/* Modal for viewing DSP notes */}
       <AgencyEditNote
         isOpen={isViewMode}

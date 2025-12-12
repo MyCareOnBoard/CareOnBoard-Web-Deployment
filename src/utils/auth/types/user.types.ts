@@ -14,93 +14,85 @@ export enum UserType {
   SUPER_ADMIN = "super_admin",
 }
 
-/**
- * Agency interface
- * Represents an agency in the system
- */
-export interface Agency {
-  id: string;
-  uid: string; // Links to the user account who created/manages the agency
-  name: string;
-  email: string;
-  phone?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  logo?: string;
-  website?: string;
-  description?: string;
 
-  // Business details
-  taxId?: string;
-  npi?: string;
-  licenseNumber?: string;
-
-  // Status and timestamps
-  status: 'active' | 'inactive' | 'pending' | 'suspended';
-  isVerified: boolean;
-  createdAt: string;
-  updatedAt: string;
-
-  // Optional owner profile
-  owner?: UserProfile;
-}
-
-/**
- * User object structure
- */
-export interface User {
-  id: string
-  uid: string
-  email: string
-  fullName: string
-  emailVerified: boolean
-  createdAt: string
-  updatedAt: string
-  photoURL?: string
+export interface Profile {
+  id?: string
+  uid?: string
+  email?: string
+  fullName?: string
+  name?: string  // Agency name or user display name
   phoneNumber?: string
-  userType?: UserType
-  profile?: Record<string, any>
-  [key: string]: any
+  address?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  gender?: string
+  dateOfBirth?: string
+  profilePicture?: string
+  professionalSummary?: string
 }
+
+/**
+ * Lightweight embedded agency shape (some endpoints embed agency details on the user)
+ */
+export interface UserAgency {
+  id?: string
+  name?: string
+  email?: string
+  phone?: string
+  address?: string
+  city?: string
+  state?: string
+  zipCode?: string
+}
+
 
 /**
  * User Profile data shape matching backend API response
+ * This structure maintains a profile sub-object while extracting commonly used fields to the top level
  */
-export interface UserProfile {
+export interface User {
+  // Core user fields
   id?: string
   uid: string
   email: string
   fullName: string
   emailVerified: boolean
   userType?: UserType
+  // Onboarding and verification (extracted from profile for convenience)
   otpVerified?: boolean
   otpVerifiedAt?: FirebaseTimestamp
   onboardingCompleted?: boolean
+  // Timestamps
   createdAt: FirebaseTimestamp | Date
   updatedAt: FirebaseTimestamp | Date
-  // Profile-specific fields
+  // Profile fields at top level for backward compatibility
   phone?: string
-  address?: string
   gender?: "Male" | "Female" | "Other" | string
-  summary?: string
   joiningDate?: string
   photo?: string
   photoURL?: string
   phoneNumber?: string
   role?: string
   profilePicture?: string
-  dateOfBirth?: string;
-  agency?: Agency;
-  profile?: Record<string, any>; // UserType-specific data (e.g., agency for AGENCY users)
+  dateOfBirth?: string
+  // Employee/DSP fields (used in user panel + employee endpoints)
+  workAvailability?: boolean
+  tagId?: string
+  hireDate?: string | FirebaseTimestamp | Date | null
+  // Agency reference 
+  agencyId?: string
+  // Some endpoints embed agency details rather than only agencyId
+  agency?: UserAgency
+  // Profile sub-object containing all profile-related data
+  profile?: Profile
 }
 
 /**
  * Auth state for Redux
  */
 export interface AuthState {
-  user: UserProfile | null
+  user: User | null
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null

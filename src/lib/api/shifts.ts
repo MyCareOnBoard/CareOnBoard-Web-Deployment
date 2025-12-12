@@ -7,7 +7,7 @@ import axiosClient from '../axios';
 import { ApiResponse } from '../api-types';
 import { Employee } from './employees';
 import { Client } from './clients';
-import { Agency } from '@/utils/auth/types/user.types';
+import { Agency } from '@/lib/api/agencies';
 
 // API endpoint constants
 const SHIFT_BASE = '/shifts';

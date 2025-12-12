@@ -1,12 +1,12 @@
 /**
  * Onboarding API Service
- * Handles all API calls related to user onboarding and profile setup
+ * Handles all API calls related to user onboarding and user setup
  */
 
 import axiosClient, { axiosClientWithoutAuth } from '../axios';
-import type { UserProfile } from '@/utils/auth/types/user.types';
-import type { UserProfileResponse } from '@/lib/api/users';
-import { getUserProfile } from '@/lib/api/users';
+import type { User } from '@/utils/auth/types/user.types';
+import type { UserResponse } from '@/lib/api/users';
+import { getUser } from '@/lib/api/users';
 import type { FirebaseTimestamp } from '@/utils/auth/types/user.types';
 
 function firebaseTimestampToISOString(timestamp?: FirebaseTimestamp): string | undefined {
@@ -24,9 +24,9 @@ export interface OnboardingStatus {
 }
 
 /**
- * Create user profile data structure
+ * Create user data structure
  */
-export interface CreateUserProfileData {
+export interface CreateUserData {
     email: string;
     fullName: string;
     uid: string;
@@ -35,14 +35,14 @@ export interface CreateUserProfileData {
 
 
 /**
- * Create a new user profile
+ * Create a new user
  * Called during initial onboarding when user first signs up
- * @param profileData - User profile data (email, fullName, uid)
- * @returns Promise with created user profile
+ * @param userData - User data (email, fullName, uid)
+ * @returns Promise with created user
  */
-export async function createUserProfile(profileData: CreateUserProfileData): Promise<UserProfile> {
+export async function createUser(userData: CreateUserData): Promise<User> {
     try {
-        const response = await axiosClient.post<UserProfileResponse>("/users", profileData);
+        const response = await axiosClient.post<UserResponse>("/users", userData);
 
         if (!response.data.success || !response.data.user) {
             throw new Error("Invalid response format from server");
@@ -50,19 +50,19 @@ export async function createUserProfile(profileData: CreateUserProfileData): Pro
 
         return response.data.user;
     } catch (err: any) {
-        console.error('Failed to create user profile:', err);
-        throw new Error(err.response?.data?.message || err.message || "Failed to create user profile");
+        console.error('Failed to create user:', err);
+        throw new Error(err.response?.data?.message || err.message || "Failed to create user");
     }
 }
 
 /**
  * Mark user's onboarding as completed
  * Called after user completes all onboarding steps (email verification, OTP, etc.)
- * @returns Promise with updated user profile
+ * @returns Promise with updated user data
  */
-export async function completeOnboarding(): Promise<UserProfile> {
+export async function completeOnboarding(): Promise<User> {
     try {
-        const response = await axiosClient.put<UserProfileResponse>("/users/profile", {
+        const response = await axiosClient.put<UserResponse>("/users/profile", {
             onboardingCompleted: true
         });
 
@@ -78,15 +78,15 @@ export async function completeOnboarding(): Promise<UserProfile> {
 }
 
 /**
- * Check if user profile exists and get its status
+ * Check if user exists and get its status
  * Useful for determining where in the onboarding flow to redirect the user
- * @returns Promise with profile or null if not found
+ * @returns Promise with user or null if not found
  */
-export async function checkProfileStatus(): Promise<UserProfile | null> {
+export async function checkUserStatus(): Promise<User | null> {
     try {
-        return await getUserProfile();
+        return await getUser();
     } catch (err: any) {
-        // If 404, profile doesn't exist yet - that's ok
+        // If 404, user data doesn't exist yet - that's ok
         if (err.response?.status === 404 || err.message?.includes("not found")) {
             return null;
         }
@@ -95,6 +95,9 @@ export async function checkProfileStatus(): Promise<UserProfile | null> {
     }
 }
 
+// Alias for backward compatibility
+export const checkProfileStatus = checkUserStatus;
+
 /**
  * Get onboarding completion status for the current user
  */
@@ -102,15 +105,12 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus> {
     try {
         console.log('🔄 [Onboarding] Fetching onboarding status...')
 
-        // Get user profile which includes onboardingCompleted field
-        const profile = await getUserProfile()
-
-        console.log('📥 [Onboarding] Profile data:', profile)
-        console.log('✅ [Onboarding] Status from API - completed:', profile.onboardingCompleted)
+        // Get user data which includes onboardingCompleted field
+        const user = await getUser()
 
         return {
-            completed: profile.onboardingCompleted || false,
-            completedAt: firebaseTimestampToISOString(profile.otpVerifiedAt), // Use OTP verification time as proxy for completion time
+            completed: user.onboardingCompleted || false,
+            completedAt: firebaseTimestampToISOString(user.otpVerifiedAt), // Use OTP verification time as proxy for completion time
         }
     } catch (error: any) {
         console.warn('⚠️ [Onboarding] API call failed:', error.message)

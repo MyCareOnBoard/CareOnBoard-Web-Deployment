@@ -201,7 +201,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             )}
 
             {/* Microphone indicator */}
-            <div className="relative flex-shrink-0">
+            <div className="relative shrink-0">
               <div 
                 className={`relative bg-[#00b4b8] border border-[rgba(0,0,0,0.12)] rounded-full w-[30px] h-[30px] flex items-center justify-center shadow-lg transition-all duration-300 ${
                   isSpeaking ? 'scale-110' : 'scale-100'
@@ -214,7 +214,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             {/* Stop button */}
             <button
               onClick={handleStop}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0 cursor-pointer"
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors shrink-0 cursor-pointer"
               aria-label="Cancel recording"
               title="Cancel recording"
             >

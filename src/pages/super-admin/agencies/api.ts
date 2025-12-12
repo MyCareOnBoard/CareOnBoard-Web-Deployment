@@ -1,6 +1,6 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
-import { Agency } from "@/utils/auth/types/user.types";
+import { Agency } from "@/lib/api/agencies";
 import { ListAgenciesResponse } from "@/lib/api/agencies";
 
 export interface CreateAgencyWithUserPayload {

@@ -134,7 +134,7 @@ export default function AgencyRespiteLog(
                 type="text"
                 value={submittedNote?.metadata?.individual ?? ""}
                 disabled={true}
-                className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
+                className="h-11 bg-white border border-[#cccccd] rounded-xl px-4"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -145,7 +145,7 @@ export default function AgencyRespiteLog(
                 type="text"
                 value={submittedNote?.metadata?.serviceCode ?? ""}
                 disabled={true}
-                className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4 text-[#b2b2b3]"
+                className="h-11 bg-white border border-[#cccccd] rounded-xl px-4 text-[#b2b2b3]"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -156,7 +156,7 @@ export default function AgencyRespiteLog(
                 type="text"
                 value={toileting}
                 onChange={(e) => setToileting(e.target.value)}
-                className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
+                className="h-11 bg-white border border-[#cccccd] rounded-xl px-4"
               />
             </div>
           </div>
@@ -171,7 +171,7 @@ export default function AgencyRespiteLog(
                 <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
                   <PopoverTrigger asChild>
                     <button type="button" className="w-full focus:outline-none">
-                      <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                      <InputGroup className="h-11 bg-white border border-[#cccccd] rounded-xl px-4">
                         <InputGroupInput
                           value={date ? format(date, "MMMM d, yyyy") : ""}
                           placeholder="Select date"
@@ -220,7 +220,7 @@ export default function AgencyRespiteLog(
                   type="text"
                   value={date ? format(date, "MMMM d, yyyy") : ""}
                   disabled={true}
-                  className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
+                  className="h-11 bg-white border border-[#cccccd] rounded-xl px-4"
                 />
               )}
             </div>
@@ -233,7 +233,7 @@ export default function AgencyRespiteLog(
                 value={medication}
                 onChange={(e) => setMedication(e.target.value)}
                 disabled={!isEditable}
-                className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
+                className="h-11 bg-white border border-[#cccccd] rounded-xl px-4"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -241,7 +241,7 @@ export default function AgencyRespiteLog(
                 className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif] opacity-0">
                 &nbsp;
               </label>
-              <div className="flex gap-[9px] items-center h-[44px]">
+              <div className="flex gap-[9px] items-center h-11">
                 <div className="flex gap-1 items-center">
                   <Radio
                     name="medicationTime"
@@ -330,7 +330,7 @@ export default function AgencyRespiteLog(
               <VoiceEnabledTextarea
                 value={activities}
                 onChange={setActivities}
-                className="h-[143px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
+                className="h-[143px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
                 placeholder=""
                 fieldName="Activities"
                 pageTitle="Respite Log"
@@ -339,7 +339,7 @@ export default function AgencyRespiteLog(
               <textarea
                 value={activities}
                 disabled={true}
-                className="h-[143px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
+                className="h-[143px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
               />
             )}
           </div>
@@ -353,7 +353,7 @@ export default function AgencyRespiteLog(
               <VoiceEnabledTextarea
                 value={comments}
                 onChange={setComments}
-                className="h-[143px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
+                className="h-[143px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
                 placeholder=""
                 fieldName="Comments"
                 pageTitle="Respite Log"
@@ -362,7 +362,7 @@ export default function AgencyRespiteLog(
               <textarea
                 value={comments}
                 disabled={true}
-                className="h-[143px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
+                className="h-[143px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
               />
             )}
           </div>
@@ -376,7 +376,7 @@ export default function AgencyRespiteLog(
               <VoiceEnabledTextarea
                 value={healthConcerns}
                 onChange={setHealthConcerns}
-                className="h-[90px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
+                className="h-[90px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
                 placeholder=""
                 fieldName="Health Concerns"
                 pageTitle="Respite Log"
@@ -385,7 +385,7 @@ export default function AgencyRespiteLog(
               <textarea
                 value={healthConcerns}
                 disabled={true}
-                className="h-[90px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
+                className="h-[90px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
               />
             )}
           </div>
@@ -399,7 +399,7 @@ export default function AgencyRespiteLog(
               <VoiceEnabledTextarea
                 value={suppliesNeeded}
                 onChange={setSuppliesNeeded}
-                className="h-[90px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
+                className="h-[90px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
                 placeholder=""
                 fieldName="Supplies Needed Soon"
                 pageTitle="Respite Log"
@@ -408,7 +408,7 @@ export default function AgencyRespiteLog(
               <textarea
                 value={suppliesNeeded}
                 disabled={true}
-                className="h-[90px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
+                className="h-[90px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
               />
             )}
           </div>

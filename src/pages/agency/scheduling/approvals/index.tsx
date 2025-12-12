@@ -65,7 +65,7 @@ export default function ApprovalsPage() {
         setLoading(true);
         const response = await listShifts({
           limit: 100,
-          agencyId: user?.profile?.id,
+          agencyId: user?.agencyId,
           client: true,
           employee: true,
         });
@@ -86,13 +86,13 @@ export default function ApprovalsPage() {
       }
     };
 
-    if (user?.profile?.id) {
+    if (user?.agencyId) {
       fetchShifts();
     } else {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.profile?.id]);
+  }, [user?.agencyId]);
 
   // Filter shifts based on search and filter status (active/inactive)
   const filteredShifts = useMemo(() => {
@@ -380,15 +380,15 @@ export default function ApprovalsPage() {
                   >
                     {/* Client Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
                         {clientAvatar && (
                           <AvatarImage
                             src={clientAvatar}
                             alt={clientName}
-                            className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                            className="w-full h-full object-cover aspect-auto rounded-lg"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(clientName)}
                         </AvatarFallback>
                       </Avatar>
@@ -404,15 +404,15 @@ export default function ApprovalsPage() {
 
                     {/* DSP/Employee Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
                         {employeeAvatar && (
                           <AvatarImage
                             src={employeeAvatar}
                             alt={employeeName}
-                            className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                            className="w-full h-full object-cover aspect-auto rounded-lg"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(employeeName)}
                         </AvatarFallback>
                       </Avatar>

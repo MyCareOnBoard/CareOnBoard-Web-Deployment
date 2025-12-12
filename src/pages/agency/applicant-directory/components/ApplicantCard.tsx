@@ -23,7 +23,7 @@ export function ApplicantCard({ applicant, selectedTab, onTabChange }: Applicant
     <div className="bg-white rounded-[20px] border border-[#e5e5e6] p-6 mb-6">
       <div className="flex items-start gap-6">
         {/* Avatar */}
-        <div className="w-[120px] h-[120px] rounded-full overflow-hidden flex-shrink-0">
+        <div className="w-[120px] h-[120px] rounded-full overflow-hidden shrink-0">
           <img
             src={`https://i.pravatar.cc/120?img=${applicant.id}`}
             alt={applicant.name}

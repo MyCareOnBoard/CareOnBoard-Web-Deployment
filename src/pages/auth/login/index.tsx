@@ -10,7 +10,7 @@ import { setUser, useAuth } from "@/utils/auth"
 import {useToast} from "@/hooks/use-toast"
 import {ButtonLoader} from "@/components/ui/loader"
 import {Routes} from "@/routes/constants"
-import {getUserProfile} from "@/lib/api/users"
+import {getUser} from "@/lib/api/users"
 import {getOnboardingStatus} from "@/lib/api/onboarding"
 import {
   getAuthErrorMessage,
@@ -129,17 +129,17 @@ export default function LoginPage() {
         description: successMsg.description,
       })
 
-      const profile = await getUserProfile()
+      const user = await getUser()
 
-      // Dispatch profile with user-specific data
-      dispatch(setUser(profile))
+      // Dispatch user with user-specific data
+      dispatch(setUser(user))
 
-      if (profile.userType !== UserType.APPLICANT) {
-        navigate(dashboardRoutes[profile.userType as UserType], {replace: true})
+      if (user.userType !== UserType.APPLICANT) {
+        navigate(dashboardRoutes[user.userType as UserType], {replace: true})
         return
       }
       // Check if onboarding is already completed
-      if (profile.onboardingCompleted) {
+      if (user.onboardingCompleted) {
         navigate(dashboardRoutes[UserType.APPLICANT], {replace: true})
         return
       }

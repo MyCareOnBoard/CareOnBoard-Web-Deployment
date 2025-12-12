@@ -536,7 +536,7 @@ export default function SupportedEmploymentInterventionPage() {
               type="text"
               value={activityLog?.metadata?.individual ?? ""}
               disabled={true}
-              className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
+              className="h-11 bg-white border border-[#cccccd] rounded-xl px-4"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -547,7 +547,7 @@ export default function SupportedEmploymentInterventionPage() {
               type="text"
               value={user?.agency?.name ?? ""}
               disabled={true}
-              className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
+              className="h-11 bg-white border border-[#cccccd] rounded-xl px-4"
             />
           </div>
         </div>
@@ -560,7 +560,7 @@ export default function SupportedEmploymentInterventionPage() {
           </label>
           <VoiceEnabledTextarea
             value={noteInfo.jobType}
-            className="min-h-[80px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
+            className="min-h-[80px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
             placeholder=""
             fieldName="Type of Job"
             onChange={(e) => handleNoteInfoChange("jobType", e)}
@@ -576,7 +576,7 @@ export default function SupportedEmploymentInterventionPage() {
           </label>
           <VoiceEnabledTextarea
             value={noteInfo.ISPOutcome}
-            className="min-h-[80px] bg-white border border-[#cccccd] rounded-[12px] px-4 py-3 resize-none"
+            className="min-h-[80px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
             placeholder=""
             onChange={(e) => handleNoteInfoChange("ISPOutcome", e)}
             fieldName="Applicable ISP Outcomes"
@@ -594,7 +594,7 @@ export default function SupportedEmploymentInterventionPage() {
               type="text"
               value={noteInfo.totalHours}
               onChange={(e) => handleNoteInfoChange("totalHours", e.target.value)}
-              className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4"
+              className="h-11 bg-white border border-[#cccccd] rounded-xl px-4"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -604,7 +604,7 @@ export default function SupportedEmploymentInterventionPage() {
             <Popover open={isStartDateOpen} onOpenChange={setIsStartDateOpen}>
               <PopoverTrigger asChild>
                 <button type="button" className="w-full focus:outline-none">
-                  <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                  <InputGroup className="h-11 bg-white border border-[#cccccd] rounded-xl px-4">
                     <InputGroupInput
                       value={noteInfo.reportingStartDate ? format(noteInfo.reportingStartDate, "MMMM d, yyyy") : ""}
                       placeholder="Select date"
@@ -651,7 +651,7 @@ export default function SupportedEmploymentInterventionPage() {
             <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
               <PopoverTrigger asChild>
                 <button type="button" className="w-full focus:outline-none">
-                  <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                  <InputGroup className="h-11 bg-white border border-[#cccccd] rounded-xl px-4">
                     <InputGroupInput
                       value={noteInfo.reportingEndDate ? format(noteInfo.reportingEndDate, "MMMM d, yyyy") : ""}
                       placeholder="Select date"
@@ -702,7 +702,7 @@ export default function SupportedEmploymentInterventionPage() {
             type="text"
             value={user?.fullName ?? ""}
             disabled={true}
-            className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4 w-full"
+            className="h-11 bg-white border border-[#cccccd] rounded-xl px-4 w-full"
           />
         </div>
 

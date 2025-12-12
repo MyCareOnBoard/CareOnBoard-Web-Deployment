@@ -23,7 +23,7 @@ export default function ClientClaimsPage() {
       serviceCode: serviceCode || undefined,
     },
     {
-      skip: !clientId || !user?.profile?.id,
+      skip: !clientId || !user?.agencyId,
     }
   );
 
