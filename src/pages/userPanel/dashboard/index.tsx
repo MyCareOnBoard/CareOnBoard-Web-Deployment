@@ -184,7 +184,7 @@ export default function UserPanelDashboardPage() {
                   </div>
                 ) : (
                   <div
-                    className="w-[180px] h-full rounded-xl bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-6xl font-bold">
+                    className="w-[180px] h-full rounded-xl bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-6xl font-bold">
                     {employeeInfo?.fullName?.charAt(0) || "U"}
                   </div>
                 )}

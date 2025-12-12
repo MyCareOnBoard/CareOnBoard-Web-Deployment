@@ -66,14 +66,14 @@ export async function getUser(): Promise<User> {
       createdAt: backendUser.createdAt,
       updatedAt: backendUser.updatedAt,
       agencyId: backendUser.agencyId,
-      
+
       // Profile data goes ONLY in profile sub-object
       profile: {}
     };
 
     // Extract profile data from backend response
     const profileSource = backendUser.profile || backendUser;
-    
+
     // Build profile sub-object from available data
     user.profile = {
       email: profileSource.email || backendUser.email,
@@ -89,27 +89,6 @@ export async function getUser(): Promise<User> {
       profilePicture: profileSource.profilePicture || profileSource.photo || profileSource.photoURL,
       professionalSummary: profileSource.professionalSummary || profileSource.summary,
     };
-
-    // Load agency data for agency users if needed
-    if (user.userType === UserType.AGENCY && !user.agencyId) {
-      try {
-        const agency = await seedAgency();
-        user.agencyId = agency.id;
-        // Update profile with agency details
-        user.profile = {
-          ...user.profile,
-          name: agency.name,
-          email: agency.email,
-          phoneNumber: agency.phone,
-          address: agency.address,
-          city: agency.city,
-          state: agency.state,
-          zipCode: agency.zipCode
-        };
-      } catch (error: any) {
-        console.error('Failed to seed agency:', error);
-      }
-    }
 
     return user;
   } catch (err: any) {

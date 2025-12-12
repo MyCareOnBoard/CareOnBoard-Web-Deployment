@@ -84,7 +84,7 @@ export default function DSPClaimsPage() {
         {/* DSP Info Card */}
         <div className="rounded-xl p-4 flex items-start gap-4 mb-6">
           <div
-            className="w-28 h-28 rounded bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-[24px] font-bold shrink-0">
+            className="w-28 h-28 rounded bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-[24px] font-bold shrink-0">
             {dspInfo.fullName.charAt(0)}
           </div>
           <div className={"flex flex-col max-w-lg w-full"}>

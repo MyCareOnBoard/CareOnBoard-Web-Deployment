@@ -14,22 +14,32 @@ export interface Client {
   id: string;
   firstName?: string;
   lastName?: string;
+  middleName?: string;
+  gender?: string;
   email?: string;
   phone?: string;
   dateOfBirth?: string;
   profileImage?: string;
 
   // Address information
-  location: string;
+  location?: { lat: string; lon: string };
   address?: string;
   city?: string;
   state?: string;
   zipCode?: string;
+  countyState?: string;
+  languagePreference?: string;
+  communicationMethod?: string;
+  medicaidId?: string;
+  dddId?: string;
+  ssn?: string;
+  nursingLevel?: string;
 
   // Service information
-  service: string;
+  service?: string;
   serviceCode?: string;
   billingRate?: string;
+  services?: ClientService[];
 
   // Plan of care
   planOfCare?: {
@@ -40,6 +50,15 @@ export interface Client {
   };
   ispOutcome?: string;
 
+  // Add Client wizard sections (Stage 2–7)
+  guardianInfo?: ClientGuardianInfo;
+  healthcareSafety?: ClientHealthcareSafety;
+  documents?: ClientDocument[];
+  evvVisitConfig?: ClientEvvVisitConfig;
+  staffAssignment?: ClientStaffAssignmentAndRestrictions;
+  goalsAndEmergency?: ClientGoalsAndEmergency;
+  systemAiAndAudit?: ClientSystemAiAndAudit;
+
   // Agency relationship
   agencyId?: string;
 
@@ -47,6 +66,132 @@ export interface Client {
   status?: 'active' | 'inactive' | 'pending' | 'archived';
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Add Client Wizard Models (Stage 1–7)
+ * These mirror the fields collected in the Add Client flow.
+ * NOTE: Backend support may be incremental; keep fields optional on requests.
+ */
+export interface ClientService {
+  id: string;
+  name: string;
+  code: string;
+  hours?: string;
+  rate?: string;
+  ispEffectiveDate?: string;
+  startAuthDate?: string;
+  endAuthDate?: string;
+  pcptDate?: string;
+  sdrDate?: string;
+}
+
+export interface ClientGuardianInfo {
+  guardianName?: string;
+  guardianRelationship?: string;
+  guardianEmail?: string;
+  guardianPhone?: string;
+  guardianAddress?: string;
+  supportCoordinatorName?: string;
+  supportCoordinatorAgency?: string;
+  supportCoordinatorContact?: string;
+}
+
+export interface ClientHealthcareSafety {
+  medicalConditions?: string;
+  allergies?: string;
+  dietaryRestrictions?: string;
+  seizurePlan?: string;
+  mobilitySupportNeeds?: string;
+  behaviorSupportPlan?: string;
+  communicationNeeds?: string;
+  emergencyProtocols?: string;
+}
+
+export type ClientDocumentKey =
+  | "isp"
+  | "pcpt"
+  | "poc"
+  | "sdr"
+  | "bsp"
+  | "medicalDocs"
+  | "consents";
+
+export interface ClientDocument {
+  key: ClientDocumentKey;
+  title?: string;
+  fileName?: string;
+  /**
+   * Storage URL (when uploaded). If the frontend is still holding a File, it should not be sent as JSON.
+   */
+  url?: string;
+  uploadDate?: string;
+  expiryDate?: string;
+  autoReminder?: boolean;
+}
+
+export type ClientYesNo = "yes" | "no" | "";
+
+export interface ClientEvvVisitConfig {
+  evvRequirement?: ClientYesNo;
+  primaryVisitLocationGps?: ClientYesNo;
+  allowedSecondaryLocations?: ClientYesNo;
+  minShiftLength?: string;
+  maxShiftLength?: string;
+  backToBackAllowed?: ClientYesNo;
+  travelTimeAllowed?: ClientYesNo;
+}
+
+export type ClientAutoCheckKey = "compliance" | "training" | "background" | "expired";
+
+export interface ClientStaffAssignmentAndRestrictions {
+  primaryDspAssigned?: string;
+  primaryDspId?: string;
+  secondaryDsps?: string;
+  secondaryDspId?: string;
+  genderPreference?: string;
+  requiredCertifications?: string;
+  specialConditions?: string;
+  prefersFamiliar?: ClientYesNo;
+  noMaleFemaleStaff?: ClientYesNo;
+  medicalRestrictionsTrained?: ClientYesNo;
+  autoChecks?: Record<ClientAutoCheckKey, boolean>;
+}
+
+export interface ClientGoalsAndEmergency {
+  // Goals
+  clientGoals?: string;
+  communityGoals?: string;
+  dailyLivingGoals?: string;
+  behavioralGoals?: string;
+  skillBuildingGoals?: string;
+  ispOutcomes?: string;
+  targetBehaviors?: string;
+  supportStrategies?: string;
+
+  // Emergency
+  emergencyName?: string;
+  emergencyRelationship?: string;
+  primaryPhone?: string;
+  secondaryPhone?: string;
+  hospitalPreference?: string;
+  emergencyProtocol?: string;
+  medicationList?: string;
+}
+
+export type ClientAuditCycle = "monthly" | "quarterly";
+
+export interface ClientSystemAiAndAudit {
+  aiNotesReview?: boolean;
+  aiPlanOfCareBuilder?: boolean;
+  aiGoalTracking?: boolean;
+  expiringDocsReminder?: boolean;
+  renewalsReminder?: boolean;
+  auditCycle?: ClientAuditCycle;
+  assignedQaStaff?: string;
+  requiredVisitDocumentation?: string;
+  notesReviewRules?: string;
+  billingValidationRules?: string;
 }
 
 /**
@@ -103,17 +248,104 @@ export interface ListClientsParams {
 export interface CreateClientRequest {
   firstName?: string;
   lastName?: string;
+  middleName?: string;
+  gender?: string;
   email?: string;
   phone?: string;
   dateOfBirth?: string;
-  location: string;
+  location?: { lat: string; lon: string };
   address?: string;
   city?: string;
   state?: string;
   zipCode?: string;
-  service: string;
+  countyState?: string;
+  languagePreference?: string;
+  communicationMethod?: string;
+  medicaidId?: string;
+  dddId?: string;
+  ssn?: string;
+  nursingLevel?: string;
+  service?: string;
   serviceCode?: string;
   billingRate?: string;
+  services?: ClientService[];
+
+  /**
+   * Flattened wizard fields (Stage 2–7)
+   * (Preferred for create/update payloads; stored as top-level fields in Firestore)
+   */
+  guardianName?: string;
+  guardianRelationship?: string;
+  guardianEmail?: string;
+  guardianPhone?: string;
+  guardianAddress?: string;
+  supportCoordinatorName?: string;
+  supportCoordinatorAgency?: string;
+  supportCoordinatorContact?: string;
+
+  medicalConditions?: string;
+  allergies?: string;
+  dietaryRestrictions?: string;
+  seizurePlan?: string;
+  mobilitySupportNeeds?: string;
+  behaviorSupportPlan?: string;
+  communicationNeeds?: string;
+  emergencyProtocols?: string;
+
+  evvRequirement?: ClientYesNo;
+  primaryVisitLocationGps?: ClientYesNo;
+  allowedSecondaryLocations?: ClientYesNo;
+  minShiftLength?: string;
+  maxShiftLength?: string;
+  backToBackAllowed?: ClientYesNo;
+  travelTimeAllowed?: ClientYesNo;
+
+  primaryDspAssigned?: string;
+  primaryDspId?: string;
+  secondaryDsps?: string;
+  secondaryDspId?: string;
+  genderPreference?: string;
+  requiredCertifications?: string;
+  specialConditions?: string;
+  prefersFamiliar?: ClientYesNo;
+  noMaleFemaleStaff?: ClientYesNo;
+  medicalRestrictionsTrained?: ClientYesNo;
+  autoChecks?: Record<ClientAutoCheckKey, boolean>;
+
+  clientGoals?: string;
+  communityGoals?: string;
+  dailyLivingGoals?: string;
+  behavioralGoals?: string;
+  skillBuildingGoals?: string;
+  ispOutcomes?: string;
+  targetBehaviors?: string;
+  supportStrategies?: string;
+
+  emergencyName?: string;
+  emergencyRelationship?: string;
+  primaryPhone?: string;
+  secondaryPhone?: string;
+  hospitalPreference?: string;
+  emergencyProtocol?: string;
+  medicationList?: string;
+
+  aiNotesReview?: boolean;
+  aiPlanOfCareBuilder?: boolean;
+  aiGoalTracking?: boolean;
+  expiringDocsReminder?: boolean;
+  renewalsReminder?: boolean;
+  auditCycle?: ClientAuditCycle;
+  assignedQaStaff?: string;
+  requiredVisitDocumentation?: string;
+  notesReviewRules?: string;
+  billingValidationRules?: string;
+  guardianInfo?: ClientGuardianInfo;
+  healthcareSafety?: ClientHealthcareSafety;
+  documents?: ClientDocument[];
+  evvVisitConfig?: ClientEvvVisitConfig;
+  staffAssignment?: ClientStaffAssignmentAndRestrictions;
+  goalsAndEmergency?: ClientGoalsAndEmergency;
+  systemAiAndAudit?: ClientSystemAiAndAudit;
   agencyId?: string; // Required for employees, defaults to own agencyId for agencies
 }
 
@@ -123,17 +355,93 @@ export interface CreateClientRequest {
 export interface UpdateClientRequest {
   firstName?: string;
   lastName?: string;
+  middleName?: string;
+  gender?: string;
   email?: string;
   phone?: string;
   dateOfBirth?: string;
-  location?: string;
+  location?: { lat: string; lon: string };
   address?: string;
   city?: string;
   state?: string;
   zipCode?: string;
+  countyState?: string;
+  languagePreference?: string;
+  communicationMethod?: string;
+  medicaidId?: string;
+  dddId?: string;
+  ssn?: string;
+  nursingLevel?: string;
   service?: string;
   serviceCode?: string;
   billingRate?: string;
+  services?: ClientService[];
+  guardianName?: string | null;
+  guardianRelationship?: string | null;
+  guardianEmail?: string | null;
+  guardianPhone?: string | null;
+  guardianAddress?: string | null;
+  supportCoordinatorName?: string | null;
+  supportCoordinatorAgency?: string | null;
+  supportCoordinatorContact?: string | null;
+  medicalConditions?: string | null;
+  allergies?: string | null;
+  dietaryRestrictions?: string | null;
+  seizurePlan?: string | null;
+  mobilitySupportNeeds?: string | null;
+  behaviorSupportPlan?: string | null;
+  communicationNeeds?: string | null;
+  emergencyProtocols?: string | null;
+  evvRequirement?: ClientYesNo | null;
+  primaryVisitLocationGps?: ClientYesNo | null;
+  allowedSecondaryLocations?: ClientYesNo | null;
+  minShiftLength?: string | null;
+  maxShiftLength?: string | null;
+  backToBackAllowed?: ClientYesNo | null;
+  travelTimeAllowed?: ClientYesNo | null;
+  primaryDspAssigned?: string | null;
+  primaryDspId?: string | null;
+  secondaryDsps?: string | null;
+  secondaryDspId?: string | null;
+  genderPreference?: string | null;
+  requiredCertifications?: string | null;
+  specialConditions?: string | null;
+  prefersFamiliar?: ClientYesNo | null;
+  noMaleFemaleStaff?: ClientYesNo | null;
+  medicalRestrictionsTrained?: ClientYesNo | null;
+  autoChecks?: Record<ClientAutoCheckKey, boolean> | null;
+  clientGoals?: string | null;
+  communityGoals?: string | null;
+  dailyLivingGoals?: string | null;
+  behavioralGoals?: string | null;
+  skillBuildingGoals?: string | null;
+  ispOutcomes?: string | null;
+  targetBehaviors?: string | null;
+  supportStrategies?: string | null;
+  emergencyName?: string | null;
+  emergencyRelationship?: string | null;
+  primaryPhone?: string | null;
+  secondaryPhone?: string | null;
+  hospitalPreference?: string | null;
+  emergencyProtocol?: string | null;
+  medicationList?: string | null;
+  aiNotesReview?: boolean | null;
+  aiPlanOfCareBuilder?: boolean | null;
+  aiGoalTracking?: boolean | null;
+  expiringDocsReminder?: boolean | null;
+  renewalsReminder?: boolean | null;
+  auditCycle?: ClientAuditCycle | null;
+  assignedQaStaff?: string | null;
+  requiredVisitDocumentation?: string | null;
+  notesReviewRules?: string | null;
+  billingValidationRules?: string | null;
+  guardianInfo?: ClientGuardianInfo | null;
+  healthcareSafety?: ClientHealthcareSafety | null;
+  documents?: ClientDocument[] | null;
+  evvVisitConfig?: ClientEvvVisitConfig | null;
+  staffAssignment?: ClientStaffAssignmentAndRestrictions | null;
+  goalsAndEmergency?: ClientGoalsAndEmergency | null;
+  systemAiAndAudit?: ClientSystemAiAndAudit | null;
   status?: 'active' | 'inactive' | 'pending' | 'archived';
 }
 

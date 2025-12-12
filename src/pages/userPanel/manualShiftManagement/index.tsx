@@ -1023,7 +1023,11 @@ export default function ManualShiftManagementPage() {
                         >
                           <div className="font-medium">{clientName}</div>
                           {client.location && (
-                            <div className="text-xs text-[#808081] mt-1">{client.location}</div>
+                            <div className="text-xs text-[#808081] mt-1">
+                              {typeof client.location === "object" && client.location
+                                ? `${client.location.lat}, ${client.location.lon}`
+                                : client.location}
+                            </div>
                           )}
                         </div>
                       );
