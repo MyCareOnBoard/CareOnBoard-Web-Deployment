@@ -19,7 +19,7 @@ export default function ClientClaimsPage() {
   const {data, isLoading, error} = useGetClientClaimsQuery(
     {
       clientId: clientId || "",
-      agencyId: user?.profile?.id || "",
+      agencyId: user?.agencyId || "",
       serviceCode: serviceCode || undefined,
     },
     {
@@ -170,7 +170,7 @@ export default function ClientClaimsPage() {
             </button>
           </div>
 
-          <div ref={printContentRef} className="bg-white p-8 rounded-lg no-oklch">
+          <div ref={printContentRef} className="bg-white p-8 rounded-lg forced-colors:none no-oklch">
             <h2 className="text-[20px] font-semibold text-[#10141a] mb-8 text-center">
               Client Claims
             </h2>
