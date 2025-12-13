@@ -210,8 +210,8 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-8">
-                    <span className={`px-4 py-1.5 rounded-full text-xs font-medium capitalize ${
+                  <div className="flex items-center w-[50%] justify-between">
+                    <span className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize ${
                       dsp.status === "active"
                         ? "bg-green-100 text-green-700"
                         : "bg-red-100 text-red-700"
@@ -220,12 +220,13 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                     </span>
                     <div className="text-center">
                       <p className="text-xs text-gray-500">Clients</p>
-                      <p className="text-sm font-semibold text-gray-900">{dsp.clients || 0}</p>
+                      <p className="text-lg font-semibold text-gray-900">{dsp.clients || 0}</p>
                     </div>
                     <div className="text-center">
                       <p className="text-xs text-gray-500">Training</p>
-                      <p className="text-sm font-semibold text-gray-900">{dsp.completedTrainings || 0}/{dsp.totalTrainings || 0}</p>
+                      <p className="text-lg font-semibold text-gray-900">{dsp.completedTrainings || 0}/{dsp.totalTrainings || 0}</p>
                     </div>
+                  </div>
                     {dsp.status === "active" ? (
                       <button
                         onClick={() => onSelectDsp(dsp)}
@@ -240,7 +241,6 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                         Send Alert
                       </button>
                     )}
-                  </div>
                 </div>
               );
             })}
