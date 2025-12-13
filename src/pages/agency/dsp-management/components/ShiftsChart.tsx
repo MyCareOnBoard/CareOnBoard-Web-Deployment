@@ -46,7 +46,7 @@ export function ShiftsChart({ filter, onFilterChange, isLoading }: ShiftsChartPr
 
   return (
     <div className="bg-[#edf1f2] p-6 rounded-lg h-full flex flex-col">
-      <div className="mb-6 ]">
+      <div className="mb-6">
         <h3 className="text-lg font-bold text-gray-900 mb-1">SHIFTS</h3>
         <div className="flex items-center justify-between">
           {/* Filter Buttons */}

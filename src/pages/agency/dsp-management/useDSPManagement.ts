@@ -36,7 +36,7 @@ function calculateAge(dateOfBirth?: string): number | undefined {
 function transformEmployeeToDSP(employee: Employee): DSP {
   return {
     id: employee.id,
-    userId: employee.userId || employee.id,
+    userId: employee.userId,
     fullName: employee.fullName,
     email: employee.email,
     bio: employee.bio || "",

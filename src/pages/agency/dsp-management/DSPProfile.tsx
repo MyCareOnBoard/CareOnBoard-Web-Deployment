@@ -19,9 +19,9 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
   const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile">("Activity");
   const { toast } = useToast();
 
-  const { dsp: dspDetails, shifts, isLoading: detailsLoading } = useDSPDetails(dsp.id);
+  const { shifts, isLoading: detailsLoading } = useDSPDetails(dsp.id);
   const { completedCount, totalCount, isLoading: trainingsLoading } = useDSPTrainings(dsp.id);
-  const { updateStatus, isUpdating: statusLoading } = useUpdateDSPStatus();
+  const { updateStatus } = useUpdateDSPStatus();
   
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
@@ -162,13 +162,13 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
         </div>
 
         {/* Tabs */}
-        <div className=" flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab("Activity")}
             className={`px-6 py-2 rounded-full text-sm font-medium border transition-colors ${
               activeTab === "Activity"
                 ? "bg-gray-900 text-white"
-                : " text-gray-600 hover:bg-gray-100"
+                : "text-gray-600 hover:bg-gray-100"
             }`}
           >
             Activity
@@ -217,7 +217,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
         <ShiftsTab
           shifts={shifts.map(shift => ({
             id: shift.id,
-            employeeId: shift.employee?.id || shift.uid || '',
+            employeeId: shift.employee?.id || '',
             clientId: shift.client?.id || '',
             clientName: shift.client ? `${shift.client.firstName || ''} ${shift.client.lastName || ''}`.trim() || 'Unknown Client' : 'Unknown Client',
             clientImage: shift.client?.profileImage,

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { FileText, Plus } from "lucide-react";
 import { EmployeeDocument } from "@/lib/api/employee-documents";
 import { ShiftsChart } from "./ShiftsChart";
 import { TrainingSection } from "./TrainingSection";

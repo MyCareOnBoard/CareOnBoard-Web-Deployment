@@ -13,7 +13,7 @@ import { User } from '@/utils/auth/types/user.types';
  */
 export interface Employee {
   id: string;
-  uid?: string; // Legacy field - same as id
+  uid?: string; // Legacy field - may be same as id or userId depending on source
   userId: string; // Links to the user account
   email: string;
   bio: string;
