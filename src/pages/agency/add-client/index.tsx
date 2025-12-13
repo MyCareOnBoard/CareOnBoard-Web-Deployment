@@ -11,7 +11,7 @@ import { Stage7SystemAiAndAudit } from "@/pages/agency/add-client/stages/Stage7S
 import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 import { SaveClientSuccessModal } from "@/pages/agency/add-client/components/SaveClientSuccessModal";
 import { createInitialAddClientFormData } from "@/pages/agency/add-client/formData";
-import { createClient, type CreateClientRequest } from "@/lib/api/clients";
+import { createAgencyClient, type CreateClientRequest } from "@/lib/api/clients";
 
 export default function AddClientPage() {
   const navigate = useNavigate();
@@ -190,7 +190,7 @@ export default function AddClientPage() {
           setIsSaving(true);
           try {
             const payload = flattenAddClientFormData();
-            const created = await createClient(payload);
+            const created = await createAgencyClient(payload);
             const fullName =
               `${created.firstName || ""} ${created.lastName || ""}`.trim() ||
               `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();

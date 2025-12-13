@@ -1,50 +1,153 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { useNavigate } from "react-router";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Routes } from "@/routes/constants";
+import { useAuth } from "@/utils/auth";
+import { listAgencyClients, getClientStats, type Client } from "@/lib/api/clients";
+
+interface DisplayClient {
+  id: string;
+  name: string;
+  status: "Active" | "Inactive" | "Pending" | "Archived";
+  roleLabel: string;
+  roleValue: string | number;
+  accountCreated: string;
+  avatarUrl?: string;
+}
 
 export default function ClientsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [totalClients, setTotalClients] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const itemsPerPage = 7;
   const searchAnchorRef = useRef<HTMLDivElement>(null);
   const shouldShowSearchDropdown = searchQuery.trim().length >= 2;
 
-  const clients = useMemo(
-    () =>
-      Array.from({ length: 8 }).map((_, idx) => ({
-        id: `client-${idx + 1}`,
-        name: "DR.Brooklyn Simmons",
-        status: "Active" as const,
-        roleLabel: "DSP",
-        roleValue: 40,
-        accountCreated: "12 January 2025",
-        avatarUrl: "https://i.pravatar.cc/120?img=12",
-      })),
-    []
-  );
+  // Format client name from firstName, lastName, middleName
+  const formatClientName = (client: Client): string => {
+    const parts = [
+      client.firstName,
+      client.middleName,
+      client.lastName,
+    ].filter(Boolean);
+    return parts.join(" ") || "Unnamed Client";
+  };
 
+  // Format date from ISO string or Firestore Timestamp
+  const formatDate = (dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): string => {
+    if (!dateValue) return "N/A";
+    
+    try {
+      let date: Date;
+      
+      // Handle Firestore Timestamp object
+      if (typeof dateValue === 'object' && '_seconds' in dateValue && dateValue._seconds) {
+        date = new Date(dateValue._seconds * 1000);
+      }
+      // Handle Date object
+      else if (dateValue instanceof Date) {
+        date = dateValue;
+      }
+      // Handle ISO string
+      else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
+      }
+      else {
+        return "N/A";
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "N/A";
+      }
+      
+      return format(date, "d MMMM yyyy");
+    } catch {
+      return "N/A";
+    }
+  };
+
+  // Fetch clients and stats
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.agencyId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Fetch stats for total count
+        const stats = await getClientStats(user.agencyId);
+        setTotalClients(stats.total);
+
+        // Fetch clients list
+        const clientsList = await listAgencyClients({
+          agencyId: user.agencyId,
+          search: searchQuery.trim() || undefined,
+          limit: 100, // Get all clients for client-side pagination
+        });
+        setClients(clientsList);
+      } catch (err: any) {
+        console.error("Failed to fetch clients:", err);
+        setError(err.message || "Failed to load clients");
+        setClients([]);
+        setTotalClients(0);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user?.agencyId, searchQuery]);
+
+  // Transform API clients to display format
+  const displayClients: DisplayClient[] = useMemo(() => {
+    return clients.map((client) => {
+      const status = client.status || "active";
+      const statusCapitalized = status.charAt(0).toUpperCase() + status.slice(1) as DisplayClient["status"];
+      
+      return {
+        id: client.id,
+        name: formatClientName(client),
+        status: statusCapitalized,
+        roleLabel: "Service",
+        roleValue: client.serviceCode || client.service || "N/A",
+        accountCreated: formatDate(client.createdAt),
+        avatarUrl: client.profileImage,
+      };
+    });
+  }, [clients]);
+
+  // Client-side filtering (already done by API, but keeping for search suggestions)
   const filteredClients = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return clients;
-    return clients.filter((c) => c.name.toLowerCase().includes(q));
-  }, [clients, searchQuery]);
+    if (!q) return displayClients;
+    return displayClients.filter((c) => c.name.toLowerCase().includes(q));
+  }, [displayClients, searchQuery]);
 
   const searchSuggestions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const list = q
-      ? clients.filter((c) => c.name.toLowerCase().includes(q))
-      : clients;
+      ? displayClients.filter((c) => c.name.toLowerCase().includes(q))
+      : displayClients;
     return list.slice(0, 5);
-  }, [clients, searchQuery]);
+  }, [displayClients, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / itemsPerPage));
   const paginatedClients = useMemo(() => {
@@ -85,13 +188,13 @@ export default function ClientsPage() {
                 Clients
               </p>
               <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                Clients overview who are registered from a 3rd party
+                Count of clients registered with the agency
               </p>
             </div>
 
             <div className="flex flex-col items-start px-[24px]">
               <p className="text-[40px] font-semibold leading-[normal] text-[#10141a]">
-                {filteredClients.length}
+                {isLoading ? "..." : totalClients}
               </p>
               <div className="flex items-center gap-[6px]">
                 <span className="inline-block h-[12px] w-[12px] rounded-full bg-[#2B82FF]" />
@@ -114,7 +217,7 @@ export default function ClientsPage() {
                 Client Directory
               </p>
               <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                Number Of Expiring Or Missing Documents/Training
+                List of clients registered with the agency
               </p>
             </div>
 
@@ -228,7 +331,19 @@ export default function ClientsPage() {
 
           {/* Rows */}
           <div className="mt-6 space-y-3">
-            {paginatedClients.length === 0 ? (
+            {isLoading ? (
+              <div className="py-12 text-center">
+                <p className="text-[14px] font-medium text-[#808081]">
+                  Loading clients...
+                </p>
+              </div>
+            ) : error ? (
+              <div className="py-12 text-center">
+                <p className="text-[14px] font-medium text-red-600">
+                  {error}
+                </p>
+              </div>
+            ) : paginatedClients.length === 0 ? (
               <div className="py-12 text-center">
                 <p className="text-[14px] font-medium text-[#808081]">
                   No clients found.
@@ -266,8 +381,12 @@ export default function ClientsPage() {
                     </div>
 
                     <Badge
-                      variant="confirmed"
-                      className="bg-[rgba(14,175,82,0.05)] border-[0.5px] border-[#0eaf52] text-[#0eaf52] px-[10px] py-[10px]"
+                      variant={client.status === "Active" ? "confirmed" : "pending"}
+                      className={
+                        client.status === "Active"
+                          ? "bg-[rgba(14,175,82,0.05)] border-[0.5px] border-[#0eaf52] text-[#0eaf52] px-[10px] py-[10px]"
+                          : "px-[10px] py-[10px]"
+                      }
                     >
                       {client.status}
                     </Badge>

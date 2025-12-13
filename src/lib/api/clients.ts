@@ -4,6 +4,7 @@
  */
 
 import axiosClient from '../axios';
+import { ApiResponse } from '@/lib/api-types';
 
 /**
  * Client interface
@@ -64,8 +65,8 @@ export interface Client {
 
   // Status and dates
   status?: 'active' | 'inactive' | 'pending' | 'archived';
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: string | { _seconds?: number; _nanoseconds?: number } | Date;
+  updatedAt?: string | { _seconds?: number; _nanoseconds?: number } | Date;
 }
 
 /**
@@ -202,6 +203,21 @@ export interface ListClientsResponse {
   clients: Client[];
   total: number;
   count: number;
+}
+
+/**
+ * List Agency Clients Response (new format)
+ */
+export interface ListAgencyClientsResponse {
+  success: boolean,
+  count: number;
+  agencyId: string;
+  clients: Client[];
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+  }
 }
 
 /**
@@ -457,23 +473,46 @@ export interface SeedClientsRequest {
 }
 
 /**
- * ✅ Create a new client
- * Endpoint: POST /clients
+ * ✅ Create a new agency client
+ * Endpoint: POST /clientManagement
  * Agencies default to their own agencyId
  * Employees must supply agencyId
  */
-export async function createClient(data: CreateClientRequest): Promise<Client> {
+export async function createAgencyClient(data: CreateClientRequest): Promise<Client> {
   try {
-    const response = await axiosClient.post<{ success: boolean; data: Client }>('/clients', data);
+    const response = await axiosClient.post<ApiResponse<Client>>('/clientManagement', data);
+    return response.data.data;
+  } catch (error) {
+    console.error('Failed to create client for agency:', error);
+    throw error;
+  }
+}
+
+/**
+ * ✅ List agency clients
+ * Endpoint: GET /clientManagement
+ * Query params: agencyId (required for employees), status, service, search, limit
+ */
+export async function listAgencyClients(params?: ListClientsParams): Promise<Client[]> {
+  try {
+    const response = await axiosClient.get<ListAgencyClientsResponse>('/clientManagement', {
+      params: {
+        agencyId: params?.agencyId,
+        status: params?.status,
+        service: params?.service,
+        search: params?.search,
+        limit: params?.limit,
+      }
+    });
 
     if (!response.data.success) {
-      throw new Error('Failed to create client');
+      throw new Error('Failed to fetch clients');
     }
 
-    return response.data.data;
-  } catch (err: any) {
-    console.error('createClient error:', err);
-    throw new Error(err.message || 'Failed to create client');
+    return response.data.clients || [];
+  } catch (error) {
+    console.error('Failed to fetch clients:', error);
+    throw error;
   }
 }
 
