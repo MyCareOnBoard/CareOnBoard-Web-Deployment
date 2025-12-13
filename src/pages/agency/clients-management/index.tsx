@@ -150,17 +150,22 @@ export default function ClientsPage() {
       const status = client.status || "active";
       const statusCapitalized = status.charAt(0).toUpperCase() + status.slice(1) as DisplayClient["status"];
       
+      // Calculate DSP count (primary + secondary)
+      const primaryDspCount = client?.primaryDsp ? 1 : 0;
+      const secondaryDspsCount = client?.secondaryDsps?.length || 0;
+      const dspCount = primaryDspCount + secondaryDspsCount;
+      
       return {
         id: client.id,
         name: formatClientName(client),
         status: statusCapitalized,
-        roleLabel: "Service",
-        roleValue: client.serviceCode || client.service || "N/A",
+        roleLabel: "DSP",
+        roleValue: dspCount,
         accountCreated: formatDate(client.createdAt),
         avatarUrl: client.profileImage,
       };
     });
-  }, [clients]);
+  }, [clients, formatClientName, formatDate]);
 
   // Client-side filtering (already done by API, but keeping for search suggestions)
   // Note: API already filters, but we keep this for instant UI feedback

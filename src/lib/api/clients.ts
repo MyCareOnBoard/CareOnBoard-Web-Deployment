@@ -22,6 +22,10 @@ export interface Client {
   dateOfBirth?: string | { _seconds?: number; _nanoseconds?: number } | Date;
   profileImage?: string;
 
+  // DSP information
+  primaryDsp?: ClientDsp;
+  secondaryDsps?: ClientDsp[];
+
   // Address information
   location?: { lat: string; lon: string };
   address?: string;
@@ -56,7 +60,6 @@ export interface Client {
   healthcareSafety?: ClientHealthcareSafety;
   documents?: ClientDocument[];
   evvVisitConfig?: ClientEvvVisitConfig;
-  staffAssignment?: ClientStaffAssignmentAndRestrictions;
   goalsAndEmergency?: ClientGoalsAndEmergency;
   systemAiAndAudit?: ClientSystemAiAndAudit;
 
@@ -152,18 +155,6 @@ export type ClientAutoCheckKey = "compliance" | "training" | "background" | "exp
 export interface ClientDsp {
   id: string;
   name: string;
-}
-
-export interface ClientStaffAssignmentAndRestrictions {
-  primaryDsp?: ClientDsp;
-  secondaryDsps?: ClientDsp[];
-  genderPreference?: string;
-  requiredCertifications?: string;
-  specialConditions?: string;
-  prefersFamiliar?: ClientYesNo;
-  noMaleFemaleStaff?: ClientYesNo;
-  medicalRestrictionsTrained?: ClientYesNo;
-  autoChecks?: Record<ClientAutoCheckKey, boolean>;
 }
 
 export interface ClientGoalsAndEmergency {
@@ -364,7 +355,7 @@ export interface CreateClientRequest {
   healthcareSafety?: ClientHealthcareSafety;
   documents?: ClientDocument[];
   evvVisitConfig?: ClientEvvVisitConfig;
-  staffAssignment?: ClientStaffAssignmentAndRestrictions;
+
   goalsAndEmergency?: ClientGoalsAndEmergency;
   systemAiAndAudit?: ClientSystemAiAndAudit;
   agencyId?: string; // Required for employees, defaults to own agencyId for agencies
@@ -458,7 +449,6 @@ export interface UpdateClientRequest {
   healthcareSafety?: ClientHealthcareSafety | null;
   documents?: ClientDocument[] | null;
   evvVisitConfig?: ClientEvvVisitConfig | null;
-  staffAssignment?: ClientStaffAssignmentAndRestrictions | null;
   goalsAndEmergency?: ClientGoalsAndEmergency | null;
   systemAiAndAudit?: ClientSystemAiAndAudit | null;
   status?: 'active' | 'inactive' | 'pending' | 'archived';
