@@ -68,6 +68,39 @@ export default function ClientsAndServicesPage() {
       .slice(0, 2);
   };
 
+  const formatDate = (dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): string => {
+    if (!dateValue) return '-';
+    
+    try {
+      let date: Date;
+      
+      // Handle Firestore Timestamp object
+      if (typeof dateValue === 'object' && '_seconds' in dateValue && dateValue._seconds) {
+        date = new Date(dateValue._seconds * 1000);
+      }
+      // Handle Date object
+      else if (dateValue instanceof Date) {
+        date = dateValue;
+      }
+      // Handle ISO string
+      else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
+      }
+      else {
+        return '-';
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return '-';
+      }
+      
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch {
+      return '-';
+    }
+  };
+
   const handleAccept = (client: Client) => {
     setAcceptedClientName(getClientName(client));
     setShowAcceptModal(true);
@@ -195,7 +228,7 @@ export default function ClientsAndServicesPage() {
                       <div>
                         <p className="text-xs text-gray-500 mb-0.5">Date</p>
                         <p className="text-sm text-gray-900">
-                          {client.createdAt ? new Date(client.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
+                          {formatDate(client.createdAt)}
                         </p>
                       </div>
                     </div>
