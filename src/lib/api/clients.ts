@@ -19,7 +19,7 @@ export interface Client {
   gender?: string;
   email?: string;
   phone?: string;
-  dateOfBirth?: string;
+  dateOfBirth?: string | { _seconds?: number; _nanoseconds?: number } | Date;
   profileImage?: string;
 
   // Address information
@@ -512,6 +512,21 @@ export async function listAgencyClients(params?: ListClientsParams): Promise<Cli
     return response.data.clients || [];
   } catch (error) {
     console.error('Failed to fetch clients:', error);
+    throw error;
+  }
+}
+
+/**
+ * ✅ Get a single client by ID
+ * Endpoint: GET /clientManagement/:clientId
+ * Employees must supply agencyId via query parameter
+ */
+export async function getAgencyClientById(clientId: string): Promise<Client> {
+  try {
+    const response = await axiosClient.get<ApiResponse<Client>>(`/clientManagement/${clientId}`);
+    return response.data.data;
+  } catch (error) {
+    console.error(`Failed to fetch client ${clientId}:`, error);
     throw error;
   }
 }
