@@ -28,6 +28,37 @@ function ServiceAuthorizationFields({
   const [isPcptOpen, setIsPcptOpen] = useState(false);
   const [isSdrOpen, setIsSdrOpen] = useState(false);
 
+  const offeredServices = [
+    {
+      name: "CS",
+      code: "123456",
+    },
+    {
+      name: "IS",
+      code: "123457",
+    },
+    {
+      name: "Respite",
+      code: "123458",
+    },
+    {
+      name: "Community Inclusion",
+      code: "123460",
+    },
+    {
+      name: "Transportation",
+      code: "123461",
+    },
+    {
+      name: "Employment Services",
+      code: "123463",
+    },
+    {
+      name: "Others per DDD plan",
+      code: "123464",
+    }
+  ];
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
       <div className="flex flex-col gap-1">
@@ -36,15 +67,21 @@ function ServiceAuthorizationFields({
         </label>
         <Select
           value={service.name}
-          onValueChange={(v) => onChange({ ...service, name: v })}
+          onValueChange={(v) => {
+            // Find the selected service to get its code
+            const selectedService = offeredServices.find((s) => s.name === v);
+            onChange({ ...service, name: v, code: selectedService?.code || "" });
+          }}
         >
           <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
             <SelectValue placeholder="Select service" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="respite">Respite</SelectItem>
-            <SelectItem value="community">Community</SelectItem>
-            <SelectItem value="supported-employment">Supported Employment</SelectItem>
+            {offeredServices.map((service) => (
+              <SelectItem key={service.code} value={service.name}>
+                {service.name} - {service.code}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -110,6 +147,16 @@ function ServiceAuthorizationFields({
               mode="single"
               selected={service.ispEffectiveDate}
               defaultMonth={service.ispEffectiveDate ?? new Date()}
+              captionLayout="dropdown"
+              fromYear={2000}
+              toYear={new Date().getFullYear() + 10}
+              formatters={{
+                formatMonthDropdown: (date) =>
+                  date.toLocaleString("default", { month: "long" }),
+              }}
+              classNames={{
+                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+              }}
               onSelect={(d) => {
                 if (d) {
                   onChange({ ...service, ispEffectiveDate: d });
@@ -146,6 +193,16 @@ function ServiceAuthorizationFields({
               mode="single"
               selected={service.startAuthDate}
               defaultMonth={service.startAuthDate ?? new Date()}
+              captionLayout="dropdown"
+              fromYear={2000}
+              toYear={new Date().getFullYear() + 10}
+              formatters={{
+                formatMonthDropdown: (date) =>
+                  date.toLocaleString("default", { month: "long" }),
+              }}
+              classNames={{
+                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+              }}
               onSelect={(d) => {
                 if (d) {
                   onChange({ ...service, startAuthDate: d });
@@ -182,6 +239,16 @@ function ServiceAuthorizationFields({
               mode="single"
               selected={service.endAuthDate}
               defaultMonth={service.endAuthDate ?? new Date()}
+              captionLayout="dropdown"
+              fromYear={2000}
+              toYear={new Date().getFullYear() + 10}
+              formatters={{
+                formatMonthDropdown: (date) =>
+                  date.toLocaleString("default", { month: "long" }),
+              }}
+              classNames={{
+                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+              }}
               onSelect={(d) => {
                 if (d) {
                   onChange({ ...service, endAuthDate: d });
@@ -216,6 +283,16 @@ function ServiceAuthorizationFields({
               mode="single"
               selected={service.pcptDate}
               defaultMonth={service.pcptDate ?? new Date()}
+              captionLayout="dropdown"
+              fromYear={2000}
+              toYear={new Date().getFullYear() + 10}
+              formatters={{
+                formatMonthDropdown: (date) =>
+                  date.toLocaleString("default", { month: "long" }),
+              }}
+              classNames={{
+                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+              }}
               onSelect={(d) => {
                 if (d) {
                   onChange({ ...service, pcptDate: d });
@@ -250,6 +327,16 @@ function ServiceAuthorizationFields({
               mode="single"
               selected={service.sdrDate}
               defaultMonth={service.sdrDate ?? new Date()}
+              captionLayout="dropdown"
+              fromYear={2000}
+              toYear={new Date().getFullYear() + 10}
+              formatters={{
+                formatMonthDropdown: (date) =>
+                  date.toLocaleString("default", { month: "long" }),
+              }}
+              classNames={{
+                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+              }}
               onSelect={(d) => {
                 if (d) {
                   onChange({ ...service, sdrDate: d });

@@ -1,50 +1,191 @@
-import React, { useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Loader2, Plus, Search } from "lucide-react";
 import { useNavigate } from "react-router";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Routes } from "@/routes/constants";
+import { useAuth } from "@/utils/auth";
+import { listAgencyClients, getClientStats, type Client } from "@/lib/api/clients";
+
+interface DisplayClient {
+  id: string;
+  name: string;
+  status: "Active" | "Inactive" | "Pending" | "Archived";
+  roleLabel: string;
+  roleValue: string | number;
+  accountCreated: string;
+  avatarUrl?: string;
+}
 
 export default function ClientsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [totalClients, setTotalClients] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const itemsPerPage = 7;
   const searchAnchorRef = useRef<HTMLDivElement>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const shouldShowSearchDropdown = searchQuery.trim().length >= 2;
 
-  const clients = useMemo(
-    () =>
-      Array.from({ length: 8 }).map((_, idx) => ({
-        id: `client-${idx + 1}`,
-        name: "DR.Brooklyn Simmons",
-        status: "Active" as const,
+  // Format client name from firstName, lastName, middleName (memoized)
+  const formatClientName = useCallback((client: Client): string => {
+    const parts = [
+      client.firstName,
+      client.middleName,
+      client.lastName,
+    ].filter(Boolean);
+    return parts.join(" ") || "Unnamed Client";
+  }, []);
+
+  // Format date from ISO string or Firestore Timestamp (memoized)
+  const formatDate = useCallback((dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): string => {
+    if (!dateValue) return "N/A";
+    
+    try {
+      let date: Date;
+      
+      // Handle Firestore Timestamp object
+      if (typeof dateValue === 'object' && '_seconds' in dateValue && dateValue._seconds) {
+        date = new Date(dateValue._seconds * 1000);
+      }
+      // Handle Date object
+      else if (dateValue instanceof Date) {
+        date = dateValue;
+      }
+      // Handle ISO string
+      else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
+      }
+      else {
+        return "N/A";
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "N/A";
+      }
+      
+      return format(date, "d MMMM yyyy");
+    } catch {
+      return "N/A";
+    }
+  }, []);
+
+  // Debounce search query (500ms delay)
+  useEffect(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    debounceTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  // Fetch clients and stats (only when debounced search query or agencyId changes)
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.agencyId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Show loading state only for initial load or when search query changes
+        if (clients.length === 0) {
+          setIsLoading(true);
+        } else {
+          setIsSearching(true);
+        }
+        setError(null);
+
+        // Fetch stats for total count (only on initial load or when search is cleared)
+        if (!debouncedSearchQuery.trim()) {
+          const stats = await getClientStats(user.agencyId);
+          setTotalClients(stats.total);
+        }
+
+        // Fetch clients list
+        const clientsList = await listAgencyClients({
+          agencyId: user.agencyId,
+          search: debouncedSearchQuery.trim() || undefined,
+          limit: 100, // Get all clients for client-side pagination
+        });
+        setClients(clientsList);
+      } catch (err: any) {
+        console.error("Failed to fetch clients:", err);
+        setError(err.message || "Failed to load clients");
+        setClients([]);
+        setTotalClients(0);
+      } finally {
+        setIsLoading(false);
+        setIsSearching(false);
+      }
+    };
+
+    fetchData();
+  }, [user?.agencyId, debouncedSearchQuery]);
+
+  // Transform API clients to display format
+  const displayClients: DisplayClient[] = useMemo(() => {
+    return clients.map((client) => {
+      const status = client.status || "active";
+      const statusCapitalized = status.charAt(0).toUpperCase() + status.slice(1) as DisplayClient["status"];
+      
+      // Calculate DSP count (primary + secondary)
+      const primaryDspCount = client?.primaryDsp ? 1 : 0;
+      const secondaryDspsCount = client?.secondaryDsps?.length || 0;
+      const dspCount = primaryDspCount + secondaryDspsCount;
+      
+      return {
+        id: client.id,
+        name: formatClientName(client),
+        status: statusCapitalized,
         roleLabel: "DSP",
-        roleValue: 40,
-        accountCreated: "12 January 2025",
-        avatarUrl: "https://i.pravatar.cc/120?img=12",
-      })),
-    []
-  );
+        roleValue: dspCount,
+        accountCreated: formatDate(client.createdAt),
+        avatarUrl: client.profileImage,
+      };
+    });
+  }, [clients, formatClientName, formatDate]);
 
+  // Client-side filtering (already done by API, but keeping for search suggestions)
+  // Note: API already filters, but we keep this for instant UI feedback
   const filteredClients = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return clients;
-    return clients.filter((c) => c.name.toLowerCase().includes(q));
-  }, [clients, searchQuery]);
+    return displayClients;
+  }, [displayClients]);
 
+  // Optimized search suggestions (only show when query length >= 2)
   const searchSuggestions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const list = q
-      ? clients.filter((c) => c.name.toLowerCase().includes(q))
-      : clients;
-    return list.slice(0, 5);
-  }, [clients, searchQuery]);
+    if (q.length < 2) return [];
+    
+    // Use a more efficient search - check if query matches start of name first
+    return displayClients
+      .filter((c) => {
+        const nameLower = c.name.toLowerCase();
+        return nameLower.includes(q);
+      })
+      .slice(0, 5);
+  }, [displayClients, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / itemsPerPage));
   const paginatedClients = useMemo(() => {
@@ -52,11 +193,23 @@ export default function ClientsPage() {
     return filteredClients.slice(start, start + itemsPerPage);
   }, [filteredClients, currentPage]);
 
-  const handleSelectSuggestion = (name: string) => {
+  const handleSelectSuggestion = useCallback((name: string) => {
     setSearchQuery(name);
     setCurrentPage(1);
     setIsSearchOpen(false);
-  };
+  }, []);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+    setActiveSuggestionIndex(0);
+    setIsSearchOpen(value.trim().length >= 2);
+  }, []);
+
+  const handleSearchFocus = useCallback(() => {
+    setActiveSuggestionIndex(0);
+    setIsSearchOpen(shouldShowSearchDropdown);
+  }, [shouldShowSearchDropdown]);
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -85,13 +238,13 @@ export default function ClientsPage() {
                 Clients
               </p>
               <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                Clients overview who are registered from a 3rd party
+                Count of clients registered with the agency
               </p>
             </div>
 
             <div className="flex flex-col items-start px-[24px]">
               <p className="text-[40px] font-semibold leading-[normal] text-[#10141a]">
-                {filteredClients.length}
+                {isLoading ? "..." : totalClients}
               </p>
               <div className="flex items-center gap-[6px]">
                 <span className="inline-block h-[12px] w-[12px] rounded-full bg-[#2B82FF]" />
@@ -114,121 +267,82 @@ export default function ClientsPage() {
                 Client Directory
               </p>
               <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                Number Of Expiring Or Missing Documents/Training
+                List of clients registered with the agency
               </p>
             </div>
-
-            <Popover open={isSearchOpen && shouldShowSearchDropdown} onOpenChange={setIsSearchOpen}>
-              <PopoverAnchor asChild>
-                <div
-                  ref={searchAnchorRef}
-                  className="flex items-center gap-2 bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full px-3 py-2 h-[36px] w-[320px]"
-                >
-                  <Search className="w-4 h-4 text-[#808081]" />
-                  <Input
-                    value={searchQuery}
-                    onFocus={() => {
-                      setActiveSuggestionIndex(0);
-                      setIsSearchOpen(shouldShowSearchDropdown);
-                    }}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      const nextShouldOpen = next.trim().length >= 2;
-                      setSearchQuery(next);
-                      setCurrentPage(1);
-                      setActiveSuggestionIndex(0);
-                      setIsSearchOpen(nextShouldOpen);
-                    }}
-                    onKeyDown={(e) => {
-                      if (!isSearchOpen || !shouldShowSearchDropdown) {
-                        if (
-                          (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter") &&
-                          shouldShowSearchDropdown
-                        ) {
-                          setIsSearchOpen(true);
-                        }
-                        return;
-                      }
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        setIsSearchOpen(false);
-                        return;
-                      }
-                      if (e.key === "ArrowDown") {
-                        e.preventDefault();
-                        setActiveSuggestionIndex((i) =>
-                          Math.min(i + 1, Math.max(0, searchSuggestions.length - 1))
-                        );
-                        return;
-                      }
-                      if (e.key === "ArrowUp") {
-                        e.preventDefault();
-                        setActiveSuggestionIndex((i) => Math.max(0, i - 1));
-                        return;
-                      }
-                      if (e.key === "Enter") {
-                        const selected = searchSuggestions[activeSuggestionIndex];
-                        if (selected) {
-                          e.preventDefault();
-                          handleSelectSuggestion(selected.name);
-                        }
-                      }
-                    }}
-                    placeholder="Search"
-                    className="h-[20px] border-0 bg-transparent px-0 py-0 text-[12px] font-medium leading-[1.4] text-[#10141a] placeholder:text-[#808081] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                    role="combobox"
-                    aria-expanded={isSearchOpen}
-                    aria-controls="client-search-dropdown"
-                    aria-autocomplete="list"
-                  />
-                </div>
-              </PopoverAnchor>
-
-              <PopoverContent
-                align="end"
-                sideOffset={8}
-                className="w-[322px] rounded-[12px] border border-[#cccccd] bg-white p-0 shadow-sm overflow-hidden"
-                onOpenAutoFocus={(e) => e.preventDefault()}
-                onInteractOutside={(e) => {
-                  const target = e.target as HTMLElement | null;
-                  if (target && searchAnchorRef.current?.contains(target)) {
-                    e.preventDefault();
+            <div
+              ref={searchAnchorRef}
+              className="relative flex items-center gap-2 bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full px-3 py-2 h-[36px] w-[320px]"
+            >
+              <Search className="w-4 h-4 text-[#808081] shrink-0" />
+              <Input
+                value={searchQuery}
+                onFocus={handleSearchFocus}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (!isSearchOpen || !shouldShowSearchDropdown) {
+                    if (
+                      (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter") &&
+                      shouldShowSearchDropdown
+                    ) {
+                      setIsSearchOpen(true);
+                    }
                     return;
                   }
-                  setIsSearchOpen(false);
-                }}
-              >
-                <div id="client-search-dropdown" role="listbox">
-                  {searchSuggestions.map((s, idx) => {
-                    const isActive = idx === activeSuggestionIndex;
-                    return (
-                      <button
-                        key={`${s.id}-suggestion`}
-                        type="button"
-                        className={[
-                          "w-full text-left px-[20px] py-[12px] text-[14px] leading-[1.4] transition-colors",
-                          isActive
-                            ? "bg-[#e5effa] text-[#00b4b8] font-semibold"
-                            : "bg-white text-[#808081] font-normal",
-                        ].join(" ")}
-                        role="option"
-                        aria-selected={isActive}
-                        onMouseEnter={() => setActiveSuggestionIndex(idx)}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => handleSelectSuggestion(s.name)}
-                      >
-                        {s.name}
-                      </button>
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setIsSearchOpen(false);
+                    return;
+                  }
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setActiveSuggestionIndex((i) =>
+                      Math.min(i + 1, Math.max(0, searchSuggestions.length - 1))
                     );
-                  })}
-                </div>
-              </PopoverContent>
-            </Popover>
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setActiveSuggestionIndex((i) => Math.max(0, i - 1));
+                    return;
+                  }
+                  if (e.key === "Enter") {
+                    const selected = searchSuggestions[activeSuggestionIndex];
+                    if (selected) {
+                      e.preventDefault();
+                      handleSelectSuggestion(selected.name);
+                    }
+                  }
+                }}
+                placeholder="Search"
+                className="h-[20px] border-0 bg-transparent px-0 py-0 text-[12px] font-medium leading-[1.4] text-[#10141a] placeholder:text-[#808081] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                role="combobox"
+                aria-expanded={isSearchOpen}
+                aria-controls="client-search-dropdown"
+                aria-autocomplete="list"
+              />
+              {isSearching && (
+                <Loader2 className="w-4 h-4 text-[#808081] animate-spin shrink-0" />
+              )}
+            </div>
           </div>
 
           {/* Rows */}
           <div className="mt-6 space-y-3">
-            {paginatedClients.length === 0 ? (
+            {isLoading ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-2 text-center">
+                <Loader2 className="w-6 h-6 animate-spin" />
+                <p className="text-[14px] font-medium text-[#808081]">
+                  Loading clients...
+                </p>
+              </div>
+            ) : error ? (
+              <div className="py-12 text-center">
+                <p className="text-[14px] font-medium text-red-600">
+                  {error}
+                </p>
+              </div>
+            ) : paginatedClients.length === 0 ? (
               <div className="py-12 text-center">
                 <p className="text-[14px] font-medium text-[#808081]">
                   No clients found.
@@ -266,8 +380,12 @@ export default function ClientsPage() {
                     </div>
 
                     <Badge
-                      variant="confirmed"
-                      className="bg-[rgba(14,175,82,0.05)] border-[0.5px] border-[#0eaf52] text-[#0eaf52] px-[10px] py-[10px]"
+                      variant={client.status === "Active" ? "confirmed" : "pending"}
+                      className={
+                        client.status === "Active"
+                          ? "bg-[rgba(14,175,82,0.05)] border-[0.5px] border-[#0eaf52] text-[#0eaf52] px-[10px] py-[10px]"
+                          : "px-[10px] py-[10px]"
+                      }
                     >
                       {client.status}
                     </Badge>
