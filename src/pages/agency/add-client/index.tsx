@@ -11,7 +11,7 @@ import { Stage7SystemAiAndAudit } from "@/pages/agency/add-client/stages/Stage7S
 import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 import { SaveClientSuccessModal } from "@/pages/agency/add-client/components/SaveClientSuccessModal";
 import { createInitialAddClientFormData } from "@/pages/agency/add-client/formData";
-import { createClient, type CreateClientRequest } from "@/lib/api/clients";
+import { createAgencyClient, type CreateClientRequest } from "@/lib/api/clients";
 
 export default function AddClientPage() {
   const navigate = useNavigate();
@@ -125,10 +125,8 @@ export default function AddClientPage() {
       travelTimeAllowed: s4.travelTimeAllowed,
 
       // Stage 5
-      primaryDspAssigned: s5.primaryDspAssigned || undefined,
-      primaryDspId: s5.primaryDspId || undefined,
-      secondaryDsps: s5.secondaryDsps || undefined,
-      secondaryDspId: s5.secondaryDspId || undefined,
+      primaryDsp: s5.primaryDsp || undefined,
+      secondaryDsps: s5.secondaryDsps.length > 0 ? s5.secondaryDsps : undefined,
       genderPreference: s5.genderPreference || undefined,
       requiredCertifications: s5.requiredCertifications || undefined,
       specialConditions: s5.specialConditions || undefined,
@@ -190,7 +188,7 @@ export default function AddClientPage() {
           setIsSaving(true);
           try {
             const payload = flattenAddClientFormData();
-            const created = await createClient(payload);
+            const created = await createAgencyClient(payload);
             const fullName =
               `${created.firstName || ""} ${created.lastName || ""}`.trim() ||
               `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();

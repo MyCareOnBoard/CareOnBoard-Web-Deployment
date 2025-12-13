@@ -223,6 +223,16 @@ export function Stage1ClientIdentityAndContact({
                   mode="single"
                   selected={stage1.dob}
                   defaultMonth={stage1.dob ?? new Date()}
+                  captionLayout="dropdown"
+                  fromYear={1900}
+                  toYear={new Date().getFullYear()}
+                  formatters={{
+                    formatMonthDropdown: (date) =>
+                      date.toLocaleString("default", { month: "long" }),
+                  }}
+                  classNames={{
+                    dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+                  }}
                   onSelect={(d) => {
                     if (d) {
                       updateStage1({ dob: d });
