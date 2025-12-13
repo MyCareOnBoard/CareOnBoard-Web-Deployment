@@ -293,6 +293,15 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     }, 300);
   }, [user?.agencyId, user?.uid]);
 
+  const formatLocation = (loc: Client["location"]): string => {
+    if (!loc) return "";
+    if (typeof loc === "string") return loc;
+    if (typeof loc === "object" && "lat" in loc && "lon" in loc) {
+      return `${loc.lat}, ${loc.lon}`;
+    }
+    return "";
+  };
+
   const handleClientSelect = (client: Client) => {
     setFormData(prev => ({
       ...prev,
@@ -300,7 +309,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         ? `${client.firstName} ${client.lastName}` 
         : client.id,
       clientId: client.id,
-      clientLocation: client.location || "",
+      clientLocation: formatLocation(client.location),
     }));
     setShowClientDropdown(false);
     setClientSearchResults([]);
@@ -881,7 +890,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                         ? `${client.firstName} ${client.lastName}` 
                         : client.id}
                     </p>
-                    <p className="text-[12px] font-normal text-[#808081]">{client.address || client.location}</p>
+                    <p className="text-[12px] font-normal text-[#808081]">
+                      {client.address || formatLocation(client.location)}
+                    </p>
                   </button>
                 ))}
               </div>
