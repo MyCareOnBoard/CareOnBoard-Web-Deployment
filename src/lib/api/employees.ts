@@ -9,26 +9,31 @@ import { User } from '@/utils/auth/types/user.types';
 /**
  * Employee interface
  * Represents an employee/DSP in the system
+ * Matches GET /employees/{employeeId} response structure
  */
 export interface Employee {
   id: string;
-  uid: string; // Links to the user account
+  userId: string; // Links to the user account
   email: string;
+  bio: string;
   fullName: string;
-  phone?: string;
+  phoneNumber?: string;
   address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  dateOfBirth?: string;
-  gender?: "Male" | "Female" | "Other" | string;
-  profilePicture?: string;
-  agencyId?: string;
+  dateOfBirth?: string; // Format: "YYYY-MM-DD"
+  profilePicture?: string; // Actual field from API
+  tagId?: string;
+  role?: string;
+  workAvailability?: boolean; // Boolean field
+  hireDate?: string; // ISO 8601 format: "YYYY-MM-DDTHH:mm:ss.sssZ"
+  emergencyContact?: {
+    name: string;
+    relationship: string;
+    phone: string;
+  };
+  // Computed fields
   status?: 'active' | 'inactive' | 'pending' | 'suspended';
-  createdAt: string;
-  updatedAt: string;
-  // Optional user profile reference
-  user?: User;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /**
@@ -160,16 +165,22 @@ export async function createEmployee(data: CreateEmployeeRequest): Promise<Emplo
  */
 export async function listEmployees(params?: ListEmployeesParams): Promise<ListEmployeesResponse> {
   try {
+    console.log('📤 Sending listEmployees request with params:', params);
+    
     const response = await axiosClient.get<ListEmployeesResponse>('/employees/', {
       params: {
         uid: params?.uid,
         agencyId: params?.agencyId,
         status: params?.status,
+        role: params?.role,
+        workAvailability: params?.workAvailability,
         search: params?.search,
-        limit: params?.limit,
+        limit: params?.limit || 50,
         page: params?.page,
       },
     });
+
+    console.log('📥 listEmployees response:', response.data);
 
     if (!response.data.success) {
       throw new Error('Failed to list employees');
@@ -177,8 +188,10 @@ export async function listEmployees(params?: ListEmployeesParams): Promise<ListE
 
     return response.data;
   } catch (err: any) {
-    console.error('listEmployees error:', err);
-    throw new Error(err.message || 'Failed to list employees');
+    console.error('❌ listEmployees error:', err);
+    console.error('❌ Error response:', err.response?.data);
+    console.error('❌ Error status:', err.response?.status);
+    throw new Error(err.response?.data?.message || err.message || 'Failed to list employees');
   }
 }
 

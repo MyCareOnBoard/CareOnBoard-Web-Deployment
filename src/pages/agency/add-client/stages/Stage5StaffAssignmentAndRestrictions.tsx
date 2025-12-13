@@ -226,7 +226,7 @@ export function Stage5StaffAssignmentAndRestrictions({
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                 {primarySearchResults.map((employee) => (
                   <button
-                    key={employee.uid || employee.id}
+                    key={employee.id}
                     type="button"
                     onClick={() => handlePrimarySelect(employee)}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
@@ -269,7 +269,7 @@ export function Stage5StaffAssignmentAndRestrictions({
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                 {secondarySearchResults.map((employee) => (
                   <button
-                    key={employee.uid || employee.id}
+                    key={employee.id}
                     type="button"
                     onClick={() => handleSecondarySelect(employee)}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"

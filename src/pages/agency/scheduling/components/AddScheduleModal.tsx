@@ -927,7 +927,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                 {dspSearchResults.map((employee) => (
                   <button
-                    key={employee.uid || employee.id}
+                    key={employee.id}
                     onClick={() => {
                       handleDspSelect(employee);
                       clearError("assignedDsp");
