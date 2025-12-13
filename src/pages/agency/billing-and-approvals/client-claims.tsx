@@ -2,25 +2,22 @@ import React, {useState, useRef} from "react";
 import {useParams, useNavigate} from "react-router";
 import {ArrowLeft, Loader2, Download} from "lucide-react";
 import {useAuth} from "@/utils/auth";
-import {ServiceLog, useGetClientClaimsQuery} from "./api";
-import AgencyEditNote from "@/pages/agency/notes/editNote";
+import {useGetClientClaimsQuery} from "./api";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 export default function ClientClaimsPage() {
-  const {clientId, serviceCode} = useParams();
+  const {clientId} = useParams();
   const navigate = useNavigate();
   const {user} = useAuth();
-  const [isViewMode, setIsViewMode] = useState(false);
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const printContentRef = useRef<HTMLDivElement>(null);
 
   const {data, isLoading, error} = useGetClientClaimsQuery(
     {
       clientId: clientId || "",
-      agencyId: user?.profile?.id || "",
-      serviceCode: serviceCode || undefined,
+      agencyId: user?.agencyId || "",
+      serviceCode: undefined,
     },
     {
       skip: !clientId || !user?.agencyId,
@@ -115,22 +112,6 @@ export default function ClientClaimsPage() {
     }
   };
 
-  const employeeGroupedServiceLogs = serviceLogsGrouped.map((group) => ({
-    ...group,
-    logs: group.logs.reduce((acc: ServiceLog[], log) => {
-      const findEmployee = acc.findIndex((employeeLog) => employeeLog.employee?.id === log.employee?.id);
-      if (findEmployee !== -1) {
-        acc[findEmployee] = {
-          ...acc[findEmployee],
-          hours: log.hours + acc[findEmployee].hours,
-        };
-      } else {
-        acc.push(log);
-      }
-      return acc;
-    }, [])
-  }))
-
   return (
     <div className="min-h-screen bg-[#eef4f5] px-8">
       <div className="mx-auto">
@@ -170,7 +151,7 @@ export default function ClientClaimsPage() {
             </button>
           </div>
 
-          <div ref={printContentRef} className="bg-white p-8 rounded-lg no-oklch">
+          <div ref={printContentRef} className="bg-white p-8 rounded-lg forced-colors:none no-oklch">
             <h2 className="text-[20px] font-semibold text-[#10141a] mb-8 text-center">
               Client Claims
             </h2>
@@ -228,18 +209,19 @@ export default function ClientClaimsPage() {
             {serviceLogsGrouped.length > 0 ? (
               <div className="overflow-hidden">
                 {/* Table Header */}
-                <div className="grid grid-cols-6 gap-4 px-4 py-3">
+                <div className="grid grid-cols-7 gap-4 px-4 py-3">
                   <div className="font-semibold text-[14px] text-[#808081]">DSP</div>
+                  <div className="font-semibold text-[14px] text-[#808081]">Service</div>
+                  {/*<div className="font-semibold text-[14px] text-[#808081]">Service Code</div>*/}
                   <div className="font-semibold text-[14px] text-[#808081]">Total Hours</div>
-                  <div className="font-semibold text-[14px] text-[#808081]">Rate per unit</div>
+                  {/*<div className="font-semibold text-[14px] text-[#808081]">Units</div>*/}
+                  <div className="font-semibold text-[14px] text-[#808081]">Rate/Unit</div>
                   <div className="font-semibold text-[14px] text-[#808081]">Total Amount</div>
-                  <div className="font-semibold text-[14px] text-[#808081]">Start Date</div>
-                  <div className="font-semibold text-[14px] text-[#808081]">End Date</div>
                 </div>
 
                 {/* Table Body */}
                 <div>
-                  {employeeGroupedServiceLogs.map((group, groupIndex) => (
+                  {serviceLogsGrouped.map((group, groupIndex) => (
                     <React.Fragment key={`${group.serviceCode}-${groupIndex}`}>
                       {group.logs.map((log) => {
                         const dailyPayCut = log.billingRate
@@ -250,17 +232,32 @@ export default function ClientClaimsPage() {
                         return (
                           <div
                             key={log.id}
-                            className="grid grid-cols-6 gap-4 px-4 py-3 hover:bg-[#f9fafb] transition-colors"
+                            className="grid grid-cols-7 gap-4 px-4 py-3 hover:bg-[#f9fafb] transition-colors"
                           >
                             {/* DSP */}
                             <div className="text-[14px] text-[#10141a]">
                               {log.employee?.fullName || "N/A"}
                             </div>
 
+                            {/* Service */}
+                            <div className="text-[14px] text-[#10141a]">
+                              {log.service || "N/A"}
+                            </div>
+
+                            {/* Service Code */}
+                            {/*<div className="text-[14px] text-[#10141a]">*/}
+                            {/*  {log.serviceCode || "N/A"}*/}
+                            {/*</div>*/}
+
                             {/* Total Hours */}
                             <div className="text-[14px] text-[#10141a]">
-                              {log.hours}
+                              {log.hours.toFixed(2)}
                             </div>
+
+                            {/* Units */}
+                            {/*<div className="text-[14px] text-[#10141a]">*/}
+                            {/*  {log.units}*/}
+                            {/*</div>*/}
 
                             {/* Rate per unit */}
                             <div className="text-[14px] text-[#10141a]">
@@ -270,16 +267,6 @@ export default function ClientClaimsPage() {
                             {/* Total Amount */}
                             <div className="text-[14px] text-[#10141a]">
                               {formatCurrency(totalAmount)}
-                            </div>
-
-                            {/* Start Date */}
-                            <div className="text-[14px] text-[#10141a]">
-                              {new Date(log.date).toISOString().slice(0,10)} {log.clockedIn}
-                            </div>
-
-                            {/* End Date */}
-                            <div className="text-[14px] text-[#10141a]">
-                              {new Date(log.date).toISOString().slice(0,10)} {log.clockedOut}
                             </div>
                           </div>
                         );
@@ -299,18 +286,12 @@ export default function ClientClaimsPage() {
                 Billing Summary
               </h2>
 
-            <div className={"flex justify-between items-end mb-4"}>
+            <div className={"flex flex-col mb-4"}>
               <div className="space-y-3 w-sm bg-white rounded p-4">
                 <div className="flex justify-between items-center py-2">
                   <p className="text-[14px] text-[#808081]">Total hours worked</p>
                   <p className="text-[14px] font-medium text-[#10141a]">
                     {billingSummary.totalHoursWorked}
-                  </p>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <p className="text-[14px] text-[#808081]">Total Units</p>
-                  <p className="text-[14px] font-medium text-[#10141a]">
-                    {billingSummary.totalUnits}
                   </p>
                 </div>
                 <div className="flex justify-between items-center py-2">
@@ -324,8 +305,8 @@ export default function ClientClaimsPage() {
                   <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary.totalAmount)}</p>
                 </div>
               </div>
-              <div className={"w-xs"}>
-                <p className="flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2">
+              <div className={"w-full"}>
+                <p className="flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2 font-semibold">
                   <span className={"text-white"}>Total Amount</span>
                   <span className="text-white">{formatCurrency(billingSummary.totalAmount)}</span>
                 </p>
@@ -334,14 +315,6 @@ export default function ClientClaimsPage() {
             </div>
           </div>
         </div>
-
-      {/* Modal for viewing DSP notes */}
-      <AgencyEditNote
-        isOpen={isViewMode}
-        setIsOpen={setIsViewMode}
-        submissionId={selectedSubmissionId}
-        reRoute={false}
-      />
       </div>
     </div>
   );

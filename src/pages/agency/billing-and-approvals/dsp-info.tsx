@@ -1,16 +1,19 @@
-import React, {useState} from "react";
+import React, {useRef, useState} from "react";
 import {useParams, useNavigate} from "react-router";
-import {ArrowLeft, Banknote, CornerDownLeft, Loader2} from "lucide-react";
+import {ArrowLeft, Banknote, CornerDownLeft, Loader2, Download, Eye} from "lucide-react";
 import {useAuth} from "@/utils/auth";
-import {useGetDspClaimsQuery} from "./api";
-import AgencyEditNote from "@/pages/agency/notes/editNote";
+import {useGetDspClaimsQuery, useApproveExpenseMutation, useRejectExpenseMutation} from "./api";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import {useToast} from "@/hooks/use-toast";
 
 export default function DSPClaimsPage() {
   const {dsp} = useParams();
   const navigate = useNavigate();
   const {user} = useAuth();
-  const [isViewMode, setIsViewMode] = useState(false);
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
+  const {toast} = useToast();
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const printContentRef = useRef<HTMLDivElement>(null);
 
   const {data, isLoading, error} = useGetDspClaimsQuery(
     {
@@ -22,11 +25,216 @@ export default function DSPClaimsPage() {
     }
   );
 
+  const [approveExpense, {isLoading: isApproving}] = useApproveExpenseMutation();
+  const [rejectExpense, {isLoading: isRejecting}] = useRejectExpenseMutation();
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
     }).format(amount);
+  };
+
+  const {dsp: dspInfo, clientServicesGrouped, billingSummary, pendingExpenses} = data?.data || {};
+
+  const handleApproveExpense = async (expenseId: string) => {
+    try {
+      await approveExpense({
+        expenseId,
+        agencyId: user?.agencyId || "",
+      }).unwrap();
+      
+      toast({
+        title: "Success",
+        description: "Expense approved successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.data?.message || "Failed to approve expense",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRejectExpense = async (expenseId: string) => {
+    try {
+      await rejectExpense({
+        expenseId,
+        agencyId: user?.agencyId || "",
+      }).unwrap();
+      
+      toast({
+        title: "Success",
+        description: "Expense rejected successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.data?.message || "Failed to reject expense",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Aggregate unique clients across all services: sum hours and units, keep a billing rate reference
+  const uniqueClients = React.useMemo(() => {
+    type Agg = {
+      client: { id: string; fullName: string; billingRate?: string } | null;
+      totalHours: number;
+      totalUnits: number;
+      billingRate: number | undefined; // using service.payRate as the available rate source
+      amount: number;
+      serviceCode: string;
+    };
+
+    const map = new Map<string, Agg>();
+
+    clientServicesGrouped?.forEach((group) => {
+      group.services.forEach((svc) => {
+        const id = svc.client?.id || 'unknown';
+        const existing = map.get(id);
+        const billingRate = typeof svc.payRate === 'number' ? svc.payRate : 0;
+        if (existing) {
+          const totalHours = existing.totalHours + (svc.hours || 0);
+          const totalUnits = existing.totalUnits + (svc.units || 0);
+          // Prefer the last non-zero billing rate encountered
+          const rate = billingRate || existing.billingRate;
+          const client = svc.client || existing.client;
+          const clientBillingRate = String(client?.billingRate)?.replace(
+            "$", ""
+          ).replace("/hour", "");
+          map.set(`${id}-${svc?.serviceCode}`, {
+            client: client,
+            serviceCode: svc.serviceCode || "",
+            totalHours,
+            totalUnits,
+            billingRate: rate,
+            amount: Math.round((totalUnits * Number(clientBillingRate || "0") * totalHours) * 100) / 100,
+          });
+        } else {
+          const totalHours = svc.hours || 0;
+          const totalUnits = svc.units || 0;
+          map.set(`${id}-${svc?.serviceCode}`, {
+            client: svc.client || null,
+            serviceCode: svc.serviceCode || "",
+            totalHours,
+            totalUnits,
+            billingRate,
+            amount: Math.round((totalUnits * billingRate * totalHours) * 100) / 100,
+          });
+        }
+      });
+    });
+
+    return Array.from(map.values());
+  }, [clientServicesGrouped]);
+
+  const handlePrint = async () => {
+    if (!printContentRef.current) return;
+
+    setIsGeneratingPDF(true);
+
+    // Keep reference for cleanup
+    let offscreen: HTMLDivElement | null = null;
+    try {
+      // Clone printable content
+      const clonedContent = printContentRef.current.cloneNode(true) as HTMLElement;
+
+      // Create offscreen container to resolve computed styles (ensures rgb/rgba colors)
+      offscreen = document.createElement('div');
+      offscreen.setAttribute('aria-hidden', 'true');
+      offscreen.style.position = 'fixed';
+      offscreen.style.left = '-10000px';
+      offscreen.style.top = '0';
+      offscreen.style.width = '1000px';
+      offscreen.style.backgroundColor = '#ffffff';
+      offscreen.appendChild(clonedContent);
+      document.body.appendChild(offscreen);
+
+      // Remove stylesheets inside the clone
+      clonedContent.querySelectorAll('style, link[rel="stylesheet"]').forEach((n) => n.parentElement?.removeChild(n));
+
+      // Inline computed styles to avoid unsupported color functions (oklch)
+      const inlineResolvedColors = (root: HTMLElement) => {
+        const nodes: HTMLElement[] = [root, ...Array.from(root.querySelectorAll('*')) as HTMLElement[]];
+        nodes.forEach((el) => {
+          const cs = window.getComputedStyle(el);
+          if (cs.color) el.style.color = cs.color;
+          if (cs.backgroundColor) el.style.backgroundColor = cs.backgroundColor;
+          if (cs.borderTopColor) el.style.borderTopColor = cs.borderTopColor;
+          if (cs.borderRightColor) el.style.borderRightColor = cs.borderRightColor;
+          if (cs.borderBottomColor) el.style.borderBottomColor = cs.borderBottomColor;
+          if (cs.borderLeftColor) el.style.borderLeftColor = cs.borderLeftColor;
+          if (cs.outlineColor) el.style.outlineColor = cs.outlineColor;
+          // SVG
+          try {
+            const fill = cs.getPropertyValue('fill');
+            const stroke = cs.getPropertyValue('stroke');
+            if (fill) (el as any).style.fill = fill;
+            if (stroke) (el as any).style.stroke = stroke;
+          } catch {
+          }
+          const boxShadow = cs.boxShadow;
+          if (boxShadow) el.style.boxShadow = boxShadow;
+        });
+      };
+
+      inlineResolvedColors(clonedContent);
+
+      // Render to canvas
+      const canvas = await html2canvas(clonedContent, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowHeight: clonedContent.scrollHeight,
+      });
+
+      // Build PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'in',
+        format: 'letter',
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 1; // 0.5 inch margins
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0.5; // top margin
+
+      pdf.addImage(imgData, 'JPEG', 0.5, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight - 1;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0.5, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight - 1;
+      }
+
+      const dspName = dspInfo?.fullName?.replace(/\s+/g, '_') || 'DSP';
+      const filename = `DSP_Claims_${dspName}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(filename);
+
+      // Cleanup on success
+      if (offscreen && offscreen.parentElement) {
+        document.body.removeChild(offscreen);
+        offscreen = null;
+      }
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+    } finally {
+      if (offscreen && offscreen.parentElement) {
+        document.body.removeChild(offscreen);
+        offscreen = null;
+      }
+      setIsGeneratingPDF(false);
+    }
   };
 
   if (isLoading) {
@@ -58,13 +266,12 @@ export default function DSPClaimsPage() {
     );
   }
 
-  const {dsp: dspInfo, clientServicesGrouped, billingSummary} = data.data;
 
   return (
     <div className="min-h-screen bg-[#eef4f5] px-8">
       <div className="mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4 mb-6 no-print">
           <button
             onClick={() => navigate(-1)}
             className="w-10 h-10 rounded-full bg-white border border-[#e5e5e6] flex items-center justify-center hover:bg-gray-50 transition-colors"
@@ -74,250 +281,224 @@ export default function DSPClaimsPage() {
           <h1 className="text-[24px] font-semibold text-[#10141a]">
             Billing & Management
           </h1>
-        </div>
-
-        <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-          DSP Information
-        </h2>
-
-
-        {/* DSP Info Card */}
-        <div className="rounded-xl p-4 flex items-start gap-4 mb-6">
-          <div
-            className="w-28 h-28 rounded bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-[24px] font-bold shrink-0">
-            {dspInfo.fullName.charAt(0)}
+          <div className="ml-auto">
+            <button
+              onClick={handlePrint}
+              disabled={isGeneratingPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-[#00b4b8] text-white rounded-full hover:bg-[#0090a8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGeneratingPDF ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin"/>
+                  <span className="text-[14px]">Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4"/>
+                  <span className="text-[14px]">Download PDF</span>
+                </>
+              )}
+            </button>
           </div>
-          <div className={"flex flex-col max-w-lg w-full"}>
-            <p className="text-lg font-semibold text-[#10141a] mb-1">
-              {dspInfo.fullName}
-            </p>
-            <p className="flex justify-between items-center">
-              <span className="text-[14px] text-[#808081] mb-1">Payrate</span>
-              <span className="text-[14px] font-medium text-[#808081]">
+        </div>
+        {/* Pending Expenses Section */}
+        {pendingExpenses && pendingExpenses.length > 0 && (
+          <div className="bg-white rounded-[20px] p-6 mb-6 no-print">
+            <h2 className="text-[14px] font-semibold text-[#808081] mb-4">
+              Pending DSP Expenses ({pendingExpenses.length})
+            </h2>
+            <div className="space-y-3">
+              {pendingExpenses.map((expense) => (
+                <div key={expense.id} className="bg-[#0EAF521A] rounded-lg p-4 flex items-center justify-between">
+                  <div className={"flex items-center gap-2 flex-1"}>
+                    <div className={"bg-[#B2B2B3] rounded-full py-2 px-3 flex items-center justify-center space-x-1"}>
+                      <Banknote className="w-6 h-6 text-white shrink-0"/>
+                      <span className={"text-white"}>{formatCurrency(expense.amount || 0)}</span>
+                    </div>
+                    <p className="text-[13px] text-[#808081] flex-1">
+                      {expense.message}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button
+                      onClick={() => window.open(expense.receiptUrl, '_blank')}
+                      className="cursor-pointer px-4 py-1.5 text-[11px] rounded-full bg-[#B2B2B3] font-semibold text-white hover:bg-[#9a9a9b] transition-colors flex items-center gap-1"
+                    >
+                      <Eye size={14}/>
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleApproveExpense(expense.id)}
+                      disabled={isApproving || isRejecting}
+                      className={`px-4 py-1.5 text-[11px] rounded-full bg-[#0EAF52] font-semibold text-white hover:bg-[#0c9644] transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                           strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleRejectExpense(expense.id)}
+                      disabled={isApproving || isRejecting}
+                      className={`px-4 py-1.5 text-[11px] rounded-full bg-[#FF6900] font-semibold text-white hover:bg-[#e55f00] transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <CornerDownLeft size={14}/>
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <div ref={printContentRef} className="bg-white p-8 rounded-lg forced-colors:none no-oklch">
+          <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
+            DSP Information
+          </h2>
+
+
+          {/* DSP Info Card */}
+          <div className="rounded-xl p-4 flex items-start gap-4 mb-6">
+            <div
+              className="w-24 h-24 rounded border-2 border-gray-300 flex items-center justify-center text-gray-400 text-[32px] font-light flex-shrink-0">
+              {dspInfo?.fullName.charAt(0)}
+            </div>
+            <div className={"flex flex-col max-w-lg w-full"}>
+              <p className="text-lg font-semibold text-[#10141a] mb-1">
+                {dspInfo?.fullName}
+              </p>
+              <p className="flex justify-between items-center">
+                <span className="text-[14px] text-[#808081] mb-1">Payrate</span>
+                <span className="text-[14px] font-medium text-[#808081]">
                   {dspInfo?.payrate || "N/A"}
                 </span>
-            </p>
-            <p className="flex justify-between items-center">
-              <span className="text-[14px] text-[#808081] mb-1">Phone No</span>
-              <span className="text-[14px] font-medium text-[#808081]">
-                  {dspInfo.phone || "N/A"}
+              </p>
+              <p className="flex justify-between items-center">
+                <span className="text-[14px] text-[#808081] mb-1">Phone No</span>
+                <span className="text-[14px] font-medium text-[#808081]">
+                  {dspInfo?.phone || "N/A"}
                 </span>
-            </p>
-            <p className="flex justify-between items-center">
-              <span className="text-[14px] text-[#808081] mb-1">Staff Category</span>
-              <span className="text-[14px] font-medium text-[#808081]">
+              </p>
+              <p className="flex justify-between items-center">
+                <span className="text-[14px] text-[#808081] mb-1">Staff Category</span>
+                <span className="text-[14px] font-medium text-[#808081]">
                   {"Permanent"}
                 </span>
-            </p>
+              </p>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Client Services */}
-      <div className="rounded-[20px] px-6 mb-6">
-        <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-          Client Services
-        </h2>
-
-        {clientServicesGrouped.length > 0 ? (
-          <div className="space-y-6">
-            {clientServicesGrouped.map((group, groupIndex) => (
-              <div key={`${group.client?.id}-${group.serviceCode}-${groupIndex}`} className="space-y-3">
-                <div className="bg-[#f9fafb] px-4 py-2 rounded-lg">
-                  <p className="text-[14px] font-semibold text-[#10141a]">
-                    {group.client?.fullName || "Unknown Client"} | Service: {group.service} ({group.serviceCode})
-                  </p>
+          {/* Unique Clients Summary */}
+          <div className="rounded-[20px] px-6 mb-6">
+            <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
+              Client Services
+            </h2>
+            {uniqueClients.length > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-5 gap-4 text-[12px] text-[#808081] px-4">
+                  <span>Client</span>
+                  <span>Service Offered</span>
+                  <span>Total Hours</span>
+                  <span>Billing Rate</span>
+                  <span>Amount</span>
                 </div>
-                
-                {group.services.map((service) => (
-                  <div
-                    key={service.id}
-                    className="grid grid-cols-7 gap-4 items-center py-3 border-b border-[#e5e5e6] last:border-b-0 ml-4"
+                {uniqueClients.map((uc, idx) => (
+                  <div key={`${uc.client?.id || 'unknown'}-${idx}`}
+                       className="grid grid-cols-5 gap-4 items-center py-3 border-b border-[#e5e5e6] last:border-b-0 px-4"
                   >
-                    {/* Date */}
-                    <div className="col-span-1">
-                      <p className="text-[12px] text-[#808081] mb-1">Date</p>
-                      <p className="text-[14px] font-medium text-[#10141a]">
-                        {service.date}
-                      </p>
-                    </div>
-
-                    {/* Clocked In */}
-                    <div className="col-span-1">
-                      <p className="text-[12px] text-[#808081] mb-1">Clocked In</p>
-                      <p className="text-[14px] font-medium text-[#10141a]">
-                        {service.clockedIn}
-                      </p>
-                    </div>
-
-                    {/* Clocked Out */}
-                    <div className="col-span-1">
-                      <p className="text-[12px] text-[#808081] mb-1">Clocked Out</p>
-                      <p className="text-[14px] font-medium text-[#10141a]">
-                        {service.clockedOut}
-                      </p>
-                    </div>
-
-                    {/* Hours */}
-                    <div className="col-span-1">
-                      <p className="text-[12px] text-[#808081] mb-1">Hours</p>
-                      <p className="text-[14px] font-medium text-[#10141a]">
-                        {service.hours}
-                      </p>
-                    </div>
-
-                    {/* Units */}
-                    <div className="col-span-1">
-                      <p className="text-[12px] text-[#808081] mb-1">Units</p>
-                      <p className="text-[14px] font-medium text-[#10141a]">
-                        {service.units}
-                      </p>
-                    </div>
-
-                    {/* Pay Period */}
-                    <div className="col-span-1">
-                      <p className="text-[12px] text-[#808081] mb-1">Pay Period</p>
-                      <p className="text-[14px] font-medium text-[#10141a]">
-                        {service.shiftPeriod || "N/A"}
-                      </p>
-                    </div>
-
-                    {/* Notes */}
-                    <div className="col-span-1">
-                      <p className="text-[12px] text-[#808081] mb-1">Notes</p>
-                      <p className="text-[14px] font-medium text-[#10141a]">
-                        {service.notes}
-                      </p>
-                    </div>
+                    <p className="text-[14px] font-medium text-[#10141a]">
+                      {uc.client?.fullName || 'Unknown Client'}
+                    </p>
+                    <p className="text-[12px] text-[#808081]">{uc.serviceCode}</p>
+                    <p className="text-[12px] text-[#808081]">{uc.totalHours}</p>
+                    <p className="text-[12px] text-[#808081]">
+                      {formatCurrency(Number((uc.client?.billingRate || "0")?.replace(
+                        "$", "").replace("/hour", ""))
+                      )}
+                    </p>
+                    <p className="text-[12px] text-[#10141a]">{formatCurrency(uc.amount || 0)}</p>
                   </div>
                 ))}
               </div>
-            ))}
+            ) : (
+              <p className="text-[14px] text-[#808081]">No client summary available</p>
+            )}
           </div>
-        ) : (
-          <p className="text-[14px] text-[#808081]">No client services available</p>
-        )}
-      </div>
 
-      {/* Billing Summary */}
-      <div className="rounded-[20px] p-6 mb-6">
-        <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-          Billing Summary
-        </h2>
+          {/* Billing Summary */}
+          <div className="rounded-[20px] p-6 mb-6">
+            <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
+              Billing Summary
+            </h2>
 
-        <div className={"flex justify-between items-end mb-4 gap-4"}>
-          <div className="space-y-3 bg-white rounded p-4 w-full">
-            <div className="flex justify-between items-center py-2">
-              <p className="text-[14px] text-[#808081]">Total hours worked</p>
-              <p className="text-[14px] font-medium text-[#10141a]">
-                {billingSummary.totalHoursWorked}
-              </p>
+            <div className={"mb-4"}>
+              <div className={"mb-6 flex justify-between items-end gap-4"}>
+                <div className="space-y-3 bg-white rounded p-4 w-full">
+                  <div className="flex justify-between items-center py-2">
+                    <p className="text-[14px] text-[#808081]">Total hours worked</p>
+                    <p className="text-[14px] font-medium text-[#10141a]">
+                      {billingSummary?.totalHoursWorked}
+                    </p>
+                  </div>
+                  {/*<div className="flex justify-between items-center py-2">*/}
+                  {/*  <p className="text-[14px] text-[#808081]">Total Units</p>*/}
+                  {/*  <p className="text-[14px] font-medium text-[#10141a]">*/}
+                  {/*    {billingSummary?.totalUnits}*/}
+                  {/*  </p>*/}
+                  {/*</div>*/}
+                  {/*<div className="flex justify-between items-center py-2">*/}
+                  {/*  <p className="text-[14px] text-[#808081]">Rate Per Unit</p>*/}
+                  {/*  <p className="text-[14px] font-medium text-[#10141a]">*/}
+                  {/*    {formatCurrency(Number(String("$0/hour").replace("$", "").replace("/hour", "")))}*/}
+                  {/*  </p>*/}
+                  {/*</div>*/}
+                  <div className="flex justify-between items-center py-2">
+                    <p className="text-[14px] text-[#808081]">Pay Rate</p>
+                    <p className="text-[14px] font-medium text-[#10141a]">
+                      {formatCurrency(Number(String("$10/hour").replace("$", "").replace("/hour", "")))}
+                    </p>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
+                    <p className="text-[14px] text-[#808081]">Total Amount</p>
+                    <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalAmount || 0)}</p>
+                  </div>
+                </div>
+                <div className="space-y-3 bg-white rounded p-4 w-full">
+                  <div className="flex justify-between items-center py-2">
+                    <p className="text-[14px] text-[#808081]">Total Mileage</p>
+                    <p className="text-[14px] font-medium text-[#10141a]">
+                      {billingSummary?.totalHoursWorked}
+                    </p>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <p className="text-[14px] text-[#808081]">Rate Per KM</p>
+                    <p className="text-[14px] font-medium text-[#10141a]">
+                      {billingSummary?.totalUnits}
+                    </p>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
+                    <p className="text-[14px] text-[#808081]">Total Amount</p>
+                    <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalAmount || 0)}</p>
+                  </div>
+                </div>
+                <div className="space-y-3 bg-white rounded p-4 w-full">
+                  <div className="flex justify-between items-center py-2 pt-3">
+                    <p className="text-[14px] text-[#808081]">Total Expenses</p>
+                    <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalAmount || 0)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className={"w-full"}>
+                <p className="font-semibold flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2">
+                  <span className={"text-white"}>Total Amount</span>
+                  <span className="text-white">{formatCurrency(billingSummary?.totalAmount || 0)}</span>
+                </p>
+              </div>
             </div>
-            <div className="flex justify-between items-center py-2">
-              <p className="text-[14px] text-[#808081]">Total Units</p>
-              <p className="text-[14px] font-medium text-[#10141a]">
-                {billingSummary.totalUnits}
-              </p>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <p className="text-[14px] text-[#808081]">Rate Per Unit</p>
-              <p className="text-[14px] font-medium text-[#10141a]">
-                {formatCurrency(Number(String("$0/hour").replace("$", "").replace("/hour", "")))}
-              </p>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <p className="text-[14px] text-[#808081]">Pay Rate</p>
-              <p className="text-[14px] font-medium text-[#10141a]">
-                {formatCurrency(Number(String("$0/hour").replace("$", "").replace("/hour", "")))}
-              </p>
-            </div>
-            <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
-              <p className="text-[14px] text-[#808081]">Total Amount</p>
-              <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary.totalAmount)}</p>
-            </div>
-          </div>
-          <div className="space-y-3 bg-white rounded p-4 w-full">
-            <div className="flex justify-between items-center py-2">
-              <p className="text-[14px] text-[#808081]">Total Mileage</p>
-              <p className="text-[14px] font-medium text-[#10141a]">
-                {billingSummary.totalHoursWorked}
-              </p>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <p className="text-[14px] text-[#808081]">Rate Per KM</p>
-              <p className="text-[14px] font-medium text-[#10141a]">
-                {billingSummary.totalUnits}
-              </p>
-            </div>
-            <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
-              <p className="text-[14px] text-[#808081]">Total Amount</p>
-              <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary.totalAmount)}</p>
-            </div>
-          </div>
-          <div className="space-y-3 bg-white rounded p-4 w-full">
-            <div className="flex justify-between items-center py-2 pt-3">
-              <p className="text-[14px] text-[#808081]">Total Expenses</p>
-              <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary.totalAmount)}</p>
-            </div>
-          </div>
-          <div className={"w-full"}>
-            <p className="flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2">
-              <span className={"text-white"}>Total Amount</span>
-              <span className="text-white">{formatCurrency(billingSummary.totalAmount)}</span>
-            </p>
           </div>
         </div>
       </div>
-
-      {/* DSP Expenses */}
-      <div className="bg-white rounded-[20px] p-6 mb-6">
-        <h2 className="text-[14px] font-semibold text-[#808081] mb-4">
-          DSP Expenses
-        </h2>
-        <div className="bg-[#0EAF521A] rounded-lg p-4 flex items-center justify-between">
-          <div className={"flex items-center gap-2"}>
-            <div className={"bg-[#B2B2B3] rounded-full py-2 px-3 flex items-center justify-center space-x-1"}>
-              <Banknote className="w-6 h-6 text-white shrink-0"/>
-              <span className={"text-white"}>$35</span>
-            </div>
-            <p className="text-[13px] text-[#808081]">
-              Client practice daily living skills including cooking and cleaning
-            </p>
-          </div>
-          <div className="flex items-center gap-2 justify-end">
-            <button
-              className="cursor-pointer px-4 py-1.5 text-[11px] rounded-full bg-[#B2B2B3] font-semibold text-white hover:bg-[#9a9a9b] transition-colors flex items-center gap-1"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                   strokeWidth="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-              View
-            </button>
-            <button
-              className={`px-4 py-1.5 text-[11px] rounded-full bg-[#0EAF52] font-semibold text-white hover:bg-[#0c9644] transition-colors flex items-center gap-1`}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                   strokeWidth="2">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              Approve
-            </button>
-            <button
-              className={`px-4 py-1.5 text-[11px] rounded-full bg-[#FF6900] font-semibold text-white hover:bg-[#e55f00] transition-colors flex items-center gap-1`}>
-              <CornerDownLeft size={14}/>
-              Return
-            </button>
-          </div>
-        </div>
-      </div>
-      {/* Modal for viewing DSP notes */}
-      <AgencyEditNote
-        isOpen={isViewMode}
-        setIsOpen={setIsViewMode}
-        submissionId={selectedSubmissionId}
-        reRoute={false}
-      />
     </div>
   );
 }

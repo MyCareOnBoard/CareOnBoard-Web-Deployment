@@ -1,10 +1,10 @@
-import React, {useState, useEffect, useMemo} from "react";
+import React, {useState, useEffect} from "react";
 import {ChevronLeft, ChevronRight} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {useAuth} from "@/utils/auth";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
-import {useGetBillingRecordsQuery, useGenerateReportMutation, BillingRecordGrouped} from "./api";
+import {useGetBillingRecordsQuery} from "./api";
 
 interface BillingStatusFilter {
   value: string;
@@ -40,7 +40,7 @@ export default function BillingAndApprovalsPage() {
     {value: "respite-care", label: "Respite Care"},
   ];
 
-  const {data: billingData, isLoading, isFetching, refetch} = useGetBillingRecordsQuery(
+  const {data: billingData, isLoading, isFetching} = useGetBillingRecordsQuery(
     {
       agencyId: user?.agencyId || '', 
       billingStatus: selectedBillingStatus,
@@ -56,22 +56,20 @@ export default function BillingAndApprovalsPage() {
     }
   );
 
-  const [generateReport] = useGenerateReportMutation();
-
   // Reset to page 1 when tab changes
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab]);
 
   const handleGenerateReport = async (
-    data: { client?: string; serviceCode: string | undefined } | { employee: string },
+    data: { client?: string; } | { employee: string },
   ) => {
     if (Object.keys(data).length === 0) return;
 
     if (activeTab === "client" && "client" in data) {
       navigate(Routes.agency.clientClaims.replace(
         ':clientId', data.client ?? ""
-      ).replace(':serviceCode', data.serviceCode ?? ""));
+      ));
     } else if (activeTab === "dsp" && "employee" in data) {
       navigate(Routes.agency.dspClaims.replace(':dsp', data.employee ?? ""));
     }
@@ -97,34 +95,7 @@ export default function BillingAndApprovalsPage() {
     return `$${amount.toFixed(0)}`;
   };
 
-  const servicesGroupedByRole = useMemo(() => {
-    if (activeTab === "client") {
-      return billingData?.records?.reduce((acc: BillingRecordGrouped[], group) => {
-        group.employees?.forEach((employee) => {
-          const checkEmployeeGrouping = acc.findIndex((item) => {
-            return item.client?.id === group.client?.id
-              && item?.employees?.some((itemEmployee) =>
-                employee.serviceCode === itemEmployee.serviceCode
-              );
-          })
-
-          if (checkEmployeeGrouping === -1) {
-            acc.push({
-                ...group,
-                employees: [employee],
-              }
-            )
-          } else {
-            acc[checkEmployeeGrouping]?.employees?.push(employee);
-          }
-        })
-
-        return acc;
-      }, []) || [];
-    } else {
-      return billingData?.records || [];
-    }
-  }, [billingData?.records, activeTab]);
+  const servicesGroupedByRole = billingData?.records || []
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -138,7 +109,7 @@ export default function BillingAndApprovalsPage() {
             onClick={() => setActiveTab("client")}
             className={`${
               activeTab === "client"
-                ? "bg-[#00b4b8] hover:bg-[#009da1] text-white"
+                ? "bg-[#00b4b8] hover:bg-[#009da1] text-white hover:text-white"
                 : "bg-white border border-[#808081] text-[#10141A]"
             } rounded-full px-6 py-2.5 h-auto font-medium shadow-sm transition-all duration-200`}
           >
@@ -148,7 +119,7 @@ export default function BillingAndApprovalsPage() {
             onClick={() => setActiveTab("dsp")}
             className={`${
               activeTab === "dsp"
-                ? "bg-[#00b4b8] hover:bg-[#009da1] text-white"
+                ? "bg-[#00b4b8] hover:bg-[#009da1] text-white hover:text-white"
                 : "bg-white border border-[#808081] text-[#10141A]"
             } rounded-full px-6 py-2.5 h-auto font-medium shadow-sm transition-all duration-200`}
           >
@@ -351,7 +322,7 @@ export default function BillingAndApprovalsPage() {
                       <Button
                         onClick={() => handleGenerateReport(
                           activeTab === "client"
-                            ? {client: record.client?.id, serviceCode: record?.employees?.[0]?.serviceCode}
+                            ? {client: record.client?.id}
                             : {employee: record.employee?.id}
                         )}
                         className="bg-[#B2B2B3] hover:bg-[#B2B2B3] text-white rounded-full px-6 py-2 h-auto font-medium transition-all duration-200"
