@@ -145,11 +145,18 @@ export interface ClientEvvVisitConfig {
 
 export type ClientAutoCheckKey = "compliance" | "training" | "background" | "expired";
 
+/**
+ * DSP (Direct Support Professional) interface
+ * Represents a DSP assigned to a client
+ */
+export interface ClientDsp {
+  id: string;
+  name: string;
+}
+
 export interface ClientStaffAssignmentAndRestrictions {
-  primaryDspAssigned?: string;
-  primaryDspId?: string;
-  secondaryDsps?: string;
-  secondaryDspId?: string;
+  primaryDsp?: ClientDsp;
+  secondaryDsps?: ClientDsp[];
   genderPreference?: string;
   requiredCertifications?: string;
   specialConditions?: string;
@@ -316,10 +323,8 @@ export interface CreateClientRequest {
   backToBackAllowed?: ClientYesNo;
   travelTimeAllowed?: ClientYesNo;
 
-  primaryDspAssigned?: string;
-  primaryDspId?: string;
-  secondaryDsps?: string;
-  secondaryDspId?: string;
+  primaryDsp?: ClientDsp;
+  secondaryDsps?: ClientDsp[];
   genderPreference?: string;
   requiredCertifications?: string;
   specialConditions?: string;
@@ -415,10 +420,8 @@ export interface UpdateClientRequest {
   maxShiftLength?: string | null;
   backToBackAllowed?: ClientYesNo | null;
   travelTimeAllowed?: ClientYesNo | null;
-  primaryDspAssigned?: string | null;
-  primaryDspId?: string | null;
-  secondaryDsps?: string | null;
-  secondaryDspId?: string | null;
+  primaryDsp?: ClientDsp | null;
+  secondaryDsps?: ClientDsp[] | null;
   genderPreference?: string | null;
   requiredCertifications?: string | null;
   specialConditions?: string | null;

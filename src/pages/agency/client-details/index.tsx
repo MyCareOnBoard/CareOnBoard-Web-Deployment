@@ -145,22 +145,6 @@ export default function ClientDetailsPage() {
     [clientId, formatClientName, calculateAge, client?.profileImage]
   );
 
-  const shifts = useMemo(
-    () =>
-      Array.from({ length: 8 }).map((_, idx) => ({
-        id: `shift-${idx + 1}`,
-        dspName: "Nola Hawkins",
-        dspRole: "DSP",
-        avatarUrl: "https://i.pravatar.cc/120?img=47",
-        dateLabel: "12 January",
-        location: "221/B Baker Street",
-        clockedIn: "2.30 PM",
-        clockedOut: "4.30 PM",
-        durationLabel: "2 hour session",
-      })),
-    []
-  );
-
   if (isLoading) {
     return (
       <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
@@ -285,7 +269,8 @@ export default function ClientDetailsPage() {
       {activeTab === "activity" && (
         <ActivityTab
           clientName={clientDisplay.name}
-          shifts={shifts}
+          clientId={clientId || ""}
+          agencyId={user?.agencyId || ""}
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
           itemsPerPage={itemsPerPage}

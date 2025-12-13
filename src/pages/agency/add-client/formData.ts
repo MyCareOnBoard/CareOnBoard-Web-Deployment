@@ -95,11 +95,14 @@ export type Stage4EvvAndVisitConfigData = {
 
 export type AutoCheckKey = "compliance" | "training" | "background" | "expired";
 
+export type Dsp = {
+    id: string;
+    name: string;
+};
+
 export type Stage5StaffAssignmentAndRestrictionsData = {
-    primaryDspAssigned: string;
-    primaryDspId: string;
-    secondaryDsps: string;
-    secondaryDspId: string;
+    primaryDsp?: Dsp;
+    secondaryDsps: Dsp[];
     genderPreference?: string;
     requiredCertifications: string;
     specialConditions: string;
@@ -274,10 +277,8 @@ export function createInitialAddClientFormData(): AddClientFormData {
             travelTimeAllowed: "",
         },
         stage5: {
-            primaryDspAssigned: "",
-            primaryDspId: "",
-            secondaryDsps: "",
-            secondaryDspId: "",
+            primaryDsp: undefined,
+            secondaryDsps: [],
             genderPreference: undefined,
             requiredCertifications: "",
             specialConditions: "",
