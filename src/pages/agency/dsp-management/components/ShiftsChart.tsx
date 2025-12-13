@@ -94,7 +94,7 @@ export function ShiftsChart({ filter, onFilterChange, isLoading }: ShiftsChartPr
           </div>
           
           {/* Legend */}
-          <div className="flex items-center gap-4 text-xs text-gray-600">
+          <div className="flex flex-col items-center gap-4 text-xs text-gray-600">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-blue-500"></div>
               <span>Scheduled</span>

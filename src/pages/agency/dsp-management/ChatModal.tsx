@@ -70,14 +70,14 @@ export function ChatModal({ dsp, isOpen, onClose, onSuccess }: ChatModalProps) {
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-blue-500 text-blue-500 rounded-full hover:bg-blue-50 transition-colors"
+              className="flex-1 px-4 py-2 border border-[#00B5B8] text-[#00B5B8] rounded-full hover:bg-[#00B5B8]/10 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleChatSubmit}
               disabled={!chatMessage.trim()}
-              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-[#00B5B8] text-white rounded-full hover:bg-[#00A0A4] transition-colors disabled:opacity-50"
             >
               Start Chat
             </button>
