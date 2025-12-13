@@ -41,6 +41,16 @@ function DatePickerInput({
           mode="single"
           selected={value}
           defaultMonth={value ?? new Date()}
+          captionLayout="dropdown"
+          fromYear={2000}
+          toYear={new Date().getFullYear() + 10}
+          formatters={{
+            formatMonthDropdown: (date) =>
+              date.toLocaleString("default", { month: "long" }),
+          }}
+          classNames={{
+            dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+          }}
           onSelect={(d) => {
             if (d) {
               onChange(d);

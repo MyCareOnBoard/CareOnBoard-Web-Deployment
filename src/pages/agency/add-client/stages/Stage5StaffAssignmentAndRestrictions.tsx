@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -8,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import { AddClientFormData, AutoCheckKey, YesNo } from "@/pages/agency/add-client/formData";
@@ -57,42 +59,17 @@ export function Stage5StaffAssignmentAndRestrictions({
   const updateStage5 = (patch: Partial<AddClientFormData["stage5"]>) =>
     setFormData((prev) => ({ ...prev, stage5: { ...prev.stage5, ...patch } }));
 
-  // DSP search (Primary/Secondary) — reuse AddScheduleModal pattern
+  // DSP search (Primary/Secondary) — using Popover pattern
   const [primarySearchResults, setPrimarySearchResults] = useState<Employee[]>([]);
   const [secondarySearchResults, setSecondarySearchResults] = useState<Employee[]>([]);
-  const [showPrimaryDropdown, setShowPrimaryDropdown] = useState(false);
-  const [showSecondaryDropdown, setShowSecondaryDropdown] = useState(false);
+  const [isPrimaryPopoverOpen, setIsPrimaryPopoverOpen] = useState(false);
+  const [isSecondaryPopoverOpen, setIsSecondaryPopoverOpen] = useState(false);
   const [isSearchingPrimary, setIsSearchingPrimary] = useState(false);
   const [isSearchingSecondary, setIsSearchingSecondary] = useState(false);
   const primarySearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const secondarySearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const primaryInputRef = useRef<HTMLDivElement>(null);
   const secondaryInputRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        primaryInputRef.current &&
-        !primaryInputRef.current.contains(event.target as Node)
-      ) {
-        setShowPrimaryDropdown(false);
-      }
-      if (
-        secondaryInputRef.current &&
-        !secondaryInputRef.current.contains(event.target as Node)
-      ) {
-        setShowSecondaryDropdown(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      if (primarySearchTimeoutRef.current) clearTimeout(primarySearchTimeoutRef.current);
-      if (secondarySearchTimeoutRef.current)
-        clearTimeout(secondarySearchTimeoutRef.current);
-    };
-  }, []);
 
   const handlePrimarySearch = useCallback(
     async (query: string) => {
@@ -102,7 +79,7 @@ export function Stage5StaffAssignmentAndRestrictions({
 
       if (query.trim().length < 2) {
         setPrimarySearchResults([]);
-        setShowPrimaryDropdown(false);
+        setIsPrimaryPopoverOpen(false);
         return;
       }
 
@@ -113,11 +90,11 @@ export function Stage5StaffAssignmentAndRestrictions({
           setIsSearchingPrimary(true);
           const results = await searchEmployees(query, agencyId);
           setPrimarySearchResults(results);
-          setShowPrimaryDropdown(results.length > 0);
+          setIsPrimaryPopoverOpen(results.length > 0);
         } catch (error) {
           console.error("Failed to search employees (primary):", error);
           setPrimarySearchResults([]);
-          setShowPrimaryDropdown(false);
+          setIsPrimaryPopoverOpen(false);
         } finally {
           setIsSearchingPrimary(false);
         }
@@ -134,7 +111,7 @@ export function Stage5StaffAssignmentAndRestrictions({
 
       if (query.trim().length < 2) {
         setSecondarySearchResults([]);
-        setShowSecondaryDropdown(false);
+        setIsSecondaryPopoverOpen(false);
         return;
       }
 
@@ -144,30 +121,48 @@ export function Stage5StaffAssignmentAndRestrictions({
         try {
           setIsSearchingSecondary(true);
           const results = await searchEmployees(query, agencyId);
-          setSecondarySearchResults(results);
-          setShowSecondaryDropdown(results.length > 0);
+          // Filter out primary DSP and already selected secondary DSPs
+          const selectedIds = new Set([
+            stage5.primaryDsp?.id,
+            ...stage5.secondaryDsps.map(dsp => dsp.id)
+          ].filter(Boolean));
+          const filteredResults = results.filter(emp => !selectedIds.has(emp.id));
+          setSecondarySearchResults(filteredResults);
+          setIsSecondaryPopoverOpen(filteredResults.length > 0);
         } catch (error) {
           console.error("Failed to search employees (secondary):", error);
           setSecondarySearchResults([]);
-          setShowSecondaryDropdown(false);
+          setIsSecondaryPopoverOpen(false);
         } finally {
           setIsSearchingSecondary(false);
         }
       }, 300);
     },
-    [user?.agencyId, user?.uid]
+    [user?.agencyId, user?.uid, stage5.primaryDsp?.id, stage5.secondaryDsps]
   );
 
   const handlePrimarySelect = (employee: Employee) => {
-    updateStage5({ primaryDspAssigned: employee.fullName, primaryDspId: employee.id });
-    setShowPrimaryDropdown(false);
+    updateStage5({ primaryDsp: { id: employee.id, name: employee.fullName } });
+    setIsPrimaryPopoverOpen(false);
     setPrimarySearchResults([]);
   };
 
   const handleSecondarySelect = (employee: Employee) => {
-    updateStage5({ secondaryDsps: employee.fullName, secondaryDspId: employee.id });
-    setShowSecondaryDropdown(false);
+    // Add to secondary DSPs array if not already selected
+    const isAlreadySelected = stage5.secondaryDsps.some(dsp => dsp.id === employee.id);
+    if (!isAlreadySelected) {
+      updateStage5({
+        secondaryDsps: [...stage5.secondaryDsps, { id: employee.id, name: employee.fullName }]
+      });
+    }
+    setIsSecondaryPopoverOpen(false);
     setSecondarySearchResults([]);
+  };
+
+  const handleRemoveSecondaryDsp = (dspId: string) => {
+    updateStage5({
+      secondaryDsps: stage5.secondaryDsps.filter(dsp => dsp.id !== dspId)
+    });
   };
 
   const autoCheckOptions = useMemo(
@@ -204,83 +199,121 @@ export function Stage5StaffAssignmentAndRestrictions({
             <label className="text-[12px] font-normal text-[#10141a]">
               Primary DSP Assigned
             </label>
-            <Input
-              value={stage5.primaryDspAssigned}
-              onChange={(e) => {
-                const value = e.target.value;
-                updateStage5({ primaryDspAssigned: value, primaryDspId: "" });
-                handlePrimarySearch(value);
-              }}
-              onFocus={() => {
-                if (primarySearchResults.length > 0) setShowPrimaryDropdown(true);
-              }}
-              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white pr-10"
-              placeholder="Search DSP name..."
-            />
-            {isSearchingPrimary && (
-              <div className="absolute right-3 top-[30px] text-[#808081] text-[12px]">
-                Searching...
-              </div>
-            )}
-            {showPrimaryDropdown && primarySearchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
-                {primarySearchResults.map((employee) => (
-                  <button
-                    key={employee.id}
-                    type="button"
-                    onClick={() => handlePrimarySelect(employee)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
-                  >
-                    <p className="text-[14px] font-normal text-black">
-                      {employee.fullName}
-                    </p>
-                    <p className="text-[12px] font-normal text-[#808081]">
-                      {employee.email}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            )}
+            <Popover open={isPrimaryPopoverOpen} onOpenChange={setIsPrimaryPopoverOpen}>
+              <PopoverAnchor asChild>
+                <div className="relative">
+                  <Input
+                    value={stage5.primaryDsp?.name || ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      updateStage5({ primaryDsp: undefined });
+                      handlePrimarySearch(value);
+                    }}
+                    onFocus={() => {
+                      if (primarySearchResults.length > 0) setIsPrimaryPopoverOpen(true);
+                    }}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white pr-10"
+                    placeholder="Search DSP name..."
+                  />
+                  {isSearchingPrimary && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-4 h-4 text-[#808081] animate-spin" />
+                    </div>
+                  )}
+                </div>
+              </PopoverAnchor>
+              {primarySearchResults.length > 0 && (
+                <PopoverContent
+                  align="start"
+                  className="w-[var(--radix-popover-trigger-width)] mt-1 p-0 border border-[#cccccd] rounded-xl shadow-lg max-h-[200px] overflow-y-auto bg-white"
+                >
+                  {primarySearchResults.map((employee) => (
+                    <button
+                      key={employee.uid || employee.id}
+                      type="button"
+                      onClick={() => handlePrimarySelect(employee)}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-xl last:rounded-b-xl cursor-pointer border-b border-[#f0f0f0] last:border-b-0 transition-colors"
+                    >
+                      <p className="text-[14px] font-normal text-black">
+                        {employee.fullName}
+                      </p>
+                      <p className="text-[12px] font-normal text-[#808081]">
+                        {employee.email}
+                      </p>
+                    </button>
+                  ))}
+                </PopoverContent>
+              )}
+            </Popover>
           </div>
 
           <div className="flex flex-col gap-1 relative" ref={secondaryInputRef}>
             <label className="text-[12px] font-normal text-[#10141a]">
               Secondary / Backup DSPs
             </label>
-            <Input
-              value={stage5.secondaryDsps}
-              onChange={(e) => {
-                const value = e.target.value;
-                updateStage5({ secondaryDsps: value, secondaryDspId: "" });
-                handleSecondarySearch(value);
-              }}
-              onFocus={() => {
-                if (secondarySearchResults.length > 0) setShowSecondaryDropdown(true);
-              }}
-              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white pr-10"
-              placeholder="Search DSP name..."
-            />
-            {isSearchingSecondary && (
-              <div className="absolute right-3 top-[30px] text-[#808081] text-[12px]">
-                Searching...
-              </div>
-            )}
-            {showSecondaryDropdown && secondarySearchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
-                {secondarySearchResults.map((employee) => (
-                  <button
-                    key={employee.id}
-                    type="button"
-                    onClick={() => handleSecondarySelect(employee)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
+            <Popover open={isSecondaryPopoverOpen} onOpenChange={setIsSecondaryPopoverOpen}>
+              <PopoverAnchor asChild>
+                <div className="relative">
+                  <Input
+                    value=""
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleSecondarySearch(value);
+                    }}
+                    onFocus={() => {
+                      if (secondarySearchResults.length > 0) setIsSecondaryPopoverOpen(true);
+                    }}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white pr-10"
+                    placeholder="Search DSP name..."
+                  />
+                  {isSearchingSecondary && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-4 h-4 text-[#808081] animate-spin" />
+                    </div>
+                  )}
+                </div>
+              </PopoverAnchor>
+              {secondarySearchResults.length > 0 && (
+                <PopoverContent
+                  align="start"
+                  className="w-[var(--radix-popover-trigger-width)] mt-1 p-0 border border-[#cccccd] rounded-xl shadow-lg max-h-[200px] overflow-y-auto bg-white"
+                >
+                  {secondarySearchResults.map((employee) => (
+                    <button
+                      key={employee.uid || employee.id}
+                      type="button"
+                      onClick={() => handleSecondarySelect(employee)}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-xl last:rounded-b-xl cursor-pointer border-b border-[#f0f0f0] last:border-b-0 transition-colors"
+                    >
+                      <p className="text-[14px] font-normal text-black">
+                        {employee.fullName}
+                      </p>
+                      <p className="text-[12px] font-normal text-[#808081]">
+                        {employee.email}
+                      </p>
+                    </button>
+                  ))}
+                </PopoverContent>
+              )}
+            </Popover>
+            {/* Selected Secondary DSPs */}
+            {stage5.secondaryDsps.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {stage5.secondaryDsps.map((dsp) => (
+                  <div
+                    key={dsp.id}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#f0f0f0] rounded-lg text-[14px] font-medium text-[#10141a]"
                   >
-                    <p className="text-[14px] font-normal text-black">
-                      {employee.fullName}
-                    </p>
-                    <p className="text-[12px] font-normal text-[#808081]">
-                      {employee.email}
-                    </p>
-                  </button>
+                    <span>{dsp.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSecondaryDsp(dsp.id)}
+                      className="hover:bg-[#d0d0d0] rounded-full p-0.5 transition-colors"
+                      aria-label={`Remove ${dsp.name}`}
+                    >
+                      <X className="w-3 h-3 text-[#808081]" />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

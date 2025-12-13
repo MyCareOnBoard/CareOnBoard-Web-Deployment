@@ -4,6 +4,7 @@
  */
 
 import axiosClient from '../axios';
+import { ApiResponse } from '@/lib/api-types';
 
 /**
  * Client interface
@@ -18,8 +19,12 @@ export interface Client {
   gender?: string;
   email?: string;
   phone?: string;
-  dateOfBirth?: string;
+  dateOfBirth?: string | { _seconds?: number; _nanoseconds?: number } | Date;
   profileImage?: string;
+
+  // DSP information
+  primaryDsp?: ClientDsp;
+  secondaryDsps?: ClientDsp[];
 
   // Address information
   location?: { lat: string; lon: string };
@@ -55,7 +60,6 @@ export interface Client {
   healthcareSafety?: ClientHealthcareSafety;
   documents?: ClientDocument[];
   evvVisitConfig?: ClientEvvVisitConfig;
-  staffAssignment?: ClientStaffAssignmentAndRestrictions;
   goalsAndEmergency?: ClientGoalsAndEmergency;
   systemAiAndAudit?: ClientSystemAiAndAudit;
 
@@ -64,8 +68,8 @@ export interface Client {
 
   // Status and dates
   status?: 'active' | 'inactive' | 'pending' | 'archived';
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: string | { _seconds?: number; _nanoseconds?: number } | Date;
+  updatedAt?: string | { _seconds?: number; _nanoseconds?: number } | Date;
 }
 
 /**
@@ -144,18 +148,13 @@ export interface ClientEvvVisitConfig {
 
 export type ClientAutoCheckKey = "compliance" | "training" | "background" | "expired";
 
-export interface ClientStaffAssignmentAndRestrictions {
-  primaryDspAssigned?: string;
-  primaryDspId?: string;
-  secondaryDsps?: string;
-  secondaryDspId?: string;
-  genderPreference?: string;
-  requiredCertifications?: string;
-  specialConditions?: string;
-  prefersFamiliar?: ClientYesNo;
-  noMaleFemaleStaff?: ClientYesNo;
-  medicalRestrictionsTrained?: ClientYesNo;
-  autoChecks?: Record<ClientAutoCheckKey, boolean>;
+/**
+ * DSP (Direct Support Professional) interface
+ * Represents a DSP assigned to a client
+ */
+export interface ClientDsp {
+  id: string;
+  name: string;
 }
 
 export interface ClientGoalsAndEmergency {
@@ -202,6 +201,21 @@ export interface ListClientsResponse {
   clients: Client[];
   total: number;
   count: number;
+}
+
+/**
+ * List Agency Clients Response (new format)
+ */
+export interface ListAgencyClientsResponse {
+  success: boolean,
+  count: number;
+  agencyId: string;
+  clients: Client[];
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+  }
 }
 
 /**
@@ -300,10 +314,8 @@ export interface CreateClientRequest {
   backToBackAllowed?: ClientYesNo;
   travelTimeAllowed?: ClientYesNo;
 
-  primaryDspAssigned?: string;
-  primaryDspId?: string;
-  secondaryDsps?: string;
-  secondaryDspId?: string;
+  primaryDsp?: ClientDsp;
+  secondaryDsps?: ClientDsp[];
   genderPreference?: string;
   requiredCertifications?: string;
   specialConditions?: string;
@@ -343,7 +355,7 @@ export interface CreateClientRequest {
   healthcareSafety?: ClientHealthcareSafety;
   documents?: ClientDocument[];
   evvVisitConfig?: ClientEvvVisitConfig;
-  staffAssignment?: ClientStaffAssignmentAndRestrictions;
+
   goalsAndEmergency?: ClientGoalsAndEmergency;
   systemAiAndAudit?: ClientSystemAiAndAudit;
   agencyId?: string; // Required for employees, defaults to own agencyId for agencies
@@ -399,10 +411,8 @@ export interface UpdateClientRequest {
   maxShiftLength?: string | null;
   backToBackAllowed?: ClientYesNo | null;
   travelTimeAllowed?: ClientYesNo | null;
-  primaryDspAssigned?: string | null;
-  primaryDspId?: string | null;
-  secondaryDsps?: string | null;
-  secondaryDspId?: string | null;
+  primaryDsp?: ClientDsp | null;
+  secondaryDsps?: ClientDsp[] | null;
   genderPreference?: string | null;
   requiredCertifications?: string | null;
   specialConditions?: string | null;
@@ -439,7 +449,6 @@ export interface UpdateClientRequest {
   healthcareSafety?: ClientHealthcareSafety | null;
   documents?: ClientDocument[] | null;
   evvVisitConfig?: ClientEvvVisitConfig | null;
-  staffAssignment?: ClientStaffAssignmentAndRestrictions | null;
   goalsAndEmergency?: ClientGoalsAndEmergency | null;
   systemAiAndAudit?: ClientSystemAiAndAudit | null;
   status?: 'active' | 'inactive' | 'pending' | 'archived';
@@ -457,23 +466,61 @@ export interface SeedClientsRequest {
 }
 
 /**
- * ✅ Create a new client
- * Endpoint: POST /clients
+ * ✅ Create a new agency client
+ * Endpoint: POST /clientManagement
  * Agencies default to their own agencyId
  * Employees must supply agencyId
  */
-export async function createClient(data: CreateClientRequest): Promise<Client> {
+export async function createAgencyClient(data: CreateClientRequest): Promise<Client> {
   try {
-    const response = await axiosClient.post<{ success: boolean; data: Client }>('/clients', data);
+    const response = await axiosClient.post<ApiResponse<Client>>('/clientManagement', data);
+    return response.data.data;
+  } catch (error) {
+    console.error('Failed to create client for agency:', error);
+    throw error;
+  }
+}
+
+/**
+ * ✅ List agency clients
+ * Endpoint: GET /clientManagement
+ * Query params: agencyId (required for employees), status, service, search, limit
+ */
+export async function listAgencyClients(params?: ListClientsParams): Promise<Client[]> {
+  try {
+    const response = await axiosClient.get<ListAgencyClientsResponse>('/clientManagement', {
+      params: {
+        agencyId: params?.agencyId,
+        status: params?.status,
+        service: params?.service,
+        search: params?.search,
+        limit: params?.limit,
+      }
+    });
 
     if (!response.data.success) {
-      throw new Error('Failed to create client');
+      throw new Error('Failed to fetch clients');
     }
 
+    return response.data.clients || [];
+  } catch (error) {
+    console.error('Failed to fetch clients:', error);
+    throw error;
+  }
+}
+
+/**
+ * ✅ Get a single client by ID
+ * Endpoint: GET /clientManagement/:clientId
+ * Employees must supply agencyId via query parameter
+ */
+export async function getAgencyClientById(clientId: string): Promise<Client> {
+  try {
+    const response = await axiosClient.get<ApiResponse<Client>>(`/clientManagement/${clientId}`);
     return response.data.data;
-  } catch (err: any) {
-    console.error('createClient error:', err);
-    throw new Error(err.message || 'Failed to create client');
+  } catch (error) {
+    console.error(`Failed to fetch client ${clientId}:`, error);
+    throw error;
   }
 }
 
