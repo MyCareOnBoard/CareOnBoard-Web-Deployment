@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowLeft, ArrowRight, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -60,7 +60,11 @@ export function StageFooter({
         >
           {isLast ? "Save Client" : "Next"}
           {isLast ? (
-            <Save className="w-5 h-5 text-white" />
+            primaryLoading ? (
+              <Loader2 className="w-5 h-5 text-white animate-spin" />
+            ) : (
+              <Save className="w-5 h-5 text-white" />
+            )
           ) : (
             <ArrowRight className="w-5 h-5 text-white" />
           )}
