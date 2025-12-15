@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { searchClients, Client } from "@/lib/api/clients";
+import { searchClients, Client, ClientService } from "@/lib/api/clients";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import {Routes} from "@/routes/constants";
@@ -135,6 +136,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   // API search states
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
   const [dspSearchResults, setDspSearchResults] = useState<Employee[]>([]);
+  const [selectedClientServices, setSelectedClientServices] = useState<ClientService[]>([]);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
   const [isSearchingDsps, setIsSearchingDsps] = useState(false);
 
@@ -310,7 +312,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         : client.id,
       clientId: client.id,
       clientLocation: formatLocation(client.location),
+      serviceCode: client.services?.[0]?.code || "",
     }));
+    setSelectedClientServices(client.services || []);
     setShowClientDropdown(false);
     setClientSearchResults([]);
   };
@@ -949,16 +953,29 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           </div>
 
           {/* Service Code */}
+          {/* Service Code */}
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Service Code</label>
-            <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
-              <input
-                type="text"
-                value={formData.serviceCode}
-                onChange={(e) => setFormData(prev => ({ ...prev, serviceCode: e.target.value }))}
-                className="flex-1 text-[14px] font-normal text-black outline-none bg-transparent"
-              />
-            </div>
+            <Select
+              value={formData.serviceCode}
+              onValueChange={(value) => setFormData((prev) => ({ ...prev, serviceCode: value }))}
+              disabled={selectedClientServices.length === 0}
+            >
+              <SelectTrigger className="w-full h-11 rounded-xl border-[#cccccd] bg-white">
+                <SelectValue
+                  placeholder={
+                    selectedClientServices.length === 0 ? "No services available" : "Select service"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {selectedClientServices.map((service) => (
+                  <SelectItem key={`${service.code}-${service.name}`} value={service.code}>
+                    {service.name ? `${service.name} — ${service.code}` : service.code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Notes Type */}
