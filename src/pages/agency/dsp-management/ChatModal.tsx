@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { X, Check } from "lucide-react";
-import ServicesAvatar from "@/assets/icons/services-avatar.png";
+
 import { DSP } from "./types";
 
 interface ChatModalProps {
@@ -49,7 +49,7 @@ export function ChatModal({ dsp, isOpen, onClose, onSuccess }: ChatModalProps) {
 
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={dsp.profileImage || ServicesAvatar} alt={dsp.fullName} />
+              <AvatarImage src={dsp.profilePicture} alt={dsp.fullName} />
               <AvatarFallback className="bg-gray-200 text-gray-700 text-sm font-medium">
                 {getInitials(dsp.fullName)}
               </AvatarFallback>
@@ -70,14 +70,14 @@ export function ChatModal({ dsp, isOpen, onClose, onSuccess }: ChatModalProps) {
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-blue-500 text-blue-500 rounded-full hover:bg-blue-50 transition-colors"
+              className="flex-1 px-4 py-2 border border-[#00B5B8] text-[#00B5B8] rounded-full hover:bg-[#00B5B8]/10 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleChatSubmit}
               disabled={!chatMessage.trim()}
-              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-[#00B5B8] text-white rounded-full hover:bg-[#00A0A4] transition-colors disabled:opacity-50"
             >
               Start Chat
             </button>

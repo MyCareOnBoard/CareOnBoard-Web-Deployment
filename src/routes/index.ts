@@ -183,7 +183,11 @@ export const router = createBrowserRouter([
         Component: ShiftsListPage,
       },
       {
-        path: Routes.agency.approvals,
+        path: Routes.agency.support,
+        Component: SupportPage,
+      },
+      {
+      path: Routes.agency.approvals,
         Component: ApprovalsPage,
       },
       {

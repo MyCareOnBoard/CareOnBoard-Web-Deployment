@@ -157,9 +157,9 @@ export default function ClientClaimsPage() {
             </h2>
 
             {/* Client Info Card */}
-            <div className="rounded-[12px] p-4 mb-6 flex justify-between items-start">
+            <div className="rounded-xl p-4 mb-6 flex justify-between items-start">
               <div className="flex items-start gap-6">
-                <div className="w-24 h-24 rounded border-2 bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-gray-400 text-[32px] font-light flex-shrink-0">
+                <div className="w-24 h-24 rounded border-2 bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-gray-400 text-[32px] font-light shrink-0">
                   {client.fullName.charAt(0)}
                 </div>
                 <div className="flex flex-col space-y-2">
@@ -169,19 +169,19 @@ export default function ClientClaimsPage() {
                     </p>
                   </div>
                   <div className="flex items-start gap-8">
-                    <span className="text-[14px] text-[#808081] min-w-[80px]">DOB</span>
+                    <span className="text-[14px] text-[#808081] min-w-20">DOB</span>
                     <span className="text-[14px] text-[#10141a]">
                       {client.dateOfBirth || "N/A"}
                     </span>
                   </div>
                   <div className="flex items-start gap-8">
-                    <span className="text-[14px] text-[#808081] min-w-[80px]">Address</span>
+                    <span className="text-[14px] text-[#808081] min-w-20">Address</span>
                     <span className="text-[14px] text-[#10141a]">
                       {client.address || "N/A"}
                     </span>
                   </div>
                   <div className="flex items-start gap-8">
-                    <span className="text-[14px] text-[#808081] min-w-[80px]">Service Type</span>
+                    <span className="text-[14px] text-[#808081] min-w-20">Service Type</span>
                     <span className="text-[14px] text-[#10141a]">
                       {client.service || "N/A"}
                     </span>
