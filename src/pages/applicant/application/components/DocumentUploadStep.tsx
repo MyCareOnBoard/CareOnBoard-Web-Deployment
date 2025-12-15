@@ -1,5 +1,5 @@
 import {FileUpload} from "@/components/ui/file-upload";
-import {useRef, useState, FormEvent, useEffect} from "react";
+import React, {useRef, useState, FormEvent, useEffect} from "react";
 import {Input} from "@/components/ui/input";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Checkbox} from "@/components/ui/checkbox";
@@ -10,61 +10,77 @@ import {
   useUploadDocumentMutation
 } from "@/pages/applicant/application/api";
 import {DocumentTypes} from "@/pages/applicant/application/types";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
+import {Calendar} from "@/components/ui/calendar";
+import {CalendarDays} from "lucide-react";
+import {toast} from "sonner";
 
 interface DocumentUploadStepProps {
   onBack?: () => void;
   onNext?: () => void;
 }
 
-interface FileUploadedInfo {
+export interface ApplicantDocumentFileUploadedInfo {
   fileName: string;
   fileUrl: string;
   fileType: string;
+  expiryDate?: string;
 }
 
 const files = [
   {
     id: "photo-id",
-    label: "Photo ID (Driver’s License, State ID, Passport)",
-    placeholder: "Upload your photo ID"
+    label: "Upload Photo ID (Driver’s License, State ID, Passport)",
+    placeholder: "Upload your photo ID",
+    requiresExpiry: true
   },
   {
     id: "social-security-card",
-    label: "Social Security Card or valid work permit.",
-    placeholder: "Upload social security card"
+    label: "Upload Social Security Card or valid work permit.",
+    placeholder: "Upload social security card",
+    requiresExpiry: false
   },
   {
     id: "diploma",
-    label: "High School Diploma/GED certificate.",
-    placeholder: "Upload high school certificate"
+    label: "Upload High School Diploma/GED certificate.",
+    placeholder: "Upload high school certificate",
+    requiresExpiry: false
   },
   {
     id: "certifications",
-    label: "Any relevant certifications (e.g., CPR, First Aid — optional at this stage).",
-    placeholder: "Upload any certificate"
+    label: "Upload Any relevant certifications (e.g., CPR, First Aid — optional at this stage).",
+    placeholder: "Upload any certificate",
+    requiresExpiry: true
   },
   {
     id: "hepatitis-b-vaccination",
-    label: "Hepatitis B vaccination series documents.",
-    placeholder: "Upload Hepatitis B vaccination series documents."
+    label: "Upload Hepatitis B vaccination series documents.",
+    placeholder: "Upload Hepatitis B vaccination series documents.",
+    requiresExpiry: false
   },
   {
     id: "hepatitis-b-immunity",
-    label: "Hepatitis B immunity (titer result)",
-    placeholder: "Upload Hepatitis B immunity (titer result)"
+    label: "Upload Hepatitis B immunity (titer result)",
+    placeholder: "Upload Hepatitis B immunity (titer result)",
+    requiresExpiry: false
   },
   {
     id: "tb-test",
-    label: "TB test result.",
-    placeholder: "Upload TB test result"
+    label: "Upload tb test result.",
+    placeholder: "Upload TB test result",
+    requiresExpiry: false
   }
 ]
+
+const tenYearsFromNow = new Date()
+tenYearsFromNow.setFullYear(new Date().getFullYear() + 10)
 
 export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
   const [documentTypeUploading, setDocumentTypeUploading] = useState<DocumentTypes | null>(null);
   const ref = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(false);
-  const [fileUploads, setFileUploads] = useState<FileUploadedInfo[]>([]);
+  const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
+  const [fileUploads, setFileUploads] = useState<ApplicantDocumentFileUploadedInfo[]>([]);
 
   const [uploadFile, {isLoading}] = useUploadDocumentMutation();
   const {data: eligibilityVerificationData} = useGetEligibilityVerificationQuery(undefined, {
@@ -128,18 +144,29 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
     event: FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.requiresExpiry) {
+        const findUpload = fileUploads.find((item) => item.fileType === file.id);
+        if (findUpload && !findUpload.expiryDate) {
+          toast.error("Please select an expiry date for " + file.label);
+          return;
+        }
+      }
+    }
     try {
       const response = await submitDocumentUploadAndEligibilityVerification({
         data: {
-          photoIdUrl: fileUploads.find((item) => item.fileType === "photo-id")?.fileUrl,
-          socialSecurityCardUrl: fileUploads.find((item) => item.fileType === "social-security-card")?.fileUrl,
-          diplomaUrl: fileUploads.find((item) => item.fileType === "diploma")?.fileUrl,
-          certificationsUrl: fileUploads.find((item) => item.fileType === "certifications")?.fileUrl,
-          hepatitisBVaccinationUrl: fileUploads.find((item) => item.fileType === "hepatitis-b-vaccination")?.fileUrl,
-          hepatitisBImmunityUrl: fileUploads.find((item) => item.fileType === "hepatitis-b-immunity")?.fileUrl,
-          tbTestResultUrl: fileUploads.find((item) => item.fileType === "tb-test")?.fileUrl,
-          i9FormUrl: fileUploads.find((item) => item.fileType === "i9-form")?.fileUrl,
-          w4FormUrl: fileUploads.find((item) => item.fileType === "w4-form")?.fileUrl,
+          photoIdUrl: fileUploads.find((item) => item.fileType === "photo-id"),
+          socialSecurityCardUrl: fileUploads.find((item) => item.fileType === "social-security-card"),
+          diplomaUrl: fileUploads.find((item) => item.fileType === "diploma"),
+          certificationsUrl: fileUploads.find((item) => item.fileType === "certifications"),
+          hepatitisBVaccinationUrl: fileUploads.find((item) => item.fileType === "hepatitis-b-vaccination"),
+          hepatitisBImmunityUrl: fileUploads.find((item) => item.fileType === "hepatitis-b-immunity"),
+          tbTestResultUrl: fileUploads.find((item) => item.fileType === "tb-test"),
+          i9FormUrl: fileUploads.find((item) => item.fileType === "i9-form"),
+          w4FormUrl: fileUploads.find((item) => item.fileType === "w4-form"),
           references,
           declarationAgreed: value
         },
@@ -179,11 +206,12 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
         "w4FormUrl": "w4-form"
       }
       setFileUploads(Object.entries(eligibilityVerificationData.data).filter(([key, value]) => fileKeys.includes(key) && value).map(([key, value]) => {
-        const splittedFileUrl = value ? value.split("/") : []
+        const splittedFileUrl = value?.fileUrl ? value.fileUrl?.split("/") : []
         return {
           fileName: splittedFileUrl[splittedFileUrl.length - 1],
-          fileUrl: value,
-          fileType: fileKeysIds[key as keyof typeof fileKeysIds] as DocumentTypes
+          fileUrl: value.fileUrl,
+          fileType: fileKeysIds[key as keyof typeof fileKeysIds] as DocumentTypes,
+          expiryDate: value.expiryDate
         }
       }))
     }
@@ -191,21 +219,88 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
 
   return (
     <form className={"w-full"} onSubmit={handleSubmit}>
-      {files.map((file) =>
-        <div className={"mb-6"}>
-          <p className={"text-sm mb-2"}>{file.label}</p>
-          <FileUpload
-            name={file.id}
-            className="h-[90px] w-full max-w-[100vw]"
-            label={(isLoading && file.id === documentTypeUploading) ? "Uploading..." : file.placeholder}
-            accept=".pdf, .jpg, .png, .webp"
-            onChange={async (event) => {
-              await handleFileUpload(event.target.files ?? null, file.id as DocumentTypes);
-            }}
-          />
-          <FileNameCard fileUploads={fileUploads} documentType={file.id as DocumentTypes}/>
-        </div>
-      )}
+      {files.map((file, index) => {
+        const fileUpload = fileUploads.find((item) => item.fileType === file.id);
+        return (
+          <div className={"mb-6"} key={index}>
+            <div className={"flex justify-between items-center"}>
+              <p className={"text-sm mb-2"}>{file.label}</p>
+              {file.requiresExpiry && (
+                <div className="px-4 py-3 flex items-center justify-center">
+                  <Popover
+                    open={openDatePopoverId === String(index)}
+                    onOpenChange={(open) => setOpenDatePopoverId(open ? String(index) : null)}
+                  >
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
+                      >
+                          <span
+                            className="flex items-center gap-2 text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]"
+                          >
+                            {fileUpload?.expiryDate
+                              ? fileUpload?.expiryDate
+                              : "Expiry Date"
+                            }
+                            <CalendarDays className={"w-5 h-5"}/>
+                          </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                      <Calendar
+                        mode="single"
+                        className="bg-white"
+                        captionLayout="dropdown"
+                        startMonth={new Date()}
+                        endMonth={tenYearsFromNow}
+                        selected={fileUpload?.expiryDate ? new Date(fileUpload?.expiryDate) : new Date()}
+                        defaultMonth={new Date()}
+                        disabled={{
+                          before: new Date()
+                        }}
+                        onSelect={async (date) => {
+                          if (date) {
+                            setFileUploads((prev) => prev.map((item) => {
+                              if (item.fileType === file.id) {
+                                return {
+                                  ...item,
+                                  expiryDate: date.toISOString().split("T")[0]
+                                }
+                              }
+                              return item
+                            }))
+                            setOpenDatePopoverId(null);
+                          }
+                        }}
+                        formatters={{
+                          formatMonthDropdown: (date) =>
+                            date.toLocaleString("default", {month: "long"}),
+                        }}
+                        classNames={{
+                          dropdown_root: "relative border-none shadow-none has-focus:ring-0",
+                          caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
+                        }}
+                        autoFocus={true}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+            </div>
+            <FileUpload
+              name={file.id}
+              className="h-[90px] w-full max-w-[100vw]"
+              label={(isLoading && file.id === documentTypeUploading) ? "Uploading..." : file.placeholder}
+              accept=".pdf, .jpg, .png, .webp"
+              onChange={async (event) => {
+                await handleFileUpload(event.target.files ?? null, file.id as DocumentTypes);
+              }}
+            />
+            <FileNameCard fileUploads={fileUploads} documentType={file.id as DocumentTypes}/>
+          </div>
+        )
+      })}
       <div className={"mb-6"}>
         <p className={"text-sm mb-2 flex items-center"}>
           <span>Upload document</span>
@@ -225,7 +320,7 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
         <FileUpload
           name={"upload-i-9-form"}
           className="h-[90px] w-full max-w-[100vw]"
-          label={(isLoading && "i9-form" === documentTypeUploading) ? "Uploading..." : "i9-form"}
+          label={(isLoading && "i9-form" === documentTypeUploading) ? "Uploading..." : "Upload I-9 Form"}
           accept=".pdf, .jpg, .png, .webp"
           onChange={async (event) => {
             await handleFileUpload(event.target.files ?? null, "i9-form");
@@ -252,7 +347,7 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
         <FileUpload
           name={"upload-w-4-form"}
           className="h-[90px] w-full max-w-[100vw]"
-          label={(isLoading && "w4-form" === documentTypeUploading) ? "Uploading..." : "w4-form"}
+          label={(isLoading && "w4-form" === documentTypeUploading) ? "Uploading..." : "Upload W-4 Form"}
           accept=".pdf, .jpg, .png, .webp"
           onChange={async (event) => {
             await handleFileUpload(event.target.files ?? null, "w4-form");
@@ -388,7 +483,7 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
 
 export const FileNameCard = (
   {fileUploads, documentType}: {
-    fileUploads: FileUploadedInfo[];
+    fileUploads: ApplicantDocumentFileUploadedInfo[];
     documentType: DocumentTypes;
   }
 ) => {
