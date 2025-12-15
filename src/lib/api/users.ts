@@ -68,7 +68,18 @@ export async function getUser(): Promise<User> {
       agencyId: backendUser.agencyId,
 
       // Profile data goes ONLY in profile sub-object
-      profile: {}
+      profile: {},
+
+      // Agency data goes ONLY in agency sub-object
+      agency: {
+        id: backendUser.agencyId,
+        name: backendUser.agency.name,
+        email: backendUser.agency.email,
+        phone: backendUser.agency.phone,
+        address: backendUser.agency.address,
+        city: backendUser.agency.city,
+        state: backendUser.agency.state,
+      },
     };
 
     // Extract profile data from backend response

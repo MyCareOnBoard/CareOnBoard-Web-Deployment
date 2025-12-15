@@ -970,7 +970,7 @@ export default function ManualShiftManagementPage() {
                 Agency
               </label>
               <Input
-                value={agencyName}
+                value={user?.agency?.name}
                 className="border-[#e5e5e6] rounded-md bg-[#f8f9fa] cursor-not-allowed"
                 placeholder="Agency"
                 disabled
@@ -1022,13 +1022,9 @@ export default function ManualShiftManagementPage() {
                           className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
                         >
                           <div className="font-medium">{clientName}</div>
-                          {client.location && (
-                            <div className="text-xs text-[#808081] mt-1">
-                              {typeof client.location === "object" && client.location
-                                ? `${client.location.lat}, ${client.location.lon}`
-                                : client.location}
-                            </div>
-                          )}
+                          <div className="text-xs text-[#808081] mt-1">
+                            {client.address}
+                          </div>
                         </div>
                       );
                     })}
