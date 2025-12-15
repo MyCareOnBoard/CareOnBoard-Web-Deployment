@@ -71,15 +71,7 @@ export async function getUser(): Promise<User> {
       profile: {},
 
       // Agency data goes ONLY in agency sub-object
-      agency: {
-        id: backendUser.agencyId,
-        name: backendUser.agency.name,
-        email: backendUser.agency.email,
-        phone: backendUser.agency.phone,
-        address: backendUser.agency.address,
-        city: backendUser.agency.city,
-        state: backendUser.agency.state,
-      },
+      agency: {},
     };
 
     // Extract profile data from backend response
@@ -100,6 +92,19 @@ export async function getUser(): Promise<User> {
       profilePicture: profileSource.profilePicture || profileSource.photo || profileSource.photoURL,
       professionalSummary: profileSource.professionalSummary || profileSource.summary,
     };
+
+    // Add agency details if user is an employee
+    if (user.userType === UserType.EMPLOYEE) {
+      user.agency = {
+        id: backendUser.agencyId,
+        name: backendUser.agency.name,
+        email: backendUser.agency.email,
+        phone: backendUser.agency.phone,
+        address: backendUser.agency.address,
+        city: backendUser.agency.city,
+        state: backendUser.agency.state,
+      };
+    }
 
     return user;
   } catch (err: any) {
