@@ -927,7 +927,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                 {dspSearchResults.map((employee) => (
                   <button
-                    key={employee.uid || employee.id}
+                    key={employee.id}
                     onClick={() => {
                       handleDspSelect(employee);
                       clearError("assignedDsp");
@@ -1454,14 +1454,14 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             onClick={handleSaveDraft}
             disabled={isSubmitting}
             variant="outline"
-            className="flex-1 border-[#2b82ff] text-[#2b82ff] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 border-[#00B5B8] text-[#00B5B8] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-[#00B5B8]/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Save
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !isFormValid}
-            className="flex-1 bg-[#2b82ff] hover:bg-[#1a6fe0] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-[#00B5B8] hover:bg-[#00A0A4] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>
