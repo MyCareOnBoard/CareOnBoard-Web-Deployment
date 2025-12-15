@@ -106,6 +106,8 @@ export interface ClientService {
     id: string;
     fullName: string;
     profileImage?: string;
+    billingRate?: string;
+    serviceCode?: string;
   } | null;
   date: string;
   clockedIn: string;
@@ -161,6 +163,32 @@ export interface ClientClaimsResponse {
   data: ClientClaimsData;
 }
 
+export interface MileageRecord {
+  id: string;
+  clientId: string;
+  clientName: string;
+  location: string;
+  scheduledStartTime: any;
+  estimatedDistance: number;
+  actualDistance: number;
+  status: string;
+  startedAt: any;
+  completedAt: any;
+}
+
+export interface ExpenseRecord {
+  id: string;
+  receiptUrl: string;
+  message: string;
+  amount: number;
+  category?: string;
+  date: string;
+  status: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  employeeName?: string;
+}
+
 export interface DspClaimsData {
   dsp: {
     id: string;
@@ -184,7 +212,10 @@ export interface DspClaimsData {
     totalExpenses: number;
     totalAmount: number;
   };
-  dspNotes: DspNote[];
+  mileageRecords: MileageRecord[];
+  expenseRecords: ExpenseRecord[];
+  pendingExpenses: ExpenseRecord[];
+  dspNotes?: DspNote[];
 }
 
 export interface DspClaimsResponse {
@@ -238,6 +269,22 @@ export const billingApi = createApi({
         requiresAuth: true
       }),
       providesTags: ['BillingRecords']
+    }),
+    approveExpense: builder.mutation<{ success: boolean; message: string; data: { id: string; status: string } }, { expenseId: string; agencyId: string }>({
+      query: ({expenseId, agencyId}) => ({
+        url: `/billing/expenses/${expenseId}/approve?agencyId=${agencyId}`,
+        method: "POST",
+        requiresAuth: true
+      }),
+      invalidatesTags: ['BillingRecords']
+    }),
+    rejectExpense: builder.mutation<{ success: boolean; message: string; data: { id: string; status: string } }, { expenseId: string; agencyId: string; reviewerNotes?: string }>({
+      query: ({expenseId, agencyId, reviewerNotes}) => ({
+        url: `/billing/expenses/${expenseId}/reject?agencyId=${agencyId}${reviewerNotes ? `&reviewerNotes=${encodeURIComponent(reviewerNotes)}` : ''}`,
+        method: "POST",
+        requiresAuth: true
+      }),
+      invalidatesTags: ['BillingRecords']
     })
   }),
 });
@@ -247,4 +294,6 @@ export const {
   useGenerateReportMutation,
   useGetClientClaimsQuery,
   useGetDspClaimsQuery,
+  useApproveExpenseMutation,
+  useRejectExpenseMutation,
 } = billingApi;
