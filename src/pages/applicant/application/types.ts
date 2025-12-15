@@ -1,3 +1,5 @@
+import {ApplicantDocumentFileUploadedInfo} from "@/pages/applicant/application/components/DocumentUploadStep";
+
 export interface Step {
   title: string;
   status: "complete" | "pending";
@@ -33,15 +35,15 @@ export interface UploadDocumentPayload {
 }
 
 export interface DocumentUploadAndEligibilityPayload {
-  photoIdUrl?: string;
-  socialSecurityCardUrl?: string;
-  diplomaUrl?: string;
-  certificationsUrl?: string;
-  hepatitisBVaccinationUrl?: string;
-  hepatitisBImmunityUrl?: string;
-  tbTestResultUrl?: string;
-  i9FormUrl?: string;
-  w4FormUrl?: string;
+  photoIdUrl?: ApplicantDocumentFileUploadedInfo;
+  socialSecurityCardUrl?: ApplicantDocumentFileUploadedInfo;
+  diplomaUrl?: ApplicantDocumentFileUploadedInfo;
+  certificationsUrl?: ApplicantDocumentFileUploadedInfo;
+  hepatitisBVaccinationUrl?: ApplicantDocumentFileUploadedInfo;
+  hepatitisBImmunityUrl?: ApplicantDocumentFileUploadedInfo;
+  tbTestResultUrl?: ApplicantDocumentFileUploadedInfo;
+  i9FormUrl?: ApplicantDocumentFileUploadedInfo;
+  w4FormUrl?: ApplicantDocumentFileUploadedInfo;
   references: {
     name: string;
     relationship: string;

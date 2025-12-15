@@ -5,11 +5,17 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 import {FileUpload} from "@/components/ui/file-upload";
 import {useSaveDocumentMutation, useUploadDocumentMutation} from "@/pages/userPanel/dashboard/api";
 import {userPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
+import {Calendar} from "@/components/ui/calendar";
 
 interface FormData {
   type: string;
   file: File | null;
+  expiryDate: Date | null;
 }
+
+const tenYearsFromNow = new Date()
+tenYearsFromNow.setFullYear(new Date().getFullYear() + 10)
 
 const UserPanelDocumentUpload = (
   {isOpen, setIsOpen, onComplete, onError}: {
@@ -22,7 +28,9 @@ const UserPanelDocumentUpload = (
   const [formData, setFormData] = useState<FormData>({
     type: '',
     file: null,
+    expiryDate: null,
   });
+  const [openDatePopover, setOpenDatePopover] = useState<boolean>(false);
   const [uploadFile, {isLoading: isUploading}] = useUploadDocumentMutation();
   const [saveDocument, {isLoading: isSavingDocument}] = useSaveDocumentMutation();
 
@@ -57,8 +65,9 @@ const UserPanelDocumentUpload = (
       await saveDocument({
         documentType: formData.type,
         fileUrl: fileUrl,
+        expiryDate: formData.expiryDate ? formData.expiryDate.toDateString() : null,
       }).unwrap();
-      setFormData({type: '', file: null});
+      setFormData({type: '', file: null, expiryDate: null});
       onComplete();
     } catch (error) {
       console.error("Error uploading file:", error);
@@ -81,7 +90,8 @@ const UserPanelDocumentUpload = (
       />
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-2xl w-full max-w-2xl relative animate-fadeIn p-6">
+        <form onSubmit={handleSubmit}
+              className="bg-white rounded-lg shadow-2xl w-full max-w-2xl relative animate-fadeIn p-6">
           {/* Header */}
           <div className="flex justify-between mb-3">
             <div>
@@ -114,6 +124,55 @@ const UserPanelDocumentUpload = (
               </div>
             </div>
             <div className={"mb-6"}>
+              <p className={"text-sm mb-1"}>Expiry Date</p>
+              <Popover
+                open={openDatePopover}
+                onOpenChange={(open) => setOpenDatePopover(open)}
+              >
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full h-full flex items-center focus:outline-none cursor-pointer"
+                  >
+                    <span className={"text-sm text-left text-[#B2B2B3] px-4 py-3 rounded-md border border-[#CCCCCD] w-full"}>
+                      {formData?.expiryDate
+                        ? new Date(formData.expiryDate).toDateString()
+                        : "Select expiry date"}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                  <Calendar
+                    mode="single"
+                    className="bg-white"
+                    captionLayout="dropdown"
+                    startMonth={new Date()}
+                    endMonth={tenYearsFromNow}
+                    selected={formData.expiryDate ? new Date(formData.expiryDate) : new Date()}
+                    defaultMonth={new Date()}
+                    disabled={{
+                      before: new Date()
+                    }}
+                    onSelect={async (date) => {
+                      if (date) {
+                        setFormData({...formData, expiryDate: date})
+                        setOpenDatePopover(false);
+                      }
+                    }}
+                    formatters={{
+                      formatMonthDropdown: (date) =>
+                        date.toLocaleString("default", {month: "long"}),
+                    }}
+                    classNames={{
+                      dropdown_root: "relative border-none shadow-none has-focus:ring-0",
+                      caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
+                    }}
+                    autoFocus={true}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className={"mb-6"}>
               <p className={"text-sm mb-1"}>Upload your document</p>
               <FileUpload
                 name={"upload-i-9-form"}
@@ -125,6 +184,7 @@ const UserPanelDocumentUpload = (
                 }}
                 required={true}
               />
+              <p className={"text-sm my-1 text-[#B2B2B3]"}>These documents will be reviewed by the HR</p>
               {formData.file && (
                 <div className={"flex space-x-2 my-3 bg-[#00D84114] p-3 rounded"}>
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
