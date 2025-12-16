@@ -38,19 +38,19 @@ const files = [
     id: "social-security-card",
     label: "Upload Social Security Card or valid work permit.",
     placeholder: "Upload social security card",
-    requiresExpiry: false
+    requiresExpiry: true
   },
   {
     id: "diploma",
     label: "Upload High School Diploma/GED certificate.",
     placeholder: "Upload high school certificate",
-    requiresExpiry: false
+    requiresExpiry: true
   },
   {
     id: "certifications",
     label: "Upload Any relevant certifications (e.g., CPR, First Aid — optional at this stage).",
     placeholder: "Upload any certificate",
-    requiresExpiry: true
+    requiresExpiry: false
   },
   {
     id: "hepatitis-b-vaccination",
@@ -80,7 +80,12 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
   const ref = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(false);
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
-  const [fileUploads, setFileUploads] = useState<ApplicantDocumentFileUploadedInfo[]>([]);
+  const [fileUploads, setFileUploads] = useState<ApplicantDocumentFileUploadedInfo[]>(files.map((file) => ({
+    fileName: "",
+    fileUrl: "",
+    fileType: file.id,
+    expiryDate: undefined
+  })));
 
   const [uploadFile, {isLoading}] = useUploadDocumentMutation();
   const {data: eligibilityVerificationData} = useGetEligibilityVerificationQuery(undefined, {
@@ -140,6 +145,14 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
     }
   };
 
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }).replace(/ /g, ' ');
+  }
+
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>
   ) => {
@@ -149,12 +162,23 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
       const file = files[i];
       if (file.requiresExpiry) {
         const findUpload = fileUploads.find((item) => item.fileType === file.id);
-        if (findUpload && !findUpload.expiryDate) {
+        if (findUpload?.fileUrl && !findUpload.expiryDate) {
           toast.error("Please select an expiry date for " + file.label);
           return;
         }
       }
     }
+
+    const fileUploadsWithExpiryDateButNoFile = fileUploads.filter((item) => item.expiryDate && !item.fileUrl);
+
+    if (fileUploadsWithExpiryDateButNoFile.length > 0) {
+      const file = files.find((item) => item.id === fileUploadsWithExpiryDateButNoFile[0].fileType);
+      if (file) {
+        toast.error("Please upload a file for " + file.label);
+        return;
+      }
+    }
+
     try {
       const response = await submitDocumentUploadAndEligibilityVerification({
         data: {
@@ -240,7 +264,7 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
                             className="flex items-center gap-2 text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]"
                           >
                             {fileUpload?.expiryDate
-                              ? fileUpload?.expiryDate
+                              ? `Expiry Date (${fileUpload?.expiryDate})`
                               : "Expiry Date"
                             }
                             <CalendarDays className={"w-5 h-5"}/>
@@ -265,7 +289,7 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
                               if (item.fileType === file.id) {
                                 return {
                                   ...item,
-                                  expiryDate: date.toISOString().split("T")[0]
+                                  expiryDate: formatDate(date)
                                 }
                               }
                               return item
@@ -297,7 +321,7 @@ export default function DocumentUploadStep({onNext}: DocumentUploadStepProps) {
                 await handleFileUpload(event.target.files ?? null, file.id as DocumentTypes);
               }}
             />
-            <FileNameCard fileUploads={fileUploads} documentType={file.id as DocumentTypes}/>
+            {fileUpload?.fileUrl && <FileNameCard fileUploads={fileUploads} documentType={file.id as DocumentTypes}/>}
           </div>
         )
       })}
