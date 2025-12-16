@@ -59,7 +59,10 @@ export type DocState = {
     key: DocKey;
     title: string;
     uploadLabel: string;
+    // Single-file upload (ISP, PCPT, POC, SDR, BSP)
     file?: File;
+    // Multi-file upload support (used for medicalDocs and consents)
+    files?: File[];
     fileName?: string;
     uploadDate?: Date;
     expiryDate?: Date;

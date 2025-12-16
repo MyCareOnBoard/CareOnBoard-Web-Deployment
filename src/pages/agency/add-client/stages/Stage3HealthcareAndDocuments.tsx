@@ -211,10 +211,22 @@ export function Stage3HealthcareAndDocuments({
                   type="file"
                   className="sr-only"
                   accept=".pdf,.doc,.docx,image/*"
+                  multiple={doc.key === "medicalDocs" || doc.key === "consents"}
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    updateDoc(doc.key, { file, fileName: file.name });
+                    const files = e.target.files;
+                    if (!files || files.length === 0) return;
+
+                    if (doc.key === "medicalDocs" || doc.key === "consents") {
+                      const fileArray = Array.from(files);
+                      const fileName =
+                        fileArray.length === 1
+                          ? fileArray[0].name
+                          : `${fileArray.length} files selected`;
+                      updateDoc(doc.key, { files: fileArray, fileName });
+                    } else {
+                      const file = files[0];
+                      updateDoc(doc.key, { file, fileName: file.name });
+                    }
                   }}
                 />
                 <div className="flex items-center gap-2 text-[14px] text-[#b2b2b3] max-w-full px-4">
