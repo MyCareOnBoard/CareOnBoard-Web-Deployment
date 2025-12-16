@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AddClientFormData, Service } from "@/pages/agency/add-client/formData";
+import { listServices, type Service as ApiService } from "@/lib/api/services";
 
 function ServiceAuthorizationFields({
   service,
@@ -27,59 +28,136 @@ function ServiceAuthorizationFields({
   const [isEndOpen, setIsEndOpen] = useState(false);
   const [isPcptOpen, setIsPcptOpen] = useState(false);
   const [isSdrOpen, setIsSdrOpen] = useState(false);
+  const [offeredServices, setOfferedServices] = useState<ApiService[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const [servicesError, setServicesError] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string>("");
 
-  const offeredServices = [
-    {
-      name: "CS",
-      code: "123456",
-    },
-    {
-      name: "IS",
-      code: "123457",
-    },
-    {
-      name: "Respite",
-      code: "123458",
-    },
-    {
-      name: "Community Inclusion",
-      code: "123460",
-    },
-    {
-      name: "Transportation",
-      code: "123461",
-    },
-    {
-      name: "Employment Services",
-      code: "123463",
-    },
-    {
-      name: "Others per DDD plan",
-      code: "123464",
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchServices() {
+      try {
+        setServicesLoading(true);
+        setServicesError(null);
+        const services = await listServices({ limit: 200 });
+        if (!isMounted) return;
+        setOfferedServices(services);
+      } catch (error: any) {
+        if (!isMounted) return;
+        console.error("Failed to load services:", error);
+        setServicesError(error?.message || "Failed to load services");
+      } finally {
+        if (isMounted) {
+          setServicesLoading(false);
+        }
+      }
     }
-  ];
+
+    fetchServices();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const serviceTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          offeredServices
+            .map((svc) => svc.type)
+            .filter((t): t is string => Boolean(t)),
+        ),
+      ),
+    [offeredServices],
+  );
+
+  const filteredServices = useMemo(
+    () =>
+      offeredServices.filter((svc) =>
+        selectedType ? svc.type === selectedType : false,
+      ),
+    [offeredServices, selectedType],
+  );
+
+  // If type changes and current service is not within that type, clear it
+  useEffect(() => {
+    if (!selectedType) return;
+    const stillValid = filteredServices.some(
+      (svc) => svc.name === service.name && svc.code === service.code,
+    );
+    if (!stillValid && (service.name || service.code)) {
+      onChange({ ...service, name: "", code: "" });
+    }
+  }, [selectedType, filteredServices, service.name, service.code, onChange]);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
       <div className="flex flex-col gap-1">
         <label className="text-[12px] font-normal text-[#10141a]">
-          Authorized Service
+          Service Type
+        </label>
+        <Select
+          value={selectedType}
+          onValueChange={(v) => setSelectedType(v)}
+          disabled={servicesLoading || serviceTypes.length === 0}
+        >
+          <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+            <SelectValue
+              placeholder={
+                servicesLoading
+                  ? "Loading service types..."
+                  : serviceTypes.length === 0
+                  ? "No service types available"
+                  : "Select service type"
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {serviceTypes.map((type) => (
+              <SelectItem key={type} value={type}>
+                {type}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-[12px] font-normal text-[#10141a]">
+          Service
         </label>
         <Select
           value={service.name}
           onValueChange={(v) => {
             // Find the selected service to get its code
-            const selectedService = offeredServices.find((s) => s.name === v);
+            const selectedService = filteredServices.find((s) => s.name === v);
             onChange({ ...service, name: v, code: selectedService?.code || "" });
           }}
+          disabled={
+            servicesLoading ||
+            !selectedType ||
+            filteredServices.length === 0
+          }
         >
           <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-            <SelectValue placeholder="Select service" />
+            <SelectValue
+              placeholder={
+                servicesLoading
+                  ? "Loading services..."
+                  : !selectedType
+                  ? "Select service type first"
+                  : filteredServices.length === 0
+                  ? "No services available for this type"
+                  : "Select service"
+              }
+            />
           </SelectTrigger>
           <SelectContent>
-            {offeredServices.map((service) => (
-              <SelectItem key={service.code} value={service.name}>
-                {service.name} - {service.code}
+            {filteredServices.map((svc) => (
+              <SelectItem key={svc.id} value={svc.name}>
+                {svc.name} - {svc.code}
               </SelectItem>
             ))}
           </SelectContent>
