@@ -276,7 +276,7 @@ export function Stage1ClientIdentityAndContact({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Nursing Level</label>
+            <label className="text-[12px] font-normal text-[#10141a]">Nursing Level (optional)</label>
             <Select
               value={stage1.nursingLevel}
               onValueChange={(v) => updateStage1({ nursingLevel: v })}

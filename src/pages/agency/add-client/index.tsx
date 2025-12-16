@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Stage1ClientIdentityAndContact } from "@/pages/agency/add-client/stages/Stage1ClientIdentityAndContact";
 import { Stage2GuardianAndFunding } from "@/pages/agency/add-client/stages/Stage2GuardianAndFunding";
 import { Stage3HealthcareAndDocuments } from "@/pages/agency/add-client/stages/Stage3HealthcareAndDocuments";
@@ -10,8 +11,17 @@ import { Stage6GoalsAndEmergency } from "@/pages/agency/add-client/stages/Stage6
 import { Stage7SystemAiAndAudit } from "@/pages/agency/add-client/stages/Stage7SystemAiAndAudit";
 import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
 import { SaveClientSuccessModal } from "@/pages/agency/add-client/components/SaveClientSuccessModal";
+import { SaveClientErrorModal } from "@/pages/agency/add-client/components/SaveClientErrorModal";
 import { createInitialAddClientFormData } from "@/pages/agency/add-client/formData";
-import { createAgencyClient, type CreateClientRequest } from "@/lib/api/clients";
+import {
+  createAgencyClient,
+  uploadClientDocument,
+  updateClient,
+  type CreateClientRequest,
+  type ClientDocumentUploadResult,
+  type ClientDocumentKey,
+  type ClientDocument,
+} from "@/lib/api/clients";
 
 export default function AddClientPage() {
   const navigate = useNavigate();
@@ -22,6 +32,10 @@ export default function AddClientPage() {
   const [savedClientName, setSavedClientName] = useState<string | undefined>(undefined);
   const [formData, setFormData] = useState(() => createInitialAddClientFormData());
   const [isSaving, setIsSaving] = useState(false);
+  const [showSavingModal, setShowSavingModal] = useState(false);
+  const [saveStage, setSaveStage] = useState<1 | 2>(1);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
 
   const flattenAddClientFormData = (): CreateClientRequest => {
     const s1 = formData.stage1;
@@ -45,12 +59,15 @@ export default function AddClientPage() {
         name: svc.name || "",
         code: svc.code || "",
         hours: svc.hours || "",
+        totalApprovedHours: svc.totalApprovedHours || "",
         rate: svc.rate || "",
+        payType: svc.payType,
         ispEffectiveDate: toIso(svc.ispEffectiveDate),
         startAuthDate: toIso(svc.startAuthDate),
         endAuthDate: toIso(svc.endAuthDate),
         pcptDate: toIso(svc.pcptDate),
-        sdrDate: toIso(svc.sdrDate),
+        sdrStartDate: toIso(svc.sdrStartDate),
+        sdrEndDate: toIso(svc.sdrEndDate),
       })) ?? [];
 
     const hasInvalidService = services.some((svc) => !svc.name || !svc.code);
@@ -186,19 +203,85 @@ export default function AddClientPage() {
         onSave={async () => {
           if (isSaving) return;
           setIsSaving(true);
+          setShowSavingModal(true);
+          setSaveStage(1);
+
           try {
             const payload = flattenAddClientFormData();
-            const created = await createAgencyClient(payload);
+
+            // Stage 1: create client without document URLs
+            const { documents, ...payloadWithoutDocs } = payload;
+            const created = await createAgencyClient(payloadWithoutDocs);
+
             const fullName =
               `${created.firstName || ""} ${created.lastName || ""}`.trim() ||
               `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();
-            setSavedClientName(fullName.length > 0 ? fullName : undefined);
+            const clientName =
+              fullName || `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();
+
+            // Stage 2: upload documents and attach metadata
+            setSaveStage(2);
+
+            const docKeyToType: Record<string, string> = {
+              isp: "isp",
+              pcpt: "pcpt",
+              poc: "plan-of-care",
+              sdr: "sdr",
+              bsp: "bsp",
+              medicalDocs: "medical-documents",
+              consents: "consent-and-releases",
+            };
+
+            const uploadResults: Record<string, ClientDocumentUploadResult[]> = {};
+
+            for (const doc of formData.stage3.docs) {
+              const documentType = docKeyToType[doc.key];
+              if (!documentType) continue;
+
+              const filesToUpload: File[] = [];
+              if (doc.files && doc.files.length > 0) {
+                filesToUpload.push(...doc.files);
+              } else if (doc.file) {
+                filesToUpload.push(doc.file);
+              }
+
+              if (filesToUpload.length === 0) continue;
+
+              const results: ClientDocumentUploadResult[] = [];
+              for (const file of filesToUpload) {
+                const result = await uploadClientDocument(created.id, documentType, file);
+                results.push(result);
+              }
+
+              uploadResults[doc.key] = results;
+            }
+
+            const finalDocuments = [];
+
+            for (let n in uploadResults) {
+              for (const result of uploadResults[n]) {
+                finalDocuments.push({
+                  key: docKeyToType[n] as ClientDocumentKey,
+                  title: result.fileName,
+                  url: result.url,
+                  uploadDate: result.uploadedAt,
+                  expiryDate: formData.stage3.docs.find((d) => d.key === n)?.expiryDate,
+                  autoReminder: formData.stage3.docs.find((d) => d.key === n)?.autoReminder,
+                });
+              }
+            }
+
+            await updateClient(created.id, { documents: finalDocuments as ClientDocument[] });
+
+            setSavedClientName(clientName || undefined);
             setShowSaveSuccess(true);
           } catch (e: any) {
             console.error("Save client failed:", e);
-            window.alert(e?.message || "Failed to save client. Please try again.");
+            setErrorMessage(e?.message || "Failed to save client. Please try again.");
+            setShowErrorModal(true);
           } finally {
             setIsSaving(false);
+            setShowSavingModal(false);
           }
         }}
         primaryLoading={isSaving}
@@ -231,6 +314,21 @@ export default function AddClientPage() {
     return (
       <>
         {stageContent}
+        <Dialog open={showSavingModal} onOpenChange={() => {}}>
+          <DialogContent showCloseButton={false} className="w-[min(90vw,400px)] gap-4 p-6">
+            <div className="flex flex-col items-center text-center gap-2">
+              <div className="h-8 w-8 rounded-full border-2 border-[#00B4B8] border-t-transparent animate-spin mb-2" />
+              <p className="text-[18px] font-semibold text-[#10141a]">
+                {saveStage === 1 ? "Saving client information..." : "Uploading documents..."}
+              </p>
+              <p className="text-[14px] text-[#808081]">
+                {saveStage === 1
+                  ? "Step 1 of 2 - Saving client profile and service details."
+                  : "Step 2 of 2 - Uploading client documents securely to your agency vault."}
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
         <SaveClientSuccessModal
           open={showSaveSuccess}
           onOpenChange={(open) => {
@@ -240,6 +338,16 @@ export default function AddClientPage() {
             }
           }}
           clientName={savedClientName}
+        />
+        <SaveClientErrorModal
+          open={showErrorModal}
+          onOpenChange={(open) => {
+            setShowErrorModal(open);
+            if (!open) {
+              setErrorMessage(undefined);
+            }
+          }}
+          errorMessage={errorMessage}
         />
       </>
     );

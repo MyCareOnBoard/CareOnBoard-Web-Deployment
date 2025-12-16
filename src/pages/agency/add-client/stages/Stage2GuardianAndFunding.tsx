@@ -27,7 +27,8 @@ function ServiceAuthorizationFields({
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [isEndOpen, setIsEndOpen] = useState(false);
   const [isPcptOpen, setIsPcptOpen] = useState(false);
-  const [isSdrOpen, setIsSdrOpen] = useState(false);
+  const [isSdrStartOpen, setIsSdrStartOpen] = useState(false);
+  const [isSdrEndOpen, setIsSdrEndOpen] = useState(false);
   const [offeredServices, setOfferedServices] = useState<ApiService[]>([]);
   const [servicesLoading, setServicesLoading] = useState(false);
   const [servicesError, setServicesError] = useState<string | null>(null);
@@ -183,17 +184,52 @@ function ServiceAuthorizationFields({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">Rate per hour</label>
+        <label className="text-[12px] font-normal text-[#10141a]">
+          Total approved hours
+        </label>
         <Input
           type="number"
-          inputMode="decimal"
+          inputMode="numeric"
           min={0}
-          step={0.01}
-          value={service.rate}
-          onChange={(e) => onChange({ ...service, rate: e.target.value })}
+          step={1}
+          value={service.totalApprovedHours}
+          onChange={(e) =>
+            onChange({ ...service, totalApprovedHours: e.target.value })
+          }
           className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-          placeholder="Enter rate"
+          placeholder="Enter total approved hours"
         />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-[12px] font-normal text-[#10141a]">
+          Rate / Pay type
+        </label>
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.01}
+            value={service.rate}
+            onChange={(e) => onChange({ ...service, rate: e.target.value })}
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+            placeholder="Enter rate"
+          />
+          <Select
+            value={service.payType}
+            onValueChange={(v) => onChange({ ...service, payType: v as any })}
+          >
+            <SelectTrigger className="w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+              <SelectValue placeholder="Pay type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hourly">Hourly</SelectItem>
+              <SelectItem value="15-min">15 minutes</SelectItem>
+              <SelectItem value="daily">Daily</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="flex flex-col gap-1">
@@ -383,13 +419,19 @@ function ServiceAuthorizationFields({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">SDR Date</label>
-        <Popover open={isSdrOpen} onOpenChange={setIsSdrOpen}>
+        <label className="text-[12px] font-normal text-[#10141a]">
+          SDR Start Date
+        </label>
+        <Popover open={isSdrStartOpen} onOpenChange={setIsSdrStartOpen}>
           <PopoverTrigger asChild>
             <button type="button" className="w-full focus:outline-none">
               <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                 <InputGroupInput
-                  value={service.sdrDate ? format(service.sdrDate, "MMM d, yyyy") : ""}
+                  value={
+                    service.sdrStartDate
+                      ? format(service.sdrStartDate, "MMM d, yyyy")
+                      : ""
+                  }
                   placeholder=" "
                   readOnly
                   className="text-[#10141a]"
@@ -403,8 +445,8 @@ function ServiceAuthorizationFields({
           <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
             <Calendar
               mode="single"
-              selected={service.sdrDate}
-              defaultMonth={service.sdrDate ?? new Date()}
+              selected={service.sdrStartDate}
+              defaultMonth={service.sdrStartDate ?? new Date()}
               captionLayout="dropdown"
               fromYear={2000}
               toYear={new Date().getFullYear() + 10}
@@ -417,8 +459,58 @@ function ServiceAuthorizationFields({
               }}
               onSelect={(d) => {
                 if (d) {
-                  onChange({ ...service, sdrDate: d });
-                  setIsSdrOpen(false);
+                  onChange({ ...service, sdrStartDate: d });
+                  setIsSdrStartOpen(false);
+                }
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-[12px] font-normal text-[#10141a]">
+          SDR End Date
+        </label>
+        <Popover open={isSdrEndOpen} onOpenChange={setIsSdrEndOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" className="w-full focus:outline-none">
+              <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                <InputGroupInput
+                  value={
+                    service.sdrEndDate
+                      ? format(service.sdrEndDate, "MMM d, yyyy")
+                      : ""
+                  }
+                  placeholder=" "
+                  readOnly
+                  className="text-[#10141a]"
+                />
+                <InputGroupAddon align="inline-end">
+                  <CalendarDays className="h-5 w-5 text-[#10141a]" />
+                </InputGroupAddon>
+              </InputGroup>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+            <Calendar
+              mode="single"
+              selected={service.sdrEndDate}
+              defaultMonth={service.sdrEndDate ?? new Date()}
+              captionLayout="dropdown"
+              fromYear={2000}
+              toYear={new Date().getFullYear() + 10}
+              formatters={{
+                formatMonthDropdown: (date) =>
+                  date.toLocaleString("default", { month: "long" }),
+              }}
+              classNames={{
+                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+              }}
+              onSelect={(d) => {
+                if (d) {
+                  onChange({ ...service, sdrEndDate: d });
+                  setIsSdrEndOpen(false);
                 }
               }}
             />
