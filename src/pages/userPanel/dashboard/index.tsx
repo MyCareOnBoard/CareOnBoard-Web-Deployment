@@ -14,7 +14,9 @@ import {
 } from "@/pages/userPanel/dashboard/api";
 import {userPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
 import {Routes} from "@/routes/constants";
-import {useAuth} from "@/utils/auth";
+import {setUser, useAuth} from "@/utils/auth";
+import {getUser} from "@/lib/api/users";
+import {useDispatch} from "react-redux";
 
 
 export default function UserPanelDashboardPage() {
@@ -35,6 +37,7 @@ export default function UserPanelDashboardPage() {
   const employeeInfo = user;
 
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const currentUser = auth.currentUser;
 
@@ -148,12 +151,14 @@ export default function UserPanelDashboardPage() {
     setTimeout(() => setAskLocationPerm(false), 3000);
   }
 
-  const handleWorkAvailabilityChange = () => {
+  const handleWorkAvailabilityChange = async () => {
     setWorkAvailability((prev) => !prev);
     try {
       updateEmployeeInfo({
         workAvailability: !employeeInfo?.workAvailability
       }).unwrap();
+      const user = await getUser();
+      dispatch(setUser(user))
     } catch (error) {
       console.error("Error updating work availability:", error);
     }
@@ -170,7 +175,7 @@ export default function UserPanelDashboardPage() {
 
   useEffect(() => {
     if (employeeInfo) {
-      setWorkAvailability(employeeInfo?.workAvailability ?? false);
+      setWorkAvailability(employeeInfo.profile?.workAvailability ?? false);
     }
   }, [employeeInfo])
 
@@ -214,7 +219,7 @@ export default function UserPanelDashboardPage() {
               <div className={"flex justify-between items-center mb-6"}>
                 <div
                   className="bg-[#F0FAF4] border border-[#0EAF52] text-[#0EAF52] text-sm font-semibold px-2 py-1 rounded-full">
-                  ID-{employeeInfo?.tagId}
+                  ID-{employeeInfo?.profile?.tagId}
                 </div>
                 <svg onClick={goToProfile} className={"cursor-pointer"} width="40" height="40" viewBox="0 0 40 40"
                      fill="none"
