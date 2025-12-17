@@ -263,8 +263,8 @@ export default function AddClientPage() {
 
               for (const result of uploadResults[n]) {
                 finalDocuments.push({
-                  key: docKeyToType[n] as ClientDocumentKey,
-                  title: result.fileName,
+                  key: n as ClientDocumentKey,
+                  title: matchingDoc?.title || "",
                   fileName: result.fileName,
                   url: result.url,
                   issuedOnDate: matchingDoc?.issuedOnDate
@@ -331,7 +331,7 @@ export default function AddClientPage() {
               <p className="text-[14px] text-[#808081]">
                 {saveStage === 1
                   ? "Step 1 of 2 - Saving client profile and service details."
-                  : "Step 2 of 2 - Uploading client documents securely to your agency vault."}
+                  : "Step 2 of 2 - Uploading client documents."}
               </p>
             </div>
           </DialogContent>

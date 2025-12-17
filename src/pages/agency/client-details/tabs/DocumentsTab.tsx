@@ -53,9 +53,20 @@ export function DocumentsTab({ client }: { client: Client }) {
                     {doc.title}
                   </p>
                   {doc.fileName && (
-                    <p className="text-[12px] font-medium leading-[1.4] text-[#808081] truncate">
-                      {doc.fileName}
-                    </p>
+                    doc.url ? (
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[12px] font-medium leading-[1.4] text-[#808081] truncate hover:text-[#00b4b8] hover:underline transition-colors"
+                      >
+                        {doc.fileName}
+                      </a>
+                    ) : (
+                      <p className="text-[12px] font-medium leading-[1.4] text-[#808081] truncate">
+                        {doc.fileName}
+                      </p>
+                    )
                   )}
                 </div>
 
