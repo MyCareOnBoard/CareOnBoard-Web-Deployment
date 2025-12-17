@@ -66,6 +66,7 @@ export const Routes = {
     dashboard: "/super-admin/dashboard",
     agencies: "/super-admin/agencies",
     addAgency: "/super-admin/agencies/add",
+    savedAgencies: "/super-admin/agencies/saved",
     userAccessControl: "/super-admin/user-access-control",
     complianceMonitor: "/super-admin/compliance-monitor",
     globalNotesQuality: "/super-admin/global-notes-quality",
