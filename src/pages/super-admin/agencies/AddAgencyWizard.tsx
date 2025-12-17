@@ -1,13 +1,16 @@
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router";
-import { Routes } from "@/routes/constants";
-import { ArrowRight, ArrowLeft, Save, Bookmark, RefreshCw, Eye, EyeOff, Upload } from "lucide-react";
-import { useCreateAgencyWithUserMutation, useUploadAgencyFileMutation } from "./api";
-import { UserType } from "@/utils/auth/types/user.types";
+import React, {useState, useEffect} from "react";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {useToast} from "@/hooks/use-toast";
+import {useNavigate, useLocation} from "react-router";
+import {Routes} from "@/routes/constants";
+import {ArrowRight, ArrowLeft, RefreshCw, Eye, EyeOff, Upload} from "lucide-react";
+import {useCreateAgencyWithUserMutation, useUploadAgencyFileMutation} from "./api";
+import {UserType} from "@/utils/auth/types/user.types";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Toggle} from "@/components/ui/toggle";
+import {SaveDraftModal} from "./SaveDraftModal";
 
 interface AgencyFormData {
   // Step 1: Agency Identity Information
@@ -43,7 +46,7 @@ interface AgencyFormData {
 
   // Step 5: Operational Settings
   schedulingRules: string;
-  maxShiftPerDay: number;
+  maxShiftPerDay: string;
   travelTimeRules: string;
   mileageSettings: string;
   mileageRate: number;
@@ -77,7 +80,7 @@ interface AgencyFormData {
 
   // Step 10: Subscription & Licensing
   subscriptionTier: string;
-  numberOfDspSeats: number;
+  numberOfDspSeats: string;
   addOns: string[];
 
   // Step 8: Branding Setup
@@ -106,30 +109,40 @@ interface AgencyFormData {
 }
 
 const STEPS = [
-  { id: 1, title: "Agency Identity Information", description: "These fields uniquely identify the agency in the system." },
-  { id: 2, title: "Contact Information", description: "Used for communication, verification, and notifications." },
-  { id: 3, title: "Leadership & Admin Contacts", description: "Defines the default Super Admin for the agency." },
-  { id: 4, title: "Service Configuration", description: "Used to auto-populate billing, scheduling, and EVV rules." },
-  { id: 5, title: "Operational Settings", description: "Defines how the agency operates internally." },
-  { id: 6, title: "AI Settings & Permissions", description: "What AI features are enabled for the agency." },
-  { id: 7, title: "Document Requirements", description: "What documents DSPs must upload before being cleared." },
-  { id: 8, title: "Branding Setup", description: "Aesthetic and identity settings." },
-  { id: 9, title: "Billing Configuration", description: "Needed for Timesheets, Invoices, and Exports." },
-  { id: 10, title: "Subscription & Licensing Setup", description: "Defines how the agency pays and what tier they belong to." },
-  { id: 11, title: "Security & Compliance Settings", description: "Define user management and access levels." },
+  {
+    id: 1,
+    title: "Agency Identity Information",
+    description: "These fields uniquely identify the agency in the system."
+  },
+  {id: 2, title: "Contact Information", description: "Used for communication, verification, and notifications."},
+  {id: 3, title: "Leadership & Admin Contacts", description: "Defines the default Super Admin for the agency."},
+  {id: 4, title: "Service Configuration", description: "Used to auto-populate billing, scheduling, and EVV rules."},
+  {id: 5, title: "Operational Settings", description: "Defines how the agency operates internally."},
+  {id: 6, title: "AI Settings & Permissions", description: "What AI features are enabled for the agency."},
+  {id: 7, title: "Document Requirements", description: "What documents DSPs must upload before being cleared."},
+  {id: 8, title: "Branding Setup", description: "Aesthetic and identity settings."},
+  {id: 9, title: "Billing Configuration", description: "Needed for Timesheets, Invoices, and Exports."},
+  {
+    id: 10,
+    title: "Subscription & Licensing Setup",
+    description: "Defines how the agency pays and what tier they belong to."
+  },
+  {id: 11, title: "Security & Compliance Settings", description: "Define user management and access levels."},
 ];
 
 export default function AddAgencyWizard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
   const [agencyId] = useState(() => Math.floor(100000 + Math.random() * 900000).toString());
-  const [isSaved, setIsSaved] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
-  const { toast } = useToast();
-  
-  const [createAgencyWithUser, { isLoading: isCreating }] = useCreateAgencyWithUserMutation();
-  const [uploadFile, { isLoading: isUploading }] = useUploadAgencyFileMutation();
-  
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+  const {toast} = useToast();
+
+  const [createAgencyWithUser, {isLoading: isCreating}] = useCreateAgencyWithUserMutation();
+  const [uploadFile, {isLoading: isUploading}] = useUploadAgencyFileMutation();
+
   const isSaving = isCreating || isUploading || isSavingDraft;
 
   const [formData, setFormData] = useState<AgencyFormData>({
@@ -157,7 +170,7 @@ export default function AddAgencyWizard() {
     serviceCodeMapping: {},
     evvSettings: {},
     schedulingRules: "",
-    maxShiftPerDay: 5,
+    maxShiftPerDay: "5",
     travelTimeRules: "",
     mileageSettings: "",
     mileageRate: 0,
@@ -185,7 +198,7 @@ export default function AddAgencyWizard() {
     reminderFrequency: "",
     whoReceivesReminders: "",
     subscriptionTier: "basic",
-    numberOfDspSeats: 5,
+    numberOfDspSeats: "5",
     addOns: [],
     logo: null,
     themeColor: "#2B82FF",
@@ -209,18 +222,56 @@ export default function AddAgencyWizard() {
 
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  // Load saved draft data if editing
+  useEffect(() => {
+    const savedData = location.state?.savedData;
+    if (savedData) {
+      setFormData(savedData.formData);
+      setCurrentStep(savedData.currentStep || 1);
+      setEditingDraftId(savedData.id);
+    }
+  }, [location.state]);
+
   const handleInputChange = (field: keyof AgencyFormData, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({...prev, [field]: value}));
   };
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (saveName: string) => {
     setIsSavingDraft(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setIsSaved(true);
+      const existingDrafts = JSON.parse(localStorage.getItem('agencyDrafts') || '[]');
+
+      if (editingDraftId) {
+        // Update existing draft
+        const draftIndex = existingDrafts.findIndex((d: any) => d.id === editingDraftId);
+        if (draftIndex !== -1) {
+          existingDrafts[draftIndex] = {
+            ...existingDrafts[draftIndex],
+            name: saveName,
+            savedDate: new Date().toLocaleDateString('en-US', {day: 'numeric', month: 'long', year: 'numeric'}),
+            formData: formData,
+            currentStep: currentStep,
+          };
+        }
+      } else {
+        // Create new draft
+        const draftData = {
+          id: Date.now().toString(),
+          name: saveName,
+          savedDate: new Date().toLocaleDateString('en-US', {day: 'numeric', month: 'long', year: 'numeric'}),
+          formData: formData,
+          currentStep: currentStep,
+        };
+        existingDrafts.push(draftData);
+        setEditingDraftId(draftData.id);
+      }
+
+      localStorage.setItem('agencyDrafts', JSON.stringify(existingDrafts));
+
+      setShowSaveModal(false);
       toast({
         title: "Draft Saved",
-        description: "Your progress has been saved successfully.",
+        description: `"${saveName}" has been saved successfully.`,
       });
     } catch (error) {
       toast({
@@ -259,10 +310,10 @@ export default function AddAgencyWizard() {
       // Upload logo if exists
       let logoUrl = formData.logo ? (typeof formData.logo === 'string' ? formData.logo : '') : '';
       if (formData.logo && typeof formData.logo !== 'string') {
-        const logoResult = await uploadFile({ 
-          file: formData.logo, 
+        const logoResult = await uploadFile({
+          file: formData.logo,
           fileType: 'logo',
-          agencyId: agencyId 
+          agencyId: agencyId
         }).unwrap();
         logoUrl = logoResult.url;
       }
@@ -270,10 +321,10 @@ export default function AddAgencyWizard() {
       // Upload letterhead if exists
       let letterheadUrl = formData.letterhead ? (typeof formData.letterhead === 'string' ? formData.letterhead : '') : '';
       if (formData.letterhead && typeof formData.letterhead !== 'string') {
-        const letterheadResult = await uploadFile({ 
-          file: formData.letterhead, 
+        const letterheadResult = await uploadFile({
+          file: formData.letterhead,
           fileType: 'letterhead',
-          agencyId: agencyId 
+          agencyId: agencyId
         }).unwrap();
         letterheadUrl = letterheadResult.url;
       }
@@ -300,7 +351,7 @@ export default function AddAgencyWizard() {
           serviceCodeMapping: formData.serviceCodeMapping,
           evvSettings: formData.evvSettings,
           schedulingRules: formData.schedulingRules,
-          maxShiftPerDay: formData.maxShiftPerDay,
+          maxShiftPerDay: parseInt(formData.maxShiftPerDay),
           travelTimeRules: formData.travelTimeRules,
           mileageSettings: formData.mileageSettings,
           mileageRate: formData.mileageRate,
@@ -343,7 +394,7 @@ export default function AddAgencyWizard() {
           adp: formData.adp,
           paycheck: formData.paycheck,
           subscriptionTier: formData.subscriptionTier,
-          numberOfDspSeats: formData.numberOfDspSeats,
+          numberOfDspSeats: parseInt(formData.numberOfDspSeats),
           addOns: formData.addOns,
           defaultUserRoles: formData.defaultUserRoles,
           permissionTemplates: formData.permissionTemplates,
@@ -380,10 +431,10 @@ export default function AddAgencyWizard() {
   const currentStepData = STEPS.find((s) => s.id === currentStep);
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] flex flex-col">
-      <div className="bg-white flex-1 flex flex-col">
+    <div className="min-h-screen flex flex-col">
+      <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-[#e5e5e6] px-8 py-6 z-10">
+        <div className="sticky top-0 px-8 pb-6 z-10">
           <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
             <div>
               <h2 className="text-[28px] font-bold text-[#10141a]">Add new agency</h2>
@@ -396,14 +447,17 @@ export default function AddAgencyWizard() {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              {isSaved && (
-                <div className="flex items-center gap-2 text-[#00b4b8]">
-                  <Bookmark className="w-4 h-4 fill-current" />
-                  <span className="text-[14px] font-medium">Saved Agency</span>
-                </div>
-              )}
-              <span className="text-[14px] text-[#808081]">Agency ID - {agencyId}</span>
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex items-center gap-2 text-[#00b4b8] cursor-pointer" onClick={() => navigate(Routes.superAdmin.savedAgencies)}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M4 17.9808V9.70753C4 6.07416 4 4.25748 5.17157 3.12874C6.34315 2 8.22876 2 12 2C15.7712 2 17.6569 2 18.8284 3.12874C20 4.25748 20 6.07416 20 9.70753V17.9808C20 20.2867 20 21.4396 19.2272 21.8523C17.7305 22.6514 14.9232 19.9852 13.59 19.1824C12.8168 18.7168 12.4302 18.484 12 18.484C11.5698 18.484 11.1832 18.7168 10.41 19.1824C9.0768 19.9852 6.26947 22.6514 4.77285 21.8523C4 21.4396 4 20.2867 4 17.9808Z"
+                    stroke="#808081" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path opacity="0.4" d="M4 7H20" stroke="#808081" stroke-width="1.5"/>
+                </svg>
+                <span className="text-[16px] text-[#808081] font-semibold">Saved Agencies</span>
+              </div>
+              <span className="text-[14px] text-black">Agency ID - {agencyId}</span>
             </div>
           </div>
         </div>
@@ -411,23 +465,23 @@ export default function AddAgencyWizard() {
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
           <div className="max-w-7xl mx-auto">
-            {currentStep === 1 && <Step1AgencyIdentity formData={formData} onChange={handleInputChange} />}
-            {currentStep === 2 && <Step2ContactInfo formData={formData} onChange={handleInputChange} />}
-            {currentStep === 3 && <Step3Leadership formData={formData} onChange={handleInputChange} />}
-            {currentStep === 4 && <Step4ServiceConfig formData={formData} onChange={handleInputChange} />}
-            {currentStep === 5 && <Step5Operational formData={formData} onChange={handleInputChange} />}
-            {currentStep === 6 && <Step6AISettings formData={formData} onChange={handleInputChange} />}
-            {currentStep === 7 && <Step7Documents formData={formData} onChange={handleInputChange} />}
-            {currentStep === 8 && <Step8Branding formData={formData} onChange={handleInputChange} />}
-            {currentStep === 9 && <Step9Billing formData={formData} onChange={handleInputChange} />}
-            {currentStep === 10 && <Step10Subscription formData={formData} onChange={handleInputChange} />}
-            {currentStep === 11 && <Step11Security formData={formData} onChange={handleInputChange} />}
+            {currentStep === 1 && <Step1AgencyIdentity formData={formData} onChange={handleInputChange}/>}
+            {currentStep === 2 && <Step2ContactInfo formData={formData} onChange={handleInputChange}/>}
+            {currentStep === 3 && <Step3Leadership formData={formData} onChange={handleInputChange}/>}
+            {currentStep === 4 && <Step4ServiceConfig formData={formData} onChange={handleInputChange}/>}
+            {currentStep === 5 && <Step5Operational formData={formData} onChange={handleInputChange}/>}
+            {currentStep === 6 && <Step6AISettings formData={formData} onChange={handleInputChange}/>}
+            {currentStep === 7 && <Step7Documents formData={formData} onChange={handleInputChange}/>}
+            {currentStep === 8 && <Step8Branding formData={formData} onChange={handleInputChange}/>}
+            {currentStep === 9 && <Step9Billing formData={formData} onChange={handleInputChange}/>}
+            {currentStep === 10 && <Step10Subscription formData={formData} onChange={handleInputChange}/>}
+            {currentStep === 11 && <Step11Security formData={formData} onChange={handleInputChange}/>}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white border-t border-[#e5e5e6] px-8 py-6">
-          <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
+        <div className="sticky bottom-0 px-8 py-6">
+          <div className="flex flex-col max-w-7xl mx-auto w-full space-y-6">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -453,12 +507,11 @@ export default function AddAgencyWizard() {
               </Button>
               <Button
                 type="button"
-                onClick={handleSaveDraft}
+                onClick={() => setShowSaveModal(true)}
                 variant="outline"
-                className="bg-[#e5e5e6] hover:bg-[#d0d0d0] text-[#10141a] border-none px-6 py-2 rounded-[60px] font-semibold text-[14px] flex items-center gap-2"
+                className="bg-[#B2B2B3] hover:bg-[#d0d0d0] text-[#10141a] border-none px-6 py-2 rounded-[60px] font-semibold text-[14px] flex items-center gap-2"
                 disabled={isSaving}
               >
-                <Save className="w-4 h-4" />
                 Save
               </Button>
               {currentStep > 1 && (
@@ -468,7 +521,7 @@ export default function AddAgencyWizard() {
                   className="bg-[#808081] hover:bg-[#6a6a6b] text-white px-6 py-2 rounded-[60px] font-semibold text-[14px] flex items-center gap-2"
                   disabled={isSaving}
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <ArrowLeft className="w-4 h-4"/>
                   Back
                 </Button>
               )}
@@ -480,7 +533,7 @@ export default function AddAgencyWizard() {
                   disabled={isSaving}
                 >
                   Next
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4"/>
                 </Button>
               ) : (
                 <Button
@@ -496,12 +549,18 @@ export default function AddAgencyWizard() {
           </div>
         </div>
       </div>
+
+      <SaveDraftModal
+        open={showSaveModal}
+        onOpenChange={setShowSaveModal}
+        onSave={handleSaveDraft}
+      />
     </div>
   );
 }
 
 // Step Components
-function Step1AgencyIdentity({ formData, onChange }: any) {
+function Step1AgencyIdentity({formData, onChange}: any) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Agency Name */}
@@ -551,17 +610,20 @@ function Step1AgencyIdentity({ formData, onChange }: any) {
         <Label htmlFor="agencyType" className="mb-2 text-[14px] font-medium text-[#10141a]">
           Agency Type
         </Label>
-        <select
-          id="agencyType"
+        <Select
+          required
           value={formData.agencyType}
-          onChange={(e) => onChange("agencyType", e.target.value)}
-          className="w-full h-[44px] rounded-[8px] border border-[#e5e5e6] px-3 text-[14px] focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none"
+          onValueChange={(value) => onChange("agencyType", value)}
         >
-          <option value="">Select agency type</option>
-          <option value="provider">Provider Agency</option>
-          <option value="support_coordination">Support Coordination Agency</option>
-          <option value="others">Others</option>
-        </select>
+          <SelectTrigger className={"w-full"}>
+            <SelectValue placeholder="Select agency type"/>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="provider">Provider Agency</SelectItem>
+            <SelectItem value="support_coordination">Support Coordination Agency</SelectItem>
+            <SelectItem value="others">Others</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Agency EIN */}
@@ -609,7 +671,7 @@ function Step1AgencyIdentity({ formData, onChange }: any) {
   );
 }
 
-function Step2ContactInfo({ formData, onChange }: any) {
+function Step2ContactInfo({formData, onChange}: any) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Primary Agency Address */}
@@ -700,9 +762,9 @@ function Step2ContactInfo({ formData, onChange }: any) {
   );
 }
 
-function Step3Leadership({ formData, onChange }: any) {
+function Step3Leadership({formData, onChange}: any) {
   const [showPassword, setShowPassword] = useState(false);
-  const { toast } = useToast();
+  const {toast} = useToast();
 
   const generatePassword = () => {
     const length = 12;
@@ -740,17 +802,19 @@ function Step3Leadership({ formData, onChange }: any) {
         <Label htmlFor="userRole" className="mb-2 text-[14px] font-medium text-[#10141a]">
           Role
         </Label>
-        <select
-          id="userRole"
+        <Select
           value={formData.userRole}
-          onChange={(e) => onChange("userRole", e.target.value)}
-          className="w-full h-[44px] rounded-[8px] border border-[#e5e5e6] px-3 text-[14px] focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none"
+          onValueChange={(value) => onChange("userRole", value)}
         >
-          <option value="">Select User</option>
-          <option value="super_admin">Super Admin</option>
-          <option value="admin">Admin</option>
-          <option value="manager">Manager</option>
-        </select>
+          <SelectTrigger className={"w-full"}>
+            <SelectValue placeholder="Select User"/>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="super_admin">Super Admin</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="manager">Manager</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Access Level */}
@@ -758,17 +822,20 @@ function Step3Leadership({ formData, onChange }: any) {
         <Label htmlFor="accessLevel" className="mb-2 text-[14px] font-medium text-[#10141a]">
           Access Level
         </Label>
-        <select
-          id="accessLevel"
+        <Select
+          required
           value={formData.accessLevel}
-          onChange={(e) => onChange("accessLevel", e.target.value)}
-          className="w-full h-[44px] rounded-[8px] border border-[#e5e5e6] px-3 text-[14px] focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none"
+          onValueChange={(value) => onChange("accessLevel", value)}
         >
-          <option value="">Select Access Level</option>
-          <option value="full">Full Access</option>
-          <option value="limited">Limited Access</option>
-          <option value="read_only">Read Only</option>
-        </select>
+          <SelectTrigger className={"w-full"}>
+            <SelectValue placeholder="Select Access Level"/>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="full">Full Access</SelectItem>
+            <SelectItem value="limited">Limited Access</SelectItem>
+            <SelectItem value="read_only">Read Only</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Phone Number */}
@@ -811,7 +878,7 @@ function Step3Leadership({ formData, onChange }: any) {
             onClick={generatePassword}
             className="flex items-center gap-2 text-[#00b4b8] hover:text-[#009da1] transition-colors"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-4 h-4"/>
           </button>
         </div>
         <div className="relative">
@@ -828,7 +895,7 @@ function Step3Leadership({ formData, onChange }: any) {
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-[#808081] hover:text-[#10141a]"
           >
-            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {showPassword ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
           </button>
         </div>
       </div>
@@ -836,7 +903,7 @@ function Step3Leadership({ formData, onChange }: any) {
   );
 }
 
-function Step4ServiceConfig({ formData, onChange }: any) {
+function Step4ServiceConfig({formData, onChange}: any) {
   const services = [
     "Services the Agency Provides",
     "Community Based Supports (CBS)",
@@ -885,18 +952,11 @@ function Step4ServiceConfig({ formData, onChange }: any) {
           ))}
         </div>
       </div>
-
-      <div className="bg-[#f5f5f5] p-6 rounded-[12px] border border-[#e5e5e6]">
-        <h4 className="text-[14px] font-semibold text-[#10141a] mb-3">4. Service Configuration</h4>
-        <p className="text-[14px] text-[#808081] leading-relaxed">
-          Used to auto-populate billing, scheduling, and EVV rules.
-        </p>
-      </div>
     </div>
   );
 }
 
-function Step5Operational({ formData, onChange }: any) {
+function Step5Operational({formData, onChange}: any) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Scheduling rules */}
@@ -918,20 +978,22 @@ function Step5Operational({ formData, onChange }: any) {
         <Label htmlFor="maxShiftPerDay" className="mb-2 text-[14px] font-medium text-[#10141a]">
           Max shift per day
         </Label>
-        <select
-          id="maxShiftPerDay"
+        <Select
           value={formData.maxShiftPerDay}
-          onChange={(e) => onChange("maxShiftPerDay", parseInt(e.target.value))}
-          className="w-full h-[44px] rounded-[8px] border border-[#e5e5e6] px-3 text-[14px] focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none"
+          onValueChange={(value) => onChange("maxShiftPerDay", value)}
         >
-          <option value="">Select number of shift</option>
-          <option value="5">5</option>
-          <option value="10">10</option>
-          <option value="15">15</option>
-          <option value="20">20</option>
-          <option value="25">25</option>
-          <option value="30">30</option>
-        </select>
+          <SelectTrigger className={"w-full"}>
+            <SelectValue placeholder="Select number of shift"/>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="5">5</SelectItem>
+            <SelectItem value="10">10</SelectItem>
+            <SelectItem value="15">15</SelectItem>
+            <SelectItem value="20">20</SelectItem>
+            <SelectItem value="25">25</SelectItem>
+            <SelectItem value="30">30</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Travel time rules */}
@@ -997,17 +1059,19 @@ function Step5Operational({ formData, onChange }: any) {
         <Label htmlFor="whoReceivesNotifications" className="mb-2 text-[14px] font-medium text-[#10141a]">
           Who receives notifications
         </Label>
-        <select
-          id="whoReceivesNotifications"
+        <Select
           value={formData.whoReceivesNotifications}
-          onChange={(e) => onChange("whoReceivesNotifications", e.target.value)}
-          className="w-full h-[44px] rounded-[8px] border border-[#e5e5e6] px-3 text-[14px] focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none"
+          onValueChange={(value) => onChange("whoReceivesNotifications", value)}
         >
-          <option value="">Select role</option>
-          <option value="admin">Admin</option>
-          <option value="manager">Manager</option>
-          <option value="supervisor">Supervisor</option>
-        </select>
+          <SelectTrigger className={"w-full"}>
+            <SelectValue placeholder="Select role"/>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="manager">Manager</SelectItem>
+            <SelectItem value="supervisor">Supervisor</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Expense Report Settings */}
@@ -1029,18 +1093,20 @@ function Step5Operational({ formData, onChange }: any) {
         <Label htmlFor="allowedFileTypes" className="mb-2 text-[14px] font-medium text-[#10141a]">
           Allowed file types
         </Label>
-        <select
-          id="allowedFileTypes"
+        <Select
           value={formData.allowedFileTypes[0] || ""}
-          onChange={(e) => onChange("allowedFileTypes", [e.target.value])}
-          className="w-full h-[44px] rounded-[8px] border border-[#e5e5e6] px-3 text-[14px] focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none"
+          onValueChange={(value) => onChange("allowedFileTypes", [value])}
         >
-          <option value="">Select file types</option>
-          <option value="pdf">pdf</option>
-          <option value="jpg">jpg</option>
-          <option value="png">png</option>
-          <option value="all">All of the above</option>
-        </select>
+          <SelectTrigger className={"w-full"}>
+            <SelectValue placeholder="Select file types"/>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={"pdf"}>pdf</SelectItem>
+            <SelectItem value={"jpg"}>jpg</SelectItem>
+            <SelectItem value={"png"}>png</SelectItem>
+            <SelectItem value={"all"}>All of the above</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Allow recurring schedules? */}
@@ -1162,21 +1228,13 @@ function Step5Operational({ formData, onChange }: any) {
   );
 }
 
-function Step6AISettings({ formData, onChange }: any) {
-  const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
-    <button
-      type="button"
-      onClick={onChange}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        checked ? "bg-[#00b4b8]" : "bg-[#e5e5e6]"
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          checked ? "translate-x-6" : "translate-x-1"
-        }`}
-      />
-    </button>
+function Step6AISettings({formData, onChange}: any) {
+  const ToggleSwitch = ({checked, onChange}: { checked: boolean; onChange: () => void }) => (
+    <Toggle
+      className={"h-8 w-14"}
+      pressed={checked}
+      onPressedChange={onChange}
+    />
   );
 
   return (
@@ -1233,21 +1291,13 @@ function Step6AISettings({ formData, onChange }: any) {
   );
 }
 
-function Step7Documents({ formData, onChange }: any) {
-  const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
-    <button
-      type="button"
-      onClick={onChange}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        checked ? "bg-[#00b4b8]" : "bg-[#e5e5e6]"
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          checked ? "translate-x-6" : "translate-x-1"
-        }`}
-      />
-    </button>
+function Step7Documents({formData, onChange}: any) {
+  const ToggleSwitch = ({checked, onChange}: { checked: boolean; onChange: () => void }) => (
+    <Toggle
+      className={"h-8 w-14"}
+      pressed={checked}
+      onPressedChange={onChange}
+    />
   );
 
   return (
@@ -1356,16 +1406,16 @@ function Step7Documents({ formData, onChange }: any) {
   );
 }
 
-function Step8Branding({ formData, onChange }: any) {
+function Step8Branding({formData, onChange}: any) {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [letterheadPreview, setLetterheadPreview] = useState<string | null>(null);
 
   const predefinedColors = [
-    "#FF6B35", // Orange
-    "#4CAF50", // Green
-    "#00BCD4", // Cyan
-    "#2196F3", // Blue
-    "#00B4B8", // Teal
+    "#D53411",
+    "#D5B111",
+    "#0EAF52",
+    "#115CD5",
+    "#11CBD5",
   ];
 
   const handleFileUpload = (field: "logo" | "letterhead", file: File | null) => {
@@ -1394,9 +1444,10 @@ function Step8Branding({ formData, onChange }: any) {
       {/* Upload Logo */}
       <div>
         <Label className="mb-2 text-[14px] font-medium text-[#10141a] block">Upload Logo</Label>
-        <div className="border-2 border-dashed border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer">
+        <div
+          className="border-2 bg-white border border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer">
           <label htmlFor="logo-upload" className="flex items-center gap-2 cursor-pointer">
-            <Upload className="w-5 h-5 text-[#808081]" />
+            <Upload className="w-5 h-5 text-[#808081]"/>
             <span className="text-[14px] text-[#808081]">
               {logoPreview ? "Change logo" : "Upload logo here"}
             </span>
@@ -1411,7 +1462,7 @@ function Step8Branding({ formData, onChange }: any) {
         </div>
         {logoPreview && (
           <div className="mt-3">
-            <img src={logoPreview} alt="Logo preview" className="h-16 object-contain" />
+            <img src={logoPreview} alt="Logo preview" className="h-16 object-contain"/>
           </div>
         )}
       </div>
@@ -1428,7 +1479,7 @@ function Step8Branding({ formData, onChange }: any) {
               className={`w-6 h-6 rounded-full transition-all ${
                 formData.themeColor === color ? "ring-2 ring-offset-2 ring-[#00b4b8]" : ""
               }`}
-              style={{ backgroundColor: color }}
+              style={{backgroundColor: color}}
             />
           ))}
           <div className="flex items-center gap-2 ml-2">
@@ -1441,13 +1492,19 @@ function Step8Branding({ formData, onChange }: any) {
                 className="w-6 h-6 rounded-full cursor-pointer"
               />
               {!predefinedColors.includes(formData.themeColor) && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#00b4b8] rounded-full border-2 border-white" />
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#00b4b8] rounded-full border-2 border-white"/>
               )}
             </div>
-            <span className="text-[14px] font-mono text-[#10141a]">{formData.themeColor}</span>
+            <input
+              type="text"
+              value={formData.themeColor}
+              onChange={(e) => onChange("themeColor", e.target.value)}
+              placeholder="#000000"
+              className="text-[14px] font-mono text-[#10141a] bg-white py-1 px-4 border border-[#e5e5e6] rounded focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none w-28"
+            />
           </div>
         </div>
-        <p className="text-[12px] text-[#808081] mt-2">Choose preferred theme for the app.</p>
+        <p className="text-[14px] text-[#808081] mt-2">Choose preferred theme for the app.</p>
       </div>
 
       {/* Letterhead / Footer for Reports */}
@@ -1455,9 +1512,10 @@ function Step8Branding({ formData, onChange }: any) {
         <Label className="mb-2 text-[14px] font-medium text-[#10141a] block">
           Letterhead / Footer for Reports
         </Label>
-        <div className="border-2 border-dashed border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer">
+        <div
+          className="border-2 bg-white border border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer">
           <label htmlFor="letterhead-upload" className="flex items-center gap-2 cursor-pointer">
-            <Upload className="w-5 h-5 text-[#808081]" />
+            <Upload className="w-5 h-5 text-[#808081]"/>
             <span className="text-[14px] text-[#808081]">
               {letterheadPreview ? "Change letterhead" : "Upload here"}
             </span>
@@ -1472,7 +1530,7 @@ function Step8Branding({ formData, onChange }: any) {
         </div>
         {letterheadPreview && (
           <div className="mt-3">
-            <img src={letterheadPreview} alt="Letterhead preview" className="h-16 object-contain" />
+            <img src={letterheadPreview} alt="Letterhead preview" className="h-16 object-contain"/>
           </div>
         )}
       </div>
@@ -1480,7 +1538,7 @@ function Step8Branding({ formData, onChange }: any) {
   );
 }
 
-function Step9Billing({ formData, onChange }: any) {
+function Step9Billing({formData, onChange}: any) {
   return (
     <div className="space-y-6">
       {/* Billing Format, DDD format, HHA eXchange Format */}
@@ -1662,11 +1720,11 @@ function Step9Billing({ formData, onChange }: any) {
   );
 }
 
-function Step10Subscription({ formData, onChange }: any) {
+function Step10Subscription({formData, onChange}: any) {
   const tiers = [
-    { id: "basic", label: "Basic" },
-    { id: "professional", label: "Professional" },
-    { id: "enterprise", label: "Enterprise (Multi-site)" },
+    {id: "basic", label: "Basic"},
+    {id: "professional", label: "Professional"},
+    {id: "enterprise", label: "Enterprise (Multi-site)"},
   ];
 
   const addOns = ["All features", "EVV", "Payroll sync"];
@@ -1710,20 +1768,22 @@ function Step10Subscription({ formData, onChange }: any) {
         <Label htmlFor="numberOfDspSeats" className="mb-2 text-[14px] font-medium text-[#10141a]">
           Number of DSP seats
         </Label>
-        <select
-          id="numberOfDspSeats"
+        <Select
           value={formData.numberOfDspSeats}
-          onChange={(e) => onChange("numberOfDspSeats", parseInt(e.target.value))}
-          className="w-full max-w-[300px] h-[44px] rounded-[8px] border border-[#e5e5e6] px-3 text-[14px] focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none"
+          onValueChange={(value) => onChange("numberOfDspSeats", value)}
         >
-          <option value="">Select number</option>
-          <option value="5">5</option>
-          <option value="10">10</option>
-          <option value="15">15</option>
-          <option value="20">20</option>
-          <option value="25">25</option>
-          <option value="30">30</option>
-        </select>
+          <SelectTrigger className={"w-full"}>
+            <SelectValue placeholder="Select number"/>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={"5"}>5</SelectItem>
+            <SelectItem value={"10"}>10</SelectItem>
+            <SelectItem value={"15"}>15</SelectItem>
+            <SelectItem value={"20"}>20</SelectItem>
+            <SelectItem value={"25"}>25</SelectItem>
+            <SelectItem value={"30"}>30</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Select Add-ons */}
@@ -1750,21 +1810,13 @@ function Step10Subscription({ formData, onChange }: any) {
   );
 }
 
-function Step11Security({ formData, onChange }: any) {
-  const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
-    <button
-      type="button"
-      onClick={onChange}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        checked ? "bg-[#00b4b8]" : "bg-[#e5e5e6]"
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          checked ? "translate-x-6" : "translate-x-1"
-        }`}
-      />
-    </button>
+function Step11Security({formData, onChange}: any) {
+  const ToggleSwitch = ({checked, onChange}: { checked: boolean; onChange: () => void }) => (
+    <Toggle
+      className={"h-8 w-14"}
+      pressed={checked}
+      onPressedChange={onChange}
+    />
   );
 
   const roles = ["Role", "Role", "Role", "Role", "Role", "Role"];
@@ -1826,19 +1878,21 @@ function Step11Security({ formData, onChange }: any) {
         <Label htmlFor="auditRetentionPeriod" className="mb-2 text-[14px] font-medium text-[#10141a]">
           Audit retention period
         </Label>
-        <select
-          id="auditRetentionPeriod"
+        <Select
           value={formData.auditRetentionPeriod}
-          onChange={(e) => onChange("auditRetentionPeriod", e.target.value)}
-          className="w-full max-w-[300px] h-[44px] rounded-[8px] border border-[#e5e5e6] px-3 text-[14px] focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none"
+          onValueChange={(value) => onChange("auditRetentionPeriod", value)}
         >
-          <option value="">Select time</option>
-          <option value="1">1 month</option>
-          <option value="2">2 months</option>
-          <option value="3">3 months</option>
-          <option value="6">6 months</option>
-          <option value="12">12 months</option>
-        </select>
+          <SelectTrigger className={"w-full"}>
+            <SelectValue placeholder="Select time"/>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={"1"}>1 month</SelectItem>
+            <SelectItem value={"2"}>2 months</SelectItem>
+            <SelectItem value={"3"}>3 months</SelectItem>
+            <SelectItem value={"6"}>6 months</SelectItem>
+            <SelectItem value={"12"}>12 months</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );
