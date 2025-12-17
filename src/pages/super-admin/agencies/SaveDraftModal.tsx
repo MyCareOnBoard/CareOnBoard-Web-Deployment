@@ -34,7 +34,7 @@ export function SaveDraftModal({ open, onOpenChange, onSave }: SaveDraftModalPro
             Do you want to save this application for later? Save this with a name
           </p>
 
-          <div className="flex flex-col gap-[4px] px-[20.5px]">
+          <div className="flex flex-col gap-[4px] mx-6 px-[20.5px]">
             <Label htmlFor="saveName" className="text-[12px] font-normal text-[#10141a]">
               Save Name
             </Label>
