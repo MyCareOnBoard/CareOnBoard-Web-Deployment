@@ -63,7 +63,18 @@ export const Routes = {
     profile: "/user-panel/profile",
   },
   superAdmin: {
+    dashboard: "/super-admin/dashboard",
     agencies: "/super-admin/agencies",
+    addAgency: "/super-admin/agencies/add",
+    userAccessControl: "/super-admin/user-access-control",
+    complianceMonitor: "/super-admin/compliance-monitor",
+    globalNotesQuality: "/super-admin/global-notes-quality",
+    agencyBillingMonitor: "/super-admin/agency-billing-monitor",
+    corporateSupport: "/super-admin/corporate-support",
+    oversightCenter: "/super-admin/oversight-center",
+    clientDirectory: "/super-admin/client-directory",
+    staffDirectory: "/super-admin/staff-directory",
+    systemSettings: "/super-admin/system-settings",
   },
   auth: {
     login: "/auth/login",
