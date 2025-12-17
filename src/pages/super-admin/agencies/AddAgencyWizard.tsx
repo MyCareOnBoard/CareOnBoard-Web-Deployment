@@ -1,15 +1,16 @@
-import React, {useState} from "react";
+import React, {useState, useEffect} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {useToast} from "@/hooks/use-toast";
-import {useNavigate} from "react-router";
+import {useNavigate, useLocation} from "react-router";
 import {Routes} from "@/routes/constants";
-import {ArrowRight, ArrowLeft, Bookmark, RefreshCw, Eye, EyeOff, Upload} from "lucide-react";
+import {ArrowRight, ArrowLeft, Bookmark, RefreshCw, Eye, EyeOff, Upload, Save} from "lucide-react";
 import {useCreateAgencyWithUserMutation, useUploadAgencyFileMutation} from "./api";
 import {UserType} from "@/utils/auth/types/user.types";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Toggle} from "@/components/ui/toggle";
+import {SaveDraftModal} from "./SaveDraftModal";
 
 interface AgencyFormData {
   // Step 1: Agency Identity Information
@@ -131,10 +132,13 @@ const STEPS = [
 
 export default function AddAgencyWizard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
   const [agencyId] = useState(() => Math.floor(100000 + Math.random() * 900000).toString());
   const [isSaved, setIsSaved] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
   const {toast} = useToast();
 
   const [createAgencyWithUser, {isLoading: isCreating}] = useCreateAgencyWithUserMutation();
@@ -219,18 +223,58 @@ export default function AddAgencyWizard() {
 
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  // Load saved draft data if editing
+  useEffect(() => {
+    const savedData = location.state?.savedData;
+    if (savedData) {
+      setFormData(savedData.formData);
+      setCurrentStep(savedData.currentStep || 1);
+      setEditingDraftId(savedData.id);
+      setIsSaved(true);
+    }
+  }, [location.state]);
+
   const handleInputChange = (field: keyof AgencyFormData, value: any) => {
     setFormData((prev) => ({...prev, [field]: value}));
   };
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (saveName: string) => {
     setIsSavingDraft(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const existingDrafts = JSON.parse(localStorage.getItem('agencyDrafts') || '[]');
+      
+      if (editingDraftId) {
+        // Update existing draft
+        const draftIndex = existingDrafts.findIndex((d: any) => d.id === editingDraftId);
+        if (draftIndex !== -1) {
+          existingDrafts[draftIndex] = {
+            ...existingDrafts[draftIndex],
+            name: saveName,
+            savedDate: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }),
+            formData: formData,
+            currentStep: currentStep,
+          };
+        }
+      } else {
+        // Create new draft
+        const draftData = {
+          id: Date.now().toString(),
+          name: saveName,
+          savedDate: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }),
+          formData: formData,
+          currentStep: currentStep,
+        };
+        existingDrafts.push(draftData);
+        setEditingDraftId(draftData.id);
+      }
+      
+      localStorage.setItem('agencyDrafts', JSON.stringify(existingDrafts));
+      
       setIsSaved(true);
+      setShowSaveModal(false);
       toast({
         title: "Draft Saved",
-        description: "Your progress has been saved successfully.",
+        description: `"${saveName}" has been saved successfully.`,
       });
     } catch (error) {
       toast({
@@ -463,7 +507,7 @@ export default function AddAgencyWizard() {
               </Button>
               <Button
                 type="button"
-                onClick={handleSaveDraft}
+                onClick={() => setShowSaveModal(true)}
                 variant="outline"
                 className="bg-[#B2B2B3] hover:bg-[#d0d0d0] text-[#10141a] border-none px-6 py-2 rounded-[60px] font-semibold text-[14px] flex items-center gap-2"
                 disabled={isSaving}
@@ -505,6 +549,12 @@ export default function AddAgencyWizard() {
           </div>
         </div>
       </div>
+      
+      <SaveDraftModal
+        open={showSaveModal}
+        onOpenChange={setShowSaveModal}
+        onSave={handleSaveDraft}
+      />
     </div>
   );
 }
