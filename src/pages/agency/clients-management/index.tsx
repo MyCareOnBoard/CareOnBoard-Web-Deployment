@@ -235,12 +235,12 @@ export default function ClientsPage() {
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-[4px]">
               <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-                Clients
+          Clients
               </p>
               <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
                 Count of clients registered with the agency
-              </p>
-            </div>
+        </p>
+      </div>
 
             <div className="flex flex-col items-start px-[24px]">
               <p className="text-[40px] font-semibold leading-[normal] text-[#10141a]">

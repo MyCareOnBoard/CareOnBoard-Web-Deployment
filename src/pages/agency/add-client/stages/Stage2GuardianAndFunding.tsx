@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AddClientFormData, Service } from "@/pages/agency/add-client/formData";
+import { listServices, type Service as ApiService } from "@/lib/api/services";
 
 function ServiceAuthorizationFields({
   service,
@@ -26,60 +27,138 @@ function ServiceAuthorizationFields({
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [isEndOpen, setIsEndOpen] = useState(false);
   const [isPcptOpen, setIsPcptOpen] = useState(false);
-  const [isSdrOpen, setIsSdrOpen] = useState(false);
+  const [isSdrStartOpen, setIsSdrStartOpen] = useState(false);
+  const [isSdrEndOpen, setIsSdrEndOpen] = useState(false);
+  const [offeredServices, setOfferedServices] = useState<ApiService[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const [servicesError, setServicesError] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string>("");
 
-  const offeredServices = [
-    {
-      name: "CS",
-      code: "123456",
-    },
-    {
-      name: "IS",
-      code: "123457",
-    },
-    {
-      name: "Respite",
-      code: "123458",
-    },
-    {
-      name: "Community Inclusion",
-      code: "123460",
-    },
-    {
-      name: "Transportation",
-      code: "123461",
-    },
-    {
-      name: "Employment Services",
-      code: "123463",
-    },
-    {
-      name: "Others per DDD plan",
-      code: "123464",
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchServices() {
+      try {
+        setServicesLoading(true);
+        setServicesError(null);
+        const services = await listServices({ limit: 200 });
+        if (!isMounted) return;
+        setOfferedServices(services);
+      } catch (error: any) {
+        if (!isMounted) return;
+        console.error("Failed to load services:", error);
+        setServicesError(error?.message || "Failed to load services");
+      } finally {
+        if (isMounted) {
+          setServicesLoading(false);
+        }
+      }
     }
-  ];
+
+    fetchServices();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const serviceTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          offeredServices
+            .map((svc) => svc.type)
+            .filter((t): t is string => Boolean(t)),
+        ),
+      ),
+    [offeredServices],
+  );
+
+  const filteredServices = useMemo(
+    () =>
+      offeredServices.filter((svc) =>
+        selectedType ? svc.type === selectedType : false,
+      ),
+    [offeredServices, selectedType],
+  );
+
+  // If type changes and current service is not within that type, clear it
+  useEffect(() => {
+    if (!selectedType) return;
+    const stillValid = filteredServices.some(
+      (svc) => svc.name === service.name && svc.code === service.code,
+    );
+    if (!stillValid && (service.name || service.code)) {
+      onChange({ ...service, name: "", code: "" });
+    }
+  }, [selectedType, filteredServices, service.name, service.code, onChange]);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
       <div className="flex flex-col gap-1">
         <label className="text-[12px] font-normal text-[#10141a]">
-          Authorized Service
+          Service Type
+        </label>
+        <Select
+          value={selectedType}
+          onValueChange={(v) => setSelectedType(v)}
+          disabled={servicesLoading || serviceTypes.length === 0}
+        >
+          <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+            <SelectValue
+              placeholder={
+                servicesLoading
+                  ? "Loading service types..."
+                  : serviceTypes.length === 0
+                  ? "No service types available"
+                  : "Select service type"
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {serviceTypes.map((type) => (
+              <SelectItem key={type} value={type}>
+                {type}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-[12px] font-normal text-[#10141a]">
+          Service
         </label>
         <Select
           value={service.name}
           onValueChange={(v) => {
             // Find the selected service to get its code
-            const selectedService = offeredServices.find((s) => s.name === v);
+            const selectedService = filteredServices.find((s) => s.name === v);
             onChange({ ...service, name: v, code: selectedService?.code || "" });
           }}
+          disabled={
+            servicesLoading ||
+            !selectedType ||
+            filteredServices.length === 0
+          }
         >
           <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-            <SelectValue placeholder="Select service" />
+            <SelectValue
+              placeholder={
+                servicesLoading
+                  ? "Loading services..."
+                  : !selectedType
+                  ? "Select service type first"
+                  : filteredServices.length === 0
+                  ? "No services available for this type"
+                  : "Select service"
+              }
+            />
           </SelectTrigger>
           <SelectContent>
-            {offeredServices.map((service) => (
-              <SelectItem key={service.code} value={service.name}>
-                {service.name} - {service.code}
+            {filteredServices.map((svc) => (
+              <SelectItem key={svc.id} value={svc.name}>
+                {svc.name} - {svc.code}
               </SelectItem>
             ))}
           </SelectContent>
@@ -105,17 +184,52 @@ function ServiceAuthorizationFields({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">Rate per hour</label>
+        <label className="text-[12px] font-normal text-[#10141a]">
+          Total approved hours
+        </label>
         <Input
           type="number"
-          inputMode="decimal"
+          inputMode="numeric"
           min={0}
-          step={0.01}
-          value={service.rate}
-          onChange={(e) => onChange({ ...service, rate: e.target.value })}
+          step={1}
+          value={service.totalApprovedHours}
+          onChange={(e) =>
+            onChange({ ...service, totalApprovedHours: e.target.value })
+          }
           className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-          placeholder="Enter rate"
+          placeholder="Enter total approved hours"
         />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-[12px] font-normal text-[#10141a]">
+          Rate / Pay type
+        </label>
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.01}
+            value={service.rate}
+            onChange={(e) => onChange({ ...service, rate: e.target.value })}
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+            placeholder="Enter rate"
+          />
+          <Select
+            value={service.payType}
+            onValueChange={(v) => onChange({ ...service, payType: v as any })}
+          >
+            <SelectTrigger className="w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+              <SelectValue placeholder="Pay type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hourly">Hourly</SelectItem>
+              <SelectItem value="15-min">15 minutes</SelectItem>
+              <SelectItem value="daily">Daily</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="flex flex-col gap-1">
@@ -305,13 +419,19 @@ function ServiceAuthorizationFields({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">SDR Date</label>
-        <Popover open={isSdrOpen} onOpenChange={setIsSdrOpen}>
+        <label className="text-[12px] font-normal text-[#10141a]">
+          SDR Start Date
+        </label>
+        <Popover open={isSdrStartOpen} onOpenChange={setIsSdrStartOpen}>
           <PopoverTrigger asChild>
             <button type="button" className="w-full focus:outline-none">
               <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                 <InputGroupInput
-                  value={service.sdrDate ? format(service.sdrDate, "MMM d, yyyy") : ""}
+                  value={
+                    service.sdrStartDate
+                      ? format(service.sdrStartDate, "MMM d, yyyy")
+                      : ""
+                  }
                   placeholder=" "
                   readOnly
                   className="text-[#10141a]"
@@ -325,8 +445,8 @@ function ServiceAuthorizationFields({
           <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
             <Calendar
               mode="single"
-              selected={service.sdrDate}
-              defaultMonth={service.sdrDate ?? new Date()}
+              selected={service.sdrStartDate}
+              defaultMonth={service.sdrStartDate ?? new Date()}
               captionLayout="dropdown"
               fromYear={2000}
               toYear={new Date().getFullYear() + 10}
@@ -339,8 +459,58 @@ function ServiceAuthorizationFields({
               }}
               onSelect={(d) => {
                 if (d) {
-                  onChange({ ...service, sdrDate: d });
-                  setIsSdrOpen(false);
+                  onChange({ ...service, sdrStartDate: d });
+                  setIsSdrStartOpen(false);
+                }
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-[12px] font-normal text-[#10141a]">
+          SDR End Date
+        </label>
+        <Popover open={isSdrEndOpen} onOpenChange={setIsSdrEndOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" className="w-full focus:outline-none">
+              <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                <InputGroupInput
+                  value={
+                    service.sdrEndDate
+                      ? format(service.sdrEndDate, "MMM d, yyyy")
+                      : ""
+                  }
+                  placeholder=" "
+                  readOnly
+                  className="text-[#10141a]"
+                />
+                <InputGroupAddon align="inline-end">
+                  <CalendarDays className="h-5 w-5 text-[#10141a]" />
+                </InputGroupAddon>
+              </InputGroup>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+            <Calendar
+              mode="single"
+              selected={service.sdrEndDate}
+              defaultMonth={service.sdrEndDate ?? new Date()}
+              captionLayout="dropdown"
+              fromYear={2000}
+              toYear={new Date().getFullYear() + 10}
+              formatters={{
+                formatMonthDropdown: (date) =>
+                  date.toLocaleString("default", { month: "long" }),
+              }}
+              classNames={{
+                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+              }}
+              onSelect={(d) => {
+                if (d) {
+                  onChange({ ...service, sdrEndDate: d });
+                  setIsSdrEndOpen(false);
                 }
               }}
             />

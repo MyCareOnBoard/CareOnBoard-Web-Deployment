@@ -276,7 +276,7 @@ export function Stage1ClientIdentityAndContact({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Nursing Level</label>
+            <label className="text-[12px] font-normal text-[#10141a]">Nursing Level (optional)</label>
             <Select
               value={stage1.nursingLevel}
               onValueChange={(v) => updateStage1({ nursingLevel: v })}
@@ -377,6 +377,7 @@ export function Stage1ClientIdentityAndContact({
             <Input
               value={stage1.phone}
               onChange={(e) => updateStage1({ phone: e.target.value })}
+              inputMode="numeric"
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter phone number"
             />
@@ -385,6 +386,7 @@ export function Stage1ClientIdentityAndContact({
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Email</label>
             <Input
+              type="email"
               value={stage1.email}
               onChange={(e) => updateStage1({ email: e.target.value })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"

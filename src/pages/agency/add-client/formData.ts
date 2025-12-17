@@ -21,17 +21,22 @@ export type Stage1ClientIdentityAndContactData = {
     communicationMethod?: string;
 };
 
+export type ServicePayType = "hourly" | "15-min" | "daily";
+
 export type Service = {
     id: string;
     name?: string;
     code?: string;
     hours?: string;
+    totalApprovedHours?: string;
     rate?: string;
+    payType?: ServicePayType;
     ispEffectiveDate?: Date;
     startAuthDate?: Date;
     endAuthDate?: Date;
     pcptDate?: Date;
-    sdrDate?: Date;
+    sdrStartDate?: Date;
+    sdrEndDate?: Date;
 };
 
 export type Stage2GuardianAndFundingData = {
@@ -60,8 +65,10 @@ export type DocState = {
     title: string;
     uploadLabel: string;
     file?: File;
+    files?: File[];
+    url?: string;
     fileName?: string;
-    uploadDate?: Date;
+    issuedOnDate?: Date;
     expiryDate?: Date;
     autoReminder: boolean;
 };
@@ -168,12 +175,15 @@ function createEmptyServiceAuthorization(): Service {
         name: undefined,
         code: undefined,
         hours: "",
+        totalApprovedHours: "",
         rate: "",
+        payType: undefined,
         ispEffectiveDate: undefined,
         startAuthDate: undefined,
         endAuthDate: undefined,
         pcptDate: undefined,
-        sdrDate: undefined,
+        sdrStartDate: undefined,
+        sdrEndDate: undefined,
     };
 }
 

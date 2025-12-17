@@ -82,12 +82,15 @@ export interface ClientService {
   name: string;
   code: string;
   hours?: string;
+  totalApprovedHours?: string;
   rate?: string;
+  payType?: "hourly" | "15-min" | "daily";
   ispEffectiveDate?: string;
   startAuthDate?: string;
   endAuthDate?: string;
   pcptDate?: string;
-  sdrDate?: string;
+  sdrStartDate?: string;
+  sdrEndDate?: string;
 }
 
 export interface ClientGuardianInfo {
@@ -125,13 +128,22 @@ export interface ClientDocument {
   key: ClientDocumentKey;
   title?: string;
   fileName?: string;
-  /**
-   * Storage URL (when uploaded). If the frontend is still holding a File, it should not be sent as JSON.
-   */
   url?: string;
-  uploadDate?: string;
+  issuedOnDate?: string;
   expiryDate?: string;
   autoReminder?: boolean;
+}
+
+/**
+ * Upload response for client document files
+ */
+export interface ClientDocumentUploadResult {
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  url: string;
+  storagePath: string;
+  uploadedAt: string;
 }
 
 export type ClientYesNo = "yes" | "no" | "";
@@ -505,6 +517,41 @@ export async function listAgencyClients(params?: ListClientsParams): Promise<Cli
     return response.data.clients || [];
   } catch (error) {
     console.error('Failed to fetch clients:', error);
+    throw error;
+  }
+}
+
+/**
+ * ✅ Upload a single client document file
+ * Endpoint: POST /clientManagement/uploads/:documentType?clientId={clientId}
+ */
+export async function uploadClientDocument(
+  clientId: string,
+  documentType: string,
+  file: File,
+): Promise<ClientDocumentUploadResult> {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await axiosClient.post<ApiResponse<ClientDocumentUploadResult>>(
+      `/clientManagement/uploads/${encodeURIComponent(documentType)}`,
+      formData,
+      {
+        params: { clientId },
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+
+    if (!response.data.success) {
+      throw new Error('Failed to upload client document');
+    }
+
+    return response.data.data;
+  } catch (error) {
+    console.error("Failed to upload client document:", error);
     throw error;
   }
 }

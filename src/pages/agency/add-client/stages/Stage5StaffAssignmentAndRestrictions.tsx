@@ -66,6 +66,8 @@ export function Stage5StaffAssignmentAndRestrictions({
   const [isSecondaryPopoverOpen, setIsSecondaryPopoverOpen] = useState(false);
   const [isSearchingPrimary, setIsSearchingPrimary] = useState(false);
   const [isSearchingSecondary, setIsSearchingSecondary] = useState(false);
+  const [primaryInputValue, setPrimaryInputValue] = useState("");
+  const [secondaryInputValue, setSecondaryInputValue] = useState("");
   const primarySearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const secondarySearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const primaryInputRef = useRef<HTMLDivElement>(null);
@@ -143,6 +145,7 @@ export function Stage5StaffAssignmentAndRestrictions({
 
   const handlePrimarySelect = (employee: Employee) => {
     updateStage5({ primaryDsp: { id: employee.id, name: employee.fullName } });
+    setPrimaryInputValue(employee.fullName);
     setIsPrimaryPopoverOpen(false);
     setPrimarySearchResults([]);
   };
@@ -155,6 +158,7 @@ export function Stage5StaffAssignmentAndRestrictions({
         secondaryDsps: [...stage5.secondaryDsps, { id: employee.id, name: employee.fullName }]
       });
     }
+    setSecondaryInputValue("");
     setIsSecondaryPopoverOpen(false);
     setSecondarySearchResults([]);
   };
@@ -164,6 +168,15 @@ export function Stage5StaffAssignmentAndRestrictions({
       secondaryDsps: stage5.secondaryDsps.filter(dsp => dsp.id !== dspId)
     });
   };
+
+  // Sync primary input value when primaryDsp changes externally
+  useEffect(() => {
+    if (stage5.primaryDsp?.name) {
+      setPrimaryInputValue(stage5.primaryDsp.name);
+    } else if (!stage5.primaryDsp) {
+      setPrimaryInputValue("");
+    }
+  }, [stage5.primaryDsp]);
 
   const autoCheckOptions = useMemo(
     () =>
@@ -203,10 +216,13 @@ export function Stage5StaffAssignmentAndRestrictions({
               <PopoverAnchor asChild>
                 <div className="relative">
                   <Input
-                    value={stage5.primaryDsp?.name || ""}
+                    value={primaryInputValue}
                     onChange={(e) => {
                       const value = e.target.value;
-                      updateStage5({ primaryDsp: undefined });
+                      setPrimaryInputValue(value);
+                      if (stage5.primaryDsp) {
+                        updateStage5({ primaryDsp: undefined });
+                      }
                       handlePrimarySearch(value);
                     }}
                     onFocus={() => {
@@ -255,9 +271,10 @@ export function Stage5StaffAssignmentAndRestrictions({
               <PopoverAnchor asChild>
                 <div className="relative">
                   <Input
-                    value=""
+                    value={secondaryInputValue}
                     onChange={(e) => {
                       const value = e.target.value;
+                      setSecondaryInputValue(value);
                       handleSecondarySearch(value);
                     }}
                     onFocus={() => {
