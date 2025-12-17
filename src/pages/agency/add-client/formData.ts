@@ -68,7 +68,7 @@ export type DocState = {
     files?: File[];
     url?: string;
     fileName?: string;
-    uploadDate?: Date;
+    issuedOnDate?: Date;
     expiryDate?: Date;
     autoReminder: boolean;
 };

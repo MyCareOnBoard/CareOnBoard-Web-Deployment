@@ -239,10 +239,10 @@ export function Stage3HealthcareAndDocuments({
 
               <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">Upload date</label>
+                  <label className="text-[12px] font-normal text-[#10141a]">Issued on date</label>
                   <DatePickerInput
-                    value={doc.uploadDate}
-                    onChange={(d) => updateDoc(doc.key, { uploadDate: d })}
+                    value={doc.issuedOnDate}
+                    onChange={(d) => updateDoc(doc.key, { issuedOnDate: d })}
                     placeholder="Select date"
                   />
                 </div>

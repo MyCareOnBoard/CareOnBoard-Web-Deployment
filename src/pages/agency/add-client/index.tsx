@@ -127,7 +127,7 @@ export default function AddClientPage() {
           key: d.key,
           title: d.title,
           fileName: d.fileName,
-          uploadDate: toIso(d.uploadDate),
+          issuedOnDate: toIso(d.issuedOnDate),
           expiryDate: toIso(d.expiryDate),
           autoReminder: d.autoReminder,
         })) ?? [],
@@ -256,22 +256,29 @@ export default function AddClientPage() {
               uploadResults[doc.key] = results;
             }
 
-            const finalDocuments = [];
+            const finalDocuments: ClientDocument[] = [];
 
             for (let n in uploadResults) {
+              const matchingDoc = formData.stage3.docs.find((d) => d.key === (n as any));
+
               for (const result of uploadResults[n]) {
                 finalDocuments.push({
                   key: docKeyToType[n] as ClientDocumentKey,
                   title: result.fileName,
+                  fileName: result.fileName,
                   url: result.url,
-                  uploadDate: result.uploadedAt,
-                  expiryDate: formData.stage3.docs.find((d) => d.key === n)?.expiryDate,
-                  autoReminder: formData.stage3.docs.find((d) => d.key === n)?.autoReminder,
+                  issuedOnDate: matchingDoc?.issuedOnDate
+                    ? matchingDoc.issuedOnDate.toISOString()
+                    : undefined,
+                  expiryDate: matchingDoc?.expiryDate
+                    ? matchingDoc.expiryDate.toISOString()
+                    : undefined,
+                  autoReminder: matchingDoc?.autoReminder,
                 });
               }
             }
 
-            await updateClient(created.id, { documents: finalDocuments as ClientDocument[] });
+            await updateClient(created.id, { documents: finalDocuments });
 
             setSavedClientName(clientName || undefined);
             setShowSaveSuccess(true);

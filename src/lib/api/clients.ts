@@ -129,7 +129,7 @@ export interface ClientDocument {
   title?: string;
   fileName?: string;
   url?: string;
-  uploadDate?: string;
+  issuedOnDate?: string;
   expiryDate?: string;
   autoReminder?: boolean;
 }

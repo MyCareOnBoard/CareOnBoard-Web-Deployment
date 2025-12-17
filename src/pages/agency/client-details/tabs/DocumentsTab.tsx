@@ -14,7 +14,7 @@ export function DocumentsTab({ client }: { client: Client }) {
       fileName: doc.fileName,
       status: doc.url ? ("Available" as const) : ("Not uploaded" as const),
       url: doc.url,
-      uploadDate: doc.uploadDate,
+      issuedOnDate: doc.issuedOnDate,
       expiryDate: doc.expiryDate,
     }));
   }, [client.documents]);
@@ -61,7 +61,7 @@ export function DocumentsTab({ client }: { client: Client }) {
 
                 <div
                   className={[
-                    "border border-[0.5px] rounded-[60px] pl-[6px] pr-[8px] py-[7px] shrink-0",
+                    "border rounded-[60px] pl-[6px] pr-[8px] py-[7px] shrink-0",
                     doc.status === "Available"
                       ? "bg-[rgba(14,175,82,0.1)] border-[#0eaf52]"
                       : "bg-[rgba(181,181,181,0.1)] border-[#b5b5b5]",
