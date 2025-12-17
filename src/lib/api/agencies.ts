@@ -28,6 +28,7 @@ export interface Agency {
     taxId?: string;
     npi?: string;
     licenseNumber?: string;
+    primaryColor?: string;
 
     // Status and timestamps
     status: 'active' | 'inactive' | 'pending' | 'suspended';

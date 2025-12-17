@@ -2,7 +2,6 @@
 import axiosClient from '../axios';
 import { User } from '@/utils/auth/types/user.types';
 import { UserType } from '@/utils/auth/types/user.types';
-import { seedAgency } from './agencies';
 
 /**
  * API Response wrapper for user data
@@ -91,6 +90,8 @@ export async function getUser(): Promise<User> {
       dateOfBirth: profileSource.dateOfBirth,
       profilePicture: profileSource.profilePicture || profileSource.photo || profileSource.photoURL,
       professionalSummary: profileSource.professionalSummary || profileSource.summary,
+      workAvailability: profileSource.workAvailability,
+      tagId: profileSource.tagId,
     };
 
     // Add agency details if user is an employee
