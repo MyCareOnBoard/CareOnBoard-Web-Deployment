@@ -60,11 +60,11 @@ export default function SavedAgencies() {
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
           <div className="max-w-7xl mx-auto">
-            {/* Saved Clients Header */}
+            {/* Saved Agencies Header */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <h3 className="text-[20px] font-medium text-[#10141a]">Saved Clients</h3>
+                  <h3 className="text-[20px] font-medium text-[#10141a]">Saved Agencies</h3>
                   <p className="text-[14px] text-[#808081]">These Are The Saved Applications</p>
                 </div>
                 <div className="relative w-[300px]">
