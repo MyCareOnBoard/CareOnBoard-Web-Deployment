@@ -1,33 +1,79 @@
 import React, { useMemo } from "react";
-import { FileText } from "lucide-react";
-import { Client } from "@/lib/api/clients";
+import { FileText, Plus } from "lucide-react";
+import { Client, ClientDocument } from "@/lib/api/clients";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
-export function DocumentsTab({ client }: { client: Client }) {
+export function DocumentsTab({
+  client,
+  onOpenUploadModal,
+}: {
+  client: Client;
+  onOpenUploadModal?: (document?: ClientDocument) => void;
+}) {
+
   const documents = useMemo(() => {
     if (!client.documents || client.documents.length === 0) {
       return [];
     }
     
-    return client.documents.map((doc) => ({
-      id: doc.key,
-      title: doc.title || doc.key,
-      fileName: doc.fileName,
-      status: doc.url ? ("Available" as const) : ("Not uploaded" as const),
-      url: doc.url,
-      issuedOnDate: doc.issuedOnDate,
-      expiryDate: doc.expiryDate,
-    }));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return client.documents.map((doc) => {
+      let isExpired = false;
+      if (doc.expiryDate) {
+        const expiryDate = new Date(doc.expiryDate);
+        expiryDate.setHours(0, 0, 0, 0);
+        isExpired = expiryDate < today;
+      }
+      
+      // Determine status: expired takes priority, then check if uploaded
+      let status: "Expired" | "Available" | "Not uploaded";
+      if (isExpired) {
+        status = "Expired";
+      } else if (doc.url) {
+        status = "Available";
+      } else {
+        status = "Not uploaded";
+      }
+      
+      return {
+        id: doc.key,
+        title: doc.title || doc.key,
+        fileName: doc.fileName,
+        status,
+        url: doc.url,
+        issuedOnDate: doc.issuedOnDate,
+        expiryDate: doc.expiryDate,
+        isExpired,
+        document: doc, // Include the full document object for editing
+      };
+    });
   }, [client.documents]);
 
   return (
     <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-[20px] flex flex-col gap-[24px] overflow-hidden">
-      <div className="flex flex-col gap-[4px]">
-        <p className="text-[24px] font-medium leading-[normal] text-[#10141a]">
-          Documents
-        </p>
-        <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-          Here are your uploaded documents
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-[4px]">
+          <p className="text-[24px] font-medium leading-[normal] text-[#10141a]">
+            Documents
+          </p>
+          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+            Here are your uploaded documents
+          </p>
+        </div>
+        <Button
+          className="h-11 rounded-[60px] bg-[#00b4b8] text-white hover:bg-[#00a0a4] px-6 shrink-0"
+          onClick={() => {
+            if (onOpenUploadModal) {
+              onOpenUploadModal();
+            }
+          }}
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          Add Document
+        </Button>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -70,24 +116,27 @@ export function DocumentsTab({ client }: { client: Client }) {
                   )}
                 </div>
 
-                <div
-                  className={[
-                    "border rounded-[60px] pl-[6px] pr-[8px] py-[7px] shrink-0",
-                    doc.status === "Available"
-                      ? "bg-[rgba(14,175,82,0.1)] border-[#0eaf52]"
-                      : "bg-[rgba(181,181,181,0.1)] border-[#b5b5b5]",
-                  ].join(" ")}
-                >
-                  <span
-                    className={[
-                      "text-[11px] font-semibold leading-[normal]",
-                      doc.status === "Available"
-                        ? "text-[#0eaf52]"
-                        : "text-[#b5b5b5]",
-                    ].join(" ")}
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge
+                    variant={
+                      doc.status === "Expired"
+                        ? "expired"
+                        : doc.status === "Available"
+                        ? "success"
+                        : "pending"
+                    }
+                    className={doc.status === "Expired" ? "cursor-pointer" : ""}
+                    onClick={() => {
+                      if (doc.status === "Expired") {
+                        if (onOpenUploadModal) {
+                          onOpenUploadModal(doc.document);
+                        }
+                      }
+                    }}
+                    title={doc.status === "Expired" ? "Update Document" : ""}
                   >
                     {doc.status}
-                  </span>
+                  </Badge>
                 </div>
               </div>
             </div>

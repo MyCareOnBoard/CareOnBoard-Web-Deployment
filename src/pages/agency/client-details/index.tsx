@@ -7,8 +7,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ActivityTab } from "@/pages/agency/client-details/tabs/ActivityTab";
 import { ProfileTab } from "@/pages/agency/client-details/tabs/ProfileTab";
 import { DocumentsTab } from "@/pages/agency/client-details/tabs/DocumentsTab";
+import { UploadClientDocumentModal } from "@/pages/agency/client-details/components/UploadClientDocumentModal";
 import { useAuth } from "@/utils/auth";
-import { getAgencyClientById, type Client } from "@/lib/api/clients";
+import { getAgencyClientById, type Client, type ClientDocument } from "@/lib/api/clients";
 
 type ClientDetailsTab = "activity" | "profile" | "documents";
 
@@ -21,6 +22,8 @@ export default function ClientDetailsPage() {
   const [client, setClient] = useState<Client | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [documentToEdit, setDocumentToEdit] = useState<ClientDocument | undefined>(undefined);
   const itemsPerPage = 6;
 
   // Format client name from firstName, lastName, middleName
@@ -110,29 +113,29 @@ export default function ClientDetailsPage() {
   }, []);
 
   // Fetch client data
+  const fetchClient = useCallback(async () => {
+    if (!clientId || !user?.agencyId) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      const clientData = await getAgencyClientById(clientId);
+      setClient(clientData);
+    } catch (err: any) {
+      console.error("Failed to fetch client:", err);
+      setError(err.message || "Failed to load client details");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [clientId, user?.agencyId]);
+
   useEffect(() => {
-    const fetchClient = async () => {
-      if (!clientId || !user?.agencyId) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-        const clientData = await getAgencyClientById(clientId);
-        setClient(clientData);
-      } catch (err: any) {
-        console.error("Failed to fetch client:", err);
-        setError(err.message || "Failed to load client details");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchClient();
     window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
-  }, [clientId, user?.agencyId]);
+  }, [fetchClient]);
 
   const clientDisplay = useMemo(
     () => ({
@@ -277,7 +280,39 @@ export default function ClientDetailsPage() {
         />
       )}
       {activeTab === "profile" && <ProfileTab client={client} formatDate={formatDate} />}
-      {activeTab === "documents" && <DocumentsTab client={client} />}
+      {activeTab === "documents" && (
+        <DocumentsTab
+          client={client}
+          onOpenUploadModal={(document) => {
+            setDocumentToEdit(document);
+            setIsUploadModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* Upload Document Modal */}
+      {clientId && (
+        <UploadClientDocumentModal
+          isOpen={isUploadModalOpen}
+          setIsOpen={(open) => {
+            setIsUploadModalOpen(open);
+            if (!open) {
+              setDocumentToEdit(undefined);
+            }
+          }}
+          clientId={clientId}
+          documentToEdit={documentToEdit}
+          onComplete={() => {
+            setIsUploadModalOpen(false);
+            setDocumentToEdit(undefined);
+            fetchClient();
+          }}
+          onError={(error) => {
+            console.error("Upload error:", error);
+            // You could show a toast notification here
+          }}
+        />
+      )}
     </div>
   );
 }
