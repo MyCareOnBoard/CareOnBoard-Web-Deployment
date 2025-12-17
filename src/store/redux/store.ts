@@ -19,6 +19,7 @@ import {agencyNotesApi} from "@/pages/agency/notes/api";
 import {complianceAlertsApi} from "@/pages/agency/compliance-alerts/api";
 import {agencyDashboardApi} from "@/pages/agency/dashboard/api";
 import {superAdminApi} from "@/pages/super-admin/agencies/api";
+import {superAdminDashboardApi} from "@/pages/super-admin/dashboard/api";
 import {billingApi} from "@/pages/agency/billing-and-approvals/api";
 
 const rootReducer = combineReducers({
@@ -31,6 +32,7 @@ const rootReducer = combineReducers({
   [agencyDashboardApi.reducerPath]: agencyDashboardApi.reducer,
   [complianceAlertsApi.reducerPath]: complianceAlertsApi.reducer,
   [superAdminApi.reducerPath]: superAdminApi.reducer,
+  [superAdminDashboardApi.reducerPath]: superAdminDashboardApi.reducer,
   [billingApi.reducerPath]: billingApi.reducer,
 });
 
@@ -58,6 +60,7 @@ export const store = configureStore({
       .concat(agencyDashboardApi.middleware)
       .concat(complianceAlertsApi.middleware)
       .concat(superAdminApi.middleware)
+      .concat(superAdminDashboardApi.middleware)
       .concat(billingApi.middleware),
   devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });

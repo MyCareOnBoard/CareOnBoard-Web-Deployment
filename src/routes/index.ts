@@ -56,7 +56,9 @@ import NotesPage from "@/pages/userPanel/notes";
 import AgencyNotesPage from "@/pages/agency/notes";
 import SuperAdminLayout from "@/layouts/SuperAdminLayout";
 import AgenciesPage from "@/pages/super-admin/agencies";
+import AddAgencyWizard from "@/pages/super-admin/agencies/AddAgencyWizard";
 import DSPClaimsPage from "@/pages/agency/billing-and-approvals/dsp-info";
+import SuperAdminDashboard from "@/pages/super-admin/dashboard";
 
 
 export const router = createBrowserRouter([
@@ -321,8 +323,16 @@ export const router = createBrowserRouter([
     Component: SuperAdminLayout,
     children: [
       {
+        path: Routes.superAdmin.dashboard,
+        Component: SuperAdminDashboard,
+      },
+      {
         path: Routes.superAdmin.agencies,
         Component: AgenciesPage,
+      },
+      {
+        path: Routes.superAdmin.addAgency,
+        Component: AddAgencyWizard,
       },
     ],
   },
