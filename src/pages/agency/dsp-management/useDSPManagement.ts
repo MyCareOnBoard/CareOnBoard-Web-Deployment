@@ -76,14 +76,9 @@ export function useDSPList() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const user = useSelector((state: RootState) => state.auth.user);
   const agencyId = user?.agencyId;
-
-  console.log('🔍 DSP Management - User Object:', user);
-  console.log('🔍 DSP Management - Agency ID:', agencyId);
-  console.log('🔍 DSP Management - User ID:', user?.id);
-  console.log('🔍 DSP Management - User Profile:', user?.profile);
 
   const fetchDSPs = useCallback(async () => {
     if (!agencyId) {
@@ -97,9 +92,9 @@ export function useDSPList() {
       setError(null);
 
       console.log('📡 Fetching employees with agencyId:', agencyId);
-      
+
       // Fetch employees - stats endpoint may not be available yet
-      const employeesResponse = await listEmployees({ 
+      const employeesResponse = await listEmployees({
         agencyId,
         // Note: Backend may not support role filtering yet
         limit: 100
@@ -112,7 +107,7 @@ export function useDSPList() {
         return transformEmployeeToDSP(employee);
       });
       setDsps(transformedDSPs);
-      
+
       // Try to fetch stats, but don't fail if endpoint doesn't exist
       try {
         const statsResponse = await getEmployeeStats(agencyId);
@@ -164,7 +159,7 @@ export function useDSPList() {
 export function useDSPSearch() {
   const [results, setResults] = useState<DSP[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  
+
   const user = useSelector((state: RootState) => state.auth.user);
   const agencyId = user?.agencyId;
 

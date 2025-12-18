@@ -29,7 +29,7 @@ export function Stage1ClientIdentityAndContact({
 
   const [isDobOpen, setIsDobOpen] = useState(false);
 
-  // Address autocomplete (same pattern as manual shift "location" field)
+  // Primary Address autocomplete (same pattern as manual shift "location" field)
   const [addressSuggestions, setAddressSuggestions] = useState<
     Array<{
       display_name?: string;
@@ -52,10 +52,36 @@ export function Stage1ClientIdentityAndContact({
   const addressInputRef = useRef<HTMLDivElement>(null);
   const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Secondary Address autocomplete
+  const [secondaryAddressSuggestions, setSecondaryAddressSuggestions] = useState<
+    Array<{
+      display_name?: string;
+      place_id: string;
+      lat: string;
+      lon: string;
+      address?: {
+        county?: string;
+        state?: string;
+        postcode?: string;
+        state_district?: string;
+        city?: string;
+        town?: string;
+        village?: string;
+      };
+    }>
+  >([]);
+  const [showSecondaryAddressSuggestions, setShowSecondaryAddressSuggestions] = useState(false);
+  const [searchingSecondaryAddress, setSearchingSecondaryAddress] = useState(false);
+  const secondaryAddressInputRef = useRef<HTMLDivElement>(null);
+  const secondaryAddressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (addressInputRef.current && !addressInputRef.current.contains(event.target as Node)) {
         setShowAddressSuggestions(false);
+      }
+      if (secondaryAddressInputRef.current && !secondaryAddressInputRef.current.contains(event.target as Node)) {
+        setShowSecondaryAddressSuggestions(false);
       }
     };
 
@@ -64,6 +90,9 @@ export function Stage1ClientIdentityAndContact({
       document.removeEventListener("mousedown", handleClickOutside);
       if (addressSearchTimeoutRef.current) {
         clearTimeout(addressSearchTimeoutRef.current);
+      }
+      if (secondaryAddressSearchTimeoutRef.current) {
+        clearTimeout(secondaryAddressSearchTimeoutRef.current);
       }
     };
   }, []);
@@ -132,6 +161,73 @@ export function Stage1ClientIdentityAndContact({
       location: { lat: suggestion.lat, lon: suggestion.lon },
       countyState: countyStateValue,
       zipCode: postcode,
+    });
+  };
+
+  const handleSecondaryAddressSearch = useCallback(async (query: string) => {
+    if (secondaryAddressSearchTimeoutRef.current) {
+      clearTimeout(secondaryAddressSearchTimeoutRef.current);
+    }
+
+    if (query.trim().length < 3) {
+      setShowSecondaryAddressSuggestions(false);
+      setSecondaryAddressSuggestions([]);
+      return;
+    }
+
+    secondaryAddressSearchTimeoutRef.current = setTimeout(async () => {
+      try {
+        setSearchingSecondaryAddress(true);
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            query
+          )}&limit=5&addressdetails=1`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch address suggestions");
+        }
+
+        const data = await response.json();
+        setSecondaryAddressSuggestions(data);
+        setShowSecondaryAddressSuggestions(data.length > 0);
+      } catch (error) {
+        console.error("Failed to fetch address suggestions:", error);
+        setSecondaryAddressSuggestions([]);
+        setShowSecondaryAddressSuggestions(false);
+      } finally {
+        setSearchingSecondaryAddress(false);
+      }
+    }, 500);
+  }, []);
+
+  const handleSelectSecondaryAddressSuggestion = (suggestion: {
+    display_name?: string;
+    place_id: string;
+    lat: string;
+    lon: string;
+    address?: {
+      county?: string;
+      state?: string;
+      postcode?: string;
+      state_district?: string;
+    };
+  }) => {
+    setShowSecondaryAddressSuggestions(false);
+    setSecondaryAddressSuggestions([]);
+
+    const county = suggestion.address?.county || suggestion.address?.state_district || "";
+    const state = suggestion.address?.state || "";
+    const postcode = suggestion.address?.postcode || "";
+
+    const countyStateValue =
+      county && state ? `${county} / ${state}` : county || state;
+
+    updateStage1({
+      secondaryAddress: suggestion.display_name || "",
+      secondaryLocation: { lat: suggestion.lat, lon: suggestion.lon },
+      secondaryCountyState: countyStateValue,
+      secondaryZipCode: postcode,
     });
   };
 
@@ -352,7 +448,7 @@ export function Stage1ClientIdentityAndContact({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">County / State</label>
+            <label className="text-[12px] font-normal text-[#10141a]">Primary County / State</label>
             <Input
               value={stage1.countyState}
               onChange={(e) => updateStage1({ countyState: e.target.value })}
@@ -362,7 +458,7 @@ export function Stage1ClientIdentityAndContact({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Zip Code</label>
+            <label className="text-[12px] font-normal text-[#10141a]">Primary Zip Code</label>
             <Input
               value={stage1.zipCode}
               onChange={(e) => updateStage1({ zipCode: e.target.value })}
@@ -371,7 +467,83 @@ export function Stage1ClientIdentityAndContact({
               placeholder="Enter Zip Code"
             />
           </div>
+        </div>
 
+        {/* Secondary Address Section */}
+        <div className="mt-6 mb-6">
+          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a] mb-4">
+            Secondary Address (Optional)
+          </p>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Secondary Address</label>
+              <div className="relative" ref={secondaryAddressInputRef}>
+                <Input
+                  value={stage1.secondaryAddress}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    // If user edits after selecting a suggestion, clear coordinates until re-selected.
+                    updateStage1({ secondaryAddress: v, secondaryLocation: undefined });
+                    handleSecondaryAddressSearch(v);
+                  }}
+                  onFocus={() => {
+                    if (secondaryAddressSuggestions.length > 0) {
+                      setShowSecondaryAddressSuggestions(true);
+                    }
+                  }}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Enter secondary address"
+                />
+
+                {showSecondaryAddressSuggestions && secondaryAddressSuggestions.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                    {searchingSecondaryAddress && (
+                      <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
+                        Searching...
+                      </div>
+                    )}
+                    {!searchingSecondaryAddress &&
+                      secondaryAddressSuggestions.map((suggestion) => (
+                        <div
+                          key={suggestion.place_id}
+                          onClick={() => handleSelectSecondaryAddressSuggestion(suggestion)}
+                          className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
+                        >
+                          <span className="line-clamp-2">
+                            {suggestion.display_name}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Secondary County / State</label>
+              <Input
+                value={stage1.secondaryCountyState}
+                onChange={(e) => updateStage1({ secondaryCountyState: e.target.value })}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="Enter County / State"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Secondary Zip Code</label>
+              <Input
+                value={stage1.secondaryZipCode}
+                onChange={(e) => updateStage1({ secondaryZipCode: e.target.value })}
+                inputMode="numeric"
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="Enter Zip Code"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Phone Number</label>
             <Input

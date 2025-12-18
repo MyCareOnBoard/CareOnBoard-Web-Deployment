@@ -166,8 +166,6 @@ export async function createEmployee(data: CreateEmployeeRequest): Promise<Emplo
  */
 export async function listEmployees(params?: ListEmployeesParams): Promise<ListEmployeesResponse> {
   try {
-    console.log('📤 Sending listEmployees request with params:', params);
-    
     const response = await axiosClient.get<ListEmployeesResponse>('/employees/', {
       params: {
         uid: params?.uid,
@@ -180,8 +178,6 @@ export async function listEmployees(params?: ListEmployeesParams): Promise<ListE
         page: params?.page,
       },
     });
-
-    console.log('📥 listEmployees response:', response.data);
 
     if (!response.data.success) {
       throw new Error('Failed to list employees');
