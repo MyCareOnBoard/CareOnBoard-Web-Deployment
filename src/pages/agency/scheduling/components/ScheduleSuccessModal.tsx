@@ -50,7 +50,7 @@ export default function ScheduleSuccessModal({
             Scheduled
           </h2>
           <p className="text-[16px] font-medium leading-[1.6] text-[#808081] max-w-[304px]">
-            You have scheduled a shift between {clientName} (Client) & {dspName} (DSP) for {duration} in {date}
+            You have scheduled a shift between {clientName} (Client) & {dspName} (DSP) for {duration} on {date}
           </p>
         </div>
 

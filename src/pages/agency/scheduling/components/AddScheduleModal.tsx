@@ -965,11 +965,11 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               </div>
             )}
             {/* Billing Rate Display */}
-            {formData.billingRate && !errors.assignedDsp && (
+            {/* {formData.billingRate && !errors.assignedDsp && (
               <span className="text-[12px] font-normal text-[#808081]">
                 Billing Rate : {formData.billingRate}
               </span>
-            )}
+            )} */}
           </div>
 
           {/* Service Code */}
