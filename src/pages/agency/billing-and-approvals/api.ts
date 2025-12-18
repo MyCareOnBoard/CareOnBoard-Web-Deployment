@@ -1,7 +1,7 @@
-import {createApi} from "@reduxjs/toolkit/query/react";
-import {customBaseQuery} from "@/lib/baseQuery";
-import {Client} from "@/lib/api/clients";
-import {Employee} from "@/lib/api/employees";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { customBaseQuery } from "@/lib/baseQuery";
+import { Client } from "@/lib/api/clients";
+import { Employee } from "@/lib/api/employees";
 
 export interface EmployeeWithHours extends Employee {
   totalHours?: number;
@@ -14,6 +14,7 @@ export interface ClientWithHours extends Client {
   totalHours?: number;
   totalAmount?: number;
   shiftCount?: number;
+  serviceCode?: string;
 }
 
 export interface BillingRecord {
@@ -229,8 +230,8 @@ export const billingApi = createApi({
   tagTypes: ['BillingRecords'],
   endpoints: (builder) => ({
     getBillingRecords: builder.query<ListBillingRecordsResponse, ListBillingRecordsParams>({
-      query: ({agencyId, billingStatus, date, serviceType, limit = 10, page = 1, groupBy = 'client'}) => {
-        const params = new URLSearchParams({agencyId});
+      query: ({ agencyId, billingStatus, date, serviceType, limit = 10, page = 1, groupBy = 'client' }) => {
+        const params = new URLSearchParams({ agencyId });
         if (billingStatus && billingStatus !== 'all') params.append('billingStatus', billingStatus);
         if (date && date !== 'all') params.append('date', date);
         if (serviceType && serviceType !== 'all') params.append('serviceType', serviceType);
@@ -255,7 +256,7 @@ export const billingApi = createApi({
       })
     }),
     getClientClaims: builder.query<ClientClaimsResponse, { clientId: string; agencyId: string; serviceCode?: string }>({
-      query: ({clientId, agencyId, serviceCode}) => ({
+      query: ({ clientId, agencyId, serviceCode }) => ({
         url: `/billing/client/${clientId}?agencyId=${agencyId}${serviceCode ? `&serviceCode=${serviceCode}` : ''}`,
         method: "GET",
         requiresAuth: true
@@ -263,7 +264,7 @@ export const billingApi = createApi({
       providesTags: ['BillingRecords']
     }),
     getDspClaims: builder.query<DspClaimsResponse, { dspId: string; agencyId: string }>({
-      query: ({dspId, agencyId}) => ({
+      query: ({ dspId, agencyId }) => ({
         url: `/billing/dsp/${dspId}?agencyId=${agencyId}`,
         method: "GET",
         requiresAuth: true
@@ -271,7 +272,7 @@ export const billingApi = createApi({
       providesTags: ['BillingRecords']
     }),
     approveExpense: builder.mutation<{ success: boolean; message: string; data: { id: string; status: string } }, { expenseId: string; agencyId: string }>({
-      query: ({expenseId, agencyId}) => ({
+      query: ({ expenseId, agencyId }) => ({
         url: `/billing/expenses/${expenseId}/approve?agencyId=${agencyId}`,
         method: "POST",
         requiresAuth: true
@@ -279,7 +280,7 @@ export const billingApi = createApi({
       invalidatesTags: ['BillingRecords']
     }),
     rejectExpense: builder.mutation<{ success: boolean; message: string; data: { id: string; status: string } }, { expenseId: string; agencyId: string; reviewerNotes?: string }>({
-      query: ({expenseId, agencyId, reviewerNotes}) => ({
+      query: ({ expenseId, agencyId, reviewerNotes }) => ({
         url: `/billing/expenses/${expenseId}/reject?agencyId=${agencyId}${reviewerNotes ? `&reviewerNotes=${encodeURIComponent(reviewerNotes)}` : ''}`,
         method: "POST",
         requiresAuth: true
