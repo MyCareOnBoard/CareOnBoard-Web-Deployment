@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { searchClients, Client, ClientService } from "@/lib/api/clients";
+import { searchClients, Client, ClientService, getAgencyClientById } from "@/lib/api/clients";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
@@ -172,6 +172,18 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     if (isOpen) {
       if (editData && mode === "edit") {
         setFormData(editData);
+        
+        // Fetch client data to populate services dropdown
+        if (editData.clientId) {
+          getAgencyClientById(editData.clientId)
+            .then((client) => {
+              setSelectedClient(client);
+              setSelectedClientServices(client.services || []);
+            })
+            .catch((error) => {
+              console.error("Failed to fetch client for edit:", error);
+            });
+        }
       } else {
         setFormData(initialFormData);
       }
@@ -179,8 +191,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       setIsSubmitting(false);
       setClientSearchResults([]);
       setDspSearchResults([]);
-      setSelectedClient(null);
-      setSelectedClientServices([]);
+      if (!(editData && mode === "edit")) {
+        setSelectedClient(null);
+        setSelectedClientServices([]);
+      }
     }
   }, [isOpen, editData, mode]);
 

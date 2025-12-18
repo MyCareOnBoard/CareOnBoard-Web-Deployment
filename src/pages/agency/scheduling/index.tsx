@@ -655,7 +655,7 @@ export default function SchedulingPage() {
                   >
                     {/* Client Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
                         {shift.client?.profileImage && (
                           <AvatarImage
                             src={shift.client.profileImage}
@@ -663,7 +663,7 @@ export default function SchedulingPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(clientName)}
                         </AvatarFallback>
                       </Avatar>
@@ -679,7 +679,7 @@ export default function SchedulingPage() {
 
                     {/* DSP/Employee Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
                         {shift.employee?.profilePicture && (
                           <AvatarImage
                             src={shift.employee.profilePicture}
@@ -687,7 +687,7 @@ export default function SchedulingPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(employeeName)}
                         </AvatarFallback>
                       </Avatar>
