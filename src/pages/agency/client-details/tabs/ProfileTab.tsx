@@ -1,8 +1,11 @@
 import React, { useState } from "react";
-import { CalendarDays, Mail, MapPin, Phone, User, AlertCircle, Loader2 } from "lucide-react";
+import { CalendarDays, Mail, MapPin, Phone, User, AlertCircle, Loader2, Trash2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Client, updateClient } from "@/lib/api/clients";
+import { Client, updateClient, deleteClient } from "@/lib/api/clients";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/utils/auth";
+import { useNavigate } from "react-router";
+import { Routes } from "@/routes/constants";
 
 function DetailRow({
   icon,
@@ -59,8 +62,13 @@ export function ProfileTab({
   onClientUpdated?: () => void;
 }) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   // Format gender display
   const formatGender = (gender?: string): string => {
     if (!gender) return "Not specified";
@@ -132,6 +140,61 @@ export function ProfileTab({
     }
   };
 
+  const handleActivate = async () => {
+    if (!clientId) return;
+
+    try {
+      setIsActivating(true);
+      await updateClient(clientId, { status: "active" });
+      
+      toast({
+        title: "Client activated",
+        description: "The client has been successfully activated.",
+      });
+      
+      if (onClientUpdated) {
+        onClientUpdated();
+      }
+    } catch (error: any) {
+      console.error("Failed to activate client:", error);
+      toast({
+        title: "Failed to activate client",
+        description: error.message || "An error occurred while activating the client.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsActivating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!clientId || !user?.agencyId) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteClient(clientId, user.agencyId);
+      
+      toast({
+        title: "Client deleted",
+        description: "The client has been successfully deleted.",
+      });
+
+      setShowDeleteModal(false);
+      
+      // Navigate to clients list
+      navigate(Routes.agency.clients);
+    } catch (error: any) {
+      console.error("Failed to delete client:", error);
+      toast({
+        title: "Failed to delete client",
+        description: error.message || "An error occurred while deleting the client.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const isInactive = client.status === "inactive" || client.status === "archived";
 
   return (
@@ -183,24 +246,68 @@ export function ProfileTab({
         </div>
       </div>
       <div className="mt-4 flex items-center gap-[8px]">
+        {/* Activate button - only show if inactive */}
+        {isInactive && (
+          <Button
+            className="h-[36px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium bg-[#00b4b8] hover:bg-[#00a0a4] text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleActivate}
+            disabled={isActivating}
+          >
+            {isActivating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Activating...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="w-4 h-4" />
+                Activate Client
+              </>
+            )}
+          </Button>
+        )}
+
+        {/* Deactivate button - only show if active */}
+        {!isInactive && (
+          <Button
+            variant="destructive"
+            className="h-[36px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium bg-[#d53411] hover:bg-[#c02e0f] disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setShowConfirmModal(true)}
+            disabled={isDeactivating}
+          >
+            {isDeactivating ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Deactivating...
+              </span>
+            ) : (
+              "Deactivate Client"
+            )}
+          </Button>
+        )}
+
+        {/* Delete button - always visible */}
         <Button
           variant="destructive"
-          className="h-[36px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium bg-[#d53411] hover:bg-[#c02e0f] disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={() => setShowConfirmModal(true)}
-          disabled={isInactive || isDeactivating}
+          className="h-[36px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium bg-red-600 hover:bg-red-700 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={() => setShowDeleteModal(true)}
+          disabled={isDeleting}
         >
-          {isDeactivating ? (
-            <span className="flex items-center gap-2">
+          {isDeleting ? (
+            <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Deactivating...
-            </span>
+              Deleting...
+            </>
           ) : (
-            "Deactivate Client"
+            <>
+              <Trash2 className="w-4 h-4" />
+              Delete Client
+            </>
           )}
         </Button>
       </div>
 
-      {/* Confirmation Modal */}
+      {/* Deactivate Confirmation Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
           <div className="w-full max-w-md rounded-[20px] bg-white shadow-lg p-6 flex flex-col items-center gap-4 text-center">
@@ -231,6 +338,43 @@ export function ProfileTab({
               >
                 {isDeactivating && <Loader2 className="w-4 h-4 animate-spin" />}
                 Deactivate
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-[20px] bg-white shadow-lg p-6 flex flex-col items-center gap-4 text-center">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50">
+              <AlertCircle className="w-7 h-7 text-red-500" />
+            </div>
+            <p className="text-[18px] font-semibold text-[#10141a]">
+              Delete Client
+            </p>
+            <p className="text-[14px] text-[#4b4b4c]">
+              Are you sure you want to delete this client? This action cannot be undone and will permanently remove all client data from the system.
+            </p>
+            <div className="mt-2 flex justify-center gap-3 w-full">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 rounded-[60px] px-5 border-[#b2b2b3] text-[#10141a] bg-white hover:bg-gray-50"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="h-10 rounded-[60px] px-5 bg-[#d53411] text-white hover:bg-[#c02e0f] flex items-center gap-2"
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                Delete
               </Button>
             </div>
           </div>

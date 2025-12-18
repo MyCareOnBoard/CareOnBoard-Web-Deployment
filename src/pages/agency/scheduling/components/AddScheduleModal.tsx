@@ -314,11 +314,11 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         ? `${client.firstName} ${client.lastName}` 
         : client.id,
       clientId: client.id,
-      clientLocation: formatLocation(client.location),
+      clientLocation: formatLocation( client.primaryAddress?.location || client.location),
       serviceCode: client.services?.[0]?.code || "",
       assignedDsp: client.primaryDsp?.name || "",
       assignedDspId: client.primaryDsp?.id || "",
-      billingRate: "", // Billing rate would need to be fetched separately if needed
+      billingRate: client.services?.[0]?.rate || "",
       ispOutcome: client.ispOutcomes || "",
     }));
     setSelectedClient(client);
@@ -332,7 +332,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       ...prev,
       assignedDsp: employee.fullName,
       assignedDspId: employee.id,
-      billingRate: "", // Billing rate would come from a different source
     }));
     setShowDspDropdown(false);
     setDspSearchResults([]);
