@@ -48,8 +48,8 @@ export default function AddClientPage() {
 
     const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
 
-    const location = s1.location;
-    if (!location || !location.lat || !location.lon) {
+    const primaryLocation = s1.location;
+    if (!primaryLocation || !primaryLocation.lat || !primaryLocation.lon) {
       throw new Error("Please select an address from the suggestions so we can capture coordinates.");
     }
 
@@ -75,8 +75,6 @@ export default function AddClientPage() {
       throw new Error("Please select an Authorized Service for each service block (service code will auto-populate).");
     }
 
-    const primaryService = services[0];
-
     return {
       // Stage 1
       firstName: s1.firstName || undefined,
@@ -86,23 +84,26 @@ export default function AddClientPage() {
       email: s1.email || undefined,
       phone: s1.phone || undefined,
       dateOfBirth: toIso(s1.dob),
-      address: s1.address || undefined,
-      location,
-      countyState: s1.countyState || undefined,
-      zipCode: s1.zipCode || undefined,
+      primaryAddress: {
+        address: s1.address || undefined,
+        location: primaryLocation,
+        countyState: s1.countyState || undefined,
+        zipCode: s1.zipCode || undefined,
+      },
+      secondaryAddress: s1.secondaryAddress || s1.secondaryLocation || s1.secondaryCountyState || s1.secondaryZipCode
+        ? {
+            address: s1.secondaryAddress || undefined,
+            location: s1.secondaryLocation || undefined,
+            countyState: s1.secondaryCountyState || undefined,
+            zipCode: s1.secondaryZipCode || undefined,
+          }
+        : undefined,
       languagePreference: s1.language || undefined,
       communicationMethod: s1.communicationMethod || undefined,
       medicaidId: s1.medicaidId || undefined,
       dddId: s1.dddId || undefined,
       ssn: s1.ssn || undefined,
       nursingLevel: s1.nursingLevel || undefined,
-
-      // Top-level service summary (optional, but useful for lists)
-      service: primaryService?.name,
-      serviceCode: primaryService?.code,
-      billingRate: primaryService?.rate,
-
-      // Stage 2
       guardianName: s2.guardianName || undefined,
       guardianRelationship: s2.guardianRelationship || undefined,
       guardianEmail: s2.guardianEmail || undefined,

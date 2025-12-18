@@ -10,11 +10,18 @@ export type Stage1ClientIdentityAndContactData = {
     ssn: string;
     nursingLevel?: string;
 
-    // Contact
+    // Contact - Primary Address
     address: string;
     location?: { lat: string; lon: string };
     countyState: string;
     zipCode: string;
+
+    // Contact - Secondary Address
+    secondaryAddress: string;
+    secondaryLocation?: { lat: string; lon: string };
+    secondaryCountyState: string;
+    secondaryZipCode: string;
+
     phone: string;
     email: string;
     language?: string;
@@ -250,6 +257,10 @@ export function createInitialAddClientFormData(): AddClientFormData {
             location: undefined,
             countyState: "",
             zipCode: "",
+            secondaryAddress: "",
+            secondaryLocation: undefined,
+            secondaryCountyState: "",
+            secondaryZipCode: "",
             phone: "",
             email: "",
             language: undefined,

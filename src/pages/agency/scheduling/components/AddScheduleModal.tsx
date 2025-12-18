@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2 } from "lucide-react";
+import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { searchClients, Client, ClientService } from "@/lib/api/clients";
@@ -137,6 +137,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
   const [dspSearchResults, setDspSearchResults] = useState<Employee[]>([]);
   const [selectedClientServices, setSelectedClientServices] = useState<ClientService[]>([]);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
   const [isSearchingDsps, setIsSearchingDsps] = useState(false);
 
@@ -178,6 +179,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       setIsSubmitting(false);
       setClientSearchResults([]);
       setDspSearchResults([]);
+      setSelectedClient(null);
+      setSelectedClientServices([]);
     }
   }, [isOpen, editData, mode]);
 
@@ -316,7 +319,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       assignedDsp: client.primaryDsp?.name || "",
       assignedDspId: client.primaryDsp?.id || "",
       billingRate: "", // Billing rate would need to be fetched separately if needed
+      ispOutcome: client.ispOutcomes || "",
     }));
+    setSelectedClient(client);
     setSelectedClientServices(client.services || []);
     setShowClientDropdown(false);
     setClientSearchResults([]);
@@ -352,6 +357,11 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       ) || null,
     [selectedClientServices, formData.serviceCode],
   );
+
+  const pocDocument = useMemo(() => {
+    if (!selectedClient?.documents) return null;
+    return selectedClient.documents.find((doc) => doc.key === "poc") || null;
+  }, [selectedClient]);
 
   const handleDateSelect = (date: Date) => {
     setFormData(prev => ({ ...prev, date }));
@@ -1453,13 +1463,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           {/* ISP Outcome */}
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">ISP Outcome</label>
-            <div className="bg-white border border-[#b2b2b3] rounded-xl h-11 px-4 flex items-center">
+            <div className="bg-[#f5f5f5] border border-[#e0e0e0] rounded-xl h-11 px-4 flex items-center">
               <input
                 type="text"
                 value={formData.ispOutcome}
-                onChange={(e) => setFormData(prev => ({ ...prev, ispOutcome: e.target.value }))}
-                placeholder="Write here..."
-                className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                readOnly
+                placeholder={formData.ispOutcome ? "" : "No ISP outcome available"}
+                className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent cursor-not-allowed"
               />
             </div>
           </div>
@@ -1467,6 +1477,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           {/* Plan of Care */}
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Plan of care</label>
+            {!pocDocument?.url && (
             <label className="bg-white border border-[#cccccd] rounded-xl px-4 py-3 flex items-center justify-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
               <Upload className="w-5 h-5 text-[#b2b2b3]" />
               <span className="text-[14px] font-normal text-[#b2b2b3]">
@@ -1479,6 +1490,22 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 accept=".pdf,.doc,.docx"
               />
             </label>
+            )}
+            {/* Client's POC Document Link */}
+            {pocDocument && pocDocument.url && (
+              <a
+                href={pocDocument.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-[rgba(0,180,216,0.08)] border border-[rgba(0,180,216,0.2)] rounded-lg h-[36px] px-3 mt-1 hover:bg-[rgba(0,180,216,0.12)] transition-colors group"
+              >
+                <FileText className="w-4 h-4 text-[#00b4d8] group-hover:text-[#0096c7]" />
+                <span className="text-[13px] font-medium text-[#10141a] flex-1 truncate">
+                  {pocDocument.fileName || pocDocument.title || "View Plan of Care"}
+                </span>
+                <ExternalLink className="w-3.5 h-3.5 text-[#00b4d8] group-hover:text-[#0096c7] shrink-0" />
+              </a>
+            )}
             {/* Selected File Chip */}
             {formData.planOfCare && (
               <div className="flex items-center gap-2 bg-[rgba(0,216,65,0.08)] rounded-lg h-[36px] px-2 mt-1">

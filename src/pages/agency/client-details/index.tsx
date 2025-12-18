@@ -212,18 +212,20 @@ export default function ClientDetailsPage() {
               <p className="text-[24px] font-semibold leading-[normal] text-[#10141a]">
                 {clientDisplay.name}
               </p>
-              <div className="flex items-center gap-2 text-[12px] font-medium leading-[1.6] text-[#808081]">
-                <span>{clientDisplay.roleLabel}</span>
-                <span className="inline-block w-[6px] h-[6px] rounded-full bg-[#808081]" />
-                <span>{clientDisplay.ageLabel}</span>
+              <div className="flex flex-col gap-1 text-[12px] font-medium text-[#808081]">
+                <span>Age: <span className="font-normal ps-2">{clientDisplay.ageLabel}</span></span>
+                <span>Medical ID: <span className="font-normal ps-2">{client.medicaidId}</span></span>
               </div>
             </div>
 
             {client.phone && (
-              <Button className="h-[44px] w-[180px] rounded-[60px] px-[11px] py-[12px] gap-2">
+              <a
+                href={`tel:${client.phone.replace(/\D/g, "")}`}
+                className="h-[44px] w-[180px] rounded-[60px] px-[11px] py-[12px] gap-2 bg-[#00b4b8] hover:bg-[#00a0a4] text-white flex items-center justify-center font-medium transition-colors"
+              >
                 <Phone className="w-5 h-5 text-white" />
                 Call
-              </Button>
+              </a>
             )}
           </div>
         </div>
@@ -292,7 +294,14 @@ export default function ClientDetailsPage() {
           itemsPerPage={itemsPerPage}
         />
       )}
-      {activeTab === "profile" && <ProfileTab client={client} formatDate={formatDate} />}
+      {activeTab === "profile" && (
+        <ProfileTab
+          client={client}
+          formatDate={formatDate}
+          clientId={clientId || ""}
+          onClientUpdated={fetchClient}
+        />
+      )}
       {activeTab === "services" && (
         <ServicesTab
           client={client}

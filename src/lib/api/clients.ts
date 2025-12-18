@@ -33,27 +33,17 @@ export interface Client {
   state?: string;
   zipCode?: string;
   countyState?: string;
+  primaryAddress?: Address;
+  secondaryAddress?: Address;
   languagePreference?: string;
   communicationMethod?: string;
   medicaidId?: string;
   dddId?: string;
   ssn?: string;
   nursingLevel?: string;
-
-  // Service information
-  service?: string;
-  serviceCode?: string;
   billingRate?: string;
   services?: ClientService[];
-
-  // Plan of care
-  planOfCare?: {
-    id: string;
-    name: string;
-    url?: string;
-    uploadedAt?: string;
-  };
-  ispOutcome?: string;
+  ispOutcomes?: string;
 
   // Add Client wizard sections (Stage 2–7)
   guardianInfo?: ClientGuardianInfo;
@@ -268,6 +258,13 @@ export interface ListClientsParams {
   limit?: number;
 }
 
+export interface Address {
+  address?: string;
+  location?: { lat: string; lon: string };
+  countyState?: string;
+  zipCode?: string;
+}
+
 /**
  * Create Client Request
  */
@@ -285,6 +282,8 @@ export interface CreateClientRequest {
   state?: string;
   zipCode?: string;
   countyState?: string;
+  primaryAddress?: Address;
+  secondaryAddress?: Address;
   languagePreference?: string;
   communicationMethod?: string;
   medicaidId?: string;
