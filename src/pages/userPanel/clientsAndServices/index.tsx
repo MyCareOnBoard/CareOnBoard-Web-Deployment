@@ -249,14 +249,14 @@ export default function ClientsAndServicesPage() {
                     <div className="col-span-2 flex items-center">
                       <div>
                         <p className="text-xs text-gray-500 mb-0.5">Service</p>
-                        <p className="text-sm text-gray-900">{client.service}</p>
+                        <p className="text-sm text-gray-900">{client.services?.[0]?.name || 'N/A'}</p>
                       </div>
                     </div>
 
                     {/* Service Code */}
                     <div className="col-span-2 flex items-center">
                       <span className="inline-flex items-center px-3 py-1 rounded-md bg-gray-200 text-gray-700 text-xs font-medium">
-                        {client.serviceCode || client.service}
+                        {client.services?.[0]?.code || client.services?.[0]?.name || 'N/A'}
                       </span>
                     </div>
 
@@ -343,7 +343,7 @@ export default function ClientsAndServicesPage() {
                       <div className="col-span-3 flex items-center">
                         <div>
                           <p className="text-xs text-gray-500 mb-0.5">Service</p>
-                          <p className="text-sm text-gray-900">{client.service}</p>
+                          <p className="text-sm text-gray-900">{client.services?.[0]?.name || 'N/A'}</p>
                         </div>
                       </div>
 

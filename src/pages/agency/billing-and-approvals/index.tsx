@@ -284,14 +284,20 @@ export default function BillingAndApprovalsPage() {
 
                   {/* Service Code - Multiple rows */}
                   <div className="flex flex-col gap-4">
-                    {(activeTab === "client" ? record.employees : record.clients)?.map((item) => (
-                      <div key={item.id} className="flex flex-col justify-center h-[60px]">
-                        <p className="text-[14px] text-[#808081] mb-1">Service Code</p>
-                        <p className="text-[16px] font-medium text-[#10141a]">
-                          {item.serviceCode || 'N/A'}
-                        </p>
-                      </div>
-                    ))}
+                    {(activeTab === "client" ? record.employees : record.clients)?.map((item) => {
+                      // For ClientWithHours, try serviceCode property first, then fallback to services array
+                      const serviceCode = activeTab === "client" 
+                        ? (item as any).serviceCode 
+                        : (item as any).serviceCode || (item as any).services?.[0]?.code;
+                      return (
+                        <div key={item.id} className="flex flex-col justify-center h-[60px]">
+                          <p className="text-[14px] text-[#808081] mb-1">Service Code</p>
+                          <p className="text-[16px] font-medium text-[#10141a]">
+                            {serviceCode || 'N/A'}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Total Hours - Multiple rows */}
