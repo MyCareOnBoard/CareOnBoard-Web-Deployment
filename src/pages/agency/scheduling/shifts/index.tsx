@@ -161,6 +161,7 @@ export default function ShiftsListPage() {
       clockOutTime: shift.endTime || "",
       ispOutcome: shift.ispOutcome || "",
       planOfCare: null,
+      submissionStatus: shift.submissionStatus,
     } as ScheduleFormData;
 
     (formData as any).shiftId = shift.id;

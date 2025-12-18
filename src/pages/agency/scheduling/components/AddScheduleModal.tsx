@@ -51,6 +51,7 @@ export interface ScheduleFormData {
   clockOutTime: string;
   ispOutcome: string;
   planOfCare: File | null;
+  submissionStatus?: SubmissionStatus;
 }
 
 const clockInTimeOptions = [
@@ -1544,7 +1545,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !isFormValid}
+            disabled={isSubmitting || !isFormValid || (mode === "edit" && formData.submissionStatus === SubmissionStatus.SUBMITTED)}
             className="flex-1 bg-[#00B5B8] hover:bg-[#00A0A4] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
