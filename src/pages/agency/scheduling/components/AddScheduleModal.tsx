@@ -313,6 +313,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       clientId: client.id,
       clientLocation: formatLocation(client.location),
       serviceCode: client.services?.[0]?.code || "",
+      assignedDsp: client.primaryDsp?.name || "",
+      assignedDspId: client.primaryDsp?.id || "",
+      billingRate: "", // Billing rate would need to be fetched separately if needed
     }));
     setSelectedClientServices(client.services || []);
     setShowClientDropdown(false);
