@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Loader2, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Loader2, Plus, Trash2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Client, ClientService } from "@/lib/api/clients";
 import { Button } from "@/components/ui/button";
@@ -169,6 +169,10 @@ function ServiceRow({
     onChange({ ...service, [field]: value });
   };
 
+  const handleFieldsChange = (patch: Partial<EditableService>) => {
+    onChange({ ...service, ...patch });
+  };
+
   const displayDate = (value?: Date | null) =>
     value ? format(value, "MMM d, yyyy") : "";
 
@@ -191,8 +195,7 @@ function ServiceRow({
                       (s) => s.name === service.name && s.code === service.code,
                     );
                     if (!stillValid) {
-                      handleFieldChange("name", "");
-                      handleFieldChange("code", "");
+                      handleFieldsChange({ code: "", name: "" });
                     }
                   }}
                   disabled={serviceTypes.length === 0}
@@ -226,13 +229,15 @@ function ServiceRow({
               <p className="text-[12px] font-normal text-[#10141a]">Service</p>
               {isEditing ? (
                 <Select
-                  value={service.name || ""}
+                  value={service.code || ""}
                   onValueChange={(v) => {
                     const selected = filteredServices.find(
-                      (s) => s.name === v,
+                      (s) => s.code === v,
                     );
-                    handleFieldChange("name", v);
-                    handleFieldChange("code", selected?.code || "");
+                    handleFieldsChange({
+                      name: selected?.name || "",
+                      code: selected?.code || "",
+                    });
                   }}
                   disabled={!selectedType || filteredServices.length === 0}
                 >
@@ -249,7 +254,7 @@ function ServiceRow({
                   </SelectTrigger>
                   <SelectContent>
                     {filteredServices.map((svc) => (
-                      <SelectItem key={svc.id} value={svc.name}>
+                      <SelectItem key={svc.id} value={svc.code}>
                         {svc.name} - {svc.code}
                       </SelectItem>
                     ))}
@@ -457,7 +462,7 @@ function ServiceRow({
             </PopoverTrigger>
             <PopoverContent
               align="start"
-              className="mt-3 w-auto border-none bgwhite p-0 shadow-lg"
+              className="mt-3 w-auto border-none bg-white p-0 shadow-lg"
             >
               <Calendar
                 mode="single"
@@ -720,6 +725,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
     mapClientServicesToEditable(client.services),
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offeredServices, setOfferedServices] = useState<ApiService[]>([]);
@@ -782,7 +788,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
       sdrEndDate: null,
     };
 
-    setServices((prev) => [...prev, newService]);
+    setServices((prev) => [newService, ...prev]);
     setIsEditing(true);
   };
 
@@ -796,6 +802,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
     const invalid = services.find((svc) => !svc.name || !svc.code);
     if (invalid) {
       setError("Each service must have a name and code before saving.");
+      setShowErrorModal(true);
       return;
     }
 
@@ -813,6 +820,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
     } catch (err: any) {
       console.error("Failed to update services:", err);
       setError(err?.message || "Failed to update services. Please try again.");
+      setShowErrorModal(true);
     } finally {
       setIsSaving(false);
     }
@@ -870,9 +878,27 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700">
-          {error}
+      {/* Error modal */}
+      {error && showErrorModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-[20px] bg-white shadow-lg p-6 flex flex-col items-center gap-4 text-center">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50">
+              <AlertCircle className="w-7 h-7 text-red-500" />
+            </div>
+            <p className="text-[18px] font-semibold text-[#10141a]">
+              Unable to save services
+            </p>
+            <p className="text-[14px] text-[#4b4b4c]">{error}</p>
+            <div className="mt-2 flex justify-center">
+              <Button
+                type="button"
+                className="h-10 rounded-[60px] px-5 bg-[#00b4b8] text-white hover:bg-[#00a0a4]"
+                onClick={() => setShowErrorModal(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -924,6 +950,23 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
             {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
             Save changes
           </Button>
+        </div>
+      )}
+
+      {/* Saving modal */}
+      {isSaving && (
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/30">
+          <div className="w-full max-w-sm rounded-[20px] bg-white shadow-lg p-6 flex flex-col items-center gap-3 text-center">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#e6f7f7]">
+              <Loader2 className="w-7 h-7 animate-spin text-[#00b4b8]" />
+            </div>
+            <p className="text-[16px] font-medium text-[#10141a]">
+              Saving services...
+            </p>
+            <p className="text-[13px] text-[#808081]">
+              Please wait while we save the updated service details for this client.
+            </p>
+          </div>
         </div>
       )}
     </div>

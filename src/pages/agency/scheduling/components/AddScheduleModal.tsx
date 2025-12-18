@@ -342,6 +342,14 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
   const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
+  const selectedService = useMemo(
+    () =>
+      selectedClientServices.find(
+        (service) => service.code === formData.serviceCode,
+      ) || null,
+    [selectedClientServices, formData.serviceCode],
+  );
+
   const handleDateSelect = (date: Date) => {
     setFormData(prev => ({ ...prev, date }));
     setShowDatePicker(false);
@@ -955,7 +963,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           {/* Service Code */}
           {/* Service Code */}
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Service Code</label>
+            <label className="text-[12px] font-normal text-[#10141a]">Service</label>
             <Select
               value={formData.serviceCode}
               onValueChange={(value) => setFormData((prev) => ({ ...prev, serviceCode: value }))}
@@ -976,6 +984,22 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 ))}
               </SelectContent>
             </Select>
+            {selectedService && (selectedService.rate || selectedService.payType) && (
+              <span className="text-[12px] font-normal text-[#808081]">
+                Service rate:{" "}
+                {selectedService.rate ? `$${selectedService.rate}` : "Not set"}
+                {selectedService.payType &&
+                  ` • ${
+                    selectedService.payType === "hourly"
+                      ? "Hourly"
+                      : selectedService.payType === "15-min"
+                      ? "15 minutes"
+                      : selectedService.payType === "daily"
+                      ? "Daily"
+                      : selectedService.payType
+                  }`}
+              </span>
+            )}
           </div>
 
           {/* Notes Type */}
