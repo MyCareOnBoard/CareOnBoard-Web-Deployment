@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ActivityTab } from "@/pages/agency/client-details/tabs/ActivityTab";
 import { ProfileTab } from "@/pages/agency/client-details/tabs/ProfileTab";
+import { ServicesTab } from "@/pages/agency/client-details/tabs/ServicesTab";
 import { DocumentsTab } from "@/pages/agency/client-details/tabs/DocumentsTab";
 import { UploadClientDocumentModal } from "@/pages/agency/client-details/components/UploadClientDocumentModal";
 import { useAuth } from "@/utils/auth";
 import { getAgencyClientById, type Client, type ClientDocument } from "@/lib/api/clients";
 
-type ClientDetailsTab = "activity" | "profile" | "documents";
+type ClientDetailsTab = "activity" | "profile" | "services" | "documents";
 
 export default function ClientDetailsPage() {
   const { clientId } = useParams();
@@ -255,6 +256,18 @@ export default function ClientDetailsPage() {
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab("services")}
+            className={[
+              "h-[36px] w-[100px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium leading-[1.4] backdrop-blur-[22px] cursor-pointer",
+              activeTab === "services"
+                ? "bg-[#00b4b8] border border-[#00b4b8] text-white"
+                : "border border-[#b2b2b3] text-[#b2b2b3]",
+            ].join(" ")}
+          >
+            Services
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab("documents")}
             className={[
               "h-[36px] w-[100px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium leading-[1.4] backdrop-blur-[22px] cursor-pointer",
@@ -280,6 +293,13 @@ export default function ClientDetailsPage() {
         />
       )}
       {activeTab === "profile" && <ProfileTab client={client} formatDate={formatDate} />}
+      {activeTab === "services" && (
+        <ServicesTab
+          client={client}
+          clientId={clientId || ""}
+          onServicesUpdated={fetchClient}
+        />
+      )}
       {activeTab === "documents" && (
         <DocumentsTab
           client={client}
