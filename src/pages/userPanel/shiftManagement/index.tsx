@@ -671,7 +671,7 @@ export default function ShiftManagementPage() {
 
   const loadShifts = async () => {
     const agencyId = user?.agencyId;
-    const employeeId = user?.id;
+    const employeeId = user?.profile?.id;
 
     if (!agencyId) {
       console.warn('No user ID available for fetching shifts');
