@@ -78,6 +78,7 @@ export async function getUser(): Promise<User> {
 
     // Build profile sub-object from available data
     user.profile = {
+      id: profileSource.id,
       email: profileSource.email || backendUser.email,
       fullName: profileSource.fullName || backendUser.fullName,
       name: profileSource.name || backendUser.displayName,
