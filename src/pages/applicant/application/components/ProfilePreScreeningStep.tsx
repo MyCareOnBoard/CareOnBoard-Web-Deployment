@@ -114,6 +114,8 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
   // Watch date of birth to automatically set isAdult
   const dateOfBirth = form.watch("dateOfBirth");
   const isAtLeast18 = dateOfBirth ? calculateAge(dateOfBirth) >= 18 : false;
+  const ellibility  = form.watch("booleanQuestions.eligibleToWork");
+  const isEligible = ellibility === "Yes";
 
   useEffect(() => {
     if (dateOfBirth) {
@@ -373,7 +375,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                 render={({ field, fieldState }) => (
                   <div className="w-[450px]">
                     <fieldset className="border-0 p-0">
-                      <legend className="mb-1 text-xs font-normal text-[#10141a]">{question.label}</legend>
+                      <legend className="mb-1 text-xs font-normal text-[#10141a]">{question.label}{question.name === "hasTransportation" ? " (Optional)" : ""}</legend>
                       <div className="flex gap-[9px]">
                         <Radio
                           id={`${question.name}-yes`}
@@ -473,10 +475,17 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
               </p>
             </div>
           )}
+          {ellibility && !isEligible && (
+            <div className="mb-4 rounded-md bg-[#fef2f2] border border-[#fecaca] px-4 py-3">
+              <p className="text-sm text-[#dc2626]">
+                You are not eligible to work in the U.S.
+              </p>
+            </div>
+          )}
           <Button 
             type="submit" 
             disabled={!form.formState.isValid || form.formState.isSubmitting || isUploading || isSubmitting || !isAtLeast18}
-            className={(!form.formState.isValid || !isAtLeast18) ? 'bg-[#b2b2b3] backdrop-blur-[22px] hover:bg-[#b2b2b3] active:bg-[#b2b2b3]' : ''}
+            className={(!form.formState.isValid || !isAtLeast18 || !isEligible) ? 'bg-[#b2b2b3] backdrop-blur-[22px] hover:bg-[#b2b2b3] active:bg-[#b2b2b3]' : ''}
           >
             <span>
               {isUploading ? 'Uploading...' : isSubmitting ? 'Submitting...' : 'Next'}
