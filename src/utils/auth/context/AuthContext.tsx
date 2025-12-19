@@ -98,7 +98,6 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
    * Login user with email and password
    */
   const login = async (email: string, password: string) => {
-    console.log('[AuthContext] Login attempt for:', email)
     const response = await loginWithEmail(email, password)
 
     if (!response.success || !response.user) {
@@ -106,14 +105,9 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
       throw new Error(response.error || "Login failed")
     }
 
-    console.log('[AuthContext] Login successful, updating state and Redux')
-    console.log('[AuthContext] User object:', response.user)
-
     // Update local state and Redux
     setUserState(response.user)
     dispatch(setUser(response.user))
-
-    console.log('[AuthContext] User dispatched to Redux')
   }
 
   /**
@@ -125,7 +119,6 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
     fullName: string,
     agencyId?: string
   ) => {
-    console.log('[AuthContext] Signup attempt for:', email)
     const response = await registerWithEmail(fullName, email, password)
 
     if (!response.success || !response.user) {
@@ -133,19 +126,13 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
       throw new Error(response.error || "Registration failed")
     }
 
-    console.log('[AuthContext] Signup successful, updating state and Redux')
-    console.log('[AuthContext] User object:', response.user)
-
     // Update local state and Redux
     setUserState(response.user)
     dispatch(setUser(response.user))
 
-    console.log('[AuthContext] User dispatched to Redux')
-
     // Create user in backend
     try {
       await createBackendUser(fullName, agencyId)
-      console.log('[signup] User created in backend successfully')
     } catch (error: any) {
       console.error('[signup] Failed to create user in backend:', error)
       // Don't throw - Firebase account is already created, just log the error
@@ -158,7 +145,6 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
   const createUser = async (fullName: string) => {
     try {
       await createBackendUser(fullName)
-      console.log('[createUser] User created in backend successfully')
     } catch (error: any) {
       console.error('[createUser] Failed to create user in backend:', error)
       throw error
@@ -169,11 +155,9 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
    * Logout current user
    */
   const logout = async () => {
-    console.log('[AuthContext] Logging out user')
     await logoutUser()
     setUserState(null)
     dispatch(setUser(null))
-    console.log('[AuthContext] User logged out, Redux cleared')
   }
 
   /**

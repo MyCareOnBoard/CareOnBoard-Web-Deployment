@@ -671,6 +671,7 @@ export default function ShiftManagementPage() {
 
   const loadShifts = async () => {
     const agencyId = user?.agencyId;
+    console.log('user', user);
     const employeeId = user?.profile?.id;
 
     if (!agencyId) {
