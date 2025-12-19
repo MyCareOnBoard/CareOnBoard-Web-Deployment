@@ -237,7 +237,7 @@ function ShiftCard({
           ) : (
             <div className="flex flex-col gap-0.5">
               <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
-              <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.location}</p>
+              <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.client?.address}</p>
             </div>
           )}
 
@@ -671,7 +671,6 @@ export default function ShiftManagementPage() {
 
   const loadShifts = async () => {
     const agencyId = user?.agencyId;
-    console.log('user', user);
     const employeeId = user?.profile?.id;
 
     if (!agencyId) {
