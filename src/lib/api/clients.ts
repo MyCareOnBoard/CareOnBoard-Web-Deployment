@@ -4,6 +4,7 @@
  */
 
 import axiosClient from '../axios';
+import { ApiResponse } from '@/lib/api-types';
 
 /**
  * Client interface
@@ -14,39 +15,184 @@ export interface Client {
   id: string;
   firstName?: string;
   lastName?: string;
+  middleName?: string;
+  gender?: string;
   email?: string;
   phone?: string;
-  dateOfBirth?: string;
+  dateOfBirth?: string | { _seconds?: number; _nanoseconds?: number } | Date;
   profileImage?: string;
 
+  // DSP information
+  primaryDsp?: ClientDsp;
+  secondaryDsps?: ClientDsp[];
+
   // Address information
-  location: string;
+  location?: { lat: string; lon: string };
   address?: string;
   city?: string;
   state?: string;
   zipCode?: string;
-
-  // Service information
-  service: string;
-  serviceCode?: string;
+  countyState?: string;
+  primaryAddress?: Address;
+  secondaryAddress?: Address;
+  languagePreference?: string;
+  communicationMethod?: string;
+  medicaidId?: string;
+  dddId?: string;
+  ssn?: string;
+  nursingLevel?: string;
   billingRate?: string;
+  services?: ClientService[];
+  ispOutcomes?: string;
 
-  // Plan of care
-  planOfCare?: {
-    id: string;
-    name: string;
-    url?: string;
-    uploadedAt?: string;
-  };
-  ispOutcome?: string;
+  // Add Client wizard sections (Stage 2–7)
+  guardianInfo?: ClientGuardianInfo;
+  healthcareSafety?: ClientHealthcareSafety;
+  documents?: ClientDocument[];
+  evvVisitConfig?: ClientEvvVisitConfig;
+  goalsAndEmergency?: ClientGoalsAndEmergency;
+  systemAiAndAudit?: ClientSystemAiAndAudit;
 
   // Agency relationship
   agencyId?: string;
 
   // Status and dates
   status?: 'active' | 'inactive' | 'pending' | 'archived';
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: string | { _seconds?: number; _nanoseconds?: number } | Date;
+  updatedAt?: string | { _seconds?: number; _nanoseconds?: number } | Date;
+}
+
+/**
+ * Add Client Wizard Models (Stage 1–7)
+ * These mirror the fields collected in the Add Client flow.
+ * NOTE: Backend support may be incremental; keep fields optional on requests.
+ */
+export interface ClientService {
+  id: string;
+  name: string;
+  code: string;
+  hours?: string;
+  totalApprovedHours?: string;
+  rate?: string;
+  payType?: "hourly" | "15-min" | "daily";
+  ispEffectiveDate?: string;
+  startAuthDate?: string;
+  endAuthDate?: string;
+  pcptDate?: string;
+  sdrStartDate?: string;
+  sdrEndDate?: string;
+}
+
+export interface ClientGuardianInfo {
+  guardianName?: string;
+  guardianRelationship?: string;
+  guardianEmail?: string;
+  guardianPhone?: string;
+  guardianAddress?: string;
+  supportCoordinatorName?: string;
+  supportCoordinatorAgency?: string;
+  supportCoordinatorContact?: string;
+}
+
+export interface ClientHealthcareSafety {
+  medicalConditions?: string;
+  allergies?: string;
+  dietaryRestrictions?: string;
+  seizurePlan?: string;
+  mobilitySupportNeeds?: string;
+  behaviorSupportPlan?: string;
+  communicationNeeds?: string;
+  emergencyProtocols?: string;
+}
+
+export type ClientDocumentKey =
+  | "isp"
+  | "pcpt"
+  | "poc"
+  | "sdr"
+  | "bsp"
+  | "medicalDocs"
+  | "consents";
+
+export interface ClientDocument {
+  key: ClientDocumentKey;
+  title?: string;
+  fileName?: string;
+  url?: string;
+  issuedOnDate?: string;
+  expiryDate?: string;
+  autoReminder?: boolean;
+}
+
+/**
+ * Upload response for client document files
+ */
+export interface ClientDocumentUploadResult {
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  url: string;
+  storagePath: string;
+  uploadedAt: string;
+}
+
+export type ClientYesNo = "yes" | "no" | "";
+
+export interface ClientEvvVisitConfig {
+  evvRequirement?: ClientYesNo;
+  primaryVisitLocationGps?: ClientYesNo;
+  allowedSecondaryLocations?: ClientYesNo;
+  minShiftLength?: string;
+  maxShiftLength?: string;
+  backToBackAllowed?: ClientYesNo;
+  travelTimeAllowed?: ClientYesNo;
+}
+
+export type ClientAutoCheckKey = "compliance" | "training" | "background" | "expired";
+
+/**
+ * DSP (Direct Support Professional) interface
+ * Represents a DSP assigned to a client
+ */
+export interface ClientDsp {
+  id: string;
+  name: string;
+}
+
+export interface ClientGoalsAndEmergency {
+  // Goals
+  clientGoals?: string;
+  communityGoals?: string;
+  dailyLivingGoals?: string;
+  behavioralGoals?: string;
+  skillBuildingGoals?: string;
+  ispOutcomes?: string;
+  targetBehaviors?: string;
+  supportStrategies?: string;
+
+  // Emergency
+  emergencyName?: string;
+  emergencyRelationship?: string;
+  primaryPhone?: string;
+  secondaryPhone?: string;
+  hospitalPreference?: string;
+  emergencyProtocol?: string;
+  medicationList?: string;
+}
+
+export type ClientAuditCycle = "monthly" | "quarterly";
+
+export interface ClientSystemAiAndAudit {
+  aiNotesReview?: boolean;
+  aiPlanOfCareBuilder?: boolean;
+  aiGoalTracking?: boolean;
+  expiringDocsReminder?: boolean;
+  renewalsReminder?: boolean;
+  auditCycle?: ClientAuditCycle;
+  assignedQaStaff?: string;
+  requiredVisitDocumentation?: string;
+  notesReviewRules?: string;
+  billingValidationRules?: string;
 }
 
 /**
@@ -57,6 +203,21 @@ export interface ListClientsResponse {
   clients: Client[];
   total: number;
   count: number;
+}
+
+/**
+ * List Agency Clients Response (new format)
+ */
+export interface ListAgencyClientsResponse {
+  success: boolean,
+  count: number;
+  agencyId: string;
+  clients: Client[];
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+  }
 }
 
 /**
@@ -97,23 +258,117 @@ export interface ListClientsParams {
   limit?: number;
 }
 
+export interface Address {
+  address?: string;
+  location?: { lat: string; lon: string };
+  countyState?: string;
+  zipCode?: string;
+}
+
 /**
  * Create Client Request
  */
 export interface CreateClientRequest {
   firstName?: string;
   lastName?: string;
+  middleName?: string;
+  gender?: string;
   email?: string;
   phone?: string;
   dateOfBirth?: string;
-  location: string;
+  location?: { lat: string; lon: string };
   address?: string;
   city?: string;
   state?: string;
   zipCode?: string;
-  service: string;
+  countyState?: string;
+  primaryAddress?: Address;
+  secondaryAddress?: Address;
+  languagePreference?: string;
+  communicationMethod?: string;
+  medicaidId?: string;
+  dddId?: string;
+  ssn?: string;
+  nursingLevel?: string;
+  service?: string;
   serviceCode?: string;
   billingRate?: string;
+  services?: ClientService[];
+
+  /**
+   * Flattened wizard fields (Stage 2–7)
+   * (Preferred for create/update payloads; stored as top-level fields in Firestore)
+   */
+  guardianName?: string;
+  guardianRelationship?: string;
+  guardianEmail?: string;
+  guardianPhone?: string;
+  guardianAddress?: string;
+  supportCoordinatorName?: string;
+  supportCoordinatorAgency?: string;
+  supportCoordinatorContact?: string;
+
+  medicalConditions?: string;
+  allergies?: string;
+  dietaryRestrictions?: string;
+  seizurePlan?: string;
+  mobilitySupportNeeds?: string;
+  behaviorSupportPlan?: string;
+  communicationNeeds?: string;
+  emergencyProtocols?: string;
+
+  evvRequirement?: ClientYesNo;
+  primaryVisitLocationGps?: ClientYesNo;
+  allowedSecondaryLocations?: ClientYesNo;
+  minShiftLength?: string;
+  maxShiftLength?: string;
+  backToBackAllowed?: ClientYesNo;
+  travelTimeAllowed?: ClientYesNo;
+
+  primaryDsp?: ClientDsp;
+  secondaryDsps?: ClientDsp[];
+  genderPreference?: string;
+  requiredCertifications?: string;
+  specialConditions?: string;
+  prefersFamiliar?: ClientYesNo;
+  noMaleFemaleStaff?: ClientYesNo;
+  medicalRestrictionsTrained?: ClientYesNo;
+  autoChecks?: Record<ClientAutoCheckKey, boolean>;
+
+  clientGoals?: string;
+  communityGoals?: string;
+  dailyLivingGoals?: string;
+  behavioralGoals?: string;
+  skillBuildingGoals?: string;
+  ispOutcomes?: string;
+  targetBehaviors?: string;
+  supportStrategies?: string;
+
+  emergencyName?: string;
+  emergencyRelationship?: string;
+  primaryPhone?: string;
+  secondaryPhone?: string;
+  hospitalPreference?: string;
+  emergencyProtocol?: string;
+  medicationList?: string;
+
+  aiNotesReview?: boolean;
+  aiPlanOfCareBuilder?: boolean;
+  aiGoalTracking?: boolean;
+  expiringDocsReminder?: boolean;
+  renewalsReminder?: boolean;
+  auditCycle?: ClientAuditCycle;
+  assignedQaStaff?: string;
+  requiredVisitDocumentation?: string;
+  notesReviewRules?: string;
+  billingValidationRules?: string;
+  guardianInfo?: ClientGuardianInfo;
+  healthcareSafety?: ClientHealthcareSafety;
+  documents?: ClientDocument[];
+  evvVisitConfig?: ClientEvvVisitConfig;
+
+  goalsAndEmergency?: ClientGoalsAndEmergency;
+  systemAiAndAudit?: ClientSystemAiAndAudit;
   agencyId?: string; // Required for employees, defaults to own agencyId for agencies
 }
 
@@ -123,17 +378,90 @@ export interface CreateClientRequest {
 export interface UpdateClientRequest {
   firstName?: string;
   lastName?: string;
+  middleName?: string;
+  gender?: string;
   email?: string;
   phone?: string;
   dateOfBirth?: string;
-  location?: string;
+  location?: { lat: string; lon: string };
   address?: string;
   city?: string;
   state?: string;
   zipCode?: string;
+  countyState?: string;
+  languagePreference?: string;
+  communicationMethod?: string;
+  medicaidId?: string;
+  dddId?: string;
+  ssn?: string;
+  nursingLevel?: string;
   service?: string;
   serviceCode?: string;
   billingRate?: string;
+  services?: ClientService[];
+  guardianName?: string | null;
+  guardianRelationship?: string | null;
+  guardianEmail?: string | null;
+  guardianPhone?: string | null;
+  guardianAddress?: string | null;
+  supportCoordinatorName?: string | null;
+  supportCoordinatorAgency?: string | null;
+  supportCoordinatorContact?: string | null;
+  medicalConditions?: string | null;
+  allergies?: string | null;
+  dietaryRestrictions?: string | null;
+  seizurePlan?: string | null;
+  mobilitySupportNeeds?: string | null;
+  behaviorSupportPlan?: string | null;
+  communicationNeeds?: string | null;
+  emergencyProtocols?: string | null;
+  evvRequirement?: ClientYesNo | null;
+  primaryVisitLocationGps?: ClientYesNo | null;
+  allowedSecondaryLocations?: ClientYesNo | null;
+  minShiftLength?: string | null;
+  maxShiftLength?: string | null;
+  backToBackAllowed?: ClientYesNo | null;
+  travelTimeAllowed?: ClientYesNo | null;
+  primaryDsp?: ClientDsp | null;
+  secondaryDsps?: ClientDsp[] | null;
+  genderPreference?: string | null;
+  requiredCertifications?: string | null;
+  specialConditions?: string | null;
+  prefersFamiliar?: ClientYesNo | null;
+  noMaleFemaleStaff?: ClientYesNo | null;
+  medicalRestrictionsTrained?: ClientYesNo | null;
+  autoChecks?: Record<ClientAutoCheckKey, boolean> | null;
+  clientGoals?: string | null;
+  communityGoals?: string | null;
+  dailyLivingGoals?: string | null;
+  behavioralGoals?: string | null;
+  skillBuildingGoals?: string | null;
+  ispOutcomes?: string | null;
+  targetBehaviors?: string | null;
+  supportStrategies?: string | null;
+  emergencyName?: string | null;
+  emergencyRelationship?: string | null;
+  primaryPhone?: string | null;
+  secondaryPhone?: string | null;
+  hospitalPreference?: string | null;
+  emergencyProtocol?: string | null;
+  medicationList?: string | null;
+  aiNotesReview?: boolean | null;
+  aiPlanOfCareBuilder?: boolean | null;
+  aiGoalTracking?: boolean | null;
+  expiringDocsReminder?: boolean | null;
+  renewalsReminder?: boolean | null;
+  auditCycle?: ClientAuditCycle | null;
+  assignedQaStaff?: string | null;
+  requiredVisitDocumentation?: string | null;
+  notesReviewRules?: string | null;
+  billingValidationRules?: string | null;
+  guardianInfo?: ClientGuardianInfo | null;
+  healthcareSafety?: ClientHealthcareSafety | null;
+  documents?: ClientDocument[] | null;
+  evvVisitConfig?: ClientEvvVisitConfig | null;
+  goalsAndEmergency?: ClientGoalsAndEmergency | null;
+  systemAiAndAudit?: ClientSystemAiAndAudit | null;
   status?: 'active' | 'inactive' | 'pending' | 'archived';
 }
 
@@ -149,23 +477,96 @@ export interface SeedClientsRequest {
 }
 
 /**
- * ✅ Create a new client
- * Endpoint: POST /clients
+ * ✅ Create a new agency client
+ * Endpoint: POST /clientManagement
  * Agencies default to their own agencyId
  * Employees must supply agencyId
  */
-export async function createClient(data: CreateClientRequest): Promise<Client> {
+export async function createAgencyClient(data: CreateClientRequest): Promise<Client> {
   try {
-    const response = await axiosClient.post<{ success: boolean; data: Client }>('/clients', data);
+    const response = await axiosClient.post<ApiResponse<Client>>('/clientManagement', data);
+    return response.data.data;
+  } catch (error) {
+    console.error('Failed to create client for agency:', error);
+    throw error;
+  }
+}
+
+/**
+ * ✅ List agency clients
+ * Endpoint: GET /clientManagement
+ * Query params: agencyId (required for employees), status, service, search, limit
+ */
+export async function listAgencyClients(params?: ListClientsParams): Promise<Client[]> {
+  try {
+    const response = await axiosClient.get<ListAgencyClientsResponse>('/clientManagement', {
+      params: {
+        agencyId: params?.agencyId,
+        status: params?.status,
+        service: params?.service,
+        search: params?.search,
+        limit: params?.limit,
+      }
+    });
 
     if (!response.data.success) {
-      throw new Error('Failed to create client');
+      throw new Error('Failed to fetch clients');
+    }
+
+    return response.data.clients || [];
+  } catch (error) {
+    console.error('Failed to fetch clients:', error);
+    throw error;
+  }
+}
+
+/**
+ * ✅ Upload a single client document file
+ * Endpoint: POST /clientManagement/uploads/:documentType?clientId={clientId}
+ */
+export async function uploadClientDocument(
+  clientId: string,
+  documentType: string,
+  file: File,
+): Promise<ClientDocumentUploadResult> {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await axiosClient.post<ApiResponse<ClientDocumentUploadResult>>(
+      `/clientManagement/uploads/${encodeURIComponent(documentType)}`,
+      formData,
+      {
+        params: { clientId },
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+
+    if (!response.data.success) {
+      throw new Error('Failed to upload client document');
     }
 
     return response.data.data;
-  } catch (err: any) {
-    console.error('createClient error:', err);
-    throw new Error(err.message || 'Failed to create client');
+  } catch (error) {
+    console.error("Failed to upload client document:", error);
+    throw error;
+  }
+}
+
+/**
+ * ✅ Get a single client by ID
+ * Endpoint: GET /clientManagement/:clientId
+ * Employees must supply agencyId via query parameter
+ */
+export async function getAgencyClientById(clientId: string): Promise<Client> {
+  try {
+    const response = await axiosClient.get<ApiResponse<Client>>(`/clientManagement/${clientId}`);
+    return response.data.data;
+  } catch (error) {
+    console.error(`Failed to fetch client ${clientId}:`, error);
+    throw error;
   }
 }
 

@@ -2,7 +2,6 @@
 import axiosClient from '../axios';
 import { User } from '@/utils/auth/types/user.types';
 import { UserType } from '@/utils/auth/types/user.types';
-import { seedAgency } from './agencies';
 
 /**
  * API Response wrapper for user data
@@ -66,16 +65,20 @@ export async function getUser(): Promise<User> {
       createdAt: backendUser.createdAt,
       updatedAt: backendUser.updatedAt,
       agencyId: backendUser.agencyId,
-      
+
       // Profile data goes ONLY in profile sub-object
-      profile: {}
+      profile: {},
+
+      // Agency data goes ONLY in agency sub-object
+      agency: {},
     };
 
     // Extract profile data from backend response
     const profileSource = backendUser.profile || backendUser;
-    
+
     // Build profile sub-object from available data
     user.profile = {
+      id: profileSource.id,
       email: profileSource.email || backendUser.email,
       fullName: profileSource.fullName || backendUser.fullName,
       name: profileSource.name || backendUser.displayName,
@@ -88,27 +91,21 @@ export async function getUser(): Promise<User> {
       dateOfBirth: profileSource.dateOfBirth,
       profilePicture: profileSource.profilePicture || profileSource.photo || profileSource.photoURL,
       professionalSummary: profileSource.professionalSummary || profileSource.summary,
+      workAvailability: profileSource.workAvailability,
+      tagId: profileSource.tagId,
     };
 
-    // Load agency data for agency users if needed
-    if (user.userType === UserType.AGENCY && !user.agencyId) {
-      try {
-        const agency = await seedAgency();
-        user.agencyId = agency.id;
-        // Update profile with agency details
-        user.profile = {
-          ...user.profile,
-          name: agency.name,
-          email: agency.email,
-          phoneNumber: agency.phone,
-          address: agency.address,
-          city: agency.city,
-          state: agency.state,
-          zipCode: agency.zipCode
-        };
-      } catch (error: any) {
-        console.error('Failed to seed agency:', error);
-      }
+    // Add agency details if user is an employee
+    if (user.userType === UserType.EMPLOYEE) {
+      user.agency = {
+        id: backendUser.agencyId,
+        name: backendUser.agency.name,
+        email: backendUser.agency.email,
+        phone: backendUser.agency.phone,
+        address: backendUser.agency.address,
+        city: backendUser.agency.city,
+        state: backendUser.agency.state,
+      };
     }
 
     return user;

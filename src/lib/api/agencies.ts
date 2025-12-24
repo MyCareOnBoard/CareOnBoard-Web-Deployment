@@ -28,6 +28,7 @@ export interface Agency {
     taxId?: string;
     npi?: string;
     licenseNumber?: string;
+    primaryColor?: string;
 
     // Status and timestamps
     status: 'active' | 'inactive' | 'pending' | 'suspended';
@@ -239,6 +240,69 @@ export async function seedAgency(params?: SeedAgencyRequest): Promise<Agency> {
     } catch (err: any) {
         console.error('seedAgency error:', err);
         throw new Error(err.message || 'Failed to seed agency');
+    }
+}
+
+/**
+ * Staff interface
+ * Represents agency staff (different from employees/DSPs)
+ */
+export interface Staff {
+    id: string;
+    uid?: string; // Links to the user account (optional)
+    email?: string;
+    fullName?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    dateOfBirth?: string;
+    gender?: "Male" | "Female" | "Other" | string;
+    profilePicture?: string;
+    agencyId: string;
+    role?: string;
+    status?: 'active' | 'inactive' | 'pending' | 'suspended';
+    createdAt?: string;
+    updatedAt?: string;
+    // Optional user profile reference
+    user?: User;
+    // Allow additional fields
+    [key: string]: any;
+}
+
+/**
+ * Agency Staff Response
+ */
+export interface AgencyStaffResponse {
+    success: boolean;
+    data: Staff[];
+}
+
+/**
+ * ✅ Get all staff for an agency
+ * Endpoint: GET /agencies/staff
+ * Query params: agencyId (required)
+ * Returns array of staff belonging to the agency
+ */
+export async function getAgencyStaff(agencyId: string): Promise<Staff[]> {
+    try {
+        const response = await axiosClient.get<AgencyStaffResponse>('/agencies/staff', {
+            params: {
+                agencyId,
+            },
+        });
+
+        if (!response.data.success) {
+            throw new Error('Failed to fetch agency staff');
+        }
+
+        return response.data.data || [];
+    } catch (err: any) {
+        console.error('getAgencyStaff error:', err);
+        throw new Error(err.message || 'Failed to fetch agency staff');
     }
 }
 

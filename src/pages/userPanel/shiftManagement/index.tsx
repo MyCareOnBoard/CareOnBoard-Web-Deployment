@@ -237,7 +237,7 @@ function ShiftCard({
           ) : (
             <div className="flex flex-col gap-0.5">
               <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
-              <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.location}</p>
+              <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.client?.address}</p>
             </div>
           )}
 
@@ -360,7 +360,7 @@ function ShiftCard({
             />
           )}
           <AvatarFallback
-            className="w-full h-full rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-bold">
+            className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-bold">
             {getInitialsFromName(getClientName(shift.client))}
           </AvatarFallback>
         </Avatar>
@@ -671,7 +671,7 @@ export default function ShiftManagementPage() {
 
   const loadShifts = async () => {
     const agencyId = user?.agencyId;
-    const employeeId = user?.id;
+    const employeeId = user?.profile?.id;
 
     if (!agencyId) {
       console.warn('No user ID available for fetching shifts');

@@ -7,6 +7,7 @@ export interface BillingRecord {
   client: Client;
   employee: Employee;
   servicesOffered: string;
+  serviceCode: string;
   totalHours: number;
   payRate: number;
   billingStatus?: 'pending' | 'approved' | 'rejected';

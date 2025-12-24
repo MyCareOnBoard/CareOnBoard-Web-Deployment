@@ -36,7 +36,9 @@ import SupportedEmploymentPrePage from "@/pages/userPanel/notes/supported-employ
 import Expenses from "@/pages/userPanel/expenses";
 import AgencyDashboardPage from "@/pages/agency/dashboard";
 import DSPManagementPage from "@/pages/agency/dsp-management";
-import ClientsPage from "@/pages/agency/clients";
+import ClientsPage from "@/pages/agency/clients-management";
+import ClientDetailsPage from "@/pages/agency/client-details";
+import AddClientPage from "@/pages/agency/add-client";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import ClientClaimsPage from "@/pages/agency/billing-and-approvals/client-claims";
 import SchedulingPage from "@/pages/agency/scheduling";
@@ -54,7 +56,10 @@ import NotesPage from "@/pages/userPanel/notes";
 import AgencyNotesPage from "@/pages/agency/notes";
 import SuperAdminLayout from "@/layouts/SuperAdminLayout";
 import AgenciesPage from "@/pages/super-admin/agencies";
+import AddAgencyWizard from "@/pages/super-admin/agencies/AddAgencyWizard";
+import SavedAgencies from "@/pages/super-admin/agencies/SavedAgencies";
 import DSPClaimsPage from "@/pages/agency/billing-and-approvals/dsp-info";
+import SuperAdminDashboard from "@/pages/super-admin/dashboard";
 
 
 export const router = createBrowserRouter([
@@ -153,6 +158,14 @@ export const router = createBrowserRouter([
         Component: ClientsPage,
       },
       {
+        path: Routes.agency.addClient,
+        Component: AddClientPage,
+      },
+      {
+        path: Routes.agency.clientDetails,
+        Component: ClientDetailsPage,
+      },
+      {
         path: Routes.agency.billingAndApprovals,
         Component: BillingAndApprovalsPage,
       },
@@ -173,7 +186,11 @@ export const router = createBrowserRouter([
         Component: ShiftsListPage,
       },
       {
-        path: Routes.agency.approvals,
+        path: Routes.agency.support,
+        Component: SupportPage,
+      },
+      {
+      path: Routes.agency.approvals,
         Component: ApprovalsPage,
       },
       {
@@ -307,8 +324,20 @@ export const router = createBrowserRouter([
     Component: SuperAdminLayout,
     children: [
       {
+        path: Routes.superAdmin.dashboard,
+        Component: SuperAdminDashboard,
+      },
+      {
         path: Routes.superAdmin.agencies,
         Component: AgenciesPage,
+      },
+      {
+        path: Routes.superAdmin.addAgency,
+        Component: AddAgencyWizard,
+      },
+      {
+        path: Routes.superAdmin.savedAgencies,
+        Component: SavedAgencies,
       },
     ],
   },

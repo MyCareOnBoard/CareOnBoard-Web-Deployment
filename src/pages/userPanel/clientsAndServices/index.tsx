@@ -68,6 +68,39 @@ export default function ClientsAndServicesPage() {
       .slice(0, 2);
   };
 
+  const formatDate = (dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): string => {
+    if (!dateValue) return '-';
+    
+    try {
+      let date: Date;
+      
+      // Handle Firestore Timestamp object
+      if (typeof dateValue === 'object' && '_seconds' in dateValue && dateValue._seconds) {
+        date = new Date(dateValue._seconds * 1000);
+      }
+      // Handle Date object
+      else if (dateValue instanceof Date) {
+        date = dateValue;
+      }
+      // Handle ISO string
+      else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
+      }
+      else {
+        return '-';
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return '-';
+      }
+      
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch {
+      return '-';
+    }
+  };
+
   const handleAccept = (client: Client) => {
     setAcceptedClientName(getClientName(client));
     setShowAcceptModal(true);
@@ -195,7 +228,7 @@ export default function ClientsAndServicesPage() {
                       <div>
                         <p className="text-xs text-gray-500 mb-0.5">Date</p>
                         <p className="text-sm text-gray-900">
-                          {client.createdAt ? new Date(client.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
+                          {formatDate(client.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -204,7 +237,11 @@ export default function ClientsAndServicesPage() {
                     <div className="col-span-2 flex items-center">
                       <div>
                         <p className="text-xs text-gray-500 mb-0.5">Location</p>
-                        <p className="text-sm text-gray-900">{client.location}</p>
+                        <p className="text-sm text-gray-900">
+                          {typeof client.location === "object" && client.location
+                            ? `${client.location.lat}, ${client.location.lon}`
+                            : client.location || "-"}
+                        </p>
                       </div>
                     </div>
 
@@ -212,14 +249,14 @@ export default function ClientsAndServicesPage() {
                     <div className="col-span-2 flex items-center">
                       <div>
                         <p className="text-xs text-gray-500 mb-0.5">Service</p>
-                        <p className="text-sm text-gray-900">{client.service}</p>
+                        <p className="text-sm text-gray-900">{client.services?.[0]?.name || 'N/A'}</p>
                       </div>
                     </div>
 
                     {/* Service Code */}
                     <div className="col-span-2 flex items-center">
                       <span className="inline-flex items-center px-3 py-1 rounded-md bg-gray-200 text-gray-700 text-xs font-medium">
-                        {client.serviceCode || client.service}
+                        {client.services?.[0]?.code || client.services?.[0]?.name || 'N/A'}
                       </span>
                     </div>
 
@@ -294,7 +331,11 @@ export default function ClientsAndServicesPage() {
                       <div className="col-span-3 flex items-center">
                         <div>
                           <p className="text-xs text-gray-500 mb-0.5">Location</p>
-                          <p className="text-sm text-gray-900">{client.location}</p>
+                          <p className="text-sm text-gray-900">
+                            {typeof client.location === "object" && client.location
+                              ? `${client.location.lat}, ${client.location.lon}`
+                              : client.location || "-"}
+                          </p>
                         </div>
                       </div>
 
@@ -302,7 +343,7 @@ export default function ClientsAndServicesPage() {
                       <div className="col-span-3 flex items-center">
                         <div>
                           <p className="text-xs text-gray-500 mb-0.5">Service</p>
-                          <p className="text-sm text-gray-900">{client.service}</p>
+                          <p className="text-sm text-gray-900">{client.services?.[0]?.name || 'N/A'}</p>
                         </div>
                       </div>
 

@@ -1,35 +1,35 @@
 import { useState } from "react";
-import { DSP, ScheduleForm } from "./types";
-import { MOCK_DSPS, MOCK_SHIFTS, MOCK_DOCUMENTS } from "./mockData";
+import { DSP } from "./types";
+import { useDSPList } from "./useDSPManagement";
 import { DSPList } from "./DSPList";
 import { DSPProfile } from "./DSPProfile";
 import { ChatModal, MessageSentModal } from "./ChatModal";
-import { ScheduleModal, ScheduleSuccessModal } from "./ScheduleModal";
+import AddScheduleModal from "@/pages/agency/scheduling/components/AddScheduleModal";
 
 export default function DSPManagementPage() {
   const [selectedDsp, setSelectedDsp] = useState<DSP | null>(null);
-  const [dsps] = useState<DSP[]>(MOCK_DSPS);
-  const [shifts] = useState(MOCK_SHIFTS);
-  const [documents] = useState(MOCK_DOCUMENTS);
   const [showChatModal, setShowChatModal] = useState(false);
   const [showMessageSentModal, setShowMessageSentModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [showScheduleSuccessModal, setShowScheduleSuccessModal] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState<ScheduleForm | null>(null);
 
-  const handleScheduleSuccess = (form: ScheduleForm) => {
-    setScheduleForm(form);
-    setShowScheduleModal(false);
-    setShowScheduleSuccessModal(true);
-    setTimeout(() => {
-      setShowScheduleSuccessModal(false);
-    }, 3000);
-  };
+  // Fetch DSPs from API
+  const { dsps, stats, isLoading, error } = useDSPList();
 
   const handleChatSuccess = () => {
     setShowMessageSentModal(true);
     setTimeout(() => setShowMessageSentModal(false), 2000);
   };
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Failed to load DSPs</p>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -50,12 +50,15 @@ export default function DSPManagementPage() {
 
         {/* DSP List or Profile */}
         {!selectedDsp ? (
-          <DSPList dsps={dsps} onSelectDsp={setSelectedDsp} />
+          <DSPList 
+            dsps={dsps} 
+            stats={stats}
+            isLoading={isLoading}
+            onSelectDsp={setSelectedDsp} 
+          />
         ) : (
           <DSPProfile
             dsp={selectedDsp}
-            shifts={shifts}
-            documents={documents}
             onBack={() => setSelectedDsp(null)}
             onChatClick={() => setShowChatModal(true)}
           />
@@ -78,17 +81,9 @@ export default function DSPManagementPage() {
             onClose={() => setShowMessageSentModal(false)}
           />
 
-          <ScheduleModal
-            dsp={selectedDsp}
+          <AddScheduleModal
             isOpen={showScheduleModal}
             onClose={() => setShowScheduleModal(false)}
-            onSuccess={handleScheduleSuccess}
-          />
-
-          <ScheduleSuccessModal
-            clientName={scheduleForm?.client?.name || ""}
-            isOpen={showScheduleSuccessModal}
-            onClose={() => setShowScheduleSuccessModal(false)}
           />
         </>
       )}

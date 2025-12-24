@@ -5,6 +5,7 @@
 
 function getApiUrl(path: string): string {
   const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+  const prefix = ''
   
   // Remove leading slash from path if present
   const cleanPath = path.startsWith('/') ? path : `/${path}`

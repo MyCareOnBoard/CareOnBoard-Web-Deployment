@@ -12,6 +12,7 @@ export interface GetEmployeeDocumentsResponse {
 export interface SaveEmployeeDocumentPayload {
   fileUrl: string;
   documentType: string;
+  expiryDate: string | null;
 }
 
 export interface GetEmployeeInfoResponse {

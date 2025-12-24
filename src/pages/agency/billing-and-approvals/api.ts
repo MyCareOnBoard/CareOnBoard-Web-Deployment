@@ -7,12 +7,14 @@ export interface EmployeeWithHours extends Employee {
   totalHours?: number;
   totalAmount?: number;
   shiftCount?: number;
+  serviceCode?: string;
 }
 
 export interface ClientWithHours extends Client {
   totalHours?: number;
   totalAmount?: number;
   shiftCount?: number;
+  serviceCode?: string;
 }
 
 export interface BillingRecord {
@@ -35,6 +37,7 @@ export interface BillingRecordGrouped extends BillingRecord {
   shifts?: BillingRecord[];
   totalAmount?: number;
   shiftCount?: number;
+  serviceCode?: string;
 }
 
 export interface ListBillingRecordsParams {
@@ -83,6 +86,12 @@ export interface ServiceLog {
   billingRate?: number;
 }
 
+export interface ServiceLogGroup {
+  serviceCode: string;
+  service: string;
+  logs: ServiceLog[];
+}
+
 export interface DspNote {
   id: string;
   employeeName?: string;
@@ -98,6 +107,8 @@ export interface ClientService {
     id: string;
     fullName: string;
     profileImage?: string;
+    billingRate?: string;
+    serviceCode?: string;
   } | null;
   date: string;
   clockedIn: string;
@@ -109,6 +120,17 @@ export interface ClientService {
   serviceCode?: string;
   payRate?: number;
   shiftPeriod: string;
+}
+
+export interface ClientServiceGroup {
+  client: {
+    id: string;
+    fullName: string;
+    profileImage?: string;
+  } | null;
+  serviceCode: string;
+  service: string;
+  services: ClientService[];
 }
 
 export interface ClientClaimsData {
@@ -127,7 +149,7 @@ export interface ClientClaimsData {
     billingRate?: number;
     status?: string;
   };
-  serviceLogs: ServiceLog[];
+  serviceLogsGrouped: ServiceLogGroup[];
   billingSummary: {
     totalHoursWorked: number;
     totalUnits: number;
@@ -140,6 +162,32 @@ export interface ClientClaimsData {
 export interface ClientClaimsResponse {
   success: boolean;
   data: ClientClaimsData;
+}
+
+export interface MileageRecord {
+  id: string;
+  clientId: string;
+  clientName: string;
+  location: string;
+  scheduledStartTime: any;
+  estimatedDistance: number;
+  actualDistance: number;
+  status: string;
+  startedAt: any;
+  completedAt: any;
+}
+
+export interface ExpenseRecord {
+  id: string;
+  receiptUrl: string;
+  message: string;
+  amount: number;
+  category?: string;
+  date: string;
+  status: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  employeeName?: string;
 }
 
 export interface DspClaimsData {
@@ -155,7 +203,7 @@ export interface DspClaimsData {
     role?: string;
     status?: string;
   };
-  clientServices: ClientService[];
+  clientServicesGrouped: ClientServiceGroup[];
   billingSummary: {
     totalHoursWorked: number;
     totalUnits: number;
@@ -165,7 +213,10 @@ export interface DspClaimsData {
     totalExpenses: number;
     totalAmount: number;
   };
-  dspNotes: DspNote[];
+  mileageRecords: MileageRecord[];
+  expenseRecords: ExpenseRecord[];
+  pendingExpenses: ExpenseRecord[];
+  dspNotes?: DspNote[];
 }
 
 export interface DspClaimsResponse {
@@ -187,7 +238,7 @@ export const billingApi = createApi({
         params.append('limit', limit.toString());
         params.append('page', page.toString());
         params.append('groupBy', groupBy);
-        
+
         return {
           url: `/billing?${params.toString()}`,
           method: "GET",
@@ -204,9 +255,9 @@ export const billingApi = createApi({
         requiresAuth: true
       })
     }),
-    getClientClaims: builder.query<ClientClaimsResponse, { clientId: string; agencyId: string }>({
-      query: ({ clientId, agencyId }) => ({
-        url: `/billing/client/${clientId}?agencyId=${agencyId}`,
+    getClientClaims: builder.query<ClientClaimsResponse, { clientId: string; agencyId: string; serviceCode?: string }>({
+      query: ({ clientId, agencyId, serviceCode }) => ({
+        url: `/billing/client/${clientId}?agencyId=${agencyId}${serviceCode ? `&serviceCode=${serviceCode}` : ''}`,
         method: "GET",
         requiresAuth: true
       }),
@@ -219,6 +270,22 @@ export const billingApi = createApi({
         requiresAuth: true
       }),
       providesTags: ['BillingRecords']
+    }),
+    approveExpense: builder.mutation<{ success: boolean; message: string; data: { id: string; status: string } }, { expenseId: string; agencyId: string }>({
+      query: ({ expenseId, agencyId }) => ({
+        url: `/billing/expenses/${expenseId}/approve?agencyId=${agencyId}`,
+        method: "POST",
+        requiresAuth: true
+      }),
+      invalidatesTags: ['BillingRecords']
+    }),
+    rejectExpense: builder.mutation<{ success: boolean; message: string; data: { id: string; status: string } }, { expenseId: string; agencyId: string; reviewerNotes?: string }>({
+      query: ({ expenseId, agencyId, reviewerNotes }) => ({
+        url: `/billing/expenses/${expenseId}/reject?agencyId=${agencyId}${reviewerNotes ? `&reviewerNotes=${encodeURIComponent(reviewerNotes)}` : ''}`,
+        method: "POST",
+        requiresAuth: true
+      }),
+      invalidatesTags: ['BillingRecords']
     })
   }),
 });
@@ -228,4 +295,6 @@ export const {
   useGenerateReportMutation,
   useGetClientClaimsQuery,
   useGetDspClaimsQuery,
+  useApproveExpenseMutation,
+  useRejectExpenseMutation,
 } = billingApi;

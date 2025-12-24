@@ -103,8 +103,6 @@ export const checkProfileStatus = checkUserStatus;
  */
 export async function getOnboardingStatus(): Promise<OnboardingStatus> {
     try {
-        console.log('🔄 [Onboarding] Fetching onboarding status...')
-
         // Get user data which includes onboardingCompleted field
         const user = await getUser()
 

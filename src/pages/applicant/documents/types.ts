@@ -1,3 +1,4 @@
+import {ApplicantDocumentFileUploadedInfo} from "@/pages/applicant/application/components/DocumentUploadStep";
 
 
 export interface UserDocsResponse {
@@ -5,61 +6,61 @@ export interface UserDocsResponse {
   documents: {
     resume: {
       label: string;
-      url: string;
+      url: ApplicantDocumentFileUploadedInfo;
       uploaded: boolean;
       uploadedAt: string;
     };
     photoId: {
       label: string;
-      url: string;
+      url: ApplicantDocumentFileUploadedInfo;
       uploaded: boolean;
       uploadedAt: string;
     };
     socialSecurityCard: {
       label: string;
-      url: string;
+      url: ApplicantDocumentFileUploadedInfo;
       uploaded: boolean;
       uploadedAt: string;
     };
     diploma: {
       label: string;
-      url: string;
+      url: ApplicantDocumentFileUploadedInfo;
       uploaded: boolean;
       uploadedAt: string;
     };
     certifications: {
       label: string;
-      url: string;
+      url: ApplicantDocumentFileUploadedInfo;
       uploaded: boolean;
       uploadedAt: string;
     };
     hepatitisBVaccination: {
       label: string;
-      url: string;
+      url: ApplicantDocumentFileUploadedInfo;
       uploaded: boolean;
       uploadedAt: string;
     };
     hepatitisBImmunity: {
       label: string;
-      url: string;
+      url: ApplicantDocumentFileUploadedInfo;
       uploaded: boolean;
       uploadedAt: string;
     };
     tbTest: {
       label: string;
-      url: string;
+      url: ApplicantDocumentFileUploadedInfo;
       uploaded: boolean;
       uploadedAt: string;
     };
     i9Form: {
       label: string;
-      url: string;
+      url: ApplicantDocumentFileUploadedInfo;
       uploaded: boolean;
       uploadedAt: string;
     };
     w4Form: {
       label: string;
-      url: string;
+      url: ApplicantDocumentFileUploadedInfo;
       uploaded: boolean;
       uploadedAt: string;
     };

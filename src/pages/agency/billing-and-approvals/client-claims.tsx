@@ -1,21 +1,23 @@
-import React, {useState} from "react";
+import React, {useState, useRef} from "react";
 import {useParams, useNavigate} from "react-router";
-import {ArrowLeft, ExternalLink, Loader2} from "lucide-react";
+import {ArrowLeft, Loader2, Download} from "lucide-react";
 import {useAuth} from "@/utils/auth";
 import {useGetClientClaimsQuery} from "./api";
-import AgencyEditNote from "@/pages/agency/notes/editNote";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 export default function ClientClaimsPage() {
   const {clientId} = useParams();
   const navigate = useNavigate();
   const {user} = useAuth();
-  const [isViewMode, setIsViewMode] = useState(false);
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const printContentRef = useRef<HTMLDivElement>(null);
 
   const {data, isLoading, error} = useGetClientClaimsQuery(
     {
       clientId: clientId || "",
       agencyId: user?.agencyId || "",
+      serviceCode: undefined,
     },
     {
       skip: !clientId || !user?.agencyId,
@@ -58,13 +60,62 @@ export default function ClientClaimsPage() {
     );
   }
 
-  const {client, serviceLogs, billingSummary, dspNotes} = data.data;
+  const {client, serviceLogsGrouped, billingSummary} = data.data;
+
+  const handlePrint = async () => {
+    if (!printContentRef.current) return;
+
+    setIsGeneratingPDF(true);
+    
+    try {
+      // Convert HTML to canvas (handles oklch colors natively)
+      const canvas = await html2canvas(printContentRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowHeight: printContentRef.current.scrollHeight,
+      });
+
+      // Create PDF from canvas
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'in',
+        format: 'letter',
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 1; // 0.5 inch margins
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0.5; // Top margin
+
+      pdf.addImage(imgData, 'JPEG', 0.5, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight - 1;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0.5, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight - 1;
+      }
+
+      const filename = `Client_Claims_${client.fullName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(filename);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#eef4f5] px-8">
       <div className="mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4 mb-6 no-print">
           <button
             onClick={() => navigate(-1)}
             className="w-10 h-10 rounded-full bg-white border border-[#e5e5e6] flex items-center justify-center hover:bg-gray-50 transition-colors"
@@ -76,291 +127,195 @@ export default function ClientClaimsPage() {
           </h1>
         </div>
 
-        {/* Client Claims Section */}
         <div className="rounded-[20px] mb-6">
-          <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-            Client Claims
-          </h2>
-
-          {/* Client Info Card */}
-          <div className="rounded-xl p-4 flex items-start gap-4 mb-6">
-            <div
-              className="w-28 h-28 rounded bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-[24px] font-bold shrink-0">
-              {client.fullName.charAt(0)}
-            </div>
-            <div className={"flex flex-col max-w-lg w-full"}>
-              <p className="text-lg font-semibold text-[#10141a] mb-1">
-                {client.fullName}
-              </p>
-              <p className="flex justify-between items-center">
-                <span className="text-[14px] text-[#808081] mb-1">DOB</span>
-                <span className="text-[14px] font-medium text-[#808081]">
-                  {client.dateOfBirth || "N/A"}
-                </span>
-              </p>
-              <p className="flex justify-between items-center">
-                <span className="text-[14px] text-[#808081] mb-1">Address</span>
-                <span className="text-[14px] font-medium text-[#808081]">
-                  {client.address || "N/A"}
-                </span>
-              </p>
-              <p className="flex justify-between items-center">
-                <span className="text-[14px] text-[#808081] mb-1">Service Type</span>
-                <span className="text-[14px] font-medium text-[#808081]">
-                  {client.service || "N/A"}
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Approved Service Logs */}
-      <div className="rounded-[20px] px-6 mb-6">
-        <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-          Approved Service Logs
-        </h2>
-
-        {serviceLogs.length > 0 ? (
-          <div className="space-y-3">
-            {serviceLogs.map((log) => (
-            <div
-              key={log.id}
-              className="grid grid-cols-7 gap-4 items-center py-3 border-b border-[#e5e5e6] last:border-b-0"
+          <div className="flex items-center justify-between mb-4 no-print">
+            <h2 className="text-[18px] font-semibold text-[#10141a]">
+              Client Claims
+            </h2>
+            <button
+              onClick={handlePrint}
+              disabled={isGeneratingPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-[#00b4b8] text-white rounded-full hover:bg-[#0090a8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {/* DSP Info */}
-              <div className="col-span-1 flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded bg-linear-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-[14px] font-bold">
-                  {log.employee?.fullName?.charAt(0) || "?"}
+              {isGeneratingPDF ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-[14px]">Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span className="text-[14px]">Download PDF</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div ref={printContentRef} className="bg-white p-8 rounded-lg forced-colors:none no-oklch">
+            <h2 className="text-[20px] font-semibold text-[#10141a] mb-8 text-center">
+              Client Claims
+            </h2>
+
+            {/* Client Info Card */}
+            <div className="rounded-xl p-4 mb-6 flex justify-between items-start">
+              <div className="flex items-start gap-6">
+                <div className="w-24 h-24 rounded border-2 bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-gray-400 text-[32px] font-light shrink-0">
+                  {client.fullName.charAt(0)}
                 </div>
-                <div>
-                  <p className="text-[14px] font-bold text-[#10141a]">
-                    {log.employee?.fullName || "Unknown DSP"}
-                  </p>
-                  <p className="text-[12px] text-[#808081]">DSP</p>
-                </div>
-              </div>
-
-              {/* Date */}
-              <div className="col-span-1">
-                <p className="text-[12px] text-[#808081] mb-1">Date</p>
-                <p className="text-[14px] font-medium text-[#10141a]">
-                  {log.date}
-                </p>
-              </div>
-
-              {/* Clocked In */}
-              <div className="col-span-1">
-                <p className="text-[12px] text-[#808081] mb-1">Clocked In</p>
-                <p className="text-[14px] font-medium text-[#10141a]">
-                  {log.clockedIn}
-                </p>
-              </div>
-
-              {/* Clocked Out */}
-              <div className="col-span-1">
-                <p className="text-[12px] text-[#808081] mb-1">Clocked Out</p>
-                <p className="text-[14px] font-medium text-[#10141a]">
-                  {log.clockedOut}
-                </p>
-              </div>
-
-              {/* Hours */}
-              <div className="col-span-1">
-                <p className="text-[12px] text-[#808081] mb-1">Hours</p>
-                <p className="text-[14px] font-medium text-[#10141a]">
-                  {log.hours}
-                </p>
-              </div>
-
-              {/* Units */}
-              <div className="col-span-1">
-                <p className="text-[12px] text-[#808081] mb-1">Units</p>
-                <p className="text-[14px] font-medium text-[#10141a]">
-                  {log.units}
-                </p>
-              </div>
-
-              {/* Notes */}
-              <div className="col-span-1">
-                <p className="text-[12px] text-[#808081] mb-1">Notes</p>
-                <p className="text-[14px] font-medium text-[#10141a]">
-                  {log.notes}
-                </p>
-              </div>
-            </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-[14px] text-[#808081]">No service logs available</p>
-        )}
-      </div>
-
-      {/* Billing Summary */}
-      <div className="rounded-[20px] p-6 mb-6">
-        <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-          Billing Summary
-        </h2>
-
-        <div className={"flex justify-between items-end mb-4"}>
-          <div className="space-y-3 w-sm bg-white rounded p-4">
-            <div className="flex justify-between items-center py-2">
-              <p className="text-[14px] text-[#808081]">Total hours worked</p>
-              <p className="text-[14px] font-medium text-[#10141a]">
-                {billingSummary.totalHoursWorked}
-              </p>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <p className="text-[14px] text-[#808081]">Total Units</p>
-              <p className="text-[14px] font-medium text-[#10141a]">
-                {billingSummary.totalUnits}
-              </p>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <p className="text-[14px] text-[#808081]">Rate Per Unit</p>
-              <p className="text-[14px] font-medium text-[#10141a]">
-                {formatCurrency(Number(String(billingSummary.ratePerUnit).replace("$", "").replace("/hour", "")))}
-              </p>
-            </div>
-            <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
-              <p className="text-[14px] text-[#808081]">Total Amount</p>
-              <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary.totalAmount)}</p>
-            </div>
-          </div>
-          <div className={"w-xs"}>
-            <p className="flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2">
-              <span className={"text-white"}>Total Amount</span>
-              <span className="text-white">{formatCurrency(billingSummary.totalAmount)}</span>
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* DSP Notes Attached */}
-      <div className="bg-white rounded-[20px] p-6 mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-[18px] font-semibold text-[#10141a]">
-            DSP Notes Attached
-          </h2>
-          {dspNotes.length > 0 && (
-            <span className="text-[12px] text-[#0EAF52] bg-[#0EAF521A] px-3 py-1 rounded-full font-medium">
-              {dspNotes.length} Approved {dspNotes.length === 1 ? 'Submission' : 'Submissions'}
-            </span>
-          )}
-        </div>
-        
-        {dspNotes.length > 0 && (
-          <p className="text-[12px] text-[#808081] mb-4">
-            These are approved employee activity log submissions associated with this client's service shifts
-          </p>
-        )}
-
-        {dspNotes.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {dspNotes.map((note) => (
-              <div
-                key={note.id}
-                onClick={() => {
-                  setSelectedSubmissionId(note.id);
-                  setIsViewMode(true);
-                }}
-                className="bg-[#0EAF521A] rounded-xl p-4 hover:bg-[#0EAF522A] transition-colors cursor-pointer"
-              >
-                <div className="flex items-start gap-3 mb-2">
-                  <ExternalLink className="w-5 h-5 text-[#0EAF52] shrink-0 mt-0.5"/>
-                  <div className="flex-1">
-                    <p className="text-[14px] font-semibold text-[#10141a]">{note.employeeName}</p>
-                    <p className="text-[12px] text-[#808081] capitalize">
-                      {note.activityType.replace(/-/g, ' ')}
+                <div className="flex flex-col space-y-2">
+                  <div>
+                    <p className="text-[16px] font-semibold text-[#10141a]">
+                      {client.fullName}
                     </p>
                   </div>
-                </div>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#0EAF5233]">
-                  <span className="text-[11px] text-[#808081]">
-                    {note.noteCount} {note.noteCount === 1 ? 'note' : 'notes'}
-                  </span>
-                  {note.approvedAt && (
-                    <span className="text-[11px] text-[#0EAF52]">
-                      Approved {new Date(note.approvedAt).toLocaleDateString()}
+                  <div className="flex items-start gap-8">
+                    <span className="text-[14px] text-[#808081] min-w-20">DOB</span>
+                    <span className="text-[14px] text-[#10141a]">
+                      {client.dateOfBirth || "N/A"}
                     </span>
-                  )}
+                  </div>
+                  <div className="flex items-start gap-8">
+                    <span className="text-[14px] text-[#808081] min-w-20">Address</span>
+                    <span className="text-[14px] text-[#10141a]">
+                      {client.address || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-8">
+                    <span className="text-[14px] text-[#808081] min-w-20">Service Type</span>
+                    <span className="text-[14px] text-[#10141a]">
+                      {client.service || "N/A"}
+                    </span>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-[14px] text-[#808081]">No approved DSP activity notes available for this client</p>
-            <p className="text-[12px] text-[#b0b0b1] mt-2">Activity notes will appear here once they are approved by the agency</p>
-          </div>
-        )}
-      </div>
+              <div className="text-right space-y-1">
+                <p className="text-[16px] font-semibold text-[#10141a] mb-2">
+                  {user?.profile?.name}
+                </p>
+                <p className="text-[14px] text-[#10141a]">{user?.profile?.address}</p>
+                <p className="text-[14px] text-[#10141a]">Provider NPI: 23764234232756</p>
+                <p className="text-[14px] text-[#10141a]">Provider Taxonomy: 21/B Baker Street</p>
+                <p className="text-[14px] text-[#10141a]">Medicaid Provider Number: 21/B Baker Street</p>
+                <p className="text-[14px] text-[#10141a]">Provider Taxonomy: 21/B Baker Street</p>
+              </div>
+            </div>
 
-      {/* Signatures */}
-      <div className="rounded-[20px] p-6">
-        <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-          Signatures
-        </h2>
+            {/* Approved Service Logs */}
+            <div className="mb-6">
+              <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
+                Approved Service Logs
+              </h2>
 
-        <div className="space-y-4">
-          {/* DSP Signature */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                DSP Signature
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
-            </div>
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                Date
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
-            </div>
-          </div>
+            {serviceLogsGrouped.length > 0 ? (
+              <div className="overflow-hidden">
+                {/* Table Header */}
+                <div className="grid grid-cols-7 gap-4 px-4 py-3">
+                  <div className="font-semibold text-[14px] text-[#808081]">DSP</div>
+                  <div className="font-semibold text-[14px] text-[#808081]">Service</div>
+                  {/*<div className="font-semibold text-[14px] text-[#808081]">Service Code</div>*/}
+                  <div className="font-semibold text-[14px] text-[#808081]">Total Hours</div>
+                  {/*<div className="font-semibold text-[14px] text-[#808081]">Units</div>*/}
+                  <div className="font-semibold text-[14px] text-[#808081]">Rate/Unit</div>
+                  <div className="font-semibold text-[14px] text-[#808081]">Total Amount</div>
+                </div>
 
-          {/* Client Signature */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                Client Signature
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
-            </div>
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                Date
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
-            </div>
-          </div>
+                {/* Table Body */}
+                <div>
+                  {serviceLogsGrouped.map((group, groupIndex) => (
+                    <React.Fragment key={`${group.serviceCode}-${groupIndex}`}>
+                      {group.logs.map((log) => {
+                        const dailyPayCut = log.billingRate
+                          ? Number(String(log.billingRate).replace("$", "").replace("/hour", ""))
+                          : 0;
+                        const totalAmount = log.hours * dailyPayCut;
 
-          {/* Admin Approval */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                Admin Approval
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
+                        return (
+                          <div
+                            key={log.id}
+                            className="grid grid-cols-7 gap-4 px-4 py-3 hover:bg-[#f9fafb] transition-colors"
+                          >
+                            {/* DSP */}
+                            <div className="text-[14px] text-[#10141a]">
+                              {log.employee?.fullName || "N/A"}
+                            </div>
+
+                            {/* Service */}
+                            <div className="text-[14px] text-[#10141a]">
+                              {log.service || "N/A"}
+                            </div>
+
+                            {/* Service Code */}
+                            {/*<div className="text-[14px] text-[#10141a]">*/}
+                            {/*  {log.serviceCode || "N/A"}*/}
+                            {/*</div>*/}
+
+                            {/* Total Hours */}
+                            <div className="text-[14px] text-[#10141a]">
+                              {log.hours.toFixed(2)}
+                            </div>
+
+                            {/* Units */}
+                            {/*<div className="text-[14px] text-[#10141a]">*/}
+                            {/*  {log.units}*/}
+                            {/*</div>*/}
+
+                            {/* Rate per unit */}
+                            <div className="text-[14px] text-[#10141a]">
+                              {log.billingRate || `${formatCurrency(dailyPayCut)}/hour`}
+                            </div>
+
+                            {/* Total Amount */}
+                            <div className="text-[14px] text-[#10141a]">
+                              {formatCurrency(totalAmount)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-[14px] text-[#808081]">No service logs available</p>
+            )}
             </div>
-            <div>
-              <label className="text-[12px] text-[#808081] mb-2 block">
-                Date
-              </label>
-              <div className="bg-[#f9fafb] border border-[#e5e5e6] rounded-xl h-10"></div>
+
+            {/* Billing Summary */}
+            <div className="mb-6">
+              <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
+                Billing Summary
+              </h2>
+
+            <div className={"flex flex-col mb-4"}>
+              <div className="space-y-3 w-sm bg-white rounded p-4">
+                <div className="flex justify-between items-center py-2">
+                  <p className="text-[14px] text-[#808081]">Total hours worked</p>
+                  <p className="text-[14px] font-medium text-[#10141a]">
+                    {billingSummary.totalHoursWorked}
+                  </p>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <p className="text-[14px] text-[#808081]">Rate Per Unit</p>
+                  <p className="text-[14px] font-medium text-[#10141a]">
+                    {formatCurrency(Number(String(billingSummary.ratePerUnit).replace("$", "").replace("/hour", "")))}
+                  </p>
+                </div>
+                <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
+                  <p className="text-[14px] text-[#808081]">Total Amount</p>
+                  <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary.totalAmount)}</p>
+                </div>
+              </div>
+              <div className={"w-full"}>
+                <p className="flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2 font-semibold">
+                  <span className={"text-white"}>Total Amount</span>
+                  <span className="text-white">{formatCurrency(billingSummary.totalAmount)}</span>
+                </p>
+              </div>
+            </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Modal for viewing DSP notes */}
-      <AgencyEditNote
-        isOpen={isViewMode}
-        setIsOpen={setIsViewMode}
-        submissionId={selectedSubmissionId}
-        reRoute={false}
-      />
     </div>
   );
 }

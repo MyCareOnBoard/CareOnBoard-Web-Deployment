@@ -109,3 +109,18 @@ body {
 * {
     font-family: "Urbanist", system-ui, sans-serif;
 }
+
+/* Add this to your global CSS or as a style tag */
+.no-oklch {
+  /* Override any oklch colors with fallbacks */
+  background-color: #ffffff !important;
+  color: #10141a !important;
+  border-color: #e5e5e6 !important;
+}
+
+.no-oklch * {
+  /* Force all elements to use safe colors */
+  background-color: transparent !important;
+  color: inherit !important;
+  border-color: inherit !important;
+}

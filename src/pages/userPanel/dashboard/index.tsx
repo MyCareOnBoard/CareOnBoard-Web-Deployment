@@ -9,17 +9,18 @@ import UserPanelDocumentUpload from "@/pages/userPanel/dashboard/components/uplo
 import {AnimatePresence, motion} from "framer-motion";
 import {
   useGetEmployeeDocumentsQuery,
-  useGetEmployeeInfoQuery,
   useGetEmployeeTrainingsQuery,
   useUpdateEmployeeInfoMutation
 } from "@/pages/userPanel/dashboard/api";
 import {userPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
 import {Routes} from "@/routes/constants";
-import { useAuth } from "@/utils/auth";
+import {setUser, useAuth} from "@/utils/auth";
+import {getUser} from "@/lib/api/users";
+import {useDispatch} from "react-redux";
 
 
 export default function UserPanelDashboardPage() {
-  const { user } = useAuth();
+  const {user} = useAuth();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<boolean>(false);
   const [locationError, setLocationError] = useState<boolean>(false);
@@ -36,6 +37,7 @@ export default function UserPanelDashboardPage() {
   const employeeInfo = user;
 
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const currentUser = auth.currentUser;
 
@@ -66,10 +68,27 @@ export default function UserPanelDashboardPage() {
   };
 
   const getDocument = useCallback((documentType: string) => {
-    return employeeDocuments?.find(doc => doc.documentType === documentType) || {
+    const employeeDocument = employeeDocuments?.find(doc => doc.documentType === documentType) || {
       status: "",
-      fileUrl: ""
+      fileUrl: "",
+      expiryDate: null
     };
+
+    let status = employeeDocument.status
+
+    // get days until expiry
+    const daysUntilExpiry = employeeDocument.expiryDate ? Math.floor((new Date(employeeDocument.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+    if (employeeDocument.expiryDate && (daysUntilExpiry || 0) <= 7 && (daysUntilExpiry || 0) > 0) {
+      status = "expiring"
+    } else if (employeeDocument.expiryDate && (daysUntilExpiry || 0) <= 0) {
+      status = "expired"
+    }
+
+    return {
+      ...employeeDocument,
+      status
+    }
+
   }, [employeeDocuments]);
 
   const getStatusColor = (status: string) => {
@@ -84,6 +103,8 @@ export default function UserPanelDashboardPage() {
         return "bg-[#e5f7f7] text-[#00b4b8] border-[#00b4b8]/20";
       case "assigned":
         return "bg-[#0EAF521A] text-[#0EAF52] border-[#0EAF52]";
+      case "expiring":
+        return "bg-[#FF6C1017] text-[#FF6C10] border-[#FF6C10]"
       default:
         return "bg-gray-100 text-gray-600 border-gray-300/20";
     }
@@ -130,12 +151,14 @@ export default function UserPanelDashboardPage() {
     setTimeout(() => setAskLocationPerm(false), 3000);
   }
 
-  const handleWorkAvailabilityChange = () => {
+  const handleWorkAvailabilityChange = async () => {
     setWorkAvailability((prev) => !prev);
     try {
       updateEmployeeInfo({
         workAvailability: !employeeInfo?.workAvailability
       }).unwrap();
+      const user = await getUser();
+      dispatch(setUser(user))
     } catch (error) {
       console.error("Error updating work availability:", error);
     }
@@ -152,7 +175,7 @@ export default function UserPanelDashboardPage() {
 
   useEffect(() => {
     if (employeeInfo) {
-      setWorkAvailability(employeeInfo?.workAvailability ?? false);
+      setWorkAvailability(employeeInfo.profile?.workAvailability ?? false);
     }
   }, [employeeInfo])
 
@@ -184,7 +207,7 @@ export default function UserPanelDashboardPage() {
                   </div>
                 ) : (
                   <div
-                    className="w-[180px] h-full rounded-xl bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-6xl font-bold">
+                    className="w-[180px] h-full rounded-xl bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-6xl font-bold">
                     {employeeInfo?.fullName?.charAt(0) || "U"}
                   </div>
                 )}
@@ -196,7 +219,7 @@ export default function UserPanelDashboardPage() {
               <div className={"flex justify-between items-center mb-6"}>
                 <div
                   className="bg-[#F0FAF4] border border-[#0EAF52] text-[#0EAF52] text-sm font-semibold px-2 py-1 rounded-full">
-                  ID-{employeeInfo?.tagId}
+                  ID-{employeeInfo?.profile?.tagId}
                 </div>
                 <svg onClick={goToProfile} className={"cursor-pointer"} width="40" height="40" viewBox="0 0 40 40"
                      fill="none"
@@ -313,31 +336,38 @@ export default function UserPanelDashboardPage() {
           <div className="space-y-3">
             {userPanelDocumentTypes
               .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-              .map((document) => (
-                <div
-                  key={document.value}
-                  onClick={() => handleOpenDocument(getDocument(document.value)?.fileUrl)}
-                  className="cursor-pointer flex items-center justify-between p-4 rounded-xl border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={"/document-image.png"}
-                      alt={"document"}
-                      className="w-12 h-12 text-[#808081] scale-x-[-1]"
-                    />
-                    <span className="text-[14px] font-medium text-[#10141a]">
+              .map((document) => {
+                const documentData = getDocument(document.value);
+                const excludedTexts: Record<string, string> = {
+                  expiring: `Expiring Soon ${documentData?.expiryDate ? ('on ' + new Date(documentData?.expiryDate).toDateString()) : ''}`
+                }
+                const statusText = Object.keys(excludedTexts).includes(documentData?.status) ? excludedTexts[documentData?.status] : documentData?.status;
+                return (
+                  <div
+                    key={document.value}
+                    onClick={() => handleOpenDocument(getDocument(document.value)?.fileUrl)}
+                    className="cursor-pointer flex items-center justify-between p-4 rounded-xl border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={"/document-image.png"}
+                        alt={"document"}
+                        className="w-12 h-12 text-[#808081] scale-x-[-1]"
+                      />
+                      <span className="text-[14px] font-medium text-[#10141a]">
                     {document.label}
                   </span>
-                  </div>
-                  <span
-                    className={`capitalize text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
-                      getDocument(document.value)?.status || "pending"
-                    )}`}
-                  >
-                  {getDocument(document.value)?.status || "Pending"}
+                    </div>
+                    <span
+                      className={`capitalize text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
+                         documentData?.status || "pending"
+                      )}`}
+                    >
+                  {statusText || "Unavailable"}
                 </span>
-                </div>
-              ))}
+                  </div>
+                )
+              })}
           </div>
 
           {/* Pagination */}

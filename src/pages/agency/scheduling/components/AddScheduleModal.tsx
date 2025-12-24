@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2 } from "lucide-react";
+import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { searchClients, Client } from "@/lib/api/clients";
+import { searchClients, Client, ClientService, getAgencyClientById } from "@/lib/api/clients";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import {Routes} from "@/routes/constants";
@@ -50,6 +51,7 @@ export interface ScheduleFormData {
   clockOutTime: string;
   ispOutcome: string;
   planOfCare: File | null;
+  submissionStatus?: SubmissionStatus;
 }
 
 const clockInTimeOptions = [
@@ -135,6 +137,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   // API search states
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
   const [dspSearchResults, setDspSearchResults] = useState<Employee[]>([]);
+  const [selectedClientServices, setSelectedClientServices] = useState<ClientService[]>([]);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
   const [isSearchingDsps, setIsSearchingDsps] = useState(false);
 
@@ -169,6 +173,18 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     if (isOpen) {
       if (editData && mode === "edit") {
         setFormData(editData);
+        
+        // Fetch client data to populate services dropdown
+        if (editData.clientId) {
+          getAgencyClientById(editData.clientId)
+            .then((client) => {
+              setSelectedClient(client);
+              setSelectedClientServices(client.services || []);
+            })
+            .catch((error) => {
+              console.error("Failed to fetch client for edit:", error);
+            });
+        }
       } else {
         setFormData(initialFormData);
       }
@@ -176,6 +192,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       setIsSubmitting(false);
       setClientSearchResults([]);
       setDspSearchResults([]);
+      if (!(editData && mode === "edit")) {
+        setSelectedClient(null);
+        setSelectedClientServices([]);
+      }
     }
   }, [isOpen, editData, mode]);
 
@@ -293,6 +313,15 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     }, 300);
   }, [user?.agencyId, user?.uid]);
 
+  const formatLocation = (loc: Client["location"]): string => {
+    if (!loc) return "";
+    if (typeof loc === "string") return loc;
+    if (typeof loc === "object" && "lat" in loc && "lon" in loc) {
+      return `${loc.lat}, ${loc.lon}`;
+    }
+    return "";
+  };
+
   const handleClientSelect = (client: Client) => {
     setFormData(prev => ({
       ...prev,
@@ -300,8 +329,15 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         ? `${client.firstName} ${client.lastName}` 
         : client.id,
       clientId: client.id,
-      clientLocation: client.location || "",
+      clientLocation: formatLocation( client.primaryAddress?.location || client.location),
+      serviceCode: client.services?.[0]?.code || "",
+      assignedDsp: client.primaryDsp?.name || "",
+      assignedDspId: client.primaryDsp?.id || "",
+      billingRate: client.services?.[0]?.rate || "",
+      ispOutcome: client.ispOutcomes || "",
     }));
+    setSelectedClient(client);
+    setSelectedClientServices(client.services || []);
     setShowClientDropdown(false);
     setClientSearchResults([]);
   };
@@ -311,7 +347,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       ...prev,
       assignedDsp: employee.fullName,
       assignedDspId: employee.id,
-      billingRate: "", // Billing rate would come from a different source
     }));
     setShowDspDropdown(false);
     setDspSearchResults([]);
@@ -328,6 +363,19 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   }, [currentMonth]);
 
   const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+  const selectedService = useMemo(
+    () =>
+      selectedClientServices.find(
+        (service) => service.code === formData.serviceCode,
+      ) || null,
+    [selectedClientServices, formData.serviceCode],
+  );
+
+  const pocDocument = useMemo(() => {
+    if (!selectedClient?.documents) return null;
+    return selectedClient.documents.find((doc) => doc.key === "poc") || null;
+  }, [selectedClient]);
 
   const handleDateSelect = (date: Date) => {
     setFormData(prev => ({ ...prev, date }));
@@ -881,7 +929,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                         ? `${client.firstName} ${client.lastName}` 
                         : client.id}
                     </p>
-                    <p className="text-[12px] font-normal text-[#808081]">{client.address || client.location}</p>
+                    <p className="text-[12px] font-normal text-[#808081]">
+                      {client.address || formatLocation(client.location)}
+                    </p>
                   </button>
                 ))}
               </div>
@@ -916,7 +966,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                 {dspSearchResults.map((employee) => (
                   <button
-                    key={employee.uid || employee.id}
+                    key={employee.id}
                     onClick={() => {
                       handleDspSelect(employee);
                       clearError("assignedDsp");
@@ -930,24 +980,53 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               </div>
             )}
             {/* Billing Rate Display */}
-            {formData.billingRate && !errors.assignedDsp && (
+            {/* {formData.billingRate && !errors.assignedDsp && (
               <span className="text-[12px] font-normal text-[#808081]">
                 Billing Rate : {formData.billingRate}
               </span>
-            )}
+            )} */}
           </div>
 
           {/* Service Code */}
+          {/* Service Code */}
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Service Code</label>
-            <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
-              <input
-                type="text"
-                value={formData.serviceCode}
-                onChange={(e) => setFormData(prev => ({ ...prev, serviceCode: e.target.value }))}
-                className="flex-1 text-[14px] font-normal text-black outline-none bg-transparent"
-              />
-            </div>
+            <label className="text-[12px] font-normal text-[#10141a]">Service</label>
+            <Select
+              value={formData.serviceCode}
+              onValueChange={(value) => setFormData((prev) => ({ ...prev, serviceCode: value }))}
+              disabled={selectedClientServices.length === 0}
+            >
+              <SelectTrigger className="w-full h-11 rounded-xl border-[#cccccd] bg-white">
+                <SelectValue
+                  placeholder={
+                    selectedClientServices.length === 0 ? "No services available" : "Select service"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {selectedClientServices.map((service) => (
+                  <SelectItem key={`${service.code}-${service.name}`} value={service.code}>
+                    {service.name ? `${service.name} — ${service.code}` : service.code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedService && (selectedService.rate || selectedService.payType) && (
+              <span className="text-[12px] font-normal text-[#808081]">
+                Service rate:{" "}
+                {selectedService.rate ? `$${selectedService.rate}` : "Not set"}
+                {selectedService.payType &&
+                  ` • ${
+                    selectedService.payType === "hourly"
+                      ? "Hourly"
+                      : selectedService.payType === "15-min"
+                      ? "15 minutes"
+                      : selectedService.payType === "daily"
+                      ? "Daily"
+                      : selectedService.payType
+                  }`}
+              </span>
+            )}
           </div>
 
           {/* Notes Type */}
@@ -1398,13 +1477,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           {/* ISP Outcome */}
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">ISP Outcome</label>
-            <div className="bg-white border border-[#b2b2b3] rounded-xl h-11 px-4 flex items-center">
+            <div className="bg-[#f5f5f5] border border-[#e0e0e0] rounded-xl h-11 px-4 flex items-center">
               <input
                 type="text"
                 value={formData.ispOutcome}
-                onChange={(e) => setFormData(prev => ({ ...prev, ispOutcome: e.target.value }))}
-                placeholder="Write here..."
-                className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                readOnly
+                placeholder={formData.ispOutcome ? "" : "No ISP outcome available"}
+                className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent cursor-not-allowed"
               />
             </div>
           </div>
@@ -1412,6 +1491,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           {/* Plan of Care */}
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Plan of care</label>
+            {!pocDocument?.url && (
             <label className="bg-white border border-[#cccccd] rounded-xl px-4 py-3 flex items-center justify-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
               <Upload className="w-5 h-5 text-[#b2b2b3]" />
               <span className="text-[14px] font-normal text-[#b2b2b3]">
@@ -1424,6 +1504,22 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 accept=".pdf,.doc,.docx"
               />
             </label>
+            )}
+            {/* Client's POC Document Link */}
+            {pocDocument && pocDocument.url && (
+              <a
+                href={pocDocument.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-[rgba(0,180,216,0.08)] border border-[rgba(0,180,216,0.2)] rounded-lg h-[36px] px-3 mt-1 hover:bg-[rgba(0,180,216,0.12)] transition-colors group"
+              >
+                <FileText className="w-4 h-4 text-[#00b4d8] group-hover:text-[#0096c7]" />
+                <span className="text-[13px] font-medium text-[#10141a] flex-1 truncate">
+                  {pocDocument.fileName || pocDocument.title || "View Plan of Care"}
+                </span>
+                <ExternalLink className="w-3.5 h-3.5 text-[#00b4d8] group-hover:text-[#0096c7] shrink-0" />
+              </a>
+            )}
             {/* Selected File Chip */}
             {formData.planOfCare && (
               <div className="flex items-center gap-2 bg-[rgba(0,216,65,0.08)] rounded-lg h-[36px] px-2 mt-1">
@@ -1443,14 +1539,14 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             onClick={handleSaveDraft}
             disabled={isSubmitting}
             variant="outline"
-            className="flex-1 border-[#2b82ff] text-[#2b82ff] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 border-[#00B5B8] text-[#00B5B8] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-[#00B5B8]/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Save
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !isFormValid}
-            className="flex-1 bg-[#2b82ff] hover:bg-[#1a6fe0] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSubmitting || !isFormValid || (mode === "edit" && formData.submissionStatus === SubmissionStatus.SUBMITTED)}
+            className="flex-1 bg-[#00B5B8] hover:bg-[#00A0A4] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>

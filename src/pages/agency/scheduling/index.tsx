@@ -6,7 +6,7 @@ import { listShifts, Shift, ShiftStatus, deleteShift } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
-import AddScheduleModal from "./components/AddScheduleModal";
+import AddScheduleModal, { ScheduleFormData } from "./components/AddScheduleModal";
 import { seedClients } from "@/lib/api/clients";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/utils/auth";
@@ -67,6 +67,8 @@ export default function SchedulingPage() {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [showAddScheduleModal, setShowAddScheduleModal] = useState(false);
+  const [editFormData, setEditFormData] = useState<ScheduleFormData | null>(null);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   
   // API data states
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -74,6 +76,41 @@ export default function SchedulingPage() {
   const [seedingClients, setSeedingClients] = useState(false);
   
   const itemsPerPage = 6;
+  
+  // Handle edit shift
+  const handleEdit = (shift: Shift) => {
+    const clientName = shift.client
+      ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
+      : "Unknown Client";
+    const employeeName = shift.employee?.fullName || "";
+    const anyShift = shift as any;
+
+    const formData: ScheduleFormData = {
+      client: clientName,
+      clientId: shift.client?.id || "",
+      clientLocation: shift.location || "",
+      assignedDsp: employeeName,
+      assignedDspId: (shift.employee as any)?.id || "",
+      billingRate: "",
+      serviceCode: shift.serviceCode || "183535",
+      notesType: anyShift.notesType || "",
+      schedulingType: (shift.schedulingType as "one-time" | "recurring" | "") || "one-time",
+      date: shift.date ? new Date(shift.date) : null,
+      startDate: null,
+      endDate: null,
+      clockInTime: shift.startTime,
+      clockOutTime: shift.endTime || "",
+      ispOutcome: shift.ispOutcome || "",
+      planOfCare: null,
+      submissionStatus: shift.submissionStatus,
+    } as ScheduleFormData;
+
+    (formData as any).shiftId = shift.id;
+
+    setEditFormData(formData);
+    setModalMode("edit");
+    setShowAddScheduleModal(true);
+  };
   
   // Month and year options
   const months = [
@@ -215,7 +252,11 @@ export default function SchedulingPage() {
         </h1>
         <div className="flex items-center gap-3">
           <Button
-            onClick={() => setShowAddScheduleModal(true)}
+            onClick={() => {
+              setEditFormData(null);
+              setModalMode("create");
+              setShowAddScheduleModal(true);
+            }}
             className="flex items-center gap-3 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px]"
           >
             <Plus className="w-5 h-5" />
@@ -655,7 +696,7 @@ export default function SchedulingPage() {
                   >
                     {/* Client Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
                         {shift.client?.profileImage && (
                           <AvatarImage
                             src={shift.client.profileImage}
@@ -663,7 +704,7 @@ export default function SchedulingPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(clientName)}
                         </AvatarFallback>
                       </Avatar>
@@ -679,7 +720,7 @@ export default function SchedulingPage() {
 
                     {/* DSP/Employee Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
                         {shift.employee?.profilePicture && (
                           <AvatarImage
                             src={shift.employee.profilePicture}
@@ -687,7 +728,7 @@ export default function SchedulingPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(employeeName)}
                         </AvatarFallback>
                       </Avatar>
@@ -735,6 +776,7 @@ export default function SchedulingPage() {
                     {/* Details Button */}
                     <Button
                       variant="outline"
+                      onClick={() => handleEdit(shift)}
                       className="bg-[#b2b2b3] border-[#b2b2b3] text-white rounded-full px-6 py-2.5 h-9 w-[121px] text-[14px] font-semibold hover:bg-[#9a9a9b] hover:text-white"
                     >
                       Details
@@ -775,8 +817,14 @@ export default function SchedulingPage() {
     {/* Add Schedule Modal */}
     <AddScheduleModal
       isOpen={showAddScheduleModal}
-      onClose={() => setShowAddScheduleModal(false)}
+      onClose={() => {
+        setShowAddScheduleModal(false);
+        setEditFormData(null);
+        setModalMode("create");
+      }}
       onShiftsUpdated={(updatedShifts) => setShifts(updatedShifts)}
+      editData={editFormData}
+      mode={modalMode}
     />
     </>
   );

@@ -30,6 +30,8 @@ export interface Profile {
   dateOfBirth?: string
   profilePicture?: string
   professionalSummary?: string
+  workAvailability?: boolean
+  tagId?: string
 }
 
 /**
