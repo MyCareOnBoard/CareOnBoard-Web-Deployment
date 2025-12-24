@@ -5,12 +5,11 @@
 
 function getApiUrl(path: string): string {
   const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
-  const prefix = (import.meta.env.VITE_API_PREFIX ?? '/api').replace(/\/$/, '')
   
   // Remove leading slash from path if present
   const cleanPath = path.startsWith('/') ? path : `/${path}`
   
-  return `${base}${prefix}${cleanPath}`
+  return `${base}${cleanPath}`
 }
 
 export async function apiFetch<T = any>(
@@ -83,7 +82,7 @@ export const apiClient = {
     }),
   
   put: <T = any>(path: string, body?: any, options?: RequestInit) =>
-    apiFetch<T>(path, {
+    apiFetch<T>(path, { 
       ...options,
       method: 'PUT',
       body: body ? JSON.stringify(body) : undefined,

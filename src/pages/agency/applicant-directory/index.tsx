@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Search, MoreVertical, Plus, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,18 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AddScheduleModal from "@/pages/agency/scheduling/components/AddScheduleModal";
 import { Routes } from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
-
-// Types for API integration
-interface Applicant {
-  id: string;
-  name: string;
-  role: string;
-  profileScreening: boolean;
-  documents: boolean;
-  conditionalHire: boolean;
-  finalAgencyReview: boolean;
-  avatar: string;
-}
+import { applicantsApi, Applicant } from "@/lib/api/applicants";
 
 interface ShiftStats {
   active: number;
@@ -107,6 +96,9 @@ export default function ApplicantDirectory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"today" | "week" | "month">("today");
   const [isLoading, setIsLoading] = useState(false);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const errorToastShownRef = useRef(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   
   // Stats state - ready for API
@@ -128,39 +120,66 @@ export default function ApplicantDirectory() {
     totalDoctors: 2,
     appointments: 3,
   });
-
   const itemsPerPage = 6;
-  
-  // Filter applicants based on search query
-  const filteredApplicants = mockApplicants.filter((applicant) =>
-    applicant.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
-  // Paginate applicants
-  const totalPages = Math.ceil(filteredApplicants.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedApplicants = filteredApplicants.slice(startIndex, endIndex);
+  // Memoize these values
+  const startIndex = useMemo(() => (currentPage - 1) * itemsPerPage, [currentPage, itemsPerPage]);
+  const totalPages = useMemo(() => totalCount > 0 ? Math.ceil(totalCount / itemsPerPage) : 0, [totalCount, itemsPerPage]);
+  const paginatedApplicants = applicants;
 
-  // API functions - ready to implement
-  const fetchApplicants = async (tab: string) => {
+  // API functions - with useCallback to prevent recreation
+  const fetchApplicants = useCallback(async () => {
     setIsLoading(true);
+    console.log('[ApplicantDirectory] Fetching applicants:', { 
+      period: activeTab, 
+      search: searchQuery, 
+      limit: itemsPerPage, 
+      offset: startIndex 
+    });
+    
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/applicants?period=${tab}`);
-      // const data = await response.json();
-      // setApplicants(data);
-    } catch (error) {
-      console.error("Error fetching applicants:", error);
+      const res = await applicantsApi.list({
+        period: activeTab,
+        search: searchQuery,
+        limit: itemsPerPage,
+        offset: startIndex,
+      });
+      
+      console.log('[ApplicantDirectory] API Response:', res);
+      
+      const loaded = res?.data ?? [];
+      const finalData = Array.isArray(loaded) && loaded.length > 0 ? loaded : mockApplicants;
+      setApplicants(finalData);
+      setTotalCount(finalData.length);
+      // Reset error toast guard on successful load
+      errorToastShownRef.current = false;
+      
+      console.log('[ApplicantDirectory] Set applicants:', res.data?.length ?? 0, 'items');
+    } catch (error: any) {
+      console.error('[ApplicantDirectory] Error fetching applicants:', error);
+      const is404 = error?.response?.status === 404;
+      const isNetwork = error?.code === 'ERR_NETWORK' || (error?.message || '').toLowerCase().includes('network');
+      const description = isNetwork
+        ? 'Network/CORS issue contacting API. See console for details.'
+        : is404
+          ? 'Applicants endpoint not available yet. Backend work pending.'
+          : (error instanceof Error ? error.message : 'Unable to load applicants');
+      // Show toast only once per failure cycle to avoid repeated popups (StrictMode double effects, retries)
+      if (!errorToastShownRef.current) {
+        toast({ title: 'Applicants', variant: 'destructive', description });
+        errorToastShownRef.current = true;
+      }
+      // Clear data on error
+      setApplicants([]);
+      setTotalCount(0);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeTab, searchQuery, itemsPerPage, startIndex, toast]);
 
   const handleApprove = async (id: string) => {
     try {
-      // TODO: Replace with actual API call
-      // await fetch(`/api/approvals/${id}/approve`, { method: 'POST' });
+      await applicantsApi.approve(id);
       setPendingApprovals(prev => prev.filter(item => item.id !== id));
       toast({
         title: "Approved",
@@ -178,8 +197,7 @@ export default function ApplicantDirectory() {
 
   const handleCancel = async (id: string) => {
     try {
-      // TODO: Replace with actual API call
-      // await fetch(`/api/approvals/${id}/cancel`, { method: 'POST' });
+      await applicantsApi.cancel(id);
       setPendingApprovals(prev => prev.filter(item => item.id !== id));
       toast({
         title: "Cancelled",
@@ -196,7 +214,7 @@ export default function ApplicantDirectory() {
   };
 
   const handleViewDetails = (id: string) => {
-    navigate(Routes.agency.applicantClearanceHiring);
+    navigate(Routes.agency.applicantProfile.replace(":id", id));
   };
 
   const handleViewClearanceList = () => {
@@ -224,27 +242,21 @@ export default function ApplicantDirectory() {
     setCurrentPage(1);
   }, [searchQuery, activeTab]);
 
-  // Fetch data when tab changes
+  // Fetch once on mount; do not retry in background on filter changes
   useEffect(() => {
-    fetchApplicants(activeTab);
-  }, [activeTab]);
+    fetchApplicants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen">
       {/* Main Content */}
         <div className="mx-auto max-w-7xl">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flexmb-4">
             <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
               Applicant's directory
             </h1>
-            <Button 
-              onClick={handleAddSchedule}
-              className="flex items-center gap-3 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-3 h-auto font-semibold text-[14px]"
-            >
-              <Plus className="w-5 h-5" />
-              Add Schedule
-            </Button>
           </div>
 
           {/* Stats Overview Section */}
@@ -328,7 +340,7 @@ export default function ApplicantDirectory() {
                           Total doctors who have collaborated
                         </p>
                       </div>
-                      <button className="shrink-0 text-gray-400 transition-colors hover:text-gray-600">
+                      <button className="text-gray-400 transition-colors shrink-0 hover:text-gray-600">
                         <ArrowUpRight className="w-4 h-4" />
                       </button>
                     </div>
@@ -351,7 +363,7 @@ export default function ApplicantDirectory() {
                         3.5% Have increased from yesterday
                       </p>
                     </div>
-                    <button className="shrink-0 text-gray-400 transition-colors hover:text-gray-600">
+                    <button className="text-gray-400 transition-colors shrink-0 hover:text-gray-600">
                       <ArrowUpRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -405,7 +417,7 @@ export default function ApplicantDirectory() {
                           />
                         </div>
                       </div>
-                      <div className="flex items-center shrink-0 gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <Button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -540,7 +552,7 @@ export default function ApplicantDirectory() {
                         <img
                           src={applicant.avatar}
                           alt={applicant.name}
-                          className="shrink-0 w-12 h-12 rounded-full"
+                          className="w-12 h-12 rounded-full shrink-0"
                         />
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-gray-900">
@@ -599,7 +611,7 @@ export default function ApplicantDirectory() {
                       {/* Action Button */}
                       <Button 
                         onClick={() => handleViewDetails(applicant.id)}
-                        className="shrink-0 px-6 py-2 text-xs font-medium text-gray-600 bg-gray-300 rounded-full hover:bg-gray-400"
+                        className="px-6 py-2 text-xs font-medium text-gray-600 bg-gray-300 rounded-full shrink-0 hover:bg-gray-400"
                       >
                         Details
                       </Button>
@@ -638,13 +650,6 @@ export default function ApplicantDirectory() {
           </div>
         </div>
       </div>
-
-      {/* Add Schedule Modal */}
-      <AddScheduleModal
-        isOpen={isScheduleModalOpen}
-        onClose={handleScheduleModalClose}
-        mode="create"
-      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import axiosClient from '../axios';
 
 export type RideStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
 
@@ -78,17 +78,28 @@ const buildQuery = (params?: Record<string, string | number | undefined>) => {
 };
 
 export const mileageApi = {
-  list: (params?: { limit?: number; offset?: number }) =>
-    apiClient.get<MileageListResponse>(`/mileage${buildQuery(params)}`),
+  list: async (params?: { limit?: number; offset?: number }) => {
+    const response = await axiosClient.get<MileageListResponse>(`/mileage${buildQuery(params)}`);
+    return response.data;
+  },
 
-  getById: (id: string) => apiClient.get<MileageRideResponse>(`/mileage/${id}`),
+  getById: async (id: string) => {
+    const response = await axiosClient.get<MileageRideResponse>(`/mileage/${id}`);
+    return response.data;
+  },
 
-  start: (id: string, payload: StartRidePayload) =>
-    apiClient.post<RideActionResponse>(`/mileage/${id}/start`, payload),
+  start: async (id: string, payload: StartRidePayload) => {
+    const response = await axiosClient.post<RideActionResponse>(`/mileage/${id}/start`, payload);
+    return response.data;
+  },
 
-  stop: (id: string, payload: StopRidePayload) =>
-    apiClient.post<RideActionResponse>(`/mileage/${id}/stop`, payload),
+  stop: async (id: string, payload: StopRidePayload) => {
+    const response = await axiosClient.post<RideActionResponse>(`/mileage/${id}/stop`, payload);
+    return response.data;
+  },
 
-  cancel: (id: string, payload: CancelRidePayload) =>
-    apiClient.post<RideActionResponse>(`/mileage/${id}/cancel`, payload),
+  cancel: async (id: string, payload: CancelRidePayload) => {
+    const response = await axiosClient.post<RideActionResponse>(`/mileage/${id}/cancel`, payload);
+    return response.data;
+  },
 };
