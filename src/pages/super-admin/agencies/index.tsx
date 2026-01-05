@@ -46,7 +46,7 @@ export default function AgenciesPage() {
         </h1>
         <button
           onClick={() => navigate(Routes.superAdmin.addAgency)}
-          className="backdrop-blur-[22px] bg-[#00b4b8] flex items-center gap-[13px] justify-center px-4 py-3 rounded-[60px] text-white font-semibold text-[14px] leading-[1.4] hover:bg-[#009da1] transition-colors"
+          className="cursor-pointer backdrop-blur-[22px] bg-[#00b4b8] flex items-center gap-[13px] justify-center px-4 py-3 rounded-[60px] text-white font-semibold text-[14px] leading-[1.4] hover:bg-[#009da1] transition-colors"
         >
           <Plus className="w-5 h-5"/>
           Add Agency
