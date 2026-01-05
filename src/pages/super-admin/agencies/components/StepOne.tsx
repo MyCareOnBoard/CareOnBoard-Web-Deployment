@@ -2,8 +2,9 @@ import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import React from "react";
+import {cn} from "@/lib/utils"
 
-export default function Step1AgencyIdentity({formData, onChange}: any) {
+export default function Step1AgencyIdentity({formData, onChange, fieldsWithErrors}: any) {
     return (
         <div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -17,8 +18,16 @@ export default function Step1AgencyIdentity({formData, onChange}: any) {
                         value={formData.agencyName}
                         onChange={(e) => onChange("agencyName", e.target.value)}
                         placeholder="Enter agency name"
-                        className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                        className={cn(
+                            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                            fieldsWithErrors.includes("agencyName") && "border-red-500"
+                        )}
                     />
+                    {fieldsWithErrors.includes("agencyName") && (
+                        <p className="text-red-500 text-sm mt-1">
+                            Agency name is required.
+                        </p>
+                    )}
                 </div>
 
                 {/* Legal Business Name */}
@@ -59,7 +68,10 @@ export default function Step1AgencyIdentity({formData, onChange}: any) {
                         value={formData.agencyType}
                         onValueChange={(value) => onChange("agencyType", value)}
                     >
-                        <SelectTrigger className={"w-full"}>
+                        <SelectTrigger className={cn(
+                            "w-full h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                            fieldsWithErrors.includes("agencyType") && "border-red-500"
+                        )}>
                             <SelectValue placeholder="Select agency type"/>
                         </SelectTrigger>
                         <SelectContent>
@@ -68,6 +80,11 @@ export default function Step1AgencyIdentity({formData, onChange}: any) {
                             <SelectItem value="others">Others</SelectItem>
                         </SelectContent>
                     </Select>
+                    {fieldsWithErrors.includes("agencyType") && (
+                        <p className="text-red-500 text-sm mt-1">
+                            Agency type is required.
+                        </p>
+                    )}
                 </div>
 
                 {/* Agency EIN */}
@@ -80,8 +97,16 @@ export default function Step1AgencyIdentity({formData, onChange}: any) {
                         value={formData.ein}
                         onChange={(e) => onChange("ein", e.target.value)}
                         placeholder="Enter EIN"
-                        className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                        className={cn(
+                            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                            fieldsWithErrors.includes("ein") && "border-red-500"
+                        )}
                     />
+                    {fieldsWithErrors.includes("ein") && (
+                        <p className="text-red-500 text-sm mt-1">
+                            EIN is required.
+                        </p>
+                    )}
                 </div>
 
                 {/* NPI Number */}
@@ -132,22 +157,38 @@ export default function Step1AgencyIdentity({formData, onChange}: any) {
                             value={formData.primaryAddress}
                             onChange={(e) => onChange("primaryAddress", e.target.value)}
                             placeholder="Enter primary address"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("primaryAddress") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("primaryAddress") && (
+                            <p className="text-red-500 text-sm mt-1">
+                                Primary address is required.
+                            </p>
+                        )}
                     </div>
 
                     {/* County / State */}
                     <div>
-                        <Label htmlFor="county" className="mb-2 text-[14px] font-medium text-[#10141a]">
+                        <Label htmlFor="county_or_state" className="mb-2 text-[14px] font-medium text-[#10141a]">
                             County / State
                         </Label>
                         <Input
-                            id="county"
-                            value={formData.county}
-                            onChange={(e) => onChange("county", e.target.value)}
+                            id="county_or_state"
+                            value={formData.county_or_state}
+                            onChange={(e) => onChange("county_or_state", e.target.value)}
                             placeholder="Enter County / State"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("county_or_state") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("county_or_state") && (
+                            <p className="text-red-500 text-sm mt-1">
+                                County/State is required.
+                            </p>
+                        )}
                     </div>
 
                     {/* Zip Code */}
@@ -160,8 +201,16 @@ export default function Step1AgencyIdentity({formData, onChange}: any) {
                             value={formData.zipCode}
                             onChange={(e) => onChange("zipCode", e.target.value)}
                             placeholder="Enter Zip Code"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("zipCode") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("zipCode") && (
+                            <p className="text-red-500 text-sm mt-1">
+                                Zip code is required.
+                            </p>
+                        )}
                     </div>
 
                     {/* Main Phone Number */}
@@ -174,8 +223,16 @@ export default function Step1AgencyIdentity({formData, onChange}: any) {
                             value={formData.mainPhone}
                             onChange={(e) => onChange("mainPhone", e.target.value)}
                             placeholder="Enter Main Phone Number"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("mainPhone") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("mainPhone") && (
+                            <p className="text-red-500 text-sm mt-1">
+                                Main phone number is required.
+                            </p>
+                        )}
                     </div>
 
                     {/* Support/Office Email */}
@@ -189,8 +246,16 @@ export default function Step1AgencyIdentity({formData, onChange}: any) {
                             value={formData.supportEmail}
                             onChange={(e) => onChange("supportEmail", e.target.value)}
                             placeholder="Enter Support/Office Email"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("supportEmail") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("supportEmail") && (
+                            <p className="text-red-500 text-sm mt-1">
+                                Support email is required and must be valid.
+                            </p>
+                        )}
                     </div>
 
                     {/* Website URL (optional) */}

@@ -27,8 +27,7 @@ interface AgencyFormData {
 
     // Step 2: Contact Information
     primaryAddress: string;
-    county: string;
-    state: string;
+    county_or_state: string;
     zipCode: string;
     mainPhone: string;
     supportEmail: string;
@@ -36,8 +35,6 @@ interface AgencyFormData {
 
     // Step 3: Leadership & Admin Contacts
     userName: string;
-    userRole: string;
-    accessLevel: string;
     userPhone: string;
     userEmail: string;
     userPassword: string;
@@ -83,7 +80,6 @@ interface AgencyFormData {
 
     // Step 10: Subscription & Licensing
     subscriptionTier: string;
-    numberOfDspSeats: string;
     addOns: string[];
 
     // Step 8: Branding Setup
@@ -105,9 +101,7 @@ interface AgencyFormData {
     paycheck: string;
 
     // Step 11: Security & Compliance
-    defaultUserRoles: string[];
     permissionTemplates: boolean;
-    twoFactorAuth: boolean;
     auditRetentionPeriod: string;
     auditRetentionPeriodNumber: string;
 }
@@ -117,20 +111,94 @@ const STEPS = [
         id: 1,
         number: 1,
         title: "Agency Identity Information",
-        description: "These fields uniquely identify the agency in the system."
+        description: "These fields uniquely identify the agency in the system.",
+        requiredFields: [
+            "agencyName",
+            "agencyType",
+            "ein",
+            "primaryAddress",
+            "county_or_state",
+            "zipCode",
+            "mainPhone",
+            "supportEmail",
+        ]
     },
     {
-        id: 2, number: 2, title: "Leadership & Admin Contacts", description: "Defines the default Super Admin for the agency."
+        id: 2,
+        number: 2,
+        title: "Leadership & Admin Contacts",
+        description: "Defines the default Super Admin for the agency.",
+        requiredFields: [
+            "userName",
+            "userPhone",
+            "userEmail",
+            "userPassword",
+            "services"
+        ]
     },
-    {id: 3, number: 5, title: "Operational Settings", description: "Defines how the agency operates internally."},
-    {id: 4, number: 6,  title: "AI Settings & Permissions", description: "What AI features are enabled for the agency."},
-    {id: 5, number: 8, title: "Branding Setup", description: "Aesthetic and identity settings."},
-    {id: 6, number: 9, title: "Billing Configuration", description: "Needed for Timesheets, Invoices, and Exports."},
+    {
+        id: 3,
+        number: 5,
+        title: "Operational Settings",
+        description: "Defines how the agency operates internally.",
+        requiredFields: [
+            "schedulingRules",
+            "maxShiftPerDay",
+            "travelTimeRules",
+            "mileageSettings",
+            "mileageRate",
+            "incidentReportingSettings",
+            "expenseReportSettings",
+            "allowedFileTypes",
+            "allowRecurringSchedules",
+            "allowOverlappingVisits",
+            "offerMileageReimbursements",
+            "realtimeGpsTracking"
+        ]
+    },
+    {
+        id: 4,
+        number: 6,
+        title: "AI Settings & Permissions",
+        description: "What AI features are enabled for the agency.",
+        requiredFields: []
+    },
+    {
+        id: 5,
+        number: 8,
+        title: "Branding Setup",
+        description: "Aesthetic and identity settings.",
+        requiredFields: [
+            "logo",
+            "themeColor",
+            "letterhead"
+        ]
+    },
+    {
+        id: 6,
+        number: 9,
+        title: "Billing Configuration",
+        description: "Needed for Timesheets, Invoices, and Exports.",
+        requiredFields: [
+            "billingFormat",
+            "dddFormat",
+            "hhaExchangeFormat",
+            "allowCustomReport",
+            "invoiceName",
+            "invoiceEmail",
+            "paycheck"
+        ]
+    },
     {
         id: 7,
         number: 10,
         title: "Subscription & Licensing Setup",
-        description: "Defines how the agency pays and what tier they belong to."
+        description: "Defines how the agency pays and what tier they belong to.",
+        requiredFields: [
+            "subscriptionTier",
+            "auditRetentionPeriod",
+            "auditRetentionPeriodNumber"
+        ]
     },
 ];
 
@@ -149,6 +217,8 @@ export default function AddAgencyWizard() {
 
     const isSaving = isCreating || isUploading || isSavingDraft;
 
+    const [fieldsWithErrors, setFieldsWithErrors] = useState<string[]>([]);
+
     const [formData, setFormData] = useState<AgencyFormData>({
         agencyName: "",
         legalBusinessName: "",
@@ -158,15 +228,12 @@ export default function AddAgencyWizard() {
         npi: "",
         medicaidProviderId: "",
         primaryAddress: "",
-        county: "",
-        state: "",
+        county_or_state: "",
         zipCode: "",
         mainPhone: "",
         supportEmail: "",
         websiteUrl: "",
         userName: "",
-        userRole: "",
-        accessLevel: "",
         userPhone: "",
         userEmail: "",
         userPassword: "",
@@ -202,7 +269,6 @@ export default function AddAgencyWizard() {
         reminderFrequency: "",
         whoReceivesReminders: "",
         subscriptionTier: "basic",
-        numberOfDspSeats: "5",
         addOns: [],
         logo: null,
         themeColor: "#2B82FF",
@@ -218,9 +284,7 @@ export default function AddAgencyWizard() {
         quickBooks: "",
         adp: "",
         paycheck: "",
-        defaultUserRoles: [],
         permissionTemplates: false,
-        twoFactorAuth: false,
         auditRetentionPeriod: "monthly",
         auditRetentionPeriodNumber: "",
     });
@@ -239,6 +303,7 @@ export default function AddAgencyWizard() {
 
     const handleInputChange = (field: keyof AgencyFormData, value: any) => {
         setFormData((prev) => ({...prev, [field]: value}));
+        setFieldsWithErrors((prev) => prev.filter((f) => f !== field));
     };
 
     const handleSaveDraft = async (saveName: string) => {
@@ -293,9 +358,66 @@ export default function AddAgencyWizard() {
         }
     };
 
+    const validateCurrentStep = (): { isValid: boolean; missingFields: string[] } => {
+        const currentStepConfig = STEPS.find(step => step.id === currentStep);
+        if (!currentStepConfig || !currentStepConfig.requiredFields?.length) {
+            return { isValid: true, missingFields: [] };
+        }
+
+        const missingFields = currentStepConfig.requiredFields.filter(field => {
+            const value = formData[field as keyof AgencyFormData];
+            return value === '' || value === null || value === undefined || 
+                   (Array.isArray(value) && value.length === 0);
+        });
+
+        setFieldsWithErrors(missingFields);
+
+        return {
+            isValid: missingFields.length === 0,
+            missingFields
+        };
+    };
+
     const handleNext = () => {
+        const { isValid, missingFields } = validateCurrentStep();
+        
+        if (!isValid) {
+            // Format field names for display (add spaces before capital letters and capitalize first letter)
+            const formattedFields = missingFields.map(field => 
+                field.replace(/([A-Z])/g, ' $1')
+                     .replace(/^./, str => str.toUpperCase())
+                     .trim()
+            );
+            
+            toast({
+                title: "Missing Required Fields",
+                description: `Please fill in the following required fields: ${formattedFields.join(', ')}`,
+                variant: "destructive",
+            });
+            return;
+        }
+
         if (currentStep < STEPS.length) {
             setCurrentStep(currentStep + 1);
+        }
+    };
+    
+    const handleStepClick = (stepNumber: number) => {
+        if (stepNumber < currentStep) {
+            // Allow going back to previous steps without validation
+            setCurrentStep(stepNumber);
+        } else if (stepNumber > currentStep) {
+            // Validate current step before allowing to proceed to next steps
+            const { isValid } = validateCurrentStep();
+            if (isValid) {
+                setCurrentStep(stepNumber);
+            } else {
+                toast({
+                    title: "Complete Current Step",
+                    description: "Please complete all required fields in the current step before proceeding.",
+                    variant: "destructive",
+                });
+            }
         }
     };
 
@@ -306,6 +428,35 @@ export default function AddAgencyWizard() {
     };
 
     const handleSubmit = async () => {
+        // Validate all steps before submission
+        for (let i = 0; i < STEPS.length; i++) {
+            const step = STEPS[i];
+            if (step.requiredFields?.length) {
+                const missingFields = step.requiredFields.filter(field => {
+                    const value = formData[field as keyof AgencyFormData];
+                    return value === '' || value === null || value === undefined || 
+                           (Array.isArray(value) && value.length === 0);
+                });
+
+                if (missingFields.length > 0) {
+                    // Format field names for display
+                    const formattedFields = missingFields.map(field => 
+                        field.replace(/([A-Z])/g, ' $1')
+                             .replace(/^./, str => str.toUpperCase())
+                             .trim()
+                    );
+
+                    setCurrentStep(i + 1); // Navigate to the step with missing fields
+                    toast({
+                        title: `Step ${i + 1} Incomplete`,
+                        description: `Please fill in the following required fields: ${formattedFields.join(', ')}`,
+                        variant: "destructive",
+                    });
+                    return;
+                }
+            }
+        }
+
         if (!agreedToTerms) {
             toast({
                 title: "Agreement Required",
@@ -477,13 +628,36 @@ export default function AddAgencyWizard() {
                 {/* Content */}
                 <div className="flex-1 px-8 py-2">
                     <div className="max-w-7xl mx-auto">
-                        {currentStep === 1 && <Step1AgencyIdentity formData={formData} onChange={handleInputChange}/>}
-                        {currentStep === 2 && <Step3Leadership formData={formData} onChange={handleInputChange}/>}
-                        {currentStep === 3 && <Step5Operational formData={formData} onChange={handleInputChange}/>}
-                        {currentStep === 4 && <Step6AISettings formData={formData} onChange={handleInputChange}/>}
-                        {currentStep === 5 && <Step8Branding formData={formData} onChange={handleInputChange}/>}
-                        {currentStep === 6 && <Step9Billing formData={formData} onChange={handleInputChange}/>}
-                        {currentStep === 7 && <Step10Subscription formData={formData} onChange={handleInputChange}/>}
+                        {currentStep === 1 && <Step1AgencyIdentity
+                            formData={formData}
+                            onChange={handleInputChange}
+                            fieldsWithErrors={fieldsWithErrors}
+                        />}
+                        {currentStep === 2 && <Step3Leadership
+                            formData={formData} onChange={handleInputChange}
+                            fieldsWithErrors={fieldsWithErrors}
+                        />}
+                        {currentStep === 3 && <Step5Operational
+                            formData={formData} onChange={handleInputChange}
+                            fieldsWithErrors={fieldsWithErrors}
+                        />}
+                        {currentStep === 4 && <Step6AISettings
+                            formData={formData} onChange={handleInputChange}
+                            fieldsWithErrors={fieldsWithErrors}
+                        />}
+                        {currentStep === 5 && <Step8Branding
+                            formData={formData} onChange={handleInputChange}
+                            fieldsWithErrors={fieldsWithErrors}
+                        />}
+                        {currentStep === 6 && <Step9Billing
+                            formData={formData}
+                            onChange={handleInputChange}
+                            fieldsWithErrors={fieldsWithErrors}
+                        />}
+                        {currentStep === 7 && <Step10Subscription
+                            formData={formData} onChange={handleInputChange}
+                            fieldsWithErrors={fieldsWithErrors}
+                        />}
                     </div>
                 </div>
 

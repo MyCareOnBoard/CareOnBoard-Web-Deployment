@@ -3,9 +3,10 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 import React from "react";
 import {Toggle} from "@/components/ui/toggle";
 import {Input} from "@/components/ui/input";
+import {cn} from "@/lib/utils"
 
 
-export default function Step10Subscription({formData, onChange}: any) {
+export default function Step10Subscription({formData, onChange, fieldsWithErrors}: any) {
     const tiers = [
         {id: "basic", label: "Basic (50DSPs)"},
         {id: "professional", label: "Professional (90DSPs)"},
@@ -106,8 +107,11 @@ export default function Step10Subscription({formData, onChange}: any) {
                             <Select
                                 value={formData.auditRetentionPeriod}
                                 onValueChange={(value) => onChange("auditRetentionPeriod", value)}
+                                className={"w-full"}
                             >
-                                <SelectTrigger className={"w-full"}>
+                                <SelectTrigger
+                                    className={cn("w-full", fieldsWithErrors.includes("auditRetentionPeriod") && "border-red-500")}
+                                >
                                     <SelectValue placeholder="Select time"/>
                                 </SelectTrigger>
                                 <SelectContent>
@@ -115,19 +119,33 @@ export default function Step10Subscription({formData, onChange}: any) {
                                     <SelectItem value={"yearly"}>Yearly</SelectItem>
                                 </SelectContent>
                             </Select>
+                            {fieldsWithErrors.includes("auditRetentionPeriod") && (
+                                <p className="text-red-500 mt-1 text-[12px]">
+                                    Please select an audit retention period.
+                                </p>
+                            )}
                         </div>
                         {/* Audit retention period */}
                         <div className={"w-full"}>
                             <Label htmlFor="auditRetentionPeriodNumber" className="mb-2 text-[14px] font-medium text-[#10141a]">
-                                Audit retention period
+                                Audit retention period Number
                             </Label>
                             <Input
                                 id="auditRetentionPeriodNumber"
+                                type="number"
                                 value={formData.auditRetentionPeriodNumber}
                                 onChange={(e) => onChange("auditRetentionPeriodNumber", e.target.value)}
                                 placeholder="Enter retention period number"
-                                className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                                className={cn(
+                                    "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                    fieldsWithErrors.includes("auditRetentionPeriodNumber") && "border-red-500"
+                                )}
                             />
+                            {fieldsWithErrors.includes("auditRetentionPeriodNumber") && (
+                                <p className="text-red-500 mt-1 text-[12px]">
+                                    Please enter an audit retention period number.
+                                </p>
+                            )}
                         </div>
                     </div>
 

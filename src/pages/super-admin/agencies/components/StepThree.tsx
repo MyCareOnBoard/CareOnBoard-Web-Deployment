@@ -3,8 +3,10 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {MultiSelect, MultiSelectItem} from "@/components/ui/multi-select";
+import {cn} from "@/lib/utils"
 
-export default function Step5Operational({formData, onChange}: any) {
+
+export default function Step5Operational({formData, onChange, fieldsWithErrors}: any) {
     const allowedTypes = [
         {value: "pdf", label: "pdf"},
         {value: "jpg", label: "jpg"},
@@ -23,8 +25,16 @@ export default function Step5Operational({formData, onChange}: any) {
                     value={formData.schedulingRules}
                     onChange={(e) => onChange("schedulingRules", e.target.value)}
                     placeholder="Enter scheduling rules"
-                    className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                    className={cn(
+                        "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                        fieldsWithErrors.includes("schedulingRules") && "border-red-500"
+                    )}
                 />
+                {fieldsWithErrors.includes("schedulingRules") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        Scheduling rules is required.
+                    </p>
+                )}
             </div>
 
             {/* Max shift per day */}
@@ -36,7 +46,10 @@ export default function Step5Operational({formData, onChange}: any) {
                     value={formData.maxShiftPerDay}
                     onValueChange={(value) => onChange("maxShiftPerDay", value)}
                 >
-                    <SelectTrigger className={"w-full"}>
+                    <SelectTrigger className={cn(
+                        "w-full",
+                        fieldsWithErrors.includes("maxShiftPerDay") && "border-red-500"
+                    )}>
                         <SelectValue placeholder="Select number of shift"/>
                     </SelectTrigger>
                     <SelectContent>
@@ -48,6 +61,11 @@ export default function Step5Operational({formData, onChange}: any) {
                         <SelectItem value="30">30</SelectItem>
                     </SelectContent>
                 </Select>
+                {fieldsWithErrors.includes("maxShiftPerDay") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        Max shift per day is required.
+                    </p>
+                )}
             </div>
 
             {/* Travel time rules */}
@@ -60,8 +78,16 @@ export default function Step5Operational({formData, onChange}: any) {
                     value={formData.travelTimeRules}
                     onChange={(e) => onChange("travelTimeRules", e.target.value)}
                     placeholder="Enter Travel time rules"
-                    className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                    className={cn(
+                        "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                        fieldsWithErrors.includes("travelTimeRules") && "border-red-500"
+                    )}
                 />
+                {fieldsWithErrors.includes("travelTimeRules") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        Travel time rules is required.
+                    </p>
+                )}
             </div>
 
             {/* Mileage Settings */}
@@ -74,8 +100,16 @@ export default function Step5Operational({formData, onChange}: any) {
                     value={formData.mileageSettings}
                     onChange={(e) => onChange("mileageSettings", e.target.value)}
                     placeholder="Enter Mileage Settings"
-                    className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                    className={cn(
+                        "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                        fieldsWithErrors.includes("mileageSettings") && "border-red-500"
+                    )}
                 />
+                {fieldsWithErrors.includes("mileageSettings") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        Mileage settings is required.
+                    </p>
+                )}
             </div>
 
             {/* Mileage rate */}
@@ -90,8 +124,16 @@ export default function Step5Operational({formData, onChange}: any) {
                     value={formData.mileageRate}
                     onChange={(e) => onChange("mileageRate", parseFloat(e.target.value))}
                     placeholder="Enter Mileage rate"
-                    className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                    className={cn(
+                        "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                        fieldsWithErrors.includes("mileageRate") && "border-red-500"
+                    )}
                 />
+                {fieldsWithErrors.includes("mileageRate") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        Mileage rate is required.
+                    </p>
+                )}
             </div>
 
             {/* Incident Reporting Settings */}
@@ -104,8 +146,16 @@ export default function Step5Operational({formData, onChange}: any) {
                     value={formData.incidentReportingSettings}
                     onChange={(e) => onChange("incidentReportingSettings", e.target.value)}
                     placeholder="Enter Incident Reporting Settings"
-                    className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                    className={cn(
+                        "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                        fieldsWithErrors.includes("incidentReportingSettings") && "border-red-500"
+                    )}
                 />
+                {fieldsWithErrors.includes("incidentReportingSettings") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        Incident reporting settings are required.
+                    </p>
+                )}
             </div>
 
             {/* Who receives notifications */}
@@ -117,7 +167,10 @@ export default function Step5Operational({formData, onChange}: any) {
                     value={formData.whoReceivesNotifications}
                     onValueChange={(value) => onChange("whoReceivesNotifications", value)}
                 >
-                    <SelectTrigger className={"w-full"}>
+                    <SelectTrigger className={cn(
+                        "w-full",
+                        fieldsWithErrors.includes("whoReceivesNotifications") && "border-red-500"
+                    )}>
                         <SelectValue placeholder="Select role"/>
                     </SelectTrigger>
                     <SelectContent>
@@ -126,6 +179,11 @@ export default function Step5Operational({formData, onChange}: any) {
                         <SelectItem value="supervisor">Supervisor</SelectItem>
                     </SelectContent>
                 </Select>
+                {fieldsWithErrors.includes("whoReceivesNotifications") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        Who receives notifications are required.
+                    </p>
+                )}
             </div>
 
             {/* Expense Report Settings */}
@@ -138,8 +196,16 @@ export default function Step5Operational({formData, onChange}: any) {
                     value={formData.expenseReportSettings}
                     onChange={(e) => onChange("expenseReportSettings", e.target.value)}
                     placeholder="Enter Expense Report Settings"
-                    className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                    className={cn(
+                        "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                        fieldsWithErrors.includes("expenseReportSettings") && "border-red-500"
+                    )}
                 />
+                {fieldsWithErrors.includes("expenseReportSettings") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        Expense report settings are required.
+                    </p>
+                )}
             </div>
 
             {/* Allowed file types */}
@@ -151,6 +217,9 @@ export default function Step5Operational({formData, onChange}: any) {
                     value={formData.allowedFileTypes}
                     onValueChange={(value) => onChange("allowedFileTypes", value)}
                     placeholder={"Select file types"}
+                    buttonClassName={cn(
+                        fieldsWithErrors.includes("allowedFileTypes") && "border-red-500"
+                    )}
                 >
                     {allowedTypes.map((type) => (
                         <MultiSelectItem key={type.value} value={type.value}>
@@ -158,6 +227,11 @@ export default function Step5Operational({formData, onChange}: any) {
                         </MultiSelectItem>
                     ))}
                 </MultiSelect>
+                {fieldsWithErrors.includes("allowedFileTypes") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        At least one file type must be selected.
+                    </p>
+                )}
             </div>
 
             {/* Allow recurring schedules? */}

@@ -10,6 +10,7 @@ interface MultiSelectProps {
     onValueChange?: (value: string[]) => void
     placeholder?: string
     className?: string
+    buttonClassName?: string
     size?: "sm" | "default"
     disabled?: boolean
     children: React.ReactNode
@@ -20,6 +21,7 @@ function MultiSelect({
                          onValueChange,
                          placeholder = "Select options...",
                          className,
+                         buttonClassName,
                          size = "default",
                          disabled = false,
                          children,
@@ -81,7 +83,8 @@ function MultiSelect({
                     "h-11 data-[size=sm]:h-9",
                     "focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20",
                     "disabled:cursor-not-allowed disabled:opacity-60",
-                    open && "border-primary ring-2 ring-ring/20"
+                    open && "border-primary ring-2 ring-ring/20",
+                    buttonClassName
                 )}
             >
                 <div className="flex flex-1 flex-wrap items-center gap-1.5 overflow-hidden">

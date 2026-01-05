@@ -1,9 +1,10 @@
 import React, {useState} from "react";
 import {Label} from "@/components/ui/label";
 import {Upload} from "lucide-react";
+import {cn} from "@/lib/utils"
 
 
-export default function Step8Branding({formData, onChange}: any) {
+export default function Step8Branding({formData, onChange, fieldsWithErrors}: any) {
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [letterheadPreview, setLetterheadPreview] = useState<string | null>(null);
 
@@ -42,7 +43,10 @@ export default function Step8Branding({formData, onChange}: any) {
             <div>
                 <Label className="mb-2 text-[14px] font-medium text-[#10141a] block">Upload Logo</Label>
                 <div
-                    className="border-2 bg-white border border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer">
+                    className={cn(
+                        "border-2 bg-white border border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer",
+                        fieldsWithErrors.includes("logo") && "border-red-500"
+                    )}>
                     <label htmlFor="logo-upload" className="flex items-center gap-2 cursor-pointer">
                         <Upload className="w-5 h-5 text-[#808081]"/>
                         <span className="text-[14px] text-[#808081]">
@@ -61,6 +65,11 @@ export default function Step8Branding({formData, onChange}: any) {
                     <div className="mt-3">
                         <img src={logoPreview} alt="Logo preview" className="h-16 object-contain"/>
                     </div>
+                )}
+                {fieldsWithErrors.includes("logo") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        Logo is required.
+                    </p>
                 )}
             </div>
 
@@ -94,8 +103,16 @@ export default function Step8Branding({formData, onChange}: any) {
                             value={formData.themeColor}
                             onChange={(e) => onChange("themeColor", e.target.value)}
                             placeholder="#000000"
-                            className="text-[14px] font-mono text-[#10141a] bg-white py-1 px-4 border border-[#e5e5e6] rounded focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none w-28"
+                            className={cn(
+                                "text-[14px] font-mono text-[#10141a] bg-white py-1 px-4 border border-[#e5e5e6] rounded focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none w-28",
+                                fieldsWithErrors.includes("themeColor") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("themeColor") && (
+                            <p className="text-red-500 mt-1 text-[12px]">
+                                Theme color is required.
+                            </p>
+                        )}
                     </div>
                 </div>
                 <p className="text-[14px] text-[#808081] mt-2">Choose preferred theme for the app.</p>
@@ -107,7 +124,11 @@ export default function Step8Branding({formData, onChange}: any) {
                     Letterhead / Footer for Reports
                 </Label>
                 <div
-                    className="border-2 bg-white border border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer">
+                    className={cn(
+                        "border-2 bg-white border border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer",
+                        fieldsWithErrors.includes("letterhead") && "border-red-500"
+                    )}
+                >
                     <label htmlFor="letterhead-upload" className="flex items-center gap-2 cursor-pointer">
                         <Upload className="w-5 h-5 text-[#808081]"/>
                         <span className="text-[14px] text-[#808081]">
@@ -126,6 +147,11 @@ export default function Step8Branding({formData, onChange}: any) {
                     <div className="mt-3">
                         <img src={letterheadPreview} alt="Letterhead preview" className="h-16 object-contain"/>
                     </div>
+                )}
+                {fieldsWithErrors.includes("letterhead") && (
+                    <p className="text-red-500 mt-1 text-[12px]">
+                        Letterhead is required.
+                    </p>
                 )}
             </div>
         </div>

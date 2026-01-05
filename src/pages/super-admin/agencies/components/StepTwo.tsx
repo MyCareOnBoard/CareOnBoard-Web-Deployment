@@ -5,7 +5,9 @@ import {Input} from "@/components/ui/input";
 import {Eye, EyeOff, RefreshCw} from "lucide-react";
 import {MultiSelect, MultiSelectItem} from "@/components/ui/multi-select";
 
-export default function Step3Leadership({formData, onChange}: any) {
+import { cn } from "@/lib/utils";
+
+export default function Step3Leadership({formData, onChange, fieldsWithErrors = []}: {formData: any, onChange: (field: string, value: any) => void, fieldsWithErrors?: string[]}) {
     const [showPassword, setShowPassword] = useState(false);
     const {toast} = useToast();
 
@@ -46,8 +48,16 @@ export default function Step3Leadership({formData, onChange}: any) {
                         value={formData.userName}
                         onChange={(e) => onChange("userName", e.target.value)}
                         placeholder="Enter user name"
-                        className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                        className={cn(
+                            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                            fieldsWithErrors.includes("userName") && "border-red-500"
+                        )}
                     />
+                    {fieldsWithErrors.includes("userName") && (
+                        <p className="text-red-500 mt-1 text-[12px]">
+                            User name is required.
+                        </p>
+                    )}
                 </div>
 
                 {/* Phone Number */}
@@ -60,8 +70,16 @@ export default function Step3Leadership({formData, onChange}: any) {
                         value={formData.userPhone}
                         onChange={(e) => onChange("userPhone", e.target.value)}
                         placeholder="Enter Phone Number"
-                        className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                        className={cn(
+                            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                            fieldsWithErrors.includes("userPhone") && "border-red-500"
+                        )}
                     />
+                    {fieldsWithErrors.includes("userPhone") && (
+                        <p className="text-red-500 mt-1 text-[12px]">
+                            Phone number is required.
+                        </p>
+                    )}
                 </div>
 
                 {/* Email Address */}
@@ -75,8 +93,16 @@ export default function Step3Leadership({formData, onChange}: any) {
                         value={formData.userEmail}
                         onChange={(e) => onChange("userEmail", e.target.value)}
                         placeholder="Enter email"
-                        className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                        className={cn(
+                            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                            fieldsWithErrors.includes("userEmail") && "border-red-500"
+                        )}
                     />
+                    {fieldsWithErrors.includes("userEmail") && (
+                        <p className="text-red-500 mt-1 text-[12px]">
+                            Email is required.
+                        </p>
+                    )}
                 </div>
 
                 {/* Generate Password */}
@@ -100,8 +126,16 @@ export default function Step3Leadership({formData, onChange}: any) {
                             value={formData.userPassword}
                             onChange={(e) => onChange("userPassword", e.target.value)}
                             placeholder="Generated password"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8] pr-10"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8] pr-10",
+                                fieldsWithErrors.includes("userPassword") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("userPassword") && (
+                            <p className="text-red-500 text-sm mt-1">
+                                Password is required.
+                            </p>
+                        )}
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
@@ -130,6 +164,9 @@ export default function Step3Leadership({formData, onChange}: any) {
                             value={formData.services}
                             onValueChange={(value) => onChange("services", value)}
                             placeholder="Select multiple services"
+                            buttonClassName={cn(
+                                fieldsWithErrors.includes("services") && "border-red-500"
+                            )}
                         >
                             {services.map((service) => (
                                 <MultiSelectItem key={service} value={service}>
@@ -137,6 +174,11 @@ export default function Step3Leadership({formData, onChange}: any) {
                                 </MultiSelectItem>
                             ))}
                         </MultiSelect>
+                        {fieldsWithErrors.includes("services") && (
+                            <p className="text-red-500 mt-1 text-[12px]">
+                                Services are required.
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>

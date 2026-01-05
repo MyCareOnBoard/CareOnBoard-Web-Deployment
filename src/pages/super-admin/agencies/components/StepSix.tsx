@@ -1,9 +1,10 @@
 import {Label} from "@/components/ui/label";
 import React from "react";
 import {Input} from "@/components/ui/input";
+import {cn} from "@/lib/utils"
 
 
-export default function Step9Billing({formData, onChange}: any) {
+export default function Step9Billing({formData, onChange, fieldsWithErrors}: any) {
     return (
         <div className="space-y-6">
             {/* Billing Format, DDD format, HHA eXchange Format */}
@@ -17,8 +18,16 @@ export default function Step9Billing({formData, onChange}: any) {
                         value={formData.billingFormat}
                         onChange={(e) => onChange("billingFormat", e.target.value)}
                         placeholder="Enter Billing Format"
-                        className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                        className={cn(
+                            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                            fieldsWithErrors.includes("billingFormat") && "border-red-500"
+                        )}
                     />
+                    {fieldsWithErrors.includes("billingFormat") && (
+                        <p className="text-red-500 mt-1 text-[12px]">
+                            Billing format is required.
+                        </p>
+                    )}
                 </div>
 
                 <div>
@@ -30,8 +39,16 @@ export default function Step9Billing({formData, onChange}: any) {
                         value={formData.dddFormat}
                         onChange={(e) => onChange("dddFormat", e.target.value)}
                         placeholder="Enter DDD format"
-                        className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                        className={cn(
+                            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                            fieldsWithErrors.includes("dddFormat") && "border-red-500"
+                        )}
                     />
+                    {fieldsWithErrors.includes("dddFormat") && (
+                        <p className="text-red-500 mt-1 text-[12px]">
+                            DDD format is required.
+                        </p>
+                    )}
                 </div>
 
                 <div>
@@ -43,8 +60,16 @@ export default function Step9Billing({formData, onChange}: any) {
                         value={formData.hhaExchangeFormat}
                         onChange={(e) => onChange("hhaExchangeFormat", e.target.value)}
                         placeholder="Enter HHA eXchange format"
-                        className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                        className={cn(
+                            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                            fieldsWithErrors.includes("hhaExchangeFormat") && "border-red-500"
+                        )}
                     />
+                    {fieldsWithErrors.includes("hhaExchangeFormat") && (
+                        <p className="text-red-500 mt-1 text-[12px]">
+                            HHA eXchange format is required.
+                        </p>
+                    )}
                 </div>
             </div>
 
@@ -91,8 +116,16 @@ export default function Step9Billing({formData, onChange}: any) {
                             value={formData.invoiceName}
                             onChange={(e) => onChange("invoiceName", e.target.value)}
                             placeholder="Enter name"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("invoiceName") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("invoiceName") && (
+                            <p className="text-red-500 mt-1 text-[12px]">
+                                Invoice name is required.
+                            </p>
+                        )}
                     </div>
 
                     {/* Email */}
@@ -106,8 +139,16 @@ export default function Step9Billing({formData, onChange}: any) {
                             value={formData.invoiceEmail}
                             onChange={(e) => onChange("invoiceEmail", e.target.value)}
                             placeholder="Enter email"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("invoiceEmail") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("invoiceEmail") && (
+                            <p className="text-red-500 mt-1 text-[12px]">
+                                Invoice email is required.
+                            </p>
+                        )}
                     </div>
 
                     {/* Fax */}
@@ -120,7 +161,10 @@ export default function Step9Billing({formData, onChange}: any) {
                             value={formData.invoiceFax}
                             onChange={(e) => onChange("invoiceFax", e.target.value)}
                             placeholder="Enter fax"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("invoiceFax") && "border-red-500"
+                            )}
                         />
                     </div>
 
@@ -135,8 +179,16 @@ export default function Step9Billing({formData, onChange}: any) {
                             value={formData.payrollSystemIntegration}
                             onChange={(e) => onChange("payrollSystemIntegration", e.target.value)}
                             placeholder="Enter Payroll System Integration"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("payrollSystemIntegration") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("payrollSystemIntegration") && (
+                            <p className="text-red-500 mt-1 text-[12px]">
+                                Payroll System Integration is required.
+                            </p>
+                        )}
                     </div>
 
                     {/* Quick Books */}
@@ -149,8 +201,16 @@ export default function Step9Billing({formData, onChange}: any) {
                             value={formData.quickBooks}
                             onChange={(e) => onChange("quickBooks", e.target.value)}
                             placeholder="Enter QuickBooks"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("quickBooks") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("quickBooks") && (
+                            <p className="text-red-500 mt-1 text-[12px]">
+                                QuickBooks is required.
+                            </p>
+                        )}
                     </div>
 
                     {/* ADP */}
@@ -163,8 +223,16 @@ export default function Step9Billing({formData, onChange}: any) {
                             value={formData.adp}
                             onChange={(e) => onChange("adp", e.target.value)}
                             placeholder="Enter ADP"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("adp") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("adp") && (
+                            <p className="text-red-500 mt-1 text-[12px]">
+                                ADP is required.
+                            </p>
+                        )}
                     </div>
 
                     {/* Paycheck */}
@@ -177,8 +245,16 @@ export default function Step9Billing({formData, onChange}: any) {
                             value={formData.paycheck}
                             onChange={(e) => onChange("paycheck", e.target.value)}
                             placeholder="Enter paycheck"
-                            className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                            className={cn(
+                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                fieldsWithErrors.includes("paycheck") && "border-red-500"
+                            )}
                         />
+                        {fieldsWithErrors.includes("paycheck") && (
+                            <p className="text-red-500 mt-1 text-[12px]">
+                                Paycheck is required.
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>

@@ -3,7 +3,7 @@ import {Label} from "@/components/ui/label";
 import React from "react";
 
 
-export default function Step6AISettings({formData, onChange}: any) {
+export default function Step6AISettings({formData, onChange, fieldsWithErrors}: any) {
     const ToggleSwitch = ({checked, onChange}: { checked: boolean; onChange: () => void }) => (
         <Toggle
             className={"h-8 w-14"}
