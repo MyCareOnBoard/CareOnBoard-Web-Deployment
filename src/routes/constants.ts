@@ -67,6 +67,7 @@ export const Routes = {
     agencies: "/super-admin/agencies",
     addAgency: "/super-admin/agencies/add",
     savedAgencies: "/super-admin/agencies/saved",
+    agencyView: "/super-admin/agencies/:id",
     userAccessControl: "/super-admin/user-access-control",
     complianceMonitor: "/super-admin/compliance-monitor",
     globalNotesQuality: "/super-admin/global-notes-quality",

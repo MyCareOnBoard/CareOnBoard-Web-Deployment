@@ -11,7 +11,7 @@ export default function AgenciesPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const {data: agencies, isLoading: loadingAgencies} = useListAllAgenciesQuery({limit: 100});
+  const {data: agencies, isLoading: loadingAgencies} = useListAllAgenciesQuery({});
 
 
   const filteredAgencies = useMemo(() => {
@@ -37,6 +37,10 @@ export default function AgenciesPage() {
     return filtered;
   }, [agencies, filterStatus, searchQuery]);
 
+  const viewAgency = (agencyId: string) => {
+      navigate(Routes.superAdmin.agencyView.replace(":id", agencyId))
+  }
+
   return (
     <div className="min-h-[calc(100vh-200px)]">
       {/* Header */}
@@ -46,7 +50,7 @@ export default function AgenciesPage() {
         </h1>
         <button
           onClick={() => navigate(Routes.superAdmin.addAgency)}
-          className="backdrop-blur-[22px] bg-[#00b4b8] flex items-center gap-[13px] justify-center px-4 py-3 rounded-[60px] text-white font-semibold text-[14px] leading-[1.4] hover:bg-[#009da1] transition-colors"
+          className="cursor-pointer backdrop-blur-[22px] bg-[#00b4b8] flex items-center gap-[13px] justify-center px-4 py-3 rounded-[60px] text-white font-semibold text-[14px] leading-[1.4] hover:bg-[#009da1] transition-colors"
         >
           <Plus className="w-5 h-5"/>
           Add Agency
@@ -151,7 +155,7 @@ export default function AgenciesPage() {
                     {agency.name}
                   </h3>
                   <p className="font-medium text-[12px] text-[#808081] truncate mt-1">
-                    #{agency.primaryColor || agency.id.slice(0, 8)}
+                    {agency.primaryColor}
                   </p>
                 </div>
               </div>
@@ -167,7 +171,10 @@ export default function AgenciesPage() {
                       Admin
                     </p>
                   </div>
-                  <button className="backdrop-blur-sm bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] flex items-center justify-center p-3 rounded-[200px] shrink-0 hover:bg-[rgba(255,255,255,0.7)] transition-colors">
+                  <button 
+                    onClick={() => viewAgency(agency.id)}
+                    className="cursor-pointer backdrop-blur-sm bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] flex items-center justify-center p-3 rounded-[200px] shrink-0 hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+                  >
                     <ArrowUpRight className="w-4 h-4 text-[#10141a]" />
                   </button>
                 </div>
