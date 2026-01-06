@@ -107,7 +107,6 @@ export default function Step10Subscription({formData, onChange, fieldsWithErrors
                             <Select
                                 value={formData.auditRetentionPeriod}
                                 onValueChange={(value) => onChange("auditRetentionPeriod", value)}
-                                className={"w-full"}
                             >
                                 <SelectTrigger
                                     className={cn("w-full", fieldsWithErrors.includes("auditRetentionPeriod") && "border-red-500")}
