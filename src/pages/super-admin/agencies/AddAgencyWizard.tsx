@@ -4,7 +4,12 @@ import {useToast} from "@/hooks/use-toast";
 import {useNavigate, useLocation} from "react-router";
 import {Routes} from "@/routes/constants";
 import {ArrowRight, ArrowLeft} from "lucide-react";
-import {useCreateAgencyWithUserMutation, useUploadAgencyFileMutation} from "./api";
+import {
+    useCreateAgencyWithUserMutation, useLazyGetAgencyQuery,
+    useLazyGetDraftAgencyQuery,
+    useSaveDraftMutation, useUpdateAgencyMutation,
+    useUploadAgencyFileMutation
+} from "./api";
 import {UserType} from "@/utils/auth/types/user.types";
 import {SaveDraftModal} from "./SaveDraftModal";
 import Step1AgencyIdentity from "@/pages/super-admin/agencies/components/StepOne";
@@ -14,6 +19,7 @@ import Step6AISettings from "@/pages/super-admin/agencies/components/StepFour";
 import Step8Branding from "@/pages/super-admin/agencies/components/StepFive";
 import Step9Billing from "@/pages/super-admin/agencies/components/StepSix";
 import Step10Subscription from "@/pages/super-admin/agencies/components/StepSeven";
+import {GetDraftAgencyResponse} from "@/pages/super-admin/agencies/apiTypes";
 
 interface AgencyFormData {
     // Step 1: Agency Identity Information
@@ -206,16 +212,27 @@ export default function AddAgencyWizard() {
     const navigate = useNavigate();
     const location = useLocation();
     const [currentStep, setCurrentStep] = useState(1);
-    const [agencyId] = useState(() => Math.floor(100000 + Math.random() * 900000).toString());
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
-    const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+    const [imagesPreview, setImagesPreview] = useState<{
+        logo: string | null;
+        letterHead: string | null;
+    }>({
+        logo: null,
+        letterHead: null,
+    })
     const {toast} = useToast();
 
     const [createAgencyWithUser, {isLoading: isCreating}] = useCreateAgencyWithUserMutation();
+    const [createDraft, {isLoading: isDrafting}] = useSaveDraftMutation();
     const [uploadFile, {isLoading: isUploading}] = useUploadAgencyFileMutation();
+    const [getDraftAgency, {data: draft}] = useLazyGetDraftAgencyQuery();
+    const [getAgency, {data: currentAgency}] = useLazyGetAgencyQuery();
+    const [updateAgency, {isLoading: isUpdating}] = useUpdateAgencyMutation();
 
-    const isSaving = isCreating || isUploading || isSavingDraft;
+    const isSaving = isCreating || isUploading || isSavingDraft || isUpdating;
+    const draftId = new URLSearchParams(location.search).get("draftId");
+    const agencyId = new URLSearchParams(location.search).get("agencyId");
 
     const [fieldsWithErrors, setFieldsWithErrors] = useState<string[]>([]);
 
@@ -291,15 +308,112 @@ export default function AddAgencyWizard() {
 
     const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+    const setFormDataBasedOnAPIResponse = (
+        responseData: GetDraftAgencyResponse
+    ) => {
+        setFormData({
+            // Step 1: Agency Identity Information
+            agencyName: responseData.agencyData?.name || "",
+            legalBusinessName: responseData.agencyData?.legalBusinessName || "",
+            dba: responseData.agencyData?.dba || "",
+            agencyType: responseData.agencyData?.agencyType || "",
+            ein: responseData.agencyData?.ein || "",
+            npi: responseData.agencyData?.npi || "",
+            medicaidProviderId: responseData.agencyData?.medicaidProviderId || "",
+            // Step 2: Contact Information
+            supportEmail: responseData.agencyData?.email || "",
+            mainPhone: responseData.agencyData?.phone || "",
+            primaryAddress: responseData.agencyData?.address || "",
+            county_or_state: responseData.agencyData?.state || "",
+            zipCode: responseData.agencyData?.zipCode || "",
+            websiteUrl: responseData.agencyData?.website || "",
+            // Step 3: Leadership & Admin Contacts
+            userName: responseData.user?.fullName || "",
+            userPhone: responseData.user?.phone || "",
+            userEmail: responseData.user?.email || "",
+            userPassword: responseData.user?.password || "",
+            // Step 4: Service Configuration
+            services: responseData.agencyData?.services || [],
+            serviceCodeMapping: responseData.agencyData?.serviceCodeMapping || {},
+            evvSettings: responseData.agencyData?.evvSettings || {},
+            // Step 5: Operational Settings
+            schedulingRules: responseData.agencyData?.schedulingRules || "",
+            maxShiftPerDay: responseData.agencyData?.maxShiftPerDay?.toString() || "",
+            travelTimeRules: responseData.agencyData?.travelTimeRules || "",
+            mileageSettings: responseData.agencyData?.mileageSettings || "",
+            mileageRate: responseData.agencyData?.mileageRate || 0,
+            incidentReportingSettings: responseData.agencyData?.incidentReportingSettings || "",
+            whoReceivesNotifications: responseData.agencyData?.whoReceivesNotifications || "",
+            expenseReportSettings: responseData.agencyData?.expenseReportSettings || "",
+            allowedFileTypes: responseData.agencyData?.allowedFileTypes || [],
+            allowRecurringSchedules: responseData.agencyData?.allowRecurringSchedules || false,
+            allowOverlappingVisits: responseData.agencyData?.allowOverlappingVisits || false,
+            offerMileageReimbursements: responseData.agencyData?.offerMileageReimbursements || false,
+            realtimeGpsTracking: responseData.agencyData?.realtimeGpsTracking || false,
+            // Step 6: AI Settings & Permissions
+            aiNotesReview: responseData.agencyData?.aiNotesReview || false,
+            aiPlanOfCareBuilder: responseData.agencyData?.aiPlanOfCareBuilder || false,
+            aiScheduleOptimizer: responseData.agencyData?.aiScheduleOptimizer || false,
+            aiDataCleaner: responseData.agencyData?.aiDataCleaner || false,
+            aiBillingValidator: responseData.agencyData?.aiBillingValidator || false,
+            // Step 7: Document Requirements
+            requireIds: responseData.agencyData?.requireIds || false,
+            requireSsn: responseData.agencyData?.requireSsn || false,
+            requireResume: responseData.agencyData?.requireResume || false,
+            requireCertificates: responseData.agencyData?.requireCertificates || false,
+            requireTrainings: responseData.agencyData?.requireTrainings || false,
+            requireClearances: responseData.agencyData?.requireClearances || false,
+            expiryRules: responseData.agencyData?.expiryRules || false,
+            autoReminders: responseData.agencyData?.autoReminders || false,
+            reminderFrequency: responseData.agencyData?.reminderFrequency || "",
+            whoReceivesReminders: responseData.agencyData?.whoReceivesReminders || "",
+            // Step 8: Branding Setup
+            logo: null,
+            themeColor: responseData.agencyData?.themeColor || "",
+            letterhead: null,
+            // Step 9: Billing Configuration
+            billingFormat: responseData.agencyData?.billingFormat || "",
+            dddFormat: responseData.agencyData?.dddFormat || "",
+            hhaExchangeFormat: responseData.agencyData?.hhaExchangeFormat || "",
+            allowCustomReport: responseData.agencyData?.allowCustomReport || false,
+            invoiceName: responseData.agencyData?.invoiceName || "",
+            invoiceEmail: responseData.agencyData?.invoiceEmail || "",
+            invoiceFax: responseData.agencyData?.invoiceFax || "",
+            payrollSystemIntegration: responseData.agencyData?.payrollSystemIntegration || "",
+            quickBooks: responseData.agencyData?.quickBooks || "",
+            adp: responseData.agencyData?.adp || "",
+            paycheck: responseData.agencyData?.paycheck || "",
+            // Step 10: Subscription & Licensing
+            subscriptionTier: responseData.agencyData?.subscriptionTier || "",
+            addOns: responseData.agencyData?.addOns || [],
+            // Step 11: Security & Compliance
+            permissionTemplates: responseData.agencyData?.permissionTemplates || false,
+            auditRetentionPeriod: responseData.agencyData?.auditRetentionPeriod || "",
+            auditRetentionPeriodNumber: responseData.agencyData?.auditRetentionPeriodNumber || "",
+        });
+        setImagesPreview({
+            logo: responseData.agencyData?.logo || "",
+            letterHead: responseData.agencyData?.letterhead || "",
+        });
+        setAgreedToTerms(true);
+    }
+
     // Load saved draft data if editing
     useEffect(() => {
-        const savedData = location.state?.savedData;
-        if (savedData) {
-            setFormData(savedData.formData);
-            setCurrentStep(savedData.currentStep || 1);
-            setEditingDraftId(savedData.id);
-        }
-    }, [location.state]);
+        if (draftId) getDraftAgency(draftId);
+    }, [draftId]);
+
+    useEffect(() => {
+        if (agencyId) getAgency(agencyId);
+    }, [agencyId]);
+
+    useEffect(() => {
+        if (draft) setFormDataBasedOnAPIResponse(draft);
+    }, [draft]);
+
+    useEffect(() => {
+        if (currentAgency) setFormDataBasedOnAPIResponse(currentAgency);
+    }, [currentAgency]);
 
     const handleInputChange = (field: keyof AgencyFormData, value: any) => {
         setFormData((prev) => ({...prev, [field]: value}));
@@ -307,165 +421,6 @@ export default function AddAgencyWizard() {
     };
 
     const handleSaveDraft = async (saveName: string) => {
-        setIsSavingDraft(true);
-        try {
-            const existingDrafts = JSON.parse(localStorage.getItem('agencyDrafts') || '[]');
-
-            if (editingDraftId) {
-                // Update existing draft
-                const draftIndex = existingDrafts.findIndex((d: any) => d.id === editingDraftId);
-                if (draftIndex !== -1) {
-                    existingDrafts[draftIndex] = {
-                        ...existingDrafts[draftIndex],
-                        name: saveName,
-                        savedDate: new Date().toLocaleDateString('en-US', {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                        }),
-                        formData: formData,
-                        currentStep: currentStep,
-                    };
-                }
-            } else {
-                // Create new draft
-                const draftData = {
-                    id: Date.now().toString(),
-                    name: saveName,
-                    savedDate: new Date().toLocaleDateString('en-US', {day: 'numeric', month: 'long', year: 'numeric'}),
-                    formData: formData,
-                    currentStep: currentStep,
-                };
-                existingDrafts.push(draftData);
-                setEditingDraftId(draftData.id);
-            }
-
-            localStorage.setItem('agencyDrafts', JSON.stringify(existingDrafts));
-
-            setShowSaveModal(false);
-            toast({
-                title: "Draft Saved",
-                description: `"${saveName}" has been saved successfully.`,
-            });
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: "Failed to save draft",
-                variant: "destructive",
-            });
-        } finally {
-            setIsSavingDraft(false);
-        }
-    };
-
-    const validateCurrentStep = (): { isValid: boolean; missingFields: string[] } => {
-        const currentStepConfig = STEPS.find(step => step.id === currentStep);
-        if (!currentStepConfig || !currentStepConfig.requiredFields?.length) {
-            return { isValid: true, missingFields: [] };
-        }
-
-        const missingFields = currentStepConfig.requiredFields.filter(field => {
-            const value = formData[field as keyof AgencyFormData];
-            return value === '' || value === null || value === undefined || 
-                   (Array.isArray(value) && value.length === 0);
-        });
-
-        setFieldsWithErrors(missingFields);
-
-        return {
-            isValid: missingFields.length === 0,
-            missingFields
-        };
-    };
-
-    const handleNext = () => {
-        const { isValid, missingFields } = validateCurrentStep();
-        
-        if (!isValid) {
-            // Format field names for display (add spaces before capital letters and capitalize first letter)
-            const formattedFields = missingFields.map(field => 
-                field.replace(/([A-Z])/g, ' $1')
-                     .replace(/^./, str => str.toUpperCase())
-                     .trim()
-            );
-            
-            toast({
-                title: "Missing Required Fields",
-                description: `Please fill in the following required fields: ${formattedFields.join(', ')}`,
-                variant: "destructive",
-            });
-            return;
-        }
-
-        if (currentStep < STEPS.length) {
-            setCurrentStep(currentStep + 1);
-        }
-    };
-    
-    const handleStepClick = (stepNumber: number) => {
-        if (stepNumber < currentStep) {
-            // Allow going back to previous steps without validation
-            setCurrentStep(stepNumber);
-        } else if (stepNumber > currentStep) {
-            // Validate current step before allowing to proceed to next steps
-            const { isValid } = validateCurrentStep();
-            if (isValid) {
-                setCurrentStep(stepNumber);
-            } else {
-                toast({
-                    title: "Complete Current Step",
-                    description: "Please complete all required fields in the current step before proceeding.",
-                    variant: "destructive",
-                });
-            }
-        }
-    };
-
-    const handleBack = () => {
-        if (currentStep > 1) {
-            setCurrentStep(currentStep - 1);
-        }
-    };
-
-    const handleSubmit = async () => {
-        // Validate all steps before submission
-        for (let i = 0; i < STEPS.length; i++) {
-            const step = STEPS[i];
-            if (step.requiredFields?.length) {
-                const missingFields = step.requiredFields.filter(field => {
-                    const value = formData[field as keyof AgencyFormData];
-                    return value === '' || value === null || value === undefined || 
-                           (Array.isArray(value) && value.length === 0);
-                });
-
-                if (missingFields.length > 0) {
-                    // Format field names for display
-                    const formattedFields = missingFields.map(field => 
-                        field.replace(/([A-Z])/g, ' $1')
-                             .replace(/^./, str => str.toUpperCase())
-                             .trim()
-                    );
-
-                    setCurrentStep(i + 1); // Navigate to the step with missing fields
-                    toast({
-                        title: `Step ${i + 1} Incomplete`,
-                        description: `Please fill in the following required fields: ${formattedFields.join(', ')}`,
-                        variant: "destructive",
-                    });
-                    return;
-                }
-            }
-        }
-
-        if (!agreedToTerms) {
-            toast({
-                title: "Agreement Required",
-                description: "Please confirm that all information is correct",
-                variant: "destructive",
-            });
-            return;
-        }
-
         try {
             // Upload logo if exists
             let logoUrl = formData.logo ? (typeof formData.logo === 'string' ? formData.logo : '') : '';
@@ -473,7 +428,6 @@ export default function AddAgencyWizard() {
                 const logoResult = await uploadFile({
                     file: formData.logo,
                     fileType: 'logo',
-                    agencyId: agencyId
                 }).unwrap();
                 logoUrl = logoResult.url;
             }
@@ -484,13 +438,11 @@ export default function AddAgencyWizard() {
                 const letterheadResult = await uploadFile({
                     file: formData.letterhead,
                     fileType: 'letterhead',
-                    agencyId: agencyId
                 }).unwrap();
                 letterheadUrl = letterheadResult.url;
             }
 
-            // Create agency with all wizard data
-            await createAgencyWithUser({
+            await createDraft({
                 agency: {
                     name: formData.agencyName,
                     legalBusinessName: formData.legalBusinessName,
@@ -502,9 +454,7 @@ export default function AddAgencyWizard() {
                     email: formData.supportEmail,
                     phone: formData.mainPhone,
                     address: formData.primaryAddress,
-                    county: formData.county,
-                    city: formData.county,
-                    state: formData.state,
+                    state: formData.county_or_state,
                     zipCode: formData.zipCode,
                     website: formData.websiteUrl,
                     services: formData.services,
@@ -554,12 +504,10 @@ export default function AddAgencyWizard() {
                     adp: formData.adp,
                     paycheck: formData.paycheck,
                     subscriptionTier: formData.subscriptionTier,
-                    numberOfDspSeats: parseInt(formData.numberOfDspSeats),
                     addOns: formData.addOns,
-                    defaultUserRoles: formData.defaultUserRoles,
                     permissionTemplates: formData.permissionTemplates,
-                    twoFactorAuth: formData.twoFactorAuth,
                     auditRetentionPeriod: formData.auditRetentionPeriod,
+                    auditRetentionPeriodNumber: formData.auditRetentionPeriodNumber,
                 },
                 user: {
                     fullName: formData.userName,
@@ -568,14 +516,233 @@ export default function AddAgencyWizard() {
                     phone: formData.userPhone,
                     userType: UserType.AGENCY,
                 },
+                name: saveName,
             }).unwrap();
 
+            setShowSaveModal(false);
             toast({
-                title: "Success",
-                description: "Agency created successfully",
+                title: "Draft Saved",
+                description: `"${saveName}" has been saved successfully.`,
             });
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "Failed to save draft",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSavingDraft(false);
+        }
+    };
+
+    const validateCurrentStep = (): { isValid: boolean; missingFields: string[] } => {
+        const currentStepConfig = STEPS.find(step => step.id === currentStep);
+        if (!currentStepConfig || !currentStepConfig.requiredFields?.length) {
+            return { isValid: true, missingFields: [] };
+        }
+
+        const missingFields = currentStepConfig.requiredFields.filter(field => {
+            if (field === "userPassword" && !!agencyId) return false;
+            if (field === "logo" && imagesPreview.logo && !!agencyId) return false;
+            if (field === "letterhead" && imagesPreview.letterHead && !!agencyId) return false;
+            const value = formData[field as keyof AgencyFormData];
+            return value === '' || value === null || value === undefined || 
+                   (Array.isArray(value) && value.length === 0);
+        });
+
+        setFieldsWithErrors(missingFields);
+
+        return {
+            isValid: missingFields.length === 0,
+            missingFields
+        };
+    };
+
+    const handleNext = () => {
+        const { isValid, missingFields } = validateCurrentStep();
+
+        if (!isValid) {
+            // Format field names for display (add spaces before capital letters and capitalize first letter)
+            const formattedFields = missingFields.map(field =>
+                field.replace(/([A-Z])/g, ' $1')
+                     .replace(/^./, str => str.toUpperCase())
+                     .trim()
+            );
+            
+            toast({
+                title: "Missing Required Fields",
+                description: `Please fill in the following required fields: ${formattedFields.join(', ')}`,
+                variant: "destructive",
+            });
+            return;
+        }
+
+        if (currentStep < STEPS.length) {
+            setCurrentStep(currentStep + 1);
+        }
+    };
+
+    const handleBack = () => {
+        if (currentStep > 1) {
+            setCurrentStep(currentStep - 1);
+        }
+    };
+
+    const handleSubmit = async () => {
+        // Validate all steps before submission
+        for (let i = 0; i < STEPS.length; i++) {
+            const step = STEPS[i];
+            if (step.requiredFields?.length) {
+                const missingFields = step.requiredFields.filter(field => {
+                    if (field === "userPassword" && !!agencyId) return false;
+                    if (field === "logo" && imagesPreview.logo && !!agencyId) return false;
+                    if (field === "letterhead" && imagesPreview.letterHead && !!agencyId) return false;
+                    const value = formData[field as keyof AgencyFormData];
+                    return value === '' || value === null || value === undefined || 
+                           (Array.isArray(value) && value.length === 0);
+                });
+
+                if (missingFields.length > 0) {
+                    // Format field names for display
+                    const formattedFields = missingFields.map(field => 
+                        field.replace(/([A-Z])/g, ' $1')
+                             .replace(/^./, str => str.toUpperCase())
+                             .trim()
+                    );
+
+                    setCurrentStep(i + 1); // Navigate to the step with missing fields
+                    toast({
+                        title: `Step ${i + 1} Incomplete`,
+                        description: `Please fill in the following required fields: ${formattedFields.join(', ')}`,
+                        variant: "destructive",
+                    });
+                    return;
+                }
+            }
+        }
+
+        if (!agreedToTerms) {
+            toast({
+                title: "Agreement Required",
+                description: "Please confirm that all information is correct",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        try {
+            // Upload logo if exists
+            let logoUrl = formData.logo ? (typeof formData.logo === 'string' ? formData.logo : '') : '';
+            if (formData.logo && typeof formData.logo !== 'string') {
+                const logoResult = await uploadFile({
+                    file: formData.logo,
+                    fileType: 'logo',
+                }).unwrap();
+                logoUrl = logoResult.url;
+            }
+
+            // Upload letterhead if exists
+            let letterheadUrl = formData.letterhead ? (typeof formData.letterhead === 'string' ? formData.letterhead : '') : '';
+            if (formData.letterhead && typeof formData.letterhead !== 'string') {
+                const letterheadResult = await uploadFile({
+                    file: formData.letterhead,
+                    fileType: 'letterhead',
+                }).unwrap();
+                letterheadUrl = letterheadResult.url;
+            }
+
+            const requestPayload = {
+                agency: {
+                    name: formData.agencyName,
+                    legalBusinessName: formData.legalBusinessName,
+                    dba: formData.dba,
+                    agencyType: formData.agencyType,
+                    ein: formData.ein,
+                    npi: formData.npi,
+                    medicaidProviderId: formData.medicaidProviderId,
+                    email: formData.supportEmail,
+                    phone: formData.mainPhone,
+                    address: formData.primaryAddress,
+                    state: formData.county_or_state,
+                    zipCode: formData.zipCode,
+                    website: formData.websiteUrl,
+                    services: formData.services,
+                    serviceCodeMapping: formData.serviceCodeMapping,
+                    evvSettings: formData.evvSettings,
+                    schedulingRules: formData.schedulingRules,
+                    maxShiftPerDay: parseInt(formData.maxShiftPerDay),
+                    travelTimeRules: formData.travelTimeRules,
+                    mileageSettings: formData.mileageSettings,
+                    mileageRate: formData.mileageRate,
+                    incidentReportingSettings: formData.incidentReportingSettings,
+                    whoReceivesNotifications: formData.whoReceivesNotifications,
+                    expenseReportSettings: formData.expenseReportSettings,
+                    allowedFileTypes: formData.allowedFileTypes,
+                    allowRecurringSchedules: formData.allowRecurringSchedules,
+                    allowOverlappingVisits: formData.allowOverlappingVisits,
+                    offerMileageReimbursements: formData.offerMileageReimbursements,
+                    realtimeGpsTracking: formData.realtimeGpsTracking,
+                    aiNotesReview: formData.aiNotesReview,
+                    aiPlanOfCareBuilder: formData.aiPlanOfCareBuilder,
+                    aiScheduleOptimizer: formData.aiScheduleOptimizer,
+                    aiDataCleaner: formData.aiDataCleaner,
+                    aiBillingValidator: formData.aiBillingValidator,
+                    requireIds: formData.requireIds,
+                    requireSsn: formData.requireSsn,
+                    requireResume: formData.requireResume,
+                    requireCertificates: formData.requireCertificates,
+                    requireTrainings: formData.requireTrainings,
+                    requireClearances: formData.requireClearances,
+                    expiryRules: formData.expiryRules,
+                    autoReminders: formData.autoReminders,
+                    reminderFrequency: formData.reminderFrequency,
+                    whoReceivesReminders: formData.whoReceivesReminders,
+                    logo: logoUrl,
+                    themeColor: formData.themeColor,
+                    letterhead: letterheadUrl,
+                    primaryColor: formData.themeColor,
+                    billingFormat: formData.billingFormat,
+                    dddFormat: formData.dddFormat,
+                    hhaExchangeFormat: formData.hhaExchangeFormat,
+                    allowCustomReport: formData.allowCustomReport,
+                    invoiceName: formData.invoiceName,
+                    invoiceEmail: formData.invoiceEmail,
+                    invoiceFax: formData.invoiceFax,
+                    payrollSystemIntegration: formData.payrollSystemIntegration,
+                    quickBooks: formData.quickBooks,
+                    adp: formData.adp,
+                    paycheck: formData.paycheck,
+                    subscriptionTier: formData.subscriptionTier,
+                    addOns: formData.addOns,
+                    permissionTemplates: formData.permissionTemplates,
+                    auditRetentionPeriod: formData.auditRetentionPeriod,
+                    auditRetentionPeriodNumber: formData.auditRetentionPeriodNumber,
+                },
+                user: {
+                    fullName: formData.userName,
+                    email: formData.userEmail,
+                    password: formData.userPassword,
+                    phone: formData.userPhone,
+                    userType: UserType.AGENCY,
+                },
+            }
+
+            if (!!agencyId) {
+                await updateAgency({agencyId, data: requestPayload}).unwrap();
+                toast({
+                    title: "Success",
+                    description: "Agency updated successfully",
+                });
+            } else {
+                await createAgencyWithUser(requestPayload).unwrap();
+                toast({
+                    title: "Success",
+                    description: "Agency created successfully",
+                });
+            }
             navigate(Routes.superAdmin.agencies);
         } catch (error: any) {
+            console.log(error);
             toast({
                 title: "Error",
                 description: error?.data?.error || error?.message || "Failed to create agency",
@@ -585,10 +752,18 @@ export default function AddAgencyWizard() {
     };
 
     const handleCancel = () => {
-        navigate(Routes.superAdmin.agencies);
+        navigate(-1);
     };
 
     const currentStepData = STEPS.find((s) => s.id === currentStep);
+    const submitButtonText = () => {
+        if (!isSaving) {
+            if (!!agencyId) return "Edit Agency"
+            else return "Create Agency"
+        } else {
+            return "Saving..."
+        }
+    }
 
     return (
         <div className="min-h-screen flex flex-col">
@@ -620,7 +795,7 @@ export default function AddAgencyWizard() {
                                 </svg>
                                 <span className="text-[16px] text-[#808081] font-semibold">Saved Agencies</span>
                             </div>
-                            <span className="text-[14px] text-black">Agency ID - {agencyId}</span>
+                            {/*<span className="text-[14px] text-black">Agency ID - {agencyId}</span>*/}
                         </div>
                     </div>
                 </div>
@@ -648,6 +823,7 @@ export default function AddAgencyWizard() {
                         {currentStep === 5 && <Step8Branding
                             formData={formData} onChange={handleInputChange}
                             fieldsWithErrors={fieldsWithErrors}
+                            imagesPreview={imagesPreview}
                         />}
                         {currentStep === 6 && <Step9Billing
                             formData={formData}
@@ -724,7 +900,7 @@ export default function AddAgencyWizard() {
                                     className="bg-[#00b4b8] hover:bg-[#009da1] text-white px-6 py-2 rounded-[60px] font-semibold text-[14px]"
                                     disabled={isSaving || !agreedToTerms}
                                 >
-                                    {isSaving ? "Creating..." : "Create Agency"}
+                                    {submitButtonText()}
                                 </Button>
                             )}
                         </div>
@@ -736,6 +912,7 @@ export default function AddAgencyWizard() {
                 open={showSaveModal}
                 onOpenChange={setShowSaveModal}
                 onSave={handleSaveDraft}
+                isLoading={isDrafting}
             />
         </div>
     );

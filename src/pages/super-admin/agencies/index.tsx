@@ -11,7 +11,7 @@ export default function AgenciesPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const {data: agencies, isLoading: loadingAgencies} = useListAllAgenciesQuery({limit: 100});
+  const {data: agencies, isLoading: loadingAgencies} = useListAllAgenciesQuery({});
 
 
   const filteredAgencies = useMemo(() => {
@@ -36,6 +36,10 @@ export default function AgenciesPage() {
     
     return filtered;
   }, [agencies, filterStatus, searchQuery]);
+
+  const viewAgency = (agencyId: string) => {
+      navigate(Routes.superAdmin.agencyView.replace(":id", agencyId))
+  }
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -151,7 +155,7 @@ export default function AgenciesPage() {
                     {agency.name}
                   </h3>
                   <p className="font-medium text-[12px] text-[#808081] truncate mt-1">
-                    #{agency.primaryColor || agency.id.slice(0, 8)}
+                    {agency.primaryColor}
                   </p>
                 </div>
               </div>
@@ -167,7 +171,10 @@ export default function AgenciesPage() {
                       Admin
                     </p>
                   </div>
-                  <button className="backdrop-blur-sm bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] flex items-center justify-center p-3 rounded-[200px] shrink-0 hover:bg-[rgba(255,255,255,0.7)] transition-colors">
+                  <button 
+                    onClick={() => viewAgency(agency.id)}
+                    className="cursor-pointer backdrop-blur-sm bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] flex items-center justify-center p-3 rounded-[200px] shrink-0 hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+                  >
                     <ArrowUpRight className="w-4 h-4 text-[#10141a]" />
                   </button>
                 </div>

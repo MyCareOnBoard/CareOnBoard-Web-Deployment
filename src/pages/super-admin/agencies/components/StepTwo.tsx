@@ -7,7 +7,7 @@ import {MultiSelect, MultiSelectItem} from "@/components/ui/multi-select";
 
 import { cn } from "@/lib/utils";
 
-export default function Step3Leadership({formData, onChange, fieldsWithErrors = []}: {formData: any, onChange: (field: string, value: any) => void, fieldsWithErrors?: string[]}) {
+export default function Step3Leadership({formData, onChange, fieldsWithErrors = []}: any) {
     const [showPassword, setShowPassword] = useState(false);
     const {toast} = useToast();
 

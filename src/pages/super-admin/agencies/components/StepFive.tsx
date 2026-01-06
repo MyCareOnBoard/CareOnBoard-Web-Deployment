@@ -1,10 +1,12 @@
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Label} from "@/components/ui/label";
 import {Upload} from "lucide-react";
 import {cn} from "@/lib/utils"
 
 
-export default function Step8Branding({formData, onChange, fieldsWithErrors}: any) {
+export default function Step8Branding(
+    {formData, onChange, fieldsWithErrors, imagesPreview}: any
+) {
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [letterheadPreview, setLetterheadPreview] = useState<string | null>(null);
 
@@ -37,6 +39,13 @@ export default function Step8Branding({formData, onChange, fieldsWithErrors}: an
         }
     };
 
+    useEffect(() => {
+        if (imagesPreview) {
+            setLogoPreview(imagesPreview.logo);
+            setLetterheadPreview(imagesPreview.letterHead);
+        }
+    }, [imagesPreview]);
+
     return (
         <div className="space-y-6 w-[50%]">
             {/* Upload Logo */}
@@ -44,7 +53,7 @@ export default function Step8Branding({formData, onChange, fieldsWithErrors}: an
                 <Label className="mb-2 text-[14px] font-medium text-[#10141a] block">Upload Logo</Label>
                 <div
                     className={cn(
-                        "border-2 bg-white border border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer",
+                        "border-2 bg-white border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer",
                         fieldsWithErrors.includes("logo") && "border-red-500"
                     )}>
                     <label htmlFor="logo-upload" className="flex items-center gap-2 cursor-pointer">
@@ -125,7 +134,7 @@ export default function Step8Branding({formData, onChange, fieldsWithErrors}: an
                 </Label>
                 <div
                     className={cn(
-                        "border-2 bg-white border border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer",
+                        "border-2 bg-white border-[#e5e5e6] rounded-[12px] h-[71px] flex items-center justify-center hover:border-[#00b4b8] transition-colors cursor-pointer",
                         fieldsWithErrors.includes("letterhead") && "border-red-500"
                     )}
                 >
