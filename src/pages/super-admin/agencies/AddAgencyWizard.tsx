@@ -110,6 +110,8 @@ interface AgencyFormData {
     permissionTemplates: boolean;
     auditRetentionPeriod: string;
     auditRetentionPeriodNumber: string;
+    planStartDate: string;
+    planEndDate: string | null;
 }
 
 const STEPS = [
@@ -203,7 +205,8 @@ const STEPS = [
         requiredFields: [
             "subscriptionTier",
             "auditRetentionPeriod",
-            "auditRetentionPeriodNumber"
+            "auditRetentionPeriodNumber",
+            "planStartDate",
         ]
     },
 ];
@@ -304,6 +307,8 @@ export default function AddAgencyWizard() {
         permissionTemplates: false,
         auditRetentionPeriod: "monthly",
         auditRetentionPeriodNumber: "",
+        planStartDate: "",
+        planEndDate: null,
     });
 
     const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -390,6 +395,8 @@ export default function AddAgencyWizard() {
             permissionTemplates: responseData.agencyData?.permissionTemplates || false,
             auditRetentionPeriod: responseData.agencyData?.auditRetentionPeriod || "",
             auditRetentionPeriodNumber: responseData.agencyData?.auditRetentionPeriodNumber || "",
+            planEndDate: responseData.agencyData?.planEndDate || null,
+            planStartDate: responseData.agencyData?.planStartDate || "",
         });
         setImagesPreview({
             logo: responseData.agencyData?.logo || "",
@@ -508,6 +515,8 @@ export default function AddAgencyWizard() {
                     permissionTemplates: formData.permissionTemplates,
                     auditRetentionPeriod: formData.auditRetentionPeriod,
                     auditRetentionPeriodNumber: formData.auditRetentionPeriodNumber,
+                    planStartDate: formData.planStartDate,
+                    planEndDate: formData.planEndDate,
                 },
                 user: {
                     fullName: formData.userName,
@@ -717,6 +726,8 @@ export default function AddAgencyWizard() {
                     permissionTemplates: formData.permissionTemplates,
                     auditRetentionPeriod: formData.auditRetentionPeriod,
                     auditRetentionPeriodNumber: formData.auditRetentionPeriodNumber,
+                    planStartDate: formData.planStartDate,
+                    planEndDate: formData.planEndDate,
                 },
                 user: {
                     fullName: formData.userName,

@@ -90,6 +90,8 @@ export interface CreateAgencyWithUserPayloadAgency {
     twoFactorAuth?: boolean;
     auditRetentionPeriod?: string;
     auditRetentionPeriodNumber?: string;
+    planStartDate?: string;
+    planEndDate?: string | null;
 }
 
 export interface CreateAgencyWithUserPayloadUser {
