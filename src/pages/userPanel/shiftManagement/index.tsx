@@ -246,7 +246,7 @@ function ShiftCard({
             <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">
               {shift.clockedInAt
                 ? (panel === 'previous' ? "Clocked In" : "Started at")
-                : "Available at"
+                : "Start at"
               }
             </p>
             <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">
@@ -262,7 +262,7 @@ function ShiftCard({
         {showDate && (
           <div className="flex flex-col gap-0.5">
             <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
-            <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.location}</p>
+            <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.client?.address}</p>
           </div>
         )}
 
@@ -388,7 +388,7 @@ function ShiftCard({
 
             <div className="flex flex-col shrink-0 gap-1">
               <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
-              <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.location}</p>
+              <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.client?.address}</p>
             </div>
 
             {shift.startTime && (
@@ -396,7 +396,7 @@ function ShiftCard({
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">
                   {shift.clockedInAt
                     ? (panel === 'previous' ? "Clocked In" : "Started at")
-                    : "Available at"
+                    : "Start at"
                   }
                 </p>
                 <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">

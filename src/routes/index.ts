@@ -39,6 +39,7 @@ import DSPManagementPage from "@/pages/agency/dsp-management";
 import ClientsPage from "@/pages/agency/clients-management";
 import ClientDetailsPage from "@/pages/agency/client-details";
 import AddClientPage from "@/pages/agency/add-client";
+import CommunityInclusionsPage from "@/pages/agency/clients-management/community-inclusions";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import ClientClaimsPage from "@/pages/agency/billing-and-approvals/client-claims";
 import SchedulingPage from "@/pages/agency/scheduling";
@@ -62,6 +63,7 @@ import AgencyView from "@/pages/super-admin/agencies/AgencyView";
 import DSPClaimsPage from "@/pages/agency/billing-and-approvals/dsp-info";
 import SuperAdminDashboard from "@/pages/super-admin/dashboard";
 import ComplianceMonitor from "@/pages/super-admin/compliance-monitor";
+import UserAccessControlPage from "@/pages/super-admin/user-access-control";
 
 
 export const router = createBrowserRouter([
@@ -166,6 +168,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.agency.clientDetails,
         Component: ClientDetailsPage,
+      },
+      {
+        path: Routes.agency.communityInclusions,
+        Component: CommunityInclusionsPage,
       },
       {
         path: Routes.agency.billingAndApprovals,
@@ -348,6 +354,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.superAdmin.complianceMonitor,
         Component: ComplianceMonitor,
+      },
+      {
+        path: Routes.superAdmin.userAccessControl,
+        Component: UserAccessControlPage,
       },
     ],
   },
