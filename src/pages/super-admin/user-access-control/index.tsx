@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import UserAccessModal from "./UserAccessModal";
 import SuccessModal from "./SuccessModal";
 
@@ -24,6 +25,8 @@ export default function UserAccessControlPage() {
   const [editingUser, setEditingUser] = useState<UserAccess | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successUserName, setSuccessUserName] = useState("");
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [userToRemove, setUserToRemove] = useState<UserAccess | null>(null);
 
   // Mock data - replace with actual API call
   const [userAccesses, setUserAccesses] = useState<UserAccess[]>([
@@ -56,9 +59,19 @@ export default function UserAccessControlPage() {
   );
 
   const handleRemoveAccess = (id: string) => {
-    console.log("Removing access for:", id);
-    // TODO: Implement remove access functionality
-    setUserAccesses((prev) => prev.filter((user) => user.id !== id));
+    const user = userAccesses.find((u) => u.id === id);
+    if (user) {
+      setUserToRemove(user);
+      setShowRemoveDialog(true);
+    }
+  };
+
+  const handleConfirmRemove = () => {
+    if (userToRemove) {
+      setUserAccesses((prev) => prev.filter((user) => user.id !== userToRemove.id));
+      setShowRemoveDialog(false);
+      setUserToRemove(null);
+    }
   };
 
   const handleEditUser = (id: string) => {
@@ -288,6 +301,18 @@ export default function UserAccessControlPage() {
         onOpenChange={setIsSuccessModalOpen}
         userName={successUserName}
       />
+
+      {/* Remove Access Confirmation Dialog */}
+      <ConfirmDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <ConfirmDialogContent
+          title="Remove Access?"
+          description={`Are you sure you want to remove access for ${userToRemove?.name || 'this user'}? This action cannot be undone.`}
+          confirmText="Yes, Remove Access"
+          cancelText="No, Keep It"
+          onConfirm={handleConfirmRemove}
+          onCancel={() => setShowRemoveDialog(false)}
+        />
+      </ConfirmDialog>
     </div>
   );
 }
