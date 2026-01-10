@@ -3,7 +3,7 @@ import {customBaseQuery} from "@/lib/baseQuery";
 import {Agency} from "@/lib/api/agencies";
 import {ListAgenciesResponse} from "@/lib/api/agencies";
 import {
-  GetDraftAgencyResponse,
+  GetDraftAgencyResponse, GetSingleAgencyUsersItem,
   GetSummaryAgencyInfoResponse,
   ListDraftAgenciesResponse
 } from "@/pages/super-admin/agencies/apiTypes";
@@ -163,8 +163,8 @@ export const superAdminApi = createApi({
       },
     }),
     listAllAgencies: builder.query<ListAgenciesResponse, { limit?: number }>({
-      query: ({limit = 100}) => ({
-        url: `/agencies?limit=${limit}`,
+      query: ({limit}) => ({
+        url: `/agencies` + (limit ? `?limit=${limit}` : ""),
         method: "GET",
         requiresAuth: true
       }),
@@ -259,7 +259,17 @@ export const superAdminApi = createApi({
         method: "GET",
         requiresAuth: true
       })
-    })
+    }),
+    getSingleAgencyUsers: builder.query<
+      GetSingleAgencyUsersItem[],
+      string
+    >({
+      query: (agencyId) => ({
+        url: `/agencyManagement/agencies/${agencyId}/users`,
+        method: "GET",
+        requiresAuth: true
+      })
+    }),
   }),
 });
 
@@ -275,5 +285,6 @@ export const {
   useGetSummaryAgencyInfoQuery,
   useUpdateAgencyMutation,
   useUpdateAgencyStatusMutation,
-  useGetServicesQuery
+  useGetServicesQuery,
+  useGetSingleAgencyUsersQuery
 } = superAdminApi;
