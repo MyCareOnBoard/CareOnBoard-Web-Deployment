@@ -251,7 +251,7 @@ export const superAdminApi = createApi({
       }),
     }),
     getServices: builder.query<
-      { services: {code: string; name: string }[] },
+      { services: { code: string; name: string }[] },
       string
     >({
       query: (query) => ({
@@ -266,6 +266,16 @@ export const superAdminApi = createApi({
     >({
       query: (agencyId) => ({
         url: `/agencyManagement/agencies/${agencyId}/users`,
+        method: "GET",
+        requiresAuth: true
+      })
+    }),
+    getSingleAgencyClients: builder.query<
+      GetSingleAgencyUsersItem[],
+      string
+    >({
+      query: (agencyId) => ({
+        url: `/agencyManagement/agencies/${agencyId}/clients`,
         method: "GET",
         requiresAuth: true
       })
@@ -286,5 +296,6 @@ export const {
   useUpdateAgencyMutation,
   useUpdateAgencyStatusMutation,
   useGetServicesQuery,
-  useGetSingleAgencyUsersQuery
+  useGetSingleAgencyUsersQuery,
+  useGetSingleAgencyClientsQuery
 } = superAdminApi;

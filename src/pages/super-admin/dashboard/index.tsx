@@ -23,26 +23,11 @@ export default function SuperAdminDashboard() {
     pendingTimesheets: 0,
   };
 
-  const shiftsData = shiftsResponse?.buckets || [
-    {time: "12:00am", scheduled: 22, completed: 15},
-    {time: "1:00am", scheduled: 18, completed: 12},
-    {time: "2:00am", scheduled: 25, completed: 20},
-    {time: "3:00am", scheduled: 20, completed: 18},
-    {time: "4:00am", scheduled: 15, completed: 10},
-    {time: "5:00am", scheduled: 28, completed: 22},
-    {time: "6:00am", scheduled: 30, completed: 25},
-  ];
+  const shiftsData = shiftsResponse?.buckets || [];
 
   const maxShiftValue = Math.max(...shiftsData.map((d) => Math.max(d.scheduled, d.completed)));
 
-  const attendanceData = attendanceResponse?.data || [
-    {time: "09:00 AM", days: [3, 2, 1, 2, 0, 1, 2]},
-    {time: "10:00 AM", days: [3, 3, 2, 3, 0, 2, 1]},
-    {time: "11:00 PM", days: [2, 3, 2, 0, 0, 1, 2]},
-    {time: "12:00 PM", days: [3, 3, 0, 3, 0, 1, 2]},
-    {time: "01:00 PM", days: [3, 0, 2, 3, 0, 1, 0]},
-    {time: "02:00 PM", days: [0, 0, 2, 0, 0, 2, 2]},
-  ];
+  const attendanceData = attendanceResponse?.data || [];
 
   const getAttendanceColor = (value: number) => {
     if (value === 0) return "bg-[#E5E5E6]";
