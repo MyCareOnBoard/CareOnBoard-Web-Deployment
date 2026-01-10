@@ -1,6 +1,9 @@
 import React, {useState} from "react";
 import {useParams, useNavigate} from "react-router";
-import {useGetSingleAgencyUsersQuery, useGetSummaryAgencyInfoQuery, useUpdateAgencyStatusMutation} from "./api";
+import {
+  useGetSingleAgencyClientsQuery,
+  useGetSingleAgencyUsersQuery, useGetSummaryAgencyInfoQuery, useUpdateAgencyStatusMutation
+} from "./api";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Search, ChevronLeft, ChevronRight, Phone, MessageSquare, Edit} from "lucide-react";
@@ -26,12 +29,18 @@ export default function AgencyView() {
     refetchOnMountOrArgChange: true,
     skip: !id
   });
+  const {data: clients = []} = useGetSingleAgencyClientsQuery(id!, {
+    refetchOnMountOrArgChange: true,
+    skip: !id
+  });
 
-  const totalPages = Math.ceil(users?.length / itemsPerPage);
+  const useCaseUsers = filterTab === "user" ? users : clients;
+
+  const totalPages = Math.ceil(useCaseUsers?.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const filteredUsers = searchQuery
-    ? users?.filter(user => user.fullName.toLowerCase().includes(searchQuery.toLowerCase()))
-    : users;
+    ? useCaseUsers?.filter(user => user?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : useCaseUsers;
   const paginatedUsers = filteredUsers?.slice(startIndex, startIndex + itemsPerPage);
 
   const handleStatusUpdate = async () => {
@@ -242,19 +251,23 @@ export default function AgencyView() {
                         <p className="text-[14px] text-[#808081] font-medium">
                           {filterTab === "user" ? "Clients" : "DSPs"}
                         </p>
-                        <p className="text-[14px] text-[#10141a] font-medium">{user.clients}</p>
+                        <p className="text-[14px] text-[#10141a] font-medium">
+                          {filterTab === "user" ? user.clients : user.employees}
+                        </p>
                       </div>
 
                       {/* Account Created */}
                       {filterTab === "client" && <div className="w-[129px]">
                           <p className="text-[14px] text-[#808081] font-medium">Account
                               Created</p>
-                          <p className="text-[14px] text-[#10141a] font-medium">{new Date(user.hireDate).toDateString()}</p>
+                          <p className="text-[14px] text-[#10141a] font-medium">
+                            {user?.createdAt ? new Date(user?.createdAt).toDateString() : ""}
+                          </p>
                       </div>}
 
                       {filterTab === "user" && <div className="w-[129px]">
                           <p className="text-[14px] text-[#808081] font-medium">Training</p>
-                          <p className="text-[14px] text-[#10141a] font-medium">{user.training.completed}({user.training.total})</p>
+                          <p className="text-[14px] text-[#10141a] font-medium">{user?.training?.completed}({user?.training?.total})</p>
                       </div>}
                     </div>
                   </div>
