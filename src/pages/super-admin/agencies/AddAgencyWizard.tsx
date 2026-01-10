@@ -8,7 +8,7 @@ import {
     useCreateAgencyWithUserMutation, useLazyGetAgencyQuery,
     useLazyGetDraftAgencyQuery,
     useSaveDraftMutation, useUpdateAgencyMutation,
-    useUploadAgencyFileMutation
+    useUploadAgencyFileMutation, useGetServicesQuery
 } from "./api";
 import {UserType} from "@/utils/auth/types/user.types";
 import {SaveDraftModal} from "./SaveDraftModal";
@@ -232,6 +232,7 @@ export default function AddAgencyWizard() {
     const [getDraftAgency, {data: draft}] = useLazyGetDraftAgencyQuery();
     const [getAgency, {data: currentAgency}] = useLazyGetAgencyQuery();
     const [updateAgency, {isLoading: isUpdating}] = useUpdateAgencyMutation();
+    const {data: services} = useGetServicesQuery("shouldPopulate=false&return=name,code");
 
     const isSaving = isCreating || isUploading || isSavingDraft || isUpdating;
     const draftId = new URLSearchParams(location.search).get("draftId");
@@ -625,6 +626,7 @@ export default function AddAgencyWizard() {
                         description: `Please fill in the following required fields: ${formattedFields.join(', ')}`,
                         variant: "destructive",
                     });
+                    setFieldsWithErrors(missingFields);
                     return;
                 }
             }
@@ -822,6 +824,7 @@ export default function AddAgencyWizard() {
                         {currentStep === 2 && <Step3Leadership
                             formData={formData} onChange={handleInputChange}
                             fieldsWithErrors={fieldsWithErrors}
+                            services={services?.services}
                         />}
                         {currentStep === 3 && <Step5Operational
                             formData={formData} onChange={handleInputChange}
@@ -842,7 +845,8 @@ export default function AddAgencyWizard() {
                             fieldsWithErrors={fieldsWithErrors}
                         />}
                         {currentStep === 7 && <Step10Subscription
-                            formData={formData} onChange={handleInputChange}
+                            formData={formData}
+                            onChange={handleInputChange}
                             fieldsWithErrors={fieldsWithErrors}
                         />}
                     </div>
