@@ -824,7 +824,7 @@ export default function AddAgencyWizard() {
                         {currentStep === 2 && <Step3Leadership
                             formData={formData} onChange={handleInputChange}
                             fieldsWithErrors={fieldsWithErrors}
-                            services={services?.services}
+                            services={services?.services || []}
                         />}
                         {currentStep === 3 && <Step5Operational
                             formData={formData} onChange={handleInputChange}
