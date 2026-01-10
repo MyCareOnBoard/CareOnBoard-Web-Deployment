@@ -17,7 +17,8 @@ import {
   BarChart3,
   UserCircle,
   UsersRound,
-  Settings
+  Settings,
+  UserLock
 } from "lucide-react";
 
 const navItems: NavItem[] = [
@@ -29,7 +30,7 @@ const navItems: NavItem[] = [
   {label: "Agency Billing Monitor", path: Routes.superAdmin.agencyBillingMonitor, icon: DollarSign},
   {label: "Corporate Support", path: Routes.superAdmin.corporateSupport, icon: HelpCircle},
   {label: "Oversight Center", path: Routes.superAdmin.oversightCenter, icon: BarChart3},
-  {label: "Client Directory", path: Routes.superAdmin.clientDirectory, icon: UserCircle},
+  {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock},
   {label: "Staff Directory", path: Routes.superAdmin.staffDirectory, icon: UsersRound},
   {label: "System Settings", path: Routes.superAdmin.systemSettings, icon: Settings},
 ];
