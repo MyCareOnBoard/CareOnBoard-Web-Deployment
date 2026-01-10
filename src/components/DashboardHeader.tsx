@@ -29,7 +29,7 @@ function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: Componen
 }
 
 
-function UserAvatar({ userName, userImage }: { userName?: string; userImage?: string }) {
+export function UserAvatar({ userName, userImage }: { userName?: string; userImage?: string }) {
   const [imageError, setImageError] = useState(false);
   
   const getInitials = (name?: string) => {
