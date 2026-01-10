@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 interface Step3LeadershipProps {
   formData: any;
-  onChange: (key: string, value: any) => void;
+  onChange: (key: any, value: any) => void;
   services: {name: string; code: string}[];
   fieldsWithErrors: string[];
 }
