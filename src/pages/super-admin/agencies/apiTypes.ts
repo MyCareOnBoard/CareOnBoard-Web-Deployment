@@ -35,15 +35,17 @@ export interface GetSummaryAgencyInfoResponse {
 
 export interface GetSingleAgencyUsersItem {
   id: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  status: string;
-  clients: string;
-  hireDate: string;
-  profilePictureUrl: string;
-  training: {
-    total: string;
-    completed: string;
+  employees?: number;
+  createdAt?: string;
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  status?: string;
+  clients?: number;
+  hireDate?: string;
+  profilePictureUrl?: string;
+  training?: {
+    total?: string;
+    completed?: string;
   }
 }
