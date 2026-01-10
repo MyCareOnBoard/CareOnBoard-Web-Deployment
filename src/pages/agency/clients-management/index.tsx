@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Plus, Search, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -215,9 +215,20 @@ export default function ClientsPage() {
     <div className="min-h-[calc(100vh-200px)]">
       {/* Page Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-          Client Management
-        </h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
+            Client Management
+          </h1>
+          <button
+            onClick={() => navigate(Routes.agency.communityInclusions)}
+            className="flex items-center gap-[13px] px-[16px] py-[12px] rounded-[60px] border border-[#525253] bg-transparent backdrop-blur-[22px] hover:bg-[rgba(82,82,83,0.05)] transition-colors cursor-pointer"
+          >
+            <span className="font-['Urbanist'] text-[14px] font-semibold leading-[1.4] text-[#525253]">
+              Community Inclusions
+            </span>
+            <ArrowRight className="w-5 h-5 text-[#525253]" />
+          </button>
+        </div>
         <Button
           size="lg"
           className="h-[52px] px-[16px] py-[12px]"
