@@ -62,6 +62,7 @@ import SavedAgencies from "@/pages/super-admin/agencies/SavedAgencies";
 import AgencyView from "@/pages/super-admin/agencies/AgencyView";
 import DSPClaimsPage from "@/pages/agency/billing-and-approvals/dsp-info";
 import SuperAdminDashboard from "@/pages/super-admin/dashboard";
+import ComplianceMonitor from "@/pages/super-admin/compliance-monitor";
 import UserAccessControlPage from "@/pages/super-admin/user-access-control";
 
 
@@ -349,6 +350,10 @@ export const router = createBrowserRouter([
       {
         path: Routes.superAdmin.agencyView,
         Component: AgencyView,
+      },
+      {
+        path: Routes.superAdmin.complianceMonitor,
+        Component: ComplianceMonitor,
       },
       {
         path: Routes.superAdmin.userAccessControl,
