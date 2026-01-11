@@ -408,6 +408,7 @@ export default function UserAccessControlPage() {
         open={isSuccessModalOpen}
         onOpenChange={setIsSuccessModalOpen}
         userName={successUserName}
+        mode={modalMode}
       />
 
       {/* Error Dialog */}

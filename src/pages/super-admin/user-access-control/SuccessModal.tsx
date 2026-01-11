@@ -9,12 +9,14 @@ interface SuccessModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userName: string;
+  mode: "create" | "edit";
 }
 
 export default function SuccessModal({
   open,
   onOpenChange,
   userName,
+  mode,
 }: SuccessModalProps) {
   // Auto-close after 3 seconds
   React.useEffect(() => {
@@ -46,10 +48,12 @@ export default function SuccessModal({
         {/* Text Content */}
         <div className="flex flex-col gap-[12px] items-center text-center w-full">
           <h2 className="text-[32px] font-semibold leading-[normal] text-[#10141a]">
-            User role added
+            {mode === "create" ? "User role added" : "User updated"}
           </h2>
           <p className="text-[16px] font-medium leading-[1.6] text-[#808081]">
-            New user {userName} has been added successfully.
+            {mode === "create"
+              ? `New user ${userName} has been added successfully.`
+              : `User ${userName} has been updated successfully.`}
           </p>
         </div>
       </DialogContent>
