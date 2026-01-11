@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import TimePicker from "@/components/TimePicker";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { searchClients, Client, ClientService, getAgencyClientById } from "@/lib/api/clients";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -145,10 +146,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showNotesTypeDropdown, setShowNotesTypeDropdown] = useState(false);
-  const [customClockIn, setCustomClockIn] = useState("");
-  const [customClockOut, setCustomClockOut] = useState("");
-  const [showCustomClockIn, setShowCustomClockIn] = useState(false);
-  const [showCustomClockOut, setShowCustomClockOut] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showDspDropdown, setShowDspDropdown] = useState(false);
   
@@ -478,6 +475,44 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setFormData(prev => ({ ...prev, planOfCare: file }));
+  };
+
+  // Convert 12-hour format (e.g., "08:00:AM") to 24-hour format (e.g., "08:00")
+  const convertTo24Hour = (time12h: string): string => {
+    if (!time12h) return "";
+    
+    // Handle formats like "08:00:AM", "08.00:AM", "8:00AM", etc.
+    const match = time12h.match(/(\d{1,2})[.:](\d{2}):?(AM|PM)/i);
+    if (!match) return "";
+    
+    let hours = parseInt(match[1]);
+    const minutes = match[2];
+    const period = match[3].toUpperCase();
+    
+    if (period === "PM" && hours !== 12) {
+      hours += 12;
+    } else if (period === "AM" && hours === 12) {
+      hours = 0;
+    }
+    
+    return `${hours.toString().padStart(2, "0")}:${minutes}`;
+  };
+
+  // Convert 24-hour format (e.g., "14:30") to 12-hour format (e.g., "02:30:PM")
+  const convertTo12Hour = (time24h: string): string => {
+    if (!time24h) return "";
+    
+    const [hoursStr, minutes] = time24h.split(":");
+    let hours = parseInt(hoursStr);
+    const period = hours >= 12 ? "PM" : "AM";
+    
+    if (hours === 0) {
+      hours = 12;
+    } else if (hours > 12) {
+      hours -= 12;
+    }
+    
+    return `${hours.toString().padStart(2, "0")}:${minutes}:${period}`;
   };
 
   // Handle weekday toggle
@@ -1561,16 +1596,31 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Clock In Time</label>
             <div className="flex flex-wrap gap-2">
+              {/* Custom time badge if selected time is not in predefined list */}
+              {formData.clockInTime && !clockInTimeOptions.includes(formData.clockInTime) && (
+                <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#00b4b8] text-white">
+                  <span className="text-[14px] font-medium">{formData.clockInTime}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, clockInTime: "" }));
+                    }}
+                    className="ml-1 hover:opacity-70 transition-opacity"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              
               {clockInTimeOptions.map((time, index) => (
                 <button
                   key={`${time}-${index}`}
                   onClick={() => {
                     setFormData(prev => ({ ...prev, clockInTime: time }));
-                    setShowCustomClockIn(false);
                     clearError("clockInTime");
                   }}
                   className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                    formData.clockInTime === time && !showCustomClockIn
+                    formData.clockInTime === time
                       ? "bg-[#00b4b8] text-white"
                       : errors.clockInTime
                         ? "border border-[#D53411] text-[#10141a]"
@@ -1580,33 +1630,28 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   {time}
                 </button>
               ))}
-              <button
-                onClick={() => setShowCustomClockIn(!showCustomClockIn)}
-                className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                  showCustomClockIn
-                    ? "bg-[#00b4b8] text-white"
-                    : errors.clockInTime
+              <TimePicker
+                value={convertTo24Hour(formData.clockInTime)}
+                onChange={(time24h) => {
+                  const time12h = convertTo12Hour(time24h);
+                  setFormData(prev => ({ ...prev, clockInTime: time12h }));
+                  clearError("clockInTime");
+                }}
+              >
+                <button
+                  type="button"
+                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
+                    errors.clockInTime
                       ? "border border-[#D53411] text-[#10141a]"
                       : "border border-[#808081] text-[#10141a]"
-                }`}
-              >
-                Enter Time
-              </button>
+                  }`}
+                >
+                  Enter Time
+                </button>
+              </TimePicker>
             </div>
             {errors.clockInTime && (
               <span className="text-[12px] font-normal text-[#D53411]">{errors.clockInTime}</span>
-            )}
-            {showCustomClockIn && (
-              <input
-                type="time"
-                value={customClockIn}
-                onChange={(e) => {
-                  setCustomClockIn(e.target.value);
-                  setFormData(prev => ({ ...prev, clockInTime: e.target.value }));
-                  clearError("clockInTime");
-                }}
-                className="mt-2 bg-white border border-[#cccccd] rounded-xl h-11 px-4 text-[14px] font-normal text-[#10141a] outline-none"
-              />
             )}
           </div>
 
@@ -1614,16 +1659,31 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Clock Out Time</label>
             <div className="flex flex-wrap gap-2">
+              {/* Custom time badge if selected time is not in predefined list */}
+              {formData.clockOutTime && !clockOutTimeOptions.includes(formData.clockOutTime) && (
+                <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#00b4b8] text-white">
+                  <span className="text-[14px] font-medium">{formData.clockOutTime}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, clockOutTime: "" }));
+                    }}
+                    className="ml-1 hover:opacity-70 transition-opacity"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              
               {clockOutTimeOptions.map((time, index) => (
                 <button
                   key={`${time}-${index}`}
                   onClick={() => {
                     setFormData(prev => ({ ...prev, clockOutTime: time }));
-                    setShowCustomClockOut(false);
                     clearError("clockOutTime");
                   }}
                   className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                    formData.clockOutTime === time && !showCustomClockOut
+                    formData.clockOutTime === time
                       ? "bg-[#00b4b8] text-white"
                       : errors.clockOutTime
                         ? "border border-[#D53411] text-[#10141a]"
@@ -1633,33 +1693,28 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   {time}
                 </button>
               ))}
-              <button
-                onClick={() => setShowCustomClockOut(!showCustomClockOut)}
-                className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                  showCustomClockOut
-                    ? "bg-[#00b4b8] text-white"
-                    : errors.clockOutTime
+              <TimePicker
+                value={convertTo24Hour(formData.clockOutTime)}
+                onChange={(time24h) => {
+                  const time12h = convertTo12Hour(time24h);
+                  setFormData(prev => ({ ...prev, clockOutTime: time12h }));
+                  clearError("clockOutTime");
+                }}
+              >
+                <button
+                  type="button"
+                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
+                    errors.clockOutTime
                       ? "border border-[#D53411] text-[#10141a]"
                       : "border border-[#808081] text-[#10141a]"
-                }`}
-              >
-                Enter Time
-              </button>
+                  }`}
+                >
+                  Enter Time
+                </button>
+              </TimePicker>
             </div>
             {errors.clockOutTime && (
               <span className="text-[12px] font-normal text-[#D53411]">{errors.clockOutTime}</span>
-            )}
-            {showCustomClockOut && (
-              <input
-                type="time"
-                value={customClockOut}
-                onChange={(e) => {
-                  setCustomClockOut(e.target.value);
-                  setFormData(prev => ({ ...prev, clockOutTime: e.target.value }));
-                  clearError("clockOutTime");
-                }}
-                className="mt-2 bg-white border border-[#cccccd] rounded-xl h-11 px-4 text-[14px] font-normal text-[#10141a] outline-none"
-              />
             )}
           </div>
 
