@@ -51,7 +51,6 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
 
   // Filter nav items based on user's access list
   const navItems = useMemo(() => {
-    console.log('user', user);
     if (!user?.profile?.accessList) {
       // If no access list, only show Dashboard
       return allNavItems.filter(item => !item.accessKey);

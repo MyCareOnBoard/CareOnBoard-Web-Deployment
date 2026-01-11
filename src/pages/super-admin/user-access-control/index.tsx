@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import UserAccessModal from "./UserAccessModal";
 import SuccessModal from "./SuccessModal";
+import ErrorDialog from "./ErrorDialog";
 import {
   listSuperAdminUsers,
   createSuperAdminUser,
@@ -34,6 +35,9 @@ export default function UserAccessControlPage() {
   const [successUserName, setSuccessUserName] = useState("");
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [userToRemove, setUserToRemove] = useState<UserAccess | null>(null);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorTitle, setErrorTitle] = useState("Error");
 
   // API integration
   const [userAccesses, setUserAccesses] = useState<UserAccess[]>([]);
@@ -115,7 +119,9 @@ export default function UserAccessControlPage() {
     } catch (err: any) {
       console.error("Failed to delete user:", err);
       setError(err.message || "Failed to delete super admin user");
-      alert(`Error: ${err.message || "Failed to delete super admin user"}`);
+      setErrorTitle("Delete Failed");
+      setErrorMessage(err.message || "Failed to delete super admin user");
+      setShowErrorDialog(true);
     } finally {
       setIsRemoving(false);
     }
@@ -182,7 +188,9 @@ export default function UserAccessControlPage() {
     } catch (err: any) {
       console.error("Failed to save user:", err);
       setError(err.message || "Failed to save super admin user");
-      alert(`Error: ${err.message || "Failed to save super admin user"}`);
+      setErrorTitle(modalMode === "create" ? "Create Failed" : "Update Failed");
+      setErrorMessage(err.message || "Failed to save super admin user");
+      setShowErrorDialog(true);
       // Re-throw error to keep modal open
       throw err;
     } finally {
@@ -400,6 +408,14 @@ export default function UserAccessControlPage() {
         open={isSuccessModalOpen}
         onOpenChange={setIsSuccessModalOpen}
         userName={successUserName}
+      />
+
+      {/* Error Dialog */}
+      <ErrorDialog
+        open={showErrorDialog}
+        onOpenChange={setShowErrorDialog}
+        title={errorTitle}
+        message={errorMessage}
       />
 
       {/* Remove Access Confirmation Dialog */}
