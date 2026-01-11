@@ -64,6 +64,7 @@ import DSPClaimsPage from "@/pages/agency/billing-and-approvals/dsp-info";
 import SuperAdminDashboard from "@/pages/super-admin/dashboard";
 import ComplianceMonitor from "@/pages/super-admin/compliance-monitor";
 import UserAccessControlPage from "@/pages/super-admin/user-access-control";
+import SuperAdminReports from "@/pages/super-admin/reports";
 
 
 export const router = createBrowserRouter([
@@ -359,6 +360,11 @@ export const router = createBrowserRouter([
         path: Routes.superAdmin.userAccessControl,
         Component: UserAccessControlPage,
       },
+      {
+        path: Routes.superAdmin.reports,
+        Component: SuperAdminReports,
+      },
+
     ],
   },
 ]);
