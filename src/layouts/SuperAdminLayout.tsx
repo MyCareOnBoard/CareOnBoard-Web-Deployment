@@ -15,8 +15,7 @@ import {
   DollarSign,
   HelpCircle,
   BarChart3,
-  UserCircle,
-  UsersRound,
+  ChartGantt,
   Settings,
   UserLock
 } from "lucide-react";
@@ -31,7 +30,7 @@ const navItems: NavItem[] = [
   {label: "Corporate Support", path: Routes.superAdmin.corporateSupport, icon: HelpCircle},
   {label: "Oversight Center", path: Routes.superAdmin.oversightCenter, icon: BarChart3},
   {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock},
-  {label: "Staff Directory", path: Routes.superAdmin.staffDirectory, icon: UsersRound},
+  {label: "Reports", path: Routes.superAdmin.reports, icon: ChartGantt},
   {label: "System Settings", path: Routes.superAdmin.systemSettings, icon: Settings},
 ];
 
