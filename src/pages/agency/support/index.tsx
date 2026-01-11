@@ -1,11 +1,26 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, X, Send, Image, Paperclip, Check } from "lucide-react";
+import { Search, Plus, X, Send, Image, Paperclip, Check, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { auth } from "@/lib/firebase";
+import {
+  useThreads,
+  useMessages,
+  useAvailableUsers,
+  useSendMessage,
+  useCreateThread,
+  useAuth,
+} from "@/lib/chat/chat.hooks";
+import type { Thread, Message as FirebaseMessage, ChatUser } from "@/lib/chat/chat.types";
+import { seedDatabase } from "@/lib/chat/seed";
 
+/**
+ * UI Display Message type
+ * Extends Firebase message with UI-specific properties
+ */
 interface Message {
   id: string;
   sender: string;
@@ -16,8 +31,13 @@ interface Message {
   avatar: string;
   read?: boolean;
   attachments?: { name: string; url: string; type: string }[];
+  firebaseId?: string; // Reference to original Firebase message ID
 }
 
+/**
+ * Contact display type for left sidebar
+ * Derived from Firebase Thread data
+ */
 interface Contact {
   id: string;
   name: string;
@@ -29,6 +49,7 @@ interface Contact {
   hasNotification?: boolean;
   isOnline?: boolean;
   category?: "dsp" | "administration" | "all";
+  otherUserId?: string; // UID of the other participant
 }
 
 export default function SupportPage() {
@@ -38,7 +59,14 @@ export default function SupportPage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const [selectedContact, setSelectedContact] = useState<string>("jacob-jones");
+  // Firebase Chat Hooks
+  const { isAuthenticated, userId } = useAuth();
+  const { threads, isLoading: threadsLoading, error: threadsError } = useThreads();
+  const { users: availableUsers, isLoading: usersLoading } = useAvailableUsers();
+  const { create: createNewThread, isCreating: isCreatingThread } = useCreateThread();
+
+  // Selected contact and message state
+  const [selectedContact, setSelectedContact] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"all" | "dsp" | "administration">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [contactSearchQuery, setContactSearchQuery] = useState("");
@@ -47,126 +75,84 @@ export default function SupportPage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
-  const [contacts, setContacts] = useState<Contact[]>([
-    {
-      id: "jenny-wilson",
-      name: "Jenny Wilson",
-      role: "Poli General Practitioners",
-      avatar: "JW",
-      lastMessage: "Thanks for the update!",
-      timestamp: "09:46 AM",
-      hasNotification: true,
-      unread: 1,
-      category: "dsp",
-    },
-    {
-      id: "jacob-jones",
-      name: "Jacob Jones",
-      role: "Poli Dermatologi",
-      avatar: "JJ",
-      lastMessage: "Sure, the test was done on November 15th...",
-      timestamp: "09:46 AM",
-      category: "dsp",
-    },
-    {
-      id: "ronald-richards",
-      name: "Ronald Richards",
-      role: "Poli Cardiology",
-      avatar: "RR",
-      lastMessage: "Can we schedule a meeting?",
-      timestamp: "08:46 AM",
-      hasNotification: true,
-      category: "administration",
-    },
-    {
-      id: "savannah-nguyen",
-      name: "Savannah Nguyen",
-      role: "Poli Dermatologi",
-      avatar: "SN",
-      lastMessage: "I'll check that for you.",
-      timestamp: "08:36 AM",
-      unread: 2,
-      category: "dsp",
-    },
-    {
-      id: "arlene-mccoy",
-      name: "Arlene McCoy",
-      role: "Poli General Practitioners",
-      avatar: "AM",
-      lastMessage: "Perfect, see you then!",
-      timestamp: "07:46 AM",
-      hasNotification: true,
-      category: "administration",
-    },
-    {
-      id: "esther-howard",
-      name: "Esther Howard",
-      role: "General Practitioners",
-      avatar: "EH",
-      lastMessage: "Got it, thanks!",
-      timestamp: "07:36 AM",
-      category: "all",
-    },
-    {
-      id: "devon-lane",
-      name: "Devon Lane",
-      role: "Poli Cardiology",
-      avatar: "DL",
-      lastMessage: "Let me know when you're available.",
-      timestamp: "07:16 AM",
-      hasNotification: true,
-      category: "dsp",
-    },
-    {
-      id: "marvin-mckinney",
-      name: "Marvin McKinney",
-      role: "Poli Dermatologi",
-      avatar: "MM",
-      lastMessage: "Sounds good!",
-      timestamp: "07:06 AM",
-      category: "administration",
-    },
-  ]);
+  // Get messages for selected thread
+  const { messages: firebaseMessages, isLoading: messagesLoading } = useMessages(selectedContact);
+  const { send: sendMessage, isSending } = useSendMessage(selectedContact);
 
-  const [conversations, setConversations] = useState<{ [key: string]: Message[] }>({
-    "jacob-jones": [
-      {
-        id: "1",
-        sender: "You",
-        role: "",
-        content: "Hello, Jacob! Let me check. Could you please provide your test reference number or date of the test?",
-        timestamp: "09:35 AM",
-        isOwn: true,
-        avatar: "Y",
-      },
-      {
-        id: "2",
-        sender: "Jacob Jones",
-        role: "",
-        content: "Sure, the test was done on November 15th, and my reference number is L#123451",
-        timestamp: "09:40 AM",
-        isOwn: false,
-        avatar: "JJ",
-      },
-      {
-        id: "3",
-        sender: "You",
-        role: "",
-        content: "Thank you! I've found your results, here are your lab results and don't hesitate to contact us if you have any further questions.",
-        timestamp: "09:42 AM",
-        isOwn: true,
-        avatar: "Y",
-      },
-    ],
-  });
+  // Map Firebase threads to UI contacts with user info lookup
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [userCache, setUserCache] = useState<Map<string, ChatUser>>(new Map());
 
-  const availableUsers = [
-    { id: "brooklyn-simmons", name: "Brooklyn Simmons", role: "DSP", avatar: "BS" },
-    { id: "darlene-robertson", name: "Darlene Robertson", role: "Client", avatar: "DR" },
-    { id: "bessie-cooper", name: "Bessie Cooper", role: "HR", avatar: "BC" },
-    { id: "annette-black", name: "Annette Black", role: "HR", avatar: "AB" },
-  ];
+  // Convert Firebase message to UI message
+  const mapFirebaseMessage = (msg: FirebaseMessage, currentUserId: string | null): Message => {
+    const isOwn = msg.senderId === currentUserId;
+    const sender = userCache.get(msg.senderId);
+
+    return {
+      id: msg.id,
+      sender: isOwn ? "You" : sender?.name || "Unknown",
+      role: sender?.role || "",
+      content: msg.text,
+      timestamp: format(msg.createdAt, "hh:mm a"),
+      isOwn,
+      avatar: isOwn ? "Y" : sender?.avatar || "?",
+      firebaseId: msg.id,
+    };
+  };
+
+  const currentMessages = firebaseMessages.map((msg) => mapFirebaseMessage(msg, userId));
+
+  // Build contacts from threads
+  useEffect(() => {
+    const buildContacts = async () => {
+      if (!userId || threads.length === 0) {
+        setContacts([]);
+        return;
+      }
+
+      const newContacts: Contact[] = [];
+      const newUserCache = new Map(userCache);
+
+      for (const thread of threads) {
+        // Get the other participant (not current user)
+        const otherUserId = thread.participants.find((id) => id !== userId);
+
+        if (!otherUserId) continue;
+
+        // Check cache first, fetch if not cached
+        let otherUser = newUserCache.get(otherUserId);
+        if (!otherUser) {
+          const foundUser = availableUsers.find((u) => u.uid === otherUserId);
+          if (foundUser) {
+            otherUser = foundUser;
+            newUserCache.set(otherUserId, foundUser);
+          }
+        }
+
+        if (!otherUser) continue;
+
+        const contact: Contact = {
+          id: thread.id,
+          name: otherUser.name,
+          role: otherUser.role,
+          avatar: otherUser.avatar,
+          lastMessage: thread.lastMessage || "(no messages yet)",
+          timestamp: formatDistanceToNow(thread.lastMessageAt, { addSuffix: true }),
+          otherUserId,
+          category: otherUser.role === "DSP" ? "dsp" : "administration",
+        };
+
+        newContacts.push(contact);
+      }
+
+      setContacts(newContacts);
+      setUserCache(newUserCache);
+    };
+
+    buildContacts();
+  }, [threads, userId, availableUsers]);
 
   const toggleUserSelection = (userId: string) => {
     setSelectedUsers((prev) =>
@@ -176,48 +162,34 @@ export default function SupportPage() {
     );
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!messageInput.trim() && attachedFiles.length === 0) return;
+    if (!selectedContact) {
+      toast({
+        title: "Error",
+        description: "Please select a conversation first.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      sender: "You",
-      role: "",
-      content: messageInput.trim(),
-      timestamp: format(new Date(), "hh:mm a"),
-      isOwn: true,
-      avatar: "Y",
-      attachments: attachedFiles.map((file) => ({
-        name: file.name,
-        url: URL.createObjectURL(file),
-        type: file.type,
-      })),
-    };
+    try {
+      await sendMessage(messageInput.trim());
+      setMessageInput("");
+      setAttachedFiles([]);
 
-    setConversations((prev) => ({
-      ...prev,
-      [selectedContact]: [...(prev[selectedContact] || []), newMessage],
-    }));
-
-    setContacts((prev) =>
-      prev.map((contact) =>
-        contact.id === selectedContact
-          ? {
-              ...contact,
-              lastMessage: messageInput.trim() || "Sent an attachment",
-              timestamp: format(new Date(), "hh:mm a"),
-            }
-          : contact
-      )
-    );
-
-    setMessageInput("");
-    setAttachedFiles([]);
-
-    toast({
-      title: "Message Sent",
-      description: "Your message has been sent successfully.",
-    });
+      toast({
+        title: "Message Sent",
+        description: "Your message has been sent successfully.",
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send message";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleFileAttachment = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -242,55 +214,63 @@ export default function SupportPage() {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleStartChat = () => {
-    if (selectedUsers.length === 0) return;
-
-    const firstUser = availableUsers.find((u) => u.id === selectedUsers[0]);
-    if (firstUser) {
-      const existingContact = contacts.find((c) => c.id === firstUser.id);
-      
-      if (!existingContact) {
-        const newContact: Contact = {
-          id: firstUser.id,
-          name: firstUser.name,
-          role: firstUser.role,
-          avatar: firstUser.avatar,
-          lastMessage: "",
-          timestamp: format(new Date(), "hh:mm a"),
-          category: "all",
-        };
-        setContacts((prev) => [newContact, ...prev]);
-      }
-
-      setSelectedContact(firstUser.id);
-      
-      if (!conversations[firstUser.id]) {
-        setConversations((prev) => ({
-          ...prev,
-          [firstUser.id]: [],
-        }));
-      }
+  const handleStartChat = async () => {
+    if (selectedUsers.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one user.",
+        variant: "destructive",
+      });
+      return;
     }
 
-    setSelectedUsers([]);
-    setSearchQuery("");
-    setNewMessageModalOpen(false);
+    try {
+      const newThreadId = await createNewThread(selectedUsers);
+      setSelectedContact(newThreadId);
+      setSelectedUsers([]);
+      setSearchQuery("");
+      setNewMessageModalOpen(false);
 
-    toast({
-      title: "Chat Started",
-      description: `New conversation started.`,
-    });
+      toast({
+        title: "Chat Started",
+        description: "New conversation started.",
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to create chat";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleContactSelect = (contactId: string) => {
     setSelectedContact(contactId);
-    setContacts((prev) =>
-      prev.map((contact) =>
-        contact.id === contactId
-          ? { ...contact, unread: 0, hasNotification: false }
-          : contact
-      )
-    );
+  };
+
+  const handleSeedDatabase = async () => {
+    setIsSeeding(true);
+    try {
+      await seedDatabase();
+      toast({
+        title: "Success",
+        description: "Test data seeded successfully! Refresh to see the conversations.",
+      });
+      // Refresh threads after a short delay to allow Firestore to sync
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to seed database";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSeeding(false);
+    }
   };
 
   const filteredContacts = contacts.filter((contact) => {
@@ -304,13 +284,43 @@ export default function SupportPage() {
   );
 
   const selectedContactData = contacts.find((c) => c.id === selectedContact);
-  const currentMessages = conversations[selectedContact] || [];
 
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [currentMessages]);
+
+  // Show auth error if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-yellow-900">Authentication Required</h3>
+              <p className="text-sm text-yellow-800 mt-1">
+                Please log in to access the messaging feature.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state
+  if (threadsLoading) {
+    return (
+      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-full border-4 border-[#e5e5e6] border-t-[#2563eb] animate-spin mx-auto mb-4"></div>
+          <p className="text-[#808081]">Loading messages...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -320,13 +330,24 @@ export default function SupportPage() {
             Message
           </h1>
         </div>
-        <Button
-          onClick={() => setNewMessageModalOpen(true)}
-          className="flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-none"
-        >
-          <Plus className="w-5 h-5" />
-          New Message
-        </Button>
+        <div className="flex gap-2">
+          {/* Temporary seed button for testing */}
+          <Button
+            onClick={handleSeedDatabase}
+            disabled={isSeeding}
+            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white rounded-full px-6 py-3 h-auto font-semibold shadow-none text-sm"
+            title="Add dummy conversations for testing"
+          >
+            {isSeeding ? "Seeding..." : "🌱 Seed Test Data"}
+          </Button>
+          <Button
+            onClick={() => setNewMessageModalOpen(true)}
+            className="flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-none"
+          >
+            <Plus className="w-5 h-5" />
+            New Message
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-6 h-[calc(100vh-280px)]">
@@ -427,38 +448,45 @@ export default function SupportPage() {
 
           {/* Contacts List */}
           <div className="flex-1 overflow-y-auto">
-            {filteredContacts.map((contact) => (
-              <button
-                key={contact.id}
-                onClick={() => handleContactSelect(contact.id)}
-                className={`w-full p-4 flex items-center gap-3 border-b border-[#e5e5e6] transition-all ${
-                  selectedContact === contact.id 
-                    ? "bg-[#e0f2fe] hover:bg-[#bae6fd]" 
-                    : "hover:bg-[#f8f9fa] active:bg-[#f0f0f1]"
-                }`}
-              >
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
-                    {contact.avatar}
+            {filteredContacts.length > 0 ? (
+              filteredContacts.map((contact) => (
+                <button
+                  key={contact.id}
+                  onClick={() => handleContactSelect(contact.id)}
+                  className={`w-full p-4 flex items-center gap-3 border-b border-[#e5e5e6] transition-all ${
+                    selectedContact === contact.id 
+                      ? "bg-[#e0f2fe] hover:bg-[#bae6fd]" 
+                      : "hover:bg-[#f8f9fa] active:bg-[#f0f0f1]"
+                  }`}
+                >
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
+                      {contact.avatar}
+                    </div>
+                    {contact.hasNotification && (
+                      <span className="absolute top-0 left-0 w-3 h-3 bg-[#ef4444] rounded-full border-2 border-white"></span>
+                    )}
                   </div>
-                  {contact.hasNotification && (
-                    <span className="absolute top-0 left-0 w-3 h-3 bg-[#ef4444] rounded-full border-2 border-white"></span>
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="font-semibold text-[#10141a] truncate">{contact.name}</h3>
+                      <span className="text-xs text-[#808081] shrink-0 ml-2">{contact.timestamp}</span>
+                    </div>
+                    <p className="text-sm text-[#808081] truncate">{contact.lastMessage || contact.role}</p>
+                  </div>
+                  {contact.unread && contact.unread > 0 && (
+                    <div className="w-6 h-6 rounded-full bg-[#ef4444] flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                      {contact.unread}
+                    </div>
                   )}
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-semibold text-[#10141a] truncate">{contact.name}</h3>
-                    <span className="text-xs text-[#808081] shrink-0 ml-2">{contact.timestamp}</span>
-                  </div>
-                  <p className="text-sm text-[#808081] truncate">{contact.lastMessage || contact.role}</p>
-                </div>
-                {contact.unread && contact.unread > 0 && (
-                  <div className="w-6 h-6 rounded-full bg-[#ef4444] flex items-center justify-center text-white text-xs font-semibold shrink-0">
-                    {contact.unread}
-                  </div>
-                )}
-              </button>
-            ))}
+                </button>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-[#808081] p-4">
+                <Send className="w-12 h-12 mb-4 opacity-50" />
+                <p>No conversations yet</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -481,7 +509,14 @@ export default function SupportPage() {
 
               {/* Messages Area */}
               <div className="flex-1 p-6 space-y-4 overflow-y-auto">
-                {currentMessages.length > 0 ? (
+                {messagesLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="w-8 h-8 rounded-full border-2 border-[#e5e5e6] border-t-[#2563eb] animate-spin mx-auto mb-2"></div>
+                      <p className="text-[#808081] text-sm">Loading messages...</p>
+                    </div>
+                  </div>
+                ) : currentMessages.length > 0 ? (
                   currentMessages.map((message) => (
                     <div
                       key={message.id}
@@ -533,9 +568,8 @@ export default function SupportPage() {
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-[#808081]">
-                            {message.isOwn ? "You" : message.sender}
+                            {message.timestamp}
                           </span>
-                          <span className="text-xs text-[#808081]">{message.timestamp}</span>
                           {message.isOwn && (
                             <Check className="w-3 h-3 text-[#808081]" />
                           )}
@@ -601,7 +635,8 @@ export default function SupportPage() {
                           handleSendMessage();
                         }
                       }}
-                      className="pr-20 border-[#e5e5e6] rounded-lg focus-visible:ring-1 focus-visible:ring-[#2563eb]"
+                      disabled={isSending}
+                      className="pr-20 border-[#e5e5e6] rounded-lg focus-visible:ring-1 focus-visible:ring-[#2563eb] disabled:bg-[#f8f9fa]"
                     />
                     <div className="absolute flex items-center gap-2 transform -translate-y-1/2 right-3 top-1/2">
                       <input
@@ -614,7 +649,8 @@ export default function SupportPage() {
                       />
                       <button
                         onClick={() => imageInputRef.current?.click()}
-                        className="p-1 hover:bg-[#f8f9fa] rounded transition-colors"
+                        disabled={isSending}
+                        className="p-1 hover:bg-[#f8f9fa] rounded transition-colors disabled:opacity-50"
                       >
                         <Image className="w-5 h-5 text-[#808081]" />
                       </button>
@@ -627,7 +663,8 @@ export default function SupportPage() {
                       />
                       <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="p-1 hover:bg-[#f8f9fa] rounded transition-colors"
+                        disabled={isSending}
+                        className="p-1 hover:bg-[#f8f9fa] rounded transition-colors disabled:opacity-50"
                       >
                         <Paperclip className="w-5 h-5 text-[#808081]" />
                       </button>
@@ -635,7 +672,7 @@ export default function SupportPage() {
                   </div>
                   <Button
                     onClick={handleSendMessage}
-                    disabled={!messageInput.trim() && attachedFiles.length === 0}
+                    disabled={(!messageInput.trim() && attachedFiles.length === 0) || isSending}
                     className="w-10 h-10 p-0 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full shadow-none disabled:opacity-50"
                   >
                     <Send className="w-5 h-5" />
@@ -696,12 +733,19 @@ export default function SupportPage() {
 
             {/* User List */}
             <div className="mb-5 max-h-[320px] overflow-y-auto -mx-1 px-1">
-              {filteredUsers.length > 0 ? (
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="w-6 h-6 rounded-full border-2 border-[#e5e5e6] border-t-[#2563eb] animate-spin mx-auto mb-2"></div>
+                    <p className="text-[#808081] text-sm">Loading users...</p>
+                  </div>
+                </div>
+              ) : filteredUsers.length > 0 ? (
                 <div className="space-y-1">
                   {filteredUsers.map((user) => (
                     <div
-                      key={user.id}
-                      onClick={() => toggleUserSelection(user.id)}
+                      key={user.uid}
+                      onClick={() => toggleUserSelection(user.uid)}
                       className="flex items-center justify-between px-3 py-3 hover:bg-[#f8f9fa] rounded-[10px] cursor-pointer transition-colors group"
                     >
                       <div className="flex items-center gap-3">
@@ -721,12 +765,12 @@ export default function SupportPage() {
                       </div>
                       <div
                         className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${
-                          selectedUsers.includes(user.id)
+                          selectedUsers.includes(user.uid)
                             ? "bg-[#2563eb] border-[#2563eb]"
                             : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
                         }`}
                       >
-                        {selectedUsers.includes(user.id) && (
+                        {selectedUsers.includes(user.uid) && (
                           <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
                         )}
                       </div>
@@ -755,10 +799,10 @@ export default function SupportPage() {
               </Button>
               <Button
                 onClick={handleStartChat}
-                disabled={selectedUsers.length === 0}
+                disabled={selectedUsers.length === 0 || isCreatingThread}
                 className="flex-1 h-12 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Start Chat
+                {isCreatingThread ? "Creating..." : "Start Chat"}
               </Button>
             </div>
           </div>

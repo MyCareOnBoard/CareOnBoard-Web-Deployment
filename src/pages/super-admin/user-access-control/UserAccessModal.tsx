@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, ChevronDown, Check } from "lucide-react";
+import { X, ChevronDown, Check, Eye, EyeOff } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { getAccessScopes } from "@/lib/api/super-admin-users";
 
 interface UserAccessModalProps {
   open: boolean;
@@ -27,20 +28,11 @@ interface UserAccessModalProps {
     email: string;
     password: string;
     accessList: string[];
-  }) => void;
+  }) => Promise<void>;
 }
 
-const ACCESS_OPTIONS = [
-  "Agency directory",
-  "User Access Control",
-  "Compliance Monitor",
-  "Global Notes Quality",
-  "Agency Billing Monitor",
-  "Corporate Support",
-  "Oversight Center",
-  "Client Directory",
-  "Staff Directory",
-];
+// Get available access scopes from the backend schema
+const ACCESS_OPTIONS = getAccessScopes();
 
 export default function UserAccessModal({
   open,
@@ -56,6 +48,8 @@ export default function UserAccessModal({
     initialData?.accessList || []
   );
   const [isAccessOpen, setIsAccessOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleGeneratePassword = () => {
     const chars =
@@ -75,27 +69,56 @@ export default function UserAccessModal({
     );
   };
 
-  const handleSave = () => {
-    onSave({ name, email, password, accessList });
-    onOpenChange(false);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSave({ name, email, password, accessList });
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error saving user:", error);
+      // Modal stays open on error so user can retry
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleClose = () => {
     onOpenChange(false);
   };
 
+  // Use a ref to track if we're currently in a save operation
+  const isSavingRef = React.useRef(false);
+
+  // Keep the ref in sync with state
   React.useEffect(() => {
-    if (open && initialData) {
-      setName(initialData.name);
-      setEmail(initialData.email);
-      setPassword(initialData.password);
-      setAccessList(initialData.accessList);
-    } else if (open && !initialData) {
-      setName("");
-      setEmail("");
-      setPassword("");
-      setAccessList([]);
+    isSavingRef.current = isSaving;
+  }, [isSaving]);
+
+  // Track the previous open state to detect modal opening
+  const prevOpenRef = React.useRef(false);
+
+  React.useEffect(() => {
+    // Only reset form when modal transitions from closed to open
+    // Don't reset if we're currently saving (prevents re-renders from resetting state)
+    const justOpened = open && !prevOpenRef.current;
+    
+    if (justOpened && !isSavingRef.current) {
+      if (initialData) {
+        setName(initialData.name);
+        setEmail(initialData.email);
+        setPassword(initialData.password);
+        setAccessList(initialData.accessList);
+      } else {
+        setName("");
+        setEmail("");
+        setPassword("");
+        setAccessList([]);
+      }
+      setIsSaving(false);
+      setShowPassword(false);
     }
+    
+    prevOpenRef.current = open;
   }, [open, initialData]);
 
   return (
@@ -111,7 +134,8 @@ export default function UserAccessModal({
           </DialogTitle>
           <button
             onClick={handleClose}
-            className="flex items-center justify-center p-[8px] rounded-[200px] bg-[#eff2f3] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[#e0e3e4] transition-colors"
+            disabled={isSaving}
+            className="flex items-center justify-center p-[8px] rounded-[200px] bg-[#eff2f3] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[#e0e3e4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-4 h-4 text-[#10141a]" />
           </button>
@@ -128,7 +152,8 @@ export default function UserAccessModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter name"
-              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8]"
+              disabled={isSaving}
+              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -142,7 +167,7 @@ export default function UserAccessModal({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter email"
-              disabled={mode === "edit"}
+              disabled={mode === "edit" || isSaving}
               className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
@@ -152,20 +177,41 @@ export default function UserAccessModal({
             <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
               Password
             </Label>
-            <Input
-              type="text"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
-              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8]"
-            />
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={
+                  mode === "edit"
+                    ? "Leave blank to keep current password"
+                    : "Enter password"
+                }
+                disabled={isSaving}
+                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white pl-[16px] pr-[44px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={isSaving}
+                className="absolute right-[12px] top-1/2 -translate-y-1/2 flex items-center justify-center text-[#808081] hover:text-[#10141a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Generate Password Button */}
           <div className="flex items-center justify-end w-full">
             <button
               onClick={handleGeneratePassword}
-              className="flex items-center justify-center px-[10px] py-[6px] rounded-[6px] border-[0.5px] border-[#808081] hover:bg-[#f5f5f5] transition-colors w-fit cursor-pointer"
+              disabled={isSaving}
+              className="flex items-center justify-center px-[10px] py-[6px] rounded-[6px] border-[0.5px] border-[#808081] hover:bg-[#f5f5f5] transition-colors w-fit cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
                 Generate Password
@@ -178,9 +224,12 @@ export default function UserAccessModal({
             <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
               Access
             </Label>
-            <Popover open={isAccessOpen} onOpenChange={setIsAccessOpen}>
+            <Popover open={isAccessOpen && !isSaving} onOpenChange={setIsAccessOpen}>
               <PopoverTrigger asChild>
-                <button className="flex items-center justify-between h-[44px] w-full rounded-[12px] border border-[#cccccd] bg-white px-[16px] hover:bg-[#fafafa] transition-colors">
+                <button
+                  disabled={isSaving}
+                  className="flex items-center justify-between h-[44px] w-full rounded-[12px] border border-[#cccccd] bg-white px-[16px] hover:bg-[#fafafa] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                >
                   <span className="text-[14px] font-normal text-[#525253]">
                     {accessList.length > 0
                       ? `${accessList.length} selected`
@@ -193,16 +242,16 @@ export default function UserAccessModal({
                 className="w-[var(--radix-popover-trigger-width)] bg-white border border-[#cccccd] rounded-[12px] p-0 shadow-lg"
                 align="start"
               >
-                <div className="flex flex-col">
+                <div className="flex flex-col max-h-[300px]">
                   {/* Header */}
-                  <div className="px-[20px] pt-[12px] pb-0">
+                  <div className="px-[20px] pt-[12px] pb-0 shrink-0">
                     <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
                       Select access
                     </p>
                   </div>
 
-                  {/* Options */}
-                  <div className="flex flex-col mt-[8px]">
+                  {/* Options - Scrollable */}
+                  <div className="flex flex-col mt-[8px] overflow-y-auto">
                     {ACCESS_OPTIONS.map((option) => {
                       const isSelected = accessList.includes(option);
                       return (
@@ -262,7 +311,8 @@ export default function UserAccessModal({
         <DialogFooter className="flex flex-row gap-[12px] items-center justify-center pt-[40px] pb-0 w-full shrink-0 mt-auto">
           <button
             onClick={handleClose}
-            className="flex-1 flex items-center justify-center px-[16px] py-[12px] rounded-[60px] backdrop-blur-[22px] border border-[#525253] hover:bg-[#f5f5f5] transition-colors"
+            disabled={isSaving}
+            className="flex-1 flex items-center justify-center px-[16px] py-[12px] rounded-[60px] backdrop-blur-[22px] border border-[#525253] hover:bg-[#f5f5f5] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="text-[14px] font-semibold leading-[1.4] text-[#525253]">
               Cancel
@@ -270,10 +320,20 @@ export default function UserAccessModal({
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 flex items-center justify-center px-[16px] py-[12px] rounded-[60px] bg-[#2b82ff] backdrop-blur-[22px] hover:bg-[#2775e5] transition-colors"
+            disabled={isSaving}
+            className="flex-1 flex items-center justify-center gap-2 px-[16px] py-[12px] rounded-[60px] bg-[#2b82ff] backdrop-blur-[22px] hover:bg-[#2775e5] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
+            {isSaving && (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
+            )}
             <span className="text-[14px] font-semibold leading-[1.4] text-white">
-              {mode === "create" ? "Add User" : "Update User"}
+              {isSaving
+                ? mode === "create"
+                  ? "Adding user..."
+                  : "Updating user..."
+                : mode === "create"
+                ? "Add User"
+                : "Update User"}
             </span>
           </button>
         </DialogFooter>
