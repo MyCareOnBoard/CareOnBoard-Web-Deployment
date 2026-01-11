@@ -1,6 +1,6 @@
 import type {ReactNode} from "react";
-import {useEffect} from "react";
-import {Outlet, useNavigate} from "react-router";
+import {useEffect, useMemo} from "react";
+import {Outlet, useNavigate, useLocation} from "react-router";
 import {useAuth} from "@/utils/auth";
 import {Routes} from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -21,23 +21,24 @@ import {
   UserLock
 } from "lucide-react";
 
-const navItems: NavItem[] = [
-  {label: "Dashboard", path: Routes.superAdmin.dashboard, icon: Home},
-  {label: "Agency directory", path: Routes.superAdmin.agencies, icon: Building2},
-  {label: "User Access Control", path: Routes.superAdmin.userAccessControl, icon: Users},
-  {label: "Compliance Monitor", path: Routes.superAdmin.complianceMonitor, icon: Shield},
-  {label: "Global Notes Quality", path: Routes.superAdmin.globalNotesQuality, icon: FileText},
-  {label: "Agency Billing Monitor", path: Routes.superAdmin.agencyBillingMonitor, icon: DollarSign},
-  {label: "Corporate Support", path: Routes.superAdmin.corporateSupport, icon: HelpCircle},
-  {label: "Oversight Center", path: Routes.superAdmin.oversightCenter, icon: BarChart3},
-  {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock},
-  {label: "Staff Directory", path: Routes.superAdmin.staffDirectory, icon: UsersRound},
-  {label: "System Settings", path: Routes.superAdmin.systemSettings, icon: Settings},
+const allNavItems: NavItem[] = [
+  {label: "Dashboard", path: Routes.superAdmin.dashboard, icon: Home}, // Always accessible
+  {label: "Agency directory", path: Routes.superAdmin.agencies, icon: Building2, accessKey: "Agency Directory"},
+  {label: "User Access Control", path: Routes.superAdmin.userAccessControl, icon: Users, accessKey: "User Access Control"},
+  {label: "Compliance Monitor", path: Routes.superAdmin.complianceMonitor, icon: Shield, accessKey: "Compliance Monitor"},
+  {label: "Global Notes Quality", path: Routes.superAdmin.globalNotesQuality, icon: FileText, accessKey: "Global Notes Quality"},
+  {label: "Agency Billing Monitor", path: Routes.superAdmin.agencyBillingMonitor, icon: DollarSign, accessKey: "Agency Billing Monitor"},
+  {label: "Corporate Support", path: Routes.superAdmin.corporateSupport, icon: HelpCircle, accessKey: "Corporate Support"},
+  {label: "Oversight Center", path: Routes.superAdmin.oversightCenter, icon: BarChart3, accessKey: "Oversight Center"},
+  {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock, accessKey: "Clients Directory"},
+  {label: "Staff Directory", path: Routes.superAdmin.staffDirectory, icon: UsersRound, accessKey: "Staff Directory"},
+  {label: "System Settings", path: Routes.superAdmin.systemSettings, icon: Settings, accessKey: "System Settings"},
 ];
 
 export default function SuperAdminLayout({children}: { children?: ReactNode }) {
   const {user, logout} = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = async () => {
     try {
@@ -48,11 +49,55 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
     }
   };
 
+  // Filter nav items based on user's access list
+  const navItems = useMemo(() => {
+    console.log('user', user);
+    if (!user?.profile?.accessList) {
+      // If no access list, only show Dashboard
+      return allNavItems.filter(item => !item.accessKey);
+    }
+
+    const accessList = user.profile.accessList;
+    
+    return allNavItems.filter(item => {
+      // Always include items without accessKey (like Dashboard)
+      if (!item.accessKey) return true;
+      
+      // Include items that are in the user's access list
+      return accessList.includes(item.accessKey);
+    });
+  }, [user?.profile?.accessList]);
+
   useEffect(() => {
     if (!user || (user?.userType !== UserType.SUPER_ADMIN)) {
       navigate(Routes.auth.login, {replace: true});
     }
   }, [user]);
+
+  // Route protection: Check if user has access to current route
+  useEffect(() => {
+    if (!user) return;
+
+    const currentPath = location.pathname;
+    
+    // Find the nav item that matches the current path
+    const currentNavItem = allNavItems.find(item => currentPath.includes(item.path));
+    
+    // If no matching nav item found, or it's dashboard (always accessible), allow access
+    if (!currentNavItem || !currentNavItem.accessKey) {
+      return;
+    }
+
+    // Check if user has the required access
+    const userAccessList = user.profile?.accessList || [];
+    const hasAccess = userAccessList.includes(currentNavItem.accessKey);
+
+    // If no access, redirect to dashboard
+    if (!hasAccess) {
+      console.warn(`[SuperAdminLayout] Access denied to ${currentNavItem.label}. Redirecting to dashboard.`);
+      navigate(Routes.superAdmin.dashboard, {replace: true});
+    }
+  }, [user, location.pathname, navigate]);
 
   return (
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">

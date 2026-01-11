@@ -108,6 +108,13 @@ export async function getUser(): Promise<User> {
       };
     }
 
+    if (user.userType === UserType.SUPER_ADMIN) {
+      user.profile = {
+        ...user.profile,
+        accessList: profileSource.accessList,
+      } as User['profile'];
+    }
+
     return user;
   } catch (err: any) {
     // Re-throw with more context
