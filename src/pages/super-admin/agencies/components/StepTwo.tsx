@@ -7,18 +7,16 @@ import {MultiSelect, MultiSelectItem} from "@/components/ui/multi-select";
 
 import { cn } from "@/lib/utils";
 
-export default function Step3Leadership({formData, onChange, fieldsWithErrors = []}: any) {
+interface Step3LeadershipProps {
+  formData: any;
+  onChange: (key: any, value: any) => void;
+  services: {name: string; code: string}[];
+  fieldsWithErrors: string[];
+}
+
+export default function Step3Leadership({formData, onChange, services = [], fieldsWithErrors = []}: Step3LeadershipProps) {
     const [showPassword, setShowPassword] = useState(false);
     const {toast} = useToast();
-
-    const services = [
-        "Community Based Supports (CBS)",
-        "Individual Supports (IS)",
-        "Respite",
-        "Community Inclusion",
-        "Transportation",
-        "Employment Services",
-    ];
 
     const generatePassword = () => {
         const length = 12;
@@ -169,8 +167,8 @@ export default function Step3Leadership({formData, onChange, fieldsWithErrors = 
                             )}
                         >
                             {services.map((service) => (
-                                <MultiSelectItem key={service} value={service}>
-                                    {service}
+                                <MultiSelectItem key={service.code} value={service.name}>
+                                    {service.name}
                                 </MultiSelectItem>
                             ))}
                         </MultiSelect>
