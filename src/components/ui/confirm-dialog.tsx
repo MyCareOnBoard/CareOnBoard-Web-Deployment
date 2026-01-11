@@ -33,6 +33,7 @@ interface ConfirmDialogContentProps extends React.ComponentPropsWithoutRef<typeo
   onConfirm?: () => void;
   onCancel?: () => void;
   isLoading?: boolean;
+  loadingText?: string;
 }
 
 const ConfirmDialogContent = React.forwardRef<
@@ -48,6 +49,7 @@ const ConfirmDialogContent = React.forwardRef<
   onConfirm, 
   onCancel,
   isLoading = false,
+  loadingText = "Processing...",
   ...props 
 }, ref) => (
   <ConfirmDialogPortal>
@@ -94,7 +96,7 @@ const ConfirmDialogContent = React.forwardRef<
         <div className="flex w-full gap-3">
           <Button 
             variant="outline"
-            className="flex-1 rounded-[60px] border-[#e0e0e0] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-[#808081] hover:bg-[#f5f5f5]" 
+            className="flex-1 rounded-[60px] border-[#e0e0e0] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-[#808081] hover:bg-[#f5f5f5] cursor-pointer disabled:cursor-not-allowed" 
             onClick={onCancel}
             disabled={isLoading}
           >
@@ -102,14 +104,14 @@ const ConfirmDialogContent = React.forwardRef<
           </Button>
           <Button 
             variant="destructive"
-            className="flex-1 rounded-[60px] bg-[#ef4444] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-white hover:bg-[#dc2626]" 
+            className="flex-1 rounded-[60px] bg-[#ef4444] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-white hover:bg-[#dc2626] cursor-pointer disabled:cursor-not-allowed" 
             onClick={onConfirm}
             disabled={isLoading}
           >
             {isLoading ? (
               <div className="flex items-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
-                <span>Processing...</span>
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
+                <span>{loadingText}</span>
               </div>
             ) : (
               confirmText
