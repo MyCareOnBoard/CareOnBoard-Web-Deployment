@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink } from "lucide-react";
+import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import TimePicker from "@/components/TimePicker";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { searchClients, Client, ClientService, getAgencyClientById } from "@/lib/api/clients";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,6 +53,14 @@ export interface ScheduleFormData {
   ispOutcome: string;
   planOfCare: File | null;
   submissionStatus?: SubmissionStatus;
+  selectedWeekdays?: WeekdaySchedule[];
+}
+
+export interface WeekdaySchedule {
+  day: string; // "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+  dayIndex: number; // 0-6 (Sunday = 0)
+  clockInTime: string;
+  clockOutTime: string;
 }
 
 const clockInTimeOptions = [
@@ -62,6 +71,16 @@ const clockInTimeOptions = [
 const clockOutTimeOptions = [
   "08:00:AM", "08:30:AM", "09:00:AM", "09:30:AM", "10.00:AM",
   "10.30:AM", "11.30:AM", "12.00:PM", "12.30:PM"
+];
+
+const WEEKDAY_OPTIONS = [
+  { label: "Sat", dayIndex: 6 },
+  { label: "Sun", dayIndex: 0 },
+  { label: "Mon", dayIndex: 1 },
+  { label: "Tues", dayIndex: 2 },
+  { label: "Wed", dayIndex: 3 },
+  { label: "Thu", dayIndex: 4 },
+  { label: "Fri", dayIndex: 5 },
 ];
 
 const noteTypes: {id: string, title: string}[] = [
@@ -127,12 +146,12 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showNotesTypeDropdown, setShowNotesTypeDropdown] = useState(false);
-  const [customClockIn, setCustomClockIn] = useState("");
-  const [customClockOut, setCustomClockOut] = useState("");
-  const [showCustomClockIn, setShowCustomClockIn] = useState(false);
-  const [showCustomClockOut, setShowCustomClockOut] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showDspDropdown, setShowDspDropdown] = useState(false);
+  
+  // Weekday scheduling state (for recurring schedules)
+  const [selectedWeekdays, setSelectedWeekdays] = useState<WeekdaySchedule[]>([]);
+  const [configuringWeekday, setConfiguringWeekday] = useState<{ day: string; dayIndex: number } | null>(null);
 
   // API search states
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
@@ -192,6 +211,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       setIsSubmitting(false);
       setClientSearchResults([]);
       setDspSearchResults([]);
+      setSelectedWeekdays([]);
+      setConfiguringWeekday(null);
       if (!(editData && mode === "edit")) {
         setSelectedClient(null);
         setSelectedClientServices([]);
@@ -210,41 +231,97 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   /**
    * Build shift requests from form data
    * Handles both one-time and recurring schedules
+   * For recurring schedules with selected weekdays, only creates shifts on those days
    */
   const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
     if (!user?.agencyId || !data.assignedDspId) return [];
 
     const requests: CreateShiftRequest[] = [];
-    const baseShiftData = {
-      employeeId: data.assignedDspId,
-      agencyId: user?.agencyId || "",
-      location: data.clientLocation || "",
-      startTime: data.clockInTime,
-      endTime: data.clockOutTime,
-      clientId: data.clientId,
-      notesType: data.notesType || undefined,
-      serviceCode: data.serviceCode,
-      schedulingType: data.schedulingType,
-      ispOutcome: data.ispOutcome || undefined,
-      assignedDsp: data.assignedDsp,
-      status: ShiftStatus.PENDING,
-      type: ShiftType.AUTOMATIC,
-      submissionStatus: SubmissionStatus.DRAFT,
-    };
 
     if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
+      // Get all dates in the range
       const dateRange = eachDayOfIntervalDateFns({ start: data.startDate, end: data.endDate });
-      dateRange.forEach((date) => {
-        requests.push({
-          ...baseShiftData,
-          date: format(date, "yyyy-MM-dd")
+      
+      // If weekdays are selected, filter dates by selected weekdays
+      if (selectedWeekdays.length > 0) {
+        const selectedDayIndices = new Set(selectedWeekdays.map(w => w.dayIndex));
+        
+        dateRange.forEach((date) => {
+          const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+          
+          // Only create shift if this day is in selected weekdays
+          if (selectedDayIndices.has(dayOfWeek)) {
+            // Find the weekday schedule for this day to get its specific times
+            const weekdaySchedule = selectedWeekdays.find(w => w.dayIndex === dayOfWeek);
+            
+            if (weekdaySchedule) {
+              const baseShiftData = {
+                employeeId: data.assignedDspId,
+                agencyId: user?.agencyId || "",
+                location: data.clientLocation || "",
+                startTime: weekdaySchedule.clockInTime,
+                endTime: weekdaySchedule.clockOutTime,
+                clientId: data.clientId,
+                notesType: data.notesType || undefined,
+                serviceCode: data.serviceCode,
+                schedulingType: data.schedulingType,
+                ispOutcome: data.ispOutcome || undefined,
+                assignedDsp: data.assignedDsp,
+                status: ShiftStatus.PENDING,
+                type: ShiftType.AUTOMATIC,
+                submissionStatus: SubmissionStatus.DRAFT,
+                date: format(date, "yyyy-MM-dd")
+              };
+              
+              requests.push(baseShiftData);
+            }
+          }
         });
-      });
+      } else {
+        // No weekdays selected - create shifts for all days (existing behavior)
+        dateRange.forEach((date) => {
+          const baseShiftData = {
+            employeeId: data.assignedDspId,
+            agencyId: user?.agencyId || "",
+            location: data.clientLocation || "",
+            startTime: data.clockInTime,
+            endTime: data.clockOutTime,
+            clientId: data.clientId,
+            notesType: data.notesType || undefined,
+            serviceCode: data.serviceCode,
+            schedulingType: data.schedulingType,
+            ispOutcome: data.ispOutcome || undefined,
+            assignedDsp: data.assignedDsp,
+            status: ShiftStatus.PENDING,
+            type: ShiftType.AUTOMATIC,
+            submissionStatus: SubmissionStatus.DRAFT,
+            date: format(date, "yyyy-MM-dd")
+          };
+          
+          requests.push(baseShiftData);
+        });
+      }
     } else if (data.date) {
-      requests.push({
-        ...baseShiftData,
+      // One-time schedule
+      const baseShiftData = {
+        employeeId: data.assignedDspId,
+        agencyId: user?.agencyId || "",
+        location: data.clientLocation || "",
+        startTime: data.clockInTime,
+        endTime: data.clockOutTime,
+        clientId: data.clientId,
+        notesType: data.notesType || undefined,
+        serviceCode: data.serviceCode,
+        schedulingType: data.schedulingType,
+        ispOutcome: data.ispOutcome || undefined,
+        assignedDsp: data.assignedDsp,
+        status: ShiftStatus.PENDING,
+        type: ShiftType.AUTOMATIC,
+        submissionStatus: SubmissionStatus.DRAFT,
         date: format(data.date, "yyyy-MM-dd")
-      });
+      };
+      
+      requests.push(baseShiftData);
     }
 
     return requests;
@@ -400,6 +477,102 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     setFormData(prev => ({ ...prev, planOfCare: file }));
   };
 
+  // Convert 12-hour format (e.g., "08:00:AM") to 24-hour format (e.g., "08:00")
+  const convertTo24Hour = (time12h: string): string => {
+    if (!time12h) return "";
+    
+    // Handle formats like "08:00:AM", "08.00:AM", "8:00AM", etc.
+    const match = time12h.match(/(\d{1,2})[.:](\d{2}):?(AM|PM)/i);
+    if (!match) return "";
+    
+    let hours = parseInt(match[1]);
+    const minutes = match[2];
+    const period = match[3].toUpperCase();
+    
+    if (period === "PM" && hours !== 12) {
+      hours += 12;
+    } else if (period === "AM" && hours === 12) {
+      hours = 0;
+    }
+    
+    return `${hours.toString().padStart(2, "0")}:${minutes}`;
+  };
+
+  // Convert 24-hour format (e.g., "14:30") to 12-hour format (e.g., "02:30:PM")
+  const convertTo12Hour = (time24h: string): string => {
+    if (!time24h) return "";
+    
+    const [hoursStr, minutes] = time24h.split(":");
+    let hours = parseInt(hoursStr);
+    const period = hours >= 12 ? "PM" : "AM";
+    
+    if (hours === 0) {
+      hours = 12;
+    } else if (hours > 12) {
+      hours -= 12;
+    }
+    
+    return `${hours.toString().padStart(2, "0")}:${minutes}:${period}`;
+  };
+
+  // Handle weekday toggle
+  const handleWeekdayToggle = (day: string, dayIndex: number) => {
+    const existing = selectedWeekdays.find(w => w.dayIndex === dayIndex);
+    
+    if (existing) {
+      // Remove the day if already selected
+      setSelectedWeekdays(prev => prev.filter(w => w.dayIndex !== dayIndex));
+      if (configuringWeekday?.dayIndex === dayIndex) {
+        setConfiguringWeekday(null);
+        // Reset clock times
+        setFormData(prev => ({ ...prev, clockInTime: "", clockOutTime: "" }));
+      }
+    } else {
+      // Start configuring this weekday
+      setConfiguringWeekday({ day, dayIndex });
+      // Reset clock times for this new weekday
+      setFormData(prev => ({ ...prev, clockInTime: "", clockOutTime: "" }));
+    }
+  };
+
+  // When clock in/out times are set and we're configuring a weekday, add it to selected weekdays
+  useEffect(() => {
+    if (configuringWeekday && formData.clockInTime && formData.clockOutTime) {
+      // Add the configured weekday to selected weekdays
+      setSelectedWeekdays(prev => {
+        // Check if it already exists
+        const existing = prev.find(w => w.dayIndex === configuringWeekday.dayIndex);
+        if (existing) {
+          // Update existing
+          return prev.map(w => 
+            w.dayIndex === configuringWeekday.dayIndex 
+              ? { ...w, clockInTime: formData.clockInTime, clockOutTime: formData.clockOutTime }
+              : w
+          );
+        } else {
+          // Add new
+          return [...prev, {
+            day: configuringWeekday.day,
+            dayIndex: configuringWeekday.dayIndex,
+            clockInTime: formData.clockInTime,
+            clockOutTime: formData.clockOutTime,
+          }];
+        }
+      });
+      
+      // Clear configuring state
+      setConfiguringWeekday(null);
+    }
+  }, [configuringWeekday, formData.clockInTime, formData.clockOutTime]);
+
+  // Clear selected weekdays when switching to one-time scheduling
+  useEffect(() => {
+    if (formData.schedulingType === "one-time") {
+      setSelectedWeekdays([]);
+      setConfiguringWeekday(null);
+    }
+  }, [formData.schedulingType]);
+
   // Form validation
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -436,14 +609,26 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       }
     }
 
-    // Clock in time validation
-    if (!formData.clockInTime) {
-      newErrors.clockInTime = "Please select a clock in time";
-    }
-
-    // Clock out time validation
-    if (!formData.clockOutTime) {
-      newErrors.clockOutTime = "Please select a clock out time";
+    // Clock time validation
+    if (formData.schedulingType === "recurring" && selectedWeekdays.length > 0) {
+      // When weekdays are selected, validate each weekday has times
+      const invalidWeekdays = selectedWeekdays.filter(w => !w.clockInTime || !w.clockOutTime);
+      if (invalidWeekdays.length > 0) {
+        newErrors.clockInTime = `Please set times for all selected weekdays`;
+      }
+      
+      // Check if a weekday is currently being configured
+      if (configuringWeekday) {
+        newErrors.clockInTime = `Please finish setting times for ${configuringWeekday.day} or deselect it`;
+      }
+    } else {
+      // For one-time or recurring without weekdays, validate general times
+      if (!formData.clockInTime) {
+        newErrors.clockInTime = "Please select a clock in time";
+      }
+      if (!formData.clockOutTime) {
+        newErrors.clockOutTime = "Please select a clock out time";
+      }
     }
 
     setErrors(newErrors);
@@ -481,14 +666,22 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       if (formData.startDate > formData.endDate) return false;
     }
 
-    // Clock in time validation
-    if (!formData.clockInTime) return false;
-
-    // Clock out time validation
-    if (!formData.clockOutTime) return false;
+    // Clock time validation
+    if (formData.schedulingType === "recurring" && selectedWeekdays.length > 0) {
+      // When weekdays are selected, validate each weekday has times
+      const invalidWeekdays = selectedWeekdays.filter(w => !w.clockInTime || !w.clockOutTime);
+      if (invalidWeekdays.length > 0) return false;
+      
+      // If a weekday is currently being configured, form is not valid
+      if (configuringWeekday) return false;
+    } else {
+      // For one-time or recurring without weekdays, validate general times
+      if (!formData.clockInTime) return false;
+      if (!formData.clockOutTime) return false;
+    }
 
     return true;
-  }, [formData]);
+  }, [formData, selectedWeekdays, configuringWeekday]);
 
   // Handle saving schedule as draft
   const handleSaveDraft = async () => {
@@ -1281,6 +1474,37 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   </div>
                 )}
               </div>
+
+              {/* Weekdays Selection */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Weekdays</label>
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAY_OPTIONS.map((weekday) => {
+                    const isSelected = selectedWeekdays.some(w => w.dayIndex === weekday.dayIndex);
+                    const isConfiguring = configuringWeekday?.dayIndex === weekday.dayIndex;
+                    return (
+                      <button
+                        key={weekday.dayIndex}
+                        onClick={() => handleWeekdayToggle(weekday.label, weekday.dayIndex)}
+                        className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
+                          isSelected
+                            ? "bg-[#00b4b8] text-white border-[0.5px] border-[#808081]"
+                            : isConfiguring
+                              ? "bg-[#ffa500] text-white border-[0.5px] border-[#ff8c00]"
+                              : "border border-[#808081] text-[#10141a]"
+                        }`}
+                      >
+                        {weekday.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {configuringWeekday && (
+                  <p className="text-[12px] font-normal text-[#ffa500] mt-1">
+                    Now select clock in and clock out times for {configuringWeekday.day}
+                  </p>
+                )}
+              </div>
             </>
           ) : (
             /* Select Date - for one-time scheduling */
@@ -1372,16 +1596,31 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Clock In Time</label>
             <div className="flex flex-wrap gap-2">
+              {/* Custom time badge if selected time is not in predefined list */}
+              {formData.clockInTime && !clockInTimeOptions.includes(formData.clockInTime) && (
+                <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#00b4b8] text-white">
+                  <span className="text-[14px] font-medium">{formData.clockInTime}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, clockInTime: "" }));
+                    }}
+                    className="ml-1 hover:opacity-70 transition-opacity"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              
               {clockInTimeOptions.map((time, index) => (
                 <button
                   key={`${time}-${index}`}
                   onClick={() => {
                     setFormData(prev => ({ ...prev, clockInTime: time }));
-                    setShowCustomClockIn(false);
                     clearError("clockInTime");
                   }}
                   className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                    formData.clockInTime === time && !showCustomClockIn
+                    formData.clockInTime === time
                       ? "bg-[#00b4b8] text-white"
                       : errors.clockInTime
                         ? "border border-[#D53411] text-[#10141a]"
@@ -1391,33 +1630,28 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   {time}
                 </button>
               ))}
-              <button
-                onClick={() => setShowCustomClockIn(!showCustomClockIn)}
-                className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                  showCustomClockIn
-                    ? "bg-[#00b4b8] text-white"
-                    : errors.clockInTime
+              <TimePicker
+                value={convertTo24Hour(formData.clockInTime)}
+                onChange={(time24h) => {
+                  const time12h = convertTo12Hour(time24h);
+                  setFormData(prev => ({ ...prev, clockInTime: time12h }));
+                  clearError("clockInTime");
+                }}
+              >
+                <button
+                  type="button"
+                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
+                    errors.clockInTime
                       ? "border border-[#D53411] text-[#10141a]"
                       : "border border-[#808081] text-[#10141a]"
-                }`}
-              >
-                Enter Time
-              </button>
+                  }`}
+                >
+                  Enter Time
+                </button>
+              </TimePicker>
             </div>
             {errors.clockInTime && (
               <span className="text-[12px] font-normal text-[#D53411]">{errors.clockInTime}</span>
-            )}
-            {showCustomClockIn && (
-              <input
-                type="time"
-                value={customClockIn}
-                onChange={(e) => {
-                  setCustomClockIn(e.target.value);
-                  setFormData(prev => ({ ...prev, clockInTime: e.target.value }));
-                  clearError("clockInTime");
-                }}
-                className="mt-2 bg-white border border-[#cccccd] rounded-xl h-11 px-4 text-[14px] font-normal text-[#10141a] outline-none"
-              />
             )}
           </div>
 
@@ -1425,16 +1659,31 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Clock Out Time</label>
             <div className="flex flex-wrap gap-2">
+              {/* Custom time badge if selected time is not in predefined list */}
+              {formData.clockOutTime && !clockOutTimeOptions.includes(formData.clockOutTime) && (
+                <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#00b4b8] text-white">
+                  <span className="text-[14px] font-medium">{formData.clockOutTime}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, clockOutTime: "" }));
+                    }}
+                    className="ml-1 hover:opacity-70 transition-opacity"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              
               {clockOutTimeOptions.map((time, index) => (
                 <button
                   key={`${time}-${index}`}
                   onClick={() => {
                     setFormData(prev => ({ ...prev, clockOutTime: time }));
-                    setShowCustomClockOut(false);
                     clearError("clockOutTime");
                   }}
                   className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                    formData.clockOutTime === time && !showCustomClockOut
+                    formData.clockOutTime === time
                       ? "bg-[#00b4b8] text-white"
                       : errors.clockOutTime
                         ? "border border-[#D53411] text-[#10141a]"
@@ -1444,35 +1693,47 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   {time}
                 </button>
               ))}
-              <button
-                onClick={() => setShowCustomClockOut(!showCustomClockOut)}
-                className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                  showCustomClockOut
-                    ? "bg-[#00b4b8] text-white"
-                    : errors.clockOutTime
+              <TimePicker
+                value={convertTo24Hour(formData.clockOutTime)}
+                onChange={(time24h) => {
+                  const time12h = convertTo12Hour(time24h);
+                  setFormData(prev => ({ ...prev, clockOutTime: time12h }));
+                  clearError("clockOutTime");
+                }}
+              >
+                <button
+                  type="button"
+                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
+                    errors.clockOutTime
                       ? "border border-[#D53411] text-[#10141a]"
                       : "border border-[#808081] text-[#10141a]"
-                }`}
-              >
-                Enter Time
-              </button>
+                  }`}
+                >
+                  Enter Time
+                </button>
+              </TimePicker>
             </div>
             {errors.clockOutTime && (
               <span className="text-[12px] font-normal text-[#D53411]">{errors.clockOutTime}</span>
             )}
-            {showCustomClockOut && (
-              <input
-                type="time"
-                value={customClockOut}
-                onChange={(e) => {
-                  setCustomClockOut(e.target.value);
-                  setFormData(prev => ({ ...prev, clockOutTime: e.target.value }));
-                  clearError("clockOutTime");
-                }}
-                className="mt-2 bg-white border border-[#cccccd] rounded-xl h-11 px-4 text-[14px] font-normal text-[#10141a] outline-none"
-              />
-            )}
           </div>
+
+          {/* Selected Weekdays Display (only for recurring with selected weekdays) */}
+          {formData.schedulingType === "recurring" && selectedWeekdays.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {selectedWeekdays.map((weekday) => (
+                <div
+                  key={weekday.dayIndex}
+                  className="flex items-center gap-2 h-[36px] px-2 rounded-lg bg-[rgba(0,216,65,0.08)] border-b border-[rgba(255,255,255,0.3)]"
+                >
+                  <Clock className="w-5 h-5 text-[#00d841] shrink-0" />
+                  <span className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
+                    {weekday.day} ( {weekday.clockInTime}-{weekday.clockOutTime} )
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* ISP Outcome */}
           <div className="flex flex-col gap-1">
