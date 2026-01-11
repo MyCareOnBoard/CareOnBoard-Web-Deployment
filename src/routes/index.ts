@@ -67,6 +67,7 @@ import UserAccessControlPage from "@/pages/super-admin/user-access-control";
 import CorporateSupportPage from "@/pages/super-admin/corporate-support";
 import OversightCenterPage from "@/pages/super-admin/oversight-center";
 import SuperAdminReports from "@/pages/super-admin/reports";
+import SuperAdminSystemSettingsPage from "@/pages/super-admin/system-settings";
 
 
 export const router = createBrowserRouter([
@@ -370,8 +371,13 @@ export const router = createBrowserRouter([
         path: Routes.superAdmin.oversightCenter,
         Component: OversightCenterPage,
       },
+      {
         path: Routes.superAdmin.reports,
         Component: SuperAdminReports,
+      },
+      {
+        path: Routes.superAdmin.systemSettings,
+        Component: SuperAdminSystemSettingsPage,
       },
 
     ],
