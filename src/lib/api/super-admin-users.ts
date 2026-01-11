@@ -4,14 +4,14 @@ import axiosClient from '../axios';
  * Available Access Scopes for Super Admins
  */
 export enum AccessScope {
-  AGENCY_MANAGEMENT = "Agency Management",
+  AGENCY_DIRECTORY = "Agency Directory",
   USER_ACCESS_CONTROL = "User Access Control",
   COMPLIANCE_MONITOR = "Compliance Monitor",
   GLOBAL_NOTES_QUALITY = "Global Notes Quality",
   AGENCY_BILLING_MONITOR = "Agency Billing Monitor",
   CORPORATE_SUPPORT = "Corporate Support",
   OVERSIGHT_CENTER = "Oversight Center",
-  CLIENT_DIRECTORY = "Client Directory",
+  CLIENTS_DIRECTORY = "Clients Directory",
   STAFF_DIRECTORY = "Staff Directory",
   SYSTEM_SETTINGS = "System Settings",
 }

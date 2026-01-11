@@ -32,6 +32,8 @@ export interface Profile {
   professionalSummary?: string
   workAvailability?: boolean
   tagId?: string
+  // Super Admin specific
+  accessList?: string[]  // List of access scopes for super admins
 }
 
 /**

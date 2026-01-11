@@ -6,6 +6,7 @@ export type NavItem = {
   label: string;
   path: string;
   icon: ComponentType<{ className?: string }>;
+  accessKey?: string; // Access scope key for permission checking (optional)
 };
 
 export default function DashboardSidebar(
