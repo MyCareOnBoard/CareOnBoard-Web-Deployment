@@ -76,7 +76,11 @@ export const Routes = {
     corporateSupport: "/super-admin/corporate-support",
     oversightCenter: "/super-admin/oversight-center",
     clientDirectory: "/super-admin/client-directory",
-    reports: "/super-admin/reports",
+    reports: {
+        index: "/super-admin/reports",
+        clients: "/super-admin/reports/clients",
+    },
+    clientReports: "/super-admin/reports/clients",
     systemSettings: "/super-admin/system-settings",
   },
   auth: {

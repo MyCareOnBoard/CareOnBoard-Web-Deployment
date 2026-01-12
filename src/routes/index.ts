@@ -65,6 +65,7 @@ import SuperAdminDashboard from "@/pages/super-admin/dashboard";
 import ComplianceMonitor from "@/pages/super-admin/compliance-monitor";
 import UserAccessControlPage from "@/pages/super-admin/user-access-control";
 import SuperAdminReports from "@/pages/super-admin/reports";
+import SuperAdminClientReports from "@/pages/super-admin/reports/clientsReport";
 
 
 export const router = createBrowserRouter([
@@ -361,10 +362,13 @@ export const router = createBrowserRouter([
         Component: UserAccessControlPage,
       },
       {
-        path: Routes.superAdmin.reports,
+        path: Routes.superAdmin.reports.index,
         Component: SuperAdminReports,
       },
-
+      {
+        path: Routes.superAdmin.reports.clients,
+        Component: SuperAdminClientReports,
+      },
     ],
   },
 ]);

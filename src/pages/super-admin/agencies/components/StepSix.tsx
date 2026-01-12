@@ -2,6 +2,7 @@ import {Label} from "@/components/ui/label";
 import React from "react";
 import {Input} from "@/components/ui/input";
 import {cn} from "@/lib/utils"
+import YesNoRadio from "@/components/ui/yesNoRadioInput";
 
 
 export default function Step9Billing({formData, onChange, fieldsWithErrors}: any) {
@@ -75,31 +76,11 @@ export default function Step9Billing({formData, onChange, fieldsWithErrors}: any
 
             {/* Allow custom report? */}
             <div>
-                <Label className="mb-3 text-[14px] font-medium text-[#10141a] block">
-                    Allow custom report?
-                </Label>
-                <div className="flex items-center gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="radio"
-                            name="allowCustomReport"
-                            checked={formData.allowCustomReport === true}
-                            onChange={() => onChange("allowCustomReport", true)}
-                            className="w-4 h-4 text-[#00b4b8] border-[#e5e5e6] focus:ring-[#00b4b8]"
-                        />
-                        <span className="text-[14px] text-[#10141a]">Yes</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="radio"
-                            name="allowCustomReport"
-                            checked={formData.allowCustomReport === false}
-                            onChange={() => onChange("allowCustomReport", false)}
-                            className="w-4 h-4 text-[#00b4b8] border-[#e5e5e6] focus:ring-[#00b4b8]"
-                        />
-                        <span className="text-[14px] text-[#10141a]">No</span>
-                    </label>
-                </div>
+                <YesNoRadio
+                    label="Allow custom report?"
+                    value={formData.allowCustomReport ? "yes" : "no"}
+                    onChange={(v) => onChange("allowCustomReport", v === "yes")}
+                />
             </div>
 
             {/* Invoice Contact */}
