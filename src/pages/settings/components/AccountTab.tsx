@@ -5,12 +5,20 @@ import { useForm } from "react-hook-form"
 import { Form, FormField, FormItem, FormMessage, FormControl } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import SuccessModal from "./SuccessModal"
 import { getAuth } from "firebase/auth"
-import { Trash2, Loader2, User, AlertCircle } from "lucide-react"
+import { Trash2, Loader2, User, AlertCircle, MapPin } from "lucide-react"
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal"
 import { useNavigate } from "react-router"
 import { Routes } from "@/routes/constants"
+
+const LOCATION_STORAGE_KEY = "user_location_access"
+
+type LocationStatus = {
+  message: string
+  tone: "success" | "error" | "info"
+}
 
 interface AccountFormValues {
   fullName: string
@@ -37,6 +45,9 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [modalTitle, setModalTitle] = useState<string>("Account Updated")
   const [modalMessage, setModalMessage] = useState<string>("Your account information has been successfully saved.")
+  const [locationEnabled, setLocationEnabled] = useState(false)
+  const [locationPending, setLocationPending] = useState(false)
+  const [locationStatus, setLocationStatus] = useState<LocationStatus | null>(null)
 
   const form = useForm<AccountFormValues>({
     mode: "onChange",
@@ -44,6 +55,13 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
   })
 
   const fullNameValue = form.watch("fullName")
+
+  useEffect(() => {
+    const stored = localStorage.getItem(LOCATION_STORAGE_KEY)
+    if (stored === "granted") {
+      setLocationEnabled(true)
+    }
+  }, [])
 
   const load = useCallback(async () => {
     console.log("🔄 Loading account info...")
@@ -245,6 +263,41 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
     setShowDeleteConfirm(false)
   }
 
+  const requestLocation = () => {
+    setLocationStatus({ message: "Requesting location access...", tone: "info" })
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationEnabled(false)
+      setLocationStatus({ message: "Geolocation is not supported in this browser.", tone: "error" })
+      return
+    }
+
+    setLocationPending(true)
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setLocationPending(false)
+        setLocationEnabled(true)
+        localStorage.setItem(LOCATION_STORAGE_KEY, "granted")
+        setLocationStatus({ message: "Location access enabled.", tone: "success" })
+      },
+      (err) => {
+        setLocationPending(false)
+        setLocationEnabled(false)
+        localStorage.setItem(LOCATION_STORAGE_KEY, "off")
+        setLocationStatus({ message: err?.message || "Location permission denied.", tone: "error" })
+      }
+    )
+  }
+
+  const handleLocationToggle = (next: boolean) => {
+    if (next) {
+      requestLocation()
+      return
+    }
+    setLocationEnabled(false)
+    localStorage.setItem(LOCATION_STORAGE_KEY, "off")
+    setLocationStatus({ message: "Location access disabled.", tone: "info" })
+  }
+
   const handleCancel = () => {
     console.log("❌ Cancel clicked - resetting to initial values")
     setTempImage(null)
@@ -404,6 +457,36 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
                 </FormItem>
               )}
             />
+          </div>
+
+          {/* Location Access */}
+          <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
+            <div>
+              <div className="flex items-center gap-2 text-lg font-semibold text-[#10141a]">
+                <MapPin className="w-5 h-5 text-[#00b3ad]" />
+                <span>Location Access</span>
+              </div>
+              <p className="text-sm text-[#4f4f4f]">The device will use GPS in the background</p>
+              {locationStatus && (
+                <p className={`mt-2 text-sm ${
+                  locationStatus.tone === "success"
+                    ? "text-emerald-700"
+                    : locationStatus.tone === "error"
+                    ? "text-red-700"
+                    : "text-[#4f4f4f]"
+                }`}>
+                  {locationStatus.message}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center justify-end">
+              <Switch
+                aria-label="Location access"
+                checked={locationEnabled}
+                disabled={locationPending}
+                onCheckedChange={handleLocationToggle}
+              />
+            </div>
           </div>
 
           {/* Danger Zone - Delete Account */}
