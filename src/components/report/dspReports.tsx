@@ -78,7 +78,7 @@ const reportsData: ClientItem[] = [
 
 
 
-export default function ClientReport() {
+export default function DSPReport() {
     const [dates, setDates] = useState<{
         startDate: Date | null;
         endDate: Date | null;
@@ -137,8 +137,8 @@ export default function ClientReport() {
             <div className={"mt-3 bg-[#FFFFFF4D] rounded-xl p-4 flex-1 flex flex-col"}>
                 <div className={"flex items-center justify-between"}>
                     <div>
-                        <h4 className={"font-semibold text-lg"}>Client Report</h4>
-                        <p className={"text-[#808081]"}>Report For Clients</p>
+                        <h4 className={"font-semibold text-lg"}>DSPs Report</h4>
+                        <p className={"text-[#808081]"}>Report For DSPs</p>
                     </div>
                     <div className={"flex items-center gap-4"}>
                         <div className="relative w-[240px] animate-in fade-in slide-in-from-right-2 duration-300">
@@ -228,7 +228,7 @@ export default function ClientReport() {
 
                                     <div>
                                         <p className="text-[14px] font-medium text-[#808081] mb-0">
-                                            DSP
+                                            Clients
                                         </p>
                                         <p className="text-[14px] font-medium text-black">
                                             40

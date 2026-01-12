@@ -79,6 +79,9 @@ export const Routes = {
     reports: {
         index: "/super-admin/reports",
         clients: "/super-admin/reports/clients",
+        dsp: "/super-admin/reports/dsp",
+        shifts: "/super-admin/reports/shifts",
+        notes: "/super-admin/reports/notes",
     },
     clientReports: "/super-admin/reports/clients",
     systemSettings: "/super-admin/system-settings",
