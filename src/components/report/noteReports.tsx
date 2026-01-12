@@ -78,7 +78,7 @@ const reportsData: ClientItem[] = [
 
 
 
-export default function ClientReport() {
+export default function NoteReport() {
     const [dates, setDates] = useState<{
         startDate: Date | null;
         endDate: Date | null;
@@ -137,8 +137,8 @@ export default function ClientReport() {
             <div className={"mt-3 bg-[#FFFFFF4D] rounded-xl p-4 flex-1 flex flex-col"}>
                 <div className={"flex items-center justify-between"}>
                     <div>
-                        <h4 className={"font-semibold text-lg"}>Client Report</h4>
-                        <p className={"text-[#808081]"}>Report For Clients</p>
+                        <h4 className={"font-semibold text-lg"}>Notes Report</h4>
+                        <p className={"text-[#808081]"}>Report For Notes</p>
                     </div>
                     <div className={"flex items-center gap-4"}>
                         <div className="relative w-[240px] animate-in fade-in slide-in-from-right-2 duration-300">
@@ -228,21 +228,13 @@ export default function ClientReport() {
 
                                     <div>
                                         <p className="text-[14px] font-medium text-[#808081] mb-0">
-                                            DSP
+                                            Notes
                                         </p>
                                         <p className="text-[14px] font-medium text-black">
-                                            40
+                                            8
                                         </p>
                                     </div>
 
-                                    <div>
-                                        <p className="text-[14px] font-medium text-[#808081] mb-0">
-                                            Account Created
-                                        </p>
-                                        <p className="text-[14px] font-medium text-black">
-                                            12 January 2025
-                                        </p>
-                                    </div>
 
                                     {/* Agency */}
                                     <div>
@@ -260,7 +252,7 @@ export default function ClientReport() {
                                             className="bg-[#00b4b8] border border-[#00b4b8] text-white hover:bg-[#00b4b8] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]"
                                             onClick={() => setIsModalOpen(true)}
                                         >
-                                            View Documents
+                                            View All
                                         </Button>
                                     </div>
                                 </div>
