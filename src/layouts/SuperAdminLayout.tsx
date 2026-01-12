@@ -10,6 +10,7 @@ import {
   Home,
   Building2,
   Users,
+  UsersRound,
   Shield,
   FileText,
   DollarSign,
@@ -48,20 +49,16 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
     }
   };
 
-  // Filter nav items based on user's access list
   const navItems = useMemo(() => {
     if (!user?.profile?.accessList) {
-      // If no access list, only show Dashboard
       return allNavItems.filter(item => !item.accessKey);
     }
 
     const accessList = user.profile.accessList;
     
     return allNavItems.filter(item => {
-      // Always include items without accessKey (like Dashboard)
       if (!item.accessKey) return true;
       
-      // Include items that are in the user's access list
       return accessList.includes(item.accessKey);
     });
   }, [user?.profile?.accessList]);
@@ -72,25 +69,20 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
     }
   }, [user]);
 
-  // Route protection: Check if user has access to current route
   useEffect(() => {
     if (!user) return;
 
     const currentPath = location.pathname;
     
-    // Find the nav item that matches the current path
     const currentNavItem = allNavItems.find(item => currentPath.includes(item.path));
     
-    // If no matching nav item found, or it's dashboard (always accessible), allow access
     if (!currentNavItem || !currentNavItem.accessKey) {
       return;
     }
 
-    // Check if user has the required access
     const userAccessList = user.profile?.accessList || [];
     const hasAccess = userAccessList.includes(currentNavItem.accessKey);
 
-    // If no access, redirect to dashboard
     if (!hasAccess) {
       console.warn(`[SuperAdminLayout] Access denied to ${currentNavItem.label}. Redirecting to dashboard.`);
       navigate(Routes.superAdmin.dashboard, {replace: true});

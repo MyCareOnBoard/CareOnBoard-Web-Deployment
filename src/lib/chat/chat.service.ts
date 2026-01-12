@@ -38,6 +38,12 @@ export function subscribeToThreads(
 ) {
   // TODO: Implement REST/WebSocket backend
   console.warn("Chat functionality not yet implemented. Awaiting backend API.");
+  
+  // Immediately call the callback with empty array to complete loading state
+  setTimeout(() => {
+    onThreadsUpdate([]);
+  }, 0);
+  
   return () => {}; // Return unsubscribe function
 }
 
@@ -55,6 +61,12 @@ export function subscribeToMessages(
 ) {
   // TODO: Implement REST/WebSocket backend
   console.warn("Chat functionality not yet implemented. Awaiting backend API.");
+  
+  // Immediately call the callback with empty array to complete loading state
+  setTimeout(() => {
+    onMessagesUpdate([]);
+  }, 0);
+  
   return () => {}; // Return unsubscribe function
 }
 
