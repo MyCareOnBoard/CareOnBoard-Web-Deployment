@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import AddScheduleModal, { ScheduleFormData } from "./components/AddScheduleModal";
-import { seedClients } from "@/lib/api/clients";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/utils/auth";
 
