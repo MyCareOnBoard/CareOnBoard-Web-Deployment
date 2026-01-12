@@ -118,7 +118,7 @@ export default function AgenciesPage() {
       {/* Agency Cards Grid */}
       <div className="flex flex-wrap gap-3">
         {loadingAgencies ? (
-          <div className="py-12 text-center">
+          <div className="py-12 w-full text-center">
             <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
             <p className="mt-4 text-sm text-[#808081]">Loading super admin users...</p>
           </div>
