@@ -64,6 +64,7 @@ import DSPClaimsPage from "@/pages/agency/billing-and-approvals/dsp-info";
 import SuperAdminDashboard from "@/pages/super-admin/dashboard";
 import ComplianceMonitor from "@/pages/super-admin/compliance-monitor";
 import UserAccessControlPage from "@/pages/super-admin/user-access-control";
+import ClientsDirectory from "@/pages/super-admin/clients-directory";
 import CorporateSupportPage from "@/pages/super-admin/corporate-support";
 import OversightCenterPage from "@/pages/super-admin/oversight-center";
 import SuperAdminReports from "@/pages/super-admin/reports";
@@ -202,7 +203,7 @@ export const router = createBrowserRouter([
         Component: SupportPage,
       },
       {
-      path: Routes.agency.approvals,
+        path: Routes.agency.approvals,
         Component: ApprovalsPage,
       },
       {
@@ -364,6 +365,10 @@ export const router = createBrowserRouter([
         Component: UserAccessControlPage,
       },
       {
+        path: Routes.superAdmin.clientsDirectory,
+        Component: ClientsDirectory,
+      },
+      {
         path: Routes.superAdmin.corporateSupport,
         Component: CorporateSupportPage,
       },
@@ -379,7 +384,6 @@ export const router = createBrowserRouter([
         path: Routes.superAdmin.systemSettings,
         Component: SuperAdminSystemSettingsPage,
       },
-
     ],
   },
 ]);

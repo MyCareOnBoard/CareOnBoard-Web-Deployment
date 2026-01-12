@@ -55,6 +55,7 @@ export interface Client {
 
   // Agency relationship
   agencyId?: string;
+  agency?: Agency;
 
   // Status and dates
   status?: 'active' | 'inactive' | 'pending' | 'archived';
@@ -195,11 +196,17 @@ export interface ClientSystemAiAndAudit {
   billingValidationRules?: string;
 }
 
+export interface Agency {
+  id: string;
+  name: string;
+}
+
 /**
  * List Clients Response (new format)
  */
 export interface ListClientsResponse {
   success: boolean;
+  agency?: Agency;
   clients: Client[];
   total: number;
   count: number;
@@ -256,6 +263,7 @@ export interface ListClientsParams {
   service?: string;
   search?: string;
   limit?: number;
+  agency?: boolean;
 }
 
 export interface Address {
@@ -584,6 +592,7 @@ export async function listClients(params?: ListClientsParams): Promise<Client[]>
         service: params?.service,
         search: params?.search,
         limit: params?.limit,
+        agency: params?.agency,
       }
     });
 
@@ -712,27 +721,6 @@ export async function searchClients(query: string, agencyId?: string): Promise<C
   } catch (error) {
     console.error('Failed to search clients:', error);
     throw error;
-  }
-}
-
-/**
- * ✅ Seed clients with dummy data
- * Endpoint: POST /clients/seed
- * Automatically uses all existing agencies from database
- * Distributes clients randomly across agencies
- */
-export async function seedClients(data: SeedClientsRequest): Promise<{ success: boolean; message: string; count: number }> {
-  try {
-    const response = await axiosClient.post<{ success: boolean; message: string; count: number }>('/clients/seed', data);
-
-    if (!response.data.success) {
-      throw new Error('Failed to seed clients');
-    }
-
-    return response.data;
-  } catch (err: any) {
-    console.error('seedClients error:', err);
-    throw new Error(err.message || 'Failed to seed clients');
   }
 }
 
