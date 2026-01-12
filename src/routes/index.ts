@@ -385,6 +385,10 @@ export const router = createBrowserRouter([
                 path: Routes.superAdmin.oversightCenter,
                 Component: OversightCenterPage,
             },
+            {
+                path: Routes.superAdmin.systemSettings,
+                Component: SuperAdminSystemSettingsPage,
+            },
         ],
     },
 ]);

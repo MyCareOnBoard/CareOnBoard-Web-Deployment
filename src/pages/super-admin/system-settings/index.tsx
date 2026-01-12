@@ -243,14 +243,14 @@ function AccountSettingsPanel() {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="flex items-start gap-2 p-3 text-sm text-red-700 rounded-xl bg-red-50 border border-red-200">
+        <div className="flex items-start gap-2 p-3 text-sm text-red-700 border border-red-200 rounded-xl bg-red-50">
           <AlertCircle className="w-4 h-4 mt-0.5" />
           <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="flex items-start gap-2 p-3 text-sm text-emerald-700 rounded-xl bg-emerald-50 border border-emerald-200">
+        <div className="flex items-start gap-2 p-3 text-sm border text-emerald-700 rounded-xl bg-emerald-50 border-emerald-200">
           <CheckCircle2 className="w-4 h-4 mt-0.5" />
           <span>{success}</span>
         </div>
@@ -327,7 +327,7 @@ function AccountSettingsPanel() {
           <h3 className="text-lg font-semibold text-[#10141a]">Email</h3>
           <p className="text-sm text-[#4f4f4f]">Used for login and receiving notifications.</p>
         </div>
-        <Input value={email} disabled readOnly className="bg-gray-100 text-gray-600" />
+        <Input value={email} disabled readOnly className="text-gray-600 bg-gray-100" />
       </div>
 
       <div className="grid gap-6 py-4 border-t border-gray-200 lg:grid-cols-2">
