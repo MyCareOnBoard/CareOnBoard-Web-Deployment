@@ -254,12 +254,12 @@ export default function CorporateSupportPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md">
+        <div className="max-w-md p-6 border border-yellow-200 rounded-lg bg-yellow-50">
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
             <div>
               <h3 className="font-semibold text-yellow-900">Authentication Required</h3>
-              <p className="text-sm text-yellow-800 mt-1">
+              <p className="mt-1 text-sm text-yellow-800">
                 Please log in to access the messaging feature.
               </p>
             </div>
@@ -443,14 +443,14 @@ export default function CorporateSupportPage() {
 
         <div className={`${!showSidebar || !selectedContact ? 'flex' : 'hidden md:flex'} flex-1 bg-[#FFFFFF4D] rounded-2xl border border-[#e5e5e6] flex-col overflow-hidden`}>
           {messagesLoading ? (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex items-center justify-center flex-1">
               <div className="text-center">
                 <div className="w-12 h-12 rounded-full border-4 border-[#e5e5e6] border-t-[#2563eb] animate-spin mx-auto mb-4"></div>
                 <p className="text-[#808081] text-sm">Loading messages...</p>
               </div>
             </div>
           ) : currentMessages.length > 0 ? (
-            <div className="flex-1 overflow-auto p-4 md:p-6">
+            <div className="flex-1 p-4 overflow-auto md:p-6">
               <div className="max-w-3xl mx-auto space-y-3 md:space-y-4">
                 {currentMessages.map((msg) => (
                   <div key={msg.id} className={`flex items-start gap-2 md:gap-3 ${msg.isOwn ? "flex-row-reverse" : ""}`}>
@@ -472,8 +472,8 @@ export default function CorporateSupportPage() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center max-w-md">
+            <div className="flex items-center justify-center flex-1">
+              <div className="max-w-md text-center">
                 <h3 className="text-lg font-semibold text-[#10141a]">No messages yet</h3>
                 <p className="text-[#808081] mt-2">
                   Select a conversation from the left or create a new message.
@@ -541,7 +541,7 @@ export default function CorporateSupportPage() {
               </div>
 
               {attachedFiles.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-3">
                   {attachedFiles.map((file, index) => (
                     <div key={index} className="flex items-center gap-2 bg-[#f8f9fa] rounded-full px-3 py-1">
                       <span className="text-sm text-[#10141a]">{file.name}</span>
