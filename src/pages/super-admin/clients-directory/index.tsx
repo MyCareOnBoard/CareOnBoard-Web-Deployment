@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
-import { listAgencyClients, getClientStats, type Client } from "@/lib/api/clients";
+import { listClients, getClientStats, type Client, type Agency } from "@/lib/api/clients";
 
 interface DisplayClient {
   id: string;
@@ -19,9 +19,10 @@ interface DisplayClient {
   roleValue: string | number;
   accountCreated: string;
   avatarUrl?: string;
+  agency?: Agency;
 }
 
-export default function ClientsPage() {
+export default function ClientsDirectory() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,7 +40,6 @@ export default function ClientsPage() {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const shouldShowSearchDropdown = searchQuery.trim().length >= 2;
 
-  // Format client name from firstName, lastName, middleName (memoized)
   const formatClientName = useCallback((client: Client): string => {
     const parts = [
       client.firstName,
@@ -49,22 +49,18 @@ export default function ClientsPage() {
     return parts.join(" ") || "Unnamed Client";
   }, []);
 
-  // Format date from ISO string or Firestore Timestamp (memoized)
   const formatDate = useCallback((dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): string => {
     if (!dateValue) return "N/A";
     
     try {
       let date: Date;
       
-      // Handle Firestore Timestamp object
       if (typeof dateValue === 'object' && '_seconds' in dateValue && dateValue._seconds) {
         date = new Date(dateValue._seconds * 1000);
       }
-      // Handle Date object
       else if (dateValue instanceof Date) {
         date = dateValue;
       }
-      // Handle ISO string
       else if (typeof dateValue === 'string') {
         date = new Date(dateValue);
       }
@@ -72,7 +68,6 @@ export default function ClientsPage() {
         return "N/A";
       }
       
-      // Check if date is valid
       if (isNaN(date.getTime())) {
         return "N/A";
       }
@@ -83,7 +78,6 @@ export default function ClientsPage() {
     }
   }, []);
 
-  // Debounce search query (500ms delay)
   useEffect(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -100,16 +94,9 @@ export default function ClientsPage() {
     };
   }, [searchQuery]);
 
-  // Fetch clients and stats (only when debounced search query or agencyId changes)
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?.agencyId) {
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        // Show loading state only for initial load or when search query changes
         if (clients.length === 0) {
           setIsLoading(true);
         } else {
@@ -117,18 +104,18 @@ export default function ClientsPage() {
         }
         setError(null);
 
-        // Fetch stats for total count (only on initial load or when search is cleared)
-        if (!debouncedSearchQuery.trim()) {
-          const stats = await getClientStats(user.agencyId);
-          setTotalClients(stats.total);
-        }
+        const [statsResult, clientsList] = await Promise.all([
+          !debouncedSearchQuery.trim() ? getClientStats() : Promise.resolve(null),
+          listClients({
+            search: debouncedSearchQuery.trim() || undefined,
+            limit: 100,
+            agency: true,
+          })
+        ]);
 
-        // Fetch clients list
-        const clientsList = await listAgencyClients({
-          agencyId: user.agencyId,
-          search: debouncedSearchQuery.trim() || undefined,
-          limit: 100, // Get all clients for client-side pagination
-        });
+        if (statsResult) {
+          setTotalClients(statsResult.total);
+        }
         setClients(clientsList);
       } catch (err: any) {
         console.error("Failed to fetch clients:", err);
@@ -144,13 +131,11 @@ export default function ClientsPage() {
     fetchData();
   }, [user?.agencyId, debouncedSearchQuery]);
 
-  // Transform API clients to display format
   const displayClients: DisplayClient[] = useMemo(() => {
     return clients.map((client) => {
       const status = client.status || "active";
       const statusCapitalized = status.charAt(0).toUpperCase() + status.slice(1) as DisplayClient["status"];
       
-      // Calculate DSP count (primary + secondary)
       const primaryDspCount = client?.primaryDsp ? 1 : 0;
       const secondaryDspsCount = client?.secondaryDsps?.length || 0;
       const dspCount = primaryDspCount + secondaryDspsCount;
@@ -163,22 +148,19 @@ export default function ClientsPage() {
         roleValue: dspCount,
         accountCreated: formatDate(client.createdAt),
         avatarUrl: client.profileImage,
+        agency: client.agency,
       };
     });
   }, [clients, formatClientName, formatDate]);
 
-  // Client-side filtering (already done by API, but keeping for search suggestions)
-  // Note: API already filters, but we keep this for instant UI feedback
   const filteredClients = useMemo(() => {
     return displayClients;
   }, [displayClients]);
 
-  // Optimized search suggestions (only show when query length >= 2)
   const searchSuggestions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (q.length < 2) return [];
     
-    // Use a more efficient search - check if query matches start of name first
     return displayClients
       .filter((c) => {
         const nameLower = c.name.toLowerCase();
@@ -213,21 +195,11 @@ export default function ClientsPage() {
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
-      {/* Page Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
             Client Management
           </h1>
-          <button
-            onClick={() => navigate(Routes.agency.communityInclusions)}
-            className="flex items-center gap-[13px] px-[16px] py-[12px] rounded-[60px] border border-[#525253] bg-transparent backdrop-blur-[22px] hover:bg-[rgba(82,82,83,0.05)] transition-colors cursor-pointer"
-          >
-            <span className="font-['Urbanist'] text-[14px] font-semibold leading-[1.4] text-[#525253]">
-              Community Inclusions
-            </span>
-            <ArrowRight className="w-5 h-5 text-[#525253]" />
-          </button>
         </div>
         <Button
           size="lg"
@@ -239,7 +211,6 @@ export default function ClientsPage() {
         </Button>
       </div>
 
-      {/* Summary Card */}
       <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)]">
         <div className="absolute inset-0 backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)]" />
         <div className="relative px-[20px] py-[16px]">
@@ -268,17 +239,15 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Directory */}
       <div className="mt-4 relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
         <div className="p-5">
-          {/* Directory Header */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-[4px]">
               <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
                 Client Directory
               </p>
               <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                List of clients registered with the agency
+                List of clients registered on the app
               </p>
             </div>
             <div
@@ -341,11 +310,9 @@ export default function ClientsPage() {
           {/* Rows */}
           <div className="mt-6 space-y-3">
             {isLoading ? (
-              <div className="py-12 flex flex-col items-center justify-center gap-2 text-center">
-                <Loader2 className="w-6 h-6 animate-spin" />
-                <p className="text-[14px] font-medium text-[#808081]">
-                  Loading clients...
-                </p>
+              <div className="py-12 text-center">
+                <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
+                <p className="mt-4 text-sm text-[#808081]">Loading super admin users...</p>
               </div>
             ) : error ? (
               <div className="py-12 text-center">
@@ -407,8 +374,13 @@ export default function ClientsPage() {
                     </div>
 
                     <div className="w-[160px] text-[14px] font-medium leading-[1.4]">
-                      <p className="mb-0 text-[#808081]">Account Created</p>
-                      <p className="text-[#10141a]">{client.accountCreated}</p>
+                      <p className="mb-0 text-[#808081] text-nowrap">Account Created</p>
+                      <p className="text-[#10141a] text-nowrap">{client.accountCreated}</p>
+                    </div>
+
+                    <div className="w-[160px] text-[14px] font-medium leading-[1.4]">
+                      <p className="mb-0 text-[#808081] text-nowrap">Assigned Agency</p>
+                      <p className="text-[#10141a] text-nowrap">{client.agency?.name}</p>
                     </div>
                   </div>
 
