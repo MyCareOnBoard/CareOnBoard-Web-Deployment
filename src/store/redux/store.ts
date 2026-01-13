@@ -1,13 +1,13 @@
 import {combineReducers, configureStore} from "@reduxjs/toolkit";
 import {
-  persistStore,
-  persistReducer,
-  FLUSH,
-  REHYDRATE,
-  PAUSE,
-  PERSIST,
-  PURGE,
-  REGISTER,
+    persistStore,
+    persistReducer,
+    FLUSH,
+    REHYDRATE,
+    PAUSE,
+    PERSIST,
+    PURGE,
+    REGISTER,
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import authReducer from "@/utils/auth/store/authSlice";
@@ -21,48 +21,51 @@ import {agencyDashboardApi} from "@/pages/agency/dashboard/api";
 import {superAdminApi} from "@/pages/super-admin/agencies/api";
 import {superAdminDashboardApi} from "@/pages/super-admin/dashboard/api";
 import {billingApi} from "@/pages/agency/billing-and-approvals/api";
+import {employeeTrainingsApi} from "@/pages/agency/trainings/trainingApi";
 
 const rootReducer = combineReducers({
-  auth: authReducer,
-  [applicationApi.reducerPath]: applicationApi.reducer,
-  [documentsApi.reducerPath]: documentsApi.reducer,
-  [userPanelDashboardApi.reducerPath]: userPanelDashboardApi.reducer,
-  [userPanelNotesApi.reducerPath]: userPanelNotesApi.reducer,
-  [agencyNotesApi.reducerPath]: agencyNotesApi.reducer,
-  [agencyDashboardApi.reducerPath]: agencyDashboardApi.reducer,
-  [complianceAlertsApi.reducerPath]: complianceAlertsApi.reducer,
-  [superAdminApi.reducerPath]: superAdminApi.reducer,
-  [superAdminDashboardApi.reducerPath]: superAdminDashboardApi.reducer,
-  [billingApi.reducerPath]: billingApi.reducer,
+    auth: authReducer,
+    [applicationApi.reducerPath]: applicationApi.reducer,
+    [documentsApi.reducerPath]: documentsApi.reducer,
+    [userPanelDashboardApi.reducerPath]: userPanelDashboardApi.reducer,
+    [userPanelNotesApi.reducerPath]: userPanelNotesApi.reducer,
+    [agencyNotesApi.reducerPath]: agencyNotesApi.reducer,
+    [agencyDashboardApi.reducerPath]: agencyDashboardApi.reducer,
+    [complianceAlertsApi.reducerPath]: complianceAlertsApi.reducer,
+    [superAdminApi.reducerPath]: superAdminApi.reducer,
+    [superAdminDashboardApi.reducerPath]: superAdminDashboardApi.reducer,
+    [billingApi.reducerPath]: billingApi.reducer,
+    [employeeTrainingsApi.reducerPath]: employeeTrainingsApi.reducer,
 });
 
 const persistConfig = {
-  key: "root",
-  storage,
-  whitelist: ['auth']
+    key: "root",
+    storage,
+    whitelist: ['auth']
 };
 
 // @ts-ignore - persistReducer type mismatch with transforms
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = configureStore({
-  reducer: persistedReducer,
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
-      },
-    }).concat(applicationApi.middleware)
-      .concat(documentsApi.middleware)
-      .concat(userPanelDashboardApi.middleware)
-      .concat(userPanelNotesApi.middleware)
-      .concat(agencyNotesApi.middleware)
-      .concat(agencyDashboardApi.middleware)
-      .concat(complianceAlertsApi.middleware)
-      .concat(superAdminApi.middleware)
-      .concat(superAdminDashboardApi.middleware)
-      .concat(billingApi.middleware),
-  devTools: process.env.VITE_ENVIRONMENT !== 'production',
+    reducer: persistedReducer,
+    middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({
+            serializableCheck: {
+                ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+            },
+        }).concat(applicationApi.middleware)
+            .concat(documentsApi.middleware)
+            .concat(userPanelDashboardApi.middleware)
+            .concat(userPanelNotesApi.middleware)
+            .concat(agencyNotesApi.middleware)
+            .concat(agencyDashboardApi.middleware)
+            .concat(complianceAlertsApi.middleware)
+            .concat(superAdminApi.middleware)
+            .concat(superAdminDashboardApi.middleware)
+            .concat(employeeTrainingsApi.middleware)
+            .concat(billingApi.middleware),
+    devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
 
 export const persistor = persistStore(store);

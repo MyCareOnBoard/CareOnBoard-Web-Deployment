@@ -17,7 +17,8 @@ import {
   UsersRound,
   CalendarDays,
   NotepadText,
-  ReceiptText
+  ReceiptText,
+    Network
 } from "lucide-react";
 
 
@@ -33,6 +34,7 @@ const navItems: NavItem[] = [
   {label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon},
   {label: "Applicant Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon},
   {label: "Reports", path: Routes.agency.reports, icon: ReportIcon},
+  {label: "Trainings", path: Routes.agency.trainings, icon: Network},
 ];
 
 
