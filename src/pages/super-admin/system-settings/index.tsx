@@ -6,7 +6,6 @@ import { Switch } from "@/components/ui/switch";
 import NotificationsTab from "@/pages/settings/components/NotificationTab";
 import { getAccountInfo, updateAccountInfo } from "@/lib/api/settings";
 import { deleteAccount } from "@/lib/api/profile";
-import { useAuth } from "@/utils/auth";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { Loader2, CheckCircle2, AlertCircle, MapPin, User } from "lucide-react";
 import { Routes } from "@/routes/constants";
@@ -64,7 +63,6 @@ export default function SuperAdminSystemSettingsPage() {
 
 function AccountSettingsPanel() {
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -141,13 +139,6 @@ function AccountSettingsPanel() {
       setTempImage(null);
       setImageFile(null);
       setSuccess("Changes saved successfully");
-      
-      // Refresh user data to sync profile image in header
-      try {
-        await refreshUser?.();
-      } catch (refreshErr) {
-        console.warn('Failed to refresh user data:', refreshErr);
-      }
     } catch (err: any) {
       setError(err?.message || "Failed to save changes");
     } finally {
