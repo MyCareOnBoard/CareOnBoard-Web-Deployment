@@ -64,7 +64,6 @@ export default function SuperAdminSystemSettingsPage() {
 
 function AccountSettingsPanel() {
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -141,13 +140,6 @@ function AccountSettingsPanel() {
       setTempImage(null);
       setImageFile(null);
       setSuccess("Changes saved successfully");
-      
-      // Refresh user data to sync profile image in header
-      try {
-        await refreshUser?.();
-      } catch (refreshErr) {
-        console.warn('Failed to refresh user data:', refreshErr);
-      }
     } catch (err: any) {
       setError(err?.message || "Failed to save changes");
     } finally {
