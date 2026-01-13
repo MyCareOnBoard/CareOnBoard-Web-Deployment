@@ -57,7 +57,7 @@ export const userPanelDashboardApi = createApi({
       }),
       invalidatesTags: ['EmployeeInfo']
     }),
-    getEmployeeTrainings: builder.query<GetEmployeeTrainingsResponse[], void>({
+    getEmployeeTrainings: builder.query<TrainingData[], void>({
       query: () => ({
         url: `/employees/trainings`,
         method: "GET",

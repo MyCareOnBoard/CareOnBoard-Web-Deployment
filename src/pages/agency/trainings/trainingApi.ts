@@ -8,7 +8,7 @@ interface GetEmployeesNonPaginatedResponseItem {
     id: string;
 }
 
-interface TrainingData {
+export interface TrainingData {
     name: string;
     timeFrame: string;
     assignedDsp: string;
