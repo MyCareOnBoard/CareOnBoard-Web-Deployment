@@ -5,17 +5,10 @@ import {
     DialogContent,
     DialogTitle,
 } from "@/components/ui/dialog";
-import {useApproveTrainingMutation} from "./trainingApi";
+import {TrainingData, useApproveTrainingMutation} from "./trainingApi";
 import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";
 
-interface Training {
-    id: string;
-    name: string;
-    completedDate: string;
-    approved: boolean;
-    status: string;
-}
 
 interface ReviewTrainingsModalProps {
     open: boolean;
@@ -26,7 +19,7 @@ interface ReviewTrainingsModalProps {
         role: string;
         profilePictureUrl?: string;
     } | null;
-    trainings: Training[];
+    trainings: TrainingData[];
     onApprovalChange?: (trainingId: string, approved: boolean) => void;
 }
 
@@ -41,7 +34,7 @@ export default function ReviewTrainingsModal(
 ) {
     const {user} = useAuth();
     const [approvalStates, setApprovalStates] = useState<Record<string, boolean>>(
-        trainings.reduce((acc, training) => ({...acc, [training.id]: training.approved}), {})
+        trainings.reduce((acc, training) => ({...acc, [training?.id as any]: training.approved}), {})
     );
     const [approveTraining] = useApproveTrainingMutation();
 
@@ -157,14 +150,14 @@ export default function ReviewTrainingsModal(
                                     Approve
                                 </p>
                                 <button
-                                    onClick={() => handleToggle(training.id)}
+                                    onClick={() => handleToggle(training?.id || "")}
                                     className={`relative w-[42px] h-[26px] rounded-full transition-colors ${
-                                        approvalStates[training.id] ? 'bg-[#0EAF52]' : 'bg-[#E0E0E0]'
+                                        approvalStates[training?.id as any] ? 'bg-[#0EAF52]' : 'bg-[#E0E0E0]'
                                     }`}
                                 >
                                     <div
                                         className={`absolute top-[3px] w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-transform ${
-                                            approvalStates[training.id] ? 'translate-x-[19px]' : 'translate-x-[3px]'
+                                            approvalStates[training?.id as any] ? 'translate-x-[19px]' : 'translate-x-[3px]'
                                         }`}
                                     />
                                 </button>
