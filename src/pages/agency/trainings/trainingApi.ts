@@ -9,6 +9,7 @@ interface GetEmployeesNonPaginatedResponseItem {
 }
 
 export interface TrainingData {
+    id?: string;
     name: string;
     timeFrame: string;
     assignedDsp: string;
@@ -68,7 +69,7 @@ export const employeeTrainingsApi = createApi({
                 data: {approved},
                 requiresAuth: true
             }),
-            providesTags: ["Trainings"]
+            invalidatesTags: ["Trainings"]
         }),
     }),
 });
