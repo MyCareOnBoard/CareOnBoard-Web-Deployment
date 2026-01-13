@@ -6,7 +6,6 @@ import { Switch } from "@/components/ui/switch";
 import NotificationsTab from "@/pages/settings/components/NotificationTab";
 import { getAccountInfo, updateAccountInfo } from "@/lib/api/settings";
 import { deleteAccount } from "@/lib/api/profile";
-import { useAuth } from "@/utils/auth";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { Loader2, CheckCircle2, AlertCircle, MapPin, User } from "lucide-react";
 import { Routes } from "@/routes/constants";
