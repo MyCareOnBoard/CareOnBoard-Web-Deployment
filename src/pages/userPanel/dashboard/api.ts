@@ -6,9 +6,10 @@ import {
 } from "@/pages/applicant/application/types";
 import {
   GetEmployeeDocumentsResponse,
-  GetEmployeeInfoResponse, GetEmployeeTrainingsResponse,
+  GetEmployeeInfoResponse,
   SaveEmployeeDocumentPayload, UpdateEmployeeInfoPayload
 } from "@/pages/userPanel/dashboard/types";
+import {TrainingData} from "@/pages/agency/trainings/trainingApi";
 
 export const userPanelDashboardApi = createApi({
   reducerPath: "userPanelDashboardApi",
