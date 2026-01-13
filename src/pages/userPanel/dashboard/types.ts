@@ -29,9 +29,3 @@ export interface GetEmployeeInfoResponse {
 export interface UpdateEmployeeInfoPayload {
   workAvailability: boolean;
 }
-
-export interface GetEmployeeTrainingsResponse {
-  id: string;
-  name: string;
-  status: string;
-}
