@@ -6,7 +6,8 @@ import AgencyAssignTrainingModal, {SaveTrainingData} from "@/pages/agency/traini
 import ReviewTrainingsModal from "@/pages/agency/trainings/reviewTrainingsModal";
 import {
     useGetTrainingsQuery,
-    useSaveTrainingMutation
+    useSaveTrainingMutation,
+    TrainingData
 } from "@/pages/agency/trainings/trainingApi";
 import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";

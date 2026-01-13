@@ -261,14 +261,9 @@ export default function UserPanelDashboardPage() {
 
           {/* Trainings Section */}
           <div className="bg-[#FFFFFF4D] rounded-[20px] p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col mb-4">
               <h3 className="text-[20px] font-bold text-[#10141a]">Trainings</h3>
-              <Button
-                className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-2 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200"
-              >
-                <Plus size={16}/>
-                Start your training
-              </Button>
+                <p className="text-[14px] text-[#808081] mt-1">Here are your trainings</p>
             </div>
 
             {/* Training Items */}
@@ -278,14 +273,9 @@ export default function UserPanelDashboardPage() {
                   trainings.map((training) => (
                     <div
                       key={training.id}
-                      className="flex items-center justify-between p-3 rounded-xl border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
+                      className="flex items-center justify-between p-3 rounded-xl transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <img
-                          src={"/document-image.png"}
-                          alt={"document"}
-                          className="w-12 h-12 text-[#808081] scale-x-[-1]"
-                        />
                         <span className="text-[14px] font-semibold text-[#10141a]">
                           {training.name}
                         </span>
