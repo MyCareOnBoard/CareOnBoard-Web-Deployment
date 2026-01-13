@@ -73,337 +73,342 @@ import SuperAdminDSPReports from "@/pages/super-admin/reports/dspReports";
 import SuperAdminTimesheetReports from "@/pages/super-admin/reports/timesheetReports";
 import SuperAdminNoteReports from "@/pages/super-admin/reports/noteReports";
 import SuperAdminSystemSettingsPage from "@/pages/super-admin/system-settings";
+import AgencyTrainings from "@/pages/agency/trainings";
 
 
 export const router = createBrowserRouter([
-  {
-    path: Routes.root,
-    Component: SplashScreen,
-  },
-  {
-    path: Routes.agencySplash,
-    Component: SplashScreen,
-  },
-  {
-    Component: OnboardingLayout,
-    children: [
-      {
-        path: Routes.onboarding.index,
-        Component: OnboardingSlider,
-      },
-      {
-        path: Routes.onboarding.email,
-        Component: VerifyEmail,
-      },
-      {
-        path: Routes.onboarding.otp,
-        Component: VerifyOTP,
-      },
-      {
-        path: Routes.onboarding.success,
-        Component: SuccessScreen,
-      },
-    ]
-  },
-  {
-    Component: AuthLayout,
-    children: [
-      {
-        path: Routes.auth.login,
-        Component: LoginPage,
-      },
-      {
-        path: Routes.auth.signup,
-        Component: SignUpPage,
-      },
-      {
-        path: Routes.auth.forgotPassword,
-        Component: ForgotPasswordPage,
-      },
-      {
-        path: Routes.auth.resetPassword,
-        Component: ResetPasswordPage,
-      },
-    ],
-  },
-  {
-    Component: ApplicantDashboardLayout,
-    children: [
-      {
-        path: Routes.applicant.application,
-        Component: ApplicationStepper,
-      },
-      {
-        path: Routes.applicant.dashboard,
-        Component: ApplicantDashboardPage,
-      },
-      {
-        path: Routes.applicant.documents,
-        Component: DocumentsPage,
-      },
-      {
-        path: Routes.applicant.helpCenter,
-        Component: HelpCenterPage,
-      },
-      {
-        path: Routes.applicant.settings,
-        Component: SettingsPage,
-      },
-      {
-        path: Routes.applicant.profile,
-        Component: ProfilePage,
-      },
-    ],
-  },
-  {
-    Component: AgencyDashboardLayout,
-    children: [
-      {
-        path: Routes.agency.dashboard,
-        Component: AgencyDashboardPage,
-      },
-      {
-        path: Routes.agency.dspManagement,
-        Component: DSPManagementPage,
-      },
-      {
-        path: Routes.agency.clients,
-        Component: ClientsPage,
-      },
-      {
-        path: Routes.agency.addClient,
-        Component: AddClientPage,
-      },
-      {
-        path: Routes.agency.clientDetails,
-        Component: ClientDetailsPage,
-      },
-      {
-        path: Routes.agency.communityInclusions,
-        Component: CommunityInclusionsPage,
-      },
-      {
-        path: Routes.agency.billingAndApprovals,
-        Component: BillingAndApprovalsPage,
-      },
-      {
-        path: Routes.agency.clientClaims,
-        Component: ClientClaimsPage,
-      },
-      {
-        path: Routes.agency.dspClaims,
-        Component: DSPClaimsPage,
-      },
-      {
-        path: Routes.agency.scheduling,
-        Component: SchedulingPage,
-      },
-      {
-        path: Routes.agency.shiftsList,
-        Component: ShiftsListPage,
-      },
-      {
-        path: Routes.agency.support,
-        Component: SupportPage,
-      },
-      {
-        path: Routes.agency.approvals,
-        Component: ApprovalsPage,
-      },
-      {
-        path: Routes.agency.support,
-        Component: SupportPage,
-      },
-      {
-        path: Routes.agency.analytics,
-        Component: AnalyticsPage,
-      },
-      {
-        path: Routes.agency.applicantDirectory,
-        Component: ApplicantDirectoryPage,
-      },
-      {
-        path: Routes.agency.applicantClearanceHiring,
-        Component: ClearanceHiringList,
-      },
-      {
-        path: Routes.agency.applicantProfile,
-        Component: ApplicantProfilePage,
-      },
-      {
-        path: Routes.agency.reports,
-        Component: ReportsPage,
-      },
-      {
-        path: Routes.agency.complianceAlerts,
-        Component: ComplianceAlertsPage,
-      },
-      {
-        path: Routes.agency.shifts,
-        Component: ShiftsPage,
-      },
-      {
-        path: Routes.agency.notes,
-        Component: AgencyNotesPage,
-      },
-      {
-        path: Routes.agency.helpCenter,
-        Component: HelpCenterPage,
-      },
-      {
-        path: Routes.agency.settings,
-        Component: SettingsPage,
-      },
-      {
-        path: Routes.agency.profile,
-        Component: ProfilePage,
-      },
-    ],
-  },
-  {
-    Component: UserPanelDashboardLayout,
-    children: [
-      {
-        path: Routes.userPanel.dashboard,
-        Component: UserPanelDashboard,
-      },
-      {
-        path: Routes.userPanel.shiftManagement,
-        Component: ShiftManagementPage,
-      },
-      {
-        path: Routes.userPanel.manualShiftManagement,
-        Component: ManualShiftManagementPage,
-      },
-      {
-        path: Routes.userPanel.clientsAndServices,
-        Component: ClientsAndServicesPage,
-      },
-      {
-        path: Routes.userPanel.planOfCare,
-        Component: PlanOfCarePage,
-      },
-      {
-        path: Routes.userPanel.helpCenter,
-        Component: HelpCenterPage,
-      },
-      {
-        path: Routes.userPanel.settings,
-        Component: SettingsPage,
-      },
-      {
-        path: Routes.userPanel.profile,
-        Component: ProfilePage,
-      },
-      {
-        path: Routes.userPanel.mileage,
-        Component: UserPanelMileage,
-      },
-      {
-        path: Routes.userPanel.notes.index,
-        Component: NotesPage,
-      },
-      {
-        path: Routes.userPanel.notes.communityBased,
-        Component: CommunityBasedPage,
-      },
-      {
-        path: Routes.userPanel.notes.communityInclusion,
-        Component: CommunityInclusionPage,
-      },
-      {
-        path: Routes.userPanel.notes.dayHabilitation,
-        Component: DayHabilitationPage,
-      },
-      {
-        path: Routes.userPanel.notes.preVocationalTraining,
-        Component: PrevocationalTrainingPage,
-      },
-      {
-        path: Routes.userPanel.notes.respiteLog,
-        Component: RespiteLogPage,
-      },
-      {
-        path: Routes.userPanel.notes.supportedEmploymentIntervention,
-        Component: SupportedEmploymentInterventionPage,
-      },
-      {
-        path: Routes.userPanel.notes.supportedEmploymentPre,
-        Component: SupportedEmploymentPrePage,
-      },
-      {
-        path: Routes.userPanel.expenses,
-        Component: Expenses,
-      },
-    ],
-  },
-  {
-    Component: SuperAdminLayout,
-    children: [
-      {
-        path: Routes.superAdmin.dashboard,
-        Component: SuperAdminDashboard,
-      },
-      {
-        path: Routes.superAdmin.agencies,
-        Component: AgenciesPage,
-      },
-      {
-        path: Routes.superAdmin.addAgency,
-        Component: AddAgencyWizard,
-      },
-      {
-        path: Routes.superAdmin.savedAgencies,
-        Component: SavedAgencies,
-      },
-      {
-        path: Routes.superAdmin.agencyView,
-        Component: AgencyView,
-      },
-      {
-        path: Routes.superAdmin.complianceMonitor,
-        Component: ComplianceMonitor,
-      },
-      {
-        path: Routes.superAdmin.userAccessControl,
-        Component: UserAccessControlPage,
-      },
-      {
-        path: Routes.superAdmin.reports.index,
-        Component: SuperAdminReports,
-      },
-      {
-        path: Routes.superAdmin.reports.clients,
-        Component: SuperAdminClientReports,
-      },
-      {
-        path: Routes.superAdmin.reports.dsp,
-        Component: SuperAdminDSPReports,
-      },
-      {
-        path: Routes.superAdmin.reports.shifts,
-        Component: SuperAdminTimesheetReports,
-      },
-      {
-        path: Routes.superAdmin.reports.notes,
-        Component: SuperAdminNoteReports,
-      },
-      {
-        path: Routes.superAdmin.clientDirectory,
-        Component: ClientsDirectory,
-      },
-      {
-        path: Routes.superAdmin.corporateSupport,
-        Component: CorporateSupportPage,
-      },
-      {
-        path: Routes.superAdmin.oversightCenter,
-        Component: OversightCenterPage,
-      },
-      {
-        path: Routes.superAdmin.systemSettings,
-        Component: SuperAdminSystemSettingsPage,
-      },
-    ],
-  },
+    {
+        path: Routes.root,
+        Component: SplashScreen,
+    },
+    {
+        path: Routes.agencySplash,
+        Component: SplashScreen,
+    },
+    {
+        Component: OnboardingLayout,
+        children: [
+            {
+                path: Routes.onboarding.index,
+                Component: OnboardingSlider,
+            },
+            {
+                path: Routes.onboarding.email,
+                Component: VerifyEmail,
+            },
+            {
+                path: Routes.onboarding.otp,
+                Component: VerifyOTP,
+            },
+            {
+                path: Routes.onboarding.success,
+                Component: SuccessScreen,
+            },
+        ]
+    },
+    {
+        Component: AuthLayout,
+        children: [
+            {
+                path: Routes.auth.login,
+                Component: LoginPage,
+            },
+            {
+                path: Routes.auth.signup,
+                Component: SignUpPage,
+            },
+            {
+                path: Routes.auth.forgotPassword,
+                Component: ForgotPasswordPage,
+            },
+            {
+                path: Routes.auth.resetPassword,
+                Component: ResetPasswordPage,
+            },
+        ],
+    },
+    {
+        Component: ApplicantDashboardLayout,
+        children: [
+            {
+                path: Routes.applicant.application,
+                Component: ApplicationStepper,
+            },
+            {
+                path: Routes.applicant.dashboard,
+                Component: ApplicantDashboardPage,
+            },
+            {
+                path: Routes.applicant.documents,
+                Component: DocumentsPage,
+            },
+            {
+                path: Routes.applicant.helpCenter,
+                Component: HelpCenterPage,
+            },
+            {
+                path: Routes.applicant.settings,
+                Component: SettingsPage,
+            },
+            {
+                path: Routes.applicant.profile,
+                Component: ProfilePage,
+            },
+        ],
+    },
+    {
+        Component: AgencyDashboardLayout,
+        children: [
+            {
+                path: Routes.agency.dashboard,
+                Component: AgencyDashboardPage,
+            },
+            {
+                path: Routes.agency.dspManagement,
+                Component: DSPManagementPage,
+            },
+            {
+                path: Routes.agency.clients,
+                Component: ClientsPage,
+            },
+            {
+                path: Routes.agency.addClient,
+                Component: AddClientPage,
+            },
+            {
+                path: Routes.agency.clientDetails,
+                Component: ClientDetailsPage,
+            },
+            {
+                path: Routes.agency.communityInclusions,
+                Component: CommunityInclusionsPage,
+            },
+            {
+                path: Routes.agency.billingAndApprovals,
+                Component: BillingAndApprovalsPage,
+            },
+            {
+                path: Routes.agency.clientClaims,
+                Component: ClientClaimsPage,
+            },
+            {
+                path: Routes.agency.dspClaims,
+                Component: DSPClaimsPage,
+            },
+            {
+                path: Routes.agency.scheduling,
+                Component: SchedulingPage,
+            },
+            {
+                path: Routes.agency.shiftsList,
+                Component: ShiftsListPage,
+            },
+            {
+                path: Routes.agency.support,
+                Component: SupportPage,
+            },
+            {
+                path: Routes.agency.approvals,
+                Component: ApprovalsPage,
+            },
+            {
+                path: Routes.agency.support,
+                Component: SupportPage,
+            },
+            {
+                path: Routes.agency.analytics,
+                Component: AnalyticsPage,
+            },
+            {
+                path: Routes.agency.applicantDirectory,
+                Component: ApplicantDirectoryPage,
+            },
+            {
+                path: Routes.agency.applicantClearanceHiring,
+                Component: ClearanceHiringList,
+            },
+            {
+                path: Routes.agency.applicantProfile,
+                Component: ApplicantProfilePage,
+            },
+            {
+                path: Routes.agency.reports,
+                Component: ReportsPage,
+            },
+            {
+                path: Routes.agency.complianceAlerts,
+                Component: ComplianceAlertsPage,
+            },
+            {
+                path: Routes.agency.shifts,
+                Component: ShiftsPage,
+            },
+            {
+                path: Routes.agency.notes,
+                Component: AgencyNotesPage,
+            },
+            {
+                path: Routes.agency.trainings,
+                Component: AgencyTrainings,
+            },
+            {
+                path: Routes.agency.helpCenter,
+                Component: HelpCenterPage,
+            },
+            {
+                path: Routes.agency.settings,
+                Component: SettingsPage,
+            },
+            {
+                path: Routes.agency.profile,
+                Component: ProfilePage,
+            },
+        ],
+    },
+    {
+        Component: UserPanelDashboardLayout,
+        children: [
+            {
+                path: Routes.userPanel.dashboard,
+                Component: UserPanelDashboard,
+            },
+            {
+                path: Routes.userPanel.shiftManagement,
+                Component: ShiftManagementPage,
+            },
+            {
+                path: Routes.userPanel.manualShiftManagement,
+                Component: ManualShiftManagementPage,
+            },
+            {
+                path: Routes.userPanel.clientsAndServices,
+                Component: ClientsAndServicesPage,
+            },
+            {
+                path: Routes.userPanel.planOfCare,
+                Component: PlanOfCarePage,
+            },
+            {
+                path: Routes.userPanel.helpCenter,
+                Component: HelpCenterPage,
+            },
+            {
+                path: Routes.userPanel.settings,
+                Component: SettingsPage,
+            },
+            {
+                path: Routes.userPanel.profile,
+                Component: ProfilePage,
+            },
+            {
+                path: Routes.userPanel.mileage,
+                Component: UserPanelMileage,
+            },
+            {
+                path: Routes.userPanel.notes.index,
+                Component: NotesPage,
+            },
+            {
+                path: Routes.userPanel.notes.communityBased,
+                Component: CommunityBasedPage,
+            },
+            {
+                path: Routes.userPanel.notes.communityInclusion,
+                Component: CommunityInclusionPage,
+            },
+            {
+                path: Routes.userPanel.notes.dayHabilitation,
+                Component: DayHabilitationPage,
+            },
+            {
+                path: Routes.userPanel.notes.preVocationalTraining,
+                Component: PrevocationalTrainingPage,
+            },
+            {
+                path: Routes.userPanel.notes.respiteLog,
+                Component: RespiteLogPage,
+            },
+            {
+                path: Routes.userPanel.notes.supportedEmploymentIntervention,
+                Component: SupportedEmploymentInterventionPage,
+            },
+            {
+                path: Routes.userPanel.notes.supportedEmploymentPre,
+                Component: SupportedEmploymentPrePage,
+            },
+            {
+                path: Routes.userPanel.expenses,
+                Component: Expenses,
+            },
+        ],
+    },
+    {
+        Component: SuperAdminLayout,
+        children: [
+            {
+                path: Routes.superAdmin.dashboard,
+                Component: SuperAdminDashboard,
+            },
+            {
+                path: Routes.superAdmin.agencies,
+                Component: AgenciesPage,
+            },
+            {
+                path: Routes.superAdmin.addAgency,
+                Component: AddAgencyWizard,
+            },
+            {
+                path: Routes.superAdmin.savedAgencies,
+                Component: SavedAgencies,
+            },
+            {
+                path: Routes.superAdmin.agencyView,
+                Component: AgencyView,
+            },
+            {
+                path: Routes.superAdmin.complianceMonitor,
+                Component: ComplianceMonitor,
+            },
+            {
+                path: Routes.superAdmin.userAccessControl,
+                Component: UserAccessControlPage,
+            },
+            {
+                path: Routes.superAdmin.reports.index,
+                Component: SuperAdminReports,
+            },
+            {
+                path: Routes.superAdmin.reports.clients,
+                Component: SuperAdminClientReports,
+            },
+            {
+                path: Routes.superAdmin.reports.dsp,
+                Component: SuperAdminDSPReports,
+            },
+            {
+                path: Routes.superAdmin.reports.shifts,
+                Component: SuperAdminTimesheetReports,
+            },
+            {
+                path: Routes.superAdmin.reports.notes,
+                Component: SuperAdminNoteReports,
+            },
+            {
+                path: Routes.superAdmin.clientDirectory,
+                Component: ClientsDirectory,
+            },
+            {
+                path: Routes.superAdmin.corporateSupport,
+                Component: CorporateSupportPage,
+            },
+            {
+                path: Routes.superAdmin.oversightCenter,
+                Component: OversightCenterPage,
+            },
+            {
+                path: Routes.superAdmin.systemSettings,
+                Component: SuperAdminSystemSettingsPage,
+            },
+        ],
+    },
 ]);

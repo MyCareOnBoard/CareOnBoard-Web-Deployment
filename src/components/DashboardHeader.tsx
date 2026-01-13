@@ -86,6 +86,13 @@ export default function DashboardHeader(
     }
     return route.replace(':userType', userTypeKeys[userType as UserType] || 'applicant');
   }
+
+  const getSettingsRoute = () => {
+    if (userType === UserType.SUPER_ADMIN) {
+      return Routes.superAdmin.systemSettings;
+    }
+    return makeCommonRoute(Routes.common.settings);
+  }
   
   return (
     <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5]">
@@ -99,7 +106,7 @@ export default function DashboardHeader(
             <HeaderActionButton 
               icon={CogIcon} 
               ariaLabel="Settings" 
-              onClick={() => navigate(makeCommonRoute(Routes.common.settings))}
+              onClick={() => navigate(getSettingsRoute())}
             />
             <DropdownMenu open={isNotificationDropdownOpen} onOpenChange={setIsNotificationDropdownOpen}>
               <DropdownMenuTrigger asChild>
@@ -183,16 +190,16 @@ export default function DashboardHeader(
                   <DropdownMenuItem 
                     className={cn(
                       "cursor-pointer px-4 py-2 rounded-none gap-3",
-                      location.pathname === makeCommonRoute(Routes.common.settings)
+                      location.pathname === getSettingsRoute() || location.pathname === makeCommonRoute(Routes.common.settings)
                         ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
                         : "hover:bg-white/50 focus:bg-white/50"
                     )}
-                    onClick={() => navigate(makeCommonRoute(Routes.common.settings))}
+                    onClick={() => navigate(getSettingsRoute())}
                   >
-                    <Lock className={cn("w-4 h-4", location.pathname === makeCommonRoute(Routes.common.settings) ? "text-[#00b4b8]" : "text-[#808081]")} />
+                    <Lock className={cn("w-4 h-4", location.pathname === getSettingsRoute() || location.pathname === makeCommonRoute(Routes.common.settings) ? "text-[#00b4b8]" : "text-[#808081]")} />
                     <span className={cn(
                       "text-[14px]",
-                      location.pathname === makeCommonRoute(Routes.common.settings) ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
+                      location.pathname === getSettingsRoute() || location.pathname === makeCommonRoute(Routes.common.settings) ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
                     )}>Settings</span>
                   </DropdownMenuItem>
                   
