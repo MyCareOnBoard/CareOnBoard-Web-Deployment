@@ -1,6 +1,7 @@
 
 import axiosClient from '../axios';
 import { User } from '@/utils/auth/types/user.types';
+import { Employee } from '@/utils/auth/types/user.types';
 import { UserType } from '@/utils/auth/types/user.types';
 
 /**
@@ -16,7 +17,11 @@ export interface UserResponse {
  */
 export interface ListUsersParams {
   userType?: UserType;       // Filter by user type (applicant, employee, agency)
-  agencyId?: string;         // Filter by agency ID (for employees under an agency)
+  agencyId?: string; 
+  status?: string;
+  role?: string;
+  workAvailability?: boolean;  // Filter by work availability (for employees)
+  search?: string;          // Search by name or email
   page?: number;             // Page number for pagination (default: 1)
   limit?: number;            // Number of items per page (default: 50, max: 100)
   sortBy?: 'fullName' | 'email' | 'createdAt' | 'updatedAt';
@@ -33,6 +38,15 @@ export interface ListUsersResponse {
   page: number;
   totalPages: number;
   users: User[];
+}
+
+export interface ListEmployeesResponse {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  totalPages: number;
+  employees: Employee[];
 }
 
 /**
@@ -243,6 +257,40 @@ export async function getUserById(userId: string): Promise<User> {
     throw new Error(err.message || "Failed to get user");
   }
 }
+
+/**
+ * ✅ List all employees with optional filtering
+ * Endpoint: GET /users
+ * @param params - Query parameters for filtering and pagination
+ * @returns Promise with paginated list of users
+ */
+export async function listEmployees(params?: ListUsersParams): Promise<ListEmployeesResponse> {
+  try {
+    const response = await axiosClient.get<ListEmployeesResponse>("/employees", {
+      params: {
+        agencyId: params?.agencyId,
+        status: params?.status,
+        role: params?.role,
+        workAvailability: params?.workAvailability,
+        search: params?.search,
+        page: params?.page || 1,
+        limit: params?.limit || 50,
+        sortBy: params?.sortBy,
+        sortOrder: params?.sortOrder,
+      },
+    });
+
+    if (!response.data.success) {
+      throw new Error("Failed to fetch users");
+    }
+
+    return response.data;
+  } catch (err: any) {
+    console.error("listUsers error:", err);
+    throw new Error(err.message || "Failed to list users");
+  }
+}
+
 
 /**
  * ✅ Get employees/DSPs under an agency

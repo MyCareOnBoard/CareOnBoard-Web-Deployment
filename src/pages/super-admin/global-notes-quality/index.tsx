@@ -1,4 +1,4 @@
-import {useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {
 	ArrowUpRight,
 	ChevronLeft,
@@ -8,11 +8,15 @@ import {
 	Sparkles,
 } from "lucide-react";
 
+import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
 import {Button} from "@/components/ui/button";
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Input} from "@/components/ui/input";
 import {cn} from "@/lib/utils";
+import {useListAllAgenciesQuery} from "@/pages/super-admin/agencies/api";
+import {listEmployees} from "@/lib/api/users";
+import {Employee, UserType} from "@/utils/auth/types/user.types";
 
 type MetricKey =
 	| "totalNotes"
@@ -34,11 +38,21 @@ type QualityMetric = {
 type RowItem = {
 	id: string;
 	name: string;
+	imageUrl?: string;
 	totalNotes: number;
 	missingRequiredFields: number;
 	poorGoalDocumentation: number;
 	aiValidation: number;
 };
+
+function getInitials(label: string) {
+	return label
+		.split(" ")
+		.filter(Boolean)
+		.slice(0, 2)
+		.map((word) => word[0]?.toUpperCase())
+		.join("");
+}
 
 function StatCard({
 	metric,
@@ -123,9 +137,58 @@ export default function GlobalNotesQualityPage() {
 	const [audience, setAudience] = useState<Audience>("agencies");
 	const [selectedMetric, setSelectedMetric] = useState<MetricKey>("totalNotes");
 	const [search, setSearch] = useState<string>("");
+	const [currentPage, setCurrentPage] = useState<number>(1);
+	const pageSize = 10;
 
 	const [aiPrompt, setAiPrompt] = useState<string>("");
 	const [aiThinking, setAiThinking] = useState<boolean>(false);
+	const canSendPrompt = aiPrompt.trim().length > 0;
+
+	const {
+		data: agenciesData,
+		isLoading: agenciesLoading,
+		isError: agenciesIsError,
+		error: agenciesError,
+	} = useListAllAgenciesQuery(
+		{},
+		{
+			skip: view !== "list" || audience !== "agencies",
+		},
+	);
+
+	const [usersData, setUsersData] = useState<Employee[]>([]);
+	const [usersLoading, setUsersLoading] = useState(false);
+
+	useEffect(() => {
+		let cancelled = false;
+		if (view !== "list" || audience !== "users") return;
+
+		setUsersLoading(true);
+		listEmployees({
+			userType: UserType.EMPLOYEE,
+			limit: 100,
+			page: 1,
+			sortBy: "fullName",
+			sortOrder: "asc",
+		})
+			.then((res) => {
+				if (cancelled) return;
+				setUsersData(res.employees ?? []);
+			})
+			.catch((err) => {
+				if (cancelled) return;
+				console.error("[GlobalNotesQuality] Failed to load users:", err);
+				setUsersData([]);
+			})
+			.finally(() => {
+				if (cancelled) return;
+				setUsersLoading(false);
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [view, audience]);
 
 	const metrics: QualityMetric[] = useMemo(
 		() => [
@@ -183,7 +246,7 @@ export default function GlobalNotesQualityPage() {
 		[],
 	);
 
-	const agencies: RowItem[] = useMemo(
+	const fallbackAgencies: RowItem[] = useMemo(
 		() => [
 			{
 				id: "iota-digital",
@@ -197,7 +260,7 @@ export default function GlobalNotesQualityPage() {
 		[],
 	);
 
-	const users: RowItem[] = useMemo(
+	const fallbackUsers: RowItem[] = useMemo(
 		() => [
 			{
 				id: "nola-hawkins",
@@ -211,12 +274,67 @@ export default function GlobalNotesQualityPage() {
 		[],
 	);
 
+	const agencies: RowItem[] = useMemo(() => {
+		if (agenciesLoading) return [];
+		const list = agenciesData?.agencies ?? [];
+		if (list.length === 0) {
+			if (agenciesIsError) console.error("[GlobalNotesQuality] Failed to load agencies:", agenciesError);
+			return agenciesIsError ? fallbackAgencies : [];
+		}
+
+		return list.map((agency) => ({
+			id: agency.id,
+			name: agency.name,
+			imageUrl: agency.logo,
+			totalNotes: 234,
+			missingRequiredFields: 234,
+			poorGoalDocumentation: 234,
+			aiValidation: 23,
+		}));
+	}, [agenciesData, agenciesIsError, agenciesError, fallbackAgencies]);
+
+	const users: RowItem[] = useMemo(() => {
+		if (usersLoading) return [];
+		if (!usersData.length) return fallbackUsers;
+
+		return usersData
+			.map((u) => {
+				const id = u.id;
+				const name = u.fullName || u.email || "Unknown";
+				if (!id) return null;
+				return {
+					id,
+					name,
+					imageUrl: u.profilePicture,
+					totalNotes: 234,
+					missingRequiredFields: 234,
+					poorGoalDocumentation: 234,
+					aiValidation: 23,
+				} satisfies RowItem;
+			})
+			.filter(Boolean) as RowItem[];
+	}, [usersData, fallbackUsers]);
+
 	const rows = useMemo(() => (audience === "agencies" ? agencies : users), [audience, agencies, users]);
 	const filteredRows = useMemo(() => {
 		const q = search.trim().toLowerCase();
 		if (!q) return rows;
 		return rows.filter((r) => r.name.toLowerCase().includes(q));
 	}, [rows, search]);
+
+	const totalPages = useMemo(() => {
+		return Math.max(1, Math.ceil(filteredRows.length / pageSize));
+	}, [filteredRows.length, pageSize]);
+
+	const safePage = Math.min(currentPage, totalPages);
+	const paginatedRows = useMemo(() => {
+		const start = (safePage - 1) * pageSize;
+		return filteredRows.slice(start, start + pageSize);
+	}, [filteredRows, safePage, pageSize]);
+
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [view, audience, search, selectedMetric]);
 
 	const handleAskAI = (promptOverride?: string) => {
 		const prompt = (promptOverride ?? aiPrompt).trim();
@@ -226,11 +344,12 @@ export default function GlobalNotesQualityPage() {
 		window.setTimeout(() => {
 			setAiThinking(false);
 			setView("list");
+			setCurrentPage(1);
 		}, 1100);
 	};
 
 	return (
-		<div className="max-w-[1150px]">
+		<div className="">
 			<div className="flex flex-col gap-2">
 				<h1 className="text-3xl font-semibold tracking-tight text-foreground">Global Notes Quality</h1>
 			</div>
@@ -276,9 +395,9 @@ export default function GlobalNotesQualityPage() {
 								))}
 							</div>
 
-							<div className="mt-4 flex items-center  bg-[#f7fafa] w-[60%] py-1.5 mx-auto rounded-full ">
-								<Input
-                           className="border-none w-full bg-transparent focus:ring-0 px-6 rounded-full"
+							<div className="mt-4 flex items-center w-[55%] mx-auto rounded-full ">
+								<Input 
+                           className="border-none w-full bg-[#f7fafa] focus:ring-[#00b4b8] p-7 rounded-full"
 									value={aiPrompt}
 									onChange={(e) => setAiPrompt(e.target.value)}
 									placeholder="Ask Care AI"
@@ -286,7 +405,8 @@ export default function GlobalNotesQualityPage() {
 								<Button
 									type="button"
 									size="icon"
-									className="shrink-0 -ml-13 "
+									className="shrink-0 -ml-13"
+									disabled={!canSendPrompt}
 									onClick={() => handleAskAI()}
 									aria-label="Send"
 								>
@@ -298,17 +418,30 @@ export default function GlobalNotesQualityPage() {
 				</div>
 			) : (
 				<div className="mt-6">
-					<div className="mb-4">
+					<div className="mb-4 flex items-center gap-3">
+						<Button
+							type="button"
+							variant="ghost"
+							className="h-10 rounded-xl bg-white/60"
+							onClick={() => {
+								setView("overview");
+								setCurrentPage(1);
+							}}
+						>
+							<ChevronLeft className="size-5"/>
+							Back
+						</Button>
 						<AudiencePills
 							value={audience}
 							onChange={(next) => {
 								setAudience(next);
 								setSearch("");
+								setCurrentPage(1);
 							}}
 						/>
 					</div>
 
-					<div className="rounded-3xl bg-white/55 p-6">
+					<div className="rounded-3xl bg-white/55 p-6 ">
 						<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
 							<div>
 								<div className="text-lg font-semibold text-foreground">{metricTitle}</div>
@@ -323,7 +456,7 @@ export default function GlobalNotesQualityPage() {
 									value={search}
 									onChange={(e) => setSearch(e.target.value)}
 									placeholder="Search"
-									className="pl-11"
+									className="pl-11 rounded-3xl border-none bg-white/60 focus:ring-[#00b4b8]"
 								/>
 							</div>
 						</div>
@@ -338,23 +471,43 @@ export default function GlobalNotesQualityPage() {
 								<div className="text-right">&nbsp;</div>
 							</div>
 							<div className="h-px w-full bg-border"/>
-							{filteredRows.map((row) => (
+							{audience === "agencies" && agenciesLoading ? (
+								<div className="px-5 py-10 text-center text-sm text-muted-foreground">Loading agencies...</div>
+							) : null}
+							{audience === "users" && usersLoading ? (
+								<div className="px-5 py-10 text-center text-sm text-muted-foreground">Loading users...</div>
+							) : null}
+							{paginatedRows.map((row) => (
 								<div
 									key={row.id}
 									className="grid grid-cols-[260px_120px_170px_170px_120px_140px] items-center gap-2 px-5 py-4 text-sm"
 								>
 									<div className="flex items-center gap-3">
-										<div className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
-											<div className="size-3 rounded-sm bg-primary"/>
-										</div>
+										<Avatar className="size-10 rounded-xl">
+											{row.imageUrl ? (
+												<AvatarImage
+													src={row.imageUrl}
+													alt={row.name}
+													className="h-full w-full rounded-xl object-cover"
+												/>
+											) : null}
+											<AvatarFallback className="rounded-xl bg-primary/10 text-xs font-semibold text-[#00b4b8]">
+												{getInitials(row.name)}
+											</AvatarFallback>
+										</Avatar>
 										<div className="font-semibold text-foreground">{row.name}</div>
 									</div>
-									<div className="font-medium text-foreground">{row.totalNotes}</div>
-									<div className="font-medium text-foreground">{row.missingRequiredFields}</div>
-									<div className="font-medium text-foreground">{row.poorGoalDocumentation}</div>
-									<div className="font-medium text-foreground">{row.aiValidation}</div>
+									<div className="font-medium text-muted-foreground">{row.totalNotes}</div>
+									<div className="font-medium text-muted-foreground">{row.missingRequiredFields}</div>
+									<div className="font-medium text-muted-foreground">{row.poorGoalDocumentation}</div>
+									<div className="font-medium text-muted-foreground">{row.aiValidation}</div>
 									<div className="flex justify-end">
-										<Button type="button" variant="outline" className="h-10 rounded-xl bg-white/60">
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											className="h-9 rounded-xl bg-gray-100 px-3 text-xs text-muted-foreground border-gray-400"
+										>
 											View Details
 										</Button>
 									</div>
@@ -363,11 +516,25 @@ export default function GlobalNotesQualityPage() {
 						</div>
 
 						<div className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-							<div>1/8</div>
-							<Button type="button" variant="ghost" size="icon-sm" aria-label="Previous page">
+							<div>{safePage}/{totalPages}</div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-sm"
+								aria-label="Previous page"
+								disabled={safePage <= 1}
+								onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+							>
 								<ChevronLeft className="size-5"/>
 							</Button>
-							<Button type="button" variant="ghost" size="icon-sm" aria-label="Next page">
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-sm"
+								aria-label="Next page"
+								disabled={safePage >= totalPages}
+								onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+							>
 								<ChevronRight className="size-5"/>
 							</Button>
 						</div>
