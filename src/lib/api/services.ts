@@ -1,6 +1,7 @@
 import axiosClient from "../axios";
 import { ApiResponse } from "../api-types";
-
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { customBaseQuery } from "@/lib/baseQuery";
 /**
  * Service interface
  * Represents a DDD service that can be assigned to clients/shifts
@@ -117,22 +118,79 @@ export async function deleteService(id: string): Promise<void> {
   await axiosClient.delete(`/services/${id}`);
 }
 
-/**
- * ✅ Seed NJ DDD services catalog
- * Endpoint: POST /services/seed
- */
-export async function seedServices(): Promise<{
-  success: boolean;
-  message: string;
-  data?: { total: number; created: number; updated: number };
-}> {
-  const response = await axiosClient.post<{
-    success: boolean;
-    message: string;
-    data?: { total: number; created: number; updated: number };
-  }>("/services/seed");
 
-  return response.data;
-}
+export const servicesApi = createApi({
+  reducerPath: "servicesApi",
+  baseQuery: customBaseQuery,
+  tagTypes: ['Services'],
+  endpoints: (builder) => ({
+    listServices: builder.query<ListServicesResponse, { limit?: number }>({
+      query: ({ limit }) => ({
+        url: `/services` + (limit ? `?limit=${limit}` : ""),
+        method: "GET",
+        requiresAuth: true
+      }),
+    }),
+    deleteService: builder.mutation<
+      { success: boolean, message: string },
+      string
+    >({
+      query: (serviceId) => ({
+        url: `/services/${serviceId}`,
+        method: "DELETE",
+        requiresAuth: true
+      }),
+    }),
+    getService: builder.query<
+      Service,
+      string
+    >({
+      query: (serviceId) => ({
+        url: `/services/${serviceId}`,
+        method: "GET",
+        requiresAuth: true
+      }),
+    }),
+    updateService: builder.mutation<
+      void,
+      { serviceId: string, data: UpdateServiceRequest }
+    >({
+      query: ({ serviceId, data }) => ({
+        url: `/services/${serviceId}`,
+        method: "PATCH",
+        data,
+        requiresAuth: true
+      }),
+    }),
+    getServices: builder.query<
+      { services: { code: string; name: string }[] },
+      string
+    >({
+      query: (query) => ({
+        url: `/services` + (query ? `?${query}` : ""),
+        method: "GET",
+        requiresAuth: true
+      })
+    }),
+    createService: builder.mutation<
+      Service,
+      CreateServiceRequest
+    >({
+      query: (data) => ({
+        url: `/services`,
+        method: "POST",
+        data,
+        requiresAuth: true
+      }),
+    }),
+  }),
+});
 
-
+export const {
+  useListServicesQuery,
+  useDeleteServiceMutation,
+  useGetServiceQuery,
+  useUpdateServiceMutation,
+  useGetServicesQuery,
+  useCreateServiceMutation,
+} = servicesApi;

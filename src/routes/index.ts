@@ -1,5 +1,5 @@
-import {createBrowserRouter} from "react-router";
-import {Routes} from "@/routes/constants";
+import { createBrowserRouter } from "react-router";
+import { Routes } from "@/routes/constants";
 import SplashScreen from "@/pages/splash";
 import VerifyOTP from "@/pages/onboarding/VerifyOTP";
 import VerifyEmail from "@/pages/onboarding/VerifyEmail";
@@ -65,6 +65,8 @@ import SuperAdminDashboard from "@/pages/super-admin/dashboard";
 import ComplianceMonitor from "@/pages/super-admin/compliance-monitor";
 import UserAccessControlPage from "@/pages/super-admin/user-access-control";
 import ClientsDirectory from "@/pages/super-admin/clients-directory";
+import AdminClientDetails from "@/pages/super-admin/clients-directory/client-details";
+import AdminAddClientPage from "@/pages/super-admin/clients-directory/add-client";
 import CorporateSupportPage from "@/pages/super-admin/corporate-support";
 import OversightCenterPage from "@/pages/super-admin/oversight-center";
 import SuperAdminReports from "@/pages/super-admin/reports";
@@ -396,6 +398,14 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.clientDirectory,
                 Component: ClientsDirectory,
+            },
+            {
+                path: Routes.superAdmin.clientDetails,
+                Component: AdminClientDetails,
+            },
+            {
+                path: Routes.superAdmin.addClient,
+                Component: AdminAddClientPage,
             },
             {
                 path: Routes.superAdmin.corporateSupport,

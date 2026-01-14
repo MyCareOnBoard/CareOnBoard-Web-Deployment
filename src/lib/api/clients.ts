@@ -277,6 +277,7 @@ export interface Address {
  * Create Client Request
  */
 export interface CreateClientRequest {
+  agencyId?: string;
   firstName?: string;
   lastName?: string;
   middleName?: string;
@@ -377,13 +378,13 @@ export interface CreateClientRequest {
 
   goalsAndEmergency?: ClientGoalsAndEmergency;
   systemAiAndAudit?: ClientSystemAiAndAudit;
-  agencyId?: string; // Required for employees, defaults to own agencyId for agencies
 }
 
 /**
  * Update Client Request
  */
 export interface UpdateClientRequest {
+  agencyId?: string;
   firstName?: string;
   lastName?: string;
   middleName?: string;
@@ -490,9 +491,9 @@ export interface SeedClientsRequest {
  * Agencies default to their own agencyId
  * Employees must supply agencyId
  */
-export async function createAgencyClient(data: CreateClientRequest): Promise<Client> {
+export async function createClient(data: CreateClientRequest): Promise<Client> {
   try {
-    const response = await axiosClient.post<ApiResponse<Client>>('/clientManagement', data);
+    const response = await axiosClient.post<ApiResponse<Client>>('/clients', data);
     return response.data.data;
   } catch (error) {
     console.error('Failed to create client for agency:', error);
@@ -530,7 +531,7 @@ export async function listAgencyClients(params?: ListClientsParams): Promise<Cli
 
 /**
  * ✅ Upload a single client document file
- * Endpoint: POST /clientManagement/uploads/:documentType?clientId={clientId}
+ * Endpoint: POST /clients/uploads/:documentType?clientId={clientId}
  */
 export async function uploadClientDocument(
   clientId: string,
@@ -542,7 +543,7 @@ export async function uploadClientDocument(
     formData.append("file", file);
 
     const response = await axiosClient.post<ApiResponse<ClientDocumentUploadResult>>(
-      `/clientManagement/uploads/${encodeURIComponent(documentType)}`,
+      `/clients/uploads/${encodeURIComponent(documentType)}`,
       formData,
       {
         params: { clientId },
