@@ -1,111 +1,62 @@
 import React, {useState} from "react";
 import {Button} from "@/components/ui/button";
-import {ChevronLeft, ChevronRight} from "lucide-react";
+import {ChevronLeft, ChevronRight, Loader2} from "lucide-react";
+import {
+  useGetComplianceDocumentsQuery,
+  useGetComplianceNotesQuery,
+  useGetComplianceEvvQuery,
+  useGetComplianceOthersQuery,
+  useSendComplianceAlertMutation,
+  ComplianceIssue,
+} from "./complianceApi";
+import {toast} from "sonner";
 
 type TabType = "documents" | "notes" | "evv" | "others";
-
-interface ComplianceItem {
-  id: string;
-  name: string;
-  image: string;
-  documentType?: string;
-  noteType?: string;
-  timeAgo: string;
-  details: string;
-  agency: string;
-  date?: string;
-}
 
 export default function ComplianceMonitor() {
   const [activeTab, setActiveTab] = useState<TabType>("documents");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const [searchTerm, setSearchTerm] = useState("");
+  const itemsPerPage = 10;
 
-  // Mock data for documents
-  const documentsData: ComplianceItem[] = [
-    {
-      id: "1",
-      name: "IOTA Digital",
-      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=1",
-      documentType: "I-9 Form",
-      timeAgo: "3 days ago",
-      details: "Details here",
-      agency: "Iota Digital",
-    },
-    {
-      id: "2",
-      name: "IOTA Digital",
-      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=2",
-      documentType: "I-9 Form",
-      timeAgo: "3 days ago",
-      details: "Details here",
-      agency: "Iota Digital",
-    },
-    {
-      id: "3",
-      name: "IOTA Digital",
-      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=3",
-      documentType: "I-9 Form",
-      timeAgo: "3 days ago",
-      details: "Details here",
-      agency: "Iota Digital",
-    },
-    {
-      id: "4",
-      name: "IOTA Digital",
-      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=4",
-      documentType: "I-9 Form",
-      timeAgo: "3 days ago",
-      details: "Details here",
-      agency: "Iota Digital",
-    },
-    {
-      id: "5",
-      name: "IOTA Digital",
-      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=5",
-      documentType: "I-9 Form",
-      timeAgo: "3 days ago",
-      details: "Details here",
-      agency: "Iota Digital",
-    },
-    {
-      id: "6",
-      name: "IOTA Digital",
-      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=6",
-      documentType: "I-9 Form",
-      timeAgo: "3 days ago",
-      details: "Details here",
-      agency: "Iota Digital",
-    },
-  ];
+  // API queries based on active tab
+  const {
+    data: documentsData,
+    isLoading: documentsLoading,
+    error: documentsError,
+  } = useGetComplianceDocumentsQuery(
+    {page: currentPage, limit: itemsPerPage, search: searchTerm},
+    {skip: activeTab !== "documents", refetchOnMountOrArgChange: true}
+  );
 
-  // Mock data for notes
-  const notesData: ComplianceItem[] = [
-    {
-      id: "1",
-      name: "Nola Hawkins",
-      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=nola1",
-      noteType: "I-9 Form",
-      timeAgo: "",
-      details: "Required Fields",
-      agency: "Iota Digital",
-      date: "25 January"
-    },
-  ];
+  const {
+    data: notesData,
+    isLoading: notesLoading,
+    error: notesError,
+  } = useGetComplianceNotesQuery(
+    {page: currentPage, limit: itemsPerPage, search: searchTerm},
+    {skip: activeTab !== "notes", refetchOnMountOrArgChange: true}
+  );
 
-  const agencyData: ComplianceItem[] = [
-    {
-      id: "1",
-      name: "Iota Digital",
-      image: "https://api.dicebear.com/7.x/avataaars/svg?seed=nola1",
-      noteType: "I-9 Form",
-      timeAgo: "",
-      details: "Plan Expiring",
-      agency: "Iota Digital",
-      date: "25 January"
-    },
-  ];
+  const {
+    data: evvData,
+    isLoading: evvLoading,
+    error: evvError,
+  } = useGetComplianceEvvQuery(
+    {page: currentPage, limit: itemsPerPage, search: searchTerm},
+    {skip: activeTab !== "evv", refetchOnMountOrArgChange: true}
+  );
 
+  const {
+    data: othersData,
+    isLoading: othersLoading,
+    error: othersError,
+  } = useGetComplianceOthersQuery(
+    {page: currentPage, limit: itemsPerPage, search: searchTerm},
+    {skip: activeTab !== "others"}
+  );
+
+  const [sendAlert, {isLoading: sendingAlert}] = useSendComplianceAlertMutation();
 
   const getCurrentData = () => {
     switch (activeTab) {
@@ -114,22 +65,59 @@ export default function ComplianceMonitor() {
       case "notes":
         return notesData;
       case "evv":
-        return [];
+        return evvData;
       case "others":
-        return agencyData;
+        return othersData;
       default:
-        return [];
+        return null;
     }
   };
 
-  const currentData = getCurrentData();
-  const totalPages = Math.ceil(currentData.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = currentData.slice(startIndex, startIndex + itemsPerPage);
+  const getCurrentLoading = () => {
+    switch (activeTab) {
+      case "documents":
+        return documentsLoading;
+      case "notes":
+        return notesLoading;
+      case "evv":
+        return evvLoading;
+      case "others":
+        return othersLoading;
+      default:
+        return false;
+    }
+  };
+
+  const currentResponse = getCurrentData();
+  const isLoading = getCurrentLoading();
+  const currentData = currentResponse?.data || [];
+  const pagination = currentResponse?.pagination;
+  const totalPages = pagination?.totalPages || 1;
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     setCurrentPage(1);
+  };
+
+  const handleSendAlert = async (issue: ComplianceIssue) => {
+    try {
+      await sendAlert({
+        userId: issue.userId,
+        category: activeTab,
+        issueType: issue.issueType,
+        documentType: issue.documentType,
+        details: issue.details,
+      }).unwrap();
+
+      toast.success("Compliance alert sent successfully");
+    } catch (error: any) {
+      toast.error(error?.data?.error || "Failed to send alert");
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {day: "numeric", month: "long"});
   };
 
   const getAlertTitle = () => {
@@ -161,6 +149,10 @@ export default function ComplianceMonitor() {
         return "";
     }
   };
+
+  const handleSeeDoc = (item: ComplianceIssue) => {
+    window.open(item?.fileUrl, '_blank', 'noopener,noreferrer')
+  }
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -229,8 +221,12 @@ export default function ComplianceMonitor() {
 
         {/* List Items */}
         <div className="space-y-4">
-          {paginatedData.length > 0 ? (
-            paginatedData.map((item) => (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-[#00b4b8]"/>
+            </div>
+          ) : currentData.length > 0 ? (
+            currentData.map((item) => (
               <div
                 key={item.id}
                 className="flex justify-between gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] flex items-center p-4"
@@ -238,60 +234,67 @@ export default function ComplianceMonitor() {
                 {/* Avatar */}
                 <div className={"flex gap-4 items-center"}>
                   <div className="w-[52.5px] h-[60px] rounded-[8px] overflow-hidden flex-shrink-0">
-                    {item.image
-                      ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div
-                          className="w-full h-full flex items-center justify-center bg-[#00b4b8] text-white rounded-[8px]">
-                          {item.name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                    <div
+                      className="w-full h-full flex items-center justify-center bg-[#00b4b8] text-white rounded-[8px]">
+                      {item.userName.charAt(0).toUpperCase()}
+                    </div>
                   </div>
                   {/* Name */}
                   <div>
                     <p className="text-[16px] font-semibold leading-[1.6] text-black">
-                      {item.name}
+                      {item.userName}
+                    </p>
+                    <p className="text-[12px] text-[#808081]">
+                      {item.userEmail}
                     </p>
                   </div>
                 </div>
 
 
                 {/* Document/Note Type */}
-                {!["others", "notes"].includes(activeTab) && <div>
-                  <p className="text-[14px] font-medium text-[#808081] mb-0">
-                    {activeTab === "documents" ? "Document" : "Note"}
-                  </p>
-                  <p className="text-[14px] font-medium text-[#10141a]">
-                    {item.documentType || item.noteType}
-                  </p>
-                </div>}
-
-                {/* Time/Details */}
-                {activeTab === "documents" && item.timeAgo && (
-                  <div className="bg-[rgba(175,33,14,0.05)] border border-[#d53411] rounded-[60px] px-4 py-2">
-                    <p className="text-[12px] font-semibold text-[#d53411]">
-                      {item.timeAgo}
+                {activeTab === "documents" && item.documentType && (
+                  <div>
+                    <p className="text-[14px] font-medium text-[#808081] mb-0">
+                      Document
+                    </p>
+                    <p className="text-[14px] font-medium text-[#10141a] capitalize">
+                      {item.documentType}
                     </p>
                   </div>
                 )}
 
-                {(activeTab === "others" || activeTab === "notes") && (
+                {activeTab === "notes" && item.noteType && (
+                  <div>
+                    <p className="text-[14px] font-medium text-[#808081] mb-0">
+                      Note Type
+                    </p>
+                    <p className="text-[14px] font-medium text-[#10141a]">
+                      {item.noteType}
+                    </p>
+                  </div>
+                )}
+
+                {/* Time/Details */}
+                {activeTab === "documents" && item.expiryStatus && (
+                  <div className="bg-[rgba(175,33,14,0.05)] border border-[#d53411] rounded-[60px] px-4 py-2">
+                    <p className="text-[12px] font-semibold text-[#d53411]">
+                      {item.expiryStatus}
+                    </p>
+                  </div>
+                )}
+
+                {(activeTab === "notes") && (
                   <div>
                     <p className="text-[14px] font-medium text-[#808081] mb-0">
                       Date
                     </p>
                     <p className="text-[14px] font-medium text-black">
-                      {item.date}
+                      {formatDate(item.createdAt)}
                     </p>
                   </div>
                 )}
 
-                {(activeTab === "notes" || activeTab === "others") && (
+                {(activeTab === "notes" || activeTab === "others" || activeTab === "evv") && (
                   <div>
                     <p className="text-[14px] font-medium text-[#808081] mb-0">
                       Details
@@ -308,28 +311,35 @@ export default function ComplianceMonitor() {
                         Agency
                     </p>
                     <p className="text-[14px] font-medium text-black">
-                      {item.agency}
+                      {item.agencyName}
                     </p>
                 </div>}
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {activeTab === "documents" && (
-                    <Button
-                      className="bg-[rgba(178,178,179,0.1)] border border-[#b2b2b3] text-[#565656] hover:bg-[rgba(178,178,179,0.2)] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]">
-                      See Doc
-                    </Button>
-                  )}
+                  {activeTab === "documents" && <Button
+                    onClick={() => handleSeeDoc(item)}
+                    disabled={sendingAlert || item.status === "alerted"}
+                    className="bg-[rgba(178,178,179,0.1)] border border-[#b2b2b3] text-[#565656] hover:bg-[rgba(178,178,179,0.2)] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px] disabled:opacity-50"
+                  >
+                    See Doc
+                  </Button>}
                   <Button
-                    className="bg-[rgba(178,178,179,0.1)] border border-[#b2b2b3] text-[#565656] hover:bg-[rgba(178,178,179,0.2)] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]">
-                    Send Alert
+                    onClick={() => handleSendAlert(item)}
+                    disabled={sendingAlert || item.status === "alerted"}
+                    className="bg-[rgba(178,178,179,0.1)] border border-[#b2b2b3] text-[#565656] hover:bg-[rgba(178,178,179,0.2)] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px] disabled:opacity-50">
+                    {sendingAlert ? (
+                      <Loader2 className="w-4 h-4 animate-spin"/>
+                    ) : (
+                      "Send Alert"
+                    )}
                   </Button>
                 </div>
               </div>
             ))
           ) : (
             <div className="flex items-center justify-center py-20">
-              <p className="text-[16px] text-[#808081]">No data available</p>
+              <p className="text-[16px] text-[#808081]">No compliance issues found</p>
             </div>
           )}
         </div>
