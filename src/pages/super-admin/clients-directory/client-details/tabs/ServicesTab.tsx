@@ -731,6 +731,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
   const [offeredServices, setOfferedServices] = useState<ApiService[]>([]);
   const {data, isLoading: loadingServices} = useListServicesQuery({});
 
+  // Load available services – same as Stage 2
   useEffect(() => {
     if (data && !loadingServices) {
       setOfferedServices(data.services);

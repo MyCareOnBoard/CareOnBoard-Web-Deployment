@@ -198,13 +198,13 @@ export default function ClientsDirectory() {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-            Client Management
+            Clients Directory
           </h1>
         </div>
         <Button
           size="lg"
           className="h-[52px] px-[16px] py-[12px]"
-          onClick={() => navigate(Routes.agency.addClient)}
+          onClick={() => navigate(Routes.superAdmin.addClient)}
         >
           <Plus className="w-5 h-5 text-white" />
           Add Client
@@ -312,7 +312,7 @@ export default function ClientsDirectory() {
             {isLoading ? (
               <div className="py-12 text-center">
                 <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
-                <p className="mt-4 text-sm text-[#808081]">Loading super admin users...</p>
+                <p className="mt-4 text-sm text-[#808081]">Loading clients...</p>
               </div>
             ) : error ? (
               <div className="py-12 text-center">
@@ -330,31 +330,33 @@ export default function ClientsDirectory() {
               paginatedClients.map((client) => (
                 <div
                   key={client.id}
-                  className="flex items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
+                  className="flex flex-wrap items-center gap-4 backdrop-blur-[20px] rounded-[20px] p-2"
                 >
-                  <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-                    {client.avatarUrl && (
-                      <AvatarImage
-                        src={client.avatarUrl}
-                        alt={client.name}
-                        className="w-full h-full object-cover aspect-auto rounded-[8px]"
-                      />
-                    )}
-                    <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-                      {client.name
-                        .split(" ")
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .map((w) => w[0]?.toUpperCase())
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div className="flex flex-1 items-center gap-16 min-w-0">
-                    <div className="min-w-[220px]">
-                      <p className="text-[16px] font-semibold leading-[1.6] text-black truncate">
-                        {client.name}
-                      </p>
+                  <div className="flex flex-wrap flex-1 gap-7 items-center justify-between min-w-0">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
+                        {client.avatarUrl && (
+                          <AvatarImage
+                            src={client.avatarUrl}
+                            alt={client.name}
+                            className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                          />
+                        )}
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                          {client.name
+                            .split(" ")
+                            .filter(Boolean)
+                            .slice(0, 2)
+                            .map((w) => w[0]?.toUpperCase())
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="min-w-[220px]">
+                        <p className="text-[16px] font-semibold leading-[1.6] text-black truncate">
+                          {client.name}
+                        </p>
+                      </div>
                     </div>
 
                     <Badge
@@ -382,18 +384,18 @@ export default function ClientsDirectory() {
                       <p className="mb-0 text-[#808081] text-nowrap">Assigned Agency</p>
                       <p className="text-[#10141a] text-nowrap">{client.agency?.name}</p>
                     </div>
+                    <Button
+                      className="h-9 w-[140px] px-4 py-2 text-[14px] font-semibold"
+                      onClick={() =>
+                        navigate(
+                          Routes.superAdmin.clientDetails.replace(":clientId", client.id)
+                        )
+                      }
+                    >
+                      Client Details
+                    </Button>
                   </div>
 
-                  <Button
-                    className="h-9 w-[140px] px-4 py-2 text-[14px] font-semibold"
-                    onClick={() =>
-                      navigate(
-                        Routes.agency.clientDetails.replace(":clientId", client.id)
-                      )
-                    }
-                  >
-                    Client Details
-                  </Button>
                 </div>
               ))
             )}

@@ -2,17 +2,17 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Stage1ClientIdentityAndContact } from "@/pages/agency/add-client/stages/Stage1ClientIdentityAndContact";
-import { Stage2GuardianAndFunding } from "@/pages/agency/add-client/stages/Stage2GuardianAndFunding";
-import { Stage3HealthcareAndDocuments } from "@/pages/agency/add-client/stages/Stage3HealthcareAndDocuments";
-import { Stage4EvvAndVisitConfig } from "@/pages/agency/add-client/stages/Stage4EvvAndVisitConfig";
-import { Stage5StaffAssignmentAndRestrictions } from "@/pages/agency/add-client/stages/Stage5StaffAssignmentAndRestrictions";
-import { Stage6GoalsAndEmergency } from "@/pages/agency/add-client/stages/Stage6GoalsAndEmergency";
-import { Stage7SystemAiAndAudit } from "@/pages/agency/add-client/stages/Stage7SystemAiAndAudit";
-import { StageFooter } from "@/pages/agency/add-client/components/StageFooter";
-import { SaveClientSuccessModal } from "@/pages/agency/add-client/components/SaveClientSuccessModal";
-import { SaveClientErrorModal } from "@/pages/agency/add-client/components/SaveClientErrorModal";
-import { createInitialAddClientFormData } from "@/pages/agency/add-client/formData";
+import { Stage1ClientIdentityAndContact } from "@/pages/super-admin/clients-directory/add-client/stages/Stage1ClientIdentityAndContact";
+import { Stage2GuardianAndFunding } from "@/pages/super-admin/clients-directory/add-client/stages/Stage2GuardianAndFunding";
+import { Stage3HealthcareAndDocuments } from "@/pages/super-admin/clients-directory/add-client/stages/Stage3HealthcareAndDocuments";
+import { Stage4EvvAndVisitConfig } from "@/pages/super-admin/clients-directory/add-client/stages/Stage4EvvAndVisitConfig";
+import { Stage5StaffAssignmentAndRestrictions } from "@/pages/super-admin/clients-directory/add-client/stages/Stage5StaffAssignmentAndRestrictions";
+import { Stage6GoalsAndEmergency } from "@/pages/super-admin/clients-directory/add-client/stages/Stage6GoalsAndEmergency";
+import { Stage7SystemAiAndAudit } from "@/pages/super-admin/clients-directory/add-client/stages/Stage7SystemAiAndAudit";
+import { StageFooter } from "@/pages/super-admin/clients-directory/add-client/components/StageFooter";
+import { SaveClientSuccessModal } from "@/pages/super-admin/clients-directory/add-client/components/SaveClientSuccessModal";
+import { SaveClientErrorModal } from "@/pages/super-admin/clients-directory/add-client/components/SaveClientErrorModal";
+import { createInitialAddClientFormData } from "@/pages/super-admin/clients-directory/add-client/formData";
 import {
   createClient,
   uploadClientDocument,
@@ -22,6 +22,8 @@ import {
   type ClientDocumentKey,
   type ClientDocument,
 } from "@/lib/api/clients";
+import { useListAllAgenciesQuery } from "@/pages/super-admin/agencies/api";
+import { useListServicesQuery } from "@/lib/api/services";
 
 export default function AddClientPage() {
   const navigate = useNavigate();
@@ -36,6 +38,27 @@ export default function AddClientPage() {
   const [saveStage, setSaveStage] = useState<1 | 2>(1);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState("");
+  const {data: services, isLoading: loadingServices} = useListServicesQuery({});
+  const {data, isLoading: loadingAgencies} = useListAllAgenciesQuery({});
+
+  const agencies = useMemo(() => {
+    if (!data?.agencies) return [];
+    
+    let filtered = data.agencies;
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(agency => 
+        agency.name.toLowerCase().includes(query) ||
+        agency.email.toLowerCase().includes(query) ||
+        agency.id.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [data, searchQuery]);
 
   const flattenAddClientFormData = (): CreateClientRequest => {
     const s1 = formData.stage1;
@@ -77,6 +100,7 @@ export default function AddClientPage() {
 
     return {
       // Stage 1
+      agencyId: formData.agencyId || undefined,
       firstName: s1.firstName || undefined,
       lastName: s1.lastName || undefined,
       middleName: s1.middleName || undefined,
@@ -302,7 +326,7 @@ export default function AddClientPage() {
 
   const stageContent = (() => {
     if (stage === 1)
-      return <Stage1ClientIdentityAndContact footer={footer} formData={formData} setFormData={setFormData} />;
+      return <Stage1ClientIdentityAndContact agencies={agencies} loadingAgencies={loadingAgencies} footer={footer} formData={formData} setFormData={setFormData} />;
     if (stage === 2)
       return <Stage2GuardianAndFunding footer={footer} formData={formData} setFormData={setFormData} />;
     if (stage === 3)
