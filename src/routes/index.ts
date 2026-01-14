@@ -76,6 +76,7 @@ import SuperAdminTimesheetReports from "@/pages/super-admin/reports/timesheetRep
 import SuperAdminNoteReports from "@/pages/super-admin/reports/noteReports";
 import SuperAdminSystemSettingsPage from "@/pages/super-admin/system-settings";
 import AgencyTrainings from "@/pages/agency/trainings";
+import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
 
 
 export const router = createBrowserRouter([
@@ -374,6 +375,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.userAccessControl,
                 Component: UserAccessControlPage,
+            },
+            {
+                path: Routes.superAdmin.globalNotesQuality,
+                Component: GlobalNotesQualityPage,
             },
             {
                 path: Routes.superAdmin.reports.index,
