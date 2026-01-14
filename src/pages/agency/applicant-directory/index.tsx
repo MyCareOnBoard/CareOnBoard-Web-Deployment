@@ -1,29 +1,17 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
-import { ChevronLeft, ChevronRight, Search, MoreVertical, Plus, ArrowUpRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AddScheduleModal from "@/pages/agency/scheduling/components/AddScheduleModal";
 import { Routes } from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
 import { applicantsApi, Applicant } from "@/lib/api/applicants";
 
-interface ShiftStats {
-  active: number;
-  completed: number;
-  missed: number;
-}
-
 interface PendingApproval {
   id: string;
   name: string;
   progress: number; // 0-100
-}
-
-interface ComplianceStats {
-  totalDoctors: number;
-  appointments: number;
 }
 
 const mockApplicants: Applicant[] = [
@@ -101,25 +89,14 @@ export default function ApplicantDirectory() {
   const errorToastShownRef = useRef(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   
-  // Stats state - ready for API
-  const [shiftStats, setShiftStats] = useState<ShiftStats>({
-    active: 42,
-    completed: 35,
-    missed: 3,
-  });
-  
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([
     { id: "1", name: "DR.Brooklyn Simmons", progress: 75 },
     { id: "2", name: "DR.Brooklyn Simmons", progress: 75 },
     { id: "3", name: "DR.Brooklyn Simmons", progress: 75 },
     { id: "4", name: "DR.Brooklyn Simmons", progress: 75 },
     { id: "5", name: "DR.Brooklyn Simmons", progress: 75 },
+    { id: "6", name: "DR.Brooklyn Simmons", progress: 75 },
   ]);
-
-  const [complianceStats, setComplianceStats] = useState<ComplianceStats>({
-    totalDoctors: 2,
-    appointments: 3,
-  });
   const itemsPerPage = 6;
 
   // Memoize these values
@@ -221,22 +198,6 @@ export default function ApplicantDirectory() {
     navigate(Routes.agency.applicantClearanceHiring);
   };
 
-  const handleAddSchedule = () => {
-    setIsScheduleModalOpen(true);
-  };
-
-  const handleScheduleModalClose = () => {
-    setIsScheduleModalOpen(false);
-  };
-
-  const handleViewShifts = () => {
-    navigate(Routes.agency.shifts);
-  };
-
-  const handleViewCompliance = () => {
-    navigate(Routes.agency.scheduling);
-  };
-
   // Reset page when search query or tab changes
   useEffect(() => {
     setCurrentPage(1);
@@ -260,125 +221,10 @@ export default function ApplicantDirectory() {
           </div>
 
           {/* Stats Overview Section */}
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_0.8fr] gap-6 mb-8 ">
-            {/* Shifts Card */}
-            <div>
-              <div 
-                onClick={handleViewShifts}
-                className="relative p-6 mb-6 overflow-hidden rounded-[24px] backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between ">
-                  <span>
-                    <h2 className="text-[18px] font-semibold text-[#10141a] mb-2">
-                      Shifts
-                    </h2>
-                    <p className="text-[14px] text-gray-600 mb-6">
-                      Insightful overview of patient recovery and ongoing care
-                    </p>
-                  </span>
-                  
-                  {/* Stats Grid */}
-                  <div className="flex items-start justify-between gap-6">
-                    {/* Active */}
-                    <div className="flex flex-col">
-                      <span className="text-[42px] font-bold text-[#10141a]">
-                        {shiftStats.active}
-                      </span>
-                      <div className="flex items-center">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#0EAF52]" />
-                        <span className="text-[13px] text-gray-600 font-medium">
-                          Active
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Completed */}
-                    <div className="flex flex-col">
-                      <span className="text-[42px] font-bold text-[#10141a]">
-                        {shiftStats.completed}
-                      </span>
-                      <div className="flex items-center">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#2B82FF]" />
-                        <span className="text-[13px] text-gray-600 font-medium">
-                          Completed
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Missed */}
-                    <div className="flex flex-col">
-                      <span className="text-[42px] font-bold text-[#10141a]">
-                        {shiftStats.missed}
-                      </span>
-                      <div className="flex items-center">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#D53411]" />
-                        <span className="text-[13px] text-gray-600 font-medium">
-                          Missed
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-          {/* Compliance & Scheduling Section */}
-          <div className="rounded-[24px] p-4 my-8 xl:grid-cols-2 backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)]">
-            <h2 className="text-[18px] font-semibold text-[#10141a]">
-              Compliance Scheduling Center
-            </h2>
-            <p>These are your Pending Billing Approvals</p>
-            <div className="grid grid-cols-2 gap-6">
-              {/* Compliance Card */}
-              <div onClick={handleViewCompliance} className="relative overflow-hidden rounded-[24px] bg-[#FFFFFF4D] shadow cursor-pointer hover:shadow-md transition-shadow">
-                <div className="p-6">
-                  <div className="space-y-6">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="text-[14px] font-bold text-[#10141a] mb-1">
-                          Total Doctors
-                        </h3>
-                        <p className="text-[12px] text-gray-600">
-                          Total doctors who have collaborated
-                        </p>
-                      </div>
-                      <button className="text-gray-400 transition-colors shrink-0 hover:text-gray-600">
-                        <ArrowUpRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {/* Second Compliance Card */}
-            <div 
-              onClick={handleViewCompliance}
-              className="relative overflow-hidden rounded-[24px] bg-[#FFFFFF4D] shadow cursor-pointer hover:shadow-md transition-shadow"
-            >
-              <div className="p-6">
-                <div className="space-y-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-[16-px] font-bold color-[#10141a] mb-1">
-                        Appointments
-                      </h3>
-                      <p className="text-[12px] text-gray-600">
-                        3.5% Have increased from yesterday
-                      </p>
-                    </div>
-                    <button className="text-gray-400 transition-colors shrink-0 hover:text-gray-600">
-                      <ArrowUpRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            </div>
-
-            
-          </div>
-          </div>  
-
+          <div className="mb-8">
             {/* Clearance & Hiring Card */}
             <div 
-              className="relative overflow-hidden rounded-[24px] backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)] shadow-sm hover:shadow-md transition-shadow"
+              className="relative overflow-hidden rounded-[24px] backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)] shadow-sm"
             >
               <div className="p-6">
                 <div className="flex items-start justify-between mb-6">
@@ -387,7 +233,7 @@ export default function ApplicantDirectory() {
                       Clearance & Hiring Toggle
                     </h2>
                     <p className="text-[13px] text-gray-600">
-                      These are your Pending Billing Approvals
+                      These are your Pending Hiring Approvals
                     </p>
                   </div>
                   <button 
@@ -475,11 +321,11 @@ export default function ApplicantDirectory() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">
-                      Applicant Directory
+                      Pending Applicant
                     </h2>
                     <p className="mt-1 text-xs text-gray-500">
-                      These are your "Pending Billing Approvals"
-                    </p>
+                      These are your Pending Applicant
+                     </p>
                   </div>
                    {/* Search and Filter Row */}
                 <div className="flex items-center justify-end gap-4">
