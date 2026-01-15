@@ -152,11 +152,14 @@ export const billingMonitorApi = createApi({
       transformResponse: (response: BillingMonitorAgenciesResponseRaw): BillingMonitorAgenciesResponse => {
         const normalized = (response?.data ?? []).map((a) => {
           const subscriptionEnd = a.subscriptionEnd ?? a.expiryDate;
+          const subscriptionStart =
+            a.subscriptionStart;
           const dspCount = a.dspCount ?? a.dsp;
           const clientsCount = a.clientsCount ?? a.clients;
 
           return {
             ...a,
+            subscriptionStart,
             subscriptionEnd,
             dspCount,
             clientsCount,
