@@ -32,6 +32,7 @@ import {
 	useGetBillingMonitorHistoryQuery,
 	useUpsertAgencyBillingPlanMutation,
 	useGetAgencyDspCountQuery,
+	useGetAgencyClientCountQuery,
 	type BillingPlanCode,
 	type BillingMonitorAgency,
 } from "@/pages/super-admin/agency-billing-monitor/api";
@@ -84,6 +85,17 @@ function isActive(subEnd: Date) {
 
 function DspCount({ agencyId }: { agencyId: string }) {
 	const { data, isLoading, isFetching, error } = useGetAgencyDspCountQuery(
+		{ agencyId },
+		{ refetchOnMountOrArgChange: true }
+	);
+
+	if (isLoading || isFetching) return <span>…</span>;
+	if (error) return <span>—</span>;
+	return <span>{data ?? 0}</span>;
+}
+
+function ClientCount({ agencyId }: { agencyId: string }) {
+	const { data, isLoading, isFetching, error } = useGetAgencyClientCountQuery(
 		{ agencyId },
 		{ refetchOnMountOrArgChange: true }
 	);
@@ -509,7 +521,7 @@ export default function AgencyBillingMonitorPage() {
 												Clients
 											</p>
 											<p className="text-[14px] font-semibold text-[#10141a]">
-												{b.clientsCount ?? 0}
+												<ClientCount agencyId={b.agencyId} />
 											</p>
 										</div>
 										<div className="text-center">

@@ -99,6 +99,13 @@ export interface EmployeesListResponse {
   employees: any[];
 }
 
+export interface ClientsListResponse {
+  success: boolean;
+  count: number;
+  total: number;
+  clients: any[];
+}
+
 export const billingMonitorApi = createApi({
   reducerPath: "billingMonitorApi",
   baseQuery: customBaseQuery,
@@ -198,6 +205,25 @@ export const billingMonitorApi = createApi({
             : 0;
       },
     }),
+
+    getAgencyClientCount: builder.query<number, { agencyId: string }>({
+      query: ({ agencyId }) => ({
+        url: "/clients",
+        method: "GET",
+        params: {
+          agencyId,
+          limit: 1,
+        },
+        requiresAuth: true,
+      }),
+      transformResponse: (response: ClientsListResponse) => {
+        return typeof response?.total === "number"
+          ? response.total
+          : typeof response?.count === "number"
+            ? response.count
+            : 0;
+      },
+    }),
   }),
 });
 
@@ -209,4 +235,5 @@ export const {
   useGetAgencyBillingInfoQuery,
   useUpsertAgencyBillingPlanMutation,
   useGetAgencyDspCountQuery,
+  useGetAgencyClientCountQuery,
 } = billingMonitorApi;
