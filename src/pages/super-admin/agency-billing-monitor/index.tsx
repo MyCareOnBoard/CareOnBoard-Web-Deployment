@@ -157,6 +157,23 @@ export default function AgencyBillingMonitorPage() {
 	const historyItems = historyResponse?.data ?? [];
 	const historyPagination = historyResponse?.pagination;
 
+	useEffect(() => {
+		if (!import.meta.env.DEV) return;
+		if (!agenciesResponse) return;
+
+		const sample = agenciesResponse.data?.[0];
+		const missingExpiryCount = (agenciesResponse.data ?? []).filter(
+			(a) => !a.subscriptionEnd
+		).length;
+
+		console.info("[billingMonitor] agencies list response", {
+			pagination: agenciesResponse.pagination,
+			sampleAgency: sample,
+			missingExpiryCount,
+			totalInPage: agenciesResponse.data?.length ?? 0,
+		});
+	}, [agenciesResponse]);
+
 	const [isBillingDialogOpen, setIsBillingDialogOpen] = useState(false);
 	const [editingBillingId, setEditingBillingId] = useState<string | null>(null);
 	const [isSuccessOpen, setIsSuccessOpen] = useState(false);
@@ -247,6 +264,14 @@ export default function AgencyBillingMonitorPage() {
 				},
 			}).unwrap();
 
+			if (import.meta.env.DEV) {
+				console.info("[billingMonitor] upsertAgencyBillingPlan response", {
+					agencyId: formAgencyId,
+					message: (result as any)?.message,
+					data: (result as any)?.data,
+				});
+			}
+
 			const returned = result?.data as
 				| {
 					agencyId?: string;
@@ -281,6 +306,12 @@ export default function AgencyBillingMonitorPage() {
 			setIsBillingDialogOpen(false);
 			setIsSuccessOpen(true);
 		} catch (e) {
+			if (import.meta.env.DEV) {
+				console.info("[billingMonitor] upsertAgencyBillingPlan error", {
+					agencyId: formAgencyId,
+					error: e,
+				});
+			}
 			toast.error("Failed to update billing. Please try again.");
 		}
 	};
@@ -304,6 +335,14 @@ export default function AgencyBillingMonitorPage() {
 				},
 			}).unwrap();
 
+			if (import.meta.env.DEV) {
+				console.info("[billingMonitor] cancelPlan response", {
+					agencyId: formAgencyId,
+					message: (result as any)?.message,
+					data: (result as any)?.data,
+				});
+			}
+
 			const returned = result?.data as
 				| {
 					agencyId?: string;
@@ -325,6 +364,12 @@ export default function AgencyBillingMonitorPage() {
 			toast.success("Plan canceled");
 			setIsBillingDialogOpen(false);
 		} catch (e) {
+			if (import.meta.env.DEV) {
+				console.info("[billingMonitor] cancelPlan error", {
+					agencyId: formAgencyId,
+					error: e,
+				});
+			}
 			toast.error("Failed to cancel plan. Please try again.");
 		}
 	};
@@ -352,6 +397,14 @@ export default function AgencyBillingMonitorPage() {
 		})
 			.unwrap()
 			.then((result) => {
+				if (import.meta.env.DEV) {
+					console.info("[billingMonitor] removePlan response", {
+						agencyId: deleteTargetId,
+						message: (result as any)?.message,
+						data: (result as any)?.data,
+					});
+				}
+
 				const returned = result?.data as
 					| {
 						agencyId?: string;
@@ -372,7 +425,13 @@ export default function AgencyBillingMonitorPage() {
 				void refetchAgencies();
 				toast.success("Plan removed");
 			})
-			.catch(() => {
+			.catch((e) => {
+				if (import.meta.env.DEV) {
+					console.info("[billingMonitor] removePlan error", {
+						agencyId: deleteTargetId,
+						error: e,
+					});
+				}
 				toast.error("Failed to remove plan. Please try again.");
 			})
 			.finally(() => {
@@ -531,7 +590,10 @@ export default function AgencyBillingMonitorPage() {
 											<p className="text-[14px] font-semibold text-[#10141a]">
 											{(() => {
 												const override = billingOverrides[b.agencyId];
-												const effectiveEnd = override?.subscriptionEnd ?? b.subscriptionEnd;
+													const effectiveEnd =
+														override?.subscriptionEnd ??
+														b.subscriptionEnd ??
+														(b as any).expiryDate;
 												return effectiveEnd
 													? formatMonthYear(new Date(effectiveEnd))
 													: "—";

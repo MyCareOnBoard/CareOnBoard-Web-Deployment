@@ -13,17 +13,45 @@ export interface Pagination {
 export interface BillingMonitorAgency {
   agencyId: string;
   agencyName: string;
+  logo?: string;
   plan?: BillingPlanCode;
   dspCount?: number;
   clientsCount?: number;
   subscriptionStart?: string; // ISO
   subscriptionEnd?: string; // ISO
+  // Some backends return `expiryDate`/`dsp`/`clients`.
+  expiryDate?: string; // ISO
+  dsp?: number;
+  clients?: number;
+  status?: string;
   sendNotification?: boolean;
+}
+
+export interface BillingMonitorAgencyRaw {
+  agencyId: string;
+  agencyName: string;
+  logo?: string;
+  plan?: BillingPlanCode;
+  subscriptionStart?: string;
+  subscriptionEnd?: string;
+  sendNotification?: boolean;
+  dspCount?: number;
+  clientsCount?: number;
+  expiryDate?: string;
+  dsp?: number;
+  clients?: number;
+  status?: string;
 }
 
 export interface BillingMonitorAgenciesResponse {
   success: boolean;
   data: BillingMonitorAgency[];
+  pagination: Pagination;
+}
+
+export interface BillingMonitorAgenciesResponseRaw {
+  success: boolean;
+  data: BillingMonitorAgencyRaw[];
   pagination: Pagination;
 }
 
@@ -121,6 +149,25 @@ export const billingMonitorApi = createApi({
         params,
         requiresAuth: true,
       }),
+      transformResponse: (response: BillingMonitorAgenciesResponseRaw): BillingMonitorAgenciesResponse => {
+        const normalized = (response?.data ?? []).map((a) => {
+          const subscriptionEnd = a.subscriptionEnd ?? a.expiryDate;
+          const dspCount = a.dspCount ?? a.dsp;
+          const clientsCount = a.clientsCount ?? a.clients;
+
+          return {
+            ...a,
+            subscriptionEnd,
+            dspCount,
+            clientsCount,
+          } as BillingMonitorAgency;
+        });
+
+        return {
+          ...response,
+          data: normalized,
+        };
+      },
       providesTags: ["BillingMonitorAgencies"],
     }),
 
