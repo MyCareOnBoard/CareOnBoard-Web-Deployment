@@ -1,0 +1,157 @@
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { customBaseQuery } from "@/lib/baseQuery";
+
+export type BillingPlanCode = "basic" | "pro" | "enterprise" | (string & {});
+
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface BillingMonitorAgency {
+  agencyId: string;
+  agencyName: string;
+  plan?: BillingPlanCode;
+  dspCount?: number;
+  clientsCount?: number;
+  subscriptionStart?: string; // ISO
+  subscriptionEnd?: string; // ISO
+  sendNotification?: boolean;
+}
+
+export interface BillingMonitorAgenciesResponse {
+  success: boolean;
+  data: BillingMonitorAgency[];
+  pagination: Pagination;
+}
+
+export interface BillingMonitorHistoryItem {
+  id: string;
+  agencyId?: string;
+  agencyName: string;
+  before?: BillingPlanCode;
+  after?: BillingPlanCode;
+  activityDate?: string; // ISO
+  createdAt?: string; // ISO
+}
+
+export interface BillingMonitorHistoryResponse {
+  success: boolean;
+  data: BillingMonitorHistoryItem[];
+  pagination: Pagination;
+}
+
+export interface BillingMonitorStatsResponse {
+  success: boolean;
+  data: any;
+}
+
+export interface ListBillingMonitorAgenciesParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  plan?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
+export interface ListBillingMonitorHistoryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  plan?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
+export interface UpsertBillingPlanRequest {
+  plan: BillingPlanCode;
+  subscriptionStart: string; // ISO
+  subscriptionEnd: string; // ISO
+  sendNotification: boolean;
+}
+
+export interface UpsertBillingPlanResponse {
+  success: boolean;
+  message?: string;
+  data?: any;
+}
+
+export const billingMonitorApi = createApi({
+  reducerPath: "billingMonitorApi",
+  baseQuery: customBaseQuery,
+  tagTypes: ["BillingMonitorAgencies", "BillingMonitorHistory", "BillingMonitorStats"],
+  endpoints: (builder) => ({
+    getBillingMonitorAgencies: builder.query<
+      BillingMonitorAgenciesResponse,
+      ListBillingMonitorAgenciesParams
+    >({
+      query: (params) => ({
+        url: "/billingMonitor/agencies",
+        method: "GET",
+        params,
+        requiresAuth: true,
+      }),
+      providesTags: ["BillingMonitorAgencies"],
+    }),
+
+    getBillingMonitorHistory: builder.query<
+      BillingMonitorHistoryResponse,
+      ListBillingMonitorHistoryParams
+    >({
+      query: (params) => ({
+        url: "/billingMonitor/history",
+        method: "GET",
+        params,
+        requiresAuth: true,
+      }),
+      providesTags: ["BillingMonitorHistory"],
+    }),
+
+    getAgencyBillingMonitorHistory: builder.query<
+      BillingMonitorHistoryResponse,
+      { agencyId: string } & ListBillingMonitorHistoryParams
+    >({
+      query: ({ agencyId, ...params }) => ({
+        url: `/billingMonitor/agencies/${agencyId}/history`,
+        method: "GET",
+        params,
+        requiresAuth: true,
+      }),
+      providesTags: ["BillingMonitorHistory"],
+    }),
+
+    getBillingMonitorStats: builder.query<BillingMonitorStatsResponse, void>({
+      query: () => ({
+        url: "/billingMonitor/stats",
+        method: "GET",
+        requiresAuth: true,
+      }),
+      providesTags: ["BillingMonitorStats"],
+    }),
+
+    upsertAgencyBillingPlan: builder.mutation<
+      UpsertBillingPlanResponse,
+      { agencyId: string; data: UpsertBillingPlanRequest }
+    >({
+      query: ({ agencyId, data }) => ({
+        url: `/billingMonitor/agencies/${agencyId}/billing`,
+        method: "POST",
+        data,
+        params: { agencyId },
+        requiresAuth: true,
+      }),
+      invalidatesTags: ["BillingMonitorAgencies", "BillingMonitorHistory", "BillingMonitorStats"],
+    }),
+  }),
+});
+
+export const {
+  useGetBillingMonitorAgenciesQuery,
+  useGetBillingMonitorHistoryQuery,
+  useGetAgencyBillingMonitorHistoryQuery,
+  useGetBillingMonitorStatsQuery,
+  useUpsertAgencyBillingPlanMutation,
+} = billingMonitorApi;
