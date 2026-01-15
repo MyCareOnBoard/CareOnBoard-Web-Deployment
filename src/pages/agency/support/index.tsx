@@ -15,7 +15,6 @@ import {
   useAuth,
 } from "@/lib/chat/chat.hooks";
 import type { Thread, Message as FirebaseMessage, ChatUser } from "@/lib/chat/chat.types";
-import { seedDatabase } from "@/lib/chat/seed";
 
 /**
  * UI Display Message type
@@ -31,7 +30,7 @@ interface Message {
   avatar: string;
   read?: boolean;
   attachments?: { name: string; url: string; type: string }[];
-  firebaseId?: string; // Reference to original Firebase message ID
+  firebaseId?: string;
 }
 
 /**
@@ -49,6 +48,7 @@ interface Contact {
   hasNotification?: boolean;
   isOnline?: boolean;
   category?: "dsp" | "administration" | "all";
+  otherUserId?: string;
   otherUserId?: string; // UID of the other participant
 }
 
@@ -75,7 +75,6 @@ export default function SupportPage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
 
   // Get messages for selected thread
   const { messages: firebaseMessages, isLoading: messagesLoading } = useMessages(selectedContact);
@@ -116,12 +115,9 @@ export default function SupportPage() {
       const newUserCache = new Map(userCache);
 
       for (const thread of threads) {
-        // Get the other participant (not current user)
         const otherUserId = thread.participants.find((id) => id !== userId);
-
         if (!otherUserId) continue;
 
-        // Check cache first, fetch if not cached
         let otherUser = newUserCache.get(otherUserId);
         if (!otherUser) {
           const foundUser = availableUsers.find((u) => u.uid === otherUserId);
@@ -154,71 +150,26 @@ export default function SupportPage() {
     buildContacts();
   }, [threads, userId, availableUsers]);
 
-  const toggleUserSelection = (userId: string) => {
-    setSelectedUsers((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
-    );
-  };
-
   const handleSendMessage = async () => {
-    if (!messageInput.trim() && attachedFiles.length === 0) return;
-    if (!selectedContact) {
-      toast({
-        title: "Error",
-        description: "Please select a conversation first.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!messageInput.trim() || !selectedContact) return;
 
     try {
       await sendMessage(messageInput.trim());
       setMessageInput("");
-      setAttachedFiles([]);
-
-      toast({
-        title: "Message Sent",
-        description: "Your message has been sent successfully.",
-      });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to send message";
       toast({
         title: "Error",
-        description: errorMessage,
+        description: "Failed to send message",
         variant: "destructive",
       });
     }
-  };
-
-  const handleFileAttachment = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      const fileArray = Array.from(files);
-      const validFiles = fileArray.filter((file) => file.size <= 10 * 1024 * 1024);
-
-      if (validFiles.length !== fileArray.length) {
-        toast({
-          title: "File Too Large",
-          description: "Some files exceed the 10MB limit.",
-          variant: "destructive",
-        });
-      }
-
-      setAttachedFiles((prev) => [...prev, ...validFiles]);
-    }
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleStartChat = async () => {
     if (selectedUsers.length === 0) {
       toast({
-        title: "Error",
-        description: "Please select at least one user.",
+        title: "No User Selected",
+        description: "Please select a user to message.",
         variant: "destructive",
       });
       return;
@@ -249,28 +200,34 @@ export default function SupportPage() {
     setSelectedContact(contactId);
   };
 
-  const handleSeedDatabase = async () => {
-    setIsSeeding(true);
-    try {
-      await seedDatabase();
-      toast({
-        title: "Success",
-        description: "Test data seeded successfully! Refresh to see the conversations.",
-      });
-      // Refresh threads after a short delay to allow Firestore to sync
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to seed database";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSeeding(false);
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const handleFileAttachment = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const fileArray = Array.from(files);
+      const validFiles = fileArray.filter((file) => file.size <= 10 * 1024 * 1024);
+
+      if (validFiles.length !== fileArray.length) {
+        toast({
+          title: "File Too Large",
+          description: "Some files exceed the 10MB limit.",
+          variant: "destructive",
+        });
+      }
+
+      setAttachedFiles((prev) => [...prev, ...validFiles]);
     }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const filteredContacts = contacts.filter((contact) => {
@@ -291,16 +248,15 @@ export default function SupportPage() {
     }
   }, [currentMessages]);
 
-  // Show auth error if not authenticated
   if (!isAuthenticated) {
     return (
       <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md">
+        <div className="max-w-md p-6 border border-yellow-200 rounded-lg bg-yellow-50">
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
             <div>
               <h3 className="font-semibold text-yellow-900">Authentication Required</h3>
-              <p className="text-sm text-yellow-800 mt-1">
+              <p className="mt-1 text-sm text-yellow-800">
                 Please log in to access the messaging feature.
               </p>
             </div>
@@ -310,13 +266,12 @@ export default function SupportPage() {
     );
   }
 
-  // Show loading state
   if (threadsLoading) {
     return (
       <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 rounded-full border-4 border-[#e5e5e6] border-t-[#2563eb] animate-spin mx-auto mb-4"></div>
-          <p className="text-[#808081]">Loading messages...</p>
+          <div className="w-12 h-12 rounded-full border-4 border-[#e5e5e6] border-t-[#3b82f6] animate-spin mx-auto mb-4"></div>
+          <p className="text-[#6b7280]">Loading messages...</p>
         </div>
       </div>
     );
@@ -324,25 +279,16 @@ export default function SupportPage() {
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
-            Message
+            Messages
           </h1>
         </div>
-        <div className="flex gap-2">
-          {/* Temporary seed button for testing */}
-          <Button
-            onClick={handleSeedDatabase}
-            disabled={isSeeding}
-            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white rounded-full px-6 py-3 h-auto font-semibold shadow-none text-sm"
-            title="Add dummy conversations for testing"
-          >
-            {isSeeding ? "Seeding..." : "🌱 Seed Test Data"}
-          </Button>
+        <div>
           <Button
             onClick={() => setNewMessageModalOpen(true)}
-            className="flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-none"
+            className="flex items-center gap-2 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
           >
             <Plus className="w-5 h-5" />
             New Message
@@ -352,95 +298,90 @@ export default function SupportPage() {
 
       <div className="flex gap-6 h-[calc(100vh-280px)]">
         {/* Left Sidebar - Contacts List */}
-        <div className="w-[400px] bg-[#FFFFFF4D] rounded-2xl border border-[#e5e5e6] flex flex-col overflow-hidden">
+        <div className="w-[380px] bg-[#f5f5f5] rounded-3xl flex flex-col overflow-hidden shadow-sm">
           {/* Messages Header */}
-          <div className="p-6 border-b border-[#e5e5e6]">
+          <div className="p-5 pb-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-[#10141a]">Messages</h2>
-              
-              {/* Collapsible Search */}
-              <div className="relative flex items-center justify-end min-w-[240px]">
-                {!isSearchExpanded && !contactSearchQuery && (
-                  <button
-                    onClick={() => {
-                      setIsSearchExpanded(true);
-                      setTimeout(() => {
-                        searchInputRef.current?.focus();
-                      }, 100);
-                    }}
-                    className="w-10 h-10 flex items-center justify-center hover:bg-[#f8f9fa] rounded-full transition-colors"
-                  >
-                    <Search className="w-5 h-5 text-[#808081]" />
-                  </button>
-                )}
-                
-                {(isSearchExpanded || contactSearchQuery) && (
-                  <div className="relative w-[240px] animate-in fade-in slide-in-from-right-2 duration-300">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#808081] pointer-events-none z-10" />
-                    <Input
-                      ref={searchInputRef}
-                      type="text"
-                      placeholder="Search here"
-                      value={contactSearchQuery}
-                      onChange={(e) => setContactSearchQuery(e.target.value)}
-                      onBlur={() => {
-                        setTimeout(() => {
-                          if (!contactSearchQuery) {
-                            setIsSearchExpanded(false);
-                          }
-                        }, 150);
-                      }}
-                      className="w-full pl-10 pr-10 h-10 border-0 rounded-full bg-[#f8f9fa] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
-                    />
-                    {contactSearchQuery && (
-                      <button
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setContactSearchQuery("");
-                          setIsSearchExpanded(false);
-                        }}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-[#e5e6e6] rounded-full transition-colors z-10"
-                      >
-                        <X className="w-4 h-4 text-[#808081]" />
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
+              <h2 className="text-[22px] font-semibold text-[#10141a]">Messages</h2>
+              <button
+                onClick={() => {
+                  setIsSearchExpanded(true);
+                  setTimeout(() => searchInputRef.current?.focus(), 100);
+                }}
+                className="flex items-center justify-center transition-colors rounded-full w-9 h-9 hover:bg-white"
+              >
+                <Search className="w-5 h-5 text-[#6b7280]" />
+              </button>
             </div>
+
+            {/* Collapsible Search */}
+            {isSearchExpanded && (
+              <div className="mb-4 duration-300 animate-in fade-in slide-in-from-top-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none z-10" />
+                  <Input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search messages..."
+                    value={contactSearchQuery}
+                    onChange={(e) => setContactSearchQuery(e.target.value)}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        if (!contactSearchQuery) {
+                          setIsSearchExpanded(false);
+                        }
+                      }, 150);
+                    }}
+                    className="w-full pl-9 pr-9 h-10 border-0 rounded-xl bg-white focus-visible:ring-1 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-0 text-sm"
+                  />
+                  {contactSearchQuery && (
+                    <button
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setContactSearchQuery("");
+                        setIsSearchExpanded(false);
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-[#f3f4f6] rounded-full transition-colors z-10"
+                    >
+                      <X className="w-4 h-4 text-[#6b7280]" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Tabs */}
             <div className="flex gap-2">
               <button
                 onClick={() => setActiveTab("all")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   activeTab === "all"
-                    ? "bg-[#e0f2fe] text-[#2563eb]"
-                    : "text-[#808081] hover:bg-[#f8f9fa]"
+                    ? "bg-[#dbeafe] text-[#1e40af]"
+                    : "text-[#6b7280] hover:bg-white"
                 }`}
               >
                 All
               </button>
               <button
                 onClick={() => setActiveTab("dsp")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   activeTab === "dsp"
-                    ? "bg-[#e0f2fe] text-[#2563eb]"
-                    : "text-[#808081] hover:bg-[#f8f9fa]"
+                    ? "bg-[#dbeafe] text-[#1e40af]"
+                    : "text-[#6b7280] hover:bg-white"
                 }`}
               >
-                <span className="w-2 h-2 bg-[#ef4444] rounded-full"></span>
+                <span className="w-1.5 h-1.5 bg-[#ef4444] rounded-full"></span>
                 DSP
               </button>
               <button
                 onClick={() => setActiveTab("administration")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   activeTab === "administration"
-                    ? "bg-[#e0f2fe] text-[#2563eb]"
-                    : "text-[#808081] hover:bg-[#f8f9fa]"
+                    ? "bg-[#dbeafe] text-[#1e40af]"
+                    : "text-[#6b7280] hover:bg-white"
                 }`}
               >
-                <span className="w-2 h-2 bg-[#a0a0a1] rounded-full"></span>
+                <span className="w-1.5 h-1.5 bg-[#9ca3af] rounded-full"></span>
                 Administration
               </button>
             </div>
@@ -453,95 +394,106 @@ export default function SupportPage() {
                 <button
                   key={contact.id}
                   onClick={() => handleContactSelect(contact.id)}
-                  className={`w-full p-4 flex items-center gap-3 border-b border-[#e5e5e6] transition-all ${
+                  className={`w-full px-5 py-3 flex items-center gap-3 transition-all ${
                     selectedContact === contact.id 
-                      ? "bg-[#e0f2fe] hover:bg-[#bae6fd]" 
-                      : "hover:bg-[#f8f9fa] active:bg-[#f0f0f1]"
+                      ? "bg-[#dbeafe]" 
+                      : "hover:bg-white"
                   }`}
                 >
                   <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
-                      {contact.avatar}
-                    </div>
+                    <img
+                      src={contact.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=e5e7eb&color=374151`}
+                      alt={contact.name}
+                      className="object-cover w-12 h-12 rounded-full"
+                    />
                     {contact.hasNotification && (
-                      <span className="absolute top-0 left-0 w-3 h-3 bg-[#ef4444] rounded-full border-2 border-white"></span>
+                      <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-[#ef4444] rounded-full border-2 border-[#f5f5f5]"></span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-semibold text-[#10141a] truncate">{contact.name}</h3>
-                      <span className="text-xs text-[#808081] shrink-0 ml-2">{contact.timestamp}</span>
+                    <div className="flex items-start justify-between mb-0.5">
+                      <h3 className="font-semibold text-[15px] text-[#111827] truncate">{contact.name}</h3>
+                      <span className="text-[11px] text-[#6b7280] shrink-0 ml-2">{contact.timestamp}</span>
                     </div>
-                    <p className="text-sm text-[#808081] truncate">{contact.lastMessage || contact.role}</p>
+                    <p className="text-[13px] text-[#6b7280] truncate">{contact.role}</p>
                   </div>
                   {contact.unread && contact.unread > 0 && (
-                    <div className="w-6 h-6 rounded-full bg-[#ef4444] flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                    <div className="w-5 h-5 rounded-full bg-[#ef4444] flex items-center justify-center text-white text-[11px] font-semibold shrink-0">
                       {contact.unread}
                     </div>
                   )}
                 </button>
               ))
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-[#808081] p-4">
-                <Send className="w-12 h-12 mb-4 opacity-50" />
-                <p>No conversations yet</p>
+              <div className="flex flex-col items-center justify-center h-full text-[#6b7280] p-4">
+                <Send className="w-12 h-12 mb-4 opacity-30" />
+                <p className="text-sm">No conversations yet</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Right Side - Chat Area */}
-        <div className="flex-1 bg-white rounded-2xl border border-[#e5e5e6] flex flex-col overflow-hidden">
+        <div className="flex-1 bg-[#f9fafb] rounded-3xl flex flex-col overflow-hidden shadow-sm">
           {selectedContactData ? (
             <>
               {/* Chat Header */}
-              <div className="p-6 border-b border-[#e5e5e6] flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold">
-                  {selectedContactData.avatar}
-                </div>
+              <div className="px-6 py-4 bg-white border-b border-[#e5e7eb] flex items-center gap-3">
+                <img
+                  src={selectedContactData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedContactData.name)}&background=e5e7eb&color=374151`}
+                  alt={selectedContactData.name}
+                  className="object-cover rounded-full w-11 h-11"
+                />
                 <div>
-                  <h3 className="font-semibold text-[#10141a]">
+                  <h3 className="font-semibold text-[15px] text-[#111827]">
                     {selectedContactData.name}
                   </h3>
-                  <p className="text-sm text-[#808081]">{selectedContactData.role}</p>
+                  <p className="text-[13px] text-[#6b7280]">{selectedContactData.role}</p>
                 </div>
               </div>
 
               {/* Messages Area */}
-              <div className="flex-1 p-6 space-y-4 overflow-y-auto">
+              <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-[#f9fafb]">
                 {messagesLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
-                      <div className="w-8 h-8 rounded-full border-2 border-[#e5e5e6] border-t-[#2563eb] animate-spin mx-auto mb-2"></div>
-                      <p className="text-[#808081] text-sm">Loading messages...</p>
+                      <div className="w-8 h-8 rounded-full border-2 border-[#e5e7eb] border-t-[#3b82f6] animate-spin mx-auto mb-2"></div>
+                      <p className="text-[#6b7280] text-sm">Loading messages...</p>
                     </div>
                   </div>
                 ) : currentMessages.length > 0 ? (
                   currentMessages.map((message) => (
                     <div
                       key={message.id}
-                      className={`flex gap-3 ${message.isOwn ? "justify-end" : ""}`}
+                      className={`flex gap-2.5 ${message.isOwn ? "justify-end" : ""}`}
                     >
                       {!message.isOwn && (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold shrink-0">
-                          {message.avatar}
-                        </div>
+                        <img
+                          src={selectedContactData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedContactData.name)}&background=e5e7eb&color=374151`}
+                          alt={message.sender}
+                          className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5"
+                        />
                       )}
-                      <div className={`flex flex-col ${message.isOwn ? "items-end" : ""} max-w-[70%]`}>
+                      <div className={`flex flex-col ${message.isOwn ? "items-end" : ""} max-w-[65%]`}>
                         {!message.isOwn && (
-                          <span className="text-sm font-semibold text-[#10141a] mb-1">
-                            {message.sender}
-                          </span>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[13px] font-medium text-[#111827]">
+                              {message.sender}
+                            </span>
+                            <span className="text-[11px] text-[#9ca3af]">
+                              {message.timestamp}
+                            </span>
+                          </div>
                         )}
                         <div
-                          className={`px-4 py-3 rounded-2xl ${
+                          className={`px-4 py-2.5 rounded-2xl ${
                             message.isOwn
-                              ? "bg-[#dbeafe] text-[#10141a]"
-                              : "bg-[#f8f9fa] text-[#10141a]"
+                              ? "bg-[#dbeafe] text-[#111827]"
+                              : "bg-white text-[#111827] shadow-sm"
                           }`}
                         >
                           {message.content && (
-                            <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
+                            <p className="text-[14px] leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
                           )}
                           {message.attachments && message.attachments.length > 0 && (
                             <div className={`${message.content ? "mt-2" : ""} space-y-2`}>
@@ -554,9 +506,9 @@ export default function SupportPage() {
                                       className="max-w-full rounded-lg"
                                     />
                                   ) : (
-                                    <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-[#e5e5e6]">
-                                      <Paperclip className="w-4 h-4 text-[#808081]" />
-                                      <span className="text-xs text-[#10141a] truncate max-w-[200px]">
+                                    <div className="flex items-center gap-2 p-2 bg-[#f9fafb] rounded-lg border border-[#e5e7eb]">
+                                      <Paperclip className="w-4 h-4 text-[#6b7280]" />
+                                      <span className="text-xs text-[#111827] truncate max-w-[200px]">
                                         {attachment.name}
                                       </span>
                                     </div>
@@ -566,26 +518,28 @@ export default function SupportPage() {
                             </div>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-[#808081]">
-                            {message.timestamp}
-                          </span>
-                          {message.isOwn && (
-                            <Check className="w-3 h-3 text-[#808081]" />
-                          )}
-                        </div>
+                        {message.isOwn && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-[11px] text-[#9ca3af]">
+                              {message.timestamp}
+                            </span>
+                            <Check className="w-3.5 h-3.5 text-[#3b82f6]" />
+                          </div>
+                        )}
                       </div>
                       {message.isOwn && (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center text-[#10141a] font-semibold shrink-0">
-                          {message.avatar}
-                        </div>
+                        <img
+                          src={message.avatar || `https://ui-avatars.com/api/?name=You&background=3b82f6&color=ffffff`}
+                          alt="You"
+                          className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5"
+                        />
                       )}
                     </div>
                   ))
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-[#808081]">
-                    <Send className="w-12 h-12 mb-4 opacity-50" />
-                    <p>No messages yet. Start the conversation!</p>
+                  <div className="flex flex-col items-center justify-center h-full text-[#9ca3af]">
+                    <Send className="w-12 h-12 mb-3 opacity-30" />
+                    <p className="text-[14px]">No messages yet. Start the conversation!</p>
                   </div>
                 )}
                 <div ref={messagesEndRef} />
@@ -593,19 +547,19 @@ export default function SupportPage() {
 
               {/* Attached Files Preview */}
               {attachedFiles.length > 0 && (
-                <div className="px-6 py-3 border-t border-[#e5e5e6] bg-[#f8f9fa]">
+                <div className="px-6 py-3 bg-white border-t border-[#e5e7eb]">
                   <div className="flex flex-wrap gap-2">
                     {attachedFiles.map((file, index) => (
                       <div
                         key={index}
-                        className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-[#e5e5e6]"
+                        className="flex items-center gap-2 bg-[#f9fafb] px-3 py-2 rounded-lg border border-[#e5e7eb]"
                       >
                         {file.type.startsWith("image/") ? (
-                          <Image className="w-4 h-4 text-[#808081]" />
+                          <Image className="w-4 h-4 text-[#6b7280]" />
                         ) : (
-                          <Paperclip className="w-4 h-4 text-[#808081]" />
+                          <Paperclip className="w-4 h-4 text-[#6b7280]" />
                         )}
-                        <span className="text-xs text-[#10141a] max-w-[150px] truncate">
+                        <span className="text-xs text-[#111827] max-w-[150px] truncate">
                           {file.name}
                         </span>
                         <button
@@ -621,7 +575,7 @@ export default function SupportPage() {
               )}
 
               {/* Message Input */}
-              <div className="p-6 border-t border-[#e5e5e6]">
+              <div className="p-5 bg-white border-t border-[#e5e7eb]">
                 <div className="flex items-center gap-3">
                   <div className="relative flex-1">
                     <Input
@@ -636,9 +590,9 @@ export default function SupportPage() {
                         }
                       }}
                       disabled={isSending}
-                      className="pr-20 border-[#e5e5e6] rounded-lg focus-visible:ring-1 focus-visible:ring-[#2563eb] disabled:bg-[#f8f9fa]"
+                      className="pr-20 h-11 border-[#e5e7eb] rounded-xl focus-visible:ring-1 focus-visible:ring-[#3b82f6] focus-visible:border-[#3b82f6] disabled:bg-[#f9fafb] text-[14px]"
                     />
-                    <div className="absolute flex items-center gap-2 transform -translate-y-1/2 right-3 top-1/2">
+                    <div className="absolute flex items-center gap-1.5 transform -translate-y-1/2 right-3 top-1/2">
                       <input
                         ref={imageInputRef}
                         type="file"
@@ -650,9 +604,9 @@ export default function SupportPage() {
                       <button
                         onClick={() => imageInputRef.current?.click()}
                         disabled={isSending}
-                        className="p-1 hover:bg-[#f8f9fa] rounded transition-colors disabled:opacity-50"
+                        className="p-1.5 hover:bg-[#f3f4f6] rounded-lg transition-colors disabled:opacity-50"
                       >
-                        <Image className="w-5 h-5 text-[#808081]" />
+                        <Image className="w-4.5 h-4.5 text-[#6b7280]" />
                       </button>
                       <input
                         ref={fileInputRef}
@@ -664,25 +618,29 @@ export default function SupportPage() {
                       <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isSending}
-                        className="p-1 hover:bg-[#f8f9fa] rounded transition-colors disabled:opacity-50"
+                        className="p-1.5 hover:bg-[#f3f4f6] rounded-lg transition-colors disabled:opacity-50"
                       >
-                        <Paperclip className="w-5 h-5 text-[#808081]" />
+                        <Paperclip className="w-4.5 h-4.5 text-[#6b7280]" />
                       </button>
                     </div>
                   </div>
                   <Button
                     onClick={handleSendMessage}
                     disabled={(!messageInput.trim() && attachedFiles.length === 0) || isSending}
-                    className="w-10 h-10 p-0 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full shadow-none disabled:opacity-50"
+                    className="w-11 h-11 p-0 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-full shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <Send className="w-5 h-5" />
+                    {isSending ? (
+                      <div className="w-4 h-4 border-2 border-white rounded-full border-t-transparent animate-spin" />
+                    ) : (
+                      <Send className="w-4.5 h-4.5" />
+                    )}
                   </Button>
                 </div>
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-[#808081]">
-              Select a conversation to start messaging
+            <div className="flex-1 flex items-center justify-center text-[#9ca3af]">
+              <p className="text-[14px]">Select a conversation to start messaging</p>
             </div>
           )}
         </div>
@@ -736,8 +694,8 @@ export default function SupportPage() {
               {usersLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="text-center">
-                    <div className="w-6 h-6 rounded-full border-2 border-[#e5e5e6] border-t-[#2563eb] animate-spin mx-auto mb-2"></div>
-                    <p className="text-[#808081] text-sm">Loading users...</p>
+                    <div className="w-6 h-6 rounded-full border-2 border-[#e5e7eb] border-t-[#3b82f6] animate-spin mx-auto mb-2"></div>
+                    <p className="text-[#6b7280] text-sm">Loading users...</p>
                   </div>
                 </div>
               ) : filteredUsers.length > 0 ? (
@@ -758,7 +716,7 @@ export default function SupportPage() {
                           <h4 className="text-[15px] font-semibold text-[#10141a] leading-tight mb-0.5">
                             {user.name}
                           </h4>
-                          <p className="text-[13px] text-[#808081] leading-tight">
+                          <p className="text-[13px] text-[#6b7280] leading-tight">
                             {user.role}
                           </p>
                         </div>
@@ -766,7 +724,7 @@ export default function SupportPage() {
                       <div
                         className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${
                           selectedUsers.includes(user.uid)
-                            ? "bg-[#2563eb] border-[#2563eb]"
+                            ? "bg-[#3b82f6] border-[#3b82f6]"
                             : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
                         }`}
                       >
@@ -778,9 +736,9 @@ export default function SupportPage() {
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-[#808081]">
-                  <Search className="w-12 h-12 mb-4 opacity-50" />
-                  <p>No users found</p>
+                <div className="flex flex-col items-center justify-center py-8 text-[#6b7280]">
+                  <Search className="w-12 h-12 mb-4 opacity-30" />
+                  <p className="text-sm">No users found</p>
                 </div>
               )}
             </div>
@@ -800,7 +758,7 @@ export default function SupportPage() {
               <Button
                 onClick={handleStartChat}
                 disabled={selectedUsers.length === 0 || isCreatingThread}
-                className="flex-1 h-12 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 h-12 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCreatingThread ? "Creating..." : "Start Chat"}
               </Button>

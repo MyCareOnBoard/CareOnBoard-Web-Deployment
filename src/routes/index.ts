@@ -79,6 +79,7 @@ import SuperAdminSystemSettingsPage from "@/pages/super-admin/system-settings";
 import AgencyTrainings from "@/pages/agency/trainings";
 import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
 import AgencyBillingMonitorPage from "@/pages/super-admin/agency-billing-monitor";
+import AIAutomationPage from "@/pages/agency/ai-automation";
 
 
 export const router = createBrowserRouter([
@@ -199,6 +200,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.dspClaims,
                 Component: DSPClaimsPage,
+            },
+            {
+                path: Routes.agency.aiAutomation,
+                Component: AIAutomationPage,
             },
             {
                 path: Routes.agency.scheduling,
