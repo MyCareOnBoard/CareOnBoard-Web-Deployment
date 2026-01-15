@@ -222,3 +222,46 @@ export async function deleteAccount(): Promise<void> {
     throw error
   }
 }
+
+/**
+ * Get account information
+ * Retrieve user's account information (name, email, profile picture)
+ */
+export async function getAccountInfo(): Promise<ProfileInfo> {
+  try {
+    const response = await axiosClient.get('/userProfile/account-info')
+    const source = resolveProfileSource(response.data)
+    return mapToProfileInfo(source)
+  } catch (err: any) {
+    console.error('getAccountInfo error:', err)
+    throw new Error(err.response?.data?.message || 'Failed to fetch account info')
+  }
+}
+
+/**
+ * Update account information
+ * Update user's full name (email cannot be changed)
+ */
+export async function updateAccountInfo(data: { fullName: string }): Promise<any> {
+  try {
+    const response = await axiosClient.put('/userProfile/account-info', data)
+    return response.data
+  } catch (err: any) {
+    console.error('updateAccountInfo error:', err)
+    throw new Error(err.response?.data?.message || 'Failed to update account info')
+  }
+}
+
+/**
+ * Get notification preferences
+ * Retrieve user's notification preferences
+ */
+export async function getNotificationPreferences(): Promise<any> {
+  try {
+    const response = await axiosClient.get('/userProfile/notifications')
+    return response.data
+  } catch (err: any) {
+    console.error('getNotificationPreferences error:', err)
+    throw new Error(err.response?.data?.message || 'Failed to fetch notification preferences')
+  }
+}

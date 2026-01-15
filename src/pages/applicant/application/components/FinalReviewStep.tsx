@@ -161,7 +161,7 @@ export default function FinalReviewStep({ onBack, onNext }: FinalReviewStepProps
         </header>
         <div className="rounded-[24px] border border-[#00b4b8]/20 bg-white/70 p-6 shadow-[0_6px_40px_-12px_rgba(16,20,26,0.16)] backdrop-blur">
           <div className="flex items-center justify-center py-12">
-            <div className="text-center space-y-3">
+            <div className="space-y-3 text-center">
               <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
               <p className="text-[14px] font-medium text-[#808081]">Loading checklist...</p>
             </div>
@@ -181,7 +181,7 @@ export default function FinalReviewStep({ onBack, onNext }: FinalReviewStepProps
         </header>
         <div className="rounded-[24px] border border-red-200 bg-red-50 p-6 shadow-[0_6px_40px_-12px_rgba(16,20,26,0.16)]">
           <div className="flex items-center gap-3">
-            <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="w-5 h-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
             </svg>
             <p className="text-[14px] font-medium text-red-800">{error}</p>
@@ -254,7 +254,7 @@ export default function FinalReviewStep({ onBack, onNext }: FinalReviewStepProps
               onClick={onNext}
             >
               <span>Next</span>
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                 <path
                   d="M4 10H16M16 10L10 4M16 10L10 16"
                   stroke="currentColor"

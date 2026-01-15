@@ -1,119 +1,101 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Search, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Routes } from "@/routes/constants";
+import { applicantsApi, Applicant } from "@/lib/api/applicants";
+import { useToast } from "@/hooks/use-toast";
 
-interface Applicant {
-  id: string;
-  name: string;
-  role: string;
-  profileScreening: boolean;
-  documents: boolean;
-  conditionalHire: boolean;
-  finalAgencyReview: boolean;
-  avatar: string;
-}
-
-const mockApplicants: Applicant[] = [
-  {
-    id: "1",
-    name: "DR.Brooklyn Simmons",
-    role: "Applicant",
-    profileScreening: true,
-    documents: true,
-    conditionalHire: true,
-    finalAgencyReview: true,
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=1",
-  },
-  {
-    id: "2",
-    name: "DR.Brooklyn Simmons",
-    role: "Applicant",
-    profileScreening: true,
-    documents: true,
-    conditionalHire: false,
-    finalAgencyReview: false,
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=2",
-  },
-  {
-    id: "3",
-    name: "DR.Brooklyn Simmons",
-    role: "Applicant",
-    profileScreening: true,
-    documents: true,
-    conditionalHire: true,
-    finalAgencyReview: true,
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=3",
-  },
-  {
-    id: "4",
-    name: "DR.Brooklyn Simmons",
-    role: "Applicant",
-    profileScreening: true,
-    documents: true,
-    conditionalHire: true,
-    finalAgencyReview: false,
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=4",
-  },
-  {
-    id: "5",
-    name: "DR.Brooklyn Simmons",
-    role: "Applicant",
-    profileScreening: true,
-    documents: true,
-    conditionalHire: true,
-    finalAgencyReview: true,
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=5",
-  },
-  {
-    id: "6",
-    name: "DR.Brooklyn Simmons",
-    role: "Applicant",
-    profileScreening: true,
-    documents: true,
-    conditionalHire: true,
-    finalAgencyReview: true,
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=6",
-  },
-  {
-    id: "7",
-    name: "DR.Brooklyn Simmons",
-    role: "Applicant",
-    profileScreening: true,
-    documents: true,
-    conditionalHire: true,
-    finalAgencyReview: true,
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=7",
-  },
-];
-
-export default function ClearanceHiringList() {
+export default function PendingApplicants() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"today" | "week" | "month">("today");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 7;
+  const [isLoading, setIsLoading] = useState(false);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const errorToastShownRef = useRef(false);
+  const itemsPerPage = 6;
+  
+  // Memoize calculated values for performance
+  const startIndex = useMemo(() => (currentPage - 1) * itemsPerPage, [currentPage]);
+  const totalPages = useMemo(() => totalCount > 0 ? Math.ceil(totalCount / itemsPerPage) : 1, [totalCount]);
+  const paginatedApplicants = applicants;
 
-  const filteredApplicants = mockApplicants.filter((applicant) => {
-    const search = searchQuery.toLowerCase();
-    return (
-      applicant.name.toLowerCase().includes(search) ||
-      applicant.role.toLowerCase().includes(search)
-    );
-  });
+  const fetchApplicants = useCallback(async () => {
+    setIsLoading(true);
+    console.log('[PendingApplicants] Fetching applicants:', {
+      tab: 'all',
+      period: activeTab,
+      search: debouncedSearchQuery,
+      limit: itemsPerPage,
+      offset: startIndex
+    });
+    
+    try {
+      const res = await applicantsApi.directory({
+        tab: 'all',
+        period: activeTab,
+        search: debouncedSearchQuery,
+        limit: itemsPerPage,
+        offset: startIndex,
+      });
+      
+      if (res?.success && res?.data) {
+        setApplicants(res.data);
+        setTotalCount(res?.pagination?.count ?? 0);
+        // Reset error toast guard on successful load
+        errorToastShownRef.current = false;
+      } else {
+        setApplicants([]);
+        setTotalCount(0);
+      }
+    } catch (error: any) {
+      console.error('[PendingApplicants] Error fetching applicants:', error);
+      const is404 = error?.response?.status === 404;
+      const isNetwork = error?.code === 'ERR_NETWORK' || (error?.message || '').toLowerCase().includes('network');
+      const description = isNetwork
+        ? 'Unable to connect to the database. Please check your network connection.'
+        : is404
+          ? 'Applicants endpoint not found. Please contact your administrator.'
+          : (error instanceof Error ? error.message : 'Failed to load applicants from database');
+      // Show toast only once per failure cycle
+      if (!errorToastShownRef.current) {
+        toast({ title: 'Database Error', variant: 'destructive', description });
+        errorToastShownRef.current = true;
+      }
+      setApplicants([]);
+      setTotalCount(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeTab, debouncedSearchQuery, startIndex, toast]);
 
-  const totalPages = Math.ceil(filteredApplicants.length / itemsPerPage);
-  const paginatedApplicants = filteredApplicants.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Debounce search query to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
 
-  // Reset to page 1 when search query changes
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset to page 1 when debounced search query or tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, activeTab]);
+
+  // Fetch applicants when debounced search, tab, or page changes
+  useEffect(() => {
+    fetchApplicants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearchQuery, activeTab, currentPage]);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    setCurrentPage(1);
   };
 
   const handleViewProfile = (id: string) => {
@@ -149,7 +131,7 @@ export default function ClearanceHiringList() {
               <div className="flex items-start justify-between gap-4">
                 <div className="shrink-0">
                   <h2 className="text-lg font-semibold text-gray-900">
-                    Clearance & Hiring Toggle
+                     Pending Applicants
                   </h2>
                   <p className="mt-1 text-xs text-gray-500">
                     These are your Pending Billing Approvals
@@ -201,9 +183,13 @@ export default function ClearanceHiringList() {
 
             {/* Applicants List */}
             <div className="p-6 space-y-3">
-              {paginatedApplicants.length === 0 ? (
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-gray-500">Loading...</div>
+                </div>
+              ) : paginatedApplicants.length === 0 ? (
                 <div className="py-12 text-center">
-                  <p className="text-gray-500">No applicants found matching your search.</p>
+                  <p className="text-gray-500">No applicants found</p>
                 </div>
               ) : (
                 paginatedApplicants.map((applicant) => (
@@ -216,7 +202,7 @@ export default function ClearanceHiringList() {
                       <img
                         src={applicant.avatar}
                         alt={applicant.name}
-                        className="shrink-0 w-12 h-12 rounded-full"
+                        className="w-12 h-12 rounded-full shrink-0"
                       />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900 truncate">
@@ -273,9 +259,9 @@ export default function ClearanceHiringList() {
                     {/* Action Button */}
                     <Button
                       onClick={() => handleVerifyDocuments(applicant.id)}
-                      className="shrink-0 px-4 py-2 text-xs font-medium text-white bg-gray-400 rounded-lg hover:bg-gray-500"
+                      className="px-4 py-2 text-xs font-medium text-white bg-gray-400 rounded-lg shrink-0 hover:bg-gray-500"
                     >
-                      Verify Documents
+                      Details
                     </Button>
                   </div>
                 ))
@@ -283,10 +269,10 @@ export default function ClearanceHiringList() {
             </div>
 
             {/* Pagination */}
-            {filteredApplicants.length > 0 && (
+            {paginatedApplicants.length > 0 && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
                 <span className="text-sm text-gray-600">
-                  Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredApplicants.length)} of {filteredApplicants.length} applicants
+                  Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} applicants
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="mr-2 text-sm text-gray-600">
