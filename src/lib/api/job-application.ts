@@ -80,6 +80,23 @@ export const submitPreScreening = async (data: PreScreeningData): Promise<ApiRes
     }
 };
 
+/**
+ * Get eligibility verification data
+ * @returns Promise with eligibility verification data
+ */
+export const getEligibilityVerification = async (): Promise<ApiResponse<any>> => {
+    try {
+        const response = await axiosClient.get<ApiResponse<any>>(
+            `${JOB_APPLICATION_BASE}/eligibility-verification`
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch eligibility verification:', error);
+        throw error;
+    }
+};
+
 
 
 export const APPLICATION_STEP_TITLES = [

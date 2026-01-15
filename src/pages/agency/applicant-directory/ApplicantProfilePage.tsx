@@ -4,12 +4,14 @@ import { useNavigate, useParams } from "react-router";
 import { Phone, MessageSquare, ArrowLeft, ExternalLink, Eye, Upload, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Routes } from "@/routes/constants";
 import { applicantsApi, type Applicant } from "@/lib/api/applicants";
 import { useToast } from "@/hooks/use-toast";
 import { agencyApplicantsExtraApi, ApplicantDocumentItem } from "@/lib/api/agencyApplicantsExtra";
 import { officialHireApi, OfficialHireStatusResponse } from "@/lib/api/officialHire";
 import { storageApi } from "@/lib/api/storage";
+import { authorizationsApi } from "@/lib/api/authorizations";
 
 export default function ApplicantProfilePage() {
   const navigate = useNavigate();
@@ -21,6 +23,7 @@ export default function ApplicantProfilePage() {
   const [documentsData, setDocumentsData] = useState<ApplicantDocumentItem[]>([]);
   const [hireStatus, setHireStatus] = useState<OfficialHireStatusResponse['status'] | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
+  const [authApprovals, setAuthApprovals] = useState<Record<number, boolean>>({});
 
   const [applicant, setApplicant] = useState<{
     id: string;
@@ -367,95 +370,42 @@ export default function ApplicantProfilePage() {
 
           {activeSection === "documents" && (
             <div className="p-8 bg-white rounded-lg shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Documents</h3>
-                <div className="text-sm text-gray-600">
-                  Progress: {progressPercent}% ({documentsData.filter(d => d.status === 'verified').length}/{documentsData.length} verified)
-                </div>
-              </div>
-              {isLoading ? (
-                <div className="py-12 text-center text-gray-500">Loading documents...</div>
-              ) : documentsData.length === 0 ? (
-                <div className="py-12 text-center text-gray-500">No documents found</div>
-              ) : (
-                <div className="space-y-3">
-                  {documentsData.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex items-center flex-1 gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-lg">
-                          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">{doc.label}</span>
-                            {doc.required && <Badge variant="outline" className="text-xs">Required</Badge>}
-                          </div>
-                          {doc.uploadedAt && (
-                            <p className="text-xs text-gray-500">Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}</p>
-                          )}
-                          {doc.note && <p className="text-xs text-red-600">{doc.note}</p>}
-                        </div>
-                        <Badge className={
-                          doc.status === 'verified' ? 'bg-green-100 text-green-700' :
-                          doc.status === 'uploaded' ? 'bg-blue-100 text-blue-700' :
-                          doc.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
-                        }>
-                          {doc.status}
-                        </Badge>
+              <div className="mb-8 space-y-3">
+                {documents.map((doc, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 border-b border-gray-200 last:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-10 h-10">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
                       </div>
-                      <div className="flex gap-2">
-                        {doc.url && (
-                          <Button variant="outline" size="sm" className="text-teal-600 border-teal-600 hover:bg-teal-50" onClick={() => window.open(doc.url, '_blank')}>
-                            <Eye className="w-4 h-4 mr-1" />
-                            View
-                          </Button>
-                        )}
-                        {doc.status === 'uploaded' && (
-                          <>
-                            <Button
-                              size="sm"
-                              className="text-white bg-green-600 hover:bg-green-700"
-                              onClick={() => handleVerifyDocument(doc.id)}
-                              disabled={actionLoading === doc.id}
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              Verify
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 border-red-600 hover:bg-red-50"
-                              onClick={() => handleRejectDocument(doc.id)}
-                              disabled={actionLoading === doc.id}
-                            >
-                              <XCircle className="w-4 h-4 mr-1" />
-                              Reject
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                      <span className="text-[15px] font-medium text-[#10141a]">{doc.name}</span>
                     </div>
-                  ))}
-                </div>
-              )}
-              <h3 className="mt-10 mb-6 text-lg font-semibold text-gray-900">References</h3>
+                    <Button 
+                      variant="outline" 
+                      className="px-6 py-2 text-sm font-medium text-[#00b3ad] border-[#00b3ad] rounded-lg hover:bg-[#00b3ad]/5"
+                    >
+                      View Document
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <h3 className="mb-6 text-[18px] font-semibold text-[#10141a]">References</h3>
               <div className="grid grid-cols-2 gap-6">
                 {references.map((ref, index) => (
-                  <div key={index} className="p-4 border border-gray-200 rounded-lg">
-                    <h4 className="mb-1 text-sm font-semibold text-gray-900">{ref.name}</h4>
-                    <p className="mb-3 text-xs text-gray-500">{ref.relation}</p>
+                  <div key={index} className="p-5 bg-white border border-gray-200 rounded-lg">
+                    <h4 className="mb-1 text-[15px] font-semibold text-[#10141a]">{ref.name}</h4>
+                    <p className="mb-4 text-[13px] text-gray-500">{ref.relation}</p>
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center justify-between text-[13px]">
                         <span className="text-gray-600">Mobile</span>
                         <span className="font-medium text-gray-900">{ref.mobile}</span>
                       </div>
-                      <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center justify-between text-[13px]">
                         <span className="text-gray-600">Email</span>
                         <span className="font-medium text-gray-900">{ref.email}</span>
                       </div>
@@ -472,31 +422,24 @@ export default function ApplicantProfilePage() {
               {isLoading ? (
                 <div className="py-12 text-center text-gray-500">Loading status...</div>
               ) : hireStatus?.letterSigning?.hasSigned ? (
-                <div className="p-6 border border-green-200 rounded-lg bg-green-50">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="flex items-center justify-center shrink-0 w-12 h-12 bg-green-100 rounded-full">
-                        <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h4 className="mb-1 text-base font-semibold text-gray-900">
-                          Conditional Hire Letter Signed
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {hireStatus.letterSigning.signedAt ? `Signed on ${new Date(hireStatus.letterSigning.signedAt).toLocaleDateString()}` : 'Signature received'}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Type: {hireStatus.letterSigning.signatureType}
-                        </p>
-                      </div>
+                <div className="flex items-center justify-between p-5 border border-green-200 rounded-lg bg-green-50">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center shrink-0 w-10 h-10 bg-green-100 rounded-full">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
                     </div>
-                    <Button variant="outline" className="text-gray-700 border-gray-300 hover:bg-gray-50">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Signed Letter
-                    </Button>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900">
+                        Conditional Hire Letter Signed
+                      </h4>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        {hireStatus.letterSigning.signedAt ? `Signed on ${new Date(hireStatus.letterSigning.signedAt).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}` : 'Signature received'}
+                      </p>
+                    </div>
                   </div>
+                  <Button variant="outline" className="text-gray-700 border-gray-300 hover:bg-gray-50">
+                    <Eye className="w-4 h-4 mr-2" />
+                    View Signed Letter
+                  </Button>
                 </div>
               ) : (
                 <div className="p-6 border border-gray-200 rounded-lg bg-gray-50">
@@ -520,68 +463,103 @@ export default function ApplicantProfilePage() {
                 {authorizations.map((auth, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
                   >
-                    <span className="flex-1 text-sm text-gray-900">{auth.name}</span>
-                    <div className="flex items-center gap-3">
-                      <Badge className={auth.status === "Enabled" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                    <span className="flex-1 text-sm font-medium text-gray-900">{auth.name}</span>
+                    <div className="flex items-center gap-4">
+                      <Badge className={auth.status === "Enabled" ? "bg-green-100 text-green-700 border-0" : "bg-red-100 text-red-700 border-0"}>
                         {auth.status}
                       </Badge>
-                      {auth.bookingLink && (
-                        <Button variant="outline" size="sm" className="text-gray-700 border-gray-300">
-                          <ExternalLink className="w-3 h-3 mr-2" />
-                          Go to appointment booking
-                        </Button>
-                      )}
-                      {!auth.bookingLink && (
-                        <Button variant="outline" size="sm" className="text-red-600 border-red-300 hover:bg-red-50">
+                      {auth.status === "Disabled" ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 border-red-300 hover:bg-red-50"
+                          onClick={async () => {
+                            if (!id) return;
+                            try {
+                              await agencyApplicantsExtraApi.createAuthorizationAlert(id, {
+                                authorizationType: auth.name,
+                                severity: 'high',
+                                message: `Authorization alert for ${auth.name}`,
+                              });
+                              toast({
+                                title: "Alert Sent",
+                                description: `Alert sent for ${auth.name}`,
+                              });
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error?.response?.data?.message || "Failed to send alert",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                        >
                           <ExternalLink className="w-3 h-3 mr-2" />
                           Send Alert
                         </Button>
+                      ) : (
+                        <>
+                          <span className="text-sm text-gray-600">Approve</span>
+                          <Switch
+                            checked={authApprovals[index] ?? auth.status === "Enabled"}
+                            onCheckedChange={async (checked) => {
+                              if (!id) return;
+                              setAuthApprovals(prev => ({ ...prev, [index]: checked }));
+                              
+                              // Map authorization name to API field
+                              const authFieldMap: Record<string, string> = {
+                                "Authorize Drug test appointment": "drugTest",
+                                "Authorize Fingerprint appointment": "fingerprint",
+                                "Authorize Central Registry Check (Developmental Disabilities Abuse/Neglect Registry)": "centralRegistry",
+                                "Authorize CARI Check (Child Abuse Record Information, DCF)": "cariCheck",
+                                "Authorize Sex Offender Registry Check (Megan's Law)": "sexOffenderRegistry",
+                                "Authorize OIG Exclusion List Check (LEIE)": "oigExclusion",
+                                "Authorize Health & TB Screening": "healthTbScreening",
+                                "Authorize Reference Checks (Minimum 2, Non-Family)": "referenceChecks",
+                              };
+                              
+                              const authField = authFieldMap[auth.name];
+                              if (!authField) return;
+                              
+                              try {
+                                await authorizationsApi.update(id, { [authField]: checked });
+                                toast({
+                                  title: "Success",
+                                  description: `${auth.name} ${checked ? 'approved' : 'disapproved'}`,
+                                });
+                              } catch (error: any) {
+                                // Revert on error
+                                setAuthApprovals(prev => ({ ...prev, [index]: !checked }));
+                                toast({
+                                  title: "Error",
+                                  description: error?.response?.data?.message || "Failed to update authorization",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            disabled={auth.status === "Disabled"}
+                          />
+                        </>
                       )}
                     </div>
                   </div>
                 ))}
               </div>
-              {/* Send Offer Letter Section */}
-              <div className="p-6 mt-8 border border-gray-200 rounded-lg bg-gray-50">
-                {hireStatus?.overall?.status === 'completed' ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full">
-                      <CheckCircle className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div>
-                      <h4 className="text-base font-semibold text-gray-900">Official Hire Complete</h4>
-                      <p className="text-sm text-gray-600">All steps completed successfully.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <p className="mb-4 text-sm text-gray-600">
-                      {hireStatus?.overall?.readyForNextStep
-                        ? 'Everything looks good! Send Official Hire letter!'
-                        : 'Complete previous steps before sending offer letter.'}
-                    </p>
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={handleSendOfferLetter}
-                        disabled={actionLoading === 'offer-letter' || !hireStatus?.overall?.readyForNextStep}
-                        className="text-white bg-teal-500 hover:bg-teal-600 disabled:bg-gray-300"
-                      >
-                        {actionLoading === 'offer-letter' ? 'Sending...' : 'Send Offer Letter!'}
-                      </Button>
-                      {hireStatus?.overall?.status === 'in_progress' && (
-                        <Button
-                          onClick={handleConfirmHire}
-                          disabled={actionLoading === 'confirm-hire'}
-                          className="text-white bg-green-600 hover:bg-green-700"
-                        >
-                          {actionLoading === 'confirm-hire' ? 'Confirming...' : 'Confirm Hire'}
-                        </Button>
-                      )}
-                    </div>
-                  </>
-                )}
+              
+              {/* Send Letter Section */}
+              <div className="mt-6">
+                <p className="mb-3 text-sm text-gray-600">
+                  Everything looks good! Send Official Hire letter!
+                </p>
+                <Button
+                  onClick={handleSendOfferLetter}
+                  disabled={actionLoading === 'offer-letter'}
+                  className="text-white bg-[#00b3ad] hover:bg-[#009992]"
+                >
+                  {actionLoading === 'offer-letter' ? 'Sending...' : 'Send Letter'}
+                </Button>
               </div>
             </div>
           )}

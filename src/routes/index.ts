@@ -46,7 +46,8 @@ import SchedulingPage from "@/pages/agency/scheduling";
 import SupportPage from "@/pages/agency/support";
 import AnalyticsPage from "@/pages/agency/analytics";
 import ApplicantDirectoryPage from "@/pages/agency/applicant-directory";
-import ClearanceHiringList from "@/pages/agency/applicant-directory/ClearanceHiringList";
+import ClearanceHiring from "@/pages/agency/applicant-directory/ClearanceHiring";
+import PendingApplicants from "@/pages/agency/applicant-directory/PendingApplicants";
 import ApplicantProfilePage from "@/pages/agency/applicant-directory/ApplicantProfilePage";
 import ReportsPage from "@/pages/agency/reports";
 import ComplianceAlertsPage from "@/pages/agency/compliance-alerts";
@@ -228,7 +229,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.applicantClearanceHiring,
-                Component: ClearanceHiringList,
+                Component: ClearanceHiring,
+            },
+            {
+                path: Routes.agency.applicantPendingApplicants,
+                Component: PendingApplicants,
             },
             {
                 path: Routes.agency.applicantProfile,
