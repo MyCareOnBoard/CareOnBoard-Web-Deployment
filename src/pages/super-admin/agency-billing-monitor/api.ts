@@ -79,6 +79,13 @@ export interface UpsertBillingPlanResponse {
   data?: any;
 }
 
+export interface EmployeesListResponse {
+  success: boolean;
+  count: number;
+  total: number;
+  employees: any[];
+}
+
 export const billingMonitorApi = createApi({
   reducerPath: "billingMonitorApi",
   baseQuery: customBaseQuery,
@@ -145,6 +152,26 @@ export const billingMonitorApi = createApi({
       }),
       invalidatesTags: ["BillingMonitorAgencies", "BillingMonitorHistory", "BillingMonitorStats"],
     }),
+
+    getAgencyDspCount: builder.query<number, { agencyId: string }>({
+      query: ({ agencyId }) => ({
+        url: "/employees/",
+        method: "GET",
+        params: {
+          agencyId,
+          limit: 1,
+          page: 1,
+        },
+        requiresAuth: true,
+      }),
+      transformResponse: (response: EmployeesListResponse) => {
+        return typeof response?.total === "number"
+          ? response.total
+          : typeof response?.count === "number"
+            ? response.count
+            : 0;
+      },
+    }),
   }),
 });
 
@@ -154,4 +181,5 @@ export const {
   useGetAgencyBillingMonitorHistoryQuery,
   useGetBillingMonitorStatsQuery,
   useUpsertAgencyBillingPlanMutation,
+  useGetAgencyDspCountQuery,
 } = billingMonitorApi;

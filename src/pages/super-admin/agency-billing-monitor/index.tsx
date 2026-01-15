@@ -30,6 +30,7 @@ import {
 	useGetBillingMonitorAgenciesQuery,
 	useGetBillingMonitorHistoryQuery,
 	useUpsertAgencyBillingPlanMutation,
+	useGetAgencyDspCountQuery,
 	type BillingPlanCode,
 	type BillingMonitorAgency,
 } from "@/pages/super-admin/agency-billing-monitor/api";
@@ -78,6 +79,17 @@ function isActive(subEnd: Date) {
 	const end = new Date(subEnd);
 	end.setHours(0, 0, 0, 0);
 	return end >= today;
+}
+
+function DspCount({ agencyId }: { agencyId: string }) {
+	const { data, isLoading, isFetching, error } = useGetAgencyDspCountQuery(
+		{ agencyId },
+		{ refetchOnMountOrArgChange: true }
+	);
+
+	if (isLoading || isFetching) return <span>…</span>;
+	if (error) return <span>—</span>;
+	return <span>{data ?? 0}</span>;
 }
 
 export default function AgencyBillingMonitorPage() {
@@ -339,7 +351,7 @@ export default function AgencyBillingMonitorPage() {
 												DSP
 											</p>
 											<p className="text-[14px] font-semibold text-[#10141a]">
-												{b.dspCount ?? 0}
+												<DspCount agencyId={b.agencyId} />
 											</p>
 										</div>
 										<div className="text-center">
