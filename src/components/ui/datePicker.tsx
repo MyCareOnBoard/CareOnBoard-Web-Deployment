@@ -8,11 +8,13 @@ import {cn} from "@/lib/utils";
 
 
 export default function CustomDatePicker(
-    {date, setDate, className, placeholder}: {
+    {date, setDate, className, placeholder, startMonth, endMonth}: {
         date: Date | null,
         setDate: (date: Date | null) => void;
         className?: string;
         placeholder?: string;
+        startMonth?: Date;
+        endMonth?: Date;
     }
 ) {
     const [isDateOpen, setIsDateOpen] = useState(false);
@@ -39,8 +41,8 @@ export default function CustomDatePicker(
                     mode="single"
                     className="bg-white"
                     captionLayout="dropdown"
-                    startMonth={new Date(1924, 0)}
-                    endMonth={new Date()}
+                    startMonth={startMonth ?? new Date(1924, 0)}
+                    endMonth={endMonth ?? new Date()}
                     selected={date ?? undefined}
                     defaultMonth={date ?? new Date()}
                     onSelect={(selectedDate) => {

@@ -48,6 +48,19 @@ export interface BillingMonitorStatsResponse {
   data: any;
 }
 
+export interface AgencyBillingInfo {
+  plan?: BillingPlanCode;
+  subscriptionStart?: string; // ISO
+  subscriptionEnd?: string; // ISO
+  sendNotification?: boolean;
+}
+
+export interface AgencyBillingInfoResponse {
+  success: boolean;
+  data?: AgencyBillingInfo;
+  billing?: AgencyBillingInfo;
+}
+
 export interface ListBillingMonitorAgenciesParams {
   page?: number;
   limit?: number;
@@ -139,6 +152,19 @@ export const billingMonitorApi = createApi({
       providesTags: ["BillingMonitorStats"],
     }),
 
+    getAgencyBillingInfo: builder.query<AgencyBillingInfo, { agencyId: string }>({
+      query: ({ agencyId }) => ({
+        url: `/billingMonitor/agencies/${agencyId}/billing`,
+        method: "GET",
+        params: { agencyId },
+        requiresAuth: true,
+      }),
+      transformResponse: (response: AgencyBillingInfoResponse) => {
+        return response?.data ?? response?.billing ?? {};
+      },
+      providesTags: ["BillingMonitorAgencies", "BillingMonitorHistory", "BillingMonitorStats"],
+    }),
+
     upsertAgencyBillingPlan: builder.mutation<
       UpsertBillingPlanResponse,
       { agencyId: string; data: UpsertBillingPlanRequest }
@@ -180,6 +206,7 @@ export const {
   useGetBillingMonitorHistoryQuery,
   useGetAgencyBillingMonitorHistoryQuery,
   useGetBillingMonitorStatsQuery,
+  useGetAgencyBillingInfoQuery,
   useUpsertAgencyBillingPlanMutation,
   useGetAgencyDspCountQuery,
 } = billingMonitorApi;

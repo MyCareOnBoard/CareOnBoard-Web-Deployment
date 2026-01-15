@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,6 +26,7 @@ import {
 	History,
 	Search,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
 	useGetBillingMonitorAgenciesQuery,
 	useGetBillingMonitorHistoryQuery,
@@ -92,6 +93,12 @@ function DspCount({ agencyId }: { agencyId: string }) {
 	return <span>{data ?? 0}</span>;
 }
 
+type BillingOverride = {
+	plan?: BillingPlanCode;
+	subscriptionStart?: string;
+	subscriptionEnd?: string;
+};
+
 export default function AgencyBillingMonitorPage() {
 	const [view, setView] = useState<"monitor" | "history">("monitor");
 	const [search, setSearch] = useState("");
@@ -109,6 +116,7 @@ export default function AgencyBillingMonitorPage() {
 		isLoading: agenciesLoading,
 		isFetching: agenciesFetching,
 		error: agenciesError,
+		refetch: refetchAgencies,
 	} = useGetBillingMonitorAgenciesQuery({
 		page: monitorPage,
 		limit,
@@ -154,6 +162,7 @@ export default function AgencyBillingMonitorPage() {
 	const [formStart, setFormStart] = useState<Date | null>(null);
 	const [formEnds, setFormEnds] = useState<Date | null>(null);
 	const [formNotify, setFormNotify] = useState(true);
+	const [billingOverrides, setBillingOverrides] = useState<Record<string, BillingOverride>>({});
 
 	const [upsertBillingPlan, { isLoading: isSavingBilling }] =
 		useUpsertAgencyBillingPlanMutation();
@@ -171,12 +180,25 @@ export default function AgencyBillingMonitorPage() {
 	const openEdit = (id: string) => {
 		const target = agencies.find((b) => b.agencyId === id);
 		if (!target) return;
+		const override = billingOverrides[id];
 
 		setEditingBillingId(id);
 		setFormAgencyId(target.agencyId);
-		setFormPlan(normalizePlanLabel(target.plan));
-		setFormStart(target.subscriptionStart ? new Date(target.subscriptionStart) : null);
-		setFormEnds(target.subscriptionEnd ? new Date(target.subscriptionEnd) : null);
+		setFormPlan(normalizePlanLabel(override?.plan ?? target.plan));
+		setFormStart(
+			override?.subscriptionStart
+				? new Date(override.subscriptionStart)
+				: target.subscriptionStart
+					? new Date(target.subscriptionStart)
+					: null
+		);
+		setFormEnds(
+			override?.subscriptionEnd
+				? new Date(override.subscriptionEnd)
+				: target.subscriptionEnd
+					? new Date(target.subscriptionEnd)
+					: null
+		);
 		setFormNotify(Boolean(target.sendNotification));
 		setIsBillingDialogOpen(true);
 	};
@@ -188,35 +210,163 @@ export default function AgencyBillingMonitorPage() {
 
 	const filteredBillings = useMemo(() => {
 		return agencies.filter((b) => {
-			const end = b.subscriptionEnd ? new Date(b.subscriptionEnd) : null;
+			const override = billingOverrides[b.agencyId];
+			const effectiveEnd = override?.subscriptionEnd ?? b.subscriptionEnd;
+			const end = effectiveEnd ? new Date(effectiveEnd) : null;
 			const active = end ? isActive(end) : true;
 			return statusTab === "active" ? active : !active;
 		});
-	}, [agencies, statusTab]);
+	}, [agencies, billingOverrides, statusTab]);
 
 	const handleSaveBilling = async () => {
 		if (!formAgencyId || !formPlan || !formStart || !formEnds) {
+			toast.error("Please complete all billing fields.");
 			return;
 		}
 
-		await upsertBillingPlan({
-			agencyId: formAgencyId,
-			data: {
-				plan: planCodeFromLabel(formPlan as PlanName),
-				subscriptionStart: formStart.toISOString(),
-				subscriptionEnd: formEnds.toISOString(),
-				sendNotification: formNotify,
-			},
-		}).unwrap();
+		try {
+			const result = await upsertBillingPlan({
+				agencyId: formAgencyId,
+				data: {
+					plan: planCodeFromLabel(formPlan as PlanName),
+					subscriptionStart: formStart.toISOString(),
+					subscriptionEnd: formEnds.toISOString(),
+					sendNotification: formNotify,
+				},
+			}).unwrap();
 
-		setIsBillingDialogOpen(false);
-		setIsSuccessOpen(true);
+			const returned = result?.data as
+				| {
+					agencyId?: string;
+					plan?: BillingPlanCode;
+					subscriptionStart?: string;
+					subscriptionEnd?: string;
+				}
+				| undefined;
+
+			if (returned?.agencyId) {
+				setBillingOverrides((prev) => ({
+					...prev,
+					[returned.agencyId as string]: {
+						plan: returned.plan,
+						subscriptionStart: returned.subscriptionStart,
+						subscriptionEnd: returned.subscriptionEnd,
+					},
+				}));
+			} else {
+				setBillingOverrides((prev) => ({
+					...prev,
+					[formAgencyId]: {
+						plan: planCodeFromLabel(formPlan as PlanName),
+						subscriptionStart: formStart.toISOString(),
+						subscriptionEnd: formEnds.toISOString(),
+					},
+				}));
+			}
+
+			void refetchAgencies();
+			toast.success(editingBillingId ? "Billing updated" : "Billing added");
+			setIsBillingDialogOpen(false);
+			setIsSuccessOpen(true);
+		} catch (e) {
+			toast.error("Failed to update billing. Please try again.");
+		}
+	};
+
+	const handleCancelPlan = async () => {
+		if (!editingBillingId || !formAgencyId) return;
+
+		const now = new Date();
+		const planLabel = formPlan || normalizePlanLabel(editingBilling?.plan);
+		const planCode = planCodeFromLabel((planLabel || "Basic Plan") as PlanName);
+		const startIso = (formStart ?? (editingBilling?.subscriptionStart ? new Date(editingBilling.subscriptionStart) : null) ?? now).toISOString();
+
+		try {
+			const result = await upsertBillingPlan({
+				agencyId: formAgencyId,
+				data: {
+					plan: planCode,
+					subscriptionStart: startIso,
+					subscriptionEnd: now.toISOString(),
+					sendNotification: true,
+				},
+			}).unwrap();
+
+			const returned = result?.data as
+				| {
+					agencyId?: string;
+					plan?: BillingPlanCode;
+					subscriptionStart?: string;
+					subscriptionEnd?: string;
+				}
+				| undefined;
+
+			setBillingOverrides((prev) => ({
+				...prev,
+				[formAgencyId]: {
+					plan: returned?.plan ?? planCode,
+					subscriptionStart: returned?.subscriptionStart ?? startIso,
+					subscriptionEnd: returned?.subscriptionEnd ?? now.toISOString(),
+				},
+			}));
+			void refetchAgencies();
+			toast.success("Plan canceled");
+			setIsBillingDialogOpen(false);
+		} catch (e) {
+			toast.error("Failed to cancel plan. Please try again.");
+		}
 	};
 
 	const handleConfirmDelete = () => {
-		// Backend delete endpoint not provided; keep UI confirmation only for now.
-		setIsDeleteOpen(false);
-		setDeleteTargetId(null);
+		if (!deleteTargetId) {
+			setIsDeleteOpen(false);
+			return;
+		}
+
+		const target = agencies.find((a) => a.agencyId === deleteTargetId);
+		const now = new Date();
+		const planLabel = normalizePlanLabel(target?.plan);
+		const planCode = planCodeFromLabel(planLabel);
+		const startIso = (target?.subscriptionStart ? new Date(target.subscriptionStart) : now).toISOString();
+
+		upsertBillingPlan({
+			agencyId: deleteTargetId,
+			data: {
+				plan: planCode,
+				subscriptionStart: startIso,
+				subscriptionEnd: now.toISOString(),
+				sendNotification: true,
+			},
+		})
+			.unwrap()
+			.then((result) => {
+				const returned = result?.data as
+					| {
+						agencyId?: string;
+						plan?: BillingPlanCode;
+						subscriptionStart?: string;
+						subscriptionEnd?: string;
+					}
+					| undefined;
+
+				setBillingOverrides((prev) => ({
+					...prev,
+					[deleteTargetId]: {
+						plan: returned?.plan ?? planCode,
+						subscriptionStart: returned?.subscriptionStart ?? startIso,
+						subscriptionEnd: returned?.subscriptionEnd ?? now.toISOString(),
+					},
+				}));
+				void refetchAgencies();
+				toast.success("Plan removed");
+			})
+			.catch(() => {
+				toast.error("Failed to remove plan. Please try again.");
+			})
+			.finally(() => {
+				setIsDeleteOpen(false);
+				setDeleteTargetId(null);
+			});
 	};
 
 	return (
@@ -345,7 +495,7 @@ export default function AgencyBillingMonitorPage() {
 										</div>
 									</div>
 
-									<div className="hidden md:flex items-center gap-12">
+									<div className="hidden md:grid grid-cols-3 items-center justify-items-center w-[360px]">
 										<div className="text-center">
 											<p className="text-[12px] font-medium text-[#808081]">
 												DSP
@@ -367,7 +517,13 @@ export default function AgencyBillingMonitorPage() {
 												Expiry Date
 											</p>
 											<p className="text-[14px] font-semibold text-[#10141a]">
-												{b.subscriptionEnd ? formatMonthYear(new Date(b.subscriptionEnd)) : "—"}
+											{(() => {
+												const override = billingOverrides[b.agencyId];
+												const effectiveEnd = override?.subscriptionEnd ?? b.subscriptionEnd;
+												return effectiveEnd
+													? formatMonthYear(new Date(effectiveEnd))
+													: "—";
+											})()}
 											</p>
 										</div>
 									</div>
@@ -511,7 +667,7 @@ export default function AgencyBillingMonitorPage() {
 			<Dialog open={isBillingDialogOpen} onOpenChange={setIsBillingDialogOpen}>
 				<DialogContent
 					showCloseButton={false}
-					className="top-0 right-0 left-auto h-screen w-[520px] max-w-[92vw] translate-x-0 translate-y-0 rounded-l-[30px] rounded-r-none p-0 overflow-hidden"
+					className="top-4 right-4 left-auto h-[calc(100vh-2rem)] w-[520px] max-w-[92vw] translate-x-0 translate-y-0 rounded-[30px] p-0 overflow-hidden shadow-2xl"
 				>
 					<div className="h-full flex flex-col">
 						<div className="px-6 pt-6 pb-4 border-b border-[#e5e5e6]">
@@ -577,6 +733,7 @@ export default function AgencyBillingMonitorPage() {
 										date={formStart}
 										setDate={setFormStart}
 										placeholder="Select date"
+										endMonth={new Date(new Date().getFullYear() + 10, 11, 1)}
 										className=""
 									/>
 								</div>
@@ -587,6 +744,7 @@ export default function AgencyBillingMonitorPage() {
 										date={formEnds}
 										setDate={setFormEnds}
 										placeholder="Select date"
+										endMonth={new Date(new Date().getFullYear() + 10, 11, 1)}
 										className=""
 									/>
 								</div>
@@ -606,13 +764,17 @@ export default function AgencyBillingMonitorPage() {
 
 						<div className="px-6 py-5 border-t border-[#e5e5e6]">
 							<div className="flex items-center justify-between gap-3">
-								<Button
-									variant="outline"
-									className="w-[140px] border-[#cccccd]"
-									onClick={() => setIsBillingDialogOpen(false)}
-								>
-									Cancel
-								</Button>
+								
+								{editingBillingId ? (
+									<Button
+										variant="outline"
+										className="w-40 border-black text-black hover:bg-[#ff4d4d] hover:text-white hover:border-[#ff4d4d]"
+										onClick={handleCancelPlan}
+										disabled={isSavingBilling}
+									>
+										Cancel Plan
+									</Button>
+								) : null}
 								<Button
 									onClick={handleSaveBilling}
 									className="w-[180px] bg-[#00b5b8] hover:bg-[#00a7aa] active:bg-[#00979a]"
