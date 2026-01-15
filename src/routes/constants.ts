@@ -27,6 +27,7 @@ export const Routes = {
         analytics: "/agency/analytics",
         applicantDirectory: "/agency/applicant-directory",
         applicantClearanceHiring: "/agency/applicant-directory/clearance-hiring",
+        applicantPendingApplicants: "/agency/applicant-directory/pending-applicants",
         applicantProfile: "/agency/applicant-directory/:id/profile",
         applicantDocuments: "/agency/applicant-directory/:id/documents",
         applicantConditionalHire: "/agency/applicant-directory/:id/conditional-hire",

@@ -59,4 +59,33 @@ export const agencyApplicantsExtraApi = {
     const res = await axiosClient.post(`/agencyApplicants/${encodeURIComponent(uid)}/mark-ready-for-official-hire`, {});
     return res.data;
   },
+  
+  // References
+  async getReferences(uid: string) {
+    const res = await axiosClient.get(`/agencyApplicants/${encodeURIComponent(uid)}/references`);
+    return res.data;
+  },
+  
+  // Approval and Rejection
+  async approveForHire(uid: string) {
+    const res = await axiosClient.post(`/agencyApplicants/${encodeURIComponent(uid)}/approve-for-hire`, {});
+    return res.data;
+  },
+  
+  async reject(uid: string, reason: string) {
+    const res = await axiosClient.post(`/agencyApplicants/${encodeURIComponent(uid)}/reject`, { reason });
+    return res.data;
+  },
+  
+  // Communication tracking
+  async initiateCommunication(uid: string, payload: { type: 'call' | 'chat'; notes?: string; duration?: number }) {
+    const res = await axiosClient.post(`/agencyApplicants/${encodeURIComponent(uid)}/initiate-communication`, payload);
+    return res.data;
+  },
+  
+  // Authorization alerts
+  async createAuthorizationAlert(uid: string, payload: { authorizationType: string; severity: 'low' | 'medium' | 'high'; message: string; details?: any }) {
+    const res = await axiosClient.post(`/agencyApplicants/${encodeURIComponent(uid)}/authorization-alert`, payload);
+    return res.data;
+  },
 };

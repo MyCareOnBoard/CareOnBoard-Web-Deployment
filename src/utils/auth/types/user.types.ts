@@ -14,6 +14,32 @@ export enum UserType {
   SUPER_ADMIN = "super_admin",
 }
 
+export interface EmergencyContact {
+  name: string
+  relationship: string
+  phone: string
+}
+
+/**
+ * Employee/DSP payload shape returned by employee endpoints.
+ * Matches the API object shown in the request.
+ */
+export interface Employee {
+  id: string
+  userId: string
+  fullName: string
+  email: string
+  dateOfBirth: string
+  workAvailability: boolean
+  hireDate: string
+  profilePicture: string
+  tagId: string
+  role: string
+  address: string
+  phoneNumber: string
+  emergencyContact: EmergencyContact
+}
+
 
 export interface Profile {
   id?: string

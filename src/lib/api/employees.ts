@@ -462,3 +462,33 @@ export async function listEmployeeActivityLogs(
   }
 }
 
+/**
+ * ✅ Get specific employee activity log with notes
+ * Retrieves a specific activity log for the current employee along with paginated notes
+ */
+export async function getEmployeeActivityLog(
+  activityLogId: string,
+  params?: { page?: number; limit?: number }
+): Promise<ActivityLogResponse> {
+  try {
+    const response = await axiosClient.get<ActivityLogResponse>(
+      `/employees/activity-logs/${activityLogId}`,
+      {
+        params: {
+          page: params?.page,
+          limit: params?.limit,
+        },
+      }
+    );
+
+    if (!response.data.success) {
+      throw new Error('Failed to fetch activity log');
+    }
+
+    return response.data;
+  } catch (err: any) {
+    console.error('getEmployeeActivityLog error:', err);
+    throw new Error(err.message || 'Failed to fetch activity log');
+  }
+}
+

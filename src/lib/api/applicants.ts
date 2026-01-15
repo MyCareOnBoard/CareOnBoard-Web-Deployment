@@ -61,6 +61,27 @@ const mapBackendToApplicant = (item: any): Applicant => {
 };
 
 export const applicantsApi = {
+  // Optimized directory view with completion percentages and stage status
+  directory: async (params?: { tab?: 'all' | 'clearance'; period?: 'today' | 'week' | 'month'; search?: string; limit?: number; offset?: number; status?: string }) => {
+    try {
+      const queryString = buildQuery(params);
+      const response = await axiosClient.get<any>(`/agencyApplicants/directory${queryString}`);
+      const body = response?.data;
+      return {
+        success: body?.success ?? true,
+        data: Array.isArray(body?.data) ? body.data.map(mapBackendToApplicant) : [],
+        pagination: body?.pagination,
+      };
+    } catch (err: any) {
+      console.error('Error fetching directory:', err);
+      return {
+        success: false,
+        data: [],
+        pagination: { limit: 10, offset: 0, count: 0 },
+      };
+    }
+  },
+
   list: async (params?: { period?: string; search?: string; limit?: number; offset?: number }) => {
     try {
       const queryString = buildQuery(params);

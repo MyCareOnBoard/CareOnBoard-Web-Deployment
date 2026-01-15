@@ -46,7 +46,8 @@ import SchedulingPage from "@/pages/agency/scheduling";
 import SupportPage from "@/pages/agency/support";
 import AnalyticsPage from "@/pages/agency/analytics";
 import ApplicantDirectoryPage from "@/pages/agency/applicant-directory";
-import ClearanceHiringList from "@/pages/agency/applicant-directory/ClearanceHiringList";
+import ClearanceHiring from "@/pages/agency/applicant-directory/ClearanceHiring";
+import PendingApplicants from "@/pages/agency/applicant-directory/PendingApplicants";
 import ApplicantProfilePage from "@/pages/agency/applicant-directory/ApplicantProfilePage";
 import ReportsPage from "@/pages/agency/reports";
 import ComplianceAlertsPage from "@/pages/agency/compliance-alerts";
@@ -76,6 +77,8 @@ import SuperAdminTimesheetReports from "@/pages/super-admin/reports/timesheetRep
 import SuperAdminNoteReports from "@/pages/super-admin/reports/noteReports";
 import SuperAdminSystemSettingsPage from "@/pages/super-admin/system-settings";
 import AgencyTrainings from "@/pages/agency/trainings";
+import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
+import AgencyBillingMonitorPage from "@/pages/super-admin/agency-billing-monitor";
 
 
 export const router = createBrowserRouter([
@@ -227,7 +230,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.applicantClearanceHiring,
-                Component: ClearanceHiringList,
+                Component: ClearanceHiring,
+            },
+            {
+                path: Routes.agency.applicantPendingApplicants,
+                Component: PendingApplicants,
             },
             {
                 path: Routes.agency.applicantProfile,
@@ -374,6 +381,14 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.userAccessControl,
                 Component: UserAccessControlPage,
+            },
+            {
+                path: Routes.superAdmin.globalNotesQuality,
+                Component: GlobalNotesQualityPage,
+            },
+            {
+                path: Routes.superAdmin.agencyBillingMonitor,
+                Component: AgencyBillingMonitorPage,
             },
             {
                 path: Routes.superAdmin.reports.index,
