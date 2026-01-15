@@ -477,15 +477,15 @@ export default function AgencyBillingMonitorPage() {
 							filteredBillings.map((b) => (
 								<div
 									key={b.agencyId}
-									className="flex items-center justify-between gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] p-4"
+									className="flex flex-col gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] p-4 md:grid md:grid-cols-12 md:items-center"
 								>
-									<div className="flex items-center gap-4">
+									<div className="flex items-center gap-4 min-w-0 md:col-span-5">
 										<div className="w-[52px] h-[60px] rounded-[10px] bg-[#b9ff63] flex items-center justify-center text-black font-semibold">
 											{b.agencyName.charAt(0).toUpperCase()}
 										</div>
-										<div>
-											<div className="flex items-center gap-3">
-												<p className="text-[16px] font-semibold text-[#10141a]">
+										<div className="min-w-0">
+											<div className="flex flex-wrap items-center gap-3 min-w-0">
+												<p className="text-[16px] font-semibold text-[#10141a] wrap-break-word max-w-full leading-5">
 													{b.agencyName}
 												</p>
 												<span className="px-3 h-7 inline-flex items-center rounded-[60px] text-[12px] font-semibold bg-[#e6f7f7] text-[#00a3a7]">
@@ -495,7 +495,7 @@ export default function AgencyBillingMonitorPage() {
 										</div>
 									</div>
 
-									<div className="hidden md:grid grid-cols-3 items-center justify-items-center w-[360px]">
+									<div className="hidden md:grid md:col-span-4 grid-cols-3 items-center justify-items-center">
 										<div className="text-center">
 											<p className="text-[12px] font-medium text-[#808081]">
 												DSP
@@ -528,7 +528,7 @@ export default function AgencyBillingMonitorPage() {
 										</div>
 									</div>
 
-									<div className="flex items-center gap-2">
+									<div className="flex items-center gap-2 md:col-span-3 md:justify-end">
 										<Button
 											variant="outline"
 											className="border-[#ff4d4d] text-[#ff4d4d] hover:bg-[#ff4d4d]/10"
