@@ -33,6 +33,8 @@ export interface BillingMonitorAgencyRaw {
   logo?: string;
   plan?: BillingPlanCode;
   subscriptionStart?: string;
+  startDate?: string;
+  subscriptionStartDate?: string;
   subscriptionEnd?: string;
   sendNotification?: boolean;
   dspCount?: number;
@@ -73,7 +75,7 @@ export interface BillingMonitorHistoryResponse {
 
 export interface BillingMonitorStatsResponse {
   success: boolean;
-  data: any;
+  data: unknown;
 }
 
 export interface AgencyBillingInfo {
@@ -94,6 +96,7 @@ export interface ListBillingMonitorAgenciesParams {
   limit?: number;
   search?: string;
   plan?: string;
+  status?: "active" | "inactive";
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }
@@ -117,21 +120,30 @@ export interface UpsertBillingPlanRequest {
 export interface UpsertBillingPlanResponse {
   success: boolean;
   message?: string;
-  data?: any;
+  data?: UpsertBillingPlanResult;
+}
+
+export interface UpsertBillingPlanResult {
+  agencyId: string;
+  agencyName?: string;
+  plan?: BillingPlanCode;
+  subscriptionStart?: string;
+  subscriptionEnd?: string;
+  expiryDate?: string;
 }
 
 export interface EmployeesListResponse {
   success: boolean;
   count: number;
   total: number;
-  employees: any[];
+  employees: unknown[];
 }
 
 export interface ClientsListResponse {
   success: boolean;
   count: number;
   total: number;
-  clients: any[];
+  clients: unknown[];
 }
 
 export const billingMonitorApi = createApi({
@@ -152,8 +164,7 @@ export const billingMonitorApi = createApi({
       transformResponse: (response: BillingMonitorAgenciesResponseRaw): BillingMonitorAgenciesResponse => {
         const normalized = (response?.data ?? []).map((a) => {
           const subscriptionEnd = a.subscriptionEnd ?? a.expiryDate;
-          const subscriptionStart =
-            a.subscriptionStart;
+          const subscriptionStart = a.subscriptionStart ?? a.startDate ?? a.subscriptionStartDate;
           const dspCount = a.dspCount ?? a.dsp;
           const clientsCount = a.clientsCount ?? a.clients;
 
@@ -213,7 +224,6 @@ export const billingMonitorApi = createApi({
       query: ({ agencyId }) => ({
         url: `/billingMonitor/agencies/${agencyId}/billing`,
         method: "GET",
-        params: { agencyId },
         requiresAuth: true,
       }),
       transformResponse: (response: AgencyBillingInfoResponse) => {

@@ -117,8 +117,8 @@ export default function AgencyBillingMonitorPage() {
 	const [statusTab, setStatusTab] = useState<BillingStatus>("active");
 
 	const [planFilter, setPlanFilter] = useState<string>("all");
-	const [sortBy] = useState<string>("updatedAt");
-	const [sortOrder] = useState<"asc" | "desc">("desc");
+	const sortBy = "updatedAt";
+	const sortOrder: "asc" | "desc" = "desc";
 	const [monitorPage, setMonitorPage] = useState(1);
 	const [historyPage, setHistoryPage] = useState(1);
 	const limit = 10;
@@ -134,6 +134,7 @@ export default function AgencyBillingMonitorPage() {
 		limit,
 		search: view === "monitor" ? search : undefined,
 		plan: planFilter === "all" ? undefined : planFilter,
+		status: statusTab,
 		sortBy,
 		sortOrder,
 	});
@@ -177,6 +178,10 @@ export default function AgencyBillingMonitorPage() {
 	const [isBillingDialogOpen, setIsBillingDialogOpen] = useState(false);
 	const [editingBillingId, setEditingBillingId] = useState<string | null>(null);
 	const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+	const [successCopy, setSuccessCopy] = useState<{ title: string; description: string }>({
+		title: "Billing added",
+		description: "New agency billing has been added successfully",
+	});
 
 	const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -239,8 +244,13 @@ export default function AgencyBillingMonitorPage() {
 
 	const filteredBillings = useMemo(() => {
 		return agencies.filter((b) => {
+			const statusFromApi = b.status?.toLowerCase();
+			if (statusFromApi === "active" || statusFromApi === "inactive") {
+				return statusTab === statusFromApi;
+			}
+
 			const override = billingOverrides[b.agencyId];
-			const effectiveEnd = override?.subscriptionEnd ?? b.subscriptionEnd;
+			const effectiveEnd = override?.subscriptionEnd ?? b.subscriptionEnd ?? b.expiryDate;
 			const end = effectiveEnd ? new Date(effectiveEnd) : null;
 			const active = end ? isActive(end) : true;
 			return statusTab === "active" ? active : !active;
@@ -250,6 +260,11 @@ export default function AgencyBillingMonitorPage() {
 	const handleSaveBilling = async () => {
 		if (!formAgencyId || !formPlan || !formStart || !formEnds) {
 			toast.error("Please complete all billing fields.");
+			return;
+		}
+
+		if (formEnds.getTime() < formStart.getTime()) {
+			toast.error("Subscription end date must be after the start date.");
 			return;
 		}
 
@@ -278,6 +293,7 @@ export default function AgencyBillingMonitorPage() {
 					plan?: BillingPlanCode;
 					subscriptionStart?: string;
 					subscriptionEnd?: string;
+					expiryDate?: string;
 				}
 				| undefined;
 
@@ -287,7 +303,7 @@ export default function AgencyBillingMonitorPage() {
 					[returned.agencyId as string]: {
 						plan: returned.plan,
 						subscriptionStart: returned.subscriptionStart,
-						subscriptionEnd: returned.subscriptionEnd,
+						subscriptionEnd: returned.subscriptionEnd ?? returned.expiryDate,
 					},
 				}));
 			} else {
@@ -302,7 +318,14 @@ export default function AgencyBillingMonitorPage() {
 			}
 
 			void refetchAgencies();
-			toast.success(editingBillingId ? "Billing updated" : "Billing added");
+			const isEdit = Boolean(editingBillingId);
+			setSuccessCopy({
+				title: isEdit ? "Billing updated" : "Billing added",
+				description: isEdit
+					? "Agency billing has been updated successfully"
+					: "New agency billing has been added successfully",
+			});
+			toast.success(isEdit ? "Billing updated" : "Billing added");
 			setIsBillingDialogOpen(false);
 			setIsSuccessOpen(true);
 		} catch (e) {
@@ -322,7 +345,12 @@ export default function AgencyBillingMonitorPage() {
 		const now = new Date();
 		const planLabel = formPlan || normalizePlanLabel(editingBilling?.plan);
 		const planCode = planCodeFromLabel((planLabel || "Basic Plan") as PlanName);
-		const startIso = (formStart ?? (editingBilling?.subscriptionStart ? new Date(editingBilling.subscriptionStart) : null) ?? now).toISOString();
+		const candidateStart =
+			formStart ??
+			(editingBilling?.subscriptionStart ? new Date(editingBilling.subscriptionStart) : null) ??
+			now;
+		const safeStart = candidateStart.getTime() > now.getTime() ? now : candidateStart;
+		const startIso = safeStart.toISOString();
 
 		try {
 			const result = await upsertBillingPlan({
@@ -384,7 +412,9 @@ export default function AgencyBillingMonitorPage() {
 		const now = new Date();
 		const planLabel = normalizePlanLabel(target?.plan);
 		const planCode = planCodeFromLabel(planLabel);
-		const startIso = (target?.subscriptionStart ? new Date(target.subscriptionStart) : now).toISOString();
+		const candidateStart = target?.subscriptionStart ? new Date(target.subscriptionStart) : now;
+		const safeStart = candidateStart.getTime() > now.getTime() ? now : candidateStart;
+		const startIso = safeStart.toISOString();
 
 		upsertBillingPlan({
 			agencyId: deleteTargetId,
@@ -593,7 +623,7 @@ export default function AgencyBillingMonitorPage() {
 													const effectiveEnd =
 														override?.subscriptionEnd ??
 														b.subscriptionEnd ??
-														(b as any).expiryDate;
+														b.expiryDate;
 												return effectiveEnd
 													? formatMonthYear(new Date(effectiveEnd))
 													: "—";
@@ -838,7 +868,6 @@ export default function AgencyBillingMonitorPage() {
 
 						<div className="px-6 py-5 border-t border-[#e5e5e6]">
 							<div className="flex items-center justify-between gap-3">
-								
 								{editingBillingId ? (
 									<Button
 										variant="outline"
@@ -864,8 +893,8 @@ export default function AgencyBillingMonitorPage() {
 
 			<SuccessDialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
 				<SuccessDialogContent
-					title="Billing added"
-					description="New agency billing has been added successfully"
+					title={successCopy.title}
+					description={successCopy.description}
 					buttonText="Okay"
 					onButtonClick={() => setIsSuccessOpen(false)}
 				/>
