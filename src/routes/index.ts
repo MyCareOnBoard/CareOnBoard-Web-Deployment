@@ -78,6 +78,7 @@ import SuperAdminNoteReports from "@/pages/super-admin/reports/noteReports";
 import SuperAdminSystemSettingsPage from "@/pages/super-admin/system-settings";
 import AgencyTrainings from "@/pages/agency/trainings";
 import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
+import AgencyBillingMonitorPage from "@/pages/super-admin/agency-billing-monitor";
 
 
 export const router = createBrowserRouter([
@@ -384,6 +385,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.globalNotesQuality,
                 Component: GlobalNotesQualityPage,
+            },
+            {
+                path: Routes.superAdmin.agencyBillingMonitor,
+                Component: AgencyBillingMonitorPage,
             },
             {
                 path: Routes.superAdmin.reports.index,
