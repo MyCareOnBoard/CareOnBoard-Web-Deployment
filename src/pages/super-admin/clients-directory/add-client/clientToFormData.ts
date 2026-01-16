@@ -32,7 +32,7 @@ export function clientToFormData(client: Client): AddClientFormData {
 
   return {
     ...initial,
-    agencyId: client.agencyId,
+    agencyId: client.agencyId ? String(client.agencyId) : undefined,
     stage1: {
       firstName: client.firstName || "",
       lastName: client.lastName || "",

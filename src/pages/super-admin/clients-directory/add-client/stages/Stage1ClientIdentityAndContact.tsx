@@ -250,9 +250,13 @@ export function Stage1ClientIdentityAndContact({
           <p className="text-[12px] font-medium leading-[1.4] text-[#808081]">
             Select the agency for the client.
           </p>
-          <Select value={formData.agencyId} onValueChange={(v) => setFormData({ ...formData, agencyId: v })}>
+          <Select 
+            value={formData.agencyId || undefined} 
+            onValueChange={(v) => setFormData((prev) => ({ ...prev, agencyId: v }))}
+            disabled={loadingAgencies}
+          >
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-                <SelectValue placeholder="Select agency" />
+                <SelectValue placeholder={loadingAgencies ? "Loading agencies..." : "Select agency"} />
               </SelectTrigger>
               <SelectContent>
                 {agencies.map((agency) => (
