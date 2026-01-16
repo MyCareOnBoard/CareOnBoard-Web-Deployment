@@ -195,7 +195,7 @@ function createEmptyServiceAuthorization(): Service {
     };
 }
 
-function createInitialDocs(): DocState[] {
+export function createInitialDocs(): DocState[] {
     return [
         {
             key: "isp",

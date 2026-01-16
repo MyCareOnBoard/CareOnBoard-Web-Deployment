@@ -25,14 +25,22 @@ import {
 import { useListAllAgenciesQuery } from "@/pages/super-admin/agencies/api";
 import { useListServicesQuery } from "@/lib/api/services";
 
-export default function AddClientPage() {
+export default function AddClientPage({
+  initialFormData,
+  clientId: editClientId,
+  isEditMode = false,
+}: {
+  initialFormData?: ReturnType<typeof createInitialAddClientFormData>;
+  clientId?: string;
+  isEditMode?: boolean;
+} = {}) {
   const navigate = useNavigate();
   const totalStages = 7;
   const [stage, setStage] = useState<number>(1);
   const [declared, setDeclared] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [savedClientName, setSavedClientName] = useState<string | undefined>(undefined);
-  const [formData, setFormData] = useState(() => createInitialAddClientFormData());
+  const [formData, setFormData] = useState(() => initialFormData || createInitialAddClientFormData());
   const [isSaving, setIsSaving] = useState(false);
   const [showSavingModal, setShowSavingModal] = useState(false);
   const [saveStage, setSaveStage] = useState<1 | 2>(1);
@@ -233,80 +241,162 @@ export default function AddClientPage() {
 
           try {
             const payload = flattenAddClientFormData();
-
-            // Stage 1: create client without document URLs
             const { documents, ...payloadWithoutDocs } = payload;
-            const created = await createClient(payloadWithoutDocs);
 
-            const fullName =
-              `${created.firstName || ""} ${created.lastName || ""}`.trim() ||
-              `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();
-            const clientName =
-              fullName || `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();
+            if (isEditMode && editClientId) {
+              await updateClient(editClientId, payloadWithoutDocs);
 
-            // Stage 2: upload documents and attach metadata
-            setSaveStage(2);
+              const fullName =
+                `${formData.stage1.firstName || ""} ${formData.stage1.lastName || ""}`.trim();
+              const clientName = fullName || "Client";
 
-            const docKeyToType: Record<string, string> = {
-              isp: "isp",
-              pcpt: "pcpt",
-              poc: "plan-of-care",
-              sdr: "sdr",
-              bsp: "bsp",
-              medicalDocs: "medical-documents",
-              consents: "consent-and-releases",
-            };
+              setSaveStage(2);
 
-            const uploadResults: Record<string, ClientDocumentUploadResult[]> = {};
+              const docKeyToType: Record<string, string> = {
+                isp: "isp",
+                pcpt: "pcpt",
+                poc: "plan-of-care",
+                sdr: "sdr",
+                bsp: "bsp",
+                medicalDocs: "medical-documents",
+                consents: "consent-and-releases",
+              };
 
-            for (const doc of formData.stage3.docs) {
-              const documentType = docKeyToType[doc.key];
-              if (!documentType) continue;
+              const documentsWithNewFiles = formData.stage3.docs.filter(doc => doc.file || (doc.files && doc.files.length > 0));
+              const existingDocuments = formData.stage3.docs.filter(doc => doc.url && !doc.file && !(doc.files && doc.files.length > 0));
 
-              const filesToUpload: File[] = [];
-              if (doc.files && doc.files.length > 0) {
-                filesToUpload.push(...doc.files);
-              } else if (doc.file) {
-                filesToUpload.push(doc.file);
+              const uploadResults: Record<string, ClientDocumentUploadResult[]> = {};
+
+              for (const doc of documentsWithNewFiles) {
+                const documentType = docKeyToType[doc.key];
+                if (!documentType) continue;
+
+                const filesToUpload: File[] = [];
+                if (doc.files && doc.files.length > 0) {
+                  filesToUpload.push(...doc.files);
+                } else if (doc.file) {
+                  filesToUpload.push(doc.file);
+                }
+
+                if (filesToUpload.length === 0) continue;
+
+                const results: ClientDocumentUploadResult[] = [];
+                for (const file of filesToUpload) {
+                  const result = await uploadClientDocument(editClientId, documentType, file);
+                  results.push(result);
+                }
+
+                uploadResults[doc.key] = results;
               }
 
-              if (filesToUpload.length === 0) continue;
-
-              const results: ClientDocumentUploadResult[] = [];
-              for (const file of filesToUpload) {
-                const result = await uploadClientDocument(created.id, documentType, file);
-                results.push(result);
-              }
-
-              uploadResults[doc.key] = results;
-            }
-
-            const finalDocuments: ClientDocument[] = [];
-
-            for (let n in uploadResults) {
-              const matchingDoc = formData.stage3.docs.find((d) => d.key === (n as any));
-
-              for (const result of uploadResults[n]) {
+              const finalDocuments: ClientDocument[] = [];
+              for (const doc of existingDocuments) {
                 finalDocuments.push({
-                  key: n as ClientDocumentKey,
-                  title: matchingDoc?.title || "",
-                  fileName: result.fileName,
-                  url: result.url,
-                  issuedOnDate: matchingDoc?.issuedOnDate
-                    ? matchingDoc.issuedOnDate.toISOString()
-                    : undefined,
-                  expiryDate: matchingDoc?.expiryDate
-                    ? matchingDoc.expiryDate.toISOString()
-                    : undefined,
-                  autoReminder: matchingDoc?.autoReminder,
+                  key: doc.key,
+                  title: doc.title || "",
+                  fileName: doc.fileName,
+                  url: doc.url,
+                  issuedOnDate: doc.issuedOnDate ? doc.issuedOnDate.toISOString() : undefined,
+                  expiryDate: doc.expiryDate ? doc.expiryDate.toISOString() : undefined,
+                  autoReminder: doc.autoReminder,
                 });
               }
+
+              for (let n in uploadResults) {
+                const matchingDoc = formData.stage3.docs.find((d) => d.key === (n as any));
+                for (const result of uploadResults[n]) {
+                  finalDocuments.push({
+                    key: n as ClientDocumentKey,
+                    title: matchingDoc?.title || "",
+                    fileName: result.fileName,
+                    url: result.url,
+                    issuedOnDate: matchingDoc?.issuedOnDate
+                      ? matchingDoc.issuedOnDate.toISOString()
+                      : undefined,
+                    expiryDate: matchingDoc?.expiryDate
+                      ? matchingDoc.expiryDate.toISOString()
+                      : undefined,
+                    autoReminder: matchingDoc?.autoReminder,
+                  });
+                }
+              }
+
+              await updateClient(editClientId, { documents: finalDocuments });
+
+              setSavedClientName(clientName || undefined);
+              setShowSaveSuccess(true);
+            } else {
+              const created = await createClient(payloadWithoutDocs);
+
+              const fullName =
+                `${created.firstName || ""} ${created.lastName || ""}`.trim() ||
+                `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();
+              const clientName =
+                fullName || `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();
+
+              setSaveStage(2);
+
+              const docKeyToType: Record<string, string> = {
+                isp: "isp",
+                pcpt: "pcpt",
+                poc: "plan-of-care",
+                sdr: "sdr",
+                bsp: "bsp",
+                medicalDocs: "medical-documents",
+                consents: "consent-and-releases",
+              };
+
+              const uploadResults: Record<string, ClientDocumentUploadResult[]> = {};
+
+              for (const doc of formData.stage3.docs) {
+                const documentType = docKeyToType[doc.key];
+                if (!documentType) continue;
+
+                const filesToUpload: File[] = [];
+                if (doc.files && doc.files.length > 0) {
+                  filesToUpload.push(...doc.files);
+                } else if (doc.file) {
+                  filesToUpload.push(doc.file);
+                }
+
+                if (filesToUpload.length === 0) continue;
+
+                const results: ClientDocumentUploadResult[] = [];
+                for (const file of filesToUpload) {
+                  const result = await uploadClientDocument(created.id, documentType, file);
+                  results.push(result);
+                }
+
+                uploadResults[doc.key] = results;
+              }
+
+              const finalDocuments: ClientDocument[] = [];
+
+              for (let n in uploadResults) {
+                const matchingDoc = formData.stage3.docs.find((d) => d.key === (n as any));
+
+                for (const result of uploadResults[n]) {
+                  finalDocuments.push({
+                    key: n as ClientDocumentKey,
+                    title: matchingDoc?.title || "",
+                    fileName: result.fileName,
+                    url: result.url,
+                    issuedOnDate: matchingDoc?.issuedOnDate
+                      ? matchingDoc.issuedOnDate.toISOString()
+                      : undefined,
+                    expiryDate: matchingDoc?.expiryDate
+                      ? matchingDoc.expiryDate.toISOString()
+                      : undefined,
+                    autoReminder: matchingDoc?.autoReminder,
+                  });
+                }
+              }
+
+              await updateClient(created.id, { documents: finalDocuments });
+
+              setSavedClientName(clientName || undefined);
+              setShowSaveSuccess(true);
             }
-
-            await updateClient(created.id, { documents: finalDocuments });
-
-            setSavedClientName(clientName || undefined);
-            setShowSaveSuccess(true);
           } catch (e: any) {
             console.error("Save client failed:", e);
             setErrorMessage(e?.message || "Failed to save client. Please try again.");
@@ -318,6 +408,7 @@ export default function AddClientPage() {
         }}
         primaryLoading={isSaving}
         requireDeclaration={true}
+        saveButtonText={isEditMode ? "Update Client" : "Save Client"}
       />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -366,7 +457,11 @@ export default function AddClientPage() {
           onOpenChange={(open) => {
             setShowSaveSuccess(open);
             if (!open) {
-              navigate(Routes.agency.clients);
+              if (isEditMode && editClientId) {
+                navigate(Routes.superAdmin.clientDetails.replace(":clientId", editClientId));
+              } else {
+                navigate(Routes.superAdmin.clientDirectory);
+              }
             }
           }}
           clientName={savedClientName}

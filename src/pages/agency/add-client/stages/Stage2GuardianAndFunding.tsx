@@ -39,6 +39,17 @@ function ServiceAuthorizationFields({
     }
   }, [data, loadingServices]);
 
+  useEffect(() => {
+    if (!loadingServices && offeredServices.length > 0 && (service.name || service.code) && !selectedType) {
+      const matchingService = offeredServices.find(
+        (s) => (service.name && s.name === service.name) || (service.code && s.code === service.code)
+      );
+      if (matchingService && matchingService.type) {
+        setSelectedType(matchingService.type);
+      }
+    }
+  }, [loadingServices, offeredServices, service.name, service.code, selectedType]);
+
   const serviceTypes = useMemo(
     () =>
       Array.from(
@@ -60,15 +71,16 @@ function ServiceAuthorizationFields({
   );
 
   // If type changes and current service is not within that type, clear it
+  // But only if services are loaded and we're not initializing
   useEffect(() => {
-    if (!selectedType) return;
+    if (!selectedType || loadingServices || offeredServices.length === 0) return;
     const stillValid = filteredServices.some(
       (svc) => svc.name === service.name && svc.code === service.code,
     );
     if (!stillValid && (service.name || service.code)) {
       onChange({ ...service, name: "", code: "" });
     }
-  }, [selectedType, filteredServices, service.name, service.code, onChange]);
+  }, [selectedType, filteredServices, service.name, service.code, onChange, loadingServices, offeredServices.length]);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
