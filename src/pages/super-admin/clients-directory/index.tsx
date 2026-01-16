@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
-import { listClients, getClientStats, type Client, type Agency } from "@/lib/api/clients";
+import { useListClientsQuery, useGetClientStatsQuery, type Client, type Agency } from "@/lib/api/clients";
 
 interface DisplayClient {
   id: string;
@@ -30,15 +30,28 @@ export default function ClientsDirectory() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [totalClients, setTotalClients] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const itemsPerPage = 7;
   const searchAnchorRef = useRef<HTMLDivElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const shouldShowSearchDropdown = searchQuery.trim().length >= 2;
+
+  const { data: clientsData, isLoading: isLoadingClients, isFetching: isSearching } = useListClientsQuery(
+    {
+      search: debouncedSearchQuery.trim() || undefined,
+      limit: 100,
+      agency: true,
+    }
+  );
+
+  const { data: statsData } = useGetClientStatsQuery(
+    undefined,
+    { skip: !!debouncedSearchQuery.trim() }
+  );
+
+  const clients = clientsData?.clients || [];
+  const totalClients = statsData?.stats?.total || 0;
+  const isLoading = isLoadingClients && clients.length === 0;
+  const error = null;
 
   const formatClientName = useCallback((client: Client): string => {
     const parts = [
@@ -93,43 +106,6 @@ export default function ClientsDirectory() {
       }
     };
   }, [searchQuery]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        if (clients.length === 0) {
-          setIsLoading(true);
-        } else {
-          setIsSearching(true);
-        }
-        setError(null);
-
-        const [statsResult, clientsList] = await Promise.all([
-          !debouncedSearchQuery.trim() ? getClientStats() : Promise.resolve(null),
-          listClients({
-            search: debouncedSearchQuery.trim() || undefined,
-            limit: 100,
-            agency: true,
-          })
-        ]);
-
-        if (statsResult) {
-          setTotalClients(statsResult.total);
-        }
-        setClients(clientsList);
-      } catch (err: any) {
-        console.error("Failed to fetch clients:", err);
-        setError(err.message || "Failed to load clients");
-        setClients([]);
-        setTotalClients(0);
-      } finally {
-        setIsLoading(false);
-        setIsSearching(false);
-      }
-    };
-
-    fetchData();
-  }, [user?.agencyId, debouncedSearchQuery]);
 
   const displayClients: DisplayClient[] = useMemo(() => {
     return clients.map((client) => {
