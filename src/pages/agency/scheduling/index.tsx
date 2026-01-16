@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Plus, ChevronLeft, ChevronRight, ArrowUpRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { listShifts, Shift, ShiftStatus, deleteShift } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router";
@@ -28,15 +28,53 @@ const formatTime = (time?: string): string => {
   }
 };
 
+const parseTimeToParts = (time: string): { hours: number; minutes: number } | null => {
+  const match = time.match(/(\d{1,2})[.:](\d{2})[:]?([AaPp][Mm])/);
+  if (!match) return null;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+
+  if (period === "PM" && hours !== 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+
+  return { hours, minutes };
+};
+
+const isShiftMissed = (shift: Shift): boolean => {
+  if (shift.status === ShiftStatus.COMPLETED) return false;
+  if (!shift.date) return false;
+
+  const endTime = shift.clockedOutAt || shift.endTime;
+  if (!endTime) return false;
+
+  const parsedTime = parseTimeToParts(endTime);
+  if (!parsedTime) return false;
+
+  const date = parseISO(shift.date);
+  const endDateTime = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    parsedTime.hours,
+    parsedTime.minutes
+  );
+
+  return endDateTime.getTime() < Date.now();
+};
 // Helper function to get status display info
-const getStatusInfo = (status: ShiftStatus) => {
+const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
   switch (status) {
     case ShiftStatus.ONGOING:
       return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
     case ShiftStatus.COMPLETED:
-      return { label: "Completed", color: "#2B82FF", bgColor: "rgba(43,130,255,0.05)" };
+      if (approved === false) {
+        return { label: "Incomplete", color: "#D53411", bgColor: "rgba(213,52,17,0.05)" };
+      }
+      return { label: "Completed", color: "#525253", bgColor: "rgba(178,178,179,0.05)" };
     case ShiftStatus.EXPIRED:
-      return { label: "Missed", color: "#D53411", bgColor: "rgba(213,52,17,0.05)" };
+      return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
     case ShiftStatus.PENDING:
       return { label: "Pending", color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
     case ShiftStatus.AVAILABLE:
@@ -154,7 +192,7 @@ export default function SchedulingPage() {
   const shiftStats = useMemo(() => {
     const active = shifts.filter(s => s.status === ShiftStatus.ONGOING).length;
     const completed = shifts.filter(s => s.status === ShiftStatus.COMPLETED).length;
-    const missed = shifts.filter(s => s.status === ShiftStatus.EXPIRED).length;
+    const missed = shifts.filter(isShiftMissed).length;
     
     return {
       active,
@@ -602,7 +640,7 @@ export default function SchedulingPage() {
               </div>
             ) : (
               paginatedShifts.map((shift) => {
-                const statusInfo = getStatusInfo(shift.status);
+                const statusInfo = getStatusInfo(shift.status, shift.approved);
                 const clientName = shift.client 
                   ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
                   : "Unknown Client";

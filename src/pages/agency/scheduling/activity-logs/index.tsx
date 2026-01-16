@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { parseISO } from "date-fns";
 import { ArrowUpRight, ChevronLeft, ChevronRight, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listShifts, Shift, ShiftStatus } from "@/lib/api/shifts";
@@ -25,20 +26,77 @@ const formatTime = (time?: string): string => {
   }
 };
 
-const getStatusInfo = (status: ShiftStatus) => {
+const parseTimeToParts = (time: string): { hours: number; minutes: number } | null => {
+  const match = time.match(/(\d{1,2})[.:](\d{2})[:]?([AaPp][Mm])/);
+  if (!match) return null;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+
+  if (period === "PM" && hours !== 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+
+  return { hours, minutes };
+};
+
+const isShiftMissed = (shift: Shift): boolean => {
+  if (shift.status === ShiftStatus.COMPLETED) return false;
+  if (!shift.date) return false;
+
+  const endTime = shift.clockedOutAt || shift.endTime;
+  if (!endTime) return false;
+
+  const parsedTime = parseTimeToParts(endTime);
+  if (!parsedTime) return false;
+
+  const date = parseISO(shift.date);
+  const endDateTime = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    parsedTime.hours,
+    parsedTime.minutes
+  );
+
+  return endDateTime.getTime() < Date.now();
+};
+
+const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
   switch (status) {
     case ShiftStatus.ONGOING:
       return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
     case ShiftStatus.COMPLETED:
-      return { label: "Completed", color: "#2B82FF", bgColor: "rgba(43,130,255,0.05)" };
+      if (approved === false) {
+        return { label: "Incomplete", color: "#D53411", bgColor: "rgba(213,52,17,0.05)" };
+      }
+      return { label: "Completed", color: "#525253", bgColor: "rgba(178,178,179,0.05)" };
     case ShiftStatus.EXPIRED:
-      return { label: "Missed", color: "#D53411", bgColor: "rgba(213,52,17,0.05)" };
+      return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
     case ShiftStatus.PENDING:
       return { label: "Pending", color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
     case ShiftStatus.AVAILABLE:
       return { label: "Available", color: "#00b4b8", bgColor: "rgba(0,180,184,0.05)" };
     default:
       return { label: status, color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
+  }
+};
+
+const getStatusInfoForTab = (shift: Shift, tab: ActivityFilter) => {
+  switch (tab) {
+    case "active":
+      if (shift.status === ShiftStatus.ONGOING) {
+        return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
+      }
+      return { label: "Available", color: "#00b4b8", bgColor: "rgba(0,180,184,0.05)" };
+    case "completed":
+      return { label: "Completed", color: "#525253", bgColor: "rgba(178,178,179,0.05)" };
+    case "missed":
+      return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
+    case "incomplete":
+      return { label: "Incomplete", color: "#D53411", bgColor: "rgba(213,52,17,0.05)" };
+    default:
+      return getStatusInfo(shift.status, shift.approved);
   }
 };
 
@@ -139,11 +197,13 @@ export default function ActivityLogsPage() {
   const filteredShifts = useMemo(() => {
     switch (activeFilter) {
       case "active":
-        return shifts.filter((shift) => shift.status === ShiftStatus.ONGOING);
+        return shifts.filter(
+          (shift) => shift.status === ShiftStatus.ONGOING || shift.status === ShiftStatus.AVAILABLE
+        );
       case "completed":
         return shifts.filter((shift) => shift.status === ShiftStatus.COMPLETED);
       case "missed":
-        return shifts.filter((shift) => shift.status === ShiftStatus.EXPIRED);
+        return shifts.filter(isShiftMissed);
       case "incomplete":
         return pendingApprovals;
       default:
@@ -235,7 +295,7 @@ export default function ActivityLogsPage() {
                 </div>
               ) : (
                 paginatedShifts.map((shift) => {
-                  const statusInfo = getStatusInfo(shift.status);
+                  const statusInfo = getStatusInfoForTab(shift, activeFilter);
                   const clientName = shift.client
                     ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
                     : "Unknown Client";
