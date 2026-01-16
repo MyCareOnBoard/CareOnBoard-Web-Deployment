@@ -3,7 +3,6 @@ import {useNavigate} from "react-router";
 import {Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation} from "@/lib/api/shifts";
-// ShiftSectionProps is defined locally below
 import {format} from "date-fns";
 import {ClockOutModal} from "./ClockOutModal";
 import {LocationErrorModal} from "./LocationErrorModal";
@@ -14,8 +13,7 @@ import {
   clockIn as apiClockIn,
   shiftStarted as apiShiftStarted,
   clockOut as apiClockOut,
-  getAvailableShifts,
-  getPreviousShifts,
+  listShifts,
 } from "@/lib/api/shifts";
 import {toast} from "sonner";
 import {useAuth} from "@/utils/auth/context/AuthContext";
@@ -74,7 +72,6 @@ const calculateRemainingMinutes = (endTime: string, date: string): number => {
 
 type ShiftPanel = 'today' | 'upcoming' | 'previous';
 
-// Helper function to get client name
 const getClientName = (client?: { firstName?: string; lastName?: string; name?: string }) => {
   if (!client) return "Unknown Client";
   if (client.firstName && client.lastName) {
@@ -161,6 +158,36 @@ const isShiftPassed = (endTime: string | undefined, date: string): boolean => {
   }
 };
 
+const isShiftExpired = (shift: Shift): boolean => {
+  if (shift.status === ShiftStatus.COMPLETED) return false;
+  if (shift.clockedInAt) return false;
+  if (!shift.date) return false;
+
+  try {
+    const now = new Date();
+    let endDateTime: Date;
+
+    if (shift.endTime) {
+      endDateTime = convertTimeToISODate(shift.endTime, shift.date);
+    } else {
+      const date = new Date(shift.date);
+      endDateTime = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        23,
+        59,
+        59
+      );
+    }
+
+    return endDateTime.getTime() < now.getTime();
+  } catch (error) {
+    console.error('Error checking if shift is expired:', error);
+    return false;
+  }
+};
+
 interface ShiftCardProps {
   shift: Shift;
   panel: ShiftPanel;
@@ -194,6 +221,7 @@ function ShiftCard({
   const getActionButton = () => {
     console.log("shift", shift.actionStatus);
     if (!showAction || !shift.actionStatus) return null;
+    if (panel === 'today' && isShiftExpired(shift)) return null;
 
     const buttonConfig = {
       [ShiftActionStatus.CLOCK_IN]: {
@@ -227,11 +255,8 @@ function ShiftCard({
   return (
     <div
       className="bg-white/50 backdrop-blur-[20px] rounded-[20px] p-3 lg:p-4 flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:gap-4 hover:bg-white/70 transition-colors">
-      {/* Mobile & Tablet Layout */}
       <div className="flex lg:hidden flex-col gap-2.5 w-full">
-        {/* Info Grid - No Avatar on Mobile */}
         <div className="grid grid-cols-3 gap-2 text-sm">
-          {/* Client Name */}
           <div className="flex flex-col gap-0.5">
             <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Client</p>
             <p className="text-[13px] text-[#10141a] leading-[1.4] font-semibold whitespace-nowrap">
@@ -239,7 +264,6 @@ function ShiftCard({
             </p>
           </div>
 
-          {/* Date or Location */}
           {showDate ? (
             <div className="flex flex-col gap-0.5">
               <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Date</p>
@@ -254,7 +278,6 @@ function ShiftCard({
             </div>
           )}
 
-          {/* Time */}
           <div className="flex flex-col gap-0.5">
             <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">
               {shift.clockedInAt
@@ -271,7 +294,6 @@ function ShiftCard({
           </div>
         </div>
 
-        {/* Location row (if date is shown in first row) */}
         {showDate && (
           <div className="flex flex-col gap-0.5">
             <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
@@ -279,7 +301,6 @@ function ShiftCard({
           </div>
         )}
 
-        {/* Clock In/Out times for previous shifts */}
         {(shift.clockedInAt || shift.clockedOutAt) && showDate && (
           <div className="grid grid-cols-3 gap-2 text-sm">
             {shift.clockedInAt && (
@@ -300,11 +321,15 @@ function ShiftCard({
           </div>
         )}
 
-        {/* Badges */}
         <div className="flex flex-wrap items-center gap-2">
           {panel === 'today' && (
             <>
-              {shift.startTime && shift.endTime && shift.date && isShiftExpiringSoon(shift.startTime, shift.endTime, shift.date) && shift.actionStatus === ShiftActionStatus.CLOCK_IN && (
+              {isShiftExpired(shift) ? (
+                <span
+                  className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
+                  Expired
+                </span>
+              ) : shift.startTime && shift.endTime && shift.date && isShiftExpiringSoon(shift.startTime, shift.endTime, shift.date) && shift.actionStatus === ShiftActionStatus.CLOCK_IN && (
                 <span
                   className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
                   Expiring Soon
@@ -355,15 +380,12 @@ function ShiftCard({
               )}
             </>
           )}
-          {/* Action Button - Mobile */}
           {showAction && <div className="mt-1">{getActionButton()}</div>}
         </div>
 
       </div>
 
-      {/* Desktop Layout */}
       <div className="items-center hidden w-full gap-6 lg:flex">
-        {/* Client Avatar */}
         <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
           {shift.client?.profileImage && (
             <AvatarImage
@@ -378,9 +400,7 @@ function ShiftCard({
           </AvatarFallback>
         </Avatar>
 
-        {/* Shift Details */}
         <div className="flex items-center flex-1 min-w-0 gap-16">
-          {/* Client Name */}
           <div className="flex flex-col gap-1.5 shrink-0">
             <p className="text-[16px] font-semibold text-[#10141a] leading-[1.6] whitespace-nowrap">
               {shift.client?.firstName} {shift.client?.lastName}
@@ -388,7 +408,6 @@ function ShiftCard({
             <p className="text-[14px] text-[#808081] leading-[1.4] whitespace-nowrap">Client</p>
           </div>
 
-          {/* Info Grid */}
           <div className="flex flex-wrap gap-x-16 gap-y-2">
             {panel === 'previous' && (
               <div className="flex flex-col shrink-0 gap-1">
@@ -443,11 +462,15 @@ function ShiftCard({
           </div>
         </div>
 
-        {/* Status Badges */}
         <div className="flex flex-wrap items-center gap-2">
           {panel === 'today' && (
             <>
-              {shift.startTime && shift.endTime && shift.date && isShiftExpiringSoon(shift.startTime, shift.endTime, shift.date) && shift.actionStatus === ShiftActionStatus.CLOCK_IN && (
+              {isShiftExpired(shift) ? (
+                <span
+                  className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
+                  Expired
+                </span>
+              ) : shift.startTime && shift.endTime && shift.date && isShiftExpiringSoon(shift.startTime, shift.endTime, shift.date) && shift.actionStatus === ShiftActionStatus.CLOCK_IN && (
                 <span
                   className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
                   Expiring Soon
@@ -498,7 +521,6 @@ function ShiftCard({
               )}
             </>
           )}
-          {/* Action Button - Desktop */}
           {showAction && <div className="shrink-0">{getActionButton()}</div>}
         </div>
 
@@ -546,12 +568,10 @@ function ShiftSection({
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
 
-  // Display shifts based on expanded state
   const displayShifts = isExpanded
     ? shifts.slice(startIndex, endIndex)
     : shifts.slice(0, maxVisibleShifts);
 
-  // Reset to page 1 when expanding/collapsing
   const handleExpandToggle = () => {
     setCurrentPage(1);
     onExpandToggle?.();
@@ -682,6 +702,45 @@ export default function ShiftManagementPage() {
     return () => clearInterval(interval);
   }, [todayShift]);
 
+  const loadUpcomingShifts = async (currentShift: Shift | null = null) => {
+    const agencyId = user?.agencyId;
+    const employeeId = user?.profile?.id;
+
+    if (!agencyId) {
+      console.warn('No user ID available for fetching shifts');
+      return;
+    }
+
+      try {
+        setUpcomingLoading(true);
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const todayShiftsResponse = await listShifts({
+          date: today,
+          employeeId: employeeId,
+          agencyId: agencyId,
+        });
+        if (todayShiftsResponse.success) {
+          const filteredShifts = todayShiftsResponse.shifts.filter(shift => {
+            if (currentShift && shift.id === currentShift.id) {
+              return false;
+            }
+            if (isShiftPassed(shift.endTime, shift.date)) {
+              return false;
+            }
+            return true;
+          });
+          setUpcomingShifts(filteredShifts);
+        }
+    } catch (error: any) {
+      console.error('Failed to load upcoming shifts:', error);
+      toast.error('Failed to load upcoming shifts', {
+        description: error?.response?.data?.error || 'Please try again later'
+      });
+    } finally {
+      setUpcomingLoading(false);
+    }
+  };
+
   const loadShifts = async () => {
     const agencyId = user?.agencyId;
     const employeeId = user?.profile?.id;
@@ -708,29 +767,54 @@ export default function ShiftManagementPage() {
       }
     };
 
-    const loadUpcomingShifts = async () => {
-      try {
-        setUpcomingLoading(true);
-        const upcomingResponse = await getAvailableShifts(undefined, agencyId, employeeId);
-        if (upcomingResponse.success) {
-          setUpcomingShifts(upcomingResponse.shifts);
-        }
-      } catch (error: any) {
-        console.error('Failed to load upcoming shifts:', error);
-        toast.error('Failed to load upcoming shifts', {
-          description: error?.response?.data?.error || 'Please try again later'
-        });
-      } finally {
-        setUpcomingLoading(false);
-      }
+    const loadUpcomingShiftsLocal = async (currentShift: Shift | null = null) => {
+      return loadUpcomingShifts(currentShift);
     };
 
     const loadPreviousShifts = async () => {
       try {
         setPreviousLoading(true);
-        const previousResponse = await getPreviousShifts(30, agencyId, employeeId);
-        if (previousResponse.success) {
-          setPreviousShifts(previousResponse.shifts);
+        const allShiftsResponse = await listShifts({
+          employeeId: employeeId,
+          agencyId: agencyId,
+          limit: 100,
+        });
+        if (allShiftsResponse.success) {
+          const now = new Date();
+          const previousShiftsList = allShiftsResponse.shifts.filter(shift => {
+            if (shift.status === ShiftStatus.COMPLETED) {
+              return true;
+            }
+            if (!shift.date) return false;
+            let endDateTime: Date;
+            if (shift.endTime) {
+              try {
+                endDateTime = convertTimeToISODate(shift.endTime, shift.date);
+              } catch {
+                const date = new Date(shift.date);
+                endDateTime = new Date(
+                  date.getFullYear(),
+                  date.getMonth(),
+                  date.getDate(),
+                  23,
+                  59,
+                  59
+                );
+              }
+            } else {
+              const date = new Date(shift.date);
+              endDateTime = new Date(
+                date.getFullYear(),
+                date.getMonth(),
+                date.getDate(),
+                23,
+                59,
+                59
+              );
+            }
+            return endDateTime.getTime() < now.getTime();
+          });
+          setPreviousShifts(previousShiftsList);
         }
       } catch (error: any) {
         console.error('Failed to load previous shifts:', error);
@@ -742,9 +826,25 @@ export default function ShiftManagementPage() {
       }
     };
 
+    let currentShift: Shift | null = null;
+    try {
+      setTodayLoading(true);
+      const todayResponse = await getTodayShifts(agencyId, employeeId);
+      if (todayResponse.success) {
+        currentShift = todayResponse.shift;
+        setTodayShift(currentShift);
+      }
+    } catch (error: any) {
+      console.error('Failed to load today shifts:', error);
+      toast.error('Failed to load today shifts', {
+        description: error?.response?.data?.error || 'Please try again later'
+      });
+    } finally {
+      setTodayLoading(false);
+    }
+    
     await Promise.all([
-      loadTodayShifts(),
-      loadUpcomingShifts(),
+      loadUpcomingShiftsLocal(currentShift),
       loadPreviousShifts()
     ]);
   };
@@ -840,6 +940,7 @@ export default function ShiftManagementPage() {
 
       if (response?.success) {
         setTodayShift(response.shift);
+        await loadUpcomingShifts(response.shift);
         toast.success('Action completed successfully');
       }
     } catch (error: any) {
@@ -888,31 +989,17 @@ export default function ShiftManagementPage() {
     }
   };
 
-  // Filter out passed shifts from upcoming shifts and move them to previous shifts
-  // Also filter out today's shift if it exists
   const filteredUpcomingShifts = useMemo(() => {
     return upcomingShifts.filter(shift => {
-      // Exclude passed shifts
       if (isShiftPassed(shift.endTime, shift.date)) {
         return false;
       }
-      // Exclude today's shift if it exists
       if (todayShift && shift.id === todayShift.id) {
         return false;
       }
       return true;
     });
   }, [upcomingShifts, todayShift]);
-
-  // Get passed shifts from upcoming shifts to add to previous shifts
-  const passedShiftsFromUpcoming = useMemo(() => {
-    return upcomingShifts.filter(shift => isShiftPassed(shift.endTime, shift.date));
-  }, [upcomingShifts]);
-
-  // Combine previous shifts with passed shifts from upcoming
-  const combinedPreviousShifts = useMemo(() => {
-    return [...passedShiftsFromUpcoming, ...previousShifts];
-  }, [passedShiftsFromUpcoming, previousShifts]);
 
   return (
     <div className="min-h-[calc(100vh-200px)] px-2 sm:px-0">
@@ -934,7 +1021,6 @@ export default function ShiftManagementPage() {
       </div>
 
       <div className="bg-white/30 backdrop-blur border border-white/30 rounded-[20px] p-3 lg:p-5 relative">
-        {/* Info Bar - Visible on all screens, wraps responsively */}
         <div
           className="flex bg-white/0 backdrop-blur rounded-[20px] min-h-[46px] mb-4 lg:mb-6 items-start flex-wrap gap-3 sm:gap-4 lg:gap-6">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -987,13 +1073,13 @@ export default function ShiftManagementPage() {
               className="bg-[rgba(14,175,82,0.1)] backdrop-blur border border-white/30 rounded-[30px] p-5 min-h-[200px] flex items-center justify-center">
               <div className="flex flex-col items-center gap-4">
                 <Loader2 className="w-10 h-10 animate-spin text-[#0eaf52]"/>
-                <p className="text-[14px] text-[#808081]">Loading today's shifts...</p>
+                <p className="text-[14px] text-[#808081]">Loading current shift...</p>
               </div>
             </div>
           ) : todayShift ? (
             <ShiftSection
-              title="Today's Shift"
-              subtitle="These are your shifts for the day."
+              title="Current Shift"
+              subtitle="This is your current active shift."
               shifts={[{...todayShift, timeRemaining: timeRemaining !== null ? timeRemaining : undefined}]}
               panel="today"
               backgroundColor="bg-[rgba(14,175,82,0.1)]"
@@ -1039,7 +1125,7 @@ export default function ShiftManagementPage() {
             <ShiftSection
               title="Previous Shifts"
               subtitle="These are your Previous shifts"
-              shifts={combinedPreviousShifts}
+              shifts={previousShifts}
               panel="previous"
               backgroundColor="bg-white/30"
               isExpanded={previousExpanded}
@@ -1052,7 +1138,6 @@ export default function ShiftManagementPage() {
         </div>
       </div>
 
-      {/* Clock Out Confirmation Modal */}
       <ClockOutModal
         isOpen={showClockOutModal}
         onConfirm={handleClockOutConfirm}
@@ -1060,7 +1145,6 @@ export default function ShiftManagementPage() {
         isLoading={shiftsLoading}
       />
 
-      {/* Location Error Modal */}
       <LocationErrorModal
         isOpen={showLocationErrorModal}
         onClose={() => setShowLocationErrorModal(false)}
