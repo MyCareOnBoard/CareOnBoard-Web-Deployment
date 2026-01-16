@@ -1,4 +1,4 @@
-import {useState, useEffect} from "react";
+import {useState, useEffect, useMemo} from "react";
 import {useNavigate} from "react-router";
 import {Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado} from "lucide-react";
 import {Button} from "@/components/ui/button";
@@ -145,6 +145,19 @@ const calculateTimeUntilStart = (startTime: string, date: string): string => {
   } catch (error) {
     console.error('Error calculating time until start:', error);
     return 'Starting soon';
+  }
+};
+
+const isShiftPassed = (endTime: string | undefined, date: string): boolean => {
+  if (!endTime) return false;
+  
+  try {
+    const now = new Date();
+    const endDateTime = convertTimeToISODate(endTime, date);
+    return endDateTime.getTime() < now.getTime();
+  } catch (error) {
+    console.error('Error checking if shift has passed:', error);
+    return false;
   }
 };
 
@@ -875,6 +888,32 @@ export default function ShiftManagementPage() {
     }
   };
 
+  // Filter out passed shifts from upcoming shifts and move them to previous shifts
+  // Also filter out today's shift if it exists
+  const filteredUpcomingShifts = useMemo(() => {
+    return upcomingShifts.filter(shift => {
+      // Exclude passed shifts
+      if (isShiftPassed(shift.endTime, shift.date)) {
+        return false;
+      }
+      // Exclude today's shift if it exists
+      if (todayShift && shift.id === todayShift.id) {
+        return false;
+      }
+      return true;
+    });
+  }, [upcomingShifts, todayShift]);
+
+  // Get passed shifts from upcoming shifts to add to previous shifts
+  const passedShiftsFromUpcoming = useMemo(() => {
+    return upcomingShifts.filter(shift => isShiftPassed(shift.endTime, shift.date));
+  }, [upcomingShifts]);
+
+  // Combine previous shifts with passed shifts from upcoming
+  const combinedPreviousShifts = useMemo(() => {
+    return [...passedShiftsFromUpcoming, ...previousShifts];
+  }, [passedShiftsFromUpcoming, previousShifts]);
+
   return (
     <div className="min-h-[calc(100vh-200px)] px-2 sm:px-0">
       <div className="flex flex-col items-start justify-between gap-4 mb-6 sm:flex-row sm:items-center lg:mb-8">
@@ -977,7 +1016,7 @@ export default function ShiftManagementPage() {
             <ShiftSection
               title="Upcoming Shifts"
               subtitle="These are your shifts for the day."
-              shifts={upcomingShifts}
+              shifts={filteredUpcomingShifts}
               panel="upcoming"
               backgroundColor="bg-[rgba(43,130,255,0.1)]"
               isExpanded={upcomingExpanded}
@@ -1000,7 +1039,7 @@ export default function ShiftManagementPage() {
             <ShiftSection
               title="Previous Shifts"
               subtitle="These are your Previous shifts"
-              shifts={previousShifts}
+              shifts={combinedPreviousShifts}
               panel="previous"
               backgroundColor="bg-white/30"
               isExpanded={previousExpanded}
