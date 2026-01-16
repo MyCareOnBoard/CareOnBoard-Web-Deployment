@@ -240,6 +240,7 @@ export interface ShiftStatsBucket {
     date: string;      // YYYY-MM-DD
     scheduled: number; // pending | available | ongoing
     completed: number; // completed
+    ongoing: number;   // ongoing
     total: number;     // scheduled + completed
     expired: number;   // expired
 }
