@@ -40,6 +40,7 @@ export const Routes = {
         approvals: "/agency/scheduling/approvals",
         notes: "/agency/notes",
         mileage: "/agency/mileage",
+        incident: "/agency/incident",
         helpCenter: "/agency/help-center",
         settings: "/agency/settings",
         profile: "/agency/profile",
