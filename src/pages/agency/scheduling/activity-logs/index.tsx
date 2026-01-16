@@ -186,11 +186,12 @@ export default function ActivityLogsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.agencyId]);
 
-  const pendingApprovals = useMemo(() => {
+  const incompleteShifts = useMemo(() => {
     return shifts.filter(
       (shift) =>
         shift.status === ShiftStatus.COMPLETED &&
-        (shift.approved === false || shift.approved === null || shift.approved === undefined)
+        Boolean(shift.clockedInAt) &&
+        Boolean(shift.clockedOutAt)
     );
   }, [shifts]);
 
@@ -205,11 +206,11 @@ export default function ActivityLogsPage() {
       case "missed":
         return shifts.filter(isShiftMissed);
       case "incomplete":
-        return pendingApprovals;
+        return incompleteShifts;
       default:
         return shifts;
     }
-  }, [activeFilter, pendingApprovals, shifts]);
+  }, [activeFilter, incompleteShifts, shifts]);
 
   const totalActivityPages = Math.max(1, Math.ceil(filteredShifts.length / itemsPerPage));
 
