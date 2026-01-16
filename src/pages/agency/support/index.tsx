@@ -48,7 +48,6 @@ interface Contact {
   hasNotification?: boolean;
   isOnline?: boolean;
   category?: "dsp" | "administration" | "all";
-  otherUserId?: string;
   otherUserId?: string; // UID of the other participant
 }
 
