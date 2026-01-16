@@ -1,4 +1,4 @@
-import {YesNo} from "@/pages/agency/add-client/formData";
+import {YesNo} from "@/pages/shared/client-management/types/formData";
 import {RadioGroup, RadioGroupItem} from "@/components/ui/radio-group";
 import React from "react";
 
