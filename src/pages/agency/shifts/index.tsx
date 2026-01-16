@@ -33,7 +33,7 @@ export default function ShiftsPage() {
 
     // For thisYear, aggregate data by month
     if (timeFilter === 'thisYear') {
-      const monthlyData = new Map<string, { scheduled: number; completed: number; month: number }>();
+      const monthlyData = new Map<string, { scheduled: number; completed: number; ongoing: number; month: number }>();
       
       shifts.forEach(bucket => {
         const date = new Date(bucket.date);
@@ -43,6 +43,7 @@ export default function ShiftsPage() {
           monthlyData.set(monthKey, {
             scheduled: 0,
             completed: 0,
+            ongoing: 0,
             month: date.getMonth()
           });
         }
@@ -50,12 +51,14 @@ export default function ShiftsPage() {
         const data = monthlyData.get(monthKey)!;
         data.scheduled += bucket.scheduled;
         data.completed += bucket.completed;
+        data.ongoing += bucket.ongoing || 0;
       });
 
       return Array.from(monthlyData.values()).map(data => ({
         day: monthNames[data.month].toUpperCase(),
         scheduled: data.scheduled,
         completed: data.completed,
+        ongoing: data.ongoing,
         date: monthNames[data.month]
       }));
     }
@@ -82,13 +85,14 @@ export default function ShiftsPage() {
         day: dayLabel,
         scheduled: bucket.scheduled,
         completed: bucket.completed,
+        ongoing: bucket.ongoing || 0,
         date: dateLabel
       };
     });
   }, [shifts, timeFilter]);
 
   const maxShiftValue = shiftsData.length > 0 
-    ? Math.max(...shiftsData.map((d) => Math.max(d.scheduled, d.completed)), 1)
+    ? Math.max(...shiftsData.map((d) => Math.max(d.scheduled, d.completed, d.ongoing || 0)), 1)
     : 1;
 
   // Check if scrolling is needed for thisMonth
@@ -192,14 +196,18 @@ export default function ShiftsPage() {
               </button>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center gap-1">
                 <div className="flex justify-end items-center w-full">
                   <span className="text-[11px] font-medium text-[#808081] text-right">Scheduled</span>
                   <div className="w-3 h-3 rounded-sm bg-[#2B82FF] ml-2"></div>
                 </div>
                 <div className="flex justify-end items-center w-full">
                   <span className="text-[11px] font-medium text-[#808081]">Visit Completed</span>
-                  <div className="w-3 h-3 rounded-sm bg-[#2B82FF]/40 ml-2"></div>
+                  <div className="w-3 h-3 rounded-sm bg-[#84B7FF] ml-2"></div>
+                </div>
+                <div className="flex justify-end items-center w-full">
+                  <span className="text-[11px] font-medium text-[#808081]">Ongoing</span>
+                  <div className="w-3 h-3 rounded-sm bg-[#808081] ml-2"></div>
                 </div>
               </div>
             </div>
@@ -251,6 +259,14 @@ export default function ShiftsPage() {
                         {shiftsData[hoveredShift].completed}
                       </div>
                     </div>
+                    {shiftsData[hoveredShift].ongoing > 0 && (
+                      <div className="flex justify-between items-center gap-4">
+                        <div className="text-[#808081] text-xs">Ongoing</div>
+                        <div className="text-black text-xs font-semibold">
+                          {shiftsData[hoveredShift].ongoing}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : null}
@@ -281,7 +297,7 @@ export default function ShiftsPage() {
                 onMouseLeave={() => setHoveredShift(null)}
               >
                 <div className="relative w-full flex gap-1 items-end justify-center h-full">
-                  {shift.scheduled > 0 || shift.completed > 0 ? (
+                  {shift.scheduled > 0 || shift.completed > 0 || shift.ongoing > 0 ? (
                     <>
                       {/* Scheduled Bar */}
                       {shift.scheduled > 0 && <div
@@ -294,12 +310,21 @@ export default function ShiftsPage() {
                       </div>}
                       {/* Completed Bar */}
                       {shift.completed > 0 && <div
-                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#2B82FF]/40 transition-all duration-300"
+                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#84B7FF] transition-all duration-300"
                         style={{
                           height: shift.completed > 0 ? `${(shift.completed / maxShiftValue) * 100}%` : "30px",
                           minHeight: "30px",
                         }}
                       >{shift.completed}
+                      </div>}
+                      {/* Ongoing Bar */}
+                      {shift.ongoing > 0 && <div
+                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#808081] transition-all duration-300"
+                        style={{
+                          height: shift.ongoing > 0 ? `${(shift.ongoing / maxShiftValue) * 100}%` : "30px",
+                          minHeight: "30px",
+                        }}
+                      >{shift.ongoing}
                       </div>}
                     </>
                   ) : (

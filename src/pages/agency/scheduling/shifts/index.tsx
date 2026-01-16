@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { listShifts, Shift, deleteShift, updateShift, ShiftType, SubmissionStatus } from "@/lib/api/shifts";
+import { listShifts, Shift, deleteShift, updateShift, ShiftType, SubmissionStatus, formatShiftLocation } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
@@ -118,7 +118,7 @@ export default function ShiftsListPage() {
       result = result.filter(shift => 
         shift.client?.firstName?.toLowerCase().includes(query) ||
         shift.client?.lastName?.toLowerCase().includes(query) ||
-        shift.location?.toLowerCase().includes(query)
+        formatShiftLocation(shift.location).toLowerCase().includes(query)
       );
     }
     
@@ -147,7 +147,7 @@ export default function ShiftsListPage() {
     const formData: ScheduleFormData = {
       client: clientName,
       clientId: shift.client?.id || "",
-      clientLocation: shift.location || "",
+      clientLocation: shift.location || null,
       assignedDsp: employeeName,
       assignedDspId: (shift.employee as any)?.id || "",
       billingRate: "",
@@ -467,7 +467,7 @@ export default function ShiftsListPage() {
                 const clientAvatar = apiShift.client?.profileImage;
                 const employeeName = apiShift.employee?.fullName || "Unknown DSP";
                 const employeeAvatar = apiShift.employee?.profilePicture;
-                const location = apiShift.location || "Unknown Location";
+                const location = formatShiftLocation(apiShift.location?.address || "") || "Unknown Location";
                 const duration = calculateDuration(apiShift.date, apiShift.startTime, apiShift.endTime);
 
                 return (
@@ -477,7 +477,7 @@ export default function ShiftsListPage() {
                   >
                     {/* Client Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
                         {clientAvatar && (
                           <AvatarImage
                             src={clientAvatar}
@@ -485,7 +485,7 @@ export default function ShiftsListPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(clientName)}
                         </AvatarFallback>
                       </Avatar>
@@ -501,7 +501,7 @@ export default function ShiftsListPage() {
 
                     {/* DSP/Employee Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
                         {employeeAvatar && (
                           <AvatarImage
                             src={employeeAvatar}
@@ -509,7 +509,7 @@ export default function ShiftsListPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(employeeName)}
                         </AvatarFallback>
                       </Avatar>

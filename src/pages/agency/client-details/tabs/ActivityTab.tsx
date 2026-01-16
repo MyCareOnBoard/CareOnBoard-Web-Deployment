@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { listShifts, type Shift } from "@/lib/api/shifts";
+import { listShifts, type Shift, formatShiftLocation } from "@/lib/api/shifts";
 
 type ShiftRow = {
   id: string;
@@ -186,7 +186,7 @@ export function ActivityTab({
       const dspName = shift.employee?.fullName || shift.assignedDsp || "Unassigned";
       const dspRole = "DSP"; // Employee doesn't have a role field, defaulting to DSP
       const dateLabel = formatDate(shift.date);
-      const location = shift.location || "Location not specified";
+      const location = formatShiftLocation(shift.location) || "Location not specified";
       const clockedIn = shift.clockedInAt ? formatTime(shift.clockedInAt) : "Not clocked in";
       const clockedOut = shift.clockedOutAt ? formatTime(shift.clockedOutAt) : shift.status === "ongoing" ? "In progress" : "Not clocked out";
       const durationLabel = shift.sessionDuration || (shift.clockedInAt && shift.clockedOutAt ? calculateDuration(shift.clockedInAt, shift.clockedOutAt) : "N/A");
@@ -286,7 +286,7 @@ export function ActivityTab({
 
               <div className="w-[180px] text-[14px] font-medium leading-[1.4]">
                 <p className="mb-0 text-[#808081]">Location</p>
-                <p className="text-[#10141a]">{shift.location}</p>
+                <p className="text-[#10141a]">{formatShiftLocation(shift.location)}</p>
               </div>
 
               <p className="w-[95px] text-[14px] font-medium leading-[1.4] text-[#808081]">

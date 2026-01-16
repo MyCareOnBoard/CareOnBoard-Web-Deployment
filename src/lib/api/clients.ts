@@ -5,6 +5,8 @@
 
 import axiosClient from '../axios';
 import { ApiResponse } from '@/lib/api-types';
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { customBaseQuery } from "@/lib/baseQuery";
 
 /**
  * Client interface
@@ -746,3 +748,155 @@ export async function getClientStats(agencyId?: string): Promise<ClientStats> {
     throw new Error(err.message || 'Failed to fetch client stats');
   }
 }
+
+export const clientsApi = createApi({
+  reducerPath: "clientsApi",
+  baseQuery: customBaseQuery,
+  tagTypes: ['Clients', 'ClientStats'],
+  endpoints: (builder) => ({
+    listClients: builder.query<
+      ListClientsResponse,
+      ListClientsParams | void
+    >({
+      query: (params = {}) => {
+        const queryParams = new URLSearchParams();
+        if (params?.agencyId) queryParams.append('agencyId', params.agencyId);
+        if (params?.status) queryParams.append('status', params.status);
+        if (params?.service) queryParams.append('service', params.service);
+        if (params?.search) queryParams.append('search', params.search);
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        if (params?.agency !== undefined) queryParams.append('agency', params.agency.toString());
+        
+        return {
+          url: `/clients${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
+          method: "GET",
+          requiresAuth: true
+        };
+      },
+      providesTags: ['Clients'],
+    }),
+    listAgencyClients: builder.query<
+      ListAgencyClientsResponse,
+      ListClientsParams | void
+    >({
+      query: (params = {}) => {
+        const queryParams = new URLSearchParams();
+        if (params?.agencyId) queryParams.append('agencyId', params.agencyId);
+        if (params?.status) queryParams.append('status', params.status);
+        if (params?.service) queryParams.append('service', params.service);
+        if (params?.search) queryParams.append('search', params.search);
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        
+        return {
+          url: `/clientManagement${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
+          method: "GET",
+          requiresAuth: true
+        };
+      },
+      providesTags: ['Clients'],
+    }),
+    getClient: builder.query<
+      { success: boolean; data: Client },
+      { clientId: string; agencyId?: string }
+    >({
+      query: ({ clientId, agencyId }) => {
+        const queryParams = new URLSearchParams();
+        if (agencyId) queryParams.append('agencyId', agencyId);
+        
+        return {
+          url: `/clients/${clientId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
+          method: "GET",
+          requiresAuth: true
+        };
+      },
+      providesTags: (result, error, { clientId }) => [{ type: 'Clients', id: clientId }],
+    }),
+    getAgencyClient: builder.query<
+      { success: boolean; data: Client },
+      string
+    >({
+      query: (clientId) => ({
+        url: `/clientManagement/${clientId}`,
+        method: "GET",
+        requiresAuth: true
+      }),
+      providesTags: (result, error, clientId) => [{ type: 'Clients', id: clientId }],
+    }),
+    getClientStats: builder.query<
+      ClientStatsResponse,
+      string | void
+    >({
+      query: (agencyId) => {
+        const queryParams = new URLSearchParams();
+        if (agencyId) queryParams.append('agencyId', agencyId);
+        
+        return {
+          url: `/clients/stats${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
+          method: "GET",
+          requiresAuth: true
+        };
+      },
+      providesTags: ['ClientStats'],
+    }),
+    createClient: builder.mutation<
+      { success: boolean; data: Client },
+      CreateClientRequest
+    >({
+      query: (data) => ({
+        url: `/clients`,
+        method: "POST",
+        data,
+        requiresAuth: true
+      }),
+      invalidatesTags: ['Clients', 'ClientStats'],
+    }),
+    updateClient: builder.mutation<
+      { success: boolean; data: Client },
+      { clientId: string; data: UpdateClientRequest; agencyId?: string }
+    >({
+      query: ({ clientId, data, agencyId }) => {
+        const queryParams = new URLSearchParams();
+        if (agencyId) queryParams.append('agencyId', agencyId);
+        
+        return {
+          url: `/clients/${clientId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
+          method: "PUT",
+          data,
+          requiresAuth: true
+        };
+      },
+      invalidatesTags: (result, error, { clientId }) => [
+        { type: 'Clients', id: clientId },
+        'Clients',
+        'ClientStats'
+      ],
+    }),
+    deleteClient: builder.mutation<
+      { success: boolean; message: string },
+      { clientId: string; agencyId?: string }
+    >({
+      query: ({ clientId, agencyId }) => {
+        const queryParams = new URLSearchParams();
+        if (agencyId) queryParams.append('agencyId', agencyId);
+        
+        return {
+          url: `/clients/${clientId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
+          method: "DELETE",
+          requiresAuth: true
+        };
+      },
+      invalidatesTags: ['Clients', 'ClientStats'],
+    }),
+  }),
+});
+
+export const {
+  useListClientsQuery,
+  useListAgencyClientsQuery,
+  useGetClientQuery,
+  useGetAgencyClientQuery,
+  useGetClientStatsQuery,
+  useCreateClientMutation,
+  useUpdateClientMutation,
+  useDeleteClientMutation,
+} = clientsApi;

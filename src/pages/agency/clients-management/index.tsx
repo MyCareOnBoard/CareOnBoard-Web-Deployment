@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
-import { listAgencyClients, getClientStats, type Client } from "@/lib/api/clients";
+import { useListAgencyClientsQuery, useGetClientStatsQuery, type Client } from "@/lib/api/clients";
 
 interface DisplayClient {
   id: string;
@@ -29,15 +29,29 @@ export default function ClientsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [totalClients, setTotalClients] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const itemsPerPage = 7;
   const searchAnchorRef = useRef<HTMLDivElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const shouldShowSearchDropdown = searchQuery.trim().length >= 2;
+
+  const { data: clientsData, isLoading: isLoadingClients, isFetching: isSearching } = useListAgencyClientsQuery(
+    {
+      agencyId: user?.agencyId || "",
+      search: debouncedSearchQuery.trim() || undefined,
+      limit: 100,
+    },
+    { skip: !user?.agencyId }
+  );
+
+  const { data: statsData } = useGetClientStatsQuery(
+    user?.agencyId || "",
+    { skip: !user?.agencyId || !!debouncedSearchQuery.trim() }
+  );
+
+  const clients = clientsData?.clients || [];
+  const totalClients = statsData?.stats?.total || 0;
+  const isLoading = isLoadingClients && clients.length === 0;
+  const error = null;
 
   // Format client name from firstName, lastName, middleName (memoized)
   const formatClientName = useCallback((client: Client): string => {
@@ -83,7 +97,6 @@ export default function ClientsPage() {
     }
   }, []);
 
-  // Debounce search query (500ms delay)
   useEffect(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -99,50 +112,6 @@ export default function ClientsPage() {
       }
     };
   }, [searchQuery]);
-
-  // Fetch clients and stats (only when debounced search query or agencyId changes)
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user?.agencyId) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        // Show loading state only for initial load or when search query changes
-        if (clients.length === 0) {
-          setIsLoading(true);
-        } else {
-          setIsSearching(true);
-        }
-        setError(null);
-
-        // Fetch stats for total count (only on initial load or when search is cleared)
-        if (!debouncedSearchQuery.trim()) {
-          const stats = await getClientStats(user.agencyId);
-          setTotalClients(stats.total);
-        }
-
-        // Fetch clients list
-        const clientsList = await listAgencyClients({
-          agencyId: user.agencyId,
-          search: debouncedSearchQuery.trim() || undefined,
-          limit: 100, // Get all clients for client-side pagination
-        });
-        setClients(clientsList);
-      } catch (err: any) {
-        console.error("Failed to fetch clients:", err);
-        setError(err.message || "Failed to load clients");
-        setClients([]);
-        setTotalClients(0);
-      } finally {
-        setIsLoading(false);
-        setIsSearching(false);
-      }
-    };
-
-    fetchData();
-  }, [user?.agencyId, debouncedSearchQuery]);
 
   // Transform API clients to display format
   const displayClients: DisplayClient[] = useMemo(() => {
@@ -240,9 +209,7 @@ export default function ClientsPage() {
       </div>
 
       {/* Summary Card */}
-      <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)]">
-        <div className="absolute inset-0 backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)]" />
-        <div className="relative px-[20px] py-[16px]">
+      <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-[4px]">
               <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
@@ -266,11 +233,9 @@ export default function ClientsPage() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Directory */}
-      <div className="mt-4 relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
-        <div className="p-5">
+      <div className="mt-4 rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
           {/* Directory Header */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-[4px]">
@@ -363,7 +328,7 @@ export default function ClientsPage() {
               paginatedClients.map((client) => (
                 <div
                   key={client.id}
-                  className="flex items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
+                  className="flex items-center gap-4 rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white"
                 >
                   <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
                     {client.avatarUrl && (
@@ -452,6 +417,5 @@ export default function ClientsPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

@@ -38,7 +38,8 @@ import AgencyDashboardPage from "@/pages/agency/dashboard";
 import DSPManagementPage from "@/pages/agency/dsp-management";
 import ClientsPage from "@/pages/agency/clients-management";
 import ClientDetailsPage from "@/pages/agency/client-details";
-import AddClientPage from "@/pages/agency/add-client";
+import AgencyAddClientPage from "@/pages/shared/client-management/wrappers/AgencyAddClientPage";
+import AgencyEditClientPage from "@/pages/shared/client-management/wrappers/AgencyEditClientPage";
 import CommunityInclusionsPage from "@/pages/agency/clients-management/community-inclusions";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import ClientClaimsPage from "@/pages/agency/billing-and-approvals/client-claims";
@@ -49,11 +50,11 @@ import ApplicantDirectoryPage from "@/pages/agency/applicant-directory";
 import ClearanceHiring from "@/pages/agency/applicant-directory/ClearanceHiring";
 import PendingApplicants from "@/pages/agency/applicant-directory/PendingApplicants";
 import ApplicantProfilePage from "@/pages/agency/applicant-directory/ApplicantProfilePage";
-import ReportsPage from "@/pages/agency/reports";
 import ComplianceAlertsPage from "@/pages/agency/compliance-alerts";
 import ShiftsPage from "@/pages/agency/shifts";
 import ShiftsListPage from "@/pages/agency/scheduling/shifts";
 import ApprovalsPage from "@/pages/agency/scheduling/approvals";
+import ActivityLogsPage from "@/pages/agency/scheduling/activity-logs";
 import NotesPage from "@/pages/userPanel/notes";
 import AgencyNotesPage from "@/pages/agency/notes";
 import SuperAdminLayout from "@/layouts/SuperAdminLayout";
@@ -67,7 +68,8 @@ import ComplianceMonitor from "@/pages/super-admin/compliance-monitor";
 import UserAccessControlPage from "@/pages/super-admin/user-access-control";
 import ClientsDirectory from "@/pages/super-admin/clients-directory";
 import AdminClientDetails from "@/pages/super-admin/clients-directory/client-details";
-import AdminAddClientPage from "@/pages/super-admin/clients-directory/add-client";
+import SuperAdminAddClientPage from "@/pages/shared/client-management/wrappers/SuperAdminAddClientPage";
+import SuperAdminEditClientPage from "@/pages/shared/client-management/wrappers/SuperAdminEditClientPage";
 import CorporateSupportPage from "@/pages/super-admin/corporate-support";
 import OversightCenterPage from "@/pages/super-admin/oversight-center";
 import SuperAdminReports from "@/pages/super-admin/reports";
@@ -82,6 +84,11 @@ import AgencyBillingMonitorPage from "@/pages/super-admin/agency-billing-monitor
 import AIAutomationPage from "@/pages/agency/ai-automation";
 import AgencyMileagePage from "@/pages/agency/mileage";
 import AgencyIncidentPage from "@/pages/agency/incident";
+import AgencyReports from "@/pages/agency/reports";
+import AgencyClientReports from "@/pages/agency/reports/clientsReport";
+import AgencyDSPReports from "@/pages/agency/reports/dspReports";
+import AgencyTimesheetReports from "@/pages/agency/reports/timesheetReports";
+import AgencyNoteReports from "@/pages/agency/reports/noteReports";
 
 
 export const router = createBrowserRouter([
@@ -181,7 +188,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.addClient,
-                Component: AddClientPage,
+                Component: AgencyAddClientPage,
+            },
+            {
+                path: Routes.agency.editClient,
+                Component: AgencyEditClientPage,
             },
             {
                 path: Routes.agency.clientDetails,
@@ -224,6 +235,10 @@ export const router = createBrowserRouter([
                 Component: ApprovalsPage,
             },
             {
+                path: Routes.agency.activityLogs,
+                Component: ActivityLogsPage,
+            },
+            {
                 path: Routes.agency.support,
                 Component: SupportPage,
             },
@@ -246,10 +261,6 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.applicantProfile,
                 Component: ApplicantProfilePage,
-            },
-            {
-                path: Routes.agency.reports,
-                Component: ReportsPage,
             },
             {
                 path: Routes.agency.complianceAlerts,
@@ -286,6 +297,26 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.profile,
                 Component: ProfilePage,
+            },
+            {
+                path: Routes.agency.reports.index,
+                Component: AgencyReports,
+            },
+            {
+                path: Routes.agency.reports.clients,
+                Component: AgencyClientReports,
+            },
+            {
+                path: Routes.agency.reports.dsp,
+                Component: AgencyDSPReports,
+            },
+            {
+                path: Routes.agency.reports.shifts,
+                Component: AgencyTimesheetReports,
+            },
+            {
+                path: Routes.agency.reports.notes,
+                Component: AgencyNoteReports,
             },
         ],
     },
@@ -435,7 +466,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.superAdmin.addClient,
-                Component: AdminAddClientPage,
+                Component: SuperAdminAddClientPage,
+            },
+            {
+                path: Routes.superAdmin.editClient,
+                Component: SuperAdminEditClientPage,
             },
             {
                 path: Routes.superAdmin.corporateSupport,

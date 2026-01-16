@@ -50,6 +50,20 @@ export enum SubmissionStatus {
     SUBMITTED = "submitted",
 }
 
+export interface ShiftLocation {
+    address?: string;
+    countyState?: string;
+    zipCode?: string;
+    latlon?: { lat?: string; lon?: string };
+}
+
+export const formatShiftLocation = (location?: ShiftLocation | string | null): string => {
+    if (!location) return "";
+    if (typeof location === "string") return location;
+
+    return location.address || "";
+};
+
 /**
  * Shift interface
  */
@@ -57,7 +71,7 @@ export interface Shift {
     id: string;
     client?: Client;
     date: string;
-    location: string;
+    location?: ShiftLocation;
     startTime: string;
     endTime?: string;
     availableAt?: string;
@@ -95,7 +109,7 @@ export interface CreateShiftRequest {
     agencyId: string;
     clientId?: string;
     date: string; // Format: YYYY-MM-DD
-    location: string;
+    location: ShiftLocation | string;
     startTime: string;
     endTime?: string;
     clockedInAt?: string;
@@ -121,7 +135,7 @@ export interface CreateShiftRequest {
  */
 export interface UpdateShiftRequest {
     date?: string;
-    location?: string;
+    location?: ShiftLocation | string;
     startTime?: string;
     endTime?: string;
     availableAt?: string;
@@ -215,6 +229,7 @@ export interface ShiftStatsBucket {
     date: string;      // YYYY-MM-DD
     scheduled: number; // pending | available | ongoing
     completed: number; // completed
+    ongoing: number;   // ongoing
     total: number;     // scheduled + completed
     expired: number;   // expired
 }

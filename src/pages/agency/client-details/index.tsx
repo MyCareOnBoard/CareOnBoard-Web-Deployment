@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Phone } from "lucide-react";
-import { useParams } from "react-router";
+import { Loader2, Phone, Edit } from "lucide-react";
+import { useParams, useNavigate } from "react-router";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,12 +11,14 @@ import { DocumentsTab } from "@/pages/agency/client-details/tabs/DocumentsTab";
 import { UploadClientDocumentModal } from "@/pages/agency/client-details/components/UploadClientDocumentModal";
 import { useAuth } from "@/utils/auth";
 import { getAgencyClientById, type Client, type ClientDocument } from "@/lib/api/clients";
+import { Routes } from "@/routes/constants";
 
 type ClientDetailsTab = "activity" | "profile" | "services" | "documents";
 
 export default function ClientDetailsPage() {
   const { clientId } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<ClientDetailsTab>("activity");
   const [currentPage, setCurrentPage] = useState(1);
@@ -184,6 +186,15 @@ export default function ClientDetailsPage() {
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
           Client Management
         </h1>
+        {clientId && (
+          <Button
+            className="h-[44px] rounded-[60px] px-[16px] py-[12px] gap-2 bg-[#00b4b8] hover:bg-[#00a0a4] text-white flex items-center justify-center font-medium transition-colors"
+            onClick={() => navigate(Routes.agency.editClient.replace(":clientId", clientId))}
+          >
+            <Edit className="w-5 h-5 text-white" />
+            Edit Client
+          </Button>
+        )}
       </div>
 
       {/* Header Block */}
