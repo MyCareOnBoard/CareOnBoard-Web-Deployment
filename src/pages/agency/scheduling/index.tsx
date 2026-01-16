@@ -46,31 +46,57 @@ const parseTimeToParts = (time: string): { hours: number; minutes: number } | nu
 const isShiftMissed = (shift: Shift): boolean => {
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (shift.clockedInAt) return false;
-  if (!shift.date || !shift.endTime) return false;
-
-  const parsedTime = parseTimeToParts(shift.endTime);
-  if (!parsedTime) return false;
+  if (!shift.date) return false;
 
   const date = parseISO(shift.date);
-  const endDateTime = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    parsedTime.hours,
-    parsedTime.minutes
-  );
+  let endDateTime: Date;
+
+  if (shift.endTime) {
+    const parsedTime = parseTimeToParts(shift.endTime);
+    if (parsedTime) {
+      endDateTime = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        parsedTime.hours,
+        parsedTime.minutes
+      );
+    } else {
+      // If endTime exists but can't be parsed, use end of day
+      endDateTime = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        23,
+        59,
+        59
+      );
+    }
+  } else {
+    // If no endTime, use end of day
+    endDateTime = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      23,
+      59,
+      59
+    );
+  }
 
   return endDateTime.getTime() < Date.now();
 };
 // Helper function to get status display info
-const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
-  switch (status) {
+const getStatusInfo = (shift: Shift, approved?: boolean) => {
+  // Check if shift is missed first, regardless of status
+  if (isShiftMissed(shift)) {
+    return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
+  }
+
+  switch (shift.status) {
     case ShiftStatus.ONGOING:
       return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
     case ShiftStatus.COMPLETED:
-      if (approved === false) {
-        return { label: "Incomplete", color: "#D53411", bgColor: "rgba(213,52,17,0.05)" };
-      }
       return { label: "Completed", color: "#525253", bgColor: "rgba(178,178,179,0.05)" };
     case ShiftStatus.EXPIRED:
       return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
@@ -79,7 +105,7 @@ const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
     case ShiftStatus.AVAILABLE:
       return { label: "Available", color: "#00b4b8", bgColor: "rgba(0,180,184,0.05)" };
     default:
-      return { label: status, color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
+      return { label: shift.status, color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
   }
 };
 
@@ -306,11 +332,8 @@ export default function SchedulingPage() {
       {/* Main Content */}
       <div className="space-y-5">
           {/* Shifts Summary Card */}
-          <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)]">
-            {/* Glassmorphism background */}
-            <div className="absolute inset-0 backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)]" />
-            
-            <div className="relative px-5 py-4 flex items-center gap-2">
+          <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
+            <div className="flex items-center gap-2">
               {/* Title Section */}
               <div className="flex flex-col gap-1 w-[214px]">
                 <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
@@ -378,6 +401,7 @@ export default function SchedulingPage() {
 
               {/* Expand Button */}
               <button 
+                onClick={() => navigate(Routes.agency.shiftsList)}
                 className="ml-auto bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full w-[38px] h-[38px] flex items-center justify-center hover:bg-white/70 transition-colors cursor-pointer"
               >
                 <ArrowUpRight className="w-4 h-4 text-[#10141a]" />
@@ -386,8 +410,7 @@ export default function SchedulingPage() {
           </div>
 
           {/* Shift Approvals Card */}
-          <div className="relative w-full overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur-sm bg-[rgba(255,255,255,0.3)]">
-            <div className="p-5">
+          <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
               {/* Header */}
               <div className="flex flex-col gap-1 mb-6">
                 <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
@@ -607,11 +630,10 @@ export default function SchedulingPage() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Activity Log Section */}
-      <div className="mt-5 relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
-        <div className="p-5">
+      <div className="mt-5 rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
+        <div className="relative">
           {/* Header */}
           <div className="flex flex-col gap-1 mb-6">
             <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
@@ -623,7 +645,7 @@ export default function SchedulingPage() {
           </div>
           <button
             onClick={() => navigate(Routes.agency.activityLogs)}
-            className="absolute top-5 right-5 bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full w-[40px] h-[40px] flex items-center justify-center hover:bg-white/70 transition-colors cursor-pointer"
+            className="absolute top-0 right-0 bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full w-[40px] h-[40px] flex items-center justify-center hover:bg-white/70 transition-colors cursor-pointer"
             aria-label="Open activity logs"
           >
             <ArrowUpRight className="w-4 h-4 text-[#10141a]" />
@@ -641,7 +663,7 @@ export default function SchedulingPage() {
               </div>
             ) : (
               paginatedShifts.map((shift) => {
-                const statusInfo = getStatusInfo(shift.status, shift.approved);
+                const statusInfo = getStatusInfo(shift, shift.approved);
                 const clientName = shift.client 
                   ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
                   : "Unknown Client";
@@ -721,13 +743,17 @@ export default function SchedulingPage() {
                       {/* Clocked In */}
                       <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
                         <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
-                        <span className="text-[#10141a]">{formatTime(shift.clockedInAt || shift.startTime)}</span>
+                        <span className="text-[#10141a]">
+                          {shift.clockedInAt ? formatTime(shift.clockedInAt) : "--:-- --"}
+                        </span>
                       </div>
 
                       {/* Clocked Out */}
                       <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
                         <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
-                        <span className="text-[#10141a]">{formatTime(shift.clockedOutAt || shift.endTime)}</span>
+                        <span className="text-[#10141a]">
+                          {shift.clockedOutAt ? formatTime(shift.clockedOutAt) : "--:-- --"}
+                        </span>
                       </div>
                     </div>
 
@@ -793,6 +819,12 @@ export default function SchedulingPage() {
         setShowShiftDetails(false);
         setSelectedShift(null);
       }}
+      onShiftUpdated={(updatedShift) =>
+        setShifts((prev) => prev.map((shift) => (shift.id === updatedShift.id ? updatedShift : shift)))
+      }
+      onShiftDeleted={(shiftId) =>
+        setShifts((prev) => prev.filter((shift) => shift.id !== shiftId))
+      }
     />
     </>
   );

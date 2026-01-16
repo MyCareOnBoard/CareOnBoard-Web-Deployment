@@ -82,7 +82,7 @@ export interface Shift {
     id: string;
     client?: Client;
     date: string;
-    location: ShiftLocation | string;
+    location?: ShiftLocation;
     startTime: string;
     endTime?: string;
     availableAt?: string;

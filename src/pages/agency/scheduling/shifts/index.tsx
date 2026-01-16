@@ -467,7 +467,7 @@ export default function ShiftsListPage() {
                 const clientAvatar = apiShift.client?.profileImage;
                 const employeeName = apiShift.employee?.fullName || "Unknown DSP";
                 const employeeAvatar = apiShift.employee?.profilePicture;
-                const location = formatShiftLocation(apiShift.location) || "Unknown Location";
+                const location = formatShiftLocation(apiShift.location?.address || "") || "Unknown Location";
                 const duration = calculateDuration(apiShift.date, apiShift.startTime, apiShift.endTime);
 
                 return (
@@ -477,7 +477,7 @@ export default function ShiftsListPage() {
                   >
                     {/* Client Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
                         {clientAvatar && (
                           <AvatarImage
                             src={clientAvatar}
@@ -485,7 +485,7 @@ export default function ShiftsListPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(clientName)}
                         </AvatarFallback>
                       </Avatar>
@@ -501,7 +501,7 @@ export default function ShiftsListPage() {
 
                     {/* DSP/Employee Info */}
                     <div className="flex items-center gap-4 w-[256px]">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
+                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
                         {employeeAvatar && (
                           <AvatarImage
                             src={employeeAvatar}
@@ -509,7 +509,7 @@ export default function ShiftsListPage() {
                             className="w-full h-full object-cover aspect-auto"
                           />
                         )}
-                        <AvatarFallback className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                           {getInitialsFromName(employeeName)}
                         </AvatarFallback>
                       </Avatar>

@@ -44,19 +44,43 @@ const parseTimeToParts = (time: string): { hours: number; minutes: number } | nu
 const isShiftMissed = (shift: Shift): boolean => {
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (shift.clockedInAt) return false;
-  if (!shift.date || !shift.endTime) return false;
-
-  const parsedTime = parseTimeToParts(shift.endTime);
-  if (!parsedTime) return false;
+  if (!shift.date) return false;
 
   const date = parseISO(shift.date);
-  const endDateTime = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    parsedTime.hours,
-    parsedTime.minutes
-  );
+  let endDateTime: Date;
+
+  if (shift.endTime) {
+    const parsedTime = parseTimeToParts(shift.endTime);
+    if (parsedTime) {
+      endDateTime = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        parsedTime.hours,
+        parsedTime.minutes
+      );
+    } else {
+      // If endTime exists but can't be parsed, use end of day
+      endDateTime = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        23,
+        59,
+        59
+      );
+    }
+  } else {
+    // If no endTime, use end of day
+    endDateTime = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      23,
+      59,
+      59
+    );
+  }
 
   return endDateTime.getTime() < Date.now();
 };
@@ -66,9 +90,6 @@ const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
     case ShiftStatus.ONGOING:
       return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
     case ShiftStatus.COMPLETED:
-      if (approved === false) {
-        return { label: "Incomplete", color: "#D53411", bgColor: "rgba(213,52,17,0.05)" };
-      }
       return { label: "Completed", color: "#525253", bgColor: "rgba(178,178,179,0.05)" };
     case ShiftStatus.EXPIRED:
       return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
@@ -200,7 +221,9 @@ export default function ActivityLogsPage() {
     switch (activeFilter) {
       case "active":
         return shifts.filter(
-          (shift) => shift.status === ShiftStatus.ONGOING || shift.status === ShiftStatus.AVAILABLE
+          (shift) => 
+            (shift.status === ShiftStatus.ONGOING || shift.status === ShiftStatus.AVAILABLE) &&
+            !isShiftMissed(shift)
         );
       case "completed":
         return shifts.filter((shift) => shift.status === ShiftStatus.COMPLETED);
@@ -445,6 +468,12 @@ export default function ActivityLogsPage() {
           setShowShiftDetails(false);
           setSelectedShift(null);
         }}
+        onShiftUpdated={(updatedShift) =>
+          setShifts((prev) => prev.map((shift) => (shift.id === updatedShift.id ? updatedShift : shift)))
+        }
+        onShiftDeleted={(shiftId) =>
+          setShifts((prev) => prev.filter((shift) => shift.id !== shiftId))
+        }
       />
     </>
   );

@@ -286,7 +286,7 @@ export function ActivityTab({
 
               <div className="w-[180px] text-[14px] font-medium leading-[1.4]">
                 <p className="mb-0 text-[#808081]">Location</p>
-                <p className="text-[#10141a]">{shift.location}</p>
+                <p className="text-[#10141a]">{formatShiftLocation(shift.location)}</p>
               </div>
 
               <p className="w-[95px] text-[14px] font-medium leading-[1.4] text-[#808081]">

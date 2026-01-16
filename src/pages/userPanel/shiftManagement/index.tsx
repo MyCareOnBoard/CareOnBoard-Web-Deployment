@@ -351,7 +351,7 @@ function ShiftCard({
       {/* Desktop Layout */}
       <div className="items-center hidden w-full gap-6 lg:flex">
         {/* Client Avatar */}
-        <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
+        <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
           {shift.client?.profileImage && (
             <AvatarImage
               src={shift.client.profileImage}
@@ -360,7 +360,7 @@ function ShiftCard({
             />
           )}
           <AvatarFallback
-            className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-bold">
+            className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-bold">
             {getInitialsFromName(getClientName(shift.client))}
           </AvatarFallback>
         </Avatar>

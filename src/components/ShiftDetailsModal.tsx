@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { Shift, ShiftStatus, formatShiftLocation } from "@/lib/api/shifts";
+import { deleteShift, updateShiftStatus, Shift, ShiftStatus, formatShiftLocation } from "@/lib/api/shifts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 
 type ShiftDetailsModalProps = {
   isOpen: boolean;
@@ -14,6 +16,8 @@ type ShiftDetailsModalProps = {
   onMarkCompleted?: (shift: Shift) => void;
   onDelete?: (shift: Shift) => void;
   onAssignManual?: (shift: Shift) => void;
+  onShiftUpdated?: (shift: Shift) => void;
+  onShiftDeleted?: (shiftId: string) => void;
 };
 
 const getInitialsFromName = (name: string) => {
@@ -32,13 +36,9 @@ const getShiftDateLabel = (shift: Shift) => {
   }
 };
 
-const isShiftMissed = (shift: Shift): boolean => {
-  if (shift.status === ShiftStatus.COMPLETED) return false;
-  if (shift.clockedInAt) return false;
-  if (!shift.date || !shift.endTime) return false;
-
-  const match = shift.endTime.match(/(\d{1,2})[.:](\d{2})[:]?([AaPp][Mm])/);
-  if (!match) return false;
+const parseTimeToParts = (time: string): { hours: number; minutes: number } | null => {
+  const match = time.match(/(\d{1,2})[.:](\d{2})[:]?([AaPp][Mm])/);
+  if (!match) return null;
 
   let hours = parseInt(match[1], 10);
   const minutes = parseInt(match[2], 10);
@@ -46,43 +46,67 @@ const isShiftMissed = (shift: Shift): boolean => {
   if (period === "PM" && hours !== 12) hours += 12;
   if (period === "AM" && hours === 12) hours = 0;
 
+  return { hours, minutes };
+};
+
+const isShiftMissed = (shift: Shift): boolean => {
+  if (shift.status === ShiftStatus.COMPLETED) return false;
+  if (shift.clockedInAt) return false;
+  if (!shift.date) return false;
+
   const date = parseISO(shift.date);
-  const endDateTime = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    hours,
-    minutes
-  );
+  let endDateTime: Date;
+
+  if (shift.endTime) {
+    const parsedTime = parseTimeToParts(shift.endTime);
+    if (parsedTime) {
+      endDateTime = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        parsedTime.hours,
+        parsedTime.minutes
+      );
+    } else {
+      // If endTime exists but can't be parsed, use end of day
+      endDateTime = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        23,
+        59,
+        59
+      );
+    }
+  } else {
+    // If no endTime, use end of day
+    endDateTime = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      23,
+      59,
+      59
+    );
+  }
 
   return endDateTime.getTime() < Date.now();
 };
 
 const getStatusCallout = (shift: Shift) => {
-  const hasClockIn = Boolean(shift.clockedInAt);
-  const hasClockOut = Boolean(shift.clockedOutAt);
-
   if (isShiftMissed(shift)) {
     return {
       tone: "missed" as const,
       title: "Missed",
-      description: "This shift marked as missed as it doesn’t have any clock out time",
+      description: "This shift marked as missed as it doesn't have any clock out time",
     };
   }
 
-  if (shift.status === ShiftStatus.COMPLETED && hasClockIn && hasClockOut) {
+  if (shift.status === ShiftStatus.COMPLETED) {
     return {
       tone: "completed" as const,
       title: "Completed",
       description: "This shift marked as completed.",
-    };
-  }
-
-  if (!hasClockIn && !hasClockOut) {
-    return {
-      tone: "incomplete" as const,
-      title: "Incomplete",
-      description: "This shift marked as incomplete as it doesn’t have any clock in, clock out time",
     };
   }
 
@@ -99,16 +123,95 @@ export default function ShiftDetailsModal({
   onMarkCompleted,
   onDelete,
   onAssignManual,
+  onShiftUpdated,
+  onShiftDeleted,
 }: ShiftDetailsModalProps) {
   if (!isOpen || !shift) return null;
 
-  const dspName = shift.employee?.fullName || "Unknown DSP";
-  const clientName = shift.client
-    ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
+  const { toast } = useToast();
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [currentShift, setCurrentShift] = useState<Shift>(shift);
+
+  // Update currentShift when shift prop changes
+  useEffect(() => {
+    if (shift) {
+      setCurrentShift(shift);
+    }
+  }, [shift]);
+
+  const dspName = currentShift.employee?.fullName || "Unknown DSP";
+  const clientName = currentShift.client
+    ? `${currentShift.client.firstName || ""} ${currentShift.client.lastName || ""}`.trim() || "Unknown Client"
     : "Unknown Client";
 
-  const callout = getStatusCallout(shift);
-  const canMarkCompleted = shift.status !== ShiftStatus.COMPLETED;
+  const callout = getStatusCallout(currentShift);
+  const canMarkCompleted = currentShift.status !== ShiftStatus.COMPLETED;
+
+  const handleMarkCompleted = async () => {
+    if (!canMarkCompleted || isUpdating) return;
+    setIsUpdating(true);
+    try {
+      const response = await updateShiftStatus(currentShift.id, {
+        status: ShiftStatus.COMPLETED,
+        actionStatus: null,
+      });
+      // Update local state immediately to disable the button
+      setCurrentShift(response.shift);
+      onShiftUpdated?.(response.shift);
+      onMarkCompleted?.(response.shift);
+      toast({
+        title: "Shift updated",
+        description: "Shift marked as completed.",
+      });
+    } catch (error) {
+      console.error("Failed to mark shift completed:", error);
+      toast({
+        title: "Error",
+        description: "Failed to mark shift as completed.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteShift(currentShift.id);
+      onShiftDeleted?.(currentShift.id);
+      onDelete?.(currentShift);
+      toast({
+        title: "Shift deleted",
+        description: "The shift was deleted successfully.",
+      });
+      setShowDeleteConfirm(false);
+      onClose();
+    } catch (error) {
+      console.error("Failed to delete shift:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete shift.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleNotImplemented = (label: string) => {
+    toast({
+      title: "Coming soon",
+      description: `${label} action is not wired yet.`,
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -126,16 +229,16 @@ export default function ShiftDetailsModal({
         <div className="mb-4">
           <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">Shift</h2>
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            {getShiftDateLabel(shift)}
+            {getShiftDateLabel(currentShift)}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-6 mb-4">
           <div className="flex items-center gap-3">
             <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-              {shift.employee?.profilePicture && (
+              {currentShift.employee?.profilePicture && (
                 <AvatarImage
-                  src={shift.employee.profilePicture}
+                  src={currentShift.employee.profilePicture}
                   alt={dspName}
                   className="w-full h-full object-cover aspect-auto"
                 />
@@ -152,9 +255,9 @@ export default function ShiftDetailsModal({
 
           <div className="flex items-center gap-3">
             <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-              {shift.client?.profileImage && (
+              {currentShift.client?.profileImage && (
                 <AvatarImage
-                  src={shift.client.profileImage}
+                  src={currentShift.client.profileImage}
                   alt={clientName}
                   className="w-full h-full object-cover aspect-auto"
                 />
@@ -173,15 +276,15 @@ export default function ShiftDetailsModal({
         <div className="w-full rounded-[8px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.4)] p-3 text-[14px] leading-[1.4] mb-4">
           <div className="flex gap-2">
             <span className="w-[90px] text-[#808081]">Location</span>
-            <span className="text-[#10141a] font-semibold">{formatShiftLocation(shift.location) || "--------"}</span>
+            <span className="text-[#10141a] font-semibold">{formatShiftLocation(currentShift.location) || "--------"}</span>
           </div>
           <div className="flex gap-2 mt-2">
             <span className="w-[90px] text-[#808081]">Clock In</span>
-            <span className="text-[#10141a] font-semibold">{shift.clockedInAt || "--------"}</span>
+            <span className="text-[#10141a] font-semibold">{currentShift.clockedInAt || "--------"}</span>
           </div>
           <div className="flex gap-2 mt-2">
             <span className="w-[90px] text-[#808081]">Clock Out</span>
-            <span className="text-[#10141a] font-semibold">{shift.clockedOutAt || "--------"}</span>
+            <span className="text-[#10141a] font-semibold">{currentShift.clockedOutAt || "--------"}</span>
           </div>
         </div>
 
@@ -208,20 +311,37 @@ export default function ShiftDetailsModal({
         <div className="mt-auto">
           <div className="flex w-full justify-between gap-2">
           <button
-            onClick={() => shift && onSendNotification?.(shift)}
-            className="h-9 w-[152px] rounded-full bg-[#b2b2b3] text-[14px] font-semibold text-white"
+            onClick={() =>
+              onSendNotification ? onSendNotification(currentShift) : handleNotImplemented("Send Notification")
+            }
+            disabled={!onSendNotification}
+            className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${
+              onSendNotification
+                ? "bg-[#b2b2b3] hover:bg-[#9a9a9b] cursor-pointer active:bg-[#828283]"
+                : "bg-[#b2b2b3] opacity-50 cursor-not-allowed"
+            }`}
           >
             Send Notification
           </button>
           <button
-            onClick={() => shift && onMessage?.(shift)}
-            className="h-9 w-[152px] rounded-full bg-[#b2b2b3] text-[14px] font-semibold text-white"
+            onClick={() => (onMessage ? onMessage(currentShift) : handleNotImplemented("Message"))}
+            disabled={!onMessage}
+            className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${
+              onMessage
+                ? "bg-[#b2b2b3] hover:bg-[#9a9a9b] cursor-pointer active:bg-[#828283]"
+                : "bg-[#b2b2b3] opacity-50 cursor-not-allowed"
+            }`}
           >
             Message
           </button>
           <button
-            onClick={() => shift && onCall?.(shift)}
-            className="h-9 w-[152px] rounded-full bg-[#b2b2b3] text-[14px] font-semibold text-white"
+            onClick={() => (onCall ? onCall(currentShift) : handleNotImplemented("Call"))}
+            disabled={!onCall}
+            className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${
+              onCall
+                ? "bg-[#b2b2b3] hover:bg-[#9a9a9b] cursor-pointer active:bg-[#828283]"
+                : "bg-[#b2b2b3] opacity-50 cursor-not-allowed"
+            }`}
           >
             Call
           </button>
@@ -229,30 +349,55 @@ export default function ShiftDetailsModal({
 
         <div className="mt-3 flex w-full justify-between gap-2">
           <button
-            onClick={() => shift && onMarkCompleted?.(shift)}
-            disabled={!canMarkCompleted}
-            className={`h-9 w-[235px] rounded-full text-[14px] font-semibold text-white ${
-              canMarkCompleted ? "bg-[#00b4b8]" : "bg-[#00b4b8] opacity-30 cursor-not-allowed"
+            onClick={handleMarkCompleted}
+            disabled={!canMarkCompleted || isUpdating}
+            className={`h-9 w-[235px] rounded-full text-[14px] font-semibold text-white transition-colors ${
+              canMarkCompleted && !isUpdating
+                ? "bg-[#00b4b8] hover:bg-[#00a0a4] cursor-pointer active:bg-[#008c90]"
+                : "bg-[#00b4b8] opacity-50 cursor-not-allowed"
             }`}
           >
-            Mark As Completed
+            {isUpdating ? "Updating..." : "Mark As Completed"}
           </button>
           <button
-            onClick={() => shift && onDelete?.(shift)}
-            className="h-9 w-[235px] rounded-full bg-[#d53411] text-[14px] font-semibold text-white"
+            onClick={handleDeleteClick}
+            disabled={isDeleting}
+            className={`h-9 w-[235px] rounded-full text-[14px] font-semibold text-white transition-colors ${
+              isDeleting
+                ? "bg-[#d53411] opacity-50 cursor-not-allowed"
+                : "bg-[#d53411] hover:bg-[#c02e0f] cursor-pointer active:bg-[#ab280d]"
+            }`}
           >
             Delete Shift
           </button>
         </div>
 
         <button
-          onClick={() => shift && onAssignManual?.(shift)}
-          className="mt-3 w-full h-9 rounded-full border border-[#525253] text-[#525253] text-[14px] font-semibold"
+          onClick={() =>
+            onAssignManual ? onAssignManual(currentShift) : handleNotImplemented("Assign Manual Shift")
+          }
+          disabled={!onAssignManual}
+          className={`mt-3 w-full h-9 rounded-full border text-[14px] font-semibold transition-colors ${
+            onAssignManual
+              ? "border-[#525253] text-[#525253] hover:bg-[#f5f5f5] cursor-pointer active:bg-[#ebebeb]"
+              : "border-[#b2b2b3] text-[#b2b2b3] opacity-50 cursor-not-allowed"
+          }`}
         >
           Assign Manual Shift
         </button>
         </div>
       </div>
+
+      <DeleteConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+        title="Delete Shift?"
+        message="Are you sure you want to delete this shift? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 }
