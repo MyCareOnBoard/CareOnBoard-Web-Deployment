@@ -3,6 +3,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DSPShift } from "../types";
+import { formatShiftLocation } from "@/lib/api/shifts";
 
 interface ShiftsTabProps {
   shifts: DSPShift[];
@@ -84,7 +85,7 @@ export function ShiftsTab({ shifts, isLoading, getInitials }: ShiftsTabProps) {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Location</p>
-                    <p className="text-sm text-gray-900">{shift.location || '-'}</p>
+                    <p className="text-sm text-gray-900">{formatShiftLocation(shift.location) || '-'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Clocked In</p>

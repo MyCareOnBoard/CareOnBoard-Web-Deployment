@@ -9,6 +9,7 @@ import { Routes } from "@/routes/constants";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
 import { useAuth } from "@/utils/auth";
+import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 
 type ActivityFilter = "active" | "completed" | "missed" | "incomplete";
 
@@ -42,12 +43,10 @@ const parseTimeToParts = (time: string): { hours: number; minutes: number } | nu
 
 const isShiftMissed = (shift: Shift): boolean => {
   if (shift.status === ShiftStatus.COMPLETED) return false;
-  if (!shift.date) return false;
+  if (shift.clockedInAt) return false;
+  if (!shift.date || !shift.endTime) return false;
 
-  const endTime = shift.clockedOutAt || shift.endTime;
-  if (!endTime) return false;
-
-  const parsedTime = parseTimeToParts(endTime);
+  const parsedTime = parseTimeToParts(shift.endTime);
   if (!parsedTime) return false;
 
   const date = parseISO(shift.date);
@@ -114,6 +113,8 @@ export default function ActivityLogsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [showAddScheduleModal, setShowAddScheduleModal] = useState(false);
+  const [showShiftDetails, setShowShiftDetails] = useState(false);
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [editFormData, setEditFormData] = useState<ScheduleFormData | null>(null);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [activityPage, setActivityPage] = useState(1);
@@ -133,7 +134,7 @@ export default function ActivityLogsPage() {
     const formData: ScheduleFormData = {
       client: clientName,
       clientId: shift.client?.id || "",
-      clientLocation: shift.location || "",
+      clientLocation: shift.location || null,
       assignedDsp: employeeName,
       assignedDspId: (shift.employee as any)?.id || "",
       billingRate: "",
@@ -369,24 +370,27 @@ export default function ActivityLogsPage() {
                           </span>
                         </div>
 
-                        <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
-                          <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
-                          <span className="text-[#10141a]">
-                            {formatTime(shift.clockedInAt || shift.startTime)}
-                          </span>
-                        </div>
+                         <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
+                           <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
+                           <span className="text-[#10141a]">
+                             {shift.clockedInAt ? formatTime(shift.clockedInAt) : "--:-- --"}
+                           </span>
+                         </div>
 
-                        <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
-                          <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
-                          <span className="text-[#10141a]">
-                            {formatTime(shift.clockedOutAt || shift.endTime)}
-                          </span>
-                        </div>
+                         <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
+                           <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
+                           <span className="text-[#10141a]">
+                             {shift.clockedOutAt ? formatTime(shift.clockedOutAt) : "--:-- --"}
+                           </span>
+                         </div>
                       </div>
 
                       <Button
                         variant="outline"
-                        onClick={() => handleEdit(shift)}
+                        onClick={() => {
+                          setSelectedShift(shift);
+                          setShowShiftDetails(true);
+                        }}
                         className="bg-[#b2b2b3] border-[#b2b2b3] text-white rounded-full px-6 py-2.5 h-9 w-[121px] text-[14px] font-semibold hover:bg-[#9a9a9b] hover:text-white"
                       >
                         Details
@@ -433,6 +437,14 @@ export default function ActivityLogsPage() {
         onShiftsUpdated={(updatedShifts) => setShifts(updatedShifts)}
         editData={editFormData}
         mode={modalMode}
+      />
+      <ShiftDetailsModal
+        isOpen={showShiftDetails}
+        shift={selectedShift}
+        onClose={() => {
+          setShowShiftDetails(false);
+          setSelectedShift(null);
+        }}
       />
     </>
   );

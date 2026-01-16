@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { format } from "date-fns";
-import { listShifts, Shift, updateShift, ShiftStatus } from "@/lib/api/shifts";
+import { listShifts, Shift, updateShift, ShiftStatus, formatShiftLocation } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -114,7 +114,7 @@ export default function ApprovalsPage() {
       result = result.filter(shift => 
         shift.client?.firstName?.toLowerCase().includes(query) ||
         shift.client?.lastName?.toLowerCase().includes(query) ||
-        shift.location?.toLowerCase().includes(query) ||
+        formatShiftLocation(shift.location).toLowerCase().includes(query) ||
         shift.employee?.fullName?.toLowerCase().includes(query)
       );
     }
@@ -370,7 +370,7 @@ export default function ApprovalsPage() {
                 const clientAvatar = apiShift.client?.profileImage;
                 const employeeName = apiShift.employee?.fullName || "Unknown DSP";
                 const employeeAvatar = apiShift.employee?.profilePicture;
-                const location = apiShift.location || "Unknown Location";
+                const location = formatShiftLocation(apiShift.location) || "Unknown Location";
                 const duration = calculateDuration(apiShift.date, apiShift.startTime, apiShift.endTime);
 
                 return (

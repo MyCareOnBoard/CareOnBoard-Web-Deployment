@@ -2,7 +2,7 @@ import {useState, useEffect} from "react";
 import {useNavigate} from "react-router";
 import {Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado} from "lucide-react";
 import {Button} from "@/components/ui/button";
-import {Shift, ShiftStatus, ShiftActionStatus} from "@/lib/api/shifts";
+import {Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation} from "@/lib/api/shifts";
 // ShiftSectionProps is defined locally below
 import {format} from "date-fns";
 import {ClockOutModal} from "./ClockOutModal";
@@ -95,9 +95,9 @@ const getInitialsFromName = (name: string) => {
   return `${first}${last}`.toUpperCase();
 };
 
-const checkLocationMatch = (userLocation: string, shiftLocation: string): boolean => {
+const checkLocationMatch = (userLocation: string, shiftLocation?: Shift["location"] | null): boolean => {
   const normalizedUserLocation = userLocation.toLowerCase().trim();
-  const normalizedShiftLocation = shiftLocation.toLowerCase().trim();
+  const normalizedShiftLocation = formatShiftLocation(shiftLocation).toLowerCase().trim();
 
   return normalizedUserLocation === normalizedShiftLocation;
 };
@@ -1026,7 +1026,7 @@ export default function ShiftManagementPage() {
         isOpen={showLocationErrorModal}
         onClose={() => setShowLocationErrorModal(false)}
         userLocation={userLocation}
-        shiftLocation={todayShift?.location || ''}
+        shiftLocation={formatShiftLocation(todayShift?.location) || ''}
       />
     </div>
   );

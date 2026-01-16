@@ -50,6 +50,31 @@ export enum SubmissionStatus {
     SUBMITTED = "submitted",
 }
 
+export interface ShiftLocation {
+    address?: string;
+    countyState?: string;
+    zipCode?: string;
+    latlon?: { lat?: string; lon?: string };
+}
+
+export const formatShiftLocation = (location?: ShiftLocation | string | null): string => {
+    if (!location) return "";
+    if (typeof location === "string") return location;
+
+    const parts: string[] = [];
+
+    if (location.address) parts.push(location.address);
+    if (location.countyState) parts.push(location.countyState);
+    if (location.zipCode) parts.push(location.zipCode);
+
+    const hasCoords = location.latlon?.lat && location.latlon?.lon;
+    if (hasCoords) {
+        parts.push(`${location.latlon?.lat}, ${location.latlon?.lon}`);
+    }
+
+    return parts.join(", ");
+};
+
 /**
  * Shift interface
  */
@@ -57,7 +82,7 @@ export interface Shift {
     id: string;
     client?: Client;
     date: string;
-    location: string;
+    location: ShiftLocation | string;
     startTime: string;
     endTime?: string;
     availableAt?: string;
@@ -95,7 +120,7 @@ export interface CreateShiftRequest {
     agencyId: string;
     clientId?: string;
     date: string; // Format: YYYY-MM-DD
-    location: string;
+    location: ShiftLocation | string;
     startTime: string;
     endTime?: string;
     clockedInAt?: string;
@@ -121,7 +146,7 @@ export interface CreateShiftRequest {
  */
 export interface UpdateShiftRequest {
     date?: string;
-    location?: string;
+    location?: ShiftLocation | string;
     startTime?: string;
     endTime?: string;
     availableAt?: string;

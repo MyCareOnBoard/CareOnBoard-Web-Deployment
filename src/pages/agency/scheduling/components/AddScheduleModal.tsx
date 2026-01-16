@@ -9,7 +9,7 @@ import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import {Routes} from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
-import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus } from "@/lib/api/shifts";
+import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation } from "@/lib/api/shifts";
 import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
@@ -38,7 +38,7 @@ export interface ScheduleFormData {
   shiftId?: string;
   client: string;
   clientId: string;
-  clientLocation: string;
+  clientLocation: ShiftLocation | null;
   assignedDsp: string;
   assignedDspId: string;
   billingRate: string;
@@ -118,7 +118,7 @@ const noteTypes: {id: string, title: string}[] = [
 const initialFormData: ScheduleFormData = {
   client: "",
   clientId: "",
-  clientLocation: "",
+  clientLocation: null,
   assignedDsp: "",
   assignedDspId: "",
   billingRate: "",
@@ -390,13 +390,28 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     }, 300);
   }, [user?.agencyId, user?.uid]);
 
-  const formatLocation = (loc: Client["location"]): string => {
-    if (!loc) return "";
-    if (typeof loc === "string") return loc;
-    if (typeof loc === "object" && "lat" in loc && "lon" in loc) {
-      return `${loc.lat}, ${loc.lon}`;
+  const getClientPrimaryAddress = (client: Client): ShiftLocation | null => {
+    if (client.primaryAddress) {
+      return {
+        address: client.primaryAddress.address,
+        countyState: client.primaryAddress.countyState,
+        zipCode: client.primaryAddress.zipCode,
+        latlon: client.primaryAddress.location,
+      };
     }
-    return "";
+
+    const fallback: ShiftLocation = {
+      address: client.address,
+      countyState: client.countyState,
+      zipCode: client.zipCode,
+      latlon: client.location,
+    };
+
+    if (fallback.address || fallback.countyState || fallback.zipCode || fallback.latlon) {
+      return fallback;
+    }
+
+    return null;
   };
 
   const handleClientSelect = (client: Client) => {
@@ -406,7 +421,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         ? `${client.firstName} ${client.lastName}` 
         : client.id,
       clientId: client.id,
-      clientLocation: formatLocation( client.primaryAddress?.location || client.location),
+      clientLocation: getClientPrimaryAddress(client),
       serviceCode: client.services?.[0]?.code || "",
       assignedDsp: client.primaryDsp?.name || "",
       assignedDspId: client.primaryDsp?.id || "",
@@ -1091,7 +1106,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 value={formData.client}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setFormData(prev => ({ ...prev, client: value, clientId: "", clientLocation: "" }));
+                  setFormData(prev => ({ ...prev, client: value, clientId: "", clientLocation: null }));
                   handleClientSearch(value);
                   clearError("client");
                 }}
@@ -1123,7 +1138,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                         : client.id}
                     </p>
                     <p className="text-[12px] font-normal text-[#808081]">
-                      {client.address || formatLocation(client.location)}
+                      {formatShiftLocation(getClientPrimaryAddress(client))}
                     </p>
                   </button>
                 ))}
