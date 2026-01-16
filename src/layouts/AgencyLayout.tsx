@@ -22,6 +22,7 @@ import {
   MapPin,
   Settings,
   FileText,
+  AlertTriangle,
 } from "lucide-react";
 
 
@@ -41,6 +42,7 @@ const navItems: NavItem[] = [
   { label: "Trainings", path: Routes.agency.trainings, icon: Network },
   { label: "Mileage", path: Routes.agency.mileage, icon: MapPin },
   { label: "Settings", path: Routes.agency.settings, icon: Settings },
+  { label: "Incident", path: Routes.agency.incident, icon: AlertTriangle },
 ];
 
 
