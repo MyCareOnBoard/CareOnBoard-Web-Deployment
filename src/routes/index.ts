@@ -83,6 +83,7 @@ import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
 import AgencyBillingMonitorPage from "@/pages/super-admin/agency-billing-monitor";
 import AIAutomationPage from "@/pages/agency/ai-automation";
 import AgencyMileagePage from "@/pages/agency/mileage";
+import AgencyIncidentPage from "@/pages/agency/incident";
 import AgencyReports from "@/pages/agency/reports";
 import AgencyClientReports from "@/pages/agency/reports/clientsReport";
 import AgencyDSPReports from "@/pages/agency/reports/dspReports";
@@ -280,6 +281,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.mileage,
                 Component: AgencyMileagePage,
+            },
+            {
+                path: Routes.agency.incident,
+                Component: AgencyIncidentPage,
             },
             {
                 path: Routes.agency.helpCenter,

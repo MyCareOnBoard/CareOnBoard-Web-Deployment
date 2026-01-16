@@ -41,6 +41,7 @@ export const Routes = {
         activityLogs: "/agency/scheduling/activity-logs",
         notes: "/agency/notes",
         mileage: "/agency/mileage",
+        incident: "/agency/incident",
         helpCenter: "/agency/help-center",
         settings: "/agency/settings",
         profile: "/agency/profile",
