@@ -186,7 +186,7 @@ export default function AgencyDashboardPage() {
         </div>
 
         {/* Bottom Row - Shifts and Billing */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
+        <div>
           <div className={"space-y-6"}>
             {/* Shifts Chart */}
             <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
@@ -379,22 +379,22 @@ export default function AgencyDashboardPage() {
           </div>
 
           {/* Billing Approvals */}
-          <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-[16px] font-semibold text-[#10141a]">Billing Approvals</h2>
-                <p className="text-[12px] font-medium text-[#808081] mt-1">
-                  View Outstanding Billing Approvals
-                </p>
-              </div>
-              <button className="text-[#00b4b8] hover:text-[#0090a8] transition-colors">
-                <ChevronRight className="w-5 h-5"/>
-              </button>
-            </div>
-            <div className="text-center py-8">
-              <p className="text-[14px] font-medium text-[#808081]">No pending approvals</p>
-            </div>
-          </div>
+          {/*<div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">*/}
+          {/*  <div className="flex items-center justify-between mb-6">*/}
+          {/*    <div>*/}
+          {/*      <h2 className="text-[16px] font-semibold text-[#10141a]">Billing Approvals</h2>*/}
+          {/*      <p className="text-[12px] font-medium text-[#808081] mt-1">*/}
+          {/*        View Outstanding Billing Approvals*/}
+          {/*      </p>*/}
+          {/*    </div>*/}
+          {/*    <button className="text-[#00b4b8] hover:text-[#0090a8] transition-colors">*/}
+          {/*      <ChevronRight className="w-5 h-5"/>*/}
+          {/*    </button>*/}
+          {/*  </div>*/}
+          {/*  <div className="text-center py-8">*/}
+          {/*    <p className="text-[14px] font-medium text-[#808081]">No pending approvals</p>*/}
+          {/*  </div>*/}
+          {/*</div>*/}
         </div>
       </div>
     </div>
