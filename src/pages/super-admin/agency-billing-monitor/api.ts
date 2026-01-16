@@ -3,6 +3,13 @@ import { customBaseQuery } from "@/lib/baseQuery";
 
 export type BillingPlanCode = "basic" | "pro" | "enterprise" | (string & {});
 
+export type BillingSubscriptionStatus =
+  | "active"
+  | "cancelled"
+  | "expired"
+  | "expiring_soon"
+  | (string & {});
+
 export interface Pagination {
   page: number;
   limit: number;
@@ -23,7 +30,7 @@ export interface BillingMonitorAgency {
   expiryDate?: string; // ISO
   dsp?: number;
   clients?: number;
-  status?: string;
+  status?: BillingSubscriptionStatus;
   sendNotification?: boolean;
 }
 
@@ -42,7 +49,7 @@ export interface BillingMonitorAgencyRaw {
   expiryDate?: string;
   dsp?: number;
   clients?: number;
-  status?: string;
+  status?: BillingSubscriptionStatus;
 }
 
 export interface BillingMonitorAgenciesResponse {
@@ -82,6 +89,7 @@ export interface AgencyBillingInfo {
   plan?: BillingPlanCode;
   subscriptionStart?: string; // ISO
   subscriptionEnd?: string; // ISO
+  status?: BillingSubscriptionStatus;
   sendNotification?: boolean;
 }
 
@@ -96,7 +104,7 @@ export interface ListBillingMonitorAgenciesParams {
   limit?: number;
   search?: string;
   plan?: string;
-  status?: "active" | "inactive";
+  status?: BillingSubscriptionStatus;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }
@@ -117,6 +125,11 @@ export interface UpsertBillingPlanRequest {
   sendNotification: boolean;
 }
 
+export interface UpdateAgencyBillingStatusRequest {
+	status: BillingSubscriptionStatus;
+	sendNotification?: boolean;
+}
+
 export interface UpsertBillingPlanResponse {
   success: boolean;
   message?: string;
@@ -130,6 +143,7 @@ export interface UpsertBillingPlanResult {
   subscriptionStart?: string;
   subscriptionEnd?: string;
   expiryDate?: string;
+  status?: BillingSubscriptionStatus;
 }
 
 export interface EmployeesListResponse {
@@ -240,7 +254,19 @@ export const billingMonitorApi = createApi({
         url: `/billingMonitor/agencies/${agencyId}/billing`,
         method: "POST",
         data,
-        params: { agencyId },
+        requiresAuth: true,
+      }),
+      invalidatesTags: ["BillingMonitorAgencies", "BillingMonitorHistory", "BillingMonitorStats"],
+    }),
+
+    updateAgencyBillingStatus: builder.mutation<
+      UpsertBillingPlanResponse,
+      { agencyId: string; data: UpdateAgencyBillingStatusRequest }
+    >({
+      query: ({ agencyId, data }) => ({
+        url: `/billingMonitor/agencies/${agencyId}/billing`,
+        method: "POST",
+        data,
         requiresAuth: true,
       }),
       invalidatesTags: ["BillingMonitorAgencies", "BillingMonitorHistory", "BillingMonitorStats"],
@@ -294,6 +320,7 @@ export const {
   useGetBillingMonitorStatsQuery,
   useGetAgencyBillingInfoQuery,
   useUpsertAgencyBillingPlanMutation,
+	useUpdateAgencyBillingStatusMutation,
   useGetAgencyDspCountQuery,
   useGetAgencyClientCountQuery,
 } = billingMonitorApi;

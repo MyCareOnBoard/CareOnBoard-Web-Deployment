@@ -31,9 +31,11 @@ import {
 	useGetBillingMonitorAgenciesQuery,
 	useGetBillingMonitorHistoryQuery,
 	useUpsertAgencyBillingPlanMutation,
+	useUpdateAgencyBillingStatusMutation,
 	useGetAgencyDspCountQuery,
 	useGetAgencyClientCountQuery,
 	type BillingPlanCode,
+	type BillingSubscriptionStatus,
 	type BillingMonitorAgency,
 } from "@/pages/super-admin/agency-billing-monitor/api";
 
@@ -109,6 +111,7 @@ type BillingOverride = {
 	plan?: BillingPlanCode;
 	subscriptionStart?: string;
 	subscriptionEnd?: string;
+	status?: BillingSubscriptionStatus;
 };
 
 export default function AgencyBillingMonitorPage() {
@@ -123,21 +126,86 @@ export default function AgencyBillingMonitorPage() {
 	const [historyPage, setHistoryPage] = useState(1);
 	const limit = 10;
 
-	const {
-		data: agenciesResponse,
-		isLoading: agenciesLoading,
-		isFetching: agenciesFetching,
-		error: agenciesError,
-		refetch: refetchAgencies,
-	} = useGetBillingMonitorAgenciesQuery({
-		page: monitorPage,
+	const baseAgencyParams = useMemo(
+		() => ({
+			page: monitorPage,
+			limit,
+			search: view === "monitor" ? search : undefined,
+			plan: planFilter === "all" ? undefined : planFilter,
+			sortBy,
+			sortOrder,
+		}),
+		[limit, monitorPage, planFilter, search, sortBy, sortOrder, view]
+	);
+
+	const activeAgenciesQuery = useGetBillingMonitorAgenciesQuery(
+		{ ...baseAgencyParams, status: "active" },
+		{ skip: view !== "monitor" || statusTab !== "active" }
+	);
+	const expiringSoonAgenciesQuery = useGetBillingMonitorAgenciesQuery(
+		{ ...baseAgencyParams, status: "expiring_soon" },
+		{ skip: view !== "monitor" || statusTab !== "active" }
+	);
+	const cancelledAgenciesQuery = useGetBillingMonitorAgenciesQuery(
+		{ ...baseAgencyParams, status: "cancelled" },
+		{ skip: view !== "monitor" || statusTab !== "inactive" }
+	);
+	const expiredAgenciesQuery = useGetBillingMonitorAgenciesQuery(
+		{ ...baseAgencyParams, status: "expired" },
+		{ skip: view !== "monitor" || statusTab !== "inactive" }
+	);
+
+	const agenciesLoading =
+		statusTab === "active"
+			? activeAgenciesQuery.isLoading || expiringSoonAgenciesQuery.isLoading
+			: cancelledAgenciesQuery.isLoading || expiredAgenciesQuery.isLoading;
+	const agenciesFetching =
+		statusTab === "active"
+			? activeAgenciesQuery.isFetching || expiringSoonAgenciesQuery.isFetching
+			: cancelledAgenciesQuery.isFetching || expiredAgenciesQuery.isFetching;
+	const agenciesError =
+		statusTab === "active"
+			? activeAgenciesQuery.error || expiringSoonAgenciesQuery.error
+			: cancelledAgenciesQuery.error || expiredAgenciesQuery.error;
+
+	const agenciesResponse = useMemo(() => {
+		const relevant =
+			statusTab === "active"
+				? [activeAgenciesQuery.data, expiringSoonAgenciesQuery.data]
+				: [cancelledAgenciesQuery.data, expiredAgenciesQuery.data];
+
+		const merged = relevant.flatMap((r) => r?.data ?? []);
+		const deduped = Array.from(new Map(merged.map((a) => [a.agencyId, a])).values());
+		const total = relevant.reduce((sum, r) => sum + (r?.pagination?.total ?? 0), 0);
+
+		return {
+			data: deduped,
+			pagination: {
+				page: monitorPage,
+				limit,
+				total,
+				totalPages: Math.max(1, Math.ceil(total / limit)),
+			},
+		};
+	}, [
+		activeAgenciesQuery.data,
+		expiringSoonAgenciesQuery.data,
+		cancelledAgenciesQuery.data,
+		expiredAgenciesQuery.data,
 		limit,
-		search: view === "monitor" ? search : undefined,
-		plan: planFilter === "all" ? undefined : planFilter,
-		status: statusTab,
-		sortBy,
-		sortOrder,
-	});
+		monitorPage,
+		statusTab,
+	]);
+
+	const refetchAgencies = () => {
+		if (statusTab === "active") {
+			activeAgenciesQuery.refetch();
+			expiringSoonAgenciesQuery.refetch();
+			return;
+		}
+		cancelledAgenciesQuery.refetch();
+		expiredAgenciesQuery.refetch();
+	};
 
 	const {
 		data: historyResponse,
@@ -200,6 +268,7 @@ export default function AgencyBillingMonitorPage() {
 
 	const [upsertBillingPlan, { isLoading: isSavingBilling }] =
 		useUpsertAgencyBillingPlanMutation();
+	const [updateBillingStatus] = useUpdateAgencyBillingStatusMutation();
 
 	const openAdd = () => {
 		setEditingBillingId(null);
@@ -243,17 +312,15 @@ export default function AgencyBillingMonitorPage() {
 	};
 
 	const filteredBillings = useMemo(() => {
+		// The server filters by status. Keep a tiny guard so local overrides
+		// immediately reflect cancel/remove without waiting for refetch.
 		return agencies.filter((b) => {
-			const statusFromApi = b.status?.toLowerCase();
-			if (statusFromApi === "active" || statusFromApi === "inactive") {
-				return statusTab === statusFromApi;
+			const overrideStatus = billingOverrides[b.agencyId]?.status;
+			if (!overrideStatus) return true;
+			if (statusTab === "active") {
+				return overrideStatus === "active" || overrideStatus === "expiring_soon";
 			}
-
-			const override = billingOverrides[b.agencyId];
-			const effectiveEnd = override?.subscriptionEnd ?? b.subscriptionEnd ?? b.expiryDate;
-			const end = effectiveEnd ? new Date(effectiveEnd) : null;
-			const active = end ? isActive(end) : true;
-			return statusTab === "active" ? active : !active;
+			return overrideStatus === "cancelled" || overrideStatus === "expired";
 		});
 	}, [agencies, billingOverrides, statusTab]);
 
@@ -287,15 +354,7 @@ export default function AgencyBillingMonitorPage() {
 				});
 			}
 
-			const returned = result?.data as
-				| {
-					agencyId?: string;
-					plan?: BillingPlanCode;
-					subscriptionStart?: string;
-					subscriptionEnd?: string;
-					expiryDate?: string;
-				}
-				| undefined;
+			const returned = result?.data;
 
 			if (returned?.agencyId) {
 				setBillingOverrides((prev) => ({
@@ -304,6 +363,7 @@ export default function AgencyBillingMonitorPage() {
 						plan: returned.plan,
 						subscriptionStart: returned.subscriptionStart,
 						subscriptionEnd: returned.subscriptionEnd ?? returned.expiryDate,
+						status: returned.status ?? "active",
 					},
 				}));
 			} else {
@@ -313,6 +373,7 @@ export default function AgencyBillingMonitorPage() {
 						plan: planCodeFromLabel(formPlan as PlanName),
 						subscriptionStart: formStart.toISOString(),
 						subscriptionEnd: formEnds.toISOString(),
+						status: "active",
 					},
 				}));
 			}
@@ -342,23 +403,11 @@ export default function AgencyBillingMonitorPage() {
 	const handleCancelPlan = async () => {
 		if (!editingBillingId || !formAgencyId) return;
 
-		const now = new Date();
-		const planLabel = formPlan || normalizePlanLabel(editingBilling?.plan);
-		const planCode = planCodeFromLabel((planLabel || "Basic Plan") as PlanName);
-		const candidateStart =
-			formStart ??
-			(editingBilling?.subscriptionStart ? new Date(editingBilling.subscriptionStart) : null) ??
-			now;
-		const safeStart = candidateStart.getTime() > now.getTime() ? now : candidateStart;
-		const startIso = safeStart.toISOString();
-
 		try {
-			const result = await upsertBillingPlan({
+			const result = await updateBillingStatus({
 				agencyId: formAgencyId,
 				data: {
-					plan: planCode,
-					subscriptionStart: startIso,
-					subscriptionEnd: now.toISOString(),
+					status: "cancelled",
 					sendNotification: true,
 				},
 			}).unwrap();
@@ -371,21 +420,12 @@ export default function AgencyBillingMonitorPage() {
 				});
 			}
 
-			const returned = result?.data as
-				| {
-					agencyId?: string;
-					plan?: BillingPlanCode;
-					subscriptionStart?: string;
-					subscriptionEnd?: string;
-				}
-				| undefined;
-
+			const returned = result?.data;
 			setBillingOverrides((prev) => ({
 				...prev,
 				[formAgencyId]: {
-					plan: returned?.plan ?? planCode,
-					subscriptionStart: returned?.subscriptionStart ?? startIso,
-					subscriptionEnd: returned?.subscriptionEnd ?? now.toISOString(),
+					...prev[formAgencyId],
+					status: returned?.status ?? "cancelled",
 				},
 			}));
 			void refetchAgencies();
@@ -408,20 +448,10 @@ export default function AgencyBillingMonitorPage() {
 			return;
 		}
 
-		const target = agencies.find((a) => a.agencyId === deleteTargetId);
-		const now = new Date();
-		const planLabel = normalizePlanLabel(target?.plan);
-		const planCode = planCodeFromLabel(planLabel);
-		const candidateStart = target?.subscriptionStart ? new Date(target.subscriptionStart) : now;
-		const safeStart = candidateStart.getTime() > now.getTime() ? now : candidateStart;
-		const startIso = safeStart.toISOString();
-
-		upsertBillingPlan({
+		updateBillingStatus({
 			agencyId: deleteTargetId,
 			data: {
-				plan: planCode,
-				subscriptionStart: startIso,
-				subscriptionEnd: now.toISOString(),
+				status: "cancelled",
 				sendNotification: true,
 			},
 		})
@@ -435,21 +465,12 @@ export default function AgencyBillingMonitorPage() {
 					});
 				}
 
-				const returned = result?.data as
-					| {
-						agencyId?: string;
-						plan?: BillingPlanCode;
-						subscriptionStart?: string;
-						subscriptionEnd?: string;
-					}
-					| undefined;
-
+				const returned = result?.data;
 				setBillingOverrides((prev) => ({
 					...prev,
 					[deleteTargetId]: {
-						plan: returned?.plan ?? planCode,
-						subscriptionStart: returned?.subscriptionStart ?? startIso,
-						subscriptionEnd: returned?.subscriptionEnd ?? now.toISOString(),
+						...prev[deleteTargetId],
+						status: returned?.status ?? "cancelled",
 					},
 				}));
 				void refetchAgencies();
