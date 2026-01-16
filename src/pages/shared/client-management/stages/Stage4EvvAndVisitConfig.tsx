@@ -1,7 +1,7 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { AddClientFormData, YesNo } from "@/pages/agency/add-client/formData";
+import { AddClientFormData, YesNo } from "@/pages/shared/client-management/types/formData";
 
 function YesNoRadio({
   label,
@@ -37,10 +37,12 @@ export function Stage4EvvAndVisitConfig({
   footer,
   formData,
   setFormData,
+  pageTitle = "Add client",
 }: {
   footer: React.ReactNode;
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+  pageTitle?: string;
 }) {
   const stage4 = formData.stage4;
   const updateStage4 = (patch: Partial<AddClientFormData["stage4"]>) =>
@@ -50,7 +52,7 @@ export function Stage4EvvAndVisitConfig({
     <div className="min-h-[calc(100vh-200px)]">
       <div className="mb-10">
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-          Add client
+          {pageTitle}
         </h1>
       </div>
 
@@ -135,5 +137,3 @@ export function Stage4EvvAndVisitConfig({
     </div>
   );
 }
-
-

@@ -12,29 +12,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AddClientFormData } from "@/pages/super-admin/clients-directory/add-client/formData";
+import { AddClientFormData } from "@/pages/shared/client-management/types/formData";
 import { Agency } from "@/lib/api/clients";
 
 export function Stage1ClientIdentityAndContact({
-  agencies,
-  loadingAgencies,
+  showAgencySelection = false,
+  agencies = [],
+  loadingAgencies = false,
+  userAgencyId,
   footer,
   formData,
   setFormData,
+  pageTitle = "Add client",
 }: {
-  agencies: Agency[];
-  loadingAgencies: boolean;
+  showAgencySelection?: boolean;
+  agencies?: Agency[];
+  loadingAgencies?: boolean;
+  userAgencyId?: string;
   footer: React.ReactNode;
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+  pageTitle?: string;
 }) {
   const stage1 = formData.stage1;
   const updateStage1 = (patch: Partial<AddClientFormData["stage1"]>) =>
     setFormData((prev) => ({ ...prev, stage1: { ...prev.stage1, ...patch } }));
 
+  useEffect(() => {
+    if (!showAgencySelection && userAgencyId && !formData.agencyId) {
+      setFormData((prev) => ({ ...prev, agencyId: userAgencyId }));
+    }
+  }, [showAgencySelection, userAgencyId, formData.agencyId, setFormData]);
+
   const [isDobOpen, setIsDobOpen] = useState(false);
 
-  // Primary Address autocomplete (same pattern as manual shift "location" field)
   const [addressSuggestions, setAddressSuggestions] = useState<
     Array<{
       display_name?: string;
@@ -57,7 +68,6 @@ export function Stage1ClientIdentityAndContact({
   const addressInputRef = useRef<HTMLDivElement>(null);
   const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Secondary Address autocomplete
   const [secondaryAddressSuggestions, setSecondaryAddressSuggestions] = useState<
     Array<{
       display_name?: string;
@@ -238,21 +248,26 @@ export function Stage1ClientIdentityAndContact({
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
-      <div className="mb-5">
+      <div className="mb-10">
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-          Add client
+          {pageTitle}
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4 mb-10">
-        <div className="flex flex-col gap-1">
-          <label className="text-[14px] font-semibold text-[#10141a]">Agency</label>
-          <p className="text-[12px] font-medium leading-[1.4] text-[#808081]">
-            Select the agency for the client.
-          </p>
-          <Select value={formData.agencyId} onValueChange={(v) => setFormData({ ...formData, agencyId: v })}>
+      {showAgencySelection && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4 mb-10">
+          <div className="flex flex-col gap-1">
+            <label className="text-[14px] font-semibold text-[#10141a]">Agency</label>
+            <p className="text-[12px] font-medium leading-[1.4] text-[#808081]">
+              Select the agency for the client.
+            </p>
+            <Select 
+              value={formData.agencyId || undefined} 
+              onValueChange={(v) => setFormData((prev) => ({ ...prev, agencyId: v }))}
+              disabled={loadingAgencies}
+            >
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-                <SelectValue placeholder="Select agency" />
+                <SelectValue placeholder={loadingAgencies ? "Loading agencies..." : "Select agency"} />
               </SelectTrigger>
               <SelectContent>
                 {agencies.map((agency) => (
@@ -260,10 +275,10 @@ export function Stage1ClientIdentityAndContact({
                 ))}
               </SelectContent>
             </Select>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* 1. Client Identity Information */}
       <div className="mb-10">
         <div className="mb-2">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
@@ -414,7 +429,6 @@ export function Stage1ClientIdentityAndContact({
         </div>
       </div>
 
-      {/* 2. Contact Information */}
       <div className="mb-10">
         <div className="mb-2">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
@@ -427,13 +441,12 @@ export function Stage1ClientIdentityAndContact({
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-semibold text-[#10141a]">Primary Address</label>
+            <label className="text-[12px] font-normal text-[#10141a]">Primary Address</label>
             <div className="relative" ref={addressInputRef}>
               <Input
                 value={stage1.address}
                 onChange={(e) => {
                   const v = e.target.value;
-                  // If user edits after selecting a suggestion, clear coordinates until re-selected.
                   updateStage1({ address: v, location: undefined });
                   handleAddressSearch(v);
                 }}
@@ -493,17 +506,18 @@ export function Stage1ClientIdentityAndContact({
           </div>
         </div>
 
-        {/* Secondary Address Section */}
         <div className="mt-6 mb-6">
-          <label className="text-[12px] font-semibold text-[#10141a]">Secondary Address (Optional)</label>
+          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a] mb-4">
+            Secondary Address (Optional)
+          </p>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
             <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Secondary Address</label>
               <div className="relative" ref={secondaryAddressInputRef}>
                 <Input
                   value={stage1.secondaryAddress}
                   onChange={(e) => {
                     const v = e.target.value;
-                    // If user edits after selecting a suggestion, clear coordinates until re-selected.
                     updateStage1({ secondaryAddress: v, secondaryLocation: undefined });
                     handleSecondaryAddressSearch(v);
                   }}
@@ -624,5 +638,3 @@ export function Stage1ClientIdentityAndContact({
     </div>
   );
 }
-
-

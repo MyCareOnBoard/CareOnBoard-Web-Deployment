@@ -1,5 +1,4 @@
 export type Stage1ClientIdentityAndContactData = {
-    // Identity
     firstName: string;
     lastName: string;
     middleName: string;
@@ -9,19 +8,14 @@ export type Stage1ClientIdentityAndContactData = {
     dddId: string;
     ssn: string;
     nursingLevel?: string;
-
-    // Contact - Primary Address
     address: string;
     location?: { lat: string; lon: string };
     countyState: string;
     zipCode: string;
-
-    // Contact - Secondary Address
     secondaryAddress: string;
     secondaryLocation?: { lat: string; lon: string };
     secondaryCountyState: string;
     secondaryZipCode: string;
-
     phone: string;
     email: string;
     language?: string;
@@ -81,7 +75,6 @@ export type DocState = {
 };
 
 export type Stage3HealthcareAndDocumentsData = {
-    // Section 5
     medicalConditions: string;
     allergies: string;
     dietaryRestrictions: string;
@@ -90,8 +83,6 @@ export type Stage3HealthcareAndDocumentsData = {
     behaviorSupportPlan: string;
     communicationNeeds: string;
     emergencyProtocols: string;
-
-    // Section 6
     docs: DocState[];
 };
 
@@ -127,7 +118,6 @@ export type Stage5StaffAssignmentAndRestrictionsData = {
 };
 
 export type Stage6GoalsAndEmergencyData = {
-    // Goals
     clientGoals: string;
     communityGoals: string;
     dailyLivingGoals: string;
@@ -136,8 +126,6 @@ export type Stage6GoalsAndEmergencyData = {
     ispOutcomes: string;
     targetBehaviors: string;
     supportStrategies: string;
-
-    // Emergency
     emergencyName: string;
     emergencyRelationship?: string;
     primaryPhone: string;
@@ -155,7 +143,6 @@ export type Stage7SystemAiAndAuditData = {
     aiGoalTracking: boolean;
     expiringDocsReminder: boolean;
     renewalsReminder: boolean;
-
     auditCycle: AuditCycle;
     assignedQaStaff: string;
     requiredVisitDocumentation: string;
@@ -195,7 +182,7 @@ function createEmptyServiceAuthorization(): Service {
     };
 }
 
-function createInitialDocs(): DocState[] {
+export function createInitialDocs(): DocState[] {
     return [
         {
             key: "isp",
@@ -346,5 +333,3 @@ export function createInitialAddClientFormData(): AddClientFormData {
         },
     };
 }
-
-

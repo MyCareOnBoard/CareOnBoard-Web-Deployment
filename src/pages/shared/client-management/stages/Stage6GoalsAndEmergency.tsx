@@ -7,16 +7,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AddClientFormData } from "@/pages/agency/add-client/formData";
+import { AddClientFormData } from "@/pages/shared/client-management/types/formData";
 
 export function Stage6GoalsAndEmergency({
   footer,
   formData,
   setFormData,
+  pageTitle = "Add client",
 }: {
   footer: React.ReactNode;
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+  pageTitle?: string;
 }) {
   const stage6 = formData.stage6;
   const updateStage6 = (patch: Partial<AddClientFormData["stage6"]>) =>
@@ -31,11 +33,10 @@ export function Stage6GoalsAndEmergency({
     <div className="min-h-[calc(100vh-200px)]">
       <div className="mb-10">
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-          Add client
+          {pageTitle}
         </h1>
       </div>
 
-      {/* 9. Goals & Outcomes Setup */}
       <div className="mb-10">
         <div className="mb-4">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
@@ -159,7 +160,6 @@ export function Stage6GoalsAndEmergency({
         </div>
       </div>
 
-      {/* 10. Emergency / Critical Information */}
       <div className="mb-10">
         <div className="mb-4">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
@@ -277,5 +277,3 @@ export function Stage6GoalsAndEmergency({
     </div>
   );
 }
-
-

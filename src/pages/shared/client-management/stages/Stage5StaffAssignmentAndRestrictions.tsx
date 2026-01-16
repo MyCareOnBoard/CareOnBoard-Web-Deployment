@@ -12,7 +12,7 @@ import {
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
-import { AddClientFormData, AutoCheckKey, YesNo } from "@/pages/agency/add-client/formData";
+import { AddClientFormData, AutoCheckKey, YesNo } from "@/pages/shared/client-management/types/formData";
 
 function YesNoRadio({
   label,
@@ -48,10 +48,12 @@ export function Stage5StaffAssignmentAndRestrictions({
   footer,
   formData,
   setFormData,
+  pageTitle = "Add client",
 }: {
   footer: React.ReactNode;
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+  pageTitle?: string;
 }) {
   const { user } = useAuth();
 
@@ -59,7 +61,6 @@ export function Stage5StaffAssignmentAndRestrictions({
   const updateStage5 = (patch: Partial<AddClientFormData["stage5"]>) =>
     setFormData((prev) => ({ ...prev, stage5: { ...prev.stage5, ...patch } }));
 
-  // DSP search (Primary/Secondary) — using Popover pattern
   const [primarySearchResults, setPrimarySearchResults] = useState<Employee[]>([]);
   const [secondarySearchResults, setSecondarySearchResults] = useState<Employee[]>([]);
   const [isPrimaryPopoverOpen, setIsPrimaryPopoverOpen] = useState(false);
@@ -123,7 +124,6 @@ export function Stage5StaffAssignmentAndRestrictions({
         try {
           setIsSearchingSecondary(true);
           const results = await searchEmployees(query, agencyId);
-          // Filter out primary DSP and already selected secondary DSPs
           const selectedIds = new Set([
             stage5.primaryDsp?.id,
             ...stage5.secondaryDsps.map(dsp => dsp.id)
@@ -151,7 +151,6 @@ export function Stage5StaffAssignmentAndRestrictions({
   };
 
   const handleSecondarySelect = (employee: Employee) => {
-    // Add to secondary DSPs array if not already selected
     const isAlreadySelected = stage5.secondaryDsps.some(dsp => dsp.id === employee.id);
     if (!isAlreadySelected) {
       updateStage5({
@@ -169,7 +168,6 @@ export function Stage5StaffAssignmentAndRestrictions({
     });
   };
 
-  // Sync primary input value when primaryDsp changes externally
   useEffect(() => {
     if (stage5.primaryDsp?.name) {
       setPrimaryInputValue(stage5.primaryDsp.name);
@@ -193,7 +191,7 @@ export function Stage5StaffAssignmentAndRestrictions({
     <div className="min-h-[calc(100vh-200px)]">
       <div className="mb-10">
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-          Add client
+          {pageTitle}
         </h1>
       </div>
 
@@ -313,7 +311,6 @@ export function Stage5StaffAssignmentAndRestrictions({
                 </PopoverContent>
               )}
             </Popover>
-            {/* Selected Secondary DSPs */}
             {stage5.secondaryDsps.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {stage5.secondaryDsps.map((dsp) => (
@@ -431,5 +428,3 @@ export function Stage5StaffAssignmentAndRestrictions({
     </div>
   );
 }
-
-

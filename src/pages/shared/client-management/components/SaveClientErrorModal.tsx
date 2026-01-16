@@ -1,5 +1,4 @@
 import React from "react";
-
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -22,7 +21,6 @@ export function SaveClientErrorModal({
         showCloseButton={false}
         className="w-[min(90vw,426px)] gap-6 p-5"
       >
-        {/* Error Icon */}
         <div className="relative inline-grid h-[100px] w-[100px] shrink-0">
           <div className="absolute inset-0 rounded-full bg-[#fef2f2]" />
           <div className="absolute left-[14.5px] top-[14px] flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full bg-[#d53411]">
@@ -61,4 +59,3 @@ export function SaveClientErrorModal({
     </Dialog>
   );
 }
-

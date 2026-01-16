@@ -1,16 +1,18 @@
 import React, { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { AddClientFormData } from "@/pages/agency/add-client/formData";
+import { AddClientFormData } from "@/pages/shared/client-management/types/formData";
 
 export function Stage7SystemAiAndAudit({
   footer,
   formData,
   setFormData,
+  pageTitle = "Add client",
 }: {
   footer: React.ReactNode;
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+  pageTitle?: string;
 }) {
   const stage7 = formData.stage7;
   const updateStage7 = (patch: Partial<AddClientFormData["stage7"]>) =>
@@ -57,18 +59,17 @@ export function Stage7SystemAiAndAudit({
     <div className="min-h-[calc(100vh-200px)]">
       <div className="mb-10">
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-          Add client
+          {pageTitle}
         </h1>
       </div>
 
-      {/* 11. System & AI Settings */}
       <div className="mb-10">
         <div className="mb-4">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
             11. System &amp; AI Settings
           </p>
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            Defines how the platform interacts with the client’s data.
+            Defines how the platform interacts with the client's data.
           </p>
         </div>
 
@@ -82,7 +83,6 @@ export function Stage7SystemAiAndAudit({
         </div>
       </div>
 
-      {/* 12. Audit & Monitoring Setup */}
       <div className="mb-10">
         <div className="mb-4">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
@@ -178,5 +178,3 @@ export function Stage7SystemAiAndAudit({
     </div>
   );
 }
-
-

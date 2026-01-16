@@ -251,15 +251,15 @@ export function ActivityTab({
             key={shift.id}
             className="flex items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
           >
-            <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
+            <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
               {shift.avatarUrl && (
                 <AvatarImage
                   src={shift.avatarUrl}
                   alt={shift.dspName}
-                  className="w-full h-full object-cover aspect-auto rounded-lg"
+                  className="w-full h-full object-cover aspect-auto rounded-[8px]"
                 />
               )}
-              <AvatarFallback className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+              <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
                 {shift.dspName
                   .split(" ")
                   .filter(Boolean)

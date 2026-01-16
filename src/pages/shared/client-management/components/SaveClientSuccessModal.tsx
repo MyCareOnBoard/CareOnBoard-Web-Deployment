@@ -1,5 +1,4 @@
 import React from "react";
-
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 type SaveClientSuccessModalProps = {
@@ -23,7 +22,6 @@ export function SaveClientSuccessModal({
         showCloseButton={false}
         className="w-[min(90vw,426px)] gap-6 p-5"
       >
-        {/* Success Icon */}
         <div className="relative inline-grid h-[100px] w-[100px] shrink-0">
           <div className="absolute inset-0 rounded-full bg-[#f0faf4]" />
           <div className="absolute left-[14.5px] top-[14px] flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full bg-[#0eaf52]">
@@ -56,5 +54,3 @@ export function SaveClientSuccessModal({
     </Dialog>
   );
 }
-
-

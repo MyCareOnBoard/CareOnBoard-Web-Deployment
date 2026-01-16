@@ -13,6 +13,7 @@ export function StageFooter({
   onSave,
   primaryLoading = false,
   requireDeclaration = true,
+  saveButtonText = "Save Client",
 }: {
   declared: boolean;
   setDeclared: (next: boolean) => void;
@@ -23,6 +24,7 @@ export function StageFooter({
   onSave: () => void;
   primaryLoading?: boolean;
   requireDeclaration?: boolean;
+  saveButtonText?: string;
 }) {
   const primaryDisabled = requireDeclaration ? !declared : false;
 
@@ -58,7 +60,7 @@ export function StageFooter({
           onClick={isLast ? onSave : onNext}
           disabled={primaryDisabled || primaryLoading}
         >
-          {isLast ? "Save Client" : "Next"}
+          {isLast ? saveButtonText : "Next"}
           {isLast ? (
             primaryLoading ? (
               <Loader2 className="w-5 h-5 text-white animate-spin" />
@@ -73,5 +75,3 @@ export function StageFooter({
     </div>
   );
 }
-
-

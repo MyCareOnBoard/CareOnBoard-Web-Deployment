@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AddClientFormData, Service } from "@/pages/agency/add-client/formData";
+import { AddClientFormData, Service } from "@/pages/shared/client-management/types/formData";
 import { listServices, useListServicesQuery, type Service as ApiService } from "@/lib/api/services";
 
 function ServiceAuthorizationFields({
@@ -39,6 +39,17 @@ function ServiceAuthorizationFields({
     }
   }, [data, loadingServices]);
 
+  useEffect(() => {
+    if (!loadingServices && offeredServices.length > 0 && (service.name || service.code) && !selectedType) {
+      const matchingService = offeredServices.find(
+        (s) => (service.name && s.name === service.name) || (service.code && s.code === service.code)
+      );
+      if (matchingService && matchingService.type) {
+        setSelectedType(matchingService.type);
+      }
+    }
+  }, [loadingServices, offeredServices, service.name, service.code, selectedType]);
+
   const serviceTypes = useMemo(
     () =>
       Array.from(
@@ -59,16 +70,15 @@ function ServiceAuthorizationFields({
     [offeredServices, selectedType],
   );
 
-  // If type changes and current service is not within that type, clear it
   useEffect(() => {
-    if (!selectedType) return;
+    if (!selectedType || loadingServices || offeredServices.length === 0) return;
     const stillValid = filteredServices.some(
       (svc) => svc.name === service.name && svc.code === service.code,
     );
     if (!stillValid && (service.name || service.code)) {
       onChange({ ...service, name: "", code: "" });
     }
-  }, [selectedType, filteredServices, service.name, service.code, onChange]);
+  }, [selectedType, filteredServices, service.name, service.code, onChange, loadingServices, offeredServices.length]);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
@@ -109,7 +119,6 @@ function ServiceAuthorizationFields({
         <Select
           value={service.name}
           onValueChange={(v) => {
-            // Find the selected service to get its code
             const selectedService = filteredServices.find((s) => s.name === v);
             onChange({ ...service, name: v, code: selectedService?.code || "" });
           }}
@@ -502,16 +511,17 @@ export function Stage2GuardianAndFunding({
   footer,
   formData,
   setFormData,
+  pageTitle = "Add client",
 }: {
   footer: React.ReactNode;
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+  pageTitle?: string;
 }) {
   const stage2 = formData.stage2;
   const updateStage2 = (patch: Partial<AddClientFormData["stage2"]>) =>
     setFormData((prev) => ({ ...prev, stage2: { ...prev.stage2, ...patch } }));
 
-  // Address autocomplete (same pattern as manual shift "location" field)
   const [addressSuggestions, setAddressSuggestions] = useState<
     Array<{
       display_name?: string;
@@ -614,11 +624,10 @@ export function Stage2GuardianAndFunding({
     <div className="min-h-[calc(100vh-200px)]">
       <div className="mb-10">
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-          Add client
+          {pageTitle}
         </h1>
       </div>
 
-      {/* Section 3 */}
       <div className="mb-10">
         <div className="mb-2">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
@@ -764,7 +773,6 @@ export function Stage2GuardianAndFunding({
         </div>
       </div>
 
-      {/* Section 4 */}
       <div className="mb-10">
         <div className="mb-2 flex items-start justify-between gap-4">
           <div>
@@ -832,5 +840,3 @@ export function Stage2GuardianAndFunding({
     </div>
   );
 }
-
-

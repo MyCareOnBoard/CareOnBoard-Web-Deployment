@@ -61,18 +61,7 @@ export const formatShiftLocation = (location?: ShiftLocation | string | null): s
     if (!location) return "";
     if (typeof location === "string") return location;
 
-    const parts: string[] = [];
-
-    if (location.address) parts.push(location.address);
-    if (location.countyState) parts.push(location.countyState);
-    if (location.zipCode) parts.push(location.zipCode);
-
-    const hasCoords = location.latlon?.lat && location.latlon?.lon;
-    if (hasCoords) {
-        parts.push(`${location.latlon?.lat}, ${location.latlon?.lon}`);
-    }
-
-    return parts.join(", ");
+    return location.address || "";
 };
 
 /**
