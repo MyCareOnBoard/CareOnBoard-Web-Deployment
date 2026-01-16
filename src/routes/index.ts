@@ -54,6 +54,7 @@ import ComplianceAlertsPage from "@/pages/agency/compliance-alerts";
 import ShiftsPage from "@/pages/agency/shifts";
 import ShiftsListPage from "@/pages/agency/scheduling/shifts";
 import ApprovalsPage from "@/pages/agency/scheduling/approvals";
+import ActivityLogsPage from "@/pages/agency/scheduling/activity-logs";
 import NotesPage from "@/pages/userPanel/notes";
 import AgencyNotesPage from "@/pages/agency/notes";
 import SuperAdminLayout from "@/layouts/SuperAdminLayout";
@@ -221,6 +222,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.approvals,
                 Component: ApprovalsPage,
+            },
+            {
+                path: Routes.agency.activityLogs,
+                Component: ActivityLogsPage,
             },
             {
                 path: Routes.agency.support,
