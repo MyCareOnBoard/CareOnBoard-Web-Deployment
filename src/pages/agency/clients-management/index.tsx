@@ -240,9 +240,7 @@ export default function ClientsPage() {
       </div>
 
       {/* Summary Card */}
-      <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)]">
-        <div className="absolute inset-0 backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)]" />
-        <div className="relative px-[20px] py-[16px]">
+      <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-[4px]">
               <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
@@ -266,11 +264,9 @@ export default function ClientsPage() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Directory */}
-      <div className="mt-4 relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
-        <div className="p-5">
+      <div className="mt-4 rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
           {/* Directory Header */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-[4px]">
@@ -363,7 +359,7 @@ export default function ClientsPage() {
               paginatedClients.map((client) => (
                 <div
                   key={client.id}
-                  className="flex items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
+                  className="flex items-center gap-4 rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white"
                 >
                   <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
                     {client.avatarUrl && (
@@ -452,6 +448,5 @@ export default function ClientsPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

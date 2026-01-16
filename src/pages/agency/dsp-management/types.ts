@@ -1,3 +1,5 @@
+import { ShiftLocation } from "@/lib/api/shifts";
+
 // Types
 export interface DSP {
   id: string;
@@ -37,7 +39,7 @@ export interface DSPShift {
   date: string;
   startTime: string;
   endTime: string;
-  location: string;
+  location: ShiftLocation | string;
   duration: string;
   status: string;
   clockedInAt?: string;

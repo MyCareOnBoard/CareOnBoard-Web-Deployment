@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ActivityTab } from "./components/ActivityTab";
 import { ShiftsTab } from "./components/ShiftsTab";
 import { ProfileTab } from "./components/ProfileTab";
+import { formatShiftLocation } from "@/lib/api/shifts";
 
 interface DSPProfileProps {
   dsp: DSP;
@@ -224,7 +225,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
             date: shift.date,
             startTime: shift.startTime,
             endTime: shift.endTime || '',
-            location: shift.location,
+            location: formatShiftLocation(shift.location),
             duration: shift.sessionDuration || '',
             status: shift.status,
             clockedInAt: shift.clockedInAt,

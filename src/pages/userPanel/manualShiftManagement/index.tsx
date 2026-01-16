@@ -9,7 +9,7 @@ import SuccessModal from "./components/SuccessModal";
 import { useToast } from "@/hooks/use-toast";
 import { Routes } from "@/routes/constants";
 import DigitalSignatureModal from "@/pages/applicant/application/components/DigitalSignature";
-import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift, ShiftActionStatus } from "@/lib/api/shifts";
+import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift, ShiftActionStatus, formatShiftLocation } from "@/lib/api/shifts";
 import { format, parse } from "date-fns";
 import { useSignDocumentMutation, useCheckSignatureStatusQuery } from "@/pages/applicant/application/api";
 import { searchClients, Client } from "@/lib/api/clients";
@@ -241,7 +241,7 @@ export default function ManualShiftManagementPage() {
             ...prev,
             client: clientName,
             clientId: client.id || "",
-            location: firstShift.location || prev.location,
+            location: formatShiftLocation(firstShift.location) || prev.location,
           }));
         }
 
