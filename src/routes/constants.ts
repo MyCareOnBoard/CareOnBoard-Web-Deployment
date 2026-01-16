@@ -33,7 +33,6 @@ export const Routes = {
         applicantDocuments: "/agency/applicant-directory/:id/documents",
         applicantConditionalHire: "/agency/applicant-directory/:id/conditional-hire",
         applicantFinalReview: "/agency/applicant-directory/:id/final-review",
-        reports: "/agency/reports",
         trainings: "/agency/trainings",
         complianceAlerts: "/agency/compliance-alerts",
         shifts: "/agency/dashboard/shifts",
@@ -45,6 +44,13 @@ export const Routes = {
         helpCenter: "/agency/help-center",
         settings: "/agency/settings",
         profile: "/agency/profile",
+        reports: {
+            index: "/agency/reports",
+            clients: "/agency/reports/clients",
+            dsp: "/agency/reports/dsp",
+            shifts: "/agency/reports/shifts",
+            notes: "/agency/reports/notes",
+        },
     },
     userPanel: {
         dashboard: "/user-panel/dashboard",
