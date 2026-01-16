@@ -39,6 +39,7 @@ import DSPManagementPage from "@/pages/agency/dsp-management";
 import ClientsPage from "@/pages/agency/clients-management";
 import ClientDetailsPage from "@/pages/agency/client-details";
 import AddClientPage from "@/pages/agency/add-client";
+import EditClientPage from "@/pages/agency/edit-client";
 import CommunityInclusionsPage from "@/pages/agency/clients-management/community-inclusions";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import ClientClaimsPage from "@/pages/agency/billing-and-approvals/client-claims";
@@ -69,6 +70,7 @@ import UserAccessControlPage from "@/pages/super-admin/user-access-control";
 import ClientsDirectory from "@/pages/super-admin/clients-directory";
 import AdminClientDetails from "@/pages/super-admin/clients-directory/client-details";
 import AdminAddClientPage from "@/pages/super-admin/clients-directory/add-client";
+import AdminEditClientPage from "@/pages/super-admin/clients-directory/edit-client";
 import CorporateSupportPage from "@/pages/super-admin/corporate-support";
 import OversightCenterPage from "@/pages/super-admin/oversight-center";
 import SuperAdminReports from "@/pages/super-admin/reports";
@@ -182,6 +184,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.addClient,
                 Component: AddClientPage,
+            },
+            {
+                path: Routes.agency.editClient,
+                Component: EditClientPage,
             },
             {
                 path: Routes.agency.clientDetails,
@@ -436,6 +442,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.addClient,
                 Component: AdminAddClientPage,
+            },
+            {
+                path: Routes.superAdmin.editClient,
+                Component: AdminEditClientPage,
             },
             {
                 path: Routes.superAdmin.corporateSupport,

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Phone } from "lucide-react";
-import { useParams, useSearchParams } from "react-router";
+import { Loader2, Phone, Edit } from "lucide-react";
+import { useParams, useSearchParams, useNavigate } from "react-router";
+import { Routes } from "@/routes/constants";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ActivityTab } from "@/pages/super-admin/clients-directory/client-details/tabs/ActivityTab";
@@ -14,6 +16,7 @@ type ClientDetailsTab = "activity" | "profile" | "services" | "documents";
 
 export default function ClientDetailsPage() {
   const { clientId } = useParams();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "activity" as ClientDetailsTab);
@@ -187,6 +190,13 @@ export default function ClientDetailsPage() {
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
           Client Management
         </h1>
+        <Button
+          className="h-[44px] w-[180px] rounded-[60px] px-[11px] py-[12px] gap-2 bg-[#00b4b8] hover:bg-[#00a0a4] text-white flex items-center justify-center font-medium transition-colors"
+          onClick={() => navigate(Routes.superAdmin.editClient.replace(":clientId", clientId || ""))}
+        >
+          <Edit className="w-5 h-5 text-white" />
+          Edit Client
+        </Button>
       </div>
 
       {/* Header Block */}

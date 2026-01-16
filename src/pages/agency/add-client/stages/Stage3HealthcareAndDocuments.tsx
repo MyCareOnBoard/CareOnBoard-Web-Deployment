@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CalendarDays, Upload } from "lucide-react";
+import { CalendarDays, Upload, File } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { AddClientFormData, DocKey, DocState } from "@/pages/agency/add-client/formData";
+import { createInitialDocs } from "@/pages/agency/add-client/formData";
 
 function DatePickerInput({
   value,
@@ -196,76 +197,100 @@ export function Stage3HealthcareAndDocuments({
         </div>
 
         <div className="mt-6 space-y-8">
-          {stage3.docs.map((doc) => (
-            <div key={doc.key}>
-              <p className="text-[12px] font-normal text-[#10141a] mb-2">
-                {doc.title}
-              </p>
+          {(() => {
+            const allDocs = createInitialDocs();
+            return allDocs.map((defaultDoc) => {
+              const doc = stage3.docs.find((d) => d.key === defaultDoc.key) || defaultDoc;
+              const hasExistingFile = !!doc.url && !doc.file && !doc.files;
 
-              <label
-                htmlFor={`doc-upload-${doc.key}`}
-                className="h-[101px] w-full rounded-[12px] border border-[#cccccd] bg-white flex items-center justify-center cursor-pointer hover:bg-[#f8f9fa] transition-colors"
-              >
-                <input
-                  id={`doc-upload-${doc.key}`}
-                  type="file"
-                  className="sr-only"
-                  accept=".pdf,.doc,.docx,image/*"
-                  multiple={doc.key === "medicalDocs" || doc.key === "consents"}
-                  onChange={(e) => {
-                    const files = e.target.files;
-                    if (!files || files.length === 0) return;
+              return (
+                <div key={doc.key}>
+                  <p className="text-[12px] font-normal text-[#10141a] mb-2">
+                    {doc.title}
+                  </p>
 
-                    if (doc.key === "medicalDocs" || doc.key === "consents") {
-                      const fileArray = Array.from(files);
-                      const fileName =
-                        fileArray.length === 1
-                          ? fileArray[0].name
-                          : `${fileArray.length} files selected`;
-                      updateDoc(doc.key, { files: fileArray, fileName });
-                    } else {
-                      const file = files[0];
-                      updateDoc(doc.key, { file, fileName: file.name });
-                    }
-                  }}
-                />
-                <div className="flex items-center gap-2 text-[14px] text-[#b2b2b3] max-w-full px-4">
-                  <Upload className="h-5 w-5 text-[#b2b2b3] shrink-0" />
-                  <span className="truncate">
-                    {doc.fileName ? doc.fileName : doc.uploadLabel}
-                  </span>
+                  <label
+                    htmlFor={`doc-upload-${doc.key}`}
+                    className="h-[101px] w-full rounded-[12px] border border-[#cccccd] bg-white flex items-center justify-center cursor-pointer hover:bg-[#f8f9fa] transition-colors"
+                  >
+                    <input
+                      id={`doc-upload-${doc.key}`}
+                      type="file"
+                      className="sr-only"
+                      accept=".pdf,.doc,.docx,image/*"
+                      multiple={doc.key === "medicalDocs" || doc.key === "consents"}
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        if (!files || files.length === 0) return;
+
+                        if (doc.key === "medicalDocs" || doc.key === "consents") {
+                          const fileArray = Array.from(files);
+                          const fileName =
+                            fileArray.length === 1
+                              ? fileArray[0].name
+                              : `${fileArray.length} files selected`;
+                          updateDoc(doc.key, { files: fileArray, fileName });
+                        } else {
+                          const file = files[0];
+                          updateDoc(doc.key, { file, fileName: file.name });
+                        }
+                      }}
+                    />
+                    <div className="flex items-center gap-2 text-[14px] text-[#b2b2b3] max-w-full px-4">
+                      <Upload className="h-5 w-5 text-[#b2b2b3] shrink-0" />
+                      <span className="truncate">
+                        {doc.fileName ? doc.fileName : doc.uploadLabel}
+                      </span>
+                    </div>
+                  </label>
+
+                  {hasExistingFile && (
+                    <div className="mt-3">
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="backdrop-blur-[8px] bg-[rgba(0,216,65,0.08)] border border-[rgba(255,255,255,0.3)] rounded-[8px] p-[8px] flex items-start gap-[8px] hover:bg-[rgba(0,216,65,0.12)] transition-colors"
+                      >
+                        <File className="h-5 w-5 text-[#10141a] shrink-0 mt-0.5" />
+                        <span className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
+                          {doc.fileName || doc.title}
+                        </span>
+                      </a>
+                    </div>
+                  )}
+
+                  <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-normal text-[#10141a]">Issued on date</label>
+                      <DatePickerInput
+                        value={doc.issuedOnDate}
+                        onChange={(d) => updateDoc(doc.key, { issuedOnDate: d })}
+                        placeholder="Select date"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-normal text-[#10141a]">Expiry date</label>
+                      <DatePickerInput
+                        value={doc.expiryDate}
+                        onChange={(d) => updateDoc(doc.key, { expiryDate: d })}
+                        placeholder="Select date"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-6">
+                      <p className="text-[14px] font-normal text-[#10141a]">Auto Reminder</p>
+                      <Switch
+                        checked={doc.autoReminder}
+                        onCheckedChange={(checked) => updateDoc(doc.key, { autoReminder: checked })}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </label>
-
-              <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">Issued on date</label>
-                  <DatePickerInput
-                    value={doc.issuedOnDate}
-                    onChange={(d) => updateDoc(doc.key, { issuedOnDate: d })}
-                    placeholder="Select date"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">Expiry date</label>
-                  <DatePickerInput
-                    value={doc.expiryDate}
-                    onChange={(d) => updateDoc(doc.key, { expiryDate: d })}
-                    placeholder="Select date"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 pt-6">
-                  <p className="text-[14px] font-normal text-[#10141a]">Auto Reminder</p>
-                  <Switch
-                    checked={doc.autoReminder}
-                    onCheckedChange={(checked) => updateDoc(doc.key, { autoReminder: checked })}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
+              );
+            });
+          })()}
         </div>
       </div>
 

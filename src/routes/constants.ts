@@ -16,6 +16,7 @@ export const Routes = {
         dspManagement: "/agency/dsp-management",
         clients: "/agency/clients",
         addClient: "/agency/clients/add",
+        editClient: "/agency/clients/edit/:clientId",
         clientDetails: "/agency/clients/:clientId",
         communityInclusions: "/agency/clients/community-inclusions",
         billingAndApprovals: "/agency/billing-and-approvals",
@@ -81,6 +82,7 @@ export const Routes = {
         oversightCenter: "/super-admin/oversight-center",
         clientDirectory: "/super-admin/clients",
         clientDetails: "/super-admin/clients/:clientId",
+        editClient: "/super-admin/clients/edit/:clientId",
         addClient: "/super-admin/clients/add",
         reports: {
             index: "/super-admin/reports",

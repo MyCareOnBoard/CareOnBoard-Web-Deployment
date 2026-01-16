@@ -270,8 +270,8 @@ export function ProfileTab({
         {/* Deactivate button - only show if active */}
         {!isInactive && (
           <Button
-            variant="destructive"
-            className="h-[36px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium bg-[#d53411] hover:bg-[#c02e0f] disabled:opacity-50 disabled:cursor-not-allowed"
+            variant="outline"
+            className="h-[36px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium border border-[#525253] text-[#525253] bg-transparent hover:bg-[rgba(82,82,83,0.05)] disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => setShowConfirmModal(true)}
             disabled={isDeactivating}
           >
@@ -281,7 +281,7 @@ export function ProfileTab({
                 Deactivating...
               </span>
             ) : (
-              "Deactivate Client"
+              "Deactivate"
             )}
           </Button>
         )}
