@@ -34,12 +34,15 @@ import RespiteLogPage from "@/pages/userPanel/notes/respite-log";
 import SupportedEmploymentInterventionPage from "@/pages/userPanel/notes/supported-employment-intervention";
 import SupportedEmploymentPrePage from "@/pages/userPanel/notes/supported-employment-pre";
 import Expenses from "@/pages/userPanel/expenses";
+import UserPanelCommunityInclusionPage from "@/pages/userPanel/community-inclusion";
 import AgencyDashboardPage from "@/pages/agency/dashboard";
 import DSPManagementPage from "@/pages/agency/dsp-management";
 import ClientsPage from "@/pages/agency/clients-management";
 import ClientDetailsPage from "@/pages/agency/client-details";
-import AddClientPage from "@/pages/agency/add-client";
-import CommunityInclusionsPage from "@/pages/agency/clients-management/community-inclusions";
+import AgencyAddClientPage from "@/pages/shared/client-management/wrappers/AgencyAddClientPage";
+import AgencyEditClientPage from "@/pages/shared/client-management/wrappers/AgencyEditClientPage";
+import AgencyCommunityInclusionsPage from "@/pages/agency/community-inclusion";
+import AgencyCommunityInclusionHistoryPage from "@/pages/agency/community-inclusion/history";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import ClientClaimsPage from "@/pages/agency/billing-and-approvals/client-claims";
 import SchedulingPage from "@/pages/agency/scheduling";
@@ -67,7 +70,8 @@ import ComplianceMonitor from "@/pages/super-admin/compliance-monitor";
 import UserAccessControlPage from "@/pages/super-admin/user-access-control";
 import ClientsDirectory from "@/pages/super-admin/clients-directory";
 import AdminClientDetails from "@/pages/super-admin/clients-directory/client-details";
-import AdminAddClientPage from "@/pages/super-admin/clients-directory/add-client";
+import SuperAdminAddClientPage from "@/pages/shared/client-management/wrappers/SuperAdminAddClientPage";
+import SuperAdminEditClientPage from "@/pages/shared/client-management/wrappers/SuperAdminEditClientPage";
 import CorporateSupportPage from "@/pages/super-admin/corporate-support";
 import OversightCenterPage from "@/pages/super-admin/oversight-center";
 import SuperAdminReports from "@/pages/super-admin/reports";
@@ -81,6 +85,7 @@ import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
 import AgencyBillingMonitorPage from "@/pages/super-admin/agency-billing-monitor";
 import AIAutomationPage from "@/pages/agency/ai-automation";
 import AgencyMileagePage from "@/pages/agency/mileage";
+import AgencyIncidentPage from "@/pages/agency/incident";
 import AgencyReports from "@/pages/agency/reports";
 import AgencyClientReports from "@/pages/agency/reports/clientsReport";
 import AgencyDSPReports from "@/pages/agency/reports/dspReports";
@@ -194,7 +199,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.addClient,
-                Component: AddClientPage,
+                Component: AgencyAddClientPage,
+            },
+            {
+                path: Routes.agency.editClient,
+                Component: AgencyEditClientPage,
             },
             {
                 path: Routes.agency.clientDetails,
@@ -202,7 +211,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.communityInclusions,
-                Component: CommunityInclusionsPage,
+                Component: AgencyCommunityInclusionsPage,
+            },
+            {
+                path: Routes.agency.communityInclusionHistory,
+                Component: AgencyCommunityInclusionHistoryPage,
             },
             {
                 path: Routes.agency.billingAndApprovals,
@@ -283,6 +296,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.mileage,
                 Component: AgencyMileagePage,
+            },
+            {
+                path: Routes.agency.incident,
+                Component: AgencyIncidentPage,
             },
             {
                 path: Routes.agency.helpCenter,
@@ -425,6 +442,10 @@ export const router = createBrowserRouter([
                 path: Routes.userPanel.expenses,
                 Component: Expenses,
             },
+            {
+                path: Routes.userPanel.communityInclusion,
+                Component: UserPanelCommunityInclusionPage,
+            },
         ],
     },
     {
@@ -496,7 +517,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.superAdmin.addClient,
-                Component: AdminAddClientPage,
+                Component: SuperAdminAddClientPage,
+            },
+            {
+                path: Routes.superAdmin.editClient,
+                Component: SuperAdminEditClientPage,
             },
             {
                 path: Routes.superAdmin.corporateSupport,

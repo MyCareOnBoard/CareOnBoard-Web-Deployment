@@ -217,29 +217,59 @@ export default function SchedulingPage() {
 
   // Calculate shift statistics
   const shiftStats = useMemo(() => {
-    const active = shifts.filter(s => s.status === ShiftStatus.ONGOING).length;
-    const completed = shifts.filter(s => s.status === ShiftStatus.COMPLETED).length;
-    const missed = shifts.filter(isShiftMissed).length;
+    const targetDate = selectedDate || new Date();
+    const filteredShifts = shifts.filter(shift => {
+      if (!shift.date) return false;
+      try {
+        const shiftDate = parseISO(shift.date);
+        return isSameDay(shiftDate, targetDate);
+      } catch {
+        return false;
+      }
+    });
+
+    const active = filteredShifts.filter(s => s.status === ShiftStatus.ONGOING).length;
+    const completed = filteredShifts.filter(s => s.status === ShiftStatus.COMPLETED).length;
+    const missed = filteredShifts.filter(isShiftMissed).length;
     
     return {
       active,
       completed,
       missed,
-      date: format(new Date(), "d MMMM"),
-      total: shifts.length,
+      date: format(targetDate, "d MMMM"),
+      total: filteredShifts.length,
     };
-  }, [shifts]);
+  }, [shifts, selectedDate]);
 
-  // Get pending approvals (completed shifts that need approval)
   const pendingApprovals = useMemo(() => {
-    return shifts.filter(shift => 
-      shift.status === ShiftStatus.COMPLETED && 
-      (shift.approved === false || shift.approved === null || shift.approved === undefined)
-    );
-  }, [shifts]);
+    const targetDate = selectedDate || new Date();
+    return shifts.filter(shift => {
+      if (shift.status !== ShiftStatus.COMPLETED) return false;
+      if (shift.approved !== false && shift.approved !== null && shift.approved !== undefined) return false;
+      if (!shift.date) return false;
+      try {
+        const shiftDate = parseISO(shift.date);
+        return isSameDay(shiftDate, targetDate);
+      } catch {
+        return false;
+      }
+    });
+  }, [shifts, selectedDate]);
 
-  // Pagination calculations
-  const totalActivityPages = Math.max(1, Math.ceil(shifts.length / itemsPerPage));
+  const filteredActivityShifts = useMemo(() => {
+    if (!selectedDate) return shifts;
+    return shifts.filter(shift => {
+      if (!shift.date) return false;
+      try {
+        const shiftDate = parseISO(shift.date);
+        return isSameDay(shiftDate, selectedDate);
+      } catch {
+        return false;
+      }
+    });
+  }, [shifts, selectedDate]);
+
+  const totalActivityPages = Math.max(1, Math.ceil(filteredActivityShifts.length / itemsPerPage));
   const totalApprovalPages = Math.max(1, Math.ceil(pendingApprovals.length / itemsPerPage));
 
   // Calendar days calculation
@@ -257,7 +287,7 @@ export default function SchedulingPage() {
   const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
 
-  const paginatedShifts = shifts.slice(
+  const paginatedShifts = filteredActivityShifts.slice(
     (activityPage - 1) * itemsPerPage,
     activityPage * itemsPerPage
   );
