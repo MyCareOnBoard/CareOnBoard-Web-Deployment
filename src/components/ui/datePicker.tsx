@@ -1,20 +1,21 @@
-import React, {useState} from "react";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group";
-import {format} from "date-fns";
-import {CalendarDaysIcon} from "lucide-react";
-import {Calendar} from "@/components/ui/calendar";
-import {cn} from "@/lib/utils";
+import React, { useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { format } from "date-fns";
+import { CalendarDaysIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 
 export default function CustomDatePicker(
-    {date, setDate, className, placeholder, startMonth, endMonth}: {
+    { date, setDate, className, placeholder, startMonth, endMonth, align = "start" }: {
         date: Date | null,
         setDate: (date: Date | null) => void;
         className?: string;
         placeholder?: string;
         startMonth?: Date;
         endMonth?: Date;
+        align?: "center" | "start" | "end";
     }
 ) {
     const [isDateOpen, setIsDateOpen] = useState(false);
@@ -22,21 +23,21 @@ export default function CustomDatePicker(
     return (
         <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
             <PopoverTrigger asChild>
-                <button type="button" className={cn("w-full focus:outline-none", className)}>
-                    <InputGroup className="h-11 bg-white border border-[#cccccd] rounded-xl px-4">
+                <button type="button" className={cn("w-full focus:outline-none cursor-pointer", className)}>
+                    <InputGroup className="h-11 bg-white border border-[#cccccd] rounded-xl px-4 cursor-pointer">
                         <InputGroupInput
                             value={date ? format(date, "MMMM d, yyyy") : ""}
                             placeholder={placeholder}
                             readOnly
-                            className="text-[#10141a] border-0 bg-transparent"
+                            className="text-[#10141a] border-0 bg-transparent cursor-pointer"
                         />
                         <InputGroupAddon align="inline-end">
-                            <CalendarDaysIcon className="h-5 w-5 text-[#808081]"/>
+                            <CalendarDaysIcon className="h-5 w-5 text-[#808081]" />
                         </InputGroupAddon>
                     </InputGroup>
                 </button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+            <PopoverContent align={align} className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
                 <Calendar
                     mode="single"
                     className="bg-white"
@@ -53,7 +54,7 @@ export default function CustomDatePicker(
                     }}
                     formatters={{
                         formatMonthDropdown: (date) =>
-                            date.toLocaleString("default", {month: "long"}),
+                            date.toLocaleString("default", { month: "long" }),
                     }}
                     classNames={{
                         dropdown_root: "relative border-none shadow-none has-focus:ring-0",

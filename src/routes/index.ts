@@ -34,6 +34,7 @@ import RespiteLogPage from "@/pages/userPanel/notes/respite-log";
 import SupportedEmploymentInterventionPage from "@/pages/userPanel/notes/supported-employment-intervention";
 import SupportedEmploymentPrePage from "@/pages/userPanel/notes/supported-employment-pre";
 import Expenses from "@/pages/userPanel/expenses";
+import UserPanelCommunityInclusionPage from "@/pages/userPanel/community-inclusion";
 import AgencyDashboardPage from "@/pages/agency/dashboard";
 import DSPManagementPage from "@/pages/agency/dsp-management";
 import ClientsPage from "@/pages/agency/clients-management";
@@ -41,6 +42,7 @@ import ClientDetailsPage from "@/pages/agency/client-details";
 import AgencyAddClientPage from "@/pages/shared/client-management/wrappers/AgencyAddClientPage";
 import AgencyEditClientPage from "@/pages/shared/client-management/wrappers/AgencyEditClientPage";
 import AgencyCommunityInclusionsPage from "@/pages/agency/community-inclusion";
+import AgencyCommunityInclusionHistoryPage from "@/pages/agency/community-inclusion/history";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import ClientClaimsPage from "@/pages/agency/billing-and-approvals/client-claims";
 import SchedulingPage from "@/pages/agency/scheduling";
@@ -196,6 +198,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.communityInclusions,
                 Component: AgencyCommunityInclusionsPage,
+            },
+            {
+                path: Routes.agency.communityInclusionHistory,
+                Component: AgencyCommunityInclusionHistoryPage,
             },
             {
                 path: Routes.agency.billingAndApprovals,
@@ -369,6 +375,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.userPanel.expenses,
                 Component: Expenses,
+            },
+            {
+                path: Routes.userPanel.communityInclusion,
+                Component: UserPanelCommunityInclusionPage,
             },
         ],
     },
