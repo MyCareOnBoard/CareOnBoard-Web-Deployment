@@ -38,6 +38,7 @@ const navItems: NavItem[] = [
   {label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon},
   {label: "Applicant Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon},
   {label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon},
+  {label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: FileText},
   {label: "Trainings", path: Routes.agency.trainings, icon: Network},
   {label: "Mileage", path: Routes.agency.mileage, icon: MapPin},
   {label: "Settings", path: Routes.agency.settings, icon: Settings},

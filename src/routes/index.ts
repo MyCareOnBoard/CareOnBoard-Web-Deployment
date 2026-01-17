@@ -90,6 +90,12 @@ import AgencyClientReports from "@/pages/agency/reports/clientsReport";
 import AgencyDSPReports from "@/pages/agency/reports/dspReports";
 import AgencyTimesheetReports from "@/pages/agency/reports/timesheetReports";
 import AgencyNoteReports from "@/pages/agency/reports/noteReports";
+import GoalsAndDocumentsPage from "@/pages/agency/goalsAndDocuments";
+import NaturalSupportsTraining from "@/pages/agency/goalsAndDocuments/NaturalSupportsTraining";
+import CommunityInclusionServices from "@/pages/agency/goalsAndDocuments/CommunityInclusionServices";
+import CommunityInclusionIndividualizedGoals from "@/pages/agency/goalsAndDocuments/CommunityInclusionIndividualizedGoals";
+import DayHabilitationServices from "@/pages/agency/goalsAndDocuments/DayHabilitationServices";
+import PrevocationalTrainingServices from "@/pages/agency/goalsAndDocuments/PrevocationalTrainingServices";
 
 
 export const router = createBrowserRouter([
@@ -322,6 +328,30 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.reports.notes,
                 Component: AgencyNoteReports,
+            },
+            {
+                path: Routes.agency.goalsAndDocuments.index,
+                Component: GoalsAndDocumentsPage,
+            },
+            {
+                path: Routes.agency.goalsAndDocuments.naturalSupportsTraining,
+                Component: NaturalSupportsTraining,
+            },
+            {
+                path: Routes.agency.goalsAndDocuments.communityInclusionServices,
+                Component: CommunityInclusionServices,
+            },
+            {
+                path: Routes.agency.goalsAndDocuments.communityInclusionIndividualizedGoals,
+                Component: CommunityInclusionIndividualizedGoals,
+            },
+            {
+                path: Routes.agency.goalsAndDocuments.dayHabilitationServices,
+                Component: DayHabilitationServices,
+            },
+            {
+                path: Routes.agency.goalsAndDocuments.prevocationalTrainingServices,
+                Component: PrevocationalTrainingServices,
             },
         ],
     },

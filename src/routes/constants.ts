@@ -53,6 +53,14 @@ export const Routes = {
             shifts: "/agency/reports/shifts",
             notes: "/agency/reports/notes",
         },
+        goalsAndDocuments: {
+            index: "/agency/goals-and-documents",
+            naturalSupportsTraining: "/agency/goals-and-documents/natural-supports-training",
+            communityInclusionServices: "/agency/goals-and-documents/community-inclusion-services",
+            communityInclusionIndividualizedGoals: "/agency/goals-and-documents/community-inclusion-individualized-goals",
+            dayHabilitationServices: "/agency/goals-and-documents/day-habilitation-services",
+            prevocationalTrainingServices: "/agency/goals-and-documents/prevocational-training-services",
+        },
     },
     userPanel: {
         dashboard: "/user-panel/dashboard",
