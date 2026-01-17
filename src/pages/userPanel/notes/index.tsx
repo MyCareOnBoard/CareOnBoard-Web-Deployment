@@ -10,7 +10,7 @@ import {useGetAllActivityLogsQuery} from "@/pages/userPanel/notes/api";
 import {Routes} from "@/routes/constants";
 import {cn} from "@/lib/utils";
 
-type NoteCardType = {
+export type NoteCardType = {
   id: string;
   icon: React.ComponentType<{ className?: string }>;
   title: string;
@@ -72,7 +72,7 @@ const noteTypes: NoteCardType[] = [
   },
 ];
 
-function NoteCard({note, noteId}: { note: NoteCardType, noteId: string | undefined }) {
+export function NoteCard({note, noteId}: { note: NoteCardType, noteId: string | undefined }) {
   const Icon = note.icon;
 
   return (
