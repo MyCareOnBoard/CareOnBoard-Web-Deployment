@@ -19,6 +19,7 @@ export const Routes = {
         editClient: "/agency/clients/edit/:clientId",
         clientDetails: "/agency/clients/:clientId",
         communityInclusions: "/agency/community-inclusions",
+        communityInclusionHistory: "/agency/community-inclusions/history",
         billingAndApprovals: "/agency/billing-and-approvals",
         clientClaims: "/agency/billing-and-approvals/client/:clientId",
         dspClaims: "/agency/billing-and-approvals/dsp/:dsp",
@@ -67,6 +68,7 @@ export const Routes = {
         helpCenter: "/user-panel/help-center",
         settings: "/user-panel/settings",
         profile: "/user-panel/profile",
+        communityInclusion: "/user-panel/community-inclusion",
     },
     superAdmin: {
         dashboard: "/super-admin/dashboard",

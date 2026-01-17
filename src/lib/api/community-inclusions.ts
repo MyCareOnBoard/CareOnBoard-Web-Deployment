@@ -35,7 +35,7 @@ export interface CommunityInclusion {
  * Create community inclusion request payload
  */
 export interface CreateCommunityInclusionRequest {
-  clientId: string;
+  clientId?: string;
   attendees: Attendee[];
 }
 
@@ -52,6 +52,7 @@ export interface UpdateCommunityInclusionRequest {
  */
 export interface QueryCommunityInclusionsParams {
   clientId?: string;
+  date?: string; // ISO date string YYYY-MM-DD
   limit?: number;
   offset?: number;
 }
