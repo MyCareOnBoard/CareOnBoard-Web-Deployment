@@ -265,7 +265,7 @@ export default function NaturalSupportsTraining() {
                                         <Textarea
                                             value={""}
                                             placeholder=""
-                                            className="w-full bg-white outline-none"
+                                            className="w-full bg-white border border-[#cccccd]"
                                         />
                                     </div>
                                 </div>
