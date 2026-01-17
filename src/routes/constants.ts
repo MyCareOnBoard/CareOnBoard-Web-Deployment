@@ -58,6 +58,8 @@ export const Routes = {
             naturalSupportsTraining: "/agency/goals-and-documents/natural-supports-training",
             communityInclusionServices: "/agency/goals-and-documents/community-inclusion-services",
             communityInclusionIndividualizedGoals: "/agency/goals-and-documents/community-inclusion-individualized-goals",
+            dayHabilitationIndividualizedGoals: "/agency/goals-and-documents/day-habilitation-individualized-goals",
+            prevocationalTrainingIndividualizedGoals: "/agency/goals-and-documents/prevocational-training-individualized-goals",
             dayHabilitationServices: "/agency/goals-and-documents/day-habilitation-services",
             prevocationalTrainingServices: "/agency/goals-and-documents/prevocational-training-services",
         },
