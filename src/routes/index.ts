@@ -40,7 +40,7 @@ import ClientsPage from "@/pages/agency/clients-management";
 import ClientDetailsPage from "@/pages/agency/client-details";
 import AgencyAddClientPage from "@/pages/shared/client-management/wrappers/AgencyAddClientPage";
 import AgencyEditClientPage from "@/pages/shared/client-management/wrappers/AgencyEditClientPage";
-import CommunityInclusionsPage from "@/pages/agency/clients-management/community-inclusions";
+import AgencyCommunityInclusionsPage from "@/pages/agency/community-inclusion";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import ClientClaimsPage from "@/pages/agency/billing-and-approvals/client-claims";
 import SchedulingPage from "@/pages/agency/scheduling";
@@ -195,7 +195,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.communityInclusions,
-                Component: CommunityInclusionsPage,
+                Component: AgencyCommunityInclusionsPage,
             },
             {
                 path: Routes.agency.billingAndApprovals,

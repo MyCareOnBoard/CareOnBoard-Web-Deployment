@@ -18,7 +18,7 @@ export const Routes = {
         addClient: "/agency/clients/add",
         editClient: "/agency/clients/edit/:clientId",
         clientDetails: "/agency/clients/:clientId",
-        communityInclusions: "/agency/clients/community-inclusions",
+        communityInclusions: "/agency/community-inclusions",
         billingAndApprovals: "/agency/billing-and-approvals",
         clientClaims: "/agency/billing-and-approvals/client/:clientId",
         dspClaims: "/agency/billing-and-approvals/dsp/:dsp",

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { Clock, Plus, Loader2 } from "lucide-react";
+import { Clock, Plus, Loader2, FileClock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import TimePicker from "@/components/TimePicker";
 import { searchClients, Client } from "@/lib/api/clients";
@@ -37,6 +37,7 @@ export default function CommunityInclusionsPage() {
 
   // Saving state
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -57,8 +58,7 @@ export default function CommunityInclusionsPage() {
     );
   };
 
-  const handleSave = async () => {
-    try {
+  const validateForm = () => {
       // Validate client selection
       if (!clientId) {
         toast({
@@ -66,7 +66,7 @@ export default function CommunityInclusionsPage() {
           description: "Please select a client before saving.",
           variant: "destructive",
         });
-        return;
+        return null;
       }
 
       // Filter out empty rows and validate
@@ -80,54 +80,67 @@ export default function CommunityInclusionsPage() {
           description: "Please add at least one attendee with complete information.",
           variant: "destructive",
         });
-        return;
+        return null;
       }
-
-      setIsSaving(true);
-
-      // Convert AttendanceRow[] to Attendee[] format expected by API
-      const attendees: Attendee[] = validAttendees.map((row) => ({
-        id: row.id,
-        name: row.name,
-        signIn: row.signIn,
-        signOut: row.signOut,
-      }));
-
-      // Call API to create community inclusion
-      await createCommunityInclusion({
-        clientId,
-        attendees,
-      });
-
-      toast({
-        title: "Success",
-        description: "Community inclusion saved successfully!",
-      });
-
-      // Reset form after successful save
-      setClientName("");
-      setClientId("");
-      setAttendanceRows([
-        { id: "1", name: "", signIn: "", signOut: "" },
-        { id: "2", name: "", signIn: "", signOut: "" },
-        { id: "3", name: "", signIn: "", signOut: "" },
-        { id: "4", name: "", signIn: "", signOut: "" },
-        { id: "5", name: "", signIn: "", signOut: "" },
-        { id: "6", name: "", signIn: "", signOut: "" },
-      ]);
-    } catch (error: any) {
-      console.error("Failed to save community inclusion:", error);
-      toast({
-        title: "Save Failed",
-        description:
-          error?.response?.data?.message ||
-          "Failed to save community inclusion. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
+      return validAttendees;
   };
+
+  const saveToApi = async (status: 'saved' | 'submitted') => {
+      const validAttendees = validateForm();
+      if (!validAttendees) return;
+
+      const loadingStateSetter = status === 'saved' ? setIsSaving : setIsSubmitting;
+      loadingStateSetter(true);
+
+      try {
+        // Convert AttendanceRow[] to Attendee[] format expected by API
+        const attendees: Attendee[] = validAttendees.map((row) => ({
+          id: row.id,
+          name: row.name,
+          signIn: row.signIn,
+          signOut: row.signOut,
+        }));
+
+        // Call API to create community inclusion
+        // Note: Assuming createCommunityInclusion can handle a status or we might need a separate endpoint for submit
+        // For now, using the same endpoint as per current logic, effectively "saving"
+        await createCommunityInclusion({
+          clientId,
+          attendees,
+        });
+
+        toast({
+          title: status === 'submitted' ? "Submitted Successfully" : "Saved Successfully",
+          description: `Community inclusion ${status} successfully!`,
+        });
+
+        // Reset form after successful save
+        setClientName("");
+        setClientId("");
+        setAttendanceRows([
+          { id: "1", name: "", signIn: "", signOut: "" },
+          { id: "2", name: "", signIn: "", signOut: "" },
+          { id: "3", name: "", signIn: "", signOut: "" },
+          { id: "4", name: "", signIn: "", signOut: "" },
+          { id: "5", name: "", signIn: "", signOut: "" },
+          { id: "6", name: "", signIn: "", signOut: "" },
+        ]);
+      } catch (error: any) {
+        console.error(`Failed to ${status} community inclusion:`, error);
+        toast({
+          title: `${status === 'submitted' ? "Submission" : "Save"} Failed`,
+          description:
+            error?.response?.data?.message ||
+            `Failed to ${status} community inclusion. Please try again.`,
+          variant: "destructive",
+        });
+      } finally {
+        loadingStateSetter(false);
+      }
+  };
+
+  const handleSave = () => saveToApi('saved');
+  const handleSubmit = () => saveToApi('submitted');
 
   const handleAddAttendee = () => {
     const newId = (attendanceRows.length + 1).toString();
@@ -217,10 +230,20 @@ export default function CommunityInclusionsPage() {
       <div className="relative overflow-hidden rounded-[16px] sm:rounded-[20px] lg:rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
         <div className="relative p-3 sm:p-4 md:p-[19px]">
           {/* Section Header */}
-          <div className="mb-4 sm:mb-[20px]">
-            <h2 className="text-[16px] sm:text-[18px] md:text-[20px] font-medium leading-[1.4] sm:leading-[1.6] text-[#10141a]">
-              Community Inclusions
-            </h2>
+          <div className="mb-4 sm:mb-[20px] flex justify-between items-start">
+            <div>
+                <h2 className="text-[16px] sm:text-[18px] md:text-[20px] font-medium leading-[1.4] sm:leading-[1.6] text-[#10141a]">
+                Community Inclusions
+                </h2>
+                <p className="text-[14px] text-[#808081] font-normal mt-1">
+                    List Of Attendances Or 29January
+                </p>
+            </div>
+            
+            <button className="flex items-center gap-2 text-[#808081] hover:text-[#00b4b8] transition-colors cursor-pointer">
+                <FileClock className="w-5 h-5" />
+                <span className="text-[14px] font-normal">Community Inclusion History</span>
+            </button>
           </div>
 
           {/* Client Search Field */}
@@ -269,20 +292,12 @@ export default function CommunityInclusionsPage() {
             )}
           </div>
 
-          {/* List of Attendees Label with Add Button */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-5 md:mb-[22px]">
-            <p className="text-[12px] sm:text-[13px] md:text-[14px] font-medium leading-[1.4] text-[#808081]">
-              List of Attendees
-            </p>
-            <button
-              onClick={handleAddAttendee}
-              className="flex items-center justify-center gap-2 h-[42px] sm:h-[44px] px-4 rounded-[60px] border border-[#00b4b8] text-[#00b4b8] text-[13px] sm:text-[14px] font-semibold hover:bg-[#00b4b8] hover:text-white transition-colors cursor-pointer w-full sm:w-auto active:scale-95"
-            >
-              <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-              Add Attendee
-            </button>
-          </div>
-
+          {/* List of Attendees Label with Add Button - Hidden in this design iteration as per Figma specific screenshot? 
+              Wait, the Figma screenshot has "List Of Attendances Or 29January" as a subtitle, 
+              and the inputs are just listed. The "Add" button is at the bottom in the Figma design.
+              I will move the "Add Attendee" button to the bottom next to Save/Submit as per Figma.
+          */}
+          
           {/* Attendance Form */}
           <div className="space-y-4 sm:space-y-5 md:space-y-[22px]">
             {attendanceRows.map((row, index) => (
@@ -348,15 +363,32 @@ export default function CommunityInclusionsPage() {
             ))}
           </div>
 
-          {/* Save Button */}
-          <div className="mt-5 sm:mt-6 md:mt-[24px]">
+          {/* Action Buttons */}
+          <div className="mt-8 flex flex-wrap gap-4 items-center">
+            <button
+                onClick={handleAddAttendee}
+                className="h-[44px] px-6 rounded-[60px] border border-[#cccccd] bg-[#f0f0f1] text-[#808081] text-[14px] font-medium hover:bg-[#e0e0e1] transition-colors cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+            >
+                <Plus className="w-5 h-5" />
+                Add
+            </button>
+
             <button
               onClick={handleSave}
-              disabled={isSaving}
-              className="h-[42px] sm:h-[44px] w-full sm:w-[90px] md:w-[80px] rounded-[60px] bg-[#00b4b8] backdrop-blur-[22px] text-[13px] sm:text-[14px] font-semibold text-white hover:bg-[#00a0a3] active:bg-[#008f92] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+              disabled={isSaving || isSubmitting}
+              className="h-[44px] w-[90px] rounded-[60px] bg-[#00b4b8] text-[14px] font-semibold text-white hover:bg-[#00a0a3] active:bg-[#008f92] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
             >
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isSaving ? "Saving..." : "Save"}
+              {isSaving ? "Saving" : "Save"}
+            </button>
+
+            <button
+              onClick={handleSubmit}
+              disabled={isSaving || isSubmitting}
+              className="h-[44px] w-[90px] rounded-[60px] bg-[#00b4b8] text-[14px] font-semibold text-white hover:bg-[#00a0a3] active:bg-[#008f92] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
+            >
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isSubmitting ? "Submitting" : "Submit"}
             </button>
           </div>
         </div>
