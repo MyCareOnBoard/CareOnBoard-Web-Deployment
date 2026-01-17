@@ -118,7 +118,7 @@ export default function AnnualUpdateTemplate(
                         <Textarea
                             value={""}
                             placeholder=""
-                            className="w-full bg-white"
+                            className="w-full bg-white border border-[#cccccd]"
                         />
                     </div>
 
@@ -130,7 +130,7 @@ export default function AnnualUpdateTemplate(
                         <Textarea
                             value={""}
                             placeholder=""
-                            className="w-full bg-white"
+                            className="w-full bg-white border border-[#cccccd]"
                         />
                     </div>
 
@@ -142,7 +142,7 @@ export default function AnnualUpdateTemplate(
                         <Textarea
                             value={""}
                             placeholder=""
-                            className="w-full bg-white"
+                            className="w-full bg-white border border-[#cccccd]"
                         />
                     </div>
 
@@ -155,7 +155,7 @@ export default function AnnualUpdateTemplate(
                         <Textarea
                             value={""}
                             placeholder=""
-                            className="w-full bg-white"
+                            className="w-full bg-white border border-[#cccccd]"
                         />
                     </div>
 
@@ -168,7 +168,7 @@ export default function AnnualUpdateTemplate(
                         <Textarea
                             value={""}
                             placeholder=""
-                            className="w-full bg-white"
+                            className="w-full bg-white border border-[#cccccd]"
                         />
                     </div>
 
@@ -181,7 +181,7 @@ export default function AnnualUpdateTemplate(
                         <Textarea
                             value={""}
                             placeholder=""
-                            className="w-full bg-white"
+                            className="w-full bg-white border border-[#cccccd]"
                         />
                     </div>
 
@@ -194,7 +194,7 @@ export default function AnnualUpdateTemplate(
                         <Textarea
                             value={""}
                             placeholder=""
-                            className="w-full bg-white"
+                            className="w-full bg-white border border-[#cccccd]"
                         />
                     </div>
 
@@ -207,7 +207,7 @@ export default function AnnualUpdateTemplate(
                         <Textarea
                             value={""}
                             placeholder=""
-                            className="w-full bg-white"
+                            className="w-full bg-white border border-[#cccccd]"
                         />
                     </div>
 
