@@ -17,13 +17,13 @@ export default function AgencyDashboardPage() {
   const itemsPerPage = 10;
 
   const shiftsData = [
-    {day: "SUN", scheduled: 0, completed: 0, date: "5 January"},
-    {day: "MON", scheduled: 0, completed: 0, date: "6 January"},
-    {day: "TUE", scheduled: 0, completed: 0, date: "7 January"},
-    {day: "WED", scheduled: 0, completed: 0, date: "8 January"},
-    {day: "THUR", scheduled: 0, completed: 0, date: "9 January"},
-    {day: "FRI", scheduled: 0, completed: 0, date: "10 January"},
-    {day: "SAT", scheduled: 0, completed: 0, date: "11 January"},
+    {day: "SUN", scheduled: 0, completed: 0, ongoing: 0, date: "5 January"},
+    {day: "MON", scheduled: 0, completed: 0, ongoing: 0, date: "6 January"},
+    {day: "TUE", scheduled: 0, completed: 0, ongoing: 0, date: "7 January"},
+    {day: "WED", scheduled: 0, completed: 0, ongoing: 0, date: "8 January"},
+    {day: "THUR", scheduled: 0, completed: 0, ongoing: 0, date: "9 January"},
+    {day: "FRI", scheduled: 0, completed: 0, ongoing: 0, date: "10 January"},
+    {day: "SAT", scheduled: 0, completed: 0, ongoing: 0, date: "11 January"},
   ];
 
   const [hoveredShift, setHoveredShift] = useState<number | null>(null);
@@ -60,6 +60,7 @@ export default function AgencyDashboardPage() {
       day: dayNames[date.getDay()],
       scheduled: bucket.scheduled,
       completed: bucket.completed,
+      ongoing: bucket.ongoing || 0,
       date: `${date.getDate()} ${monthNames[date.getMonth()]}`
     };
   }) : shiftsData;
@@ -73,7 +74,7 @@ export default function AgencyDashboardPage() {
     status: `Expired (${doc.daysExpired} day${doc.daysExpired !== 1 ? 's' : ''} ago)`,
   }));
 
-  const maxShiftValue = Math.max(...transformedShifts.map((d) => Math.max(d.scheduled, d.completed)));
+  const maxShiftValue = Math.max(...transformedShifts.map((d) => Math.max(d.scheduled, d.completed, d.ongoing || 0)));
 
   const copyToClipboard = async () => {
     const domain = window.location.origin;
@@ -185,7 +186,7 @@ export default function AgencyDashboardPage() {
         </div>
 
         {/* Bottom Row - Shifts and Billing */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
+        <div>
           <div className={"space-y-6"}>
             {/* Shifts Chart */}
             <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
@@ -197,16 +198,18 @@ export default function AgencyDashboardPage() {
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center gap-1">
                     <div className="flex justify-end items-center w-full">
-                                            <span
-                                              className="text-[11px] font-medium text-[#808081] text-right">Scheduled</span>
+                      <span className="text-[11px] font-medium text-[#808081] text-right">Scheduled</span>
                       <div className="w-3 h-3 rounded-sm bg-[#2B82FF] ml-2"></div>
                     </div>
                     <div className="flex justify-end items-center w-full">
-                                            <span
-                                              className="text-[11px] font-medium text-[#808081]">Visit Completed</span>
-                      <div className="w-3 h-3 rounded-sm bg-[#2B82FF]/40 ml-2"></div>
+                      <span className="text-[11px] font-medium text-[#808081]">Visit Completed</span>
+                      <div className="w-3 h-3 rounded-sm bg-[#84B7FF] ml-2"></div>
+                    </div>
+                    <div className="flex justify-end items-center w-full">
+                      <span className="text-[11px] font-medium text-[#808081]">Ongoing</span>
+                      <div className="w-3 h-3 rounded-sm bg-[#808081] ml-2"></div>
                     </div>
                   </div>
                   <div>
@@ -236,12 +239,18 @@ export default function AgencyDashboardPage() {
                           for {shift.date}</div>
                         <div className={"flex justify-between items-center gap-4"}>
                           <div className="text-[#808081] text-xs">Scheduled</div>
-                          <div className="text-black text-xs">{shift.scheduled}</div>
+                          <div className="text-black text-xs font-semibold">{shift.scheduled}</div>
                         </div>
                         <div className={"flex justify-between items-center gap-4"}>
                           <div className="text-[#808081] text-xs">Visit Completed</div>
-                          <div className="text-black text-xs">{shift.completed}</div>
+                          <div className="text-black text-xs font-semibold">{shift.completed}</div>
                         </div>
+                        {shift.ongoing > 0 && (
+                          <div className={"flex justify-between items-center gap-4"}>
+                            <div className="text-[#808081] text-xs">Ongoing</div>
+                            <div className="text-black text-xs font-semibold">{shift.ongoing}</div>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -256,13 +265,22 @@ export default function AgencyDashboardPage() {
                       >{shift.scheduled}
                       </div>}
                       {/* Completed Bar */}
-                       {shift.completed > 0 && <div
-                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#2B82FF]/40 transition-all duration-300"
+                      {shift.completed > 0 && <div
+                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#84B7FF] transition-all duration-300"
                         style={{
                           height: `${(shift.completed / maxShiftValue) * 100}%`,
                           minHeight: shift.completed ? "30px" : "0px",
                         }}
                       >{shift.completed}
+                      </div>}
+                      {/* Ongoing Bar */}
+                      {shift.ongoing > 0 && <div
+                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#808081] transition-all duration-300"
+                        style={{
+                          height: `${(shift.ongoing / maxShiftValue) * 100}%`,
+                          minHeight: shift.ongoing ? "30px" : "0px",
+                        }}
+                      >{shift.ongoing}
                       </div>}
                     </div>
                     {/* Day Label */}
@@ -361,22 +379,22 @@ export default function AgencyDashboardPage() {
           </div>
 
           {/* Billing Approvals */}
-          <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-[16px] font-semibold text-[#10141a]">Billing Approvals</h2>
-                <p className="text-[12px] font-medium text-[#808081] mt-1">
-                  View Outstanding Billing Approvals
-                </p>
-              </div>
-              <button className="text-[#00b4b8] hover:text-[#0090a8] transition-colors">
-                <ChevronRight className="w-5 h-5"/>
-              </button>
-            </div>
-            <div className="text-center py-8">
-              <p className="text-[14px] font-medium text-[#808081]">No pending approvals</p>
-            </div>
-          </div>
+          {/*<div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">*/}
+          {/*  <div className="flex items-center justify-between mb-6">*/}
+          {/*    <div>*/}
+          {/*      <h2 className="text-[16px] font-semibold text-[#10141a]">Billing Approvals</h2>*/}
+          {/*      <p className="text-[12px] font-medium text-[#808081] mt-1">*/}
+          {/*        View Outstanding Billing Approvals*/}
+          {/*      </p>*/}
+          {/*    </div>*/}
+          {/*    <button className="text-[#00b4b8] hover:text-[#0090a8] transition-colors">*/}
+          {/*      <ChevronRight className="w-5 h-5"/>*/}
+          {/*    </button>*/}
+          {/*  </div>*/}
+          {/*  <div className="text-center py-8">*/}
+          {/*    <p className="text-[14px] font-medium text-[#808081]">No pending approvals</p>*/}
+          {/*  </div>*/}
+          {/*</div>*/}
         </div>
       </div>
     </div>

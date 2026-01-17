@@ -52,7 +52,6 @@ import ApplicantDirectoryPage from "@/pages/agency/applicant-directory";
 import ClearanceHiring from "@/pages/agency/applicant-directory/ClearanceHiring";
 import PendingApplicants from "@/pages/agency/applicant-directory/PendingApplicants";
 import ApplicantProfilePage from "@/pages/agency/applicant-directory/ApplicantProfilePage";
-import ReportsPage from "@/pages/agency/reports";
 import ComplianceAlertsPage from "@/pages/agency/compliance-alerts";
 import ShiftsPage from "@/pages/agency/shifts";
 import ShiftsListPage from "@/pages/agency/scheduling/shifts";
@@ -86,6 +85,12 @@ import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
 import AgencyBillingMonitorPage from "@/pages/super-admin/agency-billing-monitor";
 import AIAutomationPage from "@/pages/agency/ai-automation";
 import AgencyMileagePage from "@/pages/agency/mileage";
+import AgencyIncidentPage from "@/pages/agency/incident";
+import AgencyReports from "@/pages/agency/reports";
+import AgencyClientReports from "@/pages/agency/reports/clientsReport";
+import AgencyDSPReports from "@/pages/agency/reports/dspReports";
+import AgencyTimesheetReports from "@/pages/agency/reports/timesheetReports";
+import AgencyNoteReports from "@/pages/agency/reports/noteReports";
 
 
 export const router = createBrowserRouter([
@@ -264,10 +269,6 @@ export const router = createBrowserRouter([
                 Component: ApplicantProfilePage,
             },
             {
-                path: Routes.agency.reports,
-                Component: ReportsPage,
-            },
-            {
                 path: Routes.agency.complianceAlerts,
                 Component: ComplianceAlertsPage,
             },
@@ -288,6 +289,10 @@ export const router = createBrowserRouter([
                 Component: AgencyMileagePage,
             },
             {
+                path: Routes.agency.incident,
+                Component: AgencyIncidentPage,
+            },
+            {
                 path: Routes.agency.helpCenter,
                 Component: HelpCenterPage,
             },
@@ -298,6 +303,26 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.profile,
                 Component: ProfilePage,
+            },
+            {
+                path: Routes.agency.reports.index,
+                Component: AgencyReports,
+            },
+            {
+                path: Routes.agency.reports.clients,
+                Component: AgencyClientReports,
+            },
+            {
+                path: Routes.agency.reports.dsp,
+                Component: AgencyDSPReports,
+            },
+            {
+                path: Routes.agency.reports.shifts,
+                Component: AgencyTimesheetReports,
+            },
+            {
+                path: Routes.agency.reports.notes,
+                Component: AgencyNoteReports,
             },
         ],
     },
