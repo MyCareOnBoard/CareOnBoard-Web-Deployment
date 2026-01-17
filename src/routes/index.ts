@@ -92,6 +92,9 @@ import CommunityInclusionServices from "@/pages/agency/goalsAndDocuments/Communi
 import CommunityInclusionIndividualizedGoals from "@/pages/agency/goalsAndDocuments/CommunityInclusionIndividualizedGoals";
 import DayHabilitationServices from "@/pages/agency/goalsAndDocuments/DayHabilitationServices";
 import PrevocationalTrainingServices from "@/pages/agency/goalsAndDocuments/PrevocationalTrainingServices";
+import DayHabilitationIndividualizedGoals from "@/pages/agency/goalsAndDocuments/DayHabilitationIndividualizedGoals";
+import PrevocationalTrainingIndividualizedGoals
+    from "@/pages/agency/goalsAndDocuments/PrevocationalTrainingIndividualizedGoals";
 
 
 export const router = createBrowserRouter([
@@ -328,6 +331,14 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.goalsAndDocuments.communityInclusionIndividualizedGoals,
                 Component: CommunityInclusionIndividualizedGoals,
+            },
+            {
+                path: Routes.agency.goalsAndDocuments.dayHabilitationIndividualizedGoals,
+                Component: DayHabilitationIndividualizedGoals,
+            },
+            {
+                path: Routes.agency.goalsAndDocuments.prevocationalTrainingIndividualizedGoals,
+                Component: PrevocationalTrainingIndividualizedGoals,
             },
             {
                 path: Routes.agency.goalsAndDocuments.dayHabilitationServices,
