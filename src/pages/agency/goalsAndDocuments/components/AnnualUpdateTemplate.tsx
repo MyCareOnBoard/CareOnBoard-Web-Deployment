@@ -1,15 +1,36 @@
-import React, {useState} from "react";
-import {useNavigate} from "react-router";
+import React, {useState, useEffect} from "react";
+import {useNavigate, useLocation} from "react-router";
 import {Routes} from "@/routes/constants";
 import {ChevronLeft} from "lucide-react";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
+import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Button} from "@/components/ui/button";
+import {useAuth} from "@/utils/auth";
+import {toast} from "sonner";
+import {useDebounce} from "@/hooks/useDebounce";
+import {
+    useGetSingleGoalDocumentQuery,
+    useUpsertGoalDocumentByTypeMutation,
+    useSubmitGoalDocumentMutation
+} from "../api";
+import {DocumentType, AnnualUpdateDocument} from "@/lib/api/goals-and-documents";
 
 export default function AnnualUpdateTemplate(
-    {pageTitle}: {pageTitle: string}
+    {pageTitle, documentType}: {pageTitle: string, documentType: DocumentType}
 ) {
     const navigate = useNavigate();
+    const location = useLocation();
+    const {user} = useAuth();
+    const documentId = new URLSearchParams(location.search).get("id");
+    
+    const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
+        skip: !documentType,
+        refetchOnMountOrArgChange: true
+    });
+    const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
+    const [submitDocument, {isLoading: isSubmitting}] = useSubmitGoalDocumentMutation();
+    
     const [formData, setFormData] = useState({
         name: "",
         ispStartDate: "",
@@ -26,25 +47,95 @@ export default function AnnualUpdateTemplate(
         completionDate: "",
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (document && document.metadata) {
+            const metadata = document.metadata as AnnualUpdateDocument;
+            setFormData({
+                name: metadata.name || "",
+                ispStartDate: metadata.ispStartDate || "",
+                ispEndDate: metadata.ispEndDate || "",
+                activitiesDescription: metadata.activitiesDescription || "",
+                changesNeeded: metadata.changesNeeded || "",
+                outstandingIssues: metadata.outstandingIssues || "",
+                planningExamples: metadata.planningExamples || "",
+                connectionsExamples: metadata.connectionsExamples || "",
+                employmentOpportunities: metadata.employmentOpportunities || "",
+                employmentPursuits: metadata.employmentPursuits || "",
+                healthSafetyChanges: metadata.healthSafetyChanges || "",
+                completedBy: metadata.completedBy || "",
+                completionDate: metadata.completionDate || "",
+            });
+        }
+    }, [document]);
+
+    const debouncedSave = useDebounce(
+        async (data: any) => {
+            try {
+                setIsSaving(true);
+                const result = await upsertDocument({
+                    documentType,
+                    data: { metadata: data, agencyId: user?.agencyId }
+                }).unwrap();
+                
+                if (result.id && !documentId) {
+                    const newUrl = `${location.pathname}?id=${result.id}`;
+                    window.history.replaceState({}, '', newUrl);
+                }
+            } catch (error) {
+                console.error('Failed to save document:', error);
+            } finally {
+                setIsSaving(false);
+            }
+        },
+        1000
+    );
+
+    const handleInputChange = (field: string, value: string) => {
+        const updatedData = {...formData, [field]: value};
+        setFormData(updatedData);
+        debouncedSave(updatedData);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Form submitted:", formData);
+        
+        if (!document?.id) {
+            toast.error('Please save the document first before submitting');
+            return;
+        }
+        
+        if (!formData.name || !formData.ispStartDate || !formData.ispEndDate) {
+            toast.error('Please fill in Name, ISP Start Date, and ISP End Date');
+            return;
+        }
+        
+        try {
+            await submitDocument(document?.id ?? "").unwrap();
+            toast.success('Document submitted successfully!');
+            navigate(Routes.agency.goalsAndDocuments.index);
+        } catch (error: any) {
+            console.error('Error submitting document:', error);
+            toast.error(error?.data?.message || 'Failed to submit document.');
+        }
     };
 
     const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric", year: "numeric"});
 
     return (
-        <div className="min-h-[calc(100vh-200px)]">
-            {/* Header with Back Button */}
-            <div className="mb-8">
-                <button
-                    onClick={() => navigate(Routes.agency.goalsAndDocuments.index)}
-                    className="flex items-center gap-2 text-[14px] font-medium text-[#808081] hover:text-[#2B82FF] transition-colors mb-4"
-                >
-                    <ChevronLeft size={20}/>
-                    Back to Goals & Documents
-                </button>
-            </div>
+        <VoiceRecordingProvider pageTitle={pageTitle}>
+            <div className="min-h-[calc(100vh-200px)]">
+                {/* Header with Back Button */}
+                <div className="mb-8">
+                    <button
+                        onClick={() => navigate(Routes.agency.goalsAndDocuments.index)}
+                        className="cursor-pointer flex items-center gap-2 text-[14px] font-medium text-[#808081] hover:text-[#2B82FF] transition-colors mb-4"
+                    >
+                        <ChevronLeft size={20}/>
+                        Back to Goals & Documents
+                    </button>
+                </div>
 
             {/* Form Container */}
             <div className="px-8">
@@ -80,7 +171,8 @@ export default function AnnualUpdateTemplate(
                             </label>
                             <Input
                                 type="text"
-                                value={""}
+                                value={formData.name}
+                                onChange={(e) => handleInputChange("name", e.target.value)}
                                 placeholder=""
                                 className="w-full"
                             />
@@ -90,8 +182,9 @@ export default function AnnualUpdateTemplate(
                                 ISP Start Date
                             </label>
                             <Input
-                                type="text"
-                                value={""}
+                                type="date"
+                                value={formData.ispStartDate}
+                                onChange={(e) => handleInputChange("ispStartDate", e.target.value)}
                                 placeholder=""
                                 className="w-full"
                             />
@@ -101,8 +194,9 @@ export default function AnnualUpdateTemplate(
                                 ISP End Date
                             </label>
                             <Input
-                                type="text"
-                                value={""}
+                                type="date"
+                                value={formData.ispEndDate}
+                                onChange={(e) => handleInputChange("ispEndDate", e.target.value)}
                                 placeholder=""
                                 className="w-full"
                             />
@@ -116,9 +210,11 @@ export default function AnnualUpdateTemplate(
                             moving toward his/her ISP outcome(s).
                         </label>
                         <Textarea
-                            value={""}
+                            value={formData.activitiesDescription}
+                            onChange={(e) => handleInputChange("activitiesDescription", e.target.value)}
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
+                            rows={4}
                         />
                     </div>
 
@@ -128,9 +224,11 @@ export default function AnnualUpdateTemplate(
                             Do changes need to be made to the strategies/activities based on the above information?
                         </label>
                         <Textarea
-                            value={""}
+                            value={formData.changesNeeded}
+                            onChange={(e) => handleInputChange("changesNeeded", e.target.value)}
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
+                            rows={4}
                         />
                     </div>
 
@@ -140,9 +238,11 @@ export default function AnnualUpdateTemplate(
                             Are there any outstanding issues/concerns?
                         </label>
                         <Textarea
-                            value={""}
+                            value={formData.outstandingIssues}
+                            onChange={(e) => handleInputChange("outstandingIssues", e.target.value)}
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
+                            rows={4}
                         />
                     </div>
 
@@ -153,9 +253,11 @@ export default function AnnualUpdateTemplate(
                             throughout the year.
                         </label>
                         <Textarea
-                            value={""}
+                            value={formData.planningExamples}
+                            onChange={(e) => handleInputChange("planningExamples", e.target.value)}
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
+                            rows={4}
                         />
                     </div>
 
@@ -166,9 +268,11 @@ export default function AnnualUpdateTemplate(
                             and/or participated more fully in his/her community.
                         </label>
                         <Textarea
-                            value={""}
+                            value={formData.connectionsExamples}
+                            onChange={(e) => handleInputChange("connectionsExamples", e.target.value)}
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
+                            rows={4}
                         />
                     </div>
 
@@ -179,9 +283,11 @@ export default function AnnualUpdateTemplate(
                             during this year?
                         </label>
                         <Textarea
-                            value={""}
+                            value={formData.employmentOpportunities}
+                            onChange={(e) => handleInputChange("employmentOpportunities", e.target.value)}
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
+                            rows={4}
                         />
                     </div>
 
@@ -189,12 +295,14 @@ export default function AnnualUpdateTemplate(
                     <div>
                         <label className="block text-[14px] font-medium text-[#10141a] mb-2">
                             What has been done to pursue these employment or additional community participation
-                            opportunities? Click here to enter text.
+                            opportunities?
                         </label>
                         <Textarea
-                            value={""}
+                            value={formData.employmentPursuits}
+                            onChange={(e) => handleInputChange("employmentPursuits", e.target.value)}
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
+                            rows={4}
                         />
                     </div>
 
@@ -205,9 +313,11 @@ export default function AnnualUpdateTemplate(
                             up needed?
                         </label>
                         <Textarea
-                            value={""}
+                            value={formData.healthSafetyChanges}
+                            onChange={(e) => handleInputChange("healthSafetyChanges", e.target.value)}
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
+                            rows={4}
                         />
                     </div>
 
@@ -219,6 +329,7 @@ export default function AnnualUpdateTemplate(
                         <Input
                             type="text"
                             value={formData.completedBy}
+                            onChange={(e) => handleInputChange("completedBy", e.target.value)}
                             placeholder=""
                             className="max-w-md"
                         />
@@ -228,18 +339,23 @@ export default function AnnualUpdateTemplate(
                     </div>
 
                     {/* Submit Button */}
-                    <div className={"flex justify-end"}>
+                    <div className={"flex justify-between items-center"}>
+                        <div className="text-sm text-gray-500">
+                            {isSaving && "Saving draft..."}
+                            {!isSaving && document?.id && "Draft saved"}
+                        </div>
                         <Button
                             type={"button"}
                             onClick={handleSubmit}
-                            disabled={false}
-                            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
+                            disabled={isSubmitting || !document?.id}
+                            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm disabled:opacity-50"
                         >
-                            Submit
+                            {isSubmitting ? "Submitting..." : "Submit"}
                         </Button>
                     </div>
                 </form>
             </div>
         </div>
+        </VoiceRecordingProvider>
     );
 }
