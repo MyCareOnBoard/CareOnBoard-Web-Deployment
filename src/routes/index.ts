@@ -23,6 +23,7 @@ import AgencyDashboardLayout from "@/layouts/AgencyLayout";
 import UserPanelDashboard from "@/pages/userPanel/dashboard";
 import UserPanelMileage from "@/pages/userPanel/mileage";
 import UserPanelIncidentPage from "@/pages/userPanel/incident";
+import UserPanelMessagesPage from "@/pages/userPanel/messages";
 import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
 import ManualShiftManagementPage from "@/pages/userPanel/manualShiftManagement";
 import ClientsAndServicesPage from "@/pages/userPanel/clientsAndServices";
@@ -81,12 +82,14 @@ import SuperAdminDSPReports from "@/pages/super-admin/reports/dspReports";
 import SuperAdminTimesheetReports from "@/pages/super-admin/reports/timesheetReports";
 import SuperAdminNoteReports from "@/pages/super-admin/reports/noteReports";
 import SuperAdminSystemSettingsPage from "@/pages/super-admin/system-settings";
+import SuperAdminMessagesPage from "@/pages/super-admin/messages";
 import AgencyTrainings from "@/pages/agency/trainings";
 import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
 import AgencyBillingMonitorPage from "@/pages/super-admin/agency-billing-monitor";
 import AIAutomationPage from "@/pages/agency/ai-automation";
 import AgencyMileagePage from "@/pages/agency/mileage";
 import AgencyIncidentPage from "@/pages/agency/incident";
+import AgencyMessagesPage from "@/pages/agency/messages";
 import AgencyReports from "@/pages/agency/reports";
 import AgencyClientReports from "@/pages/agency/reports/clientsReport";
 import AgencyDSPReports from "@/pages/agency/reports/dspReports";
@@ -303,6 +306,10 @@ export const router = createBrowserRouter([
                 Component: AgencyIncidentPage,
             },
             {
+                path: Routes.agency.messages,
+                Component: AgencyMessagesPage,
+            },
+            {
                 path: Routes.agency.helpCenter,
                 Component: HelpCenterPage,
             },
@@ -410,6 +417,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.userPanel.incident,
                 Component: UserPanelIncidentPage,
+            },
+            {
+                path: Routes.userPanel.messages,
+                Component: UserPanelMessagesPage,
             },
             {
                 path: Routes.userPanel.notes.index,
@@ -539,6 +550,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.systemSettings,
                 Component: SuperAdminSystemSettingsPage,
+            },
+            {
+                path: Routes.superAdmin.messages,
+                Component: SuperAdminMessagesPage,
             },
         ],
     },
