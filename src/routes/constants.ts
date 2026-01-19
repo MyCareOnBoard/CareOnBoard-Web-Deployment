@@ -82,6 +82,7 @@ export const Routes = {
         },
         mileage: "/user-panel/mileage",
         expenses: "/user-panel/expenses",
+        incident: "/user-panel/incident",
         helpCenter: "/user-panel/help-center",
         settings: "/user-panel/settings",
         profile: "/user-panel/profile",

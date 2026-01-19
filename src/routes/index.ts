@@ -22,6 +22,7 @@ import UserPanelDashboardLayout from "@/layouts/UserPanelLayout";
 import AgencyDashboardLayout from "@/layouts/AgencyLayout";
 import UserPanelDashboard from "@/pages/userPanel/dashboard";
 import UserPanelMileage from "@/pages/userPanel/mileage";
+import UserPanelIncidentPage from "@/pages/userPanel/incident";
 import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
 import ManualShiftManagementPage from "@/pages/userPanel/manualShiftManagement";
 import ClientsAndServicesPage from "@/pages/userPanel/clientsAndServices";
@@ -405,6 +406,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.userPanel.mileage,
                 Component: UserPanelMileage,
+            },
+            {
+                path: Routes.userPanel.incident,
+                Component: UserPanelIncidentPage,
             },
             {
                 path: Routes.userPanel.notes.index,
