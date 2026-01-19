@@ -109,6 +109,20 @@ export interface NotResolvedIncidentPayload {
     reason: string;
 }
 
+/**
+ * Create Incident Payload
+ */
+export interface CreateIncidentPayload {
+    agencyId: string;
+    employeeId: string;
+    clientId: string;
+    incidentDate: string;
+    whatHappened: string;
+    actionsTaken: string;
+    staffAction: string;
+    witness: string;
+}
+
 // ==================== API Functions ====================
 
 /**
@@ -131,6 +145,23 @@ export const getAllIncidents = async (
         return response.data;
     } catch (error: any) {
         console.error('Error fetching incidents:', error);
+        throw error;
+    }
+};
+
+/**
+ * Create a new incident report
+ * @param payload - Incident creation data
+ * @returns Promise with created incident
+ */
+export const createIncident = async (
+    payload: CreateIncidentPayload
+): Promise<ApiResponse<IncidentReport>> => {
+    try {
+        const response = await axiosClient.post(INCIDENT_BASE, payload);
+        return response.data;
+    } catch (error: any) {
+        console.error('Error creating incident:', error);
         throw error;
     }
 };
