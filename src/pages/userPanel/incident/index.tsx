@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search } from "lucide-react";
-import { createIncident, CreateIncidentPayload } from "@/lib/api/incidents";
+import { submitUserIncident, CreateUserIncidentPayload } from "@/lib/api/incidents";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import { Input } from "@/components/ui/input";
@@ -16,53 +15,23 @@ export default function UserIncidentPage() {
 
   // Form state
   const [clientName, setClientName] = useState("");
-  const [clientId, setClientId] = useState("");
   const [date, setDate] = useState<Date | null>(null);
   const [time, setTime] = useState("12:00");
   const [whatHappened, setWhatHappened] = useState("");
   const [actionsTaken, setActionsTaken] = useState("");
   const [whatDidYouDo, setWhatDidYouDo] = useState("");
+  
   const [witness, setWitness] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  // Client search state
-  const [showClientSearch, setShowClientSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [clients, setClients] = useState<any[]>([]);
-
-  // For simplicity, mock client data - replace with actual API call
-  useEffect(() => {
-    // TODO: Fetch user's assigned clients from API
-    // For now using mock data
-    setClients([
-      { id: "1", firstName: "John", lastName: "Doe" },
-      { id: "2", firstName: "Jane", lastName: "Smith" },
-      { id: "3", firstName: "Robert", lastName: "Johnson" },
-    ]);
-  }, []);
-
-  const filteredClients = clients.filter((client) =>
-    `${client.firstName} ${client.lastName}`
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase())
-  );
-
-  const handleClientSelect = (client: any) => {
-    setClientName(`${client.firstName} ${client.lastName}`);
-    setClientId(client.id);
-    setShowClientSearch(false);
-    setSearchQuery("");
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
-    if (!clientId) {
+    if (!clientName.trim()) {
       toast({
         title: "Client Required",
-        description: "Please select a client",
+        description: "Please enter the client name",
         variant: "destructive",
       });
       return;
@@ -86,10 +55,19 @@ export default function UserIncidentPage() {
       return;
     }
 
-    if (!user?.id || !user?.agencyId) {
+    if (!actionsTaken.trim()) {
       toast({
-        title: "Authentication Error",
-        description: "User not properly authenticated",
+        title: "Actions Required",
+        description: "Please describe what actions were taken",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!whatDidYouDo.trim()) {
+      toast({
+        title: "Your Actions Required",
+        description: "Please describe what you did",
         variant: "destructive",
       });
       return;
@@ -98,24 +76,24 @@ export default function UserIncidentPage() {
     try {
       setSubmitting(true);
 
-      // Combine date and time
-      const [hours, minutes] = time.split(":");
-      const incidentDate = new Date(date);
-      incidentDate.setHours(parseInt(hours), parseInt(minutes));
-      const incidentDateTime = incidentDate.toISOString();
+      // Format date as YYYY-MM-DD
+      const formattedDate = date.toISOString().split('T')[0];
 
-      const payload: CreateIncidentPayload = {
-        agencyId: user.agencyId,
-        employeeId: user.id,
-        clientId: clientId,
-        incidentDate: incidentDateTime,
+      const payload: CreateUserIncidentPayload = {
+        clientName: clientName.trim(),
+        date: formattedDate,
+        time: time,
         whatHappened: whatHappened.trim(),
-        actionsTaken: actionsTaken.trim(),
-        staffAction: whatDidYouDo.trim(),
-        witness: witness.trim(),
+        whatActionsTaken: actionsTaken.trim(),
+        whatDidYouDo: whatDidYouDo.trim(),
+        witness: {
+          name: witness.trim(),
+          contactInfo: "",
+          relationship: "",
+        },
       };
 
-      const response = await createIncident(payload);
+      const response = await submitUserIncident(payload);
 
       if (response.success) {
         toast({
@@ -125,7 +103,6 @@ export default function UserIncidentPage() {
 
         // Reset form
         setClientName("");
-        setClientId("");
         setDate(null);
         setTime("12:00");
         setWhatHappened("");
@@ -161,49 +138,12 @@ export default function UserIncidentPage() {
           <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
             Client Name
           </Label>
-          <div className="relative">
-            <div
-              onClick={() => setShowClientSearch(!showClientSearch)}
-              className="w-full px-4 py-3 h-11 border border-[#cccccd] rounded-xl bg-white text-[14px] sm:text-[15px] text-[#10141a] cursor-pointer hover:border-[#00b8d4] transition-colors flex items-center justify-between"
-            >
-              <span className={clientName ? "text-[#10141a]" : "text-[#b2b2b3]"}>
-                {clientName || "Search"}
-              </span>
-              <Search className="w-5 h-5 text-[#808081]" />
-            </div>
-
-            {/* Dropdown Search */}
-            {showClientSearch && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-[#e5e7eb] rounded-lg shadow-lg max-h-[200px] overflow-y-auto">
-                <div className="p-2 border-b border-[#e5e7eb]">
-                  <Input
-                    type="text"
-                    placeholder="Search clients..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    autoFocus
-                  />
-                </div>
-                <div className="max-h-[150px] overflow-y-auto">
-                  {filteredClients.length > 0 ? (
-                    filteredClients.map((client) => (
-                      <div
-                        key={client.id}
-                        onClick={() => handleClientSelect(client)}
-                        className="px-4 py-2 text-[14px] hover:bg-[#f3f4f6] cursor-pointer"
-                      >
-                        {client.firstName} {client.lastName}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="px-4 py-3 text-[14px] text-[#6b7280]">
-                      No clients found
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <Input
+            type="text"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            placeholder="Enter client name..."
+          />
         </div>
 
         {/* Date and Time Row */}
@@ -278,7 +218,7 @@ export default function UserIncidentPage() {
         </div>
 
         {/* Witness */}
-        <div className="mb-8">
+        <div className="mb-6">
           <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
             Witness
           </Label>
@@ -291,7 +231,7 @@ export default function UserIncidentPage() {
         </div>
 
         {/* Submit Button */}
-        <div>
+        <div className="mt-8">
           <Button
             type="submit"
             disabled={submitting}

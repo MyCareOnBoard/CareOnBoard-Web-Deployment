@@ -28,7 +28,7 @@ const navItems: NavItem[] = [
   { label: "Notes", path: Routes.userPanel.notes.index, icon: NoteIcon },
   { label: "Mileage", path: Routes.userPanel.mileage, icon: UserRoadsideIcon },
   { label: "Expenses", path: Routes.userPanel.expenses, icon: InvoiceIcon },
-  { label: "Incident Reports", path: Routes.userPanel.incident, icon: BellIcon },
+  { label: "Incident", path: Routes.userPanel.incident, icon: BellIcon },
   { label: "Support", path: Routes.userPanel.messages, icon: SupportIcon },
   {
     label: "Community Inclusion",
