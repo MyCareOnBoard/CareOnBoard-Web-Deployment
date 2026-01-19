@@ -16,6 +16,7 @@ import NoteIcon from "@/assets/icons/note-01.svg?react";
 import InvoiceIcon from "@/assets/icons/invoice-01.svg?react";
 import UserRoadsideIcon from "@/assets/icons/user-roadside.svg?react";
 import BellIcon from "@/assets/icons/bell.svg?react";
+import SupportIcon from "@/assets/icons/support.svg?react";
 
 import FileIcon from "@/assets/icons/file.svg?react";
 
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { label: "Mileage", path: Routes.userPanel.mileage, icon: UserRoadsideIcon },
   { label: "Expenses", path: Routes.userPanel.expenses, icon: InvoiceIcon },
   { label: "Incident Reports", path: Routes.userPanel.incident, icon: BellIcon },
+  { label: "Support", path: Routes.userPanel.messages, icon: SupportIcon },
   {
     label: "Community Inclusion",
     path: Routes.userPanel.communityInclusion,

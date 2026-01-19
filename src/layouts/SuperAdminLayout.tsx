@@ -18,8 +18,10 @@ import {
   BarChart3,
   ChartGantt,
   Settings,
-  UserLock
+  UserLock,
+  MessageSquare
 } from "lucide-react";
+import MessageIcon from "@/assets/icons/message-outline.svg?react";
 
 const allNavItems: NavItem[] = [
   {label: "Dashboard", path: Routes.superAdmin.dashboard, icon: Home}, // Always accessible
@@ -32,6 +34,7 @@ const allNavItems: NavItem[] = [
   {label: "Oversight Center", path: Routes.superAdmin.oversightCenter, icon: BarChart3, accessKey: "Oversight Center"},
   {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock, accessKey: "Clients Directory"},
   {label: "Reports", path: Routes.superAdmin.reports.index, icon: ChartGantt, accessKey: "Reports"},
+  {label: "Messages", path: Routes.superAdmin.messages, icon: MessageIcon},
   {label: "System Settings", path: Routes.superAdmin.systemSettings, icon: Settings, accessKey: "System Settings"},
 ];
 
