@@ -4,67 +4,12 @@ import UpcomingRides from "./components/UpcomingRides";
 import { mileageApi, MileageRide } from "@/lib/api/mileage";
 import { useToast } from "@/hooks/use-toast";
 
-const mockRides: MileageRide[] = [
-  {
-    id: "ride123",
-    agencyId: "agency456",
-    caregiverId: "caregiver789",
-    clientId: "client101",
-    clientName: "DR.Brooklyn Simmons",
-    location: "221/B Baker Street",
-    scheduledStartTime: "2024-12-02T14:30:00Z",
-    estimatedDistance: 2,
-    actualDistance: null,
-    status: "scheduled",
-    startLocation: null,
-    endLocation: null,
-    startedAt: null,
-    completedAt: null,
-    cancelledAt: null,
-    cancelReason: null,
-    createdBy: "admin123",
-    createdAt: "2024-12-01T10:00:00Z",
-    updatedAt: "2024-12-01T10:00:00Z",
-  },
-  {
-    id: "ride124",
-    agencyId: "agency456",
-    caregiverId: "caregiver789",
-    clientId: "client102",
-    clientName: "DR.Savannah Nguyen",
-    location: "102 Market Street",
-    scheduledStartTime: "2024-12-03T09:00:00Z",
-    estimatedDistance: 3.4,
-    actualDistance: null,
-    status: "scheduled",
-    startLocation: null,
-    endLocation: null,
-    startedAt: null,
-    completedAt: null,
-    cancelledAt: null,
-    cancelReason: null,
-    createdBy: "admin123",
-    createdAt: "2024-12-01T10:00:00Z",
-    updatedAt: "2024-12-01T10:00:00Z",
-  },
-];
-
 export default function MileagePage() {
   const [totalMileage, setTotalMileage] = useState(0);
   const [rides, setRides] = useState<MileageRide[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const { toast } = useToast();
-
-  const loadMock = () => {
-    setRides(mockRides);
-    setTotalMileage(10.5);
-  };
-
-  const seedMockData = () => {
-    loadMock();
-    toast({ title: "Mileage", description: "Mock rides loaded for testing." });
-  };
 
   const fetchRides = async () => {
     setLoading(true);
@@ -102,10 +47,15 @@ export default function MileagePage() {
   const handleStart = async (rideId: string) => {
     setActionLoading(true);
     try {
+      // Get current location
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+      });
+
       await mileageApi.start(rideId, {
         startLocation: {
-          latitude: 40.7128,
-          longitude: -74.006,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
         },
       });
       await fetchRides();
@@ -122,11 +72,17 @@ export default function MileagePage() {
     setActionLoading(true);
     try {
       const ride = rides.find((r) => r.id === rideId);
+      
+      // Get current location
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+      });
+
       await mileageApi.stop(rideId, {
         actualDistance: ride?.actualDistance ?? ride?.estimatedDistance ?? 0,
         endLocation: {
-          latitude: 40.758,
-          longitude: -73.9855,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
         },
       });
       await fetchRides();
@@ -160,18 +116,9 @@ export default function MileagePage() {
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
           Mileage
         </h1>
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={seedMockData}
-            className="px-4 py-2 text-sm font-semibold text-[#10141a] border border-gray-300 rounded-full hover:bg-gray-50"
-          >
-            Load Dummy Data
-          </button>
-          <div className="text-right">
-            <span className="text-lg font-semibold text-[#808081]">Total Mileage : </span>
-            <span className="text-lg font-semibold text-[#10141a]">{totalMileage}KM</span>
-          </div>
+        <div className="text-right">
+          <span className="text-lg font-semibold text-[#808081]">Total Mileage : </span>
+          <span className="text-lg font-semibold text-[#10141a]">{totalMileage}KM</span>
         </div>
       </div>
 
