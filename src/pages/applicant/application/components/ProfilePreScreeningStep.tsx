@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useDispatch } from "react-redux";
+import { useAuth } from "@/utils/auth";
 import { updateUserProfile } from "@/utils/auth/store/authSlice";
 import type { AppDispatch } from "@/store/redux/store";
 
@@ -90,13 +91,14 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const dispatch = useDispatch<AppDispatch>();
+  const { user } = useAuth();
 
   const form = useForm<ProfilePreScreeningFormValues>({
     resolver: zodResolver(profilePreScreeningSchema),
     mode: "onChange", // Enable validation on change to track form validity
     defaultValues: {
-      fullName: "",
-      email: "",
+      fullName: user?.fullName || user?.profile?.fullName || "",
+      email: user?.email || user?.profile?.email || "",
       dateOfBirth: undefined,
       address: "",
       gender: undefined,
