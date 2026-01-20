@@ -5,7 +5,15 @@ export interface ProfileInfo {
   fullName: string
   email: string
   phone: string
-  address: string
+  address: string | {
+    address: string
+    city: string
+    zipCode: string
+    latlon?: {
+      lat: string
+      lon: string
+    }
+  }
   city: string
   state: string
   zipCode: string

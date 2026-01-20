@@ -34,6 +34,7 @@ export function transformFirebaseUser(firebaseUser: FirebaseUser): User {
     email: firebaseUser.email || '',
     fullName: firebaseUser.displayName || '',
     emailVerified: firebaseUser.emailVerified,
+    userType: 'applicant' as any, // Default to applicant, will be updated from backend
     createdAt: firebaseUser.metadata.creationTime
       ? new Date(firebaseUser.metadata.creationTime)
       : new Date(),

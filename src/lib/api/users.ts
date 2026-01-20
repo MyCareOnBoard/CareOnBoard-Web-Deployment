@@ -17,7 +17,7 @@ export interface UserResponse {
  */
 export interface ListUsersParams {
   userType?: UserType;       // Filter by user type (applicant, employee, agency)
-  agencyId?: string; 
+  agencyId?: string;
   status?: string;
   role?: string;
   workAvailability?: boolean;  // Filter by work availability (for employees)
@@ -110,7 +110,7 @@ export async function getUser(): Promise<User> {
     };
 
     // Add agency details if user is an employee
-    if (user.userType === UserType.EMPLOYEE) {
+    if ([UserType.EMPLOYEE, UserType.APPLICANT].includes(user.userType)) {
       user.agency = {
         id: backendUser.agencyId,
         name: backendUser.agency.name,

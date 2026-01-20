@@ -50,7 +50,15 @@ export interface PreScreeningData {
     fullName: string;
     email: string;
     dateOfBirth: string; // Format: YYYY-MM-DD
-    address: string;
+    address: {
+        address: string;
+        city: string;
+        zipCode: string;
+        latlon?: {
+            lat: string;
+            lon: string;
+        };
+    };
     gender: 'Male' | 'Female';
     isAtLeast18: boolean;
     hasHighSchoolDiploma: boolean;
@@ -76,6 +84,42 @@ export const submitPreScreening = async (data: PreScreeningData): Promise<ApiRes
         return response.data;
     } catch (error) {
         console.error('Failed to submit pre-screening:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get pre-screening form data
+ * @returns Promise with submission response
+ */
+export const getPreScreening = async (): Promise<ApiResponse<any>> => {
+    try {
+        const response = await axiosClient.get<ApiResponse<any>>(
+            `${JOB_APPLICATION_BASE}/pre-screening`
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to get pre-screening:', error);
+        throw error;
+    }
+};
+
+/**
+ * Update pre-screening form data
+ * @param data - The pre-screening form data to update
+ * @returns Promise with update response
+ */
+export const updatePreScreening = async (data: PreScreeningData): Promise<ApiResponse<any>> => {
+    try {
+        const response = await axiosClient.put<ApiResponse<any>>(
+            `${JOB_APPLICATION_BASE}/pre-screening`,
+            data
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to update pre-screening:', error);
         throw error;
     }
 };
@@ -107,7 +151,7 @@ export const APPLICATION_STEP_TITLES = [
     "Official Hire & Orientation",
 ];
 
-export const APPLICATION_STEP_NAMES = ["profile", "eligibility", "compliance", "review", "orientation"];
+export const APPLICATION_STEP_NAMES = ["pre-screening", "eligibility", "compliance", "review", "orientation"];
 
 export type ApplicationStepName = typeof APPLICATION_STEP_NAMES[number] | null;
 
