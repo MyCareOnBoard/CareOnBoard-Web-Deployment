@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion"
 import { AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ButtonLoader } from "@/components/ui/loader"
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean
@@ -62,7 +63,14 @@ export function DeleteConfirmationModal({
                 disabled={isDeleting}
                 className="flex-1 bg-[#d93c24] hover:bg-[#c52d16] text-white"
               >
-                {isDeleting ? "Deleting..." : confirmText}
+                {isDeleting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <ButtonLoader />
+                    Processing...
+                  </span>
+                ) : (
+                  confirmText
+                )}
               </Button>
             </div>
           </motion.div>

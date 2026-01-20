@@ -192,7 +192,7 @@ export default function ClientClaimsPage() {
                 <p className="text-[16px] font-semibold text-[#10141a] mb-2">
                   {user?.profile?.name}
                 </p>
-                <p className="text-[14px] text-[#10141a]">{user?.profile?.address}</p>
+                <p className="text-[14px] text-[#10141a]">{typeof user?.profile?.address === 'object' ? user.profile.address.address : user?.profile?.address}</p>
                 <p className="text-[14px] text-[#10141a]">Provider NPI: 23764234232756</p>
                 <p className="text-[14px] text-[#10141a]">Provider Taxonomy: 21/B Baker Street</p>
                 <p className="text-[14px] text-[#10141a]">Medicaid Provider Number: 21/B Baker Street</p>

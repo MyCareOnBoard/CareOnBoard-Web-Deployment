@@ -48,7 +48,15 @@ export interface Profile {
   fullName?: string
   name?: string  // Agency name or user display name
   phoneNumber?: string
-  address?: string
+  address?: string | {
+    address: string
+    city: string
+    zipCode: string
+    latlon?: {
+      lat: string
+      lon: string
+    }
+  }
   city?: string
   state?: string
   zipCode?: string
@@ -88,7 +96,7 @@ export interface User {
   email: string
   fullName: string
   emailVerified: boolean
-  userType?: UserType
+  userType: UserType
   // Onboarding and verification (extracted from profile for convenience)
   otpVerified?: boolean
   otpVerifiedAt?: FirebaseTimestamp
