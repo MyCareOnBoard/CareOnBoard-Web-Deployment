@@ -16,7 +16,7 @@ import { Radio } from "@/components/ui/radio";
 import { Calendar } from "@/components/ui/calendar";
 import { FileUpload } from "@/components/ui/file-upload";
 import CalendarDaysIcon from "@/assets/icons/calendar-days.svg?react";
-import { format, differenceInYears } from "date-fns";
+import { format, differenceInYears, subYears } from "date-fns";
 import { uploadResume, submitPreScreening, type PreScreeningData } from "@/lib/api/job-application";
 
 const DEFAULT_DOB = new Date();
@@ -114,7 +114,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
   // Watch date of birth to automatically set isAdult
   const dateOfBirth = form.watch("dateOfBirth");
   const isAtLeast18 = dateOfBirth ? calculateAge(dateOfBirth) >= 18 : false;
-  const ellibility  = form.watch("booleanQuestions.eligibleToWork");
+  const ellibility = form.watch("booleanQuestions.eligibleToWork");
   const isEligible = ellibility === "Yes";
 
   useEffect(() => {
@@ -132,12 +132,12 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
     try {
       setUploadError(null);
       let resumeUrl: string | undefined;
-      
+
       // If a resume file is provided, upload it first
       if (values.resume && values.resume.length > 0) {
         setIsUploading(true);
         const file = values.resume[0];
-        
+
         try {
           const uploadResponse = await uploadResume(file);
           console.log('Resume uploaded successfully:', uploadResponse);
@@ -149,7 +149,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
           setIsUploading(false);
         }
       }
-      
+
       // Transform form data to match backend API structure
       const preScreeningData: PreScreeningData = {
         fullName: values.fullName,
@@ -170,7 +170,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
       setIsSubmitting(true);
       try {
         const response = await submitPreScreening(preScreeningData);
-        
+
         // Update user profile with application data
         try {
           const { updateProfileInfo } = await import('@/lib/api/profile');
@@ -181,7 +181,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
             address: values.address,
             gender: values.gender,
           });
-          
+
           // Update Redux state - save ONLY in profile sub-object
           dispatch(updateUserProfile({
             fullName: values.fullName,
@@ -193,7 +193,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         } catch (profileUpdateError) {
           console.warn('Failed to update user profile:', profileUpdateError);
         }
-        
+
         // Proceed to next step with form data
         onNext();
       } catch (error) {
@@ -265,7 +265,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                                 value={formattedDob}
                                 placeholder="November 14, 2025"
                                 readOnly
-                                className="text-[#10141a]"
+                                className="text-[#10141a] cursor-pointer"
                               />
                               <InputGroupAddon align="inline-end">
                                 <CalendarDaysIcon className="h-5 w-5 text-[#808081]" />
@@ -280,7 +280,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                           className="bg-white"
                           captionLayout="dropdown"
                           startMonth={new Date(1924, 0)}
-                          endMonth={new Date()}
+                          endMonth={subYears(new Date(), 18)}
                           selected={field.value}
                           defaultMonth={field.value ?? DEFAULT_DOB}
                           onSelect={(date) => {
@@ -422,14 +422,14 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
 
             return (
               <FormItem className="w-6xl space-y-3">
-                <FormLabel className="block text-xs font-normal text-[#10141a]">Upload Resume</FormLabel>
+                <FormLabel className="block text-xs font-normal text-[#10141a]">Upload Resume in PDF format (Optional)</FormLabel>
                 <FormControl className="mb-0">
                   <FileUpload
                     ref={ref}
                     name={name}
                     className="h-[101px]"
                     label={selectedFileName ?? "Upload your resume"}
-                    accept=".pdf,.doc,.docx"
+                    accept=".pdf"
                     onBlur={onBlur}
                     onChange={(event) => {
                       onChange(event.target.files ?? undefined);
@@ -482,8 +482,8 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
               </p>
             </div>
           )}
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={!form.formState.isValid || form.formState.isSubmitting || isUploading || isSubmitting || !isAtLeast18}
             className={(!form.formState.isValid || !isAtLeast18 || !isEligible) ? 'bg-[#b2b2b3] backdrop-blur-[22px] hover:bg-[#b2b2b3] active:bg-[#b2b2b3]' : ''}
           >

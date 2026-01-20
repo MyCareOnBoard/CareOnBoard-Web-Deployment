@@ -13,41 +13,39 @@ import AnalyticsIcon from "@/assets/icons/analytics.svg?react";
 import ApplicantDirectoryIcon from "@/assets/icons/search-list.svg?react";
 import ReportIcon from "@/assets/icons/analysis-text-line.svg?react";
 import {
-    UserRoundPlus,
-    UsersRound,
-    CalendarDays,
-    NotepadText,
-    ReceiptText,
-    Network,
-    MapPin,
-    Settings,
-    AlertTriangle,
-    FileText,
-    MessageSquare,
+  UserRoundPlus,
+  UsersRound,
+  CalendarDays,
+  NotepadText,
+  ReceiptText,
+  Network,
+  MapPin,
+  Settings,
+  AlertTriangle,
+  FileText,
 } from "lucide-react";
 import MessageIcon from "@/assets/icons/message-outline.svg?react";
 
 
 const navItems: NavItem[] = [
-    {label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: FileText},
-    {label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon},
-    {label: "DSP Management", path: Routes.agency.dspManagement, icon: UserRoundPlus},
-    {label: "Client Management", path: Routes.agency.clients, icon: UsersRound},
-    {label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: FileText},
-    {label: "Scheduling", path: Routes.agency.scheduling, icon: NotepadText},
-    {label: "Notes", path: Routes.agency.notes, icon: CalendarDays},
-    {label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText},
-    {label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon},
-    {label: "Support", path: Routes.agency.support, icon: SupportIcon},
-    {label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon},
-    {label: "Applicant Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon},
-    {label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: FileText},
-    {label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon},
-    {label: "Trainings", path: Routes.agency.trainings, icon: Network},
-    {label: "Mileage", path: Routes.agency.mileage, icon: MapPin},
-    {label: "Incident", path: Routes.agency.incident, icon: AlertTriangle},
-    {label: "Messages", path: Routes.agency.messages, icon: MessageIcon},
-    {label: "Settings", path: Routes.agency.settings, icon: Settings},
+    { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon },
+    { label: "DSP Management", path: Routes.agency.dspManagement, icon: UserRoundPlus },
+    { label: "Client Management", path: Routes.agency.clients, icon: UsersRound },
+    { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: FileText },
+    { label: "Scheduling", path: Routes.agency.scheduling, icon: NotepadText },
+    { label: "Notes", path: Routes.agency.notes, icon: CalendarDays },
+    { label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText },
+    { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon },
+    { label: "Support", path: Routes.agency.support, icon: SupportIcon },
+    { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon },
+    { label: "Applicant Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon },
+    { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon },
+    { label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: FileText },
+    { label: "Trainings", path: Routes.agency.trainings, icon: Network },
+    { label: "Mileage", path: Routes.agency.mileage, icon: MapPin },
+    { label: "Incident", path: Routes.agency.incident, icon: AlertTriangle },
+    { label: "Messages", path: Routes.agency.messages, icon: MessageIcon },
+    { label: "Settings", path: Routes.agency.settings, icon: Settings },
 ];
 
 
@@ -60,12 +58,12 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
       await logout();
       navigate(Routes.auth.login, { replace: true });
     } catch (error) {
-      console.error('[DashboardLayout] Logout failed:', error);
+      console.error("[DashboardLayout] Logout failed:", error);
     }
   };
 
   useEffect(() => {
-    if (!user || (user?.userType !== UserType.AGENCY)) {
+    if (!user || user?.userType !== UserType.AGENCY) {
       navigate(Routes.auth.login, { replace: true });
     }
   }, [user]);
@@ -75,7 +73,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
       <DashboardHeader
         userName={user?.fullName}
         userImage={(user as any)?.profileImage || user?.photoURL}
-        userRole={(user as any)?.role || 'DSP'}
+        userRole={(user as any)?.role || "DSP"}
         userType={user?.userType || UserType.APPLICANT}
         onLogout={handleLogout}
       />
