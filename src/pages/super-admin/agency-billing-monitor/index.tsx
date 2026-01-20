@@ -73,6 +73,7 @@ export default function AgencyBillingMonitorPage() {
 		isSavingBilling,
 		handleSaveBilling,
 		handleCancelPlan,
+		isCancelling,
 		isSuccessOpen,
 		setIsSuccessOpen,
 		successCopy,
@@ -80,6 +81,7 @@ export default function AgencyBillingMonitorPage() {
 		setIsDeleteOpen,
 		openDelete,
 		handleConfirmDelete,
+		isDeleting,
 	} = useAgencyBillingActions({ agencies, statusTab, refetchAgencies });
 
 	const monitorTotalPages = agenciesPagination?.totalPages ?? 1;
@@ -117,6 +119,7 @@ export default function AgencyBillingMonitorPage() {
 						error={agenciesError}
 						page={monitorResolvedPage}
 						totalPages={monitorTotalPages}
+						statusTab={statusTab}
 						onPrevPage={() => setMonitorPage((p) => Math.max(1, p - 1))}
 						onNextPage={() =>
 							setMonitorPage((p) => Math.min(monitorTotalPages, p + 1))
@@ -158,6 +161,7 @@ export default function AgencyBillingMonitorPage() {
 				isSaving={isSavingBilling}
 				onSave={handleSaveBilling}
 				onCancelPlan={handleCancelPlan}
+				isCancelling={isCancelling}
 			/>
 
 			<SuccessDialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
@@ -173,6 +177,7 @@ export default function AgencyBillingMonitorPage() {
 				isOpen={isDeleteOpen}
 				onClose={() => setIsDeleteOpen(false)}
 				onConfirm={handleConfirmDelete}
+				isDeleting={isDeleting}
 				title="Remove plan?"
 				message="Are you sure you want to remove this agency plan?"
 				confirmText="Remove"

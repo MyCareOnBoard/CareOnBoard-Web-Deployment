@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { ButtonLoader } from "@/components/ui/loader";
 import {
 	Dialog,
 	DialogContent,
@@ -38,6 +39,7 @@ type Props = {
 	isSaving: boolean;
 	onSave: () => void;
 	onCancelPlan: () => void;
+	isCancelling: boolean;
 };
 
 export function BillingPlanDialog({
@@ -58,6 +60,7 @@ export function BillingPlanDialog({
 	isSaving,
 	onSave,
 	onCancelPlan,
+	isCancelling,
 }: Props) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,9 +176,16 @@ export function BillingPlanDialog({
 									variant="outline"
 									className="w-40 border-black text-black hover:bg-[#ff4d4d] hover:text-white hover:border-[#ff4d4d]"
 									onClick={onCancelPlan}
-									disabled={isSaving}
+									disabled={isSaving || isCancelling}
 								>
-									Cancel Plan
+									{isCancelling ? (
+										<span className="flex items-center gap-2">
+											<ButtonLoader />
+											Canceling...
+										</span>
+									) : (
+										"Cancel Plan"
+									)}
 								</Button>
 							) : null}
 							<Button
@@ -183,7 +193,14 @@ export function BillingPlanDialog({
 								className="w-[180px] bg-[#00b5b8] hover:bg-[#00a7aa] active:bg-[#00979a]"
 								disabled={isSaving}
 							>
-								{isSaving ? "Saving…" : "Add Plan"}
+								{isSaving ? (
+									<span className="flex items-center gap-2">
+										<ButtonLoader />
+										Saving...
+									</span>
+								) : (
+									"Add Plan"
+								)}
 							</Button>
 						</div>
 					</div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import {
 	useGetBillingMonitorAgenciesQuery,
 	useGetBillingMonitorHistoryQuery,
@@ -41,78 +41,34 @@ export function useBillingMonitorData({
 		[limit, monitorPage, planFilter, search, sortBy, sortOrder, view]
 	);
 
-	const activeAgenciesQuery = useGetBillingMonitorAgenciesQuery(
-		{ ...baseAgencyParams, status: "active" },
-		{ skip: view !== "monitor" || statusTab !== "active" }
-	);
-	const expiringSoonAgenciesQuery = useGetBillingMonitorAgenciesQuery(
-		{ ...baseAgencyParams, status: "expiring_soon" },
-		{ skip: view !== "monitor" || statusTab !== "active" }
-	);
-	const cancelledAgenciesQuery = useGetBillingMonitorAgenciesQuery(
-		{ ...baseAgencyParams, status: "cancelled" },
-		{ skip: view !== "monitor" || statusTab !== "inactive" }
-	);
-	const expiredAgenciesQuery = useGetBillingMonitorAgenciesQuery(
-		{ ...baseAgencyParams, status: "expired" },
-		{ skip: view !== "monitor" || statusTab !== "inactive" }
-	);
+	const agenciesQuery = useGetBillingMonitorAgenciesQuery(baseAgencyParams, {
+		skip: view !== "monitor",
+	});
 
-	const agenciesLoading =
-		statusTab === "active"
-			? activeAgenciesQuery.isLoading || expiringSoonAgenciesQuery.isLoading
-			: cancelledAgenciesQuery.isLoading || expiredAgenciesQuery.isLoading;
-	const agenciesFetching =
-		statusTab === "active"
-			? activeAgenciesQuery.isFetching || expiringSoonAgenciesQuery.isFetching
-			: cancelledAgenciesQuery.isFetching || expiredAgenciesQuery.isFetching;
-	const agenciesError =
-		statusTab === "active"
-			? activeAgenciesQuery.error || expiringSoonAgenciesQuery.error
-			: cancelledAgenciesQuery.error || expiredAgenciesQuery.error;
+	const agenciesLoading = agenciesQuery.isLoading;
+	const agenciesFetching = agenciesQuery.isFetching;
+	const agenciesError = agenciesQuery.error;
 
 	const agenciesResponse = useMemo(() => {
-		const relevant =
-			statusTab === "active"
-				? [activeAgenciesQuery.data, expiringSoonAgenciesQuery.data]
-				: [cancelledAgenciesQuery.data, expiredAgenciesQuery.data];
-
-		const merged = relevant.flatMap((r) => r?.data ?? []);
-		const deduped = Array.from(
-			new Map(merged.map((a) => [a.agencyId, a])).values()
-		);
-		const total = relevant.reduce(
-			(sum, r) => sum + (r?.pagination?.total ?? 0),
-			0
-		);
+		const response = agenciesQuery.data;
+		const all = response?.data ?? [];
+		const filtered = all.filter((agency) => {
+			const status = agency.status;
+			if (!status) return true;
+			if (statusTab === "active") {
+				return status === "active" || status === "expiring_soon";
+			}
+			return status === "cancelled" || status === "expired";
+		});
 
 		return {
-			data: deduped,
-			pagination: {
-				page: monitorPage,
-				limit,
-				total,
-				totalPages: Math.max(1, Math.ceil(total / limit)),
-			},
+			data: filtered,
+			pagination: response?.pagination,
 		};
-	}, [
-		activeAgenciesQuery.data,
-		expiringSoonAgenciesQuery.data,
-		cancelledAgenciesQuery.data,
-		expiredAgenciesQuery.data,
-		limit,
-		monitorPage,
-		statusTab,
-	]);
+	}, [agenciesQuery.data, statusTab]);
 
 	const refetchAgencies = () => {
-		if (statusTab === "active") {
-			activeAgenciesQuery.refetch();
-			expiringSoonAgenciesQuery.refetch();
-			return;
-		}
-		cancelledAgenciesQuery.refetch();
-		expiredAgenciesQuery.refetch();
+		agenciesQuery.refetch();
 	};
 
 	const {
@@ -133,23 +89,6 @@ export function useBillingMonitorData({
 	const agenciesPagination = agenciesResponse?.pagination;
 	const historyItems = historyResponse?.data ?? [];
 	const historyPagination = historyResponse?.pagination;
-
-	useEffect(() => {
-		if (!import.meta.env.DEV) return;
-		if (!agenciesResponse) return;
-
-		const sample = agenciesResponse.data?.[0];
-		const missingExpiryCount = (agenciesResponse.data ?? []).filter(
-			(a) => !a.subscriptionEnd
-		).length;
-
-		console.info("[billingMonitor] agencies list response", {
-			pagination: agenciesResponse.pagination,
-			sampleAgency: sample,
-			missingExpiryCount,
-			totalInPage: agenciesResponse.data?.length ?? 0,
-		});
-	}, [agenciesResponse]);
 
 	return {
 		agencies,

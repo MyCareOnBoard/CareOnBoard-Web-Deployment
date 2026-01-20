@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { BillingMonitorHistoryItem } from "@/pages/super-admin/agency-billing-monitor/api";
 import { normalizePlanLabel } from "@/pages/super-admin/agency-billing-monitor/utils/billingPlan";
 import { formatShortDate } from "@/pages/super-admin/agency-billing-monitor/utils/dateFormat";
+import { InlineLoader } from "@/components/ui/loader";
 
 type Props = {
 	items: BillingMonitorHistoryItem[];
@@ -26,7 +27,7 @@ export function HistoryList({
 	onNextPage,
 }: Props) {
 	if (isLoading) {
-		return <div className="py-20 text-center text-[#808081]">Loading…</div>;
+		return <InlineLoader text="Loading history..." />;
 	}
 	if (error) {
 		return (

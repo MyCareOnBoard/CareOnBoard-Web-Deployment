@@ -2,10 +2,14 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { BillingMonitorAgency } from "@/pages/super-admin/agency-billing-monitor/api";
-import type { BillingOverride } from "@/pages/super-admin/agency-billing-monitor/types";
+import type {
+	BillingOverride,
+	BillingStatusTab,
+} from "@/pages/super-admin/agency-billing-monitor/types";
 import { normalizePlanLabel } from "@/pages/super-admin/agency-billing-monitor/utils/billingPlan";
 import { formatMonthYear } from "@/pages/super-admin/agency-billing-monitor/utils/dateFormat";
 import { ClientCount, DspCount } from "@/pages/super-admin/agency-billing-monitor/components/AgencyCounts";
+import { InlineLoader } from "@/components/ui/loader";
 
 type Props = {
 	items: BillingMonitorAgency[];
@@ -15,6 +19,7 @@ type Props = {
 	error: unknown;
 	page: number;
 	totalPages: number;
+	statusTab: BillingStatusTab;
 	onPrevPage: () => void;
 	onNextPage: () => void;
 	onEdit: (agencyId: string) => void;
@@ -29,13 +34,14 @@ export function MonitorList({
 	error,
 	page,
 	totalPages,
+	statusTab,
 	onPrevPage,
 	onNextPage,
 	onEdit,
 	onRemove,
 }: Props) {
 	if (isLoading) {
-		return <div className="py-20 text-center text-[#808081]">Loading…</div>;
+		return <InlineLoader text="Loading agencies..." />;
 	}
 	if (error) {
 		return (
@@ -100,13 +106,15 @@ export function MonitorList({
 					</div>
 
 					<div className="flex items-center gap-2 md:col-span-3 md:justify-end">
-						<Button
-							variant="outline"
-							className="border-[#ff4d4d] text-[#ff4d4d] hover:bg-[#ff4d4d]/10"
-							onClick={() => onRemove(b.agencyId)}
-						>
-							Remove Plan
-						</Button>
+						{statusTab === "active" ? (
+							<Button
+								variant="outline"
+								className="border-[#ff4d4d] text-[#ff4d4d] hover:bg-[#ff4d4d]/10"
+								onClick={() => onRemove(b.agencyId)}
+							>
+								Remove Plan
+							</Button>
+						) : null}
 						<Button
 							variant="outline"
 							className="border-white/30 bg-white/40 hover:bg-white/60 text-[#10141a]"

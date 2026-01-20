@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-	useUpdateAgencyBillingStatusMutation,
+	useCancelAgencySubscriptionMutation,
 	useUpsertAgencyBillingPlanMutation,
 	type BillingMonitorAgency,
 	type BillingSubscriptionStatus,
@@ -36,6 +36,8 @@ export function useAgencyBillingActions({
 		title: "Billing added",
 		description: "New agency billing has been added successfully",
 	});
+	const [isCancelling, setIsCancelling] = useState(false);
+	const [isDeleting, setIsDeleting] = useState(false);
 
 	const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -51,7 +53,7 @@ export function useAgencyBillingActions({
 
 	const [upsertBillingPlan, { isLoading: isSavingBilling }] =
 		useUpsertAgencyBillingPlanMutation();
-	const [updateBillingStatus] = useUpdateAgencyBillingStatusMutation();
+	const [cancelAgencySubscription] = useCancelAgencySubscriptionMutation();
 
 	const openAdd = () => {
 		setEditingBillingId(null);
@@ -116,14 +118,6 @@ export function useAgencyBillingActions({
 				},
 			}).unwrap();
 
-			if (import.meta.env.DEV) {
-				console.info("[billingMonitor] upsertAgencyBillingPlan response", {
-					agencyId: formAgencyId,
-					message: (result as any)?.message,
-					data: (result as any)?.data,
-				});
-			}
-
 			const returned = result?.data;
 
 			if (returned?.agencyId) {
@@ -161,7 +155,7 @@ export function useAgencyBillingActions({
 			setIsSuccessOpen(true);
 		} catch (e) {
 			if (import.meta.env.DEV) {
-				console.info("[billingMonitor] upsertAgencyBillingPlan error", {
+				console.error("[billingMonitor] upsertAgencyBillingPlan error", {
 					agencyId: formAgencyId,
 					error: e,
 				});
@@ -174,21 +168,10 @@ export function useAgencyBillingActions({
 		if (!editingBillingId || !formAgencyId) return;
 
 		try {
-			const result = await updateBillingStatus({
+			setIsCancelling(true);
+			const result = await cancelAgencySubscription({
 				agencyId: formAgencyId,
-				data: {
-					status: "cancelled",
-					sendNotification: true,
-				},
 			}).unwrap();
-
-			if (import.meta.env.DEV) {
-				console.info("[billingMonitor] cancelPlan response", {
-					agencyId: formAgencyId,
-					message: (result as any)?.message,
-					data: (result as any)?.data,
-				});
-			}
 
 			const returned = result?.data;
 			setBillingOverrides((prev) => ({
@@ -203,12 +186,14 @@ export function useAgencyBillingActions({
 			setIsBillingDialogOpen(false);
 		} catch (e) {
 			if (import.meta.env.DEV) {
-				console.info("[billingMonitor] cancelPlan error", {
+				console.error("[billingMonitor] cancelPlan error", {
 					agencyId: formAgencyId,
 					error: e,
 				});
 			}
 			toast.error("Failed to cancel plan. Please try again.");
+		} finally {
+			setIsCancelling(false);
 		}
 	};
 
@@ -218,23 +203,12 @@ export function useAgencyBillingActions({
 			return;
 		}
 
-		updateBillingStatus({
+		setIsDeleting(true);
+		cancelAgencySubscription({
 			agencyId: deleteTargetId,
-			data: {
-				status: "cancelled",
-				sendNotification: true,
-			},
 		})
 			.unwrap()
 			.then((result) => {
-				if (import.meta.env.DEV) {
-					console.info("[billingMonitor] removePlan response", {
-						agencyId: deleteTargetId,
-						message: (result as any)?.message,
-						data: (result as any)?.data,
-					});
-				}
-
 				const returned = result?.data;
 				setBillingOverrides((prev) => ({
 					...prev,
@@ -248,7 +222,7 @@ export function useAgencyBillingActions({
 			})
 			.catch((e) => {
 				if (import.meta.env.DEV) {
-					console.info("[billingMonitor] removePlan error", {
+					console.error("[billingMonitor] removePlan error", {
 						agencyId: deleteTargetId,
 						error: e,
 					});
@@ -256,6 +230,7 @@ export function useAgencyBillingActions({
 				toast.error("Failed to remove plan. Please try again.");
 			})
 			.finally(() => {
+				setIsDeleting(false);
 				setIsDeleteOpen(false);
 				setDeleteTargetId(null);
 			});
@@ -265,11 +240,12 @@ export function useAgencyBillingActions({
 		// Server filters by status; keep a local guard so overrides immediately reflect
 		// cancel/remove without waiting for a refetch.
 		const overrideStatus = billingOverrides[b.agencyId]?.status;
-		if (!overrideStatus) return true;
+		const effectiveStatus = overrideStatus ?? b.status;
+		if (!effectiveStatus) return true;
 		if (statusTab === "active") {
-			return overrideStatus === "active" || overrideStatus === "expiring_soon";
+			return effectiveStatus === "active" || effectiveStatus === "expiring_soon";
 		}
-		return overrideStatus === "cancelled" || overrideStatus === "expired";
+		return effectiveStatus === "cancelled" || effectiveStatus === "expired";
 	});
 
 	return {
@@ -300,6 +276,7 @@ export function useAgencyBillingActions({
 		isSavingBilling,
 		handleSaveBilling,
 		handleCancelPlan,
+		isCancelling,
 
 		// success dialog
 		isSuccessOpen,
@@ -311,5 +288,6 @@ export function useAgencyBillingActions({
 		setIsDeleteOpen,
 		openDelete,
 		handleConfirmDelete,
+		isDeleting,
 	};
 }

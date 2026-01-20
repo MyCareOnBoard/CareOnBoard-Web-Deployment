@@ -125,6 +125,12 @@ export interface UpsertBillingPlanRequest {
   sendNotification: boolean;
 }
 
+export interface CancelAgencySubscriptionResponse {
+  success: boolean;
+  message?: string;
+  data?: UpsertBillingPlanResult;
+}
+
 export interface UpdateAgencyBillingStatusRequest {
 	status: BillingSubscriptionStatus;
 	sendNotification?: boolean;
@@ -272,6 +278,18 @@ export const billingMonitorApi = createApi({
       invalidatesTags: ["BillingMonitorAgencies", "BillingMonitorHistory", "BillingMonitorStats"],
     }),
 
+    cancelAgencySubscription: builder.mutation<
+      CancelAgencySubscriptionResponse,
+      { agencyId: string }
+    >({
+      query: ({ agencyId }) => ({
+        url: `/billingMonitor/agencies/${agencyId}/cancel-subscription`,
+        method: "POST",
+        requiresAuth: true,
+      }),
+      invalidatesTags: ["BillingMonitorAgencies", "BillingMonitorHistory", "BillingMonitorStats"],
+    }),
+
     getAgencyDspCount: builder.query<number, { agencyId: string }>({
       query: ({ agencyId }) => ({
         url: "/employees/",
@@ -320,7 +338,8 @@ export const {
   useGetBillingMonitorStatsQuery,
   useGetAgencyBillingInfoQuery,
   useUpsertAgencyBillingPlanMutation,
-	useUpdateAgencyBillingStatusMutation,
+  useUpdateAgencyBillingStatusMutation,
+  useCancelAgencySubscriptionMutation,
   useGetAgencyDspCountQuery,
   useGetAgencyClientCountQuery,
 } = billingMonitorApi;
