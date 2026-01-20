@@ -19,6 +19,7 @@ import DSPManagementIcon from "@/assets/icons/dsp-management.svg?react";
 import CommunityInclusionIcon from "@/assets/icons/community-inclusion.svg?react";
 import GoaslAndDocumentsIcon from "@/assets/icons/goals-and-documents.svg?react";
 import MileageIcon from "@/assets/icons/mileage.svg?react";
+import MessageIcon from "@/assets/icons/message.svg?react";
 
 import {
     UsersRound,
@@ -27,7 +28,10 @@ import {
     Settings,
     AlertTriangle,
     FileText,
-    AlertTriangle
+    UserRoundPlus,
+    CalendarDays,
+    MapPin,
+    NotepadText,
 } from "lucide-react";
 
 
@@ -66,7 +70,6 @@ const navItems: NavItem[] = [
     { label: "Trainings", path: Routes.agency.trainings, icon: Network },
     { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon },
     { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon },
-    { label: "Messages", path: Routes.agency.messages, icon: MessageIcon },
     { label: "Settings", path: Routes.agency.settings, icon: Settings },
 ];
 
