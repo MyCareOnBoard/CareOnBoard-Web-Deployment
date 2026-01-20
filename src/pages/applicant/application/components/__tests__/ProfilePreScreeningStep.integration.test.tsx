@@ -79,7 +79,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     (uploadResume as Mock).mockResolvedValue(mockUploadResponse);
     (submitPreScreening as Mock).mockResolvedValue(mockSubmitResponse);
 
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     // Initially button should be disabled
     const submitButton = screen.getByRole("button", { name: /Next/i });
@@ -95,7 +95,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
 
   it("displays file name after file selection", async () => {
     const user = userEvent.setup();
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     const file = new File(["resume content"], "my-resume.pdf", { type: "application/pdf" });
     const fileInput = screen.getByLabelText("Upload your resume") as HTMLInputElement;
@@ -112,7 +112,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     const user = userEvent.setup();
     (uploadResume as Mock).mockRejectedValue(new Error("Network error"));
 
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     await fillCompleteForm(user);
 
@@ -135,7 +135,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     (uploadResume as Mock).mockResolvedValue(mockUploadResponse);
     (submitPreScreening as Mock).mockResolvedValue({ success: true, data: {} });
 
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     await fillCompleteForm(user);
 
@@ -168,7 +168,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     (uploadResume as Mock).mockReturnValue(uploadPromise);
     (submitPreScreening as Mock).mockResolvedValue({ success: true });
 
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     await fillCompleteForm(user);
 
@@ -184,7 +184,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
 
   it("validates all required fields are filled", async () => {
     const user = userEvent.setup();
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     const submitButton = screen.getByRole("button", { name: /Next/i });
 
@@ -205,7 +205,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
 
   it("accepts only valid file types for resume", async () => {
     const user = userEvent.setup();
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     const fileInput = screen.getByLabelText("Upload your resume") as HTMLInputElement;
     
@@ -220,7 +220,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
 
   it("validates email format in real-time", async () => {
     const user = userEvent.setup();
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     const emailInput = screen.getByPlaceholderText("Enter your email");
 
@@ -260,7 +260,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     const user = userEvent.setup();
     (uploadResume as Mock).mockRejectedValue(new Error("Upload failed"));
 
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     // Fill form
     const nameInput = screen.getByPlaceholderText("Enter full name") as HTMLInputElement;
@@ -286,7 +286,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     const user = userEvent.setup();
     (uploadResume as Mock).mockRejectedValue(new Error("Upload failed"));
 
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     await fillCompleteForm(user);
 
@@ -296,7 +296,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
 
   it("clears error when new file is selected", async () => {
     const user = userEvent.setup();
-    render(<ProfilePreScreeningStep onNext={mockOnNext} />);
+    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     const fileInput = screen.getByLabelText("Upload your resume");
     

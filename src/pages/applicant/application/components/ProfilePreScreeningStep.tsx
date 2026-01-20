@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useDispatch } from "react-redux";
+import { useAuth } from "@/utils/auth";
 import { updateUserProfile } from "@/utils/auth/store/authSlice";
 import type { AppDispatch } from "@/store/redux/store";
 
@@ -16,8 +17,9 @@ import { Radio } from "@/components/ui/radio";
 import { Calendar } from "@/components/ui/calendar";
 import { FileUpload } from "@/components/ui/file-upload";
 import CalendarDaysIcon from "@/assets/icons/calendar-days.svg?react";
-import { format, differenceInYears } from "date-fns";
-import { uploadResume, submitPreScreening, type PreScreeningData } from "@/lib/api/job-application";
+import { Loader } from "lucide-react";
+import { format, differenceInYears, subYears } from "date-fns";
+import { uploadResume, submitPreScreening, getPreScreening, updatePreScreening, type PreScreeningData } from "@/lib/api/job-application";
 
 const DEFAULT_DOB = new Date();
 
@@ -43,28 +45,21 @@ const booleanQuestionsSchemaShape = (() => {
   return shape;
 })();
 
-const fileListSchema = z.custom<FileList>(
-  (value: unknown) => {
-    if (typeof FileList === "undefined") {
-      return true;
-    }
-    return value instanceof FileList && value.length > 0;
-  },
-  {
-    message: "Resume file is required",
-  }
-).optional();
-
 const profilePreScreeningSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
   email: z.string().email("Enter a valid email address"),
   dateOfBirth: z.date({ message: "Date of birth is required" }),
-  address: z.string().min(1, "Address is required"),
+  address: z.object({
+    address: z.string().min(1, "Address is required"),
+    city: z.string(),
+    zipCode: z.string(),
+    latlon: z.object({ lat: z.string(), lon: z.string() }).optional(),
+  }),
   gender: z.enum(["Male", "Female"], {
     message: "Please select a gender",
   }),
   booleanQuestions: z.object(booleanQuestionsSchemaShape),
-  resume: fileListSchema,
+  resume: z.any().nullish(), // Accept any value including undefined and null
   declaration: z.boolean().refine((val) => val, {
     message: "You must confirm the information is correct",
   }),
@@ -81,24 +76,53 @@ const booleanQuestionsDefaults = BOOLEAN_QUESTIONS.reduce(
 );
 
 interface ProfilePreScreeningStepProps {
-  onNext: () => void;
+  onSuccess: () => void;
 }
 
-export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningStepProps) {
+export default function ProfilePreScreeningStep({ onSuccess }: ProfilePreScreeningStepProps) {
   const [isDobOpen, setIsDobOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [hasExistingData, setHasExistingData] = useState(false);
+  const [existingResumeUrl, setExistingResumeUrl] = useState<string | null>(null);
   const dispatch = useDispatch<AppDispatch>();
+  const { user } = useAuth();
+
+  // Address autocomplete state
+  const [addressSuggestions, setAddressSuggestions] = useState<
+    Array<{
+      display_name?: string;
+      place_id: string;
+      lat: string;
+      lon: string;
+      address?: {
+        county?: string;
+        state?: string;
+        postcode?: string;
+        state_district?: string;
+      };
+    }>
+  >([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [searchingAddress, setSearchingAddress] = useState(false);
+  const addressInputRef = useRef<HTMLDivElement>(null);
+  const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const form = useForm<ProfilePreScreeningFormValues>({
     resolver: zodResolver(profilePreScreeningSchema),
     mode: "onChange", // Enable validation on change to track form validity
     defaultValues: {
-      fullName: "",
-      email: "",
+      fullName: user?.fullName || user?.profile?.fullName || "",
+      email: user?.email || user?.profile?.email || "",
       dateOfBirth: undefined,
-      address: "",
+      address: {
+        address: "",
+        city: "",
+        zipCode: "",
+        latlon: undefined,
+      },
       gender: undefined,
       booleanQuestions: booleanQuestionsDefaults,
       resume: undefined,
@@ -114,8 +138,25 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
   // Watch date of birth to automatically set isAdult
   const dateOfBirth = form.watch("dateOfBirth");
   const isAtLeast18 = dateOfBirth ? calculateAge(dateOfBirth) >= 18 : false;
-  const ellibility  = form.watch("booleanQuestions.eligibleToWork");
+  const ellibility = form.watch("booleanQuestions.eligibleToWork");
   const isEligible = ellibility === "Yes";
+
+  // Handle click outside for address suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addressInputRef.current && !addressInputRef.current.contains(event.target as Node)) {
+        setShowAddressSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      if (addressSearchTimeoutRef.current) {
+        clearTimeout(addressSearchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (dateOfBirth) {
@@ -128,16 +169,142 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
     }
   }, [dateOfBirth, form]);
 
+  // Fetch existing pre-screening data on mount
+  useEffect(() => {
+    const fetchExistingData = async () => {
+      try {
+        setIsLoadingData(true);
+        const response = await getPreScreening();
+
+        if (response.success && response.data) {
+          setHasExistingData(true);
+          const data = response.data;
+
+          // Prefill form with existing data
+          const formData: any = {
+            fullName: data.fullName || user?.fullName || user?.profile?.fullName || "",
+            email: data.email || user?.email || user?.profile?.email || "",
+            dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+            address: data.address || {
+              address: "",
+              city: "",
+              zipCode: "",
+              latlon: undefined,
+            },
+            gender: data.gender || undefined,
+            booleanQuestions: {
+              isAdult: data.isAtLeast18 ? "Yes" : "No",
+              hasDiploma: data.hasHighSchoolDiploma ? "Yes" : "No",
+              eligibleToWork: data.isLegallyEligible ? "Yes" : "No",
+              hasDisqualifyingOffense: data.hasBeenConvicted ? "Yes" : "No",
+              hasTransportation: data.hasReliableTransportation ? "Yes" : "No",
+            },
+            resume: data?.resumeUrl,
+            declaration: data.declarationAgreed || false,
+          };
+
+          // Store existing resume URL if available
+          if (data.resumeUrl) {
+            setExistingResumeUrl(data.resumeUrl);
+          }
+
+          form.reset(formData);
+        }
+      } catch (error: any) {
+        // If 404, it means no data exists yet - this is fine
+        if (error.response?.status === 404) {
+          setHasExistingData(false);
+        } else {
+          console.error('Failed to fetch pre-screening data:', error);
+        }
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchExistingData();
+  }, [user]);
+
+  const handleAddressSearch = useCallback(async (query: string) => {
+    if (addressSearchTimeoutRef.current) {
+      clearTimeout(addressSearchTimeoutRef.current);
+    }
+
+    if (query.trim().length < 3) {
+      setShowAddressSuggestions(false);
+      setAddressSuggestions([]);
+      return;
+    }
+
+    addressSearchTimeoutRef.current = setTimeout(async () => {
+      try {
+        setSearchingAddress(true);
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            query
+          )}&limit=5&addressdetails=1`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch address suggestions");
+        }
+
+        const data = await response.json();
+        setAddressSuggestions(data);
+        setShowAddressSuggestions(data.length > 0);
+      } catch (error) {
+        console.error("Failed to fetch address suggestions:", error);
+        setAddressSuggestions([]);
+        setShowAddressSuggestions(false);
+      } finally {
+        setSearchingAddress(false);
+      }
+    }, 500);
+  }, []);
+
+  const handleSelectAddressSuggestion = (suggestion: {
+    display_name?: string;
+    place_id: string;
+    lat: string;
+    lon: string;
+    address?: {
+      county?: string;
+      state?: string;
+      postcode?: string;
+      state_district?: string;
+      city?: string;
+      town?: string;
+      village?: string;
+    };
+  }) => {
+    setShowAddressSuggestions(false);
+    setAddressSuggestions([]);
+
+    const zipCode = suggestion.address?.postcode || "";
+    const city = suggestion.address?.city || suggestion.address?.town || suggestion.address?.village || "";
+
+    form.setValue("address", {
+      address: suggestion.display_name || "",
+      city: city,
+      zipCode: zipCode,
+      latlon: { lat: suggestion.lat, lon: suggestion.lon },
+    }, {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+  };
+
   const handleSubmit = async (values: ProfilePreScreeningFormValues) => {
     try {
       setUploadError(null);
       let resumeUrl: string | undefined;
-      
+
       // If a resume file is provided, upload it first
-      if (values.resume && values.resume.length > 0) {
+      if (values.resume && values.resume instanceof FileList && values.resume.length > 0) {
         setIsUploading(true);
         const file = values.resume[0];
-        
+
         try {
           const uploadResponse = await uploadResume(file);
           console.log('Resume uploaded successfully:', uploadResponse);
@@ -149,7 +316,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
           setIsUploading(false);
         }
       }
-      
+
       // Transform form data to match backend API structure
       const preScreeningData: PreScreeningData = {
         fullName: values.fullName,
@@ -166,11 +333,13 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         declarationAgreed: values.declaration,
       };
 
-      // Submit pre-screening data to backend
+      // Submit or update pre-screening data to backend
       setIsSubmitting(true);
       try {
-        const response = await submitPreScreening(preScreeningData);
-        
+        const response = hasExistingData
+          ? await updatePreScreening(preScreeningData)
+          : await submitPreScreening(preScreeningData);
+
         // Update user profile with application data
         try {
           const { updateProfileInfo } = await import('@/lib/api/profile');
@@ -181,7 +350,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
             address: values.address,
             gender: values.gender,
           });
-          
+
           // Update Redux state - save ONLY in profile sub-object
           dispatch(updateUserProfile({
             fullName: values.fullName,
@@ -193,9 +362,9 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
         } catch (profileUpdateError) {
           console.warn('Failed to update user profile:', profileUpdateError);
         }
-        
+
         // Proceed to next step with form data
-        onNext();
+        onSuccess();
       } catch (error) {
         setUploadError('Failed to submit application. Please try again.');
         console.error('Error submitting pre-screening:', error);
@@ -209,6 +378,16 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
       setIsSubmitting(false);
     }
   };
+
+  // Show loading state while fetching existing data
+  if (isLoadingData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-[#808081]">Loading your application data...</p>
+      </div>
+    );
+  }
 
   return (
     <Form {...form}>
@@ -265,7 +444,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                                 value={formattedDob}
                                 placeholder="November 14, 2025"
                                 readOnly
-                                className="text-[#10141a]"
+                                className="text-[#10141a] cursor-pointer"
                               />
                               <InputGroupAddon align="inline-end">
                                 <CalendarDaysIcon className="h-5 w-5 text-[#808081]" />
@@ -280,7 +459,7 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                           className="bg-white"
                           captionLayout="dropdown"
                           startMonth={new Date(1924, 0)}
-                          endMonth={new Date()}
+                          endMonth={subYears(new Date(), 18)}
                           selected={field.value}
                           defaultMonth={field.value ?? DEFAULT_DOB}
                           onSelect={(date) => {
@@ -311,13 +490,51 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
           />
           <FormField
             control={form.control}
-            name="address"
+            name="address.address"
             render={({ field }) => (
               <div className="w-[353px]">
                 <FormItem className="space-y-2">
                   <FormLabel className="text-xs font-normal text-[#10141a]">Address</FormLabel>
                   <FormControl className="mb-0">
-                    <Input placeholder="Enter Address" {...field} />
+                    <div className="relative" ref={addressInputRef}>
+                      <Input
+                        placeholder="Enter Address"
+                        {...field}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          field.onChange(v);
+                          form.setValue("address.latlon", undefined);
+                          handleAddressSearch(v);
+                        }}
+                        onFocus={() => {
+                          if (addressSuggestions.length > 0) {
+                            setShowAddressSuggestions(true);
+                          }
+                        }}
+                      />
+                      {showAddressSuggestions && addressSuggestions.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                          {searchingAddress && (
+                            <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
+                              Searching...
+                            </div>
+                          )}
+                          {!searchingAddress &&
+                            addressSuggestions.map((suggestion) => (
+                              <div
+                                key={suggestion.place_id}
+                                onClick={() => handleSelectAddressSuggestion(suggestion)}
+                                className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
+                              >
+                                <span className="line-clamp-2">
+                                  {suggestion.display_name}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage className="text-xs text-[#d53411]" />
                 </FormItem>
@@ -422,14 +639,14 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
 
             return (
               <FormItem className="w-6xl space-y-3">
-                <FormLabel className="block text-xs font-normal text-[#10141a]">Upload Resume</FormLabel>
+                <FormLabel className="block text-xs font-normal text-[#10141a]">Upload Resume in PDF format (Optional)</FormLabel>
                 <FormControl className="mb-0">
                   <FileUpload
                     ref={ref}
                     name={name}
                     className="h-[101px]"
                     label={selectedFileName ?? "Upload your resume"}
-                    accept=".pdf,.doc,.docx"
+                    accept=".pdf"
                     onBlur={onBlur}
                     onChange={(event) => {
                       onChange(event.target.files ?? undefined);
@@ -438,6 +655,28 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
                   />
                 </FormControl>
                 {uploadError && <p className="text-xs text-[#d53411]">{uploadError}</p>}
+
+                {/* Show existing resume if available */}
+                {existingResumeUrl && (
+                  <a
+                    href={existingResumeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="backdrop-blur-[8px] bg-[rgba(0,216,65,0.08)] border-[rgba(255,255,255,0.3)] border-b border-solid flex gap-2 items-center p-2 rounded-lg hover:bg-[rgba(0,216,65,0.12)] transition-colors"
+                  >
+                    <svg className="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="none">
+                      <path
+                        d="M11.6667 1.66669H5.00002C4.55799 1.66669 4.13407 1.84228 3.82151 2.15484C3.50895 2.4674 3.33335 2.89133 3.33335 3.33335V16.6667C3.33335 17.1087 3.50895 17.5326 3.82151 17.8452C4.13407 18.1578 4.55799 18.3334 5.00002 18.3334H15C15.442 18.3334 15.866 18.1578 16.1785 17.8452C16.4911 17.5326 16.6667 17.1087 16.6667 16.6667V6.66669M11.6667 1.66669L16.6667 6.66669M11.6667 1.66669V6.66669H16.6667M13.3334 10.8334H6.66669M13.3334 14.1667H6.66669M8.33335 7.50002H6.66669"
+                        stroke="#00D841"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <span className="font-['Urbanist',sans-serif] font-medium text-sm text-[#10141a]">View Uploaded Resume</span>
+                  </a>
+                )}
+
                 <FormMessage className="text-xs text-[#d53411]" />
               </FormItem>
             );
@@ -482,23 +721,28 @@ export default function ProfilePreScreeningStep({ onNext }: ProfilePreScreeningS
               </p>
             </div>
           )}
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={!form.formState.isValid || form.formState.isSubmitting || isUploading || isSubmitting || !isAtLeast18}
             className={(!form.formState.isValid || !isAtLeast18 || !isEligible) ? 'bg-[#b2b2b3] backdrop-blur-[22px] hover:bg-[#b2b2b3] active:bg-[#b2b2b3]' : ''}
           >
+            {(isUploading || isSubmitting) && (
+              <Loader className="h-5 w-5 animate-spin" />
+            )}
             <span>
-              {isUploading ? 'Uploading...' : isSubmitting ? 'Submitting...' : 'Next'}
+              {isUploading ? 'Uploading...' : isSubmitting ? 'Saving...' : 'Save'}
             </span>
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M4 10H16M16 10L10 4M16 10L10 16"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            {!isUploading && !isSubmitting && (
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M4 10H16M16 10L10 4M16 10L10 16"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
           </Button>
         </div>
       </form>
