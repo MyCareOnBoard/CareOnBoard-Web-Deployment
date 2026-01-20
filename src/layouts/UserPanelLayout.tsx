@@ -17,8 +17,7 @@ import InvoiceIcon from "@/assets/icons/invoice-01.svg?react";
 import UserRoadsideIcon from "@/assets/icons/user-roadside.svg?react";
 import BellIcon from "@/assets/icons/bell.svg?react";
 import SupportIcon from "@/assets/icons/support.svg?react";
-
-import FileIcon from "@/assets/icons/file.svg?react";
+import CommunityInclusionIcon from "@/assets/icons/community-inclusion.svg?react";
 
 const navItems: NavItem[] = [
   { label: "Dashboard", path: Routes.userPanel.dashboard, icon: HomeIcon },
@@ -33,7 +32,7 @@ const navItems: NavItem[] = [
   {
     label: "Community Inclusion",
     path: Routes.userPanel.communityInclusion,
-    icon: FileIcon
+    icon: CommunityInclusionIcon
   },
   {
     label: "Help Center",
