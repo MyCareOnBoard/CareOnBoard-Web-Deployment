@@ -1,770 +1,658 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, X, Send, Image, Paperclip, Check, AlertCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Search, Plus, X, Send, Image as ImageIcon, Paperclip, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import NewMessageModal from "./components/NewMessageModal";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
-import { auth } from "@/lib/firebase";
+import { useAuth } from "@/utils/auth";
 import {
-  useThreads,
-  useMessages,
-  useAvailableUsers,
-  useSendMessage,
-  useCreateThread,
-  useAuth,
-} from "@/lib/chat/chat.hooks";
-import type { Thread, Message as FirebaseMessage, ChatUser } from "@/lib/chat/chat.types";
+  getUserConversations,
+  getUserConversationMessages,
+  sendUserMessage,
+  markUserMessagesAsRead,
+  createUserConversation,
+  getUserContacts,
+  getUserConversationById,
+  leaveUserConversation,
+  UserConversation,
+  UserMessage,
+  ConversationParticipant,
+  AgencyContact,
+} from "@/lib/api/userMessaging";
 
-/**
- * UI Display Message type
- * Extends Firebase message with UI-specific properties
- */
-interface Message {
-  id: string;
-  sender: string;
-  role: string;
-  content: string;
-  timestamp: string;
-  isOwn: boolean;
-  avatar: string;
-  read?: boolean;
-  attachments?: { name: string; url: string; type: string }[];
-  firebaseId?: string;
-}
 
-/**
- * Contact display type for left sidebar
- * Derived from Firebase Thread data
- */
-interface Contact {
-  id: string;
-  name: string;
-  role: string;
-  avatar: string;
-  lastMessage: string;
-  timestamp: string;
-  unread?: number;
-  hasNotification?: boolean;
-  isOnline?: boolean;
-  category?: "dsp" | "administration" | "all";
-  otherUserId?: string; // UID of the other participant
-}
+type FilterTab = 'all' | 'dsp' | 'administration';
 
-export default function SupportPage() {
+export default function AgencySupportPage() {
+  const { user } = useAuth();
   const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<FilterTab>('all');
+  const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
+  const [conversations, setConversations] = useState<UserConversation[]>([]);
+  const [messages, setMessages] = useState<UserMessage[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<UserConversation | null>(null);
+  const [messageInput, setMessageInput] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [contacts, setContacts] = useState<AgencyContact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [creatingConversation, setCreatingConversation] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingConversation, setDeletingConversation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Firebase Chat Hooks
-  const { isAuthenticated, userId } = useAuth();
-  const { threads, isLoading: threadsLoading, error: threadsError } = useThreads();
-  const { users: availableUsers, isLoading: usersLoading } = useAvailableUsers();
-  const { create: createNewThread, isCreating: isCreatingThread } = useCreateThread();
+  // Fetch conversations on mount
+  useEffect(() => {
+    fetchConversations();
+  }, []);
 
-  // Selected contact and message state
-  const [selectedContact, setSelectedContact] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"all" | "dsp" | "administration">("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [contactSearchQuery, setContactSearchQuery] = useState("");
-  const [messageInput, setMessageInput] = useState("");
-  const [newMessageModalOpen, setNewMessageModalOpen] = useState(false);
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  // Fetch messages when conversation is selected
+  useEffect(() => {
+    if (selectedConversation) {
+      fetchMessages(selectedConversation.id);
+      markConversationAsRead(selectedConversation.id);
+    }
+  }, [selectedConversation]);
 
-  // Get messages for selected thread
-  const { messages: firebaseMessages, isLoading: messagesLoading } = useMessages(selectedContact);
-  const { send: sendMessage, isSending } = useSendMessage(selectedContact);
+  // Auto-scroll to bottom when messages update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  // Map Firebase threads to UI contacts with user info lookup
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [userCache, setUserCache] = useState<Map<string, ChatUser>>(new Map());
+  // Fetch contacts when modal opens
+  useEffect(() => {
+    if (isNewMessageModalOpen) {
+      fetchContacts();
+    }
+  }, [isNewMessageModalOpen]);
 
-  // Convert Firebase message to UI message
-  const mapFirebaseMessage = (msg: FirebaseMessage, currentUserId: string | null): Message => {
-    const isOwn = msg.senderId === currentUserId;
-    const sender = userCache.get(msg.senderId);
-
-    return {
-      id: msg.id,
-      sender: isOwn ? "You" : sender?.name || "Unknown",
-      role: sender?.role || "",
-      content: msg.text,
-      timestamp: format(msg.createdAt, "hh:mm a"),
-      isOwn,
-      avatar: isOwn ? "Y" : sender?.avatar || "?",
-      firebaseId: msg.id,
-    };
+  const fetchConversations = async () => {
+    try {
+      setLoading(true);
+      const response = await getUserConversations();
+      setConversations(response.data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load conversations",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const currentMessages = firebaseMessages.map((msg) => mapFirebaseMessage(msg, userId));
+  const fetchContacts = async () => {
+    try {
+      setLoadingContacts(true);
+      const response = await getUserContacts();
+      setContacts(response.data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load contacts",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
 
-  // Build contacts from threads
-  useEffect(() => {
-    const buildContacts = async () => {
-      if (!userId || threads.length === 0) {
-        setContacts([]);
-        return;
+  const fetchMessages = async (conversationId: string) => {
+    try {
+      const response = await getUserConversationMessages(conversationId);
+      setMessages(response.data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load messages",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const markConversationAsRead = async (conversationId: string) => {
+    try {
+      const unreadMessages = messages.filter(msg => 
+        msg.senderId !== user?.id && !msg.isRead
+      );
+      
+      if (unreadMessages.length > 0) {
+        const messageIds = unreadMessages.map(msg => msg.id);
+        await markUserMessagesAsRead(conversationId, { messageIds });
+        
+        // Update local state
+        setMessages(prev => 
+          prev.map(msg => 
+            messageIds.includes(msg.id) ? { ...msg, isRead: true } : msg
+          )
+        );
+        
+        // Update conversation unread count
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.id === conversationId
+              ? { ...conv, unreadCount: 0 }
+              : conv
+          )
+        );
       }
+    } catch (error: any) {
+      console.error('Failed to mark messages as read:', error);
+    }
+  };
 
-      const newContacts: Contact[] = [];
-      const newUserCache = new Map(userCache);
-
-      for (const thread of threads) {
-        const otherUserId = thread.participants.find((id) => id !== userId);
-        if (!otherUserId) continue;
-
-        let otherUser = newUserCache.get(otherUserId);
-        if (!otherUser) {
-          const foundUser = availableUsers.find((u) => u.uid === otherUserId);
-          if (foundUser) {
-            otherUser = foundUser;
-            newUserCache.set(otherUserId, foundUser);
-          }
-        }
-
-        if (!otherUser) continue;
-
-        const contact: Contact = {
-          id: thread.id,
-          name: otherUser.name,
-          role: otherUser.role,
-          avatar: otherUser.avatar,
-          lastMessage: thread.lastMessage || "(no messages yet)",
-          timestamp: formatDistanceToNow(thread.lastMessageAt, { addSuffix: true }),
-          otherUserId,
-          category: otherUser.role === "DSP" ? "dsp" : "administration",
-        };
-
-        newContacts.push(contact);
+  const handleRefreshConversation = async (conversationId: string) => {
+    try {
+      const response = await getUserConversationById(conversationId);
+      setConversations(prev =>
+        prev.map(conv => conv.id === conversationId ? response.data : conv)
+      );
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(response.data);
       }
+    } catch (error: any) {
+      console.error('Failed to refresh conversation:', error);
+    }
+  };
 
-      setContacts(newContacts);
-      setUserCache(newUserCache);
-    };
+  const handleDeleteConversation = async () => {
+    if (!selectedConversation || deletingConversation) return;
 
-    buildContacts();
-  }, [threads, userId, availableUsers]);
+    try {
+      setDeletingConversation(true);
+      await leaveUserConversation(selectedConversation.id);
+
+      // Remove from list
+      setConversations(prev => prev.filter(conv => conv.id !== selectedConversation.id));
+      
+      // Clear selection
+      setSelectedConversation(null);
+      setMessages([]);
+      setIsDeleteDialogOpen(false);
+
+      toast({
+        title: "Success",
+        description: "Conversation deleted successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete conversation",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingConversation(false);
+    }
+  };
+
+  const handleCreateConversation = async (selectedUserIds: string[]) => {
+    if (selectedUserIds.length === 0 || creatingConversation) return;
+
+    try {
+      setCreatingConversation(true);
+
+      // Create conversation
+      const conversationResponse = await createUserConversation({
+        participantIds: selectedUserIds,
+      });
+
+      // Add new conversation to list
+      const newConversation = conversationResponse.data;
+      setConversations(prev => [newConversation, ...prev]);
+
+      // Select the new conversation
+      setSelectedConversation(newConversation);
+
+      toast({
+        title: "Success",
+        description: "Conversation created successfully",
+      });
+
+      // Fetch messages for the new conversation
+      fetchMessages(newConversation.id);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create conversation",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingConversation(false);
+    }
+  };
 
   const handleSendMessage = async () => {
-    if (!messageInput.trim() || !selectedContact) return;
+    if (!messageInput.trim() || !selectedConversation || sendingMessage) return;
 
+    const messageText = messageInput.trim();
+    setMessageInput("");
+    
     try {
-      await sendMessage(messageInput.trim());
-      setMessageInput("");
-    } catch (error) {
+      setSendingMessage(true);
+      
+      // Optimistic UI update
+      const tempMessage: UserMessage = {
+        id: `temp-${Date.now()}`,
+        conversationId: selectedConversation.id,
+        senderId: user?.id || "",
+        senderName: user?.fullName || "You",
+        senderRole: user?.role || "Agency",
+        content: messageText,
+        readBy: [user?.id || ""],
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      setMessages(prev => [...prev, tempMessage]);
+      
+      // Send to API
+      const response = await sendUserMessage(selectedConversation.id, {
+        content: messageText,
+      });
+      
+      // Replace temp message with real one
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempMessage.id ? response.data : msg
+        )
+      );
+      
+      // Update conversation's last message
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === selectedConversation.id
+            ? {
+                ...conv,
+                lastMessage: messageText,
+                lastMessageAt: new Date().toISOString(),
+                lastMessageSenderId: user?.id,
+              }
+            : conv
+        )
+      );
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to send message",
+        description: error.message || "Failed to send message",
         variant: "destructive",
       });
+      
+      // Remove temp message on error
+      setMessages(prev => prev.filter(msg => !msg.id.startsWith("temp-")));
+      setMessageInput(messageText); // Restore input
+    } finally {
+      setSendingMessage(false);
     }
   };
 
-  const handleStartChat = async () => {
-    if (selectedUsers.length === 0) {
-      toast({
-        title: "No User Selected",
-        description: "Please select a user to message.",
-        variant: "destructive",
-      });
-      return;
+  // Helper to get participant info (not the current user)
+  const getParticipantInfo = (conversation: UserConversation): ConversationParticipant | null => {
+    return conversation.participants.find(p => p.uid !== user?.id) || null;
+  };
+
+  // Helper to get initials
+  const getInitials = (name: string): string => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
+
+  // Filter conversations by tab and search
+  const filteredConversations = conversations.filter(conv => {
+    const participant = getParticipantInfo(conv);
+    if (!participant) return false;
+
+    // Filter by tab
+    if (activeTab === 'dsp' && participant.role !== 'DSP') return false;
+    if (activeTab === 'administration' && participant.role === 'DSP') return false;
+
+    // Filter by search
+    if (searchQuery) {
+      return participant.name.toLowerCase().includes(searchQuery.toLowerCase());
     }
 
-    try {
-      const newThreadId = await createNewThread(selectedUsers);
-      setSelectedContact(newThreadId);
-      setSelectedUsers([]);
-      setSearchQuery("");
-      setNewMessageModalOpen(false);
-
-      toast({
-        title: "Chat Started",
-        description: "New conversation started.",
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to create chat";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleContactSelect = (contactId: string) => {
-    setSelectedContact(contactId);
-  };
-
-  const toggleUserSelection = (userId: string) => {
-    setSelectedUsers((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
-    );
-  };
-
-  const handleFileAttachment = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      const fileArray = Array.from(files);
-      const validFiles = fileArray.filter((file) => file.size <= 10 * 1024 * 1024);
-
-      if (validFiles.length !== fileArray.length) {
-        toast({
-          title: "File Too Large",
-          description: "Some files exceed the 10MB limit.",
-          variant: "destructive",
-        });
-      }
-
-      setAttachedFiles((prev) => [...prev, ...validFiles]);
-    }
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const filteredContacts = contacts.filter((contact) => {
-    const matchesSearch = contact.name.toLowerCase().includes(contactSearchQuery.toLowerCase());
-    const matchesTab = activeTab === "all" || contact.category === activeTab;
-    return matchesSearch && matchesTab;
+    return true;
   });
 
-  const filteredUsers = availableUsers.filter((user) =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const selectedContactData = contacts.find((c) => c.id === selectedContact);
-
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [currentMessages]);
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="max-w-md p-6 border border-yellow-200 rounded-lg bg-yellow-50">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="font-semibold text-yellow-900">Authentication Required</h3>
-              <p className="mt-1 text-sm text-yellow-800">
-                Please log in to access the messaging feature.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (threadsLoading) {
-    return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-full border-4 border-[#e5e5e6] border-t-[#3b82f6] animate-spin mx-auto mb-4"></div>
-          <p className="text-[#6b7280]">Loading messages...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-[calc(100vh-200px)]">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
-            Messages
-          </h1>
-        </div>
-        <div>
+    <>
+      <div className="flex flex-col h-[calc(100vh-160px)]">
+        {/* Top Header with New Message Button */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e7eb]">
+          <h1 className="text-[28px] font-bold text-[#10141a]">Support</h1>
           <Button
-            onClick={() => setNewMessageModalOpen(true)}
-            className="flex items-center gap-2 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
+            onClick={() => setIsNewMessageModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-lg font-medium"
           >
             <Plus className="w-5 h-5" />
             New Message
           </Button>
         </div>
-      </div>
 
-      <div className="flex gap-6 h-[calc(100vh-280px)]">
-        {/* Left Sidebar - Contacts List */}
-        <div className="w-[380px] bg-[#f5f5f5] rounded-3xl flex flex-col overflow-hidden shadow-sm">
-          {/* Messages Header */}
-          <div className="p-5 pb-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[22px] font-semibold text-[#10141a]">Messages</h2>
-              <button
-                onClick={() => {
-                  setIsSearchExpanded(true);
-                  setTimeout(() => searchInputRef.current?.focus(), 100);
-                }}
-                className="flex items-center justify-center transition-colors rounded-full w-9 h-9 hover:bg-white"
-              >
-                <Search className="w-5 h-5 text-[#6b7280]" />
-              </button>
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Panel - Conversations List */}
+          <div className="w-[360px] flex flex-col border-r border-[#e5e7eb] bg-white">
+            {/* Search Bar */}
+            <div className="px-4 py-3 border-b border-[#e5e7eb]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#808081]" />
+                <Input
+                  type="text"
+                  placeholder="Search conversations..."
+                  className="pl-10 h-10 bg-[#f3f4f6] border-0"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
 
-            {/* Collapsible Search */}
-            {isSearchExpanded && (
-              <div className="mb-4 duration-300 animate-in fade-in slide-in-from-top-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#9ca3af] pointer-events-none z-10" />
-                  <Input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Search messages..."
-                    value={contactSearchQuery}
-                    onChange={(e) => setContactSearchQuery(e.target.value)}
-                    onBlur={() => {
-                      setTimeout(() => {
-                        if (!contactSearchQuery) {
-                          setIsSearchExpanded(false);
-                        }
-                      }, 150);
-                    }}
-                    className="w-full pl-9 pr-9 h-10 border-0 rounded-xl bg-white focus-visible:ring-1 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-0 text-sm"
-                  />
-                  {contactSearchQuery && (
-                    <button
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        setContactSearchQuery("");
-                        setIsSearchExpanded(false);
-                      }}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-[#f3f4f6] rounded-full transition-colors z-10"
-                    >
-                      <X className="w-4 h-4 text-[#6b7280]" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Tabs */}
-            <div className="flex gap-2">
+            {/* Filter Tabs */}
+            <div className="flex gap-2 px-4 py-3 border-b border-[#e5e7eb]">
               <button
-                onClick={() => setActiveTab("all")}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  activeTab === "all"
-                    ? "bg-[#dbeafe] text-[#1e40af]"
-                    : "text-[#6b7280] hover:bg-white"
+                onClick={() => setActiveTab('all')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'all'
+                    ? 'bg-[#2563eb] text-white'
+                    : 'text-[#6b7280] hover:bg-[#f3f4f6]'
                 }`}
               >
                 All
               </button>
               <button
-                onClick={() => setActiveTab("dsp")}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  activeTab === "dsp"
-                    ? "bg-[#dbeafe] text-[#1e40af]"
-                    : "text-[#6b7280] hover:bg-white"
+                onClick={() => setActiveTab('dsp')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'dsp'
+                    ? 'bg-[#2563eb] text-white'
+                    : 'text-[#6b7280] hover:bg-[#f3f4f6]'
                 }`}
               >
                 <span className="w-1.5 h-1.5 bg-[#ef4444] rounded-full"></span>
                 DSP
               </button>
               <button
-                onClick={() => setActiveTab("administration")}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  activeTab === "administration"
-                    ? "bg-[#dbeafe] text-[#1e40af]"
-                    : "text-[#6b7280] hover:bg-white"
+                onClick={() => setActiveTab('administration')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'administration'
+                    ? 'bg-[#2563eb] text-white'
+                    : 'text-[#6b7280] hover:bg-[#f3f4f6]'
                 }`}
               >
-                <span className="w-1.5 h-1.5 bg-[#9ca3af] rounded-full"></span>
                 Administration
               </button>
             </div>
-          </div>
 
-          {/* Contacts List */}
-          <div className="flex-1 overflow-y-auto">
-            {filteredContacts.length > 0 ? (
-              filteredContacts.map((contact) => (
-                <button
-                  key={contact.id}
-                  onClick={() => handleContactSelect(contact.id)}
-                  className={`w-full px-5 py-3 flex items-center gap-3 transition-all ${
-                    selectedContact === contact.id 
-                      ? "bg-[#dbeafe]" 
-                      : "hover:bg-white"
-                  }`}
-                >
-                  <div className="relative">
-                    <img
-                      src={contact.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=e5e7eb&color=374151`}
-                      alt={contact.name}
-                      className="object-cover w-12 h-12 rounded-full"
-                    />
-                    {contact.hasNotification && (
-                      <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-[#ef4444] rounded-full border-2 border-[#f5f5f5]"></span>
-                    )}
+            {/* Conversations List */}
+            <div className="flex-1 overflow-y-auto">
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="w-8 h-8 rounded-full border-2 border-[#e5e7eb] border-t-[#2563eb] animate-spin mx-auto mb-2"></div>
+                    <p className="text-sm text-[#808081]">Loading...</p>
                   </div>
-                  <div className="flex-1 min-w-0 text-left">
-                    <div className="flex items-start justify-between mb-0.5">
-                      <h3 className="font-semibold text-[15px] text-[#111827] truncate">{contact.name}</h3>
-                      <span className="text-[11px] text-[#6b7280] shrink-0 ml-2">{contact.timestamp}</span>
-                    </div>
-                    <p className="text-[13px] text-[#6b7280] truncate">{contact.role}</p>
-                  </div>
-                  {contact.unread && contact.unread > 0 && (
-                    <div className="w-5 h-5 rounded-full bg-[#ef4444] flex items-center justify-center text-white text-[11px] font-semibold shrink-0">
-                      {contact.unread}
-                    </div>
-                  )}
-                </button>
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-[#6b7280] p-4">
-                <Send className="w-12 h-12 mb-4 opacity-30" />
-                <p className="text-sm">No conversations yet</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Side - Chat Area */}
-        <div className="flex-1 bg-[#f9fafb] rounded-3xl flex flex-col overflow-hidden shadow-sm">
-          {selectedContactData ? (
-            <>
-              {/* Chat Header */}
-              <div className="px-6 py-4 bg-white border-b border-[#e5e7eb] flex items-center gap-3">
-                <img
-                  src={selectedContactData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedContactData.name)}&background=e5e7eb&color=374151`}
-                  alt={selectedContactData.name}
-                  className="object-cover rounded-full w-11 h-11"
-                />
-                <div>
-                  <h3 className="font-semibold text-[15px] text-[#111827]">
-                    {selectedContactData.name}
-                  </h3>
-                  <p className="text-[13px] text-[#6b7280]">{selectedContactData.role}</p>
                 </div>
-              </div>
+              ) : filteredConversations.length > 0 ? (
+                filteredConversations.map((conv) => {
+                  const participant = getParticipantInfo(conv);
+                  if (!participant) return null;
 
-              {/* Messages Area */}
-              <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-[#f9fafb]">
-                {messagesLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <div className="w-8 h-8 rounded-full border-2 border-[#e5e7eb] border-t-[#3b82f6] animate-spin mx-auto mb-2"></div>
-                      <p className="text-[#6b7280] text-sm">Loading messages...</p>
-                    </div>
-                  </div>
-                ) : currentMessages.length > 0 ? (
-                  currentMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex gap-2.5 ${message.isOwn ? "justify-end" : ""}`}
+                  return (
+                    <button
+                      key={conv.id}
+                      onClick={() => setSelectedConversation(conv)}
+                      className={`w-full px-4 py-3 flex items-center gap-3 border-b border-[#f3f4f6] transition-colors ${
+                        selectedConversation?.id === conv.id
+                          ? 'bg-[#eff6ff]'
+                          : 'hover:bg-[#f9fafb]'
+                      }`}
                     >
-                      {!message.isOwn && (
-                        <img
-                          src={selectedContactData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedContactData.name)}&background=e5e7eb&color=374151`}
-                          alt={message.sender}
-                          className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5"
-                        />
-                      )}
-                      <div className={`flex flex-col ${message.isOwn ? "items-end" : ""} max-w-[65%]`}>
-                        {!message.isOwn && (
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[13px] font-medium text-[#111827]">
-                              {message.sender}
-                            </span>
-                            <span className="text-[11px] text-[#9ca3af]">
-                              {message.timestamp}
-                            </span>
-                          </div>
-                        )}
-                        <div
-                          className={`px-4 py-2.5 rounded-2xl ${
-                            message.isOwn
-                              ? "bg-[#dbeafe] text-[#111827]"
-                              : "bg-white text-[#111827] shadow-sm"
-                          }`}
-                        >
-                          {message.content && (
-                            <p className="text-[14px] leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
-                          )}
-                          {message.attachments && message.attachments.length > 0 && (
-                            <div className={`${message.content ? "mt-2" : ""} space-y-2`}>
-                              {message.attachments.map((attachment, index) => (
-                                <div key={index}>
-                                  {attachment.type.startsWith("image/") ? (
-                                    <img
-                                      src={attachment.url}
-                                      alt={attachment.name}
-                                      className="max-w-full rounded-lg"
-                                    />
-                                  ) : (
-                                    <div className="flex items-center gap-2 p-2 bg-[#f9fafb] rounded-lg border border-[#e5e7eb]">
-                                      <Paperclip className="w-4 h-4 text-[#6b7280]" />
-                                      <span className="text-xs text-[#111827] truncate max-w-[200px]">
-                                        {attachment.name}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
+                      <div className="relative">
+                        <div className="w-12 h-12 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-sm font-semibold">
+                          {participant.avatar ? (
+                            <img
+                              src={participant.avatar}
+                              alt={participant.name}
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            getInitials(participant.name)
                           )}
                         </div>
-                        {message.isOwn && (
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <span className="text-[11px] text-[#9ca3af]">
-                              {message.timestamp}
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="flex items-baseline justify-between mb-1">
+                          <h3 className="font-semibold text-[15px] text-[#10141a] truncate">
+                            {participant.name}
+                          </h3>
+                          {conv.lastMessageAt && (
+                            <span className="text-[11px] text-[#808081] ml-2 flex-shrink-0">
+                              {formatDistanceToNow(new Date(conv.lastMessageAt), { addSuffix: true })}
                             </span>
-                            <Check className="w-3.5 h-3.5 text-[#3b82f6]" />
-                          </div>
-                        )}
+                          )}
+                        </div>
+                        <p className="text-[13px] text-[#808081] truncate">
+                          {conv.lastMessage || 'No messages yet'}
+                        </p>
                       </div>
-                      {message.isOwn && (
-                        <img
-                          src={message.avatar || `https://ui-avatars.com/api/?name=You&background=3b82f6&color=ffffff`}
-                          alt="You"
-                          className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5"
-                        />
+                      {conv.unreadCount > 0 && (
+                        <div className="w-5 h-5 rounded-full bg-[#ef4444] flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0">
+                          {conv.unreadCount}
+                        </div>
                       )}
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-[#9ca3af]">
-                    <Send className="w-12 h-12 mb-3 opacity-30" />
-                    <p className="text-[14px]">No messages yet. Start the conversation!</p>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Attached Files Preview */}
-              {attachedFiles.length > 0 && (
-                <div className="px-6 py-3 bg-white border-t border-[#e5e7eb]">
-                  <div className="flex flex-wrap gap-2">
-                    {attachedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 bg-[#f9fafb] px-3 py-2 rounded-lg border border-[#e5e7eb]"
-                      >
-                        {file.type.startsWith("image/") ? (
-                          <Image className="w-4 h-4 text-[#6b7280]" />
-                        ) : (
-                          <Paperclip className="w-4 h-4 text-[#6b7280]" />
-                        )}
-                        <span className="text-xs text-[#111827] max-w-[150px] truncate">
-                          {file.name}
-                        </span>
-                        <button
-                          onClick={() => removeAttachment(index)}
-                          className="text-[#ef4444] hover:text-[#dc2626] ml-1"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                  <Send className="w-12 h-12 text-[#d1d5db] mb-3" />
+                  <p className="text-[14px] text-[#808081]">No conversations yet</p>
+                  <p className="text-[12px] text-[#9ca3af] mt-1">Start a new message to begin</p>
                 </div>
               )}
+            </div>
+          </div>
 
-              {/* Message Input */}
-              <div className="p-5 bg-white border-t border-[#e5e7eb]">
-                <div className="flex items-center gap-3">
-                  <div className="relative flex-1">
+          {/* Right Panel - Chat Area */}
+          <div className="flex-1 flex flex-col bg-[#f9fafb]">
+            {selectedConversation ? (
+              <>
+                {/* Chat Header */}
+                <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-[#e5e7eb]">
+                  <div className="flex items-center gap-3">
+                    {(() => {
+                      const participant = getParticipantInfo(selectedConversation);
+                      return participant ? (
+                        <>
+                          <div className="w-10 h-10 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-sm font-semibold">
+                            {participant.avatar ? (
+                              <img
+                                src={participant.avatar}
+                                alt={participant.name}
+                                className="w-full h-full rounded-full object-cover"
+                              />
+                            ) : (
+                              getInitials(participant.name)
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-[15px] text-[#10141a]">
+                              {participant.name}
+                            </h3>
+                            <p className="text-[13px] text-[#808081]">{participant.role}</p>
+                          </div>
+                        </>
+                      ) : null;
+                    })()}
+                  </div>
+                  <button
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    className="p-2 hover:bg-[#fef2f2] rounded-lg transition-colors"
+                    title="Delete conversation"
+                  >
+                    <Trash2 className="w-5 h-5 text-[#ef4444]" />
+                  </button>
+                </div>
+
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                  {messages.length > 0 ? (
+                    messages.map((msg) => {
+                      const isOwn = msg.senderId === user?.id;
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`flex gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
+                        >
+                          {!isOwn && (
+                            <div className="w-8 h-8 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                              {msg.senderAvatar ? (
+                                <img
+                                  src={msg.senderAvatar}
+                                  alt={msg.senderName}
+                                  className="w-full h-full rounded-full object-cover"
+                                />
+                              ) : (
+                                getInitials(msg.senderName)
+                              )}
+                            </div>
+                          )}
+                          <div className={`flex flex-col max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
+                            {!isOwn && (
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[12px] font-medium text-[#10141a]">
+                                  {msg.senderName}
+                                </span>
+                                <span className="text-[11px] text-[#9ca3af]">
+                                  {format(new Date(msg.createdAt), 'h:mm a')}
+                                </span>
+                              </div>
+                            )}
+                            <div
+                              className={`px-4 py-2.5 rounded-lg ${
+                                isOwn
+                                  ? 'bg-[#2563eb] text-white'
+                                  : 'bg-white text-[#10141a] border border-[#e5e7eb]'
+                              }`}
+                            >
+                              <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">
+                                {msg.content}
+                              </p>
+                            </div>
+                            {isOwn && (
+                              <span className="text-[11px] text-[#9ca3af] mt-1">
+                                {format(new Date(msg.createdAt), 'h:mm a')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <Send className="w-12 h-12 text-[#d1d5db] mx-auto mb-3" />
+                        <p className="text-[14px] text-[#808081]">No messages yet</p>
+                        <p className="text-[12px] text-[#9ca3af] mt-1">Start the conversation</p>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Message Input */}
+                <div className="px-6 py-4 bg-white border-t border-[#e5e7eb]">
+                  <div className="flex items-center gap-3">
+                    <button className="p-2 hover:bg-[#f3f4f6] rounded-lg transition-colors">
+                      <Paperclip className="w-5 h-5 text-[#6b7280]" />
+                    </button>
+                    <button className="p-2 hover:bg-[#f3f4f6] rounded-lg transition-colors">
+                      <ImageIcon className="w-5 h-5 text-[#6b7280]" />
+                    </button>
                     <Input
                       type="text"
-                      placeholder="Enter message"
+                      placeholder="Type a message..."
+                      className="flex-1 h-10 border-[#e5e7eb]"
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
                       onKeyPress={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
+                        if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleSendMessage();
                         }
                       }}
-                      disabled={isSending}
-                      className="pr-20 h-11 border-[#e5e7eb] rounded-xl focus-visible:ring-1 focus-visible:ring-[#3b82f6] focus-visible:border-[#3b82f6] disabled:bg-[#f9fafb] text-[14px]"
+                      disabled={sendingMessage}
                     />
-                    <div className="absolute flex items-center gap-1.5 transform -translate-y-1/2 right-3 top-1/2">
-                      <input
-                        ref={imageInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleFileAttachment}
-                        className="hidden"
-                      />
-                      <button
-                        onClick={() => imageInputRef.current?.click()}
-                        disabled={isSending}
-                        className="p-1.5 hover:bg-[#f3f4f6] rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        <Image className="w-4.5 h-4.5 text-[#6b7280]" />
-                      </button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        onChange={handleFileAttachment}
-                        className="hidden"
-                      />
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isSending}
-                        className="p-1.5 hover:bg-[#f3f4f6] rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        <Paperclip className="w-4.5 h-4.5 text-[#6b7280]" />
-                      </button>
-                    </div>
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={!messageInput.trim() || sendingMessage}
+                      className="px-4 py-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-lg"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={(!messageInput.trim() && attachedFiles.length === 0) || isSending}
-                    className="w-11 h-11 p-0 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-full shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {isSending ? (
-                      <div className="w-4 h-4 border-2 border-white rounded-full border-t-transparent animate-spin" />
-                    ) : (
-                      <Send className="w-4.5 h-4.5" />
-                    )}
-                  </Button>
                 </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center flex-1">
+                <p className="text-[16px] text-[#808081]">Select a conversation to start messaging</p>
               </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-[#9ca3af]">
-              <p className="text-[14px]">Select a conversation to start messaging</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
       {/* New Message Modal */}
-      <Dialog open={newMessageModalOpen} onOpenChange={setNewMessageModalOpen}>
-        <DialogContent className="sm:max-w-[480px] p-0 gap-0 bg-white rounded-[24px] border-0 shadow-lg">
-          <div className="px-6 pt-6 pb-5">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-5">
-              <DialogTitle className="text-[20px] font-bold text-[#10141a] leading-tight">
-                New Message
-              </DialogTitle>
-              <button
-                onClick={() => {
-                  setNewMessageModalOpen(false);
-                  setSelectedUsers([]);
-                  setSearchQuery("");
-                }}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#f8f9fa] transition-colors"
-              >
-                <X className="w-5 h-5 text-[#10141a]" />
-              </button>
-            </div>
+      <NewMessageModal
+        open={isNewMessageModalOpen}
+        onOpenChange={setIsNewMessageModalOpen}
+        users={contacts.map(contact => ({
+          id: contact.uid,
+          name: contact.name,
+          role: contact.role,
+          avatar: getInitials(contact.name),
+          image: contact.avatar
+        }))}
+        onStartChat={handleCreateConversation}
+      />
 
-            {/* Search */}
-            <div className="relative mb-5">
-              <div className="absolute -translate-y-1/2 pointer-events-none left-3 top-1/2">
-                <Search className="w-[18px] h-[18px] text-[#a0a0a1]" />
-              </div>
-              <Input
-                type="text"
-                placeholder="Search here"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-11 pl-10 pr-10 bg-[#f8f9fa] border-0 rounded-[10px] text-[15px] text-[#10141a] placeholder:text-[#a0a0a1] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-[#e5e6e6] rounded-full transition-colors"
-                >
-                  <X className="w-4 h-4 text-[#a0a0a1]" />
-                </button>
-              )}
-            </div>
-
-            {/* User List */}
-            <div className="mb-5 max-h-[320px] overflow-y-auto -mx-1 px-1">
-              {usersLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-center">
-                    <div className="w-6 h-6 rounded-full border-2 border-[#e5e7eb] border-t-[#3b82f6] animate-spin mx-auto mb-2"></div>
-                    <p className="text-[#6b7280] text-sm">Loading users...</p>
-                  </div>
-                </div>
-              ) : filteredUsers.length > 0 ? (
-                <div className="space-y-1">
-                  {filteredUsers.map((user) => (
-                    <div
-                      key={user.uid}
-                      onClick={() => toggleUserSelection(user.uid)}
-                      className="flex items-center justify-between px-3 py-3 hover:bg-[#f8f9fa] rounded-[10px] cursor-pointer transition-colors group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center shrink-0">
-                          <span className="text-[15px] font-semibold text-[#10141a]">
-                            {user.avatar}
-                          </span>
-                        </div>
-                        <div className="flex flex-col">
-                          <h4 className="text-[15px] font-semibold text-[#10141a] leading-tight mb-0.5">
-                            {user.name}
-                          </h4>
-                          <p className="text-[13px] text-[#6b7280] leading-tight">
-                            {user.role}
-                          </p>
-                        </div>
-                      </div>
-                      <div
-                        className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${
-                          selectedUsers.includes(user.uid)
-                            ? "bg-[#3b82f6] border-[#3b82f6]"
-                            : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
-                        }`}
-                      >
-                        {selectedUsers.includes(user.uid) && (
-                          <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-[#6b7280]">
-                  <Search className="w-12 h-12 mb-4 opacity-30" />
-                  <p className="text-sm">No users found</p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex gap-3 pt-1">
-              <Button
-                onClick={() => {
-                  setNewMessageModalOpen(false);
-                  setSelectedUsers([]);
-                  setSearchQuery("");
-                }}
-                className="flex-1 h-12 bg-transparent hover:bg-[#f8f9fa] text-[#808081] hover:text-[#10141a] border border-[#e5e5e6] rounded-full text-[15px] font-medium transition-colors shadow-none"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleStartChat}
-                disabled={selectedUsers.length === 0 || isCreatingThread}
-                className="flex-1 h-12 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCreatingThread ? "Creating..." : "Start Chat"}
-              </Button>
-            </div>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[20px] font-semibold">Delete Conversation</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-[14px] text-[#6b7280]">
+              Are you sure you want to delete this conversation? This action cannot be undone.
+            </p>
           </div>
+          <DialogFooter className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={deletingConversation}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteConversation}
+              disabled={deletingConversation}
+              className="bg-[#ef4444] hover:bg-[#dc2626] text-white"
+            >
+              {deletingConversation ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

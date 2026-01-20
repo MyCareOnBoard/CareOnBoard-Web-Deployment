@@ -82,14 +82,12 @@ import SuperAdminDSPReports from "@/pages/super-admin/reports/dspReports";
 import SuperAdminTimesheetReports from "@/pages/super-admin/reports/timesheetReports";
 import SuperAdminNoteReports from "@/pages/super-admin/reports/noteReports";
 import SuperAdminSystemSettingsPage from "@/pages/super-admin/system-settings";
-import SuperAdminMessagesPage from "@/pages/super-admin/messages";
 import AgencyTrainings from "@/pages/agency/trainings";
 import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
 import AgencyBillingMonitorPage from "@/pages/super-admin/agency-billing-monitor";
 import AIAutomationPage from "@/pages/agency/ai-automation";
 import AgencyMileagePage from "@/pages/agency/mileage";
 import AgencyIncidentPage from "@/pages/agency/incident";
-import AgencyMessagesPage from "@/pages/agency/messages";
 import AgencyReports from "@/pages/agency/reports";
 import AgencyClientReports from "@/pages/agency/reports/clientsReport";
 import AgencyDSPReports from "@/pages/agency/reports/dspReports";
@@ -304,10 +302,6 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.incident,
                 Component: AgencyIncidentPage,
-            },
-            {
-                path: Routes.agency.messages,
-                Component: AgencyMessagesPage,
             },
             {
                 path: Routes.agency.helpCenter,
@@ -550,10 +544,6 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.systemSettings,
                 Component: SuperAdminSystemSettingsPage,
-            },
-            {
-                path: Routes.superAdmin.messages,
-                Component: SuperAdminMessagesPage,
             },
         ],
     },

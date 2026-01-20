@@ -9,13 +9,16 @@ interface User {
   role: string;
   avatar: string;
   image?: string;
+  uid?: string;
+  email?: string;
 }
 
 interface NewMessageModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   users: User[];
-  onStartChat: (selectedUserIds: string[]) => void;
+  onStartChat: (selectedUser: User) => void;
+  loading?: boolean;
 }
 
 export default function NewMessageModal({
@@ -23,9 +26,10 @@ export default function NewMessageModal({
   onOpenChange,
   users,
   onStartChat,
+  loading = false,
 }: NewMessageModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -50,31 +54,30 @@ export default function NewMessageModal({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [open]);
 
-  const toggleUserSelection = (userId: string) => {
-    setSelectedUsers((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
-    );
-  };
-
   const handleStartChat = () => {
-    if (selectedUsers.length > 0) {
-      onStartChat(selectedUsers);
-      setSelectedUsers([]);
+    if (selectedUser) {
+      onStartChat(selectedUser);
+      setSelectedUser(null);
       setSearchQuery("");
-      onOpenChange(false);
     }
   };
 
   const handleCancel = () => {
-    setSelectedUsers([]);
+    setSelectedUser(null);
     setSearchQuery("");
     onOpenChange(false);
   };
 
+  const getInitials = (name: string) => {
+    const names = name.split(" ");
+    if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+    return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+  };
+
   const filteredUsers = users.filter((user) =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase())
+    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   if (!open) return null;
@@ -121,11 +124,15 @@ export default function NewMessageModal({
 
             {/* User List */}
             <div className="min-h-[200px] max-h-[400px] overflow-y-auto space-y-2 mb-5">
-              {filteredUsers.length > 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center h-[200px] text-center text-[#808081] text-[14px]">
+                  Loading contacts...
+                </div>
+              ) : filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => (
                   <div
                     key={user.id}
-                    onClick={() => toggleUserSelection(user.id)}
+                    onClick={() => setSelectedUser(user)}
                     className="flex items-center justify-between px-3 py-3 hover:bg-[#f5f5f5] rounded-[10px] cursor-pointer transition-colors group"
                   >
                     <div className="flex items-center gap-3">
@@ -138,9 +145,9 @@ export default function NewMessageModal({
                             className="object-cover w-full h-full rounded-full"
                           />
                         ) : (
-                          <div className="w-full h-full rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center">
-                            <span className="text-[14px] font-semibold text-[#10141a]">
-                              {user.avatar}
+                          <div className="w-full h-full rounded-full bg-gradient-to-br from-[#00b8d4] to-[#0095b3] flex items-center justify-center">
+                            <span className="text-[14px] font-semibold text-white">
+                              {getInitials(user.name)}
                             </span>
                           </div>
                         )}
@@ -160,12 +167,12 @@ export default function NewMessageModal({
                     {/* Checkbox */}
                     <div
                       className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${
-                        selectedUsers.includes(user.id)
+                        selectedUser?.id === user.id
                           ? "bg-[#2563eb] border-[#2563eb]"
                           : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
                       }`}
                     >
-                      {selectedUsers.includes(user.id) && (
+                      {selectedUser?.id === user.id && (
                         <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
                       )}
                     </div>
@@ -188,8 +195,8 @@ export default function NewMessageModal({
               </Button>
               <Button
                 onClick={handleStartChat}
-                disabled={selectedUsers.length === 0}
-                className="flex-1 h-12 bg-[#7c9ff5] hover:bg-[#6b8fe5] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!selectedUser}
+                className="flex-1 h-12 bg-[#00b8d4] hover:bg-[#00a5c0] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Start Chat
               </Button>
