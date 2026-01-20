@@ -9,11 +9,11 @@ import { toast } from "sonner";
 
 interface ComplianceStepProps {
   onBack?: () => void;
-  onNext?: () => void;
+  onSuccess: () => void;
 }
 
 export default function ComplianceStep({
-  onNext,
+  onSuccess,
 }: ComplianceStepProps) {
   const [finalizeConditionalHire, { isLoading }] =
     useFinalizeConditionalHireMutation();
@@ -76,9 +76,7 @@ export default function ComplianceStep({
         duration: 4000,
       });
 
-      if (onNext) {
-        onNext();
-      }
+      onSuccess();
     } catch (error) {
       console.error("Failed to finalize conditional hire:", error);
       toast.error("Failed to submit compliance requirements", {
