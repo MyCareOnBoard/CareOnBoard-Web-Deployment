@@ -45,7 +45,7 @@ const navItems: NavItem[] = [
     { label: "Trainings", path: Routes.agency.trainings, icon: Network },
     { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon },
     { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon },
-    { label: "Settings", path: Routes.agency.settings, icon: Settings },
+    { label: "Settings", path: Routes.agency.agencySettings, icon: Settings },
 ];
 
 
