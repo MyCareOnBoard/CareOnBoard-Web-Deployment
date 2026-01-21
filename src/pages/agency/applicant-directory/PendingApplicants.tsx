@@ -199,7 +199,7 @@ export default function PendingApplicants() {
                     {/* Profile */}
                     <div className="flex items-center gap-4 min-w-[200px] shrink-0">
                       <img
-                        src={applicant.avatar}
+                        src={applicant.profilePictureUrl}
                         alt={applicant.name}
                         className="w-12 h-12 rounded-full shrink-0"
                       />
