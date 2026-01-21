@@ -1,678 +1,723 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
+import { Search, Image as ImageIcon, Paperclip, Send, Plus, X, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, X, Send, Image, Paperclip, Check, AlertCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import NewMessageModal from "./components/NewMessageModal";
+import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
-import { format, formatDistanceToNow } from "date-fns";
-import { auth } from "@/lib/firebase";
 import {
-  useThreads,
-  useMessages,
-  useAvailableUsers,
-  useSendMessage,
-  useCreateThread,
-  useAuth,
-} from "@/lib/chat/chat.hooks";
-import type { Thread, Message as FirebaseMessage, ChatUser } from "@/lib/chat/chat.types";
+  getUserConversations,
+  getUserConversationMessages,
+  sendUserMessage,
+  markUserMessagesAsRead,
+  createUserConversation,
+  getUserContacts,
+  getUserConversationById,
+  leaveUserConversation,
+  UserConversation,
+  UserMessage,
+  ConversationParticipant,
+  AgencyContact,
+} from "@/lib/api/userMessaging";
 
-interface Message {
-  id: string;
-  sender: string;
-  role: string;
-  content: string;
-  timestamp: string;
-  isOwn: boolean;
-  avatar: string;
-  read?: boolean;
-  attachments?: { name: string; url: string; type: string }[];
-  firebaseId?: string;
-}
+type FilterTab = 'all' | 'agency' | 'administration';
 
-interface Contact {
-  id: string;
-  name: string;
-  role: string;
-  avatar: string;
-  lastMessage: string;
-  timestamp: string;
-  unread?: number;
-  hasNotification?: boolean;
-  isOnline?: boolean;
-  category?: "dsp" | "administration" | "all";
-  otherUserId?: string;
-}
-
-export default function CorporateSupportPage() {
+export default function SuperAdminCorporateSupportPage() {
+  const { user } = useAuth();
   const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<FilterTab>('all');
+  const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
+  const [conversations, setConversations] = useState<UserConversation[]>([]);
+  const [messages, setMessages] = useState<UserMessage[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<UserConversation | null>(null);
+  const [messageInput, setMessageInput] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [contacts, setContacts] = useState<AgencyContact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [creatingConversation, setCreatingConversation] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingConversation, setDeletingConversation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const { isAuthenticated, userId } = useAuth();
-  const { threads, isLoading: threadsLoading } = useThreads();
-  const { users: availableUsers } = useAvailableUsers();
-  const { create: createNewThread } = useCreateThread();
+  // Fetch conversations on mount
+  useEffect(() => {
+    fetchConversations();
+  }, []);
 
-  const [selectedContact, setSelectedContact] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"all" | "dsp" | "administration">("all");
-  const [contactSearchQuery, setContactSearchQuery] = useState("");
-  const [messageInput, setMessageInput] = useState("");
-  const [newMessageModalOpen, setNewMessageModalOpen] = useState(false);
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
+  // Fetch messages when conversation is selected
+  useEffect(() => {
+    if (selectedConversation) {
+      fetchMessages(selectedConversation.id);
+      markConversationAsRead(selectedConversation.id);
+    }
+  }, [selectedConversation]);
 
-  const { messages: firebaseMessages, isLoading: messagesLoading } = useMessages(selectedContact);
-  const { send: sendMessage, isSending } = useSendMessage(selectedContact);
+  // Auto-scroll to bottom when messages update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [userCache, setUserCache] = useState<Map<string, ChatUser>>(new Map());
+  // Fetch contacts when modal opens
+  useEffect(() => {
+    if (isNewMessageModalOpen) {
+      fetchContacts();
+    }
+  }, [isNewMessageModalOpen]);
 
-  const mapFirebaseMessage = (msg: FirebaseMessage, currentUserId: string | null): Message => {
-    const isOwn = msg.senderId === currentUserId;
-    const sender = userCache.get(msg.senderId);
-
-    return {
-      id: msg.id,
-      sender: isOwn ? "You" : sender?.name || "Unknown",
-      role: sender?.role || "",
-      content: msg.text,
-      timestamp: format(msg.createdAt, "hh:mm a"),
-      isOwn,
-      avatar: isOwn ? "Y" : sender?.avatar || "?",
-      firebaseId: msg.id,
-    };
+  const fetchConversations = async () => {
+    try {
+      setLoading(true);
+      const response = await getUserConversations();
+      setConversations(response.data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load conversations",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const currentMessages = firebaseMessages.map((msg) => mapFirebaseMessage(msg, userId));
+  const fetchContacts = async () => {
+    try {
+      setLoadingContacts(true);
+      const response = await getUserContacts();
+      setContacts(response.data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load contacts",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
 
-  useEffect(() => {
-    const buildContacts = async () => {
-      if (!userId || threads.length === 0) {
-        setContacts([]);
-        return;
+  const fetchMessages = async (conversationId: string) => {
+    try {
+      const response = await getUserConversationMessages(conversationId);
+      setMessages(response.data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load messages",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const markConversationAsRead = async (conversationId: string) => {
+    try {
+      const unreadMessages = messages.filter(msg => 
+        msg.senderId !== user?.id && !msg.isRead
+      );
+      
+      if (unreadMessages.length > 0) {
+        const messageIds = unreadMessages.map(msg => msg.id);
+        await markUserMessagesAsRead(conversationId, { messageIds });
+        
+        // Update local state
+        setMessages(prev => 
+          prev.map(msg => 
+            messageIds.includes(msg.id) ? { ...msg, isRead: true } : msg
+          )
+        );
+        
+        // Update conversation unread count
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.id === conversationId
+              ? { ...conv, unreadCount: 0 }
+              : conv
+          )
+        );
       }
+    } catch (error: any) {
+      console.error('Failed to mark messages as read:', error);
+    }
+  };
 
-      const newContacts: Contact[] = [];
-      const newUserCache = new Map(userCache);
-
-      for (const thread of threads) {
-        const otherUserId = thread.participants.find((id) => id !== userId);
-        if (!otherUserId) continue;
-
-        let otherUser = newUserCache.get(otherUserId);
-        if (!otherUser) {
-          const foundUser = availableUsers.find((u) => u.uid === otherUserId);
-          if (foundUser) {
-            otherUser = foundUser;
-            newUserCache.set(otherUserId, foundUser);
-          }
-        }
-
-        if (!otherUser) continue;
-
-        const contact: Contact = {
-          id: thread.id,
-          name: otherUser.name,
-          role: otherUser.role,
-          avatar: otherUser.avatar,
-          lastMessage: thread.lastMessage || "(no messages yet)",
-          timestamp: formatDistanceToNow(thread.lastMessageAt, { addSuffix: true }),
-          otherUserId,
-          category: otherUser.role === "DSP" ? "dsp" : "administration",
-        };
-
-        newContacts.push(contact);
+  const handleRefreshConversation = async (conversationId: string) => {
+    try {
+      const response = await getUserConversationById(conversationId);
+      setConversations(prev =>
+        prev.map(conv => conv.id === conversationId ? response.data : conv)
+      );
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(response.data);
       }
+    } catch (error: any) {
+      console.error('Failed to refresh conversation:', error);
+    }
+  };
 
-      setContacts(newContacts);
-      setUserCache(newUserCache);
-    };
+  const handleDeleteConversation = async () => {
+    if (!selectedConversation || deletingConversation) return;
 
-    buildContacts();
-  }, [threads, userId, availableUsers]);
+    try {
+      setDeletingConversation(true);
+      await leaveUserConversation(selectedConversation.id);
 
-  const toggleUserSelection = (userId: string) => {
-    setSelectedUsers((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
-    );
+      // Remove from list
+      setConversations(prev => prev.filter(conv => conv.id !== selectedConversation.id));
+      
+      // Clear selection
+      setSelectedConversation(null);
+      setMessages([]);
+      setIsDeleteDialogOpen(false);
+
+      toast({
+        title: "Success",
+        description: "Conversation deleted successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete conversation",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingConversation(false);
+    }
+  };
+
+  const handleCreateConversation = async (selectedUserIds: string[]) => {
+    if (selectedUserIds.length === 0 || creatingConversation) return;
+
+    try {
+      setCreatingConversation(true);
+
+      // Create conversation
+      const conversationResponse = await createUserConversation({
+        participantIds: selectedUserIds,
+      });
+
+      // Add new conversation to list
+      const newConversation = conversationResponse.data;
+      setConversations(prev => [newConversation, ...prev]);
+
+      // Select the new conversation
+      setSelectedConversation(newConversation);
+
+      // Modal will be closed by NewMessageModal component
+
+      toast({
+        title: "Success",
+        description: "Conversation created successfully",
+      });
+
+      // Fetch messages for the new conversation
+      fetchMessages(newConversation.id);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create conversation",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingConversation(false);
+    }
   };
 
   const handleSendMessage = async () => {
-    if (!messageInput.trim() && attachedFiles.length === 0) return;
-    if (!selectedContact) {
-      toast({
-        title: "Error",
-        description: "Please select a conversation first.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!messageInput.trim() || !selectedConversation || sendingMessage) return;
 
+    const messageText = messageInput.trim();
+    setMessageInput("");
+    
     try {
-      await sendMessage(messageInput.trim());
-      setMessageInput("");
-      setAttachedFiles([]);
-
-      toast({
-        title: "Message Sent",
-        description: "Your message has been sent successfully.",
+      setSendingMessage(true);
+      
+      // Optimistic UI update
+      const tempMessage: UserMessage = {
+        id: `temp-${Date.now()}`,
+        conversationId: selectedConversation.id,
+        senderId: user?.id || "",
+        senderName: user?.fullName || "You",
+        senderRole: user?.role || "Super Admin",
+        content: messageText,
+        readBy: [user?.id || ""],
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      setMessages(prev => [...prev, tempMessage]);
+      
+      // Send to API
+      const response = await sendUserMessage(selectedConversation.id, {
+        content: messageText,
       });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to send message";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleFileAttachment = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      const fileArray = Array.from(files);
-      const validFiles = fileArray.filter((file) => file.size <= 10 * 1024 * 1024);
-
-      if (validFiles.length !== fileArray.length) {
-        toast({
-          title: "File Too Large",
-          description: "Some files exceed the 10MB limit.",
-          variant: "destructive",
-        });
-      }
-
-      setAttachedFiles((prev) => [...prev, ...validFiles]);
-    }
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleStartChat = async () => {
-    if (selectedUsers.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please select at least one user.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const newThreadId = await createNewThread(selectedUsers);
-      setSelectedContact(newThreadId);
-      setSelectedUsers([]);
-      setNewMessageModalOpen(false);
-
-      toast({
-        title: "Chat Started",
-        description: "New conversation started.",
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to create chat";
+      
+      // Replace temp message with real one
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempMessage.id ? response.data : msg
+        )
+      );
+      
+      // Update conversation's last message
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === selectedConversation.id
+            ? {
+                ...conv,
+                lastMessage: messageText,
+                lastMessageAt: new Date().toISOString(),
+                lastMessageSenderId: user?.id,
+              }
+            : conv
+        )
+      );
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: errorMessage,
+        description: error.message || "Failed to send message",
         variant: "destructive",
       });
+      
+      // Remove temp message on error
+      setMessages(prev => prev.filter(msg => !msg.id.startsWith("temp-")));
+      setMessageInput(messageText); // Restore input
+    } finally {
+      setSendingMessage(false);
     }
   };
 
-  const handleContactSelect = (contactId: string) => {
-    setSelectedContact(contactId);
-    // Hide sidebar on mobile after selecting contact
-    if (window.innerWidth < 768) {
-      setShowSidebar(false);
+  // Helper to get participant info (not the current user)
+  const getParticipantInfo = (conversation: UserConversation): ConversationParticipant | null => {
+    return conversation.participants.find(p => p.uid !== user?.id) || null;
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  const getInitials = (name: string) => {
+    const names = name.split(" ");
+    if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+    return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+  };
+
+  const handleSearchExpand = () => {
+    setIsSearchExpanded(true);
+    setTimeout(() => searchInputRef.current?.focus(), 100);
+  };
+
+  const handleSearchCollapse = () => {
+    if (!searchQuery) {
+      setIsSearchExpanded(false);
     }
   };
 
-  const filteredContacts = contacts.filter((contact) => {
-    const matchesSearch = contact.name.toLowerCase().includes(contactSearchQuery.toLowerCase());
-    const matchesTab = activeTab === "all" || contact.category === activeTab;
-    return matchesSearch && matchesTab;
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    if (!e.target.value) {
+      setIsSearchExpanded(false);
+    }
+  };
+
+  const filteredByTab = conversations.filter((conv) => {
+    if (activeTab === 'all') return true;
+    const participant = getParticipantInfo(conv);
+    if (!participant) return false;
+    if (activeTab === 'agency') return participant.role.toLowerCase().includes('agency');
+    if (activeTab === 'administration') return !participant.role.toLowerCase().includes('agency');
+    return true;
   });
 
-  const filteredUsers = availableUsers.filter((user) =>
-    user.name.toLowerCase().includes("")
-  );
-
-  const selectedContactData = contacts.find((c) => c.id === selectedContact);
-
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [currentMessages]);
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="max-w-md p-6 border border-yellow-200 rounded-lg bg-yellow-50">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="font-semibold text-yellow-900">Authentication Required</h3>
-              <p className="mt-1 text-sm text-yellow-800">
-                Please log in to access the messaging feature.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (threadsLoading) {
-    return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-full border-4 border-[#e5e5e6] border-t-[#2563eb] animate-spin mx-auto mb-4"></div>
-          <p className="text-[#808081]">Loading messages...</p>
-        </div>
-      </div>
-    );
-  }
+  const filteredConversations = filteredByTab.filter((conv) => {
+    const participant = getParticipantInfo(conv);
+    return participant?.name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   return (
-    <div className="min-h-[calc(100vh-200px)]">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          {!showSidebar && selectedContact && (
-            <button
-              onClick={() => setShowSidebar(true)}
-              className="md:hidden w-10 h-10 flex items-center justify-center hover:bg-[#f8f9fa] rounded-full transition-colors"
-              title="Show conversations"
-            >
-              <Search className="w-5 h-5 text-[#808081]" />
-            </button>
-          )}
-          <h1 className="text-2xl md:text-[40px] font-bold leading-[1.4] text-[#10141a]">
-            Corporate Support
-          </h1>
-        </div>
-        <div className="flex gap-2">
+    <>
+      <div className="flex flex-col h-[calc(100vh-160px)]">
+        {/* Top Header with New Message Button */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e7eb]">
+          <h1 className="text-[28px] font-bold text-[#10141a]">Corporate Support</h1>
           <Button
-            onClick={() => setNewMessageModalOpen(true)}
-            className="flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full px-4 md:px-6 py-2 md:py-3 h-auto font-semibold shadow-none text-sm md:text-base"
+            onClick={() => setIsNewMessageModalOpen(true)}
+            className="bg-[#00b8d4] hover:bg-[#00a5c0] text-white gap-2"
           >
-            <Plus className="w-4 h-4 md:w-5 md:h-5" />
-            <span className="hidden sm:inline">New Message</span>
+            <Plus className="w-5 h-5" />
+            New Message
           </Button>
         </div>
-      </div>
 
-      <div className="flex gap-3 md:gap-6 h-[calc(100vh-220px)] md:h-[calc(100vh-280px)] relative">
-        <div className={`${showSidebar ? 'flex' : 'hidden md:flex'} w-full md:w-[400px] bg-[#FFFFFF4D] rounded-2xl border border-[#e5e5e6] flex-col overflow-hidden ${selectedContact && !showSidebar ? 'md:flex' : ''}`}>
-          <div className="p-4 md:p-6 border-b border-[#e5e5e6]">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg md:text-xl font-bold text-[#10141a]">Messages</h2>
-              <div className="relative flex items-center justify-end min-w-[180px] md:min-w-[240px]">
-                {!isSearchExpanded && !contactSearchQuery && (
+        <div className="flex flex-1 overflow-hidden bg-white shadow-sm rounded-2xl">
+          {/* Left Sidebar - Conversations List */}
+          <div className="w-full md:w-[380px] border-r border-[#e5e7eb] flex flex-col">
+            {/* Header with Search */}
+            <div className="p-6 border-b border-[#e5e7eb]">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[18px] font-semibold text-[#10141a]">Corporate Support</h2>
+                
+                {/* Search - Expandable */}
+                {!isSearchExpanded ? (
                   <button
-                    onClick={() => {
-                      setIsSearchExpanded(true);
-                      setTimeout(() => {
-                        searchInputRef.current?.focus();
-                      }, 100);
-                    }}
-                    className="w-10 h-10 flex items-center justify-center hover:bg-[#f8f9fa] rounded-full transition-colors"
+                    onClick={handleSearchExpand}
+                    className="p-2 hover:bg-[#f3f4f6] rounded-lg transition-colors"
+                    title="Search conversations"
                   >
                     <Search className="w-5 h-5 text-[#808081]" />
                   </button>
-                )}
-
-                {(isSearchExpanded || contactSearchQuery) && (
-                  <div className="relative w-[240px] animate-in fade-in slide-in-from-right-2 duration-300">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#808081] pointer-events-none z-10" />
+                ) : (
+                  <div className="relative flex-1 ml-4">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#808081]" />
                     <Input
                       ref={searchInputRef}
                       type="text"
-                      placeholder="Search here"
-                      value={contactSearchQuery}
-                      onChange={(e) => setContactSearchQuery(e.target.value)}
-                      onBlur={() => {
-                        setTimeout(() => {
-                          if (!contactSearchQuery) {
-                            setIsSearchExpanded(false);
-                          }
-                        }, 150);
-                      }}
-                      className="w-full pl-10 pr-10 h-10 border-0 rounded-full bg-[#f8f9fa] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
+                      placeholder="Search"
+                      value={searchQuery}
+                      onChange={handleSearchChange}
+                      onBlur={handleSearchCollapse}
+                      className="pl-10 pr-3"
                     />
-                    {contactSearchQuery && (
-                      <button
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setContactSearchQuery("");
-                          setIsSearchExpanded(false);
-                        }}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-[#e5e6e6] rounded-full transition-colors z-10"
-                      >
-                        <X className="w-4 h-4 text-[#808081]" />
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
+
+              {/* Filter Tabs */}
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setActiveTab('all')}
+                  className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
+                    activeTab === 'all'
+                      ? 'bg-[#00b8d4] text-white'
+                      : 'bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setActiveTab('agency')}
+                  className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors flex items-center gap-1 ${
+                    activeTab === 'agency'
+                      ? 'bg-[#00b8d4] text-white'
+                      : 'bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]'
+                  }`}
+                >
+                  <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                  Agency
+                </button>
+                <button
+                  onClick={() => setActiveTab('administration')}
+                  className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
+                    activeTab === 'administration'
+                      ? 'bg-[#00b8d4] text-white'
+                      : 'bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]'
+                  }`}
+                >
+                  Administration
+                </button>
+              </div>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => setActiveTab("all")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  activeTab === "all"
-                    ? "bg-[#e0f2fe] text-[#2563eb]"
-                    : "text-[#808081] hover:bg-[#f8f9fa]"
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setActiveTab("dsp")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  activeTab === "dsp"
-                    ? "bg-[#e0f2fe] text-[#2563eb]"
-                    : "text-[#808081] hover:bg-[#f8f9fa]"
-                }`}
-              >
-                Agency
-              </button>
-              <button
-                onClick={() => setActiveTab("administration")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  activeTab === "administration"
-                    ? "bg-[#e0f2fe] text-[#2563eb]"
-                    : "text-[#808081] hover:bg-[#f8f9fa]"
-                }`}
-              >
-                Administration
-              </button>
+            {/* Conversations List */}
+            <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <p className="text-[14px] text-[#808081]">Loading conversations...</p>
             </div>
-          </div>
+          ) : filteredConversations.map((conversation) => {
+            const participant = getParticipantInfo(conversation);
+            if (!participant) return null;
 
-          <div className="flex-1 overflow-auto">
-            {filteredContacts.length === 0 ? (
-              <div className="p-6 text-center text-[#808081]">No conversations found</div>
-            ) : (
-              <div className="p-2 space-y-1">
-                {filteredContacts.map((contact) => (
-                  <button
-                    key={contact.id}
-                    onClick={() => handleContactSelect(contact.id)}
-                    className={`w-full p-4 rounded-xl text-left transition-colors ${
-                      selectedContact === contact.id
-                        ? "bg-[#e7f0fe] border border-[#c7d7fe]"
-                        : "hover:bg-[#f8f9fa]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#e7f0fe] text-[#2563eb] flex items-center justify-center font-semibold">
-                        {contact.avatar}
+            return (
+              <div
+                key={conversation.id}
+                onClick={() => setSelectedConversation(conversation)}
+                className={`flex items-start gap-3 p-4 cursor-pointer transition-colors border-b border-[#f3f4f6] ${
+                  selectedConversation?.id === conversation.id
+                    ? "bg-[#e0f7fa] border-l-4 border-l-[#00b8d4]"
+                    : "hover:bg-[#f9fafb]"
+                }`}
+              >
+                {/* Avatar */}
+                <div className="relative flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-[16px] font-semibold">
+                    {participant.avatar ? (
+                      <img
+                        src={participant.avatar}
+                        alt={participant.name}
+                        className="object-cover w-full h-full rounded-full"
+                      />
+                    ) : (
+                      getInitials(participant.name)
+                    )}
+                  </div>
+                  {conversation.unreadCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#ef4444] rounded-full flex items-center justify-center">
+                      <span className="text-[10px] text-white font-semibold">
+                        {conversation.unreadCount}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-[15px] font-semibold text-[#10141a] truncate">
+                      {participant.name}
+                    </h3>
+                    <span className="text-[11px] text-[#808081] flex-shrink-0 ml-2">
+                      {conversation.lastMessageAt ? formatTime(new Date(conversation.lastMessageAt)) : ''}
+                    </span>
+                  </div>
+                  <p className="text-[13px] text-[#808081] mb-0.5">{participant.role}</p>
+                  <p className="text-[13px] text-[#6b7280] line-clamp-2">
+                    {conversation.lastMessage || 'No messages yet'}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+
+          {filteredConversations.length === 0 && (
+            <div className="flex flex-col items-center justify-center px-4 py-12">
+              <p className="text-[14px] text-[#808081]">No conversations found</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right Side - Chat Area */}
+      <div className="flex flex-col flex-1">
+        {selectedConversation ? (
+          <>
+            {/* Chat Header */}
+            <div className="p-6 border-b border-[#e5e7eb] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {(() => {
+                  const participant = getParticipantInfo(selectedConversation);
+                  if (!participant) return null;
+                  
+                  return (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-[16px] font-semibold flex-shrink-0">
+                        {participant.avatar ? (
+                          <img
+                            src={participant.avatar}
+                            alt={participant.name}
+                            className="object-cover w-full h-full rounded-full"
+                          />
+                        ) : (
+                          getInitials(participant.name)
+                        )}
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold text-[#10141a]">{contact.name}</p>
-                            <p className="text-xs text-[#808081]">{contact.role}</p>
-                          </div>
-                          <span className="text-xs text-[#808081]">{contact.timestamp}</span>
-                        </div>
-                        <p className="text-sm text-[#808081] mt-1 line-clamp-1">
-                          {contact.lastMessage}
+                      <div>
+                        <h3 className="text-[18px] font-semibold text-[#10141a]">
+                          {participant.name}
+                        </h3>
+                        <p className="text-[13px] text-[#808081]">
+                          {participant.role}
                         </p>
                       </div>
-                      {contact.unread && (
-                        <span className="ml-auto bg-[#ef4444] text-white text-xs px-2 py-1 rounded-full">
-                          {contact.unread}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ))}
+                    </>
+                  );
+                })()}
               </div>
-            )}
-          </div>
-        </div>
-
-        <div className={`${!showSidebar || !selectedContact ? 'flex' : 'hidden md:flex'} flex-1 bg-[#FFFFFF4D] rounded-2xl border border-[#e5e5e6] flex-col overflow-hidden`}>
-          {messagesLoading ? (
-            <div className="flex items-center justify-center flex-1">
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full border-4 border-[#e5e5e6] border-t-[#2563eb] animate-spin mx-auto mb-4"></div>
-                <p className="text-[#808081] text-sm">Loading messages...</p>
-              </div>
+              <button
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="p-2 hover:bg-[#fef2f2] text-[#ef4444] rounded-lg transition-colors"
+                title="Delete conversation"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
             </div>
-          ) : currentMessages.length > 0 ? (
-            <div className="flex-1 p-4 overflow-auto md:p-6">
-              <div className="max-w-3xl mx-auto space-y-3 md:space-y-4">
-                {currentMessages.map((msg) => (
-                  <div key={msg.id} className={`flex items-start gap-2 md:gap-3 ${msg.isOwn ? "flex-row-reverse" : ""}`}>
-                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#e7f0fe] text-[#2563eb] flex items-center justify-center font-semibold text-sm md:text-base shrink-0">
-                      {msg.avatar}
-                    </div>
-                    <div className={`max-w-[85%] md:max-w-[75%] p-3 md:p-4 rounded-xl ${msg.isOwn ? "bg-[#e7f0fe]" : "bg-white border border-[#e5e5e6]"}`}>
-                      <p className="text-sm text-[#10141a]">{msg.content}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs text-[#808081]">{msg.isOwn ? "You" : msg.sender}</span>
-                        <span className="text-xs text-[#808081]">•</span>
-                        <span className="text-xs text-[#808081]">{msg.timestamp}</span>
-                        {msg.isOwn && <Check className="w-4 h-4 text-[#2563eb]" />}
+
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-6 bg-[#f9fafb]">
+              <div className="space-y-4">
+                {messages.map((message) => {
+                  const isSentByUser = message.senderId === user?.id;
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${isSentByUser ? "justify-end" : "justify-start"}`}
+                    >
+                      <div className={`flex gap-2 max-w-[70%] ${isSentByUser ? "flex-row-reverse" : "flex-row"}`}>
+                        {/* Avatar */}
+                        {!isSentByUser && (
+                          <div className="w-10 h-10 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-[14px] font-semibold flex-shrink-0">
+                            {message.senderAvatar ? (
+                              <img
+                                src={message.senderAvatar}
+                                alt={message.senderName}
+                                className="object-cover w-full h-full rounded-full"
+                              />
+                            ) : (
+                              getInitials(message.senderName)
+                            )}
+                          </div>
+                        )}
+
+                        {isSentByUser && (
+                          <div className="w-10 h-10 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-[14px] font-semibold flex-shrink-0">
+                            {user?.photoURL ? (
+                              <img
+                                src={user.photoURL}
+                                alt="You"
+                                className="object-cover w-full h-full rounded-full"
+                              />
+                            ) : (
+                              getInitials(user?.fullName || "You")
+                            )}
+                          </div>
+                        )}
+
+                        {/* Message Bubble */}
+                        <div className="flex flex-col">
+                          <div
+                            className={`px-4 py-3 rounded-2xl ${
+                              isSentByUser
+                                ? "bg-[#dbeafe] text-[#10141a]"
+                                : "bg-white text-[#10141a] shadow-sm"
+                            }`}
+                          >
+                            <p className="text-[14px] leading-relaxed">{message.content}</p>
+                          </div>
+                          <div
+                            className={`flex items-center gap-1 mt-1 ${
+                              isSentByUser ? "justify-end" : "justify-start"
+                            }`}
+                          >
+                            <span className="text-[11px] text-[#808081]">
+                              {isSentByUser ? "You" : message.senderName}
+                            </span>
+                            <span className="text-[11px] text-[#808081]">•</span>
+                            <span className="text-[11px] text-[#808081]">
+                              {formatTime(new Date(message.createdAt))}
+                            </span>
+                            {isSentByUser && message.isRead && (
+                              <>
+                                <span className="text-[11px] text-[#808081]">•</span>
+                                <span className="text-[11px] text-[#00b8d4]">✓</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </div>
             </div>
-          ) : (
-            <div className="flex items-center justify-center flex-1">
-              <div className="max-w-md text-center">
-                <h3 className="text-lg font-semibold text-[#10141a]">No messages yet</h3>
-                <p className="text-[#808081] mt-2">
-                  Select a conversation from the left or create a new message.
-                </p>
-              </div>
-            </div>
-          )}
 
-          <div className="border-t border-[#e5e5e6] p-3 md:p-4">
-            <div className="max-w-3xl mx-auto">
-              <div className="flex items-center gap-1 md:gap-2">
-                <button
-                  onClick={() => imageInputRef.current?.click()}
-                  className="hidden sm:flex w-10 h-10 items-center justify-center hover:bg-[#f8f9fa] rounded-full transition-colors"
-                  title="Attach image"
-                >
-                  <Image className="w-5 h-5 text-[#808081]" />
-                </button>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="hidden sm:flex w-10 h-10 items-center justify-center hover:bg-[#f8f9fa] rounded-full transition-colors"
-                  title="Attach file"
-                >
-                  <Paperclip className="w-5 h-5 text-[#808081]" />
-                </button>
-
+            {/* Message Input */}
+            <div className="p-6 border-t border-[#e5e7eb] bg-white">
+              <div className="flex items-center gap-3">
                 <Input
                   type="text"
                   placeholder="Enter message"
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSendMessage();
                     }
                   }}
-                  className="flex-1 h-10 md:h-12 rounded-full bg-[#f8f9fa] border-0 focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0 text-sm md:text-base"
+                  className="flex-1"
+                  disabled={sendingMessage}
                 />
-
-                <Button
+                <button
+                  type="button"
+                  className="p-2.5 text-[#808081] hover:text-[#00b8d4] transition-colors"
+                  title="Attach image"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  className="p-2.5 text-[#808081] hover:text-[#00b8d4] transition-colors"
+                  title="Attach file"
+                >
+                  <Paperclip className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
                   onClick={handleSendMessage}
-                  disabled={isSending || !selectedContact}
-                  className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white p-0 shrink-0"
+                  disabled={!messageInput.trim() || sendingMessage}
+                  className="p-2.5 bg-[#00b8d4] text-white rounded-full hover:bg-[#00a5c0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Send message"
                 >
-                  <Send className="w-4 h-4 md:w-5 md:h-5" />
-                </Button>
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
-                  onChange={handleFileAttachment}
-                  className="hidden"
-                />
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileAttachment}
-                  className="hidden"
-                />
-              </div>
-
-              {attachedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {attachedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center gap-2 bg-[#f8f9fa] rounded-full px-3 py-1">
-                      <span className="text-sm text-[#10141a]">{file.name}</span>
-                      <button
-                        onClick={() => removeAttachment(index)}
-                        className="w-6 h-6 flex items-center justify-center hover:bg-[#e5e6e6] rounded-full"
-                        title="Remove attachment"
-                      >
-                        <X className="w-4 h-4 text-[#808081]" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <Dialog open={newMessageModalOpen} onOpenChange={setNewMessageModalOpen}>
-        <DialogContent className="sm:max-w-[480px] p-0 gap-0 bg-white rounded-[24px] border-0 shadow-lg">
-          <div className="px-6 pt-6 pb-5">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-5">
-              <DialogTitle className="text-[20px] font-bold text-[#10141a] leading-tight">
-                New Message
-              </DialogTitle>
-              <button
-                onClick={() => {
-                  setNewMessageModalOpen(false);
-                  setSelectedUsers([]);
-                  setContactSearchQuery("");
-                }}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#f8f9fa] transition-colors"
-              >
-                <X className="w-5 h-5 text-[#10141a]" />
-              </button>
-            </div>
-
-            {/* Search */}
-            <div className="relative mb-5">
-              <div className="absolute -translate-y-1/2 pointer-events-none left-3 top-1/2">
-                <Search className="w-[18px] h-[18px] text-[#a0a0a1]" />
-              </div>
-              <Input
-                type="text"
-                placeholder="Search here"
-                value={contactSearchQuery}
-                onChange={(e) => setContactSearchQuery(e.target.value)}
-                className="h-11 pl-10 pr-10 bg-[#f8f9fa] border-0 rounded-[10px] text-[15px] text-[#10141a] placeholder:text-[#a0a0a1] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
-              />
-              {contactSearchQuery && (
-                <button
-                  onClick={() => setContactSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-[#e5e6e6] rounded-full transition-colors"
-                >
-                  <X className="w-4 h-4 text-[#a0a0a1]" />
+                  <Send className="w-5 h-5" />
                 </button>
-              )}
+              </div>
             </div>
-
-            {/* User List */}
-            <div className="mb-5 max-h-[320px] overflow-y-auto -mx-1 px-1">
-              {availableUsers.length > 0 ? (
-                <div className="space-y-1">
-                  {availableUsers.map((user) => (
-                    <div
-                      key={user.uid}
-                      onClick={() => toggleUserSelection(user.uid)}
-                      className="flex items-center justify-between px-3 py-3 hover:bg-[#f8f9fa] rounded-[10px] cursor-pointer transition-colors group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center shrink-0">
-                          <span className="text-[15px] font-semibold text-[#10141a]">
-                            {user.avatar}
-                          </span>
-                        </div>
-                        <div className="flex flex-col">
-                          <h4 className="text-[15px] font-semibold text-[#10141a] leading-tight mb-0.5">
-                            {user.name}
-                          </h4>
-                          <p className="text-[13px] text-[#808081] leading-tight">
-                            {user.role}
-                          </p>
-                        </div>
-                      </div>
-                      <div
-                        className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${
-                          selectedUsers.includes(user.uid)
-                            ? "bg-[#2563eb] border-[#2563eb]"
-                            : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
-                        }`}
-                      >
-                        {selectedUsers.includes(user.uid) && (
-                          <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-[#808081]">
-                  <Search className="w-12 h-12 mb-4 opacity-50" />
-                  <p>No users found</p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex gap-3 pt-1">
-              <Button
-                onClick={() => {
-                  setNewMessageModalOpen(false);
-                  setSelectedUsers([]);
-                  setContactSearchQuery("");
-                }}
-                className="flex-1 h-12 bg-transparent hover:bg-[#f8f9fa] text-[#808081] hover:text-[#10141a] border border-[#e5e5e6] rounded-full text-[15px] font-medium transition-colors shadow-none"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleStartChat}
-                disabled={selectedUsers.length === 0}
-                className="flex-1 h-12 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Start Chat
-              </Button>
-            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-center flex-1">
+            <p className="text-[16px] text-[#808081]">Select a conversation to start messaging</p>
           </div>
+        )}
+      </div>
+    </div>
+  </div>
+    
+  {/* New Message Modal */}
+      <NewMessageModal
+        open={isNewMessageModalOpen}
+        onOpenChange={setIsNewMessageModalOpen}
+        users={contacts.map(contact => ({
+          id: contact.uid,
+          name: contact.name,
+          role: contact.role,
+          avatar: getInitials(contact.name),
+          image: contact.avatar
+        }))}
+        onStartChat={handleCreateConversation}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[20px] font-semibold">Delete Conversation</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-[14px] text-[#6b7280]">
+              Are you sure you want to delete this conversation? This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={deletingConversation}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteConversation}
+              disabled={deletingConversation}
+              className="bg-[#ef4444] hover:bg-[#dc2626] text-white"
+            >
+              {deletingConversation ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

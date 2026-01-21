@@ -43,7 +43,6 @@ export const Routes = {
         notes: "/agency/notes",
         mileage: "/agency/mileage",
         incident: "/agency/incident",
-        messages: "/agency/messages",
         helpCenter: "/agency/help-center",
         settings: "/agency/settings",
         profile: "/agency/profile",
@@ -106,7 +105,6 @@ export const Routes = {
         clientDetails: "/super-admin/clients/:clientId",
         editClient: "/super-admin/clients/edit/:clientId",
         addClient: "/super-admin/clients/add",
-        messages: "/super-admin/messages",
         reports: {
             index: "/super-admin/reports",
             clients: "/super-admin/reports/clients",

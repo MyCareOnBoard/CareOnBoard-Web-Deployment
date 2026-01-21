@@ -24,10 +24,8 @@ import {
     UsersRound,
     ReceiptText,
     Network,
-    Settings,
-    AlertTriangle
+    Settings
 } from "lucide-react";
-import MessageIcon from "@/assets/icons/message-outline.svg?react";
 
 
 const navItems: NavItem[] = [
@@ -47,7 +45,6 @@ const navItems: NavItem[] = [
     { label: "Trainings", path: Routes.agency.trainings, icon: Network },
     { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon },
     { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon },
-    { label: "Messages", path: Routes.agency.messages, icon: MessageIcon },
     { label: "Settings", path: Routes.agency.settings, icon: Settings },
 ];
 

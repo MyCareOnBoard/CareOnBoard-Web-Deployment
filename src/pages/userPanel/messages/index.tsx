@@ -1,132 +1,214 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Image as ImageIcon, Paperclip, Send } from "lucide-react";
+import { Search, Image as ImageIcon, Paperclip, Send, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/utils/auth";
-
-interface Message {
-  id: string;
-  senderId: string;
-  senderName: string;
-  senderAvatar?: string;
-  text: string;
-  timestamp: Date;
-  isRead: boolean;
-}
-
-interface Conversation {
-  id: string;
-  participantId: string;
-  participantName: string;
-  participantRole: string;
-  participantAvatar?: string;
-  lastMessage: string;
-  lastMessageTime: Date;
-  unreadCount: number;
-  messages: Message[];
-}
+import {
+  getUserConversations,
+  getUserConversationMessages,
+  sendUserMessage,
+  markUserMessagesAsRead,
+  getUserConversationById,
+  leaveUserConversation,
+  UserConversation,
+  UserMessage,
+} from "@/lib/api/userMessaging";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export default function MessagesPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState<UserConversation | null>(null);
+  const [conversations, setConversations] = useState<UserConversation[]>([]);
+  const [messages, setMessages] = useState<UserMessage[]>([]);
   const [messageInput, setMessageInput] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingConversation, setDeletingConversation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Mock conversations - Replace with actual API call
-  const [conversations, setConversations] = useState<Conversation[]>([
-    {
-      id: "1",
-      participantId: "agency-1",
-      participantName: "Agency Admin",
-      participantRole: "Agency",
-      lastMessage: "Thank you! I've found your results, here are your lab results and don't hesitate to contact us if you have any further questions.",
-      lastMessageTime: new Date("2026-01-19T09:42:00"),
-      unreadCount: 0,
-      messages: [
-        {
-          id: "1",
-          senderId: user?.id || "user",
-          senderName: "You",
-          text: "Hello, Jacob! Let me check. Could you please provide your test reference number or date of the test?",
-          timestamp: new Date("2026-01-19T09:35:00"),
-          isRead: true,
-        },
-        {
-          id: "2",
-          senderId: "agency-1",
-          senderName: "Agency Admin",
-          text: "Sure, the test was done on November 15th, and my reference number is (#123451.",
-          timestamp: new Date("2026-01-19T09:40:00"),
-          isRead: true,
-        },
-        {
-          id: "3",
-          senderId: user?.id || "user",
-          senderName: "You",
-          text: "Thank you! I've found your results, here are your lab results and don't hesitate to contact us if you have any further questions.",
-          timestamp: new Date("2026-01-19T09:42:00"),
-          isRead: true,
-        },
-      ],
-    },
-  ]);
+  // Fetch conversations on mount
+  useEffect(() => {
+    fetchConversations();
+  }, []);
+
+  // Fetch messages when conversation is selected
+  useEffect(() => {
+    if (selectedConversation) {
+      fetchMessages(selectedConversation.id);
+      // Mark messages as read
+      if (selectedConversation.unreadCount > 0) {
+        markConversationAsRead(selectedConversation.id);
+      }
+    }
+  }, [selectedConversation?.id]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [selectedConversation?.messages]);
+  }, [messages]);
 
-  // Select first conversation by default
-  useEffect(() => {
-    if (conversations.length > 0 && !selectedConversation) {
-      setSelectedConversation(conversations[0]);
+  const fetchConversations = async () => {
+    try {
+      setLoading(true);
+      const response = await getUserConversations();
+      if (response.success) {
+        setConversations(response.data);
+        // Select first conversation by default
+        if (response.data.length > 0 && !selectedConversation) {
+          setSelectedConversation(response.data[0]);
+        }
+      }
+    } catch (error: any) {
+      console.error("Error fetching conversations:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load conversations",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [conversations]);
-
-  const filteredConversations = conversations.filter((conv) =>
-    conv.participantName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleSendMessage = () => {
-    if (!messageInput.trim() || !selectedConversation) return;
-
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      senderId: user?.id || "user",
-      senderName: "You",
-      text: messageInput,
-      timestamp: new Date(),
-      isRead: false,
-    };
-
-    setConversations((prev) =>
-      prev.map((conv) =>
-        conv.id === selectedConversation.id
-          ? {
-              ...conv,
-              messages: [...conv.messages, newMessage],
-              lastMessage: messageInput,
-              lastMessageTime: new Date(),
-            }
-          : conv
-      )
-    );
-
-    setSelectedConversation((prev) =>
-      prev
-        ? {
-            ...prev,
-            messages: [...prev.messages, newMessage],
-          }
-        : null
-    );
-
-    setMessageInput("");
   };
 
-  const formatTime = (date: Date) => {
+  const fetchMessages = async (conversationId: string) => {
+    try {
+      const response = await getUserConversationMessages(conversationId);
+      if (response.success) {
+        setMessages(response.data);
+      }
+    } catch (error: any) {
+      console.error("Error fetching messages:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load messages",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const markConversationAsRead = async (conversationId: string) => {
+    try {
+      const unreadMessageIds = messages
+        .filter((msg) => !msg.isRead && msg.senderId !== user?.id)
+        .map((msg) => msg.id);
+
+      if (unreadMessageIds.length > 0) {
+        await markUserMessagesAsRead(conversationId, { messageIds: unreadMessageIds });
+        
+        // Update local state
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
+          )
+        );
+      }
+    } catch (error: any) {
+      console.error("Error marking messages as read:", error);
+    }
+  };
+
+  const handleRefreshConversation = async (conversationId: string) => {
+    try {
+      const response = await getUserConversationById(conversationId);
+      setConversations(prev =>
+        prev.map(conv => conv.id === conversationId ? response.data : conv)
+      );
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(response.data);
+      }
+    } catch (error: any) {
+      console.error('Failed to refresh conversation:', error);
+    }
+  };
+
+  const handleDeleteConversation = async () => {
+    if (!selectedConversation || deletingConversation) return;
+
+    try {
+      setDeletingConversation(true);
+      await leaveUserConversation(selectedConversation.id);
+
+      // Remove from list
+      setConversations(prev => prev.filter(conv => conv.id !== selectedConversation.id));
+      
+      // Clear selection
+      setSelectedConversation(null);
+      setMessages([]);
+      setIsDeleteDialogOpen(false);
+
+      toast({
+        title: "Success",
+        description: "Conversation deleted successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete conversation",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingConversation(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || !selectedConversation) return;
+
+    try {
+      setSendingMessage(true);
+
+      const response = await sendUserMessage(selectedConversation.id, {
+        content: messageInput.trim(),
+      });
+
+      if (response.success && response.data) {
+        // Add new message to local state
+        setMessages((prev) => [...prev, response.data!]);
+
+        // Update conversation last message
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === selectedConversation.id
+              ? {
+                  ...conv,
+                  lastMessage: messageInput.trim(),
+                  lastMessageAt: new Date().toISOString(),
+                  lastMessageSenderId: user?.id,
+                }
+              : conv
+          )
+        );
+
+        setMessageInput("");
+      }
+    } catch (error: any) {
+      console.error("Error sending message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
     return date.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
@@ -140,119 +222,190 @@ export default function MessagesPage() {
     return (names[0][0] + names[names.length - 1][0]).toUpperCase();
   };
 
+  const getParticipantInfo = (conversation: UserConversation) => {
+    // Find the other participant (not the current user)
+    const otherParticipant = conversation.participants.find(
+      (p) => p.uid !== user?.uid
+    );
+    return otherParticipant || conversation.participants[0];
+  };
+
+  const filteredConversations = conversations.filter((conv) => {
+    const participant = getParticipantInfo(conv);
+    return participant.name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const handleSearchExpand = () => {
+    setIsSearchExpanded(true);
+    setTimeout(() => searchInputRef.current?.focus(), 100);
+  };
+
+  const handleSearchCollapse = () => {
+    if (!searchQuery) {
+      setIsSearchExpanded(false);
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    if (!e.target.value) {
+      setIsSearchExpanded(false);
+    }
+  };
+
   return (
+    <>
     <div className="flex h-[calc(100vh-160px)] bg-white rounded-2xl shadow-sm overflow-hidden">
       {/* Left Sidebar - Conversations List */}
       <div className="w-full md:w-[380px] border-r border-[#e5e7eb] flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-[#e5e7eb]">
-          <h2 className="text-[24px] font-semibold text-[#10141a] mb-4">Messages</h2>
-          
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#808081]" />
-            <Input
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[24px] font-semibold text-[#10141a]">Messages</h2>
+            
+            {/* Search - Expandable */}
+            {!isSearchExpanded ? (
+              <button
+                onClick={handleSearchExpand}
+                className="p-2 hover:bg-[#f3f4f6] rounded-lg transition-colors"
+                title="Search conversations"
+              >
+                <Search className="w-5 h-5 text-[#808081]" />
+              </button>
+            ) : (
+              <div className="relative flex-1 ml-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#808081]" />
+                <Input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  onBlur={handleSearchCollapse}
+                  className="pl-10 pr-3"
+                />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Conversations List */}
         <div className="flex-1 overflow-y-auto">
-          {filteredConversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              onClick={() => setSelectedConversation(conversation)}
-              className={`flex items-start gap-3 p-4 cursor-pointer transition-colors border-b border-[#f3f4f6] ${
-                selectedConversation?.id === conversation.id
-                  ? "bg-[#e0f7fa] border-l-4 border-l-[#00b8d4]"
-                  : "hover:bg-[#f9fafb]"
-              }`}
-            >
-              {/* Avatar */}
-              <div className="relative flex-shrink-0">
-                <div className="w-12 h-12 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-[16px] font-semibold">
-                  {conversation.participantAvatar ? (
-                    <img
-                      src={conversation.participantAvatar}
-                      alt={conversation.participantName}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    getInitials(conversation.participantName)
-                  )}
-                </div>
-                {conversation.unreadCount > 0 && (
-                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#ef4444] rounded-full flex items-center justify-center">
-                    <span className="text-[10px] text-white font-semibold">
-                      {conversation.unreadCount}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-[15px] font-semibold text-[#10141a] truncate">
-                    {conversation.participantName}
-                  </h3>
-                  <span className="text-[11px] text-[#808081] flex-shrink-0 ml-2">
-                    {formatTime(conversation.lastMessageTime)}
-                  </span>
-                </div>
-                <p className="text-[13px] text-[#808081] mb-0.5">{conversation.participantRole}</p>
-                <p className="text-[13px] text-[#6b7280] line-clamp-2">
-                  {conversation.lastMessage}
-                </p>
-              </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <p className="text-[14px] text-[#808081]">Loading conversations...</p>
             </div>
-          ))}
-
-          {filteredConversations.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 px-4">
+          ) : filteredConversations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-4 py-12">
               <p className="text-[14px] text-[#808081]">No conversations found</p>
             </div>
+          ) : (
+            filteredConversations.map((conversation) => {
+              const participant = getParticipantInfo(conversation);
+              return (
+                <div
+                  key={conversation.id}
+                  onClick={() => setSelectedConversation(conversation)}
+                  className={`flex items-start gap-3 p-4 cursor-pointer transition-colors border-b border-[#f3f4f6] ${
+                    selectedConversation?.id === conversation.id
+                      ? "bg-[#e0f7fa] border-l-4 border-l-[#00b8d4]"
+                      : "hover:bg-[#f9fafb]"
+                  }`}
+                >
+                  {/* Avatar */}
+                  <div className="relative flex-shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-[16px] font-semibold">
+                      {participant.avatar ? (
+                        <img
+                          src={participant.avatar}
+                          alt={participant.name}
+                          className="object-cover w-full h-full rounded-full"
+                        />
+                      ) : (
+                        getInitials(participant.name)
+                      )}
+                    </div>
+                    {conversation.unreadCount > 0 && (
+                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#ef4444] rounded-full flex items-center justify-center">
+                        <span className="text-[10px] text-white font-semibold">
+                          {conversation.unreadCount}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="text-[15px] font-semibold text-[#10141a] truncate">
+                        {participant.name}
+                      </h3>
+                      {conversation.lastMessageAt && (
+                        <span className="text-[11px] text-[#808081] flex-shrink-0 ml-2">
+                          {formatTime(conversation.lastMessageAt)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[13px] text-[#808081] mb-0.5">{participant.role}</p>
+                    <p className="text-[13px] text-[#6b7280] line-clamp-2">
+                      {conversation.lastMessage || "No messages yet"}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
 
       {/* Right Side - Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex flex-col flex-1">
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="p-6 border-b border-[#e5e7eb] flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-[16px] font-semibold flex-shrink-0">
-                {selectedConversation.participantAvatar ? (
-                  <img
-                    src={selectedConversation.participantAvatar}
-                    alt={selectedConversation.participantName}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  getInitials(selectedConversation.participantName)
-                )}
+            <div className="p-6 border-b border-[#e5e7eb] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {(() => {
+                  const participant = getParticipantInfo(selectedConversation);
+                  return (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-[16px] font-semibold flex-shrink-0">
+                        {participant.avatar ? (
+                          <img
+                            src={participant.avatar}
+                            alt={participant.name}
+                            className="object-cover w-full h-full rounded-full"
+                          />
+                        ) : (
+                          getInitials(participant.name)
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="text-[18px] font-semibold text-[#10141a]">
+                          {participant.name}
+                        </h3>
+                        <p className="text-[13px] text-[#808081]">
+                          {participant.role}
+                        </p>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
-              <div>
-                <h3 className="text-[18px] font-semibold text-[#10141a]">
-                  {selectedConversation.participantName}
-                </h3>
-                <p className="text-[13px] text-[#808081]">
-                  {selectedConversation.participantRole}
-                </p>
-              </div>
+              <button
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="p-2 hover:bg-[#fef2f2] text-[#ef4444] rounded-lg transition-colors"
+                title="Delete conversation"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
             </div>
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-6 bg-[#f9fafb]">
               <div className="space-y-4">
-                {selectedConversation.messages.map((message) => {
-                  const isSentByUser = message.senderId === (user?.id || "user");
+                {messages.map((message) => {
+                  const isSentByUser = message.senderId === user?.id;
 
                   return (
                     <div
@@ -267,7 +420,7 @@ export default function MessagesPage() {
                               <img
                                 src={message.senderAvatar}
                                 alt={message.senderName}
-                                className="w-full h-full rounded-full object-cover"
+                                className="object-cover w-full h-full rounded-full"
                               />
                             ) : (
                               getInitials(message.senderName)
@@ -281,7 +434,7 @@ export default function MessagesPage() {
                               <img
                                 src={user.photoURL}
                                 alt="You"
-                                className="w-full h-full rounded-full object-cover"
+                                className="object-cover w-full h-full rounded-full"
                               />
                             ) : (
                               getInitials(user?.fullName || "You")
@@ -298,7 +451,7 @@ export default function MessagesPage() {
                                 : "bg-white text-[#10141a] shadow-sm"
                             }`}
                           >
-                            <p className="text-[14px] leading-relaxed">{message.text}</p>
+                            <p className="text-[14px] leading-relaxed">{message.content}</p>
                           </div>
                           <div
                             className={`flex items-center gap-1 mt-1 ${
@@ -310,7 +463,7 @@ export default function MessagesPage() {
                             </span>
                             <span className="text-[11px] text-[#808081]">•</span>
                             <span className="text-[11px] text-[#808081]">
-                              {formatTime(message.timestamp)}
+                              {formatTime(message.createdAt)}
                             </span>
                             {isSentByUser && message.isRead && (
                               <>
@@ -327,7 +480,6 @@ export default function MessagesPage() {
                 <div ref={messagesEndRef} />
               </div>
             </div>
-
             {/* Message Input */}
             <div className="p-6 border-t border-[#e5e7eb] bg-white">
               <div className="flex items-center gap-3">
@@ -343,6 +495,7 @@ export default function MessagesPage() {
                     }
                   }}
                   className="flex-1"
+                  disabled={sendingMessage}
                 />
                 <button
                   type="button"
@@ -361,7 +514,7 @@ export default function MessagesPage() {
                 <button
                   type="button"
                   onClick={handleSendMessage}
-                  disabled={!messageInput.trim()}
+                  disabled={!messageInput.trim() || sendingMessage}
                   className="p-2.5 bg-[#00b8d4] text-white rounded-full hover:bg-[#00a5c0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Send message"
                 >
@@ -371,11 +524,42 @@ export default function MessagesPage() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex items-center justify-center flex-1">
             <p className="text-[16px] text-[#808081]">Select a conversation to start messaging</p>
           </div>
         )}
       </div>
     </div>
+
+    {/* Delete Confirmation Dialog */}
+    <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-[20px] font-semibold">Delete Conversation</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="text-[14px] text-[#6b7280]">
+            Are you sure you want to delete this conversation? This action cannot be undone.
+          </p>
+        </div>
+        <DialogFooter className="flex justify-end gap-3">
+          <Button
+            variant="outline"
+            onClick={() => setIsDeleteDialogOpen(false)}
+            disabled={deletingConversation}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConversation}
+            disabled={deletingConversation}
+            className="bg-[#ef4444] hover:bg-[#dc2626] text-white"
+          >
+            {deletingConversation ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

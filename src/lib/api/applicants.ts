@@ -8,7 +8,7 @@ export interface Applicant {
   documents: boolean;
   conditionalHire: boolean;
   finalAgencyReview: boolean;
-  avatar: string;
+  profilePictureUrl: string;
 }
 
 export interface ApplicantListResponse {
@@ -45,8 +45,6 @@ const mapBackendToApplicant = (item: any): Applicant => {
   const role = item?.userType === 'applicant' ? 'Applicant' : (item?.role || 'Applicant');
   const stages = item?.stages || {};
 
-  // Prefer provided avatar fields, fallback to dicebear
-  const avatar = item?.avatar || item?.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(id)}`;
 
   return {
     id,
@@ -56,7 +54,7 @@ const mapBackendToApplicant = (item: any): Applicant => {
     documents: Boolean(stages.documents),
     conditionalHire: Boolean(stages.conditionalHire),
     finalAgencyReview: Boolean(stages.officialHire),
-    avatar,
+    profilePictureUrl: item?.profilePictureUrl,
   };
 };
 
@@ -69,7 +67,7 @@ export const applicantsApi = {
       const body = response?.data;
       return {
         success: body?.success ?? true,
-        data: Array.isArray(body?.data) ? body.data.map(mapBackendToApplicant) : [],
+        data: Array.isArray(body?.applicants) ? body.applicants.map(mapBackendToApplicant) : [],
         pagination: body?.pagination,
       };
     } catch (err: any) {
