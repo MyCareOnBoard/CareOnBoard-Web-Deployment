@@ -15,7 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Routes } from "@/routes/constants";
-import { applicantsApi, type Applicant } from "@/lib/api/applicants";
+import { applicantsApi, type Applicant, type ApplicantDetailResponse, type ComplianceData } from "@/lib/api/applicants";
+import type { EligibilityData } from "@/lib/api/applicants";
 import { useToast } from "@/hooks/use-toast";
 import { agencyApplicantsExtraApi, ApplicantDocumentItem } from "@/lib/api/agencyApplicantsExtra";
 import { officialHireApi, OfficialHireStatusResponse } from "@/lib/api/officialHire";
@@ -24,7 +25,10 @@ import { authorizationsApi } from "@/lib/api/authorizations";
 import { ProfileTab } from "./components/ProfileTab";
 import { DocumentsTab } from "./components/DocumentsTab";
 import { ConditionalHireTab } from "./components/ConditionalHireTab";
-import { FinalReviewTab, type AuthorizationConfig } from "./components/FinalReviewTab";
+import { FinalReviewTab, type ReviewStepsState } from "./components/FinalReviewTab";
+
+// Type alias for document file from eligibility data
+type DocumentFile = NonNullable<EligibilityData['photoIdUrl']>;
 
 export default function ApplicantProfilePage() {
   const navigate = useNavigate();
@@ -37,6 +41,17 @@ export default function ApplicantProfilePage() {
   const [hireStatus, setHireStatus] = useState<OfficialHireStatusResponse['status'] | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
   const [authApprovals, setAuthApprovals] = useState<Record<number, boolean>>({});
+  const [complianceData, setComplianceData] = useState<ComplianceData | undefined>(undefined);
+  const [toggledAuthorizations, setToggledAuthorizations] = useState<Set<string>>(new Set());
+  const [reviewSteps, setReviewSteps] = useState<ReviewStepsState>({
+    documentsValid: { confirmed: false },
+    backgroundCheck: { confirmed: false },
+    drugTest: { confirmed: false },
+    fingerprint: { confirmed: false },
+    trainings: { confirmed: false },
+    systemProfile: { confirmed: false },
+    orientation: { confirmed: false },
+  });
 
   type ReferenceItem = {
     name: string;
@@ -56,21 +71,24 @@ export default function ApplicantProfilePage() {
     gender?: string;
     email?: string;
     avatar: string;
+    resumeUrl?: string;
     profileScreening: boolean;
     documents: boolean;
     conditionalHire: boolean;
     finalAgencyReview: boolean;
     questionnaire?: {
+      isAtLeast18?: string;
       highSchoolDiploma?: string;
       legallyEligible?: string;
       convicted?: string;
-      convictedRepeat?: string;
+      reliableTransportation?: string;
     };
   }>({
     id: id || "",
     name: "",
     role: "Applicant",
     avatar: "",
+    resumeUrl: "",
     profileScreening: false,
     documents: false,
     conditionalHire: false,
@@ -97,20 +115,6 @@ export default function ApplicantProfilePage() {
     },
     {} as Record<string, string>
   );
-  const conditionalHireData = {
-    letterSigned: true,
-    signedDate: "18 January 2022",
-  };
-  const authorizations: AuthorizationConfig[] = [
-    { name: "Authorize Drug test appointment", status: "Enabled", bookingLink: true },
-    { name: "Authorize Fingerprint appointment", status: "Enabled", bookingLink: true },
-    { name: "Authorize Central Registry Check (Developmental Disabilities Abuse/Neglect Registry)", status: "Enabled", bookingLink: true },
-    { name: "Authorize CARI Check (Child Abuse Record Information, DCF)", status: "Enabled", bookingLink: true },
-    { name: "Authorize Sex Offender Registry Check (Megan's Law)", status: "Enabled", bookingLink: true },
-    { name: "Authorize OIG Exclusion List Check (LEIE)", status: "Disabled", bookingLink: false },
-    { name: "Authorize Health & TB Screening", status: "Enabled", bookingLink: true },
-    { name: "Authorize Reference Checks (Minimum 2, Non-Family)", status: "Enabled", bookingLink: true },
-  ];
 
   const handleNavigateToSection = (section: "profile" | "documents" | "conditional" | "final") => {
     setActiveSection(section);
@@ -122,92 +126,200 @@ export default function ApplicantProfilePage() {
     return item?.url;
   };
 
-  // Fetch documents and hire status
+  const handleToggleCompliance = async (authKey: string, checked: boolean) => {
+    if (!id) return;
+    try {
+      await authorizationsApi.update(id, { [authKey]: checked });
+      // Add to toggled set to disable the toggle
+      setToggledAuthorizations(prev => new Set(prev).add(authKey));
+      toast({
+        title: "Success",
+        description: `Authorization ${checked ? 'approved' : 'disapproved'}`,
+      });
+      // Refresh applicant data
+      fetchApplicantData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to update authorization",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConfirmReviewStep = async (stepKey: keyof ReviewStepsState) => {
+    if (!id) return;
+    setActionLoading(stepKey);
+    try {
+      // Call API to save confirmation
+      await applicantsApi.confirmReviewStep(id, stepKey, true);
+
+      setReviewSteps(prev => ({
+        ...prev,
+        [stepKey]: {
+          confirmed: true,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      toast({
+        title: "Confirmed",
+        description: "Review step confirmed successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to confirm step",
+        variant: "destructive"
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Fetch all applicant data with a single API call
   const fetchApplicantData = async () => {
     if (!id) return;
     setIsLoading(true);
     try {
-      const [detailRes, docsRes, statusRes] = await Promise.all([
-        applicantsApi.getById(id).catch(() => null),
-        agencyApplicantsExtraApi.documents(id).catch(() => ({ success: false, documents: [] })),
-        officialHireApi.status(id).catch(() => null),
-      ]);
-      if (detailRes?.data) {
-        // Map backend fields to UI model where possible
-        setApplicant(prev => ({
-          ...prev,
-          id,
-          name: detailRes.data.name ?? prev.name,
-          role: detailRes.data.role ?? prev.role,
-          // use mapped profile picture url from applicantsApi.getById
-          avatar: (detailRes.data as any).profilePictureUrl ?? prev.avatar,
-          profileScreening: detailRes.data.profileScreening,
-          documents: detailRes.data.documents,
-          conditionalHire: detailRes.data.conditionalHire,
-          finalAgencyReview: detailRes.data.finalAgencyReview,
-        }));
+      // Single comprehensive API call
+      const response = await applicantsApi.getByIdDetailed(id);
+
+      if (!response?.data) {
+        console.error('No applicant data returned');
+        return;
       }
-      if (docsRes.success) {
-        // Support both legacy array and new keyed-object responses
-        let normalizedDocs: ApplicantDocumentItem[] = [];
 
-        if (Array.isArray(docsRes.documents)) {
-          normalizedDocs = docsRes.documents;
-        } else if (docsRes.documents && typeof docsRes.documents === "object") {
-          const rawDocs = docsRes.documents as Record<string, any>;
+      const data = response.data;
 
-          // Map references if present
-          const refs = Array.isArray(rawDocs.references)
-            ? rawDocs.references.map((r: any) => ({
-              name: r.name ?? "",
-              relation: r.relationship ?? "",
-              mobile: r.phoneNumber ?? "",
-              email: r.email ?? "",
-            }))
-            : [];
-          if (refs.length) {
-            setReferences(refs);
-          }
+      // Extract basic profile information
+      setApplicant(prev => ({
+        ...prev,
+        id,
+        name: data.fullName || prev.name,
+        role: data.userType === 'applicant' ? 'Applicant' : (prev.role || 'Applicant'),
+        avatar: data.profilePictureUrl || prev.avatar,
+        address: data.address?.address || prev.address,
+        dob: data.dateOfBirth || prev.dob,
+        gender: data.gender || prev.gender,
+        email: data.email || prev.email,
+        resumeUrl: data.preScreening?.resumeUrl || prev.resumeUrl,
+        // Stage completions based on application status
+        profileScreening: Boolean(data.preScreening?.status),
+        documents: Boolean(data.eligibility?.status),
+        conditionalHire: Boolean(data.conditionalHire?.status),
+        finalAgencyReview: data.applicationStatus === 'approved' || false,
+        // Map all pre-screening questions from preScreening data
+        questionnaire: {
+          isAtLeast18: data.preScreening?.isAtLeast18 ? 'Yes' : 'No',
+          highSchoolDiploma: data.preScreening?.hasHighSchoolDiploma ? 'Yes' : 'No',
+          legallyEligible: data.preScreening?.isLegallyEligible ? 'Yes' : 'No',
+          convicted: data.preScreening?.hasBeenConvicted ? 'Yes' : 'No',
+          reliableTransportation: data.preScreening?.hasReliableTransportation ? 'Yes' : 'No',
+        },
+      }));
 
-          normalizedDocs = Object.entries(rawDocs)
-            .filter(([key, value]) => key !== "references" && value && value.fileUrl)
-            .map(([key, value]) => {
-              const v = value as any;
-              const type = v.fileType || key;
-              const label =
-                documentLabelByType[type] ||
-                key
-                  .replace(/([A-Z])/g, " $1")
-                  .replace(/\b\w/g, (c: string) => c.toUpperCase())
-                  .trim();
+      // Extract documents from eligibility data
+      const eligibility = data.eligibility;
+      if (eligibility) {
+        const normalizedDocs: ApplicantDocumentItem[] = [];
 
-              return {
-                id: key,
-                type,
-                label,
-                required: false,
-                status: "uploaded" as const,
-                url: v.fileUrl,
-                uploadedAt: undefined,
-                verifiedAt: undefined,
-                note: undefined,
-              };
+        // Map each document type
+        const docMap: Record<string, { url?: DocumentFile; label: string }> = {
+          'photo-id': { url: eligibility.photoIdUrl, label: 'Photo ID' },
+          'social-security-card': { url: eligibility.socialSecurityCardUrl, label: 'Social Security Card' },
+          'diploma': { url: eligibility.diplomaUrl, label: 'School Diploma Certificate' },
+          'certifications': { url: eligibility.certificationsUrl, label: 'Extra Certificates' },
+          'hepatitis-b-vaccination': { url: eligibility.hepatitisBVaccinationUrl, label: 'Hepatitis B Vaccination' },
+          'hepatitis-b-immunity': { url: eligibility.hepatitisBImmunityUrl, label: 'Hepatitis B Immunity' },
+          'tb-test': { url: eligibility.tbTestResultUrl, label: 'TB Test' },
+          'i9-form': { url: eligibility.i9FormUrl, label: 'Filled I-9 form' },
+          'w4-form': { url: eligibility.w4FormUrl, label: 'Filled W-4 form' },
+        };
+
+        Object.entries(docMap).forEach(([type, { url, label }]) => {
+          if (url?.fileUrl) {
+            normalizedDocs.push({
+              id: type,
+              type,
+              label,
+              required: false,
+              status: 'uploaded' as const,
+              url: url.fileUrl,
+              uploadedAt: undefined,
+              verifiedAt: undefined,
+              note: undefined,
             });
-        }
+          }
+        });
 
         setDocumentsData(normalizedDocs);
-        const uploaded = normalizedDocs.filter(
-          (d: ApplicantDocumentItem) => d.status !== "pending"
-        ).length;
-        const verified = normalizedDocs.filter(
-          (d: ApplicantDocumentItem) => d.status === "verified"
-        ).length;
+
+        // Calculate progress
         const total = normalizedDocs.length;
+        const verified = normalizedDocs.filter(d => d.status === 'verified').length;
         setProgressPercent(total > 0 ? Math.round((verified / total) * 100) : 0);
+
+        // Extract references
+        if (Array.isArray(eligibility.references)) {
+          const refs = eligibility.references.map(r => ({
+            name: r.name || '',
+            relation: r.relationship || '',
+            mobile: r.phoneNumber || '',
+            email: r.email || '',
+          }));
+          setReferences(refs);
+        }
       }
-      if (statusRes?.success) {
-        setHireStatus(statusRes.status);
+
+      // Extract conditional hire status
+      if (data.conditionalHire) {
+        setHireStatus({
+          status: data.conditionalHire.status || 'pending',
+          letterSigning: {
+            hasSigned: Boolean(data.conditionalHire.finalizedAt),
+            signedAt: data.conditionalHire.finalizedAt
+              ? new Date(data.conditionalHire.finalizedAt._seconds * 1000).toISOString()
+              : undefined,
+          },
+        } as any);
       }
+
+      // Extract compliance data
+      if (data.compliance) {
+        setComplianceData(data.compliance);
+      }
+
+      // Map reviews data to reviewSteps state
+      if (data.reviews && typeof data.reviews === 'object') {
+        const mappedReviews: ReviewStepsState = {
+          documentsValid: { confirmed: false },
+          backgroundCheck: { confirmed: false },
+          drugTest: { confirmed: false },
+          fingerprint: { confirmed: false },
+          trainings: { confirmed: false },
+          systemProfile: { confirmed: false },
+          orientation: { confirmed: false },
+        };
+
+        // Map each review step from the API response
+        Object.entries(data.reviews).forEach(([stepKey, reviewData]) => {
+          // Only map if the stepKey exists in our ReviewStepsState
+          if (stepKey in mappedReviews && reviewData) {
+            const firebaseTimestamp = reviewData.timestamp || reviewData.updatedAt;
+            const timestamp = firebaseTimestamp && firebaseTimestamp._seconds
+              ? new Date(firebaseTimestamp._seconds * 1000).toISOString()
+              : undefined;
+
+            mappedReviews[stepKey as keyof ReviewStepsState] = {
+              confirmed: Boolean(reviewData.confirmed),
+              timestamp,
+            };
+          }
+        });
+
+        setReviewSteps(mappedReviews);
+      }
+
     } catch (error) {
       console.error('Error fetching applicant data:', error);
     } finally {
@@ -453,82 +565,17 @@ export default function ApplicantProfilePage() {
               hireStatus={hireStatus}
               actionLoading={actionLoading}
               onRequestSignature={handleRequestSignature}
+              complianceData={complianceData}
+              toggledAuthorizations={toggledAuthorizations}
+              onToggleAuthorization={handleToggleCompliance}
             />
           )}
 
           {activeSection === "final" && (
             <FinalReviewTab
-              authorizations={authorizations}
-              authApprovals={authApprovals}
+              reviewSteps={reviewSteps}
+              onConfirm={handleConfirmReviewStep}
               actionLoading={actionLoading}
-              onSendLetter={handleSendOfferLetter}
-              onSendAlert={async (authName) => {
-                if (!id) return;
-                try {
-                  await agencyApplicantsExtraApi.createAuthorizationAlert(id, {
-                    authorizationType: authName,
-                    severity: "high",
-                    message: `Authorization alert for ${authName}`,
-                  });
-                  toast({
-                    title: "Alert Sent",
-                    description: `Alert sent for ${authName}`,
-                  });
-                } catch (error: any) {
-                  toast({
-                    title: "Error",
-                    description:
-                      error?.response?.data?.message || "Failed to send alert",
-                    variant: "destructive",
-                  });
-                }
-              }}
-              onToggleAuthorization={async (index, checked, authName) => {
-                if (!id) return;
-                setAuthApprovals((prev) => ({
-                  ...prev,
-                  [index]: checked,
-                }));
-
-                const authFieldMap: Record<string, string> = {
-                  "Authorize Drug test appointment": "drugTest",
-                  "Authorize Fingerprint appointment": "fingerprint",
-                  "Authorize Central Registry Check (Developmental Disabilities Abuse/Neglect Registry)":
-                    "centralRegistry",
-                  "Authorize CARI Check (Child Abuse Record Information, DCF)":
-                    "cariCheck",
-                  "Authorize Sex Offender Registry Check (Megan's Law)":
-                    "sexOffenderRegistry",
-                  "Authorize OIG Exclusion List Check (LEIE)": "oigExclusion",
-                  "Authorize Health & TB Screening": "healthTbScreening",
-                  "Authorize Reference Checks (Minimum 2, Non-Family)":
-                    "referenceChecks",
-                };
-
-                const authField = authFieldMap[authName];
-                if (!authField) return;
-
-                try {
-                  await authorizationsApi.update(id, { [authField]: checked });
-                  toast({
-                    title: "Success",
-                    description: `${authName} ${checked ? "approved" : "disapproved"
-                      }`,
-                  });
-                } catch (error: any) {
-                  setAuthApprovals((prev) => ({
-                    ...prev,
-                    [index]: !checked,
-                  }));
-                  toast({
-                    title: "Error",
-                    description:
-                      error?.response?.data?.message ||
-                      "Failed to update authorization",
-                    variant: "destructive",
-                  });
-                }
-              }}
             />
           )}
         </div>

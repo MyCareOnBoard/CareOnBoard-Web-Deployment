@@ -5,11 +5,13 @@ interface ProfileTabProps {
   applicant: {
     gender?: string;
     email?: string;
+    resumeUrl?: string;
     questionnaire?: {
+      isAtLeast18?: string;
       highSchoolDiploma?: string;
       legallyEligible?: string;
       convicted?: string;
-      convictedRepeat?: string;
+      reliableTransportation?: string;
     };
   } & Pick<Applicant, "name">;
 }
@@ -38,40 +40,49 @@ export function ProfileTab({ applicant }: ProfileTabProps) {
       </div>
 
       {/* Questions */}
-      <div className="rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <p className="text-[16px] font-medium leading-[1.6] text-[#808081]">
+      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
+        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
+          Are you at least 18 years old?
+        </span>
+        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
+          {applicant.questionnaire?.isAtLeast18 ?? "-"}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
+        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
           Do you have a High School Diploma or GED?
-        </p>
-        <p className="mt-1 text-[16px] font-semibold leading-[1.6] text-[#10141a]">
+        </span>
+        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
           {applicant.questionnaire?.highSchoolDiploma ?? "-"}
-        </p>
+        </span>
       </div>
 
-      <div className="rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <p className="text-[16px] font-medium leading-[1.6] text-[#808081]">
+      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
+        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
           Are you legally eligible to work in the U.S.?
-        </p>
-        <p className="mt-1 text-[16px] font-semibold leading-[1.6] text-[#10141a]">
+        </span>
+        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
           {applicant.questionnaire?.legallyEligible ?? "-"}
-        </p>
+        </span>
       </div>
 
-      <div className="rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <p className="text-[16px] font-medium leading-[1.6] text-[#808081]">
+      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
+        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
           Have you ever been convicted of a disqualifying offense under NJ law?
-        </p>
-        <p className="mt-1 text-[16px] font-semibold leading-[1.6] text-[#10141a]">
+        </span>
+        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
           {applicant.questionnaire?.convicted ?? "-"}
-        </p>
+        </span>
       </div>
 
-      <div className="rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <p className="text-[16px] font-medium leading-[1.6] text-[#808081]">
-          Have you ever been convicted of a disqualifying offense under NJ law?
-        </p>
-        <p className="mt-1 text-[16px] font-semibold leading-[1.6] text-[#10141a]">
-          {applicant.questionnaire?.convictedRepeat ?? "-"}
-        </p>
+      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
+        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
+          Do you have reliable transportation? (Optional)
+        </span>
+        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
+          {applicant.questionnaire?.reliableTransportation ?? "-"}
+        </span>
       </div>
 
       {/* Resume */}
@@ -97,12 +108,25 @@ export function ProfileTab({ applicant }: ProfileTabProps) {
               Resume
             </span>
           </div>
-          <Button
-            variant="outline"
-            className="rounded-[60px] border-[#0eaf52] bg-[rgba(14,175,82,0.1)] px-4 py-[6px] text-[11px] font-semibold text-[#0eaf52] hover:bg-[rgba(14,175,82,0.15)]"
-          >
-            View Resume
-          </Button>
+          {applicant.resumeUrl ? (
+            <Button
+              asChild
+              variant="outline"
+              className="rounded-[60px] border-[#0eaf52] bg-[rgba(14,175,82,0.1)] px-4 py-[6px] text-[11px] font-semibold text-[#0eaf52] hover:bg-[rgba(14,175,82,0.15)]"
+            >
+              <a href={applicant.resumeUrl} target="_blank" rel="noreferrer">
+                View Resume
+              </a>
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              disabled
+              className="rounded-[60px] border-[#b2b2b3] bg-[rgba(178,178,179,0.08)] px-4 py-[6px] text-[11px] font-semibold text-[#b2b2b3] cursor-not-allowed"
+            >
+              View Resume
+            </Button>
+          )}
         </div>
       </div>
     </div>
