@@ -73,31 +73,19 @@ export default function ApplicantDirectory() {
 
         {/* Applicant Directory List Section */}
         <div className="backdrop-blur-[8px] bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] border-solid overflow-hidden relative rounded-[30px]">
-          <div className="p-[19px]">
-            <div className="mb-[37px]">
-              <div className="mb-6">
-                <h2 className="text-[20px] font-medium text-[#10141a] leading-[1.6] font-['Urbanist'] mb-1">
-                  Pending Applicant
-                </h2>
-                <p className="text-[14px] font-medium text-[#808081] leading-[1.4] font-['Urbanist']">
-                  These are your Pending Applicant
-                </p>
-              </div>
-            </div>
-
-            <ApplicantsList
-              applicants={applicants}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              filterPeriod={activeTab}
-              onFilterChange={setActiveTab}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={goToPage}
-              onApplicantSelect={(applicant) => handleViewDetails(applicant.id)}
-              isLoading={isLoading}
-            />
-          </div>
+          <ApplicantsList
+            applicants={applicants}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            filterPeriod={activeTab}
+            onFilterChange={setActiveTab}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={goToPage}
+            onApplicantSelect={(applicant) => handleViewDetails(applicant.id)}
+            isLoading={isLoading}
+            onViewFullList={handleViewPendingApplicants}
+          />
         </div>
       </div>
     </div>
