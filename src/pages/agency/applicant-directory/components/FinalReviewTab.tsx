@@ -68,7 +68,7 @@ export function FinalReviewTab({
                     onCheckedChange={(checked) =>
                       onToggleAuthorization(index, checked, auth.name)
                     }
-                    disabled={auth.status === "Disabled"}
+                    disabled={false}
                   />
                 </>
               )}
