@@ -36,24 +36,6 @@ import {
 
 
 const navItems: NavItem[] = [
-    {label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: FileText},
-    {label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon},
-    {label: "DSP Management", path: Routes.agency.dspManagement, icon: UserRoundPlus},
-    {label: "Client Management", path: Routes.agency.clients, icon: UsersRound},
-    {label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: FileText},
-    {label: "Scheduling", path: Routes.agency.scheduling, icon: NotepadText},
-    {label: "Notes", path: Routes.agency.notes, icon: CalendarDays},
-    {label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText},
-    {label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon},
-    {label: "Support", path: Routes.agency.support, icon: SupportIcon},
-    {label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon},
-    {label: "Applicant Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon},
-    {label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: FileText},
-    {label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon},
-    {label: "Trainings", path: Routes.agency.trainings, icon: Network},
-    {label: "Mileage", path: Routes.agency.mileage, icon: MapPin},
-    {label: "Incident", path: Routes.agency.incident, icon: AlertTriangle},
-    {label: "Settings", path: Routes.agency.settings, icon: Settings},
     { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon },
     { label: "DSP Management", path: Routes.agency.dspManagement, icon: DSPManagementIcon },
     { label: "Client Management", path: Routes.agency.clients, icon: UsersRound },
@@ -70,7 +52,7 @@ const navItems: NavItem[] = [
     { label: "Trainings", path: Routes.agency.trainings, icon: Network },
     { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon },
     { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon },
-    { label: "Settings", path: Routes.agency.settings, icon: Settings },
+    { label: "Settings", path: Routes.agency.agencySettings, icon: Settings },
 ];
 
 
