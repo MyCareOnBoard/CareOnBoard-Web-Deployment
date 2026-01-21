@@ -24,7 +24,7 @@ const applicationStages = [{
 //   subtitle: "Once they are approved, You can move to stage 4"
 // },
 {
-  title: "You are conditionally Hired! Lets' wait for the [Agency] to review your final documents",
+  title: "You are conditionally Hired! Lets' wait for the Agency to review your final documents",
   subtitle: "Once they are approved, You can move to stage 5. You can cover your mandatory training."
 },
 {
@@ -53,7 +53,7 @@ export default function ApplicantDashboardPage() {
         setApplicationStatus(status);
         setApplicationStep(APPLICATION_STEP_NAMES.indexOf(currentStep || "profile"));
         setApplicationStarted(hasStarted);
-        
+
         if (hasStarted && currentStep !== null) {
           console.log("🔍 Setting application stage to:", APPLICATION_STEP_NAMES.indexOf(currentStep));
           setApplicationStage(applicationStages[APPLICATION_STEP_NAMES.indexOf(currentStep)]);
@@ -84,7 +84,7 @@ export default function ApplicantDashboardPage() {
       );
     }
 
-    if (!applicationStarted){
+    if (!applicationStarted) {
       return (
         <div className="flex flex-col items-center max-w-md text-center">
           <div className="flex items-center justify-center w-20 h-20 mb-6 rounded-full bg-[#e5f7f7]">

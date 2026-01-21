@@ -278,7 +278,7 @@ export interface FinalReviewResponse {
 export const getFinalReviewChecklist = async (): Promise<FinalReviewResponse> => {
     try {
         const response = await axiosClient.get<FinalReviewResponse>(
-            'https://us-central1-care-on-board.cloudfunctions.net/finalReview/checklist'
+            '/finalReview/checklist'
         );
 
         return response.data;
