@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Search, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { applicantsApi, Applicant } from "@/lib/api/applicants";
+import { Routes } from "@/routes/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Routes } from "@/routes/constants";
-import { applicantsApi, Applicant } from "@/lib/api/applicants";
-import { useToast } from "@/hooks/use-toast";
+import { CheckCircle2 } from "lucide-react";
+
 
 export default function PendingApplicants() {
   const navigate = useNavigate();
@@ -19,7 +21,7 @@ export default function PendingApplicants() {
   const [totalCount, setTotalCount] = useState(0);
   const errorToastShownRef = useRef(false);
   const itemsPerPage = 6;
-  
+
   // Memoize calculated values for performance
   const startIndex = useMemo(() => (currentPage - 1) * itemsPerPage, [currentPage]);
   const totalPages = useMemo(() => totalCount > 0 ? Math.ceil(totalCount / itemsPerPage) : 1, [totalCount]);
@@ -34,7 +36,7 @@ export default function PendingApplicants() {
       limit: itemsPerPage,
       offset: startIndex
     });
-    
+
     try {
       const res = await applicantsApi.directory({
         tab: 'all',
@@ -43,7 +45,7 @@ export default function PendingApplicants() {
         limit: itemsPerPage,
         offset: startIndex,
       });
-      
+
       if (res?.success && res?.data) {
         setApplicants(res.data);
         setTotalCount(res?.pagination?.count ?? 0);
@@ -131,49 +133,46 @@ export default function PendingApplicants() {
               <div className="flex items-start justify-between gap-4">
                 <div className="shrink-0">
                   <h2 className="text-lg font-semibold text-gray-900">
-                     Pending Applicants
+                    Pending Applicants
                   </h2>
                   <p className="mt-1 text-xs text-gray-500">
                     These are your Pending Billing Approvals
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative">
-                      <Search className="absolute w-4 h-4 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
-                      <Input
-                        placeholder="Search"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full py-2 pr-4 text-sm border border-gray-300 rounded-lg pl-9"
-                      />
-                    </div>
+                  <div className="relative">
+                    <Search className="absolute w-4 h-4 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
+                    <Input
+                      placeholder="Search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full py-2 pr-4 text-sm border border-gray-300 rounded-lg pl-9"
+                    />
+                  </div>
                   <Button
                     onClick={() => setActiveTab("today")}
-                    className={`px-4 py-2 text-sm rounded-lg ${
-                      activeTab === "today"
-                        ? "text-white bg-blue-500 hover:bg-blue-600"
-                        : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-                    }`}
+                    className={`px-4 py-2 text-sm rounded-lg ${activeTab === "today"
+                      ? "text-white bg-blue-500 hover:bg-blue-600"
+                      : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                      }`}
                   >
                     Today
                   </Button>
                   <Button
                     onClick={() => setActiveTab("week")}
-                    className={`px-4 py-2 text-sm rounded-lg ${
-                      activeTab === "week"
-                        ? "text-white bg-blue-500 hover:bg-blue-600"
-                        : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-                    }`}
+                    className={`px-4 py-2 text-sm rounded-lg ${activeTab === "week"
+                      ? "text-white bg-blue-500 hover:bg-blue-600"
+                      : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                      }`}
                   >
                     This Week
                   </Button>
                   <Button
                     onClick={() => setActiveTab("month")}
-                    className={`px-4 py-2 text-sm rounded-lg ${
-                      activeTab === "month"
-                        ? "text-white bg-blue-500 hover:bg-blue-600"
-                        : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-                    }`}
+                    className={`px-4 py-2 text-sm rounded-lg ${activeTab === "month"
+                      ? "text-white bg-blue-500 hover:bg-blue-600"
+                      : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                      }`}
                   >
                     This month
                   </Button>
@@ -215,43 +214,39 @@ export default function PendingApplicants() {
                     {/* Status Badges */}
                     <div className="flex flex-wrap items-center flex-1 gap-2">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                          applicant.profileScreening
-                            ? "bg-green-100 text-green-700 border border-green-300"
-                            : "bg-gray-100 text-gray-700 border border-gray-300"
-                        }`}
+                        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap ${applicant.profileScreening
+                          ? "bg-[rgba(14,175,82,0.05)] border border-[#0EAF52] text-[#0EAF52]"
+                          : "bg-[rgba(128,128,129,0.05)] border border-[#525253] text-[#525253]"
+                          }`}
                       >
-                        {applicant.profileScreening && <span>✓</span>}
+                        {applicant.profileScreening && <CheckCircle2 className="w-6 h-6" />}
                         Profile & Pre-Screening
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                          applicant.documents
-                            ? "bg-green-100 text-green-700 border border-green-300"
-                            : "bg-gray-100 text-gray-700 border border-gray-300"
-                        }`}
+                        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap ${applicant.documents
+                          ? "bg-[rgba(14,175,82,0.05)] border border-[#0EAF52] text-[#0EAF52]"
+                          : "bg-[rgba(128,128,129,0.05)] border border-[#525253] text-[#525253]"
+                          }`}
                       >
-                        {applicant.documents && <span>✓</span>}
+                        {applicant.documents && <CheckCircle2 className="w-6 h-6" />}
                         Documents
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                          applicant.conditionalHire
-                            ? "bg-green-100 text-green-700 border border-green-300"
-                            : "bg-gray-100 text-gray-700 border border-gray-300"
-                        }`}
+                        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap ${applicant.conditionalHire
+                          ? "bg-[rgba(14,175,82,0.05)] border border-[#0EAF52] text-[#0EAF52]"
+                          : "bg-[rgba(128,128,129,0.05)] border border-[#525253] text-[#525253]"
+                          }`}
                       >
-                        {applicant.conditionalHire && <span>✓</span>}
+                        {applicant.conditionalHire && <CheckCircle2 className="w-6 h-6" />}
                         Conditional Hire
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                          applicant.finalAgencyReview
-                            ? "bg-red-100 text-red-700 border border-red-300"
-                            : "bg-gray-100 text-gray-700 border border-gray-300"
-                        }`}
+                        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap ${applicant.finalAgencyReview
+                          ? "bg-[rgba(220,38,38,0.05)] border border-[#DC2626] text-[#DC2626]"
+                          : "bg-[rgba(128,128,129,0.05)] border border-[#525253] text-[#525253]"
+                          }`}
                       >
-                        {applicant.finalAgencyReview && <span>!</span>}
+                        {applicant.finalAgencyReview && <CheckCircle2 className="w-6 h-6" />}
                         Final Agency Review
                       </span>
                     </div>

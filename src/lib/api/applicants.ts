@@ -69,7 +69,7 @@ export const applicantsApi = {
       const body = response?.data;
       return {
         success: body?.success ?? true,
-        data: Array.isArray(body?.data) ? body.data.map(mapBackendToApplicant) : [],
+        data: Array.isArray(body?.applicants) ? body.applicants.map(mapBackendToApplicant) : [],
         pagination: body?.pagination,
       };
     } catch (err: any) {
