@@ -42,6 +42,10 @@ export default function ApplicantProfilePage() {
   const [progressPercent, setProgressPercent] = useState(0);
   const [authApprovals, setAuthApprovals] = useState<Record<number, boolean>>({});
   const [complianceData, setComplianceData] = useState<ComplianceData | undefined>(undefined);
+  const [signatures, setSignatures] = useState<{
+    conditionalHire?: { signatureType: string; signatureData: string } | null;
+    officialHire?: { signatureType: string; signatureData: string } | null;
+  } | null>(null);
   const [toggledAuthorizations, setToggledAuthorizations] = useState<Set<string>>(new Set());
   const [reviewSteps, setReviewSteps] = useState<ReviewStepsState>({
     documentsValid: { confirmed: false },
@@ -287,6 +291,11 @@ export default function ApplicantProfilePage() {
       // Extract compliance data
       if (data.compliance) {
         setComplianceData(data.compliance);
+      }
+
+      // Extract signatures data
+      if (data.signatures) {
+        setSignatures(data.signatures);
       }
 
       // Map reviews data to reviewSteps state
@@ -568,6 +577,7 @@ export default function ApplicantProfilePage() {
               complianceData={complianceData}
               toggledAuthorizations={toggledAuthorizations}
               onToggleAuthorization={handleToggleCompliance}
+              signatureData={signatures?.conditionalHire}
             />
           )}
 

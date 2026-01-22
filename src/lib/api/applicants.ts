@@ -209,6 +209,26 @@ export interface ApplicantDetailResponse {
   compliance?: ComplianceData;
   conditionalHire?: ConditionalHireData;
   reviews?: Record<string, ReviewStepData>;
+  signatures?: {
+    conditionalHire?: {
+      signatureType: string;
+      signatureData: string;
+      context?: string;
+      userId?: string;
+      status?: string;
+      createdAt?: FirebaseTimestamp;
+      updatedAt?: FirebaseTimestamp;
+    } | null;
+    officialHire?: {
+      signatureType: string;
+      signatureData: string;
+      context?: string;
+      userId?: string;
+      status?: string;
+      createdAt?: FirebaseTimestamp;
+      updatedAt?: FirebaseTimestamp;
+    } | null;
+  };
 }
 
 // ===== Helper Functions =====
@@ -415,7 +435,7 @@ export const applicantsApi = {
       const response = await axiosClient.get<ApiResponse<ApplicantDetailResponse>>(
         `/agencyApplicants/${encodedId}`
       );
-      
+
       const body = response.data;
       const raw = body?.data || body?.applicant || (body as ApplicantDetailResponse);
 

@@ -120,7 +120,7 @@ function ApplicationContent() {
     <ProfilePreScreeningStep key="profile" onSuccess={handleStepSuccess} />,
     <DocumentUploadStep key="documents" onBack={() => setActiveStep(activeStep - 1)} onSuccess={handleStepSuccess} />,
     <ConditionalHireStep key="conditional" onBack={() => setActiveStep(activeStep - 1)} onSuccess={handleStepSuccess} />,
-    <FinalReviewStep key="review" onBack={() => setActiveStep(activeStep - 1)} onSuccess={handleStepSuccess} />,
+    <FinalReviewStep key="review" onSuccess={handleStepSuccess} />,
     <OrientationStep key="orientation" />,
   ];
 

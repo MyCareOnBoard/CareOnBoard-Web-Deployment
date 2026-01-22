@@ -1,8 +1,8 @@
-import React, {useState, useRef, useEffect} from 'react';
-import {X} from 'lucide-react';
-import {Button} from "@/components/ui/button";
-import {FileUpload} from "@/components/ui/file-upload";
-import {useSignDocumentMutation} from "@/pages/applicant/application/api";
+import React, { useState, useRef, useEffect } from 'react';
+import { X } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { FileUpload } from "@/components/ui/file-upload";
+import { useSignDocumentMutation } from "@/pages/applicant/application/api";
 
 type SignaturePayload = {
   signatureType: string;
@@ -16,6 +16,8 @@ interface DigitalSignatureModalProps {
   useCase?: string;
   onSave?: (signatureData: SignaturePayload) => void;
   skipBackend?: boolean;
+  mode?: 'create' | 'view';
+  existingSignature?: SignaturePayload | null;
 }
 
 const DigitalSignatureModal = ({
@@ -25,6 +27,8 @@ const DigitalSignatureModal = ({
   useCase = "general",
   onSave,
   skipBackend = false,
+  mode = 'create',
+  existingSignature,
 }: DigitalSignatureModalProps) => {
   const [activeTab, setActiveTab] = useState('type');
   const [typedSignature, setTypedSignature] = useState('');
@@ -56,9 +60,9 @@ const DigitalSignatureModal = ({
   }, [activeTab]);
 
   const startDrawing = (
-    {nativeEvent}: { nativeEvent: MouseEvent }
+    { nativeEvent }: { nativeEvent: MouseEvent }
   ) => {
-    const {offsetX, offsetY} = nativeEvent
+    const { offsetX, offsetY } = nativeEvent
     if (contextRef.current) {
       contextRef.current.beginPath();
       contextRef.current.moveTo(offsetX, offsetY);
@@ -67,10 +71,10 @@ const DigitalSignatureModal = ({
   };
 
   const draw = (
-    {nativeEvent}: { nativeEvent: MouseEvent }
+    { nativeEvent }: { nativeEvent: MouseEvent }
   ) => {
     if (!isDrawing) return;
-    const {offsetX, offsetY} = nativeEvent;
+    const { offsetX, offsetY } = nativeEvent;
     if (!contextRef.current) return;
     contextRef.current.lineTo(offsetX, offsetY);
     contextRef.current.stroke();
@@ -108,11 +112,11 @@ const DigitalSignatureModal = ({
     let signatureData: SignaturePayload | null = null;
 
     if (activeTab === 'type' && typedSignature) {
-      signatureData = {signatureType: 'type', signatureData: typedSignature};
+      signatureData = { signatureType: 'type', signatureData: typedSignature };
     } else if (activeTab === 'draw' && canvasRef.current) {
-      signatureData = {signatureType: 'draw', signatureData: canvasRef.current.toDataURL()};
+      signatureData = { signatureType: 'draw', signatureData: canvasRef.current.toDataURL() };
     } else if (activeTab === 'upload' && uploadedImage) {
-      signatureData = {signatureType: 'upload', signatureData: uploadedImage};
+      signatureData = { signatureType: 'upload', signatureData: uploadedImage };
     }
 
     if (signatureData) {
@@ -159,159 +163,200 @@ const DigitalSignatureModal = ({
               className="cursor-pointer text-gray-400 hover:text-gray-600 transition-colors"
               aria-label="Close modal"
             >
-              <X className="w-5 h-5"/>
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Tabs */}
-          <div className="flex border-b border-b-[#B2B2B3]">
-            <button
-              onClick={() => setActiveTab('type')}
-              className={`cursor-pointer px-6 py-3 font-medium transition-colors relative ${
-                activeTab === 'type'
-                  ? 'text-teal-600 border-b-8 border-teal-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Type
-            </button>
-            <button
-              onClick={() => setActiveTab('draw')}
-              className={`cursor-pointer px-6 py-3 font-medium transition-colors relative ${
-                activeTab === 'draw'
-                  ? 'text-teal-600 border-b-2 border-teal-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Draw
-            </button>
-            <button
-              onClick={() => setActiveTab('upload')}
-              className={`cursor-pointer px-6 py-3 font-medium transition-colors relative ${
-                activeTab === 'upload'
-                  ? 'text-teal-600 border-b-2 border-teal-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Upload
-            </button>
-          </div>
-
-          {/* Content Area */}
-          <div className="p-6">
-            <div className="bg-[#EFEFEF] rounded-lg p-6 min-h-[240px] flex items-center justify-center">
-              {/* Type Tab */}
-              {activeTab === 'type' && (
-                <div className="w-full">
-                  <input
-                    type="text"
-                    value={typedSignature}
-                    onChange={(e) => setTypedSignature(e.target.value)}
-                    placeholder="Type your signature here"
-                    className="w-full text-center text-3xl font-signature border-b-2 border-gray-300 bg-transparent focus:border-teal-600 outline-none py-4"
-                    style={{fontFamily: 'Brush Script MT, cursive'}}
-                  />
-                </div>
-              )}
-
-              {/* Draw Tab */}
-              {activeTab === 'draw' && (
-                <div className="w-full relative">
-                  <canvas
-                    ref={canvasRef}
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    onTouchStart={(e) => {
-                      const touch = e.touches[0];
-                      const mouseEvent = new MouseEvent('mousedown', {
-                        clientX: touch.clientX,
-                        clientY: touch.clientY
-                      });
-                      if (!canvasRef.current) return;
-                      canvasRef.current.dispatchEvent(mouseEvent);
-                    }}
-                    onTouchMove={(e) => {
-                      const touch = e.touches[0];
-                      const mouseEvent = new MouseEvent('mousemove', {
-                        clientX: touch.clientX,
-                        clientY: touch.clientY
-                      });
-                      if (!canvasRef.current) return;
-                      canvasRef.current.dispatchEvent(mouseEvent);
-                    }}
-                    onTouchEnd={() => {
-                      const mouseEvent = new MouseEvent('mouseup', {});
-                      if (!canvasRef.current) return;
-                      canvasRef.current.dispatchEvent(mouseEvent);
-                    }}
-                    className="w-full h-48 bg-white border-2 border-dashed border-gray-300 rounded cursor-crosshair"
-                  />
-                  <button
-                    onClick={clearCanvas}
-                    className="absolute top-2 right-2 text-xs text-gray-600 hover:text-gray-900 bg-white px-3 py-1 rounded border border-gray-300"
-                  >
-                    Clear
-                  </button>
-                  <p className="text-center text-sm text-gray-500 mt-3">
-                    Draw your signature above
-                  </p>
-                </div>
-              )}
-
-              {/* Upload Tab */}
-              {activeTab === 'upload' && (
-                <div className="w-full">
-                  {!uploadedImage ? (
-                    <FileUpload
-                      name={"signature"}
-                      className="h-[90px] w-full max-w-[100vw]"
-                      label={"Upload your signature"}
-                      accept=".jpeg, .png, .jpg"
-                      onChange={handleFileUpload}
-                    />
-                  ) : (
-                    <div className="relative">
-                      <img
-                        src={uploadedImage}
-                        alt="Uploaded signature"
-                        className="max-h-48 mx-auto"
-                      />
-                      <button
-                        onClick={() => setUploadedImage(null)}
-                        className="absolute top-2 right-2 text-xs text-gray-600 hover:text-gray-900 bg-white px-3 py-1 rounded border border-gray-300"
+          {/* View Mode */}
+          {mode === 'view' && existingSignature && (
+            <>
+              <div className="p-6">
+                <div className="bg-[#EFEFEF] rounded-lg p-6 min-h-[240px] flex items-center justify-center">
+                  {existingSignature.signatureType === 'type' ? (
+                    <div className="w-full text-center">
+                      <p
+                        className="text-4xl py-4"
+                        style={{ fontFamily: 'Brush Script MT, cursive' }}
                       >
-                        Remove
-                      </button>
+                        {existingSignature.signatureData}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="w-full flex justify-center">
+                      <img
+                        src={existingSignature.signatureData}
+                        alt="Signature"
+                        className="max-h-48 object-contain"
+                      />
                     </div>
                   )}
                 </div>
-              )}
-            </div>
+                <p className="text-xs text-gray-500 mt-4 text-center">
+                  Signature type: {existingSignature.signatureType === 'type' ? 'Typed' : existingSignature.signatureType === 'draw' ? 'Drawn' : 'Uploaded'}
+                </p>
+              </div>
+              <div className="flex items-center justify-center p-3">
+                <Button
+                  onClick={handleCancel}
+                  className="px-8 text-white font-medium bg-teal-500 hover:bg-teal-600 rounded-full transition-colors"
+                >
+                  Close
+                </Button>
+              </div>
+            </>
+          )}
 
-            {/* Disclaimer */}
-            <p className="text-xs text-gray-600 mt-4 leading-relaxed">
-              By signing this document with an electronic signature, I agree that such signature will be as valid as
-              handwritten signatures to the extent allowed by local law.
-            </p>
-          </div>
+          {/* Create Mode */}
+          {mode === 'create' && (
+            <>
+              {/* Tabs */}
+              <div className="flex border-b border-b-[#B2B2B3]">
+                <button
+                  onClick={() => setActiveTab('type')}
+                  className={`cursor-pointer px-6 py-3 font-medium transition-colors relative ${activeTab === 'type'
+                    ? 'text-teal-600 border-b-8 border-teal-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                >
+                  Type
+                </button>
+                <button
+                  onClick={() => setActiveTab('draw')}
+                  className={`cursor-pointer px-6 py-3 font-medium transition-colors relative ${activeTab === 'draw'
+                    ? 'text-teal-600 border-b-2 border-teal-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                >
+                  Draw
+                </button>
+                <button
+                  onClick={() => setActiveTab('upload')}
+                  className={`cursor-pointer px-6 py-3 font-medium transition-colors relative ${activeTab === 'upload'
+                    ? 'text-teal-600 border-b-2 border-teal-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                >
+                  Upload
+                </button>
+              </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between space-x-3 p-3">
-            <Button
-              onClick={handleCancel}
-              className="px-6 text-white font-medium bg-[#B2B2B3] hover:bg-gray-300 rounded-full transition-colors"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleNext}
-              className="px-6 text-white font-medium bg-teal-500 hover:bg-teal-600 rounded-full transition-colors"
-            >
-              Next
-            </Button>
-          </div>
+              {/* Content Area */}
+              <div className="p-6">
+                <div className="bg-[#EFEFEF] rounded-lg p-6 min-h-[240px] flex items-center justify-center">
+                  {/* Type Tab */}
+                  {activeTab === 'type' && (
+                    <div className="w-full">
+                      <input
+                        type="text"
+                        value={typedSignature}
+                        onChange={(e) => setTypedSignature(e.target.value)}
+                        placeholder="Type your signature here"
+                        className="w-full text-center text-3xl font-signature border-b-2 border-gray-300 bg-transparent focus:border-teal-600 outline-none py-4"
+                        style={{ fontFamily: 'Brush Script MT, cursive' }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Draw Tab */}
+                  {activeTab === 'draw' && (
+                    <div className="w-full relative">
+                      <canvas
+                        ref={canvasRef}
+                        onMouseDown={startDrawing}
+                        onMouseMove={draw}
+                        onMouseUp={stopDrawing}
+                        onMouseLeave={stopDrawing}
+                        onTouchStart={(e) => {
+                          const touch = e.touches[0];
+                          const mouseEvent = new MouseEvent('mousedown', {
+                            clientX: touch.clientX,
+                            clientY: touch.clientY
+                          });
+                          if (!canvasRef.current) return;
+                          canvasRef.current.dispatchEvent(mouseEvent);
+                        }}
+                        onTouchMove={(e) => {
+                          const touch = e.touches[0];
+                          const mouseEvent = new MouseEvent('mousemove', {
+                            clientX: touch.clientX,
+                            clientY: touch.clientY
+                          });
+                          if (!canvasRef.current) return;
+                          canvasRef.current.dispatchEvent(mouseEvent);
+                        }}
+                        onTouchEnd={() => {
+                          const mouseEvent = new MouseEvent('mouseup', {});
+                          if (!canvasRef.current) return;
+                          canvasRef.current.dispatchEvent(mouseEvent);
+                        }}
+                        className="w-full h-48 bg-white border-2 border-dashed border-gray-300 rounded cursor-crosshair"
+                      />
+                      <button
+                        onClick={clearCanvas}
+                        className="absolute top-2 right-2 text-xs text-gray-600 hover:text-gray-900 bg-white px-3 py-1 rounded border border-gray-300"
+                      >
+                        Clear
+                      </button>
+                      <p className="text-center text-sm text-gray-500 mt-3">
+                        Draw your signature above
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Upload Tab */}
+                  {activeTab === 'upload' && (
+                    <div className="w-full">
+                      {!uploadedImage ? (
+                        <FileUpload
+                          name={"signature"}
+                          className="h-[90px] w-full max-w-[100vw]"
+                          label={"Upload your signature"}
+                          accept=".jpeg, .png, .jpg"
+                          onChange={handleFileUpload}
+                        />
+                      ) : (
+                        <div className="relative">
+                          <img
+                            src={uploadedImage}
+                            alt="Uploaded signature"
+                            className="max-h-48 mx-auto"
+                          />
+                          <button
+                            onClick={() => setUploadedImage(null)}
+                            className="absolute top-2 right-2 text-xs text-gray-600 hover:text-gray-900 bg-white px-3 py-1 rounded border border-gray-300"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Disclaimer */}
+                <p className="text-xs text-gray-600 mt-4 leading-relaxed">
+                  By signing this document with an electronic signature, I agree that such signature will be as valid as
+                  handwritten signatures to the extent allowed by local law.
+                </p>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between space-x-3 p-3">
+                <Button
+                  onClick={handleCancel}
+                  className="px-6 text-white font-medium bg-[#B2B2B3] hover:bg-gray-300 rounded-full transition-colors"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleNext}
+                  className="px-6 text-white font-medium bg-teal-500 hover:bg-teal-600 rounded-full transition-colors"
+                >
+                  Next
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </>
