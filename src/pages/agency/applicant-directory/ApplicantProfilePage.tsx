@@ -25,6 +25,7 @@ import { authorizationsApi } from "@/lib/api/authorizations";
 import { ProfileTab } from "./components/ProfileTab";
 import { DocumentsTab } from "./components/DocumentsTab";
 import { ConditionalHireTab } from "./components/ConditionalHireTab";
+import { OfficialHireTab } from "./components/OfficialHireTab";
 import { FinalReviewTab, type ReviewStepsState } from "./components/FinalReviewTab";
 
 // Type alias for document file from eligibility data
@@ -34,7 +35,7 @@ export default function ApplicantProfilePage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { toast } = useToast();
-  const [activeSection, setActiveSection] = useState<"profile" | "documents" | "conditional" | "final">("profile");
+  const [activeSection, setActiveSection] = useState<"profile" | "documents" | "conditional" | "official" | "final">("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [documentsData, setDocumentsData] = useState<ApplicantDocumentItem[]>([]);
@@ -43,8 +44,8 @@ export default function ApplicantProfilePage() {
   const [authApprovals, setAuthApprovals] = useState<Record<number, boolean>>({});
   const [complianceData, setComplianceData] = useState<ComplianceData | undefined>(undefined);
   const [signatures, setSignatures] = useState<{
-    conditionalHire?: { signatureType: string; signatureData: string } | null;
-    officialHire?: { signatureType: string; signatureData: string } | null;
+    conditionalHire?: { signatureType: string; signatureData: string; createdAt?: { _seconds: number; _nanoseconds: number } } | null;
+    officialHire?: { signatureType: string; signatureData: string; createdAt?: { _seconds: number; _nanoseconds: number } } | null;
   } | null>(null);
   const [toggledAuthorizations, setToggledAuthorizations] = useState<Set<string>>(new Set());
   const [reviewSteps, setReviewSteps] = useState<ReviewStepsState>({
@@ -120,7 +121,7 @@ export default function ApplicantProfilePage() {
     {} as Record<string, string>
   );
 
-  const handleNavigateToSection = (section: "profile" | "documents" | "conditional" | "final") => {
+  const handleNavigateToSection = (section: "profile" | "documents" | "conditional" | "official" | "final") => {
     setActiveSection(section);
     // No navigation, just switch tab
   };
@@ -529,7 +530,6 @@ export default function ApplicantProfilePage() {
                 Document Upload &amp; Eligibility Verification
               </button>
 
-              {/* Conditional Hire */}
               <button
                 type="button"
                 onClick={() => handleNavigateToSection("conditional")}
@@ -553,6 +553,19 @@ export default function ApplicantProfilePage() {
               >
                 <CircleAlert className="h-4 w-4" />
                 Final Agency Review
+              </button>
+
+              {/* Official Hire */}
+              <button
+                type="button"
+                onClick={() => handleNavigateToSection("official")}
+                className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
+                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                  : "bg-[rgba(178,178,179,0.05)] text-[#525253] border-[#525253]"
+                  }`}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Official Hire
               </button>
             </div>
           </div>
@@ -586,6 +599,19 @@ export default function ApplicantProfilePage() {
               reviewSteps={reviewSteps}
               onConfirm={handleConfirmReviewStep}
               actionLoading={actionLoading}
+            />
+          )}
+
+          {activeSection === "official" && (
+            <OfficialHireTab
+              isLoading={isLoading}
+              hasSigned={Boolean(signatures?.officialHire)}
+              signedAt={signatures?.officialHire?.createdAt?._seconds
+                ? new Date(signatures.officialHire.createdAt._seconds * 1000).toISOString()
+                : undefined}
+              actionLoading={actionLoading}
+              onRequestSignature={handleSendOfferLetter}
+              signatureData={signatures?.officialHire}
             />
           )}
         </div>
