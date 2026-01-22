@@ -202,6 +202,8 @@ export interface ApplicantDetailResponse {
   applicationLastUpdatedAt?: FirebaseTimestamp;
   applicationStatus?: string;
   currentApplicationStep?: string;
+  officialHireStatus?: string;
+  officialHireSignedAt?: FirebaseTimestamp;
   updatedAt?: FirebaseTimestamp;
   profilePictureUrl?: string;
   preScreening?: PreScreeningData;

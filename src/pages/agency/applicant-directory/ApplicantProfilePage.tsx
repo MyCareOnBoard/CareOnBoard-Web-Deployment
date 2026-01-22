@@ -58,6 +58,29 @@ export default function ApplicantProfilePage() {
     orientation: { confirmed: false },
   });
 
+  // Track status of each application step for tab styling
+  const [stepStatuses, setStepStatuses] = useState<{
+    profile: string | null;
+    documents: string | null;
+    conditional: string | null;
+    final: boolean;
+    official: string | null;
+  }>({
+    profile: null,
+    documents: null,
+    conditional: null,
+    final: false,
+    official: null,
+  });
+
+  // Helper to check if a step is complete (submitted or completed)
+  const isStepComplete = (status: string | null | boolean): boolean => {
+    if (typeof status === 'boolean') return status;
+    if (!status) return false;
+    return ['submitted', 'completed', 'letter_signed'].includes(status.toLowerCase());
+  };
+
+
   type ReferenceItem = {
     name: string;
     relation: string;
@@ -330,6 +353,20 @@ export default function ApplicantProfilePage() {
         setReviewSteps(mappedReviews);
       }
 
+      // Extract step statuses for tab styling
+      // Check if all review steps are confirmed for final review status
+      const allReviewsConfirmed = data.reviews
+        ? Object.values(data.reviews).every((review: any) => review?.confirmed === true)
+        : false;
+
+      setStepStatuses({
+        profile: data.preScreening?.status || null,
+        documents: data.eligibility?.status || null,
+        conditional: data.conditionalHire?.status || null,
+        final: allReviewsConfirmed,
+        official: data.officialHireStatus || null,
+      });
+
     } catch (error) {
       console.error('Error fetching applicant data:', error);
     } finally {
@@ -509,11 +546,17 @@ export default function ApplicantProfilePage() {
                 type="button"
                 onClick={() => handleNavigateToSection("profile")}
                 className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "profile"
-                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : "bg-[rgba(178,178,179,0.05)] text-[#525253] border-[#b2b2b3]"
+                    ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                    : isStepComplete(stepStatuses.profile)
+                      ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                      : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                   }`}
               >
-                <CheckCircle2 className="h-4 w-4" />
+                {isStepComplete(stepStatuses.profile) ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
                 Profile &amp; Pre-Screening
               </button>
 
@@ -522,23 +565,36 @@ export default function ApplicantProfilePage() {
                 type="button"
                 onClick={() => handleNavigateToSection("documents")}
                 className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "documents"
-                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : "bg-[rgba(178,178,179,0.05)] text-[#525253] border-[#525253]"
+                    ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                    : isStepComplete(stepStatuses.documents)
+                      ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                      : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                   }`}
               >
-                <CheckCircle2 className="h-4 w-4" />
+                {isStepComplete(stepStatuses.documents) ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
                 Document Upload &amp; Eligibility Verification
               </button>
 
+              {/* Conditional Hire */}
               <button
                 type="button"
                 onClick={() => handleNavigateToSection("conditional")}
                 className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "conditional"
-                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : "bg-[rgba(178,178,179,0.05)] text-[#525253] border-[#525253]"
+                    ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                    : isStepComplete(stepStatuses.conditional)
+                      ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                      : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                   }`}
               >
-                <CheckCircle2 className="h-4 w-4" />
+                {isStepComplete(stepStatuses.conditional) ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
                 Conditional Hire &amp; Compliance
               </button>
 
@@ -547,11 +603,17 @@ export default function ApplicantProfilePage() {
                 type="button"
                 onClick={() => handleNavigateToSection("final")}
                 className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "final"
-                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                    ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                    : isStepComplete(stepStatuses.final)
+                      ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                      : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                   }`}
               >
-                <CircleAlert className="h-4 w-4" />
+                {isStepComplete(stepStatuses.final) ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
                 Final Agency Review
               </button>
 
@@ -560,11 +622,17 @@ export default function ApplicantProfilePage() {
                 type="button"
                 onClick={() => handleNavigateToSection("official")}
                 className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
-                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : "bg-[rgba(178,178,179,0.05)] text-[#525253] border-[#525253]"
+                    ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                    : isStepComplete(stepStatuses.official)
+                      ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                      : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                   }`}
               >
-                <CheckCircle2 className="h-4 w-4" />
+                {isStepComplete(stepStatuses.official) ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
                 Official Hire
               </button>
             </div>
