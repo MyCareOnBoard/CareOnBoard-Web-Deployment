@@ -48,12 +48,7 @@ function ApplicantRow({ applicant, onClick }: ApplicantRowProps) {
             />
           )}
           <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-            {applicant.name
-              .split(" ")
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((w) => w[0]?.toUpperCase())
-              .join("")}
+            {getInitials(applicant.name)}
           </AvatarFallback>
         </Avatar>
 
@@ -137,6 +132,7 @@ export function ApplicantsList({
   isLoading,
   onViewFullList,
 }: ApplicantsListProps) {
+  console.log(applicants)
   return (
     <div className="bg-white rounded-[30px] border border-[#e5e5e6] p-4 md:p-6 w-full">
       {/* Filters Section */}

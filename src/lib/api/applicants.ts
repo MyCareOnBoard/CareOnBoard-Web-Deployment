@@ -28,6 +28,12 @@ export interface ApplicantActionResponse {
   message?: string;
 }
 
+
+interface Stage {
+  completed?: boolean;
+  completedAt?: FirebaseTimestamp;
+}
+
 interface BackendApplicant {
   uid?: string;
   id?: string;
@@ -37,10 +43,11 @@ interface BackendApplicant {
   userType?: string;
   role?: string;
   stages?: {
-    preScreening?: boolean;
-    documents?: boolean;
-    conditionalHire?: boolean;
-    officialHire?: boolean;
+    preScreening?: Stage;
+    documents?: Stage;
+    conditionalHire?: Stage;
+    officialHire?: Stage;
+    finalAgencyReview?: Stage;
   };
   profilePictureUrl?: string;
 }
@@ -290,10 +297,10 @@ const mapBackendToApplicant = (item: BackendApplicant): Applicant => {
     id,
     name: fullName,
     role,
-    profileScreening: Boolean(stages.preScreening),
-    documents: Boolean(stages.documents),
-    conditionalHire: Boolean(stages.conditionalHire),
-    finalAgencyReview: Boolean(stages.officialHire),
+    profileScreening: Boolean(stages.preScreening?.completed),
+    documents: Boolean(stages.documents?.completed),
+    conditionalHire: Boolean(stages.conditionalHire?.completed),
+    finalAgencyReview: Boolean(stages.finalAgencyReview?.completed),
     profilePictureUrl: item?.profilePictureUrl || '',
   };
 };
