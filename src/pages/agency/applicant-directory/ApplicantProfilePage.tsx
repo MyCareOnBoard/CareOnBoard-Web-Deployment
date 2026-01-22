@@ -25,6 +25,7 @@ import { authorizationsApi } from "@/lib/api/authorizations";
 import { ProfileTab } from "./components/ProfileTab";
 import { DocumentsTab } from "./components/DocumentsTab";
 import { ConditionalHireTab } from "./components/ConditionalHireTab";
+import { OfficialHireTab } from "./components/OfficialHireTab";
 import { FinalReviewTab, type ReviewStepsState } from "./components/FinalReviewTab";
 
 // Type alias for document file from eligibility data
@@ -34,7 +35,7 @@ export default function ApplicantProfilePage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { toast } = useToast();
-  const [activeSection, setActiveSection] = useState<"profile" | "documents" | "conditional" | "final">("profile");
+  const [activeSection, setActiveSection] = useState<"profile" | "documents" | "conditional" | "official" | "final">("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [documentsData, setDocumentsData] = useState<ApplicantDocumentItem[]>([]);
@@ -42,6 +43,10 @@ export default function ApplicantProfilePage() {
   const [progressPercent, setProgressPercent] = useState(0);
   const [authApprovals, setAuthApprovals] = useState<Record<number, boolean>>({});
   const [complianceData, setComplianceData] = useState<ComplianceData | undefined>(undefined);
+  const [signatures, setSignatures] = useState<{
+    conditionalHire?: { signatureType: string; signatureData: string; createdAt?: { _seconds: number; _nanoseconds: number } } | null;
+    officialHire?: { signatureType: string; signatureData: string; createdAt?: { _seconds: number; _nanoseconds: number } } | null;
+  } | null>(null);
   const [toggledAuthorizations, setToggledAuthorizations] = useState<Set<string>>(new Set());
   const [reviewSteps, setReviewSteps] = useState<ReviewStepsState>({
     documentsValid: { confirmed: false },
@@ -52,6 +57,29 @@ export default function ApplicantProfilePage() {
     systemProfile: { confirmed: false },
     orientation: { confirmed: false },
   });
+
+  // Track status of each application step for tab styling
+  const [stepStatuses, setStepStatuses] = useState<{
+    profile: string | null;
+    documents: string | null;
+    conditional: string | null;
+    final: boolean;
+    official: string | null;
+  }>({
+    profile: null,
+    documents: null,
+    conditional: null,
+    final: false,
+    official: null,
+  });
+
+  // Helper to check if a step is complete (submitted or completed)
+  const isStepComplete = (status: string | null | boolean): boolean => {
+    if (typeof status === 'boolean') return status;
+    if (!status) return false;
+    return ['submitted', 'completed', 'letter_signed', 'pre-screening_complete'].includes(status.toLowerCase());
+  };
+
 
   type ReferenceItem = {
     name: string;
@@ -116,7 +144,7 @@ export default function ApplicantProfilePage() {
     {} as Record<string, string>
   );
 
-  const handleNavigateToSection = (section: "profile" | "documents" | "conditional" | "final") => {
+  const handleNavigateToSection = (section: "profile" | "documents" | "conditional" | "official" | "final") => {
     setActiveSection(section);
     // No navigation, just switch tab
   };
@@ -289,6 +317,11 @@ export default function ApplicantProfilePage() {
         setComplianceData(data.compliance);
       }
 
+      // Extract signatures data
+      if (data.signatures) {
+        setSignatures(data.signatures);
+      }
+
       // Map reviews data to reviewSteps state
       if (data.reviews && typeof data.reviews === 'object') {
         const mappedReviews: ReviewStepsState = {
@@ -319,6 +352,20 @@ export default function ApplicantProfilePage() {
 
         setReviewSteps(mappedReviews);
       }
+
+      // Extract step statuses for tab styling
+      // Check if all review steps are confirmed for final review status
+      const allReviewsConfirmed = data.reviews
+        ? Object.values(data.reviews).every((review: any) => review?.confirmed === true)
+        : false;
+
+      setStepStatuses({
+        profile: data.preScreening?.status || null,
+        documents: data.eligibility?.status || null,
+        conditional: data.conditionalHire?.status || null,
+        final: allReviewsConfirmed,
+        official: data.officialHireStatus || null,
+      });
 
     } catch (error) {
       console.error('Error fetching applicant data:', error);
@@ -500,10 +547,16 @@ export default function ApplicantProfilePage() {
                 onClick={() => handleNavigateToSection("profile")}
                 className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "profile"
                   ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : "bg-[rgba(178,178,179,0.05)] text-[#525253] border-[#b2b2b3]"
+                  : isStepComplete(stepStatuses.profile)
+                    ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                    : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                   }`}
               >
-                <CheckCircle2 className="h-4 w-4" />
+                {isStepComplete(stepStatuses.profile) ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
                 Profile &amp; Pre-Screening
               </button>
 
@@ -513,10 +566,16 @@ export default function ApplicantProfilePage() {
                 onClick={() => handleNavigateToSection("documents")}
                 className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "documents"
                   ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : "bg-[rgba(178,178,179,0.05)] text-[#525253] border-[#525253]"
+                  : isStepComplete(stepStatuses.documents)
+                    ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                    : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                   }`}
               >
-                <CheckCircle2 className="h-4 w-4" />
+                {isStepComplete(stepStatuses.documents) ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
                 Document Upload &amp; Eligibility Verification
               </button>
 
@@ -526,10 +585,16 @@ export default function ApplicantProfilePage() {
                 onClick={() => handleNavigateToSection("conditional")}
                 className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "conditional"
                   ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : "bg-[rgba(178,178,179,0.05)] text-[#525253] border-[#525253]"
+                  : isStepComplete(stepStatuses.conditional)
+                    ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                    : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                   }`}
               >
-                <CheckCircle2 className="h-4 w-4" />
+                {isStepComplete(stepStatuses.conditional) ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
                 Conditional Hire &amp; Compliance
               </button>
 
@@ -539,11 +604,36 @@ export default function ApplicantProfilePage() {
                 onClick={() => handleNavigateToSection("final")}
                 className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "final"
                   ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                  : isStepComplete(stepStatuses.final)
+                    ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                    : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                   }`}
               >
-                <CircleAlert className="h-4 w-4" />
+                {isStepComplete(stepStatuses.final) ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
                 Final Agency Review
+              </button>
+
+              {/* Official Hire */}
+              <button
+                type="button"
+                onClick={() => handleNavigateToSection("official")}
+                className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
+                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                  : isStepComplete(stepStatuses.official)
+                    ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                    : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                  }`}
+              >
+                {isStepComplete(stepStatuses.official) ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
+                Official Hire
               </button>
             </div>
           </div>
@@ -568,6 +658,7 @@ export default function ApplicantProfilePage() {
               complianceData={complianceData}
               toggledAuthorizations={toggledAuthorizations}
               onToggleAuthorization={handleToggleCompliance}
+              signatureData={signatures?.conditionalHire}
             />
           )}
 
@@ -576,6 +667,19 @@ export default function ApplicantProfilePage() {
               reviewSteps={reviewSteps}
               onConfirm={handleConfirmReviewStep}
               actionLoading={actionLoading}
+            />
+          )}
+
+          {activeSection === "official" && (
+            <OfficialHireTab
+              isLoading={isLoading}
+              hasSigned={Boolean(signatures?.officialHire)}
+              signedAt={signatures?.officialHire?.createdAt?._seconds
+                ? new Date(signatures.officialHire.createdAt._seconds * 1000).toISOString()
+                : undefined}
+              actionLoading={actionLoading}
+              onRequestSignature={handleSendOfferLetter}
+              signatureData={signatures?.officialHire}
             />
           )}
         </div>

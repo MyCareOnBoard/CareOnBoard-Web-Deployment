@@ -28,6 +28,12 @@ export interface ApplicantActionResponse {
   message?: string;
 }
 
+
+interface Stage {
+  completed?: boolean;
+  completedAt?: FirebaseTimestamp;
+}
+
 interface BackendApplicant {
   uid?: string;
   id?: string;
@@ -37,10 +43,11 @@ interface BackendApplicant {
   userType?: string;
   role?: string;
   stages?: {
-    preScreening?: boolean;
-    documents?: boolean;
-    conditionalHire?: boolean;
-    officialHire?: boolean;
+    preScreening?: Stage;
+    documents?: Stage;
+    conditionalHire?: Stage;
+    officialHire?: Stage;
+    finalAgencyReview?: Stage;
   };
   profilePictureUrl?: string;
 }
@@ -202,6 +209,8 @@ export interface ApplicantDetailResponse {
   applicationLastUpdatedAt?: FirebaseTimestamp;
   applicationStatus?: string;
   currentApplicationStep?: string;
+  officialHireStatus?: string;
+  officialHireSignedAt?: FirebaseTimestamp;
   updatedAt?: FirebaseTimestamp;
   profilePictureUrl?: string;
   preScreening?: PreScreeningData;
@@ -209,6 +218,26 @@ export interface ApplicantDetailResponse {
   compliance?: ComplianceData;
   conditionalHire?: ConditionalHireData;
   reviews?: Record<string, ReviewStepData>;
+  signatures?: {
+    conditionalHire?: {
+      signatureType: string;
+      signatureData: string;
+      context?: string;
+      userId?: string;
+      status?: string;
+      createdAt?: FirebaseTimestamp;
+      updatedAt?: FirebaseTimestamp;
+    } | null;
+    officialHire?: {
+      signatureType: string;
+      signatureData: string;
+      context?: string;
+      userId?: string;
+      status?: string;
+      createdAt?: FirebaseTimestamp;
+      updatedAt?: FirebaseTimestamp;
+    } | null;
+  };
 }
 
 // ===== Helper Functions =====
@@ -268,10 +297,10 @@ const mapBackendToApplicant = (item: BackendApplicant): Applicant => {
     id,
     name: fullName,
     role,
-    profileScreening: Boolean(stages.preScreening),
-    documents: Boolean(stages.documents),
-    conditionalHire: Boolean(stages.conditionalHire),
-    finalAgencyReview: Boolean(stages.officialHire),
+    profileScreening: Boolean(stages.preScreening?.completed),
+    documents: Boolean(stages.documents?.completed),
+    conditionalHire: Boolean(stages.conditionalHire?.completed),
+    finalAgencyReview: Boolean(stages.finalAgencyReview?.completed),
     profilePictureUrl: item?.profilePictureUrl || '',
   };
 };
@@ -415,7 +444,7 @@ export const applicantsApi = {
       const response = await axiosClient.get<ApiResponse<ApplicantDetailResponse>>(
         `/agencyApplicants/${encodedId}`
       );
-      
+
       const body = response.data;
       const raw = body?.data || body?.applicant || (body as ApplicantDetailResponse);
 

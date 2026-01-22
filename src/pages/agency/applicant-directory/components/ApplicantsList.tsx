@@ -48,12 +48,7 @@ function ApplicantRow({ applicant, onClick }: ApplicantRowProps) {
             />
           )}
           <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-            {applicant.name
-              .split(" ")
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((w) => w[0]?.toUpperCase())
-              .join("")}
+            {getInitials(applicant.name)}
           </AvatarFallback>
         </Avatar>
 
@@ -102,7 +97,7 @@ function ApplicantRow({ applicant, onClick }: ApplicantRowProps) {
           <div
             className={`flex items-center gap-[4px] px-[10px] py-2 rounded-[60px] text-[14px] font-semibold whitespace-nowrap border-[0.5px] ${applicant.finalAgencyReview
               ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-              : "bg-[rgba(128,128,129,0.05)] text-[#808081] border-[#808081]"
+              : "bg-[rgba(128,128,129,0.05)] text-[#525253] border-[#525253]"
               }`}
           >
             <CheckCircle2 className="w-5 h-5" strokeWidth={2.2} />
@@ -137,6 +132,7 @@ export function ApplicantsList({
   isLoading,
   onViewFullList,
 }: ApplicantsListProps) {
+  console.log(applicants)
   return (
     <div className="bg-white rounded-[30px] border border-[#e5e5e6] p-4 md:p-6 w-full">
       {/* Filters Section */}

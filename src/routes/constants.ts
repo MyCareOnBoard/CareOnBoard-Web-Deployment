@@ -44,7 +44,10 @@ export const Routes = {
         mileage: "/agency/mileage",
         incident: "/agency/incident",
         helpCenter: "/agency/help-center",
-        settings: "/agency/settings",
+        agencySettings: "/agency/agency-settings",
+        agencySettingsInternalUsers: "/agency/agency-settings/user-levels/internal-users",
+        agencySettingsDSP: "/agency/agency-settings/user-levels/dsp",
+        agencySettingsClients: "/agency/agency-settings/user-levels/clients",
         profile: "/agency/profile",
         reports: {
             index: "/agency/reports",

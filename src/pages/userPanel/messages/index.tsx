@@ -65,15 +65,18 @@ export default function MessagesPage() {
     try {
       setLoading(true);
       const response = await getUserConversations();
-      if (response.success) {
+      if (response.success && response.data) {
         setConversations(response.data);
         // Select first conversation by default
         if (response.data.length > 0 && !selectedConversation) {
           setSelectedConversation(response.data[0]);
         }
+      } else {
+        setConversations([]);
       }
     } catch (error: any) {
       console.error("Error fetching conversations:", error);
+      setConversations([]);
       toast({
         title: "Error",
         description: "Failed to load conversations",
@@ -102,6 +105,8 @@ export default function MessagesPage() {
 
   const markConversationAsRead = async (conversationId: string) => {
     try {
+      if (!messages || messages.length === 0) return;
+      
       const unreadMessageIds = messages
         .filter((msg) => !msg.isRead && msg.senderId !== user?.id)
         .map((msg) => msg.id);
@@ -224,14 +229,18 @@ export default function MessagesPage() {
 
   const getParticipantInfo = (conversation: UserConversation) => {
     // Find the other participant (not the current user)
+    if (!conversation.participants || conversation.participants.length === 0) {
+      return null;
+    }
     const otherParticipant = conversation.participants.find(
       (p) => p.uid !== user?.uid
     );
-    return otherParticipant || conversation.participants[0];
+    return otherParticipant || conversation.participants[0] || null;
   };
 
-  const filteredConversations = conversations.filter((conv) => {
+  const filteredConversations = (conversations || []).filter((conv) => {
     const participant = getParticipantInfo(conv);
+    if (!participant || !participant.name) return false;
     return participant.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
@@ -302,6 +311,7 @@ export default function MessagesPage() {
           ) : (
             filteredConversations.map((conversation) => {
               const participant = getParticipantInfo(conversation);
+              if (!participant) return null;
               return (
                 <div
                   key={conversation.id}
@@ -367,6 +377,7 @@ export default function MessagesPage() {
               <div className="flex items-center gap-3">
                 {(() => {
                   const participant = getParticipantInfo(selectedConversation);
+                  if (!participant) return null;
                   return (
                     <>
                       <div className="w-12 h-12 rounded-full bg-[#00b8d4] text-white flex items-center justify-center text-[16px] font-semibold flex-shrink-0">
