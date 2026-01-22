@@ -97,7 +97,7 @@ function ApplicantRow({ applicant, onClick }: ApplicantRowProps) {
           <div
             className={`flex items-center gap-[4px] px-[10px] py-2 rounded-[60px] text-[14px] font-semibold whitespace-nowrap border-[0.5px] ${applicant.finalAgencyReview
               ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-              : "bg-[rgba(128,128,129,0.05)] text-[#808081] border-[#808081]"
+              : "bg-[rgba(128,128,129,0.05)] text-[#525253] border-[#525253]"
               }`}
           >
             <CheckCircle2 className="w-5 h-5" strokeWidth={2.2} />
