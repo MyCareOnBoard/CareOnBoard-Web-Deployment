@@ -12,6 +12,7 @@ import SupportIcon from "@/assets/icons/support.svg?react";
 import AnalyticsIcon from "@/assets/icons/analytics.svg?react";
 import ApplicantDirectoryIcon from "@/assets/icons/search-list.svg?react";
 import ReportIcon from "@/assets/icons/analysis-text-line.svg?react";
+import GoalsAndDocumentIcon from "@/assets/icons/goalsAndocumentSidebarIcon.svg?react";
 import {
     UserRoundPlus,
     UsersRound,
@@ -27,7 +28,6 @@ import {
 
 
 const navItems: NavItem[] = [
-    {label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: FileText},
     {label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon},
     {label: "DSP Management", path: Routes.agency.dspManagement, icon: UserRoundPlus},
     {label: "Client Management", path: Routes.agency.clients, icon: UsersRound},
@@ -39,7 +39,7 @@ const navItems: NavItem[] = [
     {label: "Support", path: Routes.agency.support, icon: SupportIcon},
     {label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon},
     {label: "Applicant Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon},
-    {label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: FileText},
+    {label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: GoalsAndDocumentIcon},
     {label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon},
     {label: "Trainings", path: Routes.agency.trainings, icon: Network},
     {label: "Mileage", path: Routes.agency.mileage, icon: MapPin},
