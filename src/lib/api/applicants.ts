@@ -20,6 +20,8 @@ export interface ApplicantListResponse {
     limit: number;
     offset: number;
     count: number;
+    total?: number;
+    hasMore?: boolean;
   };
 }
 

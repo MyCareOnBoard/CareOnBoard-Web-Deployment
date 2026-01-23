@@ -50,7 +50,7 @@ export function useApplicantDirectoryData(): UseApplicantDirectoryDataResult {
     try {
       const res = await applicantsApi.directory({
         tab: "all",
-        period: activeTab,
+        dateFilter: activeTab,
         search: debouncedSearchQuery,
         limit: ITEMS_PER_PAGE,
         offset: startIndex,
@@ -58,7 +58,7 @@ export function useApplicantDirectoryData(): UseApplicantDirectoryDataResult {
 
       const loaded = res?.data ?? [];
       setApplicants(loaded);
-      setTotalCount(res?.pagination?.count ?? 0);
+      setTotalCount(res?.pagination?.total ?? 0);
       errorToastShownRef.current = false;
     } catch (error: any) {
       const is404 = error?.response?.status === 404;
@@ -68,10 +68,10 @@ export function useApplicantDirectoryData(): UseApplicantDirectoryDataResult {
       const description = isNetwork
         ? "Unable to connect to the database. Please check your network connection."
         : is404
-        ? "Applicants endpoint not found. Please contact your administrator."
-        : error instanceof Error
-        ? error.message
-        : "Failed to load applicants from database";
+          ? "Applicants endpoint not found. Please contact your administrator."
+          : error instanceof Error
+            ? error.message
+            : "Failed to load applicants from database";
 
       if (!errorToastShownRef.current) {
         toastRef.current({
