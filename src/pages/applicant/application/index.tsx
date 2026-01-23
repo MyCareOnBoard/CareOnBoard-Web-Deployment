@@ -48,6 +48,8 @@ function ApplicationContent() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+
+  console.log("activeStep", activeStep);
   const [isLoading, setIsLoading] = useState(true);
   const progressValue = useMemo(() => getProgressPercentage(activeStep), [activeStep]);
 
@@ -110,6 +112,9 @@ function ApplicationContent() {
       status: updatedStatus.status,
       currentStep: updatedStatus.currentStep,
     });
+    
+    setActiveStep(newActiveStep);
+    setShowSuccessDialog(true);
   };
 
   const handleStepSuccess = () => {

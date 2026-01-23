@@ -1,10 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { applicantsApi, Applicant } from "@/lib/api/applicants";
+import { applicantsApi, Applicant, PeriodFilter } from "@/lib/api/applicants";
 
-export type PeriodFilter = "today" | "week" | "month";
-
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE = 10;
 
 interface UseApplicantDirectoryDataResult {
   applicants: Applicant[];
@@ -18,13 +16,25 @@ interface UseApplicantDirectoryDataResult {
   goToPage: (page: number) => void;
 }
 
-export function useApplicantDirectoryData(): UseApplicantDirectoryDataResult {
+interface UseApplicantDirectoryDataParams {
+  tab?: "all" | "clearance" | "pending" | "approved" | "rejected";
+  dateFilter?: PeriodFilter;
+  limit?: number;
+  offset?: number;
+}
+
+export function useApplicantDirectoryData({
+  tab = "all",
+  dateFilter = "today",
+  limit = ITEMS_PER_PAGE,
+  offset = 0,
+}: UseApplicantDirectoryDataParams = {}): UseApplicantDirectoryDataResult {
   const { toast } = useToast();
   const toastRef = useRef(toast);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(Math.floor(offset / limit) + 1);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<PeriodFilter>("today");
+  const [activeTab, setActiveTab] = useState<PeriodFilter>(dateFilter);
   const [isLoading, setIsLoading] = useState(false);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -36,23 +46,23 @@ export function useApplicantDirectoryData(): UseApplicantDirectoryDataResult {
   }, [toast]);
 
   const startIndex = useMemo(
-    () => (currentPage - 1) * ITEMS_PER_PAGE,
-    [currentPage]
+    () => (currentPage - 1) * limit,
+    [currentPage, limit]
   );
 
   const totalPages = useMemo(
-    () => (totalCount > 0 ? Math.ceil(totalCount / ITEMS_PER_PAGE) : 0),
-    [totalCount]
+    () => (totalCount > 0 ? Math.ceil(totalCount / limit) : 0),
+    [totalCount, limit]
   );
 
   const fetchApplicants = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await applicantsApi.directory({
-        tab: "all",
-        dateFilter: activeTab,
+        tab,
+        period: activeTab,
         search: debouncedSearchQuery,
-        limit: ITEMS_PER_PAGE,
+        limit,
         offset: startIndex,
       });
 

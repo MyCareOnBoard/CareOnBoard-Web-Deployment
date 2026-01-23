@@ -1,84 +1,22 @@
-import React, {useState} from "react";
+import React, {useState, useMemo} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
-import {Search} from "lucide-react";
+import {Search, X, FileText, Loader2} from "lucide-react";
 import CustomDatePicker from "@/components/ui/datePicker";
-import {cn} from "@/lib/utils";
-import ClientReportModal from "@/components/report/clientReportModal";
-
-interface ClientItem {
-    id: string;
-    name: string;
-    image: string;
-    documentType?: string;
-    noteType?: string;
-    timeAgo: string;
-    details: string;
-    agency: string;
-    date?: string;
-}
-
-
-const reportsData: ClientItem[] = [
-    {
-        id: "1",
-        name: "Dr. Brooklyn Simmons",
-        image: "https://api.dicebear.com/7.x/avataaars/svg?seed=1",
-        documentType: "I-9 Form",
-        timeAgo: "3 days ago",
-        details: "Details here",
-        agency: "Iota Digital",
-    },
-    {
-        id: "2",
-        name: "Dr. Brooklyn Simmons",
-        image: "https://api.dicebear.com/7.x/avataaars/svg?seed=2",
-        documentType: "I-9 Form",
-        timeAgo: "3 days ago",
-        details: "Details here",
-        agency: "Iota Digital",
-    },
-    {
-        id: "3",
-        name: "Dr. Brooklyn Simmons",
-        image: "https://api.dicebear.com/7.x/avataaars/svg?seed=3",
-        documentType: "I-9 Form",
-        timeAgo: "3 days ago",
-        details: "Details here",
-        agency: "Iota Digital",
-    },
-    {
-        id: "4",
-        name: "Dr. Brooklyn Simmons",
-        image: "https://api.dicebear.com/7.x/avataaars/svg?seed=4",
-        documentType: "I-9 Form",
-        timeAgo: "3 days ago",
-        details: "Details here",
-        agency: "Iota Digital",
-    },
-    {
-        id: "5",
-        name: "Dr. Brooklyn Simmons",
-        image: "https://api.dicebear.com/7.x/avataaars/svg?seed=5",
-        documentType: "I-9 Form",
-        timeAgo: "3 days ago",
-        details: "Details here",
-        agency: "Iota Digital",
-    },
-    {
-        id: "6",
-        name: "Dr. Brooklyn Simmons",
-        image: "https://api.dicebear.com/7.x/avataaars/svg?seed=6",
-        documentType: "I-9 Form",
-        timeAgo: "3 days ago",
-        details: "Details here",
-        agency: "Iota Digital",
-    },
-];
-
-
+import {useAuth} from "@/utils/auth";
+import {UserType} from "@/utils/auth/types";
+import {
+    useGetNotesReportQuery,
+    useGetSuperAdminNotesReportQuery,
+    useGetDSPApprovedNotesQuery,
+    NoteReport as NoteReportType,
+    DSPApprovedNote
+} from "@/lib/api/reports";
 
 export default function NoteReport() {
+    const {user} = useAuth();
+    const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
+
     const [dates, setDates] = useState<{
         startDate: Date | null;
         endDate: Date | null;
@@ -88,9 +26,9 @@ export default function NoteReport() {
     });
 
     const [searchQuery, setSearchQuery] = useState<string>("");
-    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-    const [currentPage, setCurrentPage] = useState<number>(1);
-    const [status, setStatus] = useState<"active" | "inactive" | "all">("all");
+    const [selectedDSP, setSelectedDSP] = useState<NoteReportType | null>(null);
+    const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
+    const [noteType, setNoteType] = useState<string>("all");
 
     const handleDateSelect = (
         name: string,
@@ -100,13 +38,44 @@ export default function NoteReport() {
             ...prev,
             [name]: value
         }));
-    }
+    };
 
-    const itemsPerPage = 8;
-    const totalPages = Math.ceil(reportsData.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedData = reportsData.slice(startIndex, startIndex + itemsPerPage);
+    const filters = useMemo(() => ({
+        noteType,
+        startDate: dates.startDate?.toISOString().slice(0, 10),
+        endDate: dates.endDate?.toISOString().slice(0, 10),
+        isLifetime: false
+    }), [noteType, dates.startDate, dates.endDate]);
 
+    const { data: agencyData, isLoading: agencyLoading } = useGetNotesReportQuery(filters, {
+        skip: isSuperAdmin
+    });
+    
+    const { data: superAdminData, isLoading: superAdminLoading } = useGetSuperAdminNotesReportQuery(filters, {
+        skip: !isSuperAdmin
+    });
+
+    const data = isSuperAdmin ? superAdminData : agencyData;
+    const isLoading = isSuperAdmin ? superAdminLoading : agencyLoading;
+
+    const { data: notesData, isLoading: notesLoading } = useGetDSPApprovedNotesQuery(
+        { employeeId: selectedDSP?.id || "", noteType },
+        { skip: !selectedDSP }
+    );
+
+    const filteredDSPs = useMemo(() => {
+        if (!data?.data) return [];
+        
+        return data.data.filter(dsp => 
+            dsp.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            dsp.email.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [data?.data, searchQuery]);
+
+    const handleDSPClick = (dsp: NoteReportType) => {
+        setSelectedDSP(dsp);
+        setShowNotesModal(true);
+    };
 
     return (
         <div className="min-h-[calc(100vh-200px)] flex flex-col">
@@ -152,120 +121,175 @@ export default function NoteReport() {
                                 className="w-full pl-10 pr-10 h-10 border-0 rounded-full bg-[#f8f9fa] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
                             />
                         </div>
-                        <Button
-                            className={cn("h-[44px] rounded-3xl w-[80px]",
-                                status === "all"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("all")}
+                        <select
+                            value={noteType}
+                            onChange={(e) => setNoteType(e.target.value)}
+                            className="h-[44px] px-4 rounded-3xl border border-[#808081] bg-white text-[#10141a] focus:outline-none focus:ring-2 focus:ring-[#00b4b8]"
                         >
-                            All
-                        </Button>
-                        <Button
-                            className={cn(
-                                "h-[44px] rounded-3xl w-[80px]",
-                                status === "active"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("active")}
-                        >
-                            Active
-                        </Button>
-                        <Button
-                            className={cn(
-                                "h-[44px] rounded-3xl w-[80px]",
-                                status === "inactive"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("inactive")}
-                        >
-                            Inactive
-                        </Button>
+                            <option value="all">All Note Types</option>
+                            <option value="community-based">Community Based</option>
+                            <option value="community-inclusion">Community Inclusion</option>
+                            <option value="day-habilitation">Day Habilitation</option>
+                            <option value="prevocational-training">Prevocational Training</option>
+                            <option value="supported-employment-intervention">Supported Employment Intervention</option>
+                            <option value="supported-employment-pre">Supported Employment Pre</option>
+                            <option value="respite-log">Respite Log</option>
+                        </select>
                     </div>
                 </div>
 
                 <div className="flex-1 mt-6 overflow-auto">
-                    <div className="space-y-4">
-                        {paginatedData.length > 0 ? (
-                            paginatedData.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className="flex justify-between gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] flex items-center p-4"
-                                >
-                                    {/* Avatar */}
-                                    <div className={"flex gap-4 items-center"}>
-                                        <div className="w-[52.5px] h-[60px] rounded-[8px] overflow-hidden flex-shrink-0">
-                                            {item.image
-                                                ? (
-                                                    <img
-                                                        src={item.image}
-                                                        alt={item.name}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        className="w-full h-full flex items-center justify-center bg-[#00b4b8] text-white rounded-[8px]">
-                                                        {item.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                )}
+                    {isLoading ? (
+                        <div className="flex items-center justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-[#00b4b8]" />
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {filteredDSPs.length > 0 ? (
+                                filteredDSPs.map((dsp) => (
+                                    <div
+                                        key={dsp.id}
+                                        className="flex justify-between gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] items-center p-4 cursor-pointer hover:bg-white/70 transition-colors"
+                                        onClick={() => handleDSPClick(dsp)}
+                                    >
+                                        <div className={"flex gap-4 items-center"}>
+                                            <div className="w-[52.5px] h-[60px] rounded-[8px] overflow-hidden flex-shrink-0">
+                                                <div className="w-full h-full flex items-center justify-center bg-[#00b4b8] text-white rounded-[8px]">
+                                                    {dsp.fullName.charAt(0).toUpperCase()}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="text-[16px] font-semibold leading-[1.6] text-black">
+                                                    {dsp.fullName}
+                                                </p>
+                                                <p className="text-[12px] text-[#808081]">
+                                                    {dsp.email}
+                                                </p>
+                                            </div>
                                         </div>
-                                        {/* Name */}
+
                                         <div>
-                                            <p className="text-[16px] font-semibold leading-[1.6] text-black">
-                                                {item.name}
+                                            <p className="text-[14px] font-medium text-[#808081] mb-0">
+                                                Role
+                                            </p>
+                                            <p className="text-[14px] font-medium text-black">
+                                                {dsp.role}
                                             </p>
                                         </div>
-                                    </div>
 
-                                    <div className="bg-[#0EAF520D] border border-[#0EAF52] rounded-[60px] px-4 py-2">
-                                        <p className="text-[12px] font-semibold text-[#0EAF52]">
-                                            Active
-                                        </p>
-                                    </div>
+                                        <div>
+                                            <p className="text-[14px] font-medium text-[#808081] mb-0">
+                                                Approved Notes
+                                            </p>
+                                            <p className="text-[14px] font-medium text-black">
+                                                {dsp.approvedNotesCount}
+                                            </p>
+                                        </div>
 
-                                    <div>
-                                        <p className="text-[14px] font-medium text-[#808081] mb-0">
-                                            Notes
-                                        </p>
-                                        <p className="text-[14px] font-medium text-black">
-                                            8
-                                        </p>
-                                    </div>
+                                        {isSuperAdmin && (
+                                            <div>
+                                                <p className="text-[14px] font-medium text-[#808081] mb-0">
+                                                    Agency
+                                                </p>
+                                                <p className="text-[14px] font-medium text-black">
+                                                    {(dsp as any).agencyName || "N/A"}
+                                                </p>
+                                            </div>
+                                        )}
 
-
-                                    {/* Agency */}
-                                    <div>
-                                        <p className="text-[14px] font-medium text-[#808081] mb-0">
-                                            Assigned Agency
-                                        </p>
-                                        <p className="text-[14px] font-medium text-black">
-                                            {item.agency}
-                                        </p>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <Button
+                                                className="bg-[#00b4b8] border border-[#00b4b8] text-white hover:bg-[#009ea1] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]"
+                                            >
+                                                View Notes
+                                            </Button>
+                                        </div>
                                     </div>
-
-                                    {/* Actions */}
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        <Button
-                                            className="bg-[#00b4b8] border border-[#00b4b8] text-white hover:bg-[#00b4b8] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]"
-                                            onClick={() => setIsModalOpen(true)}
-                                        >
-                                            View All
-                                        </Button>
-                                    </div>
+                                ))
+                            ) : (
+                                <div className="flex items-center justify-center py-20">
+                                    <p className="text-[16px] text-[#808081]">No DSPs with approved notes found</p>
                                 </div>
-                            ))
-                        ) : (
-                            <div className="flex items-center justify-center py-20">
-                                <p className="text-[16px] text-[#808081]">No data available</p>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
-          {isModalOpen && <ClientReportModal onClose={() => setIsModalOpen(false)}/>}
+
+            {showNotesModal && selectedDSP && (
+                <>
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => setShowNotesModal(false)} />
+                    <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-3xl max-h-[80vh] overflow-hidden">
+                        <div className="bg-white rounded-lg shadow-xl">
+                            <div className="flex items-center justify-between p-6 border-b">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-[#10141a]">
+                                        {selectedDSP.fullName}
+                                    </h2>
+                                    <p className="text-sm text-[#808081] mt-1">
+                                        Approved Notes ({notesData?.total || 0})
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setShowNotesModal(false)}
+                                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    <X className="h-6 w-6" />
+                                </button>
+                            </div>
+
+                            <div className="p-6 overflow-y-auto max-h-[60vh]">
+                                {notesLoading ? (
+                                    <div className="flex justify-center py-8">
+                                        <Loader2 className="h-8 w-8 animate-spin text-[#00b4b8]" />
+                                    </div>
+                                ) : notesData?.data.length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                                        <p className="text-gray-500">No approved notes found</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {notesData?.data.map((note: DSPApprovedNote) => (
+                                            <div
+                                                key={note.id}
+                                                className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex-1">
+                                                        <p className="font-medium text-[#10141a]">
+                                                            {note.activityType}
+                                                        </p>
+                                                        <p className="text-sm text-[#808081] mt-1">
+                                                            {note.activityDescription}
+                                                        </p>
+                                                        <p className="text-xs text-[#808081] mt-2">
+                                                            Submitted: {new Date(note.submittedAt).toLocaleDateString()} • 
+                                                            Approved: {new Date(note.approvedAt).toLocaleDateString()}
+                                                        </p>
+                                                    </div>
+                                                    <span className="ml-4 px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+                                                        {note.noteCount} {note.noteCount === 1 ? 'Note' : 'Notes'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex justify-end p-6 border-t">
+                                <Button
+                                    onClick={() => setShowNotesModal(false)}
+                                    className="bg-gray-200 text-gray-700 hover:bg-gray-300"
+                                >
+                                    Close
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     )
 }
