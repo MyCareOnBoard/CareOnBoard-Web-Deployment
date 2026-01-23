@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, ChevronLeft, ChevronRight, CheckCircle2, ArrowUpRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import type { Applicant } from "@/lib/api/applicants";
 
 interface ApplicantsListProps {
@@ -15,7 +15,6 @@ interface ApplicantsListProps {
   onPageChange: (page: number) => void;
   onApplicantSelect: (applicant: Applicant) => void;
   isLoading?: boolean;
-  onViewFullList?: () => void;
 }
 
 function getInitials(name: string) {
@@ -130,7 +129,6 @@ export function ApplicantsList({
   onPageChange,
   onApplicantSelect,
   isLoading,
-  onViewFullList,
 }: ApplicantsListProps) {
   console.log(applicants)
   return (
@@ -173,17 +171,6 @@ export function ApplicantsList({
                 {period === "month" && "This month"}
               </Button>
             ))}
-
-            {onViewFullList && (
-              <button
-                type="button"
-                className="p-2 text-gray-400 transition-colors rounded-b-full shadow-md cursor-pointer hover:text-gray-600"
-                onClick={onViewFullList}
-                aria-label="View all pending applicants"
-              >
-                <ArrowUpRight className="w-5 h-5" />
-              </button>
-            )}
           </div>
         </div>
       </div>

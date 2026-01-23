@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Routes } from "@/routes/constants";
 import { applicantsApi, type Applicant, type ApplicantDetailResponse, type ComplianceData } from "@/lib/api/applicants";
 import type { EligibilityData } from "@/lib/api/applicants";
@@ -114,7 +115,7 @@ export default function ApplicantProfilePage() {
   }>({
     id: id || "",
     name: "",
-    role: "Applicant",
+    role: "",
     avatar: "",
     resumeUrl: "",
     profileScreening: false,
@@ -478,164 +479,190 @@ export default function ApplicantProfilePage() {
 
           {/* Profile Header Card */}
           <div className="relative mb-6 rounded-[24px] bg-[rgba(255,255,255,0.8)] shadow-sm p-6 md:p-8">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start">
-              {/* Avatar */}
-              <div className="h-[145px] w-[127px] rounded-[12px] bg-[#e0e0e0] overflow-hidden shrink-0">
-                {applicant.avatar ? (
-                  <img
-                    src={applicant.avatar}
-                    alt={applicant.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xl font-semibold text-[#808081]">
-                    {applicant.name
-                      .split(" ")
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((w) => w[0]?.toUpperCase())
-                      .join("") || "AP"}
+            {isLoading ? (
+              <div className="space-y-6">
+                <div className="flex flex-col gap-6 md:flex-row md:items-start">
+                  <Skeleton className="h-[145px] w-[127px] rounded-[12px]" />
+                  <div className="flex-1 space-y-4">
+                    <Skeleton className="h-6 w-24 rounded-full" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-8 w-64" />
+                      <Skeleton className="h-4 w-48" />
+                    </div>
+                    <div className="flex gap-3">
+                      <Skeleton className="h-10 w-24 rounded-full" />
+                      <Skeleton className="h-10 w-24 rounded-full" />
+                    </div>
                   </div>
-                )}
-              </div>
-
-              {/* Name / meta / actions */}
-              <div className="flex-1 space-y-3">
-                <div className="inline-flex rounded-[60px] border border-[#0eaf52] bg-[#f0faf4] px-4 py-[6px]">
-                  <span className="text-[10px] font-semibold leading-[1.4] text-[#0eaf52]">
-                    {applicant.role || "Applicant"}
-                  </span>
                 </div>
-                <div>
-                  <h2 className="text-[24px] font-semibold leading-[1.3] text-[#10141a]">
-                    {applicant.name || "DR.Brooklyn Simmons"}
-                  </h2>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] font-medium leading-[1.6] text-[#808081]">
-                    {applicant.address && <span>{applicant.address}</span>}
-                    {applicant.address && applicant.dob && (
-                      <span className="h-[6px] w-[6px] rounded-full bg-[#b2b2b3]" />
+                <div className="flex flex-wrap gap-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-9 w-40 rounded-full" />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-6 md:flex-row md:items-start">
+                  {/* Avatar */}
+                  <div className="h-[145px] w-[127px] rounded-[12px] bg-[#e0e0e0] overflow-hidden shrink-0">
+                    {applicant.avatar ? (
+                      <img
+                        src={applicant.avatar}
+                        alt={applicant.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xl font-semibold text-[#808081]">
+                        {applicant.name
+                          .split(" ")
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((w) => w[0]?.toUpperCase())
+                          .join("") || "AP"}
+                      </div>
                     )}
-                    {applicant.dob && <span>{applicant.dob}</span>}
+                  </div>
+
+                  {/* Name / meta / actions */}
+                  <div className="flex-1 space-y-3">
+                    <div className="inline-flex rounded-[60px] border border-[#0eaf52] bg-[#f0faf4] px-4 py-[6px]">
+                      <span className="text-[10px] font-semibold leading-[1.4] text-[#0eaf52]">
+                        {applicant.role || "Applicant"}
+                      </span>
+                    </div>
+                    <div>
+                      <h2 className="text-[24px] font-semibold leading-[1.3] text-[#10141a]">
+                        {applicant.name}
+                      </h2>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] font-medium leading-[1.6] text-[#808081]">
+                        {applicant.address && <span>{applicant.address}</span>}
+                        {applicant.address && applicant.dob && (
+                          <span className="h-[6px] w-[6px] rounded-full bg-[#b2b2b3]" />
+                        )}
+                        {applicant.dob && <span>{applicant.dob}</span>}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <Button
+                        disabled
+                        className="flex items-center gap-2 rounded-[60px] bg-[#2b82ff] px-5 py-[10px] text-[14px] font-semibold text-white shadow-none hover:bg-[#2563eb] disabled:opacity-70"
+                      >
+                        <Phone className="h-4 w-4" />
+                        Call
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2 rounded-[60px] border-[rgba(255,255,255,0.3)] bg-white/70 px-5 py-[10px] text-[14px] font-semibold text-[#10141a] shadow-none hover:bg-white"
+                        onClick={() => navigate(Routes.agency.support)}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        Chat
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <Button
-                    disabled
-                    className="flex items-center gap-2 rounded-[60px] bg-[#2b82ff] px-5 py-[10px] text-[14px] font-semibold text-white shadow-none hover:bg-[#2563eb] disabled:opacity-70"
+                {/* Stage Pills */}
+                <div className="mt-6 flex flex-wrap gap-3">
+                  {/* Profile */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateToSection("profile")}
+                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "profile"
+                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                      : !!(stepStatuses.profile)
+                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                      }`}
                   >
-                    <Phone className="h-4 w-4" />
-                    Call
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex items-center gap-2 rounded-[60px] border-[rgba(255,255,255,0.3)] bg-white/70 px-5 py-[10px] text-[14px] font-semibold text-[#10141a] shadow-none hover:bg-white"
-                    onClick={() => navigate(Routes.agency.support)}
+                    {!!(stepStatuses.profile) ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <CircleAlert className="h-4 w-4" />
+                    )}
+                    Profile &amp; Pre-Screening
+                  </button>
+
+                  {/* Documents */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateToSection("documents")}
+                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "documents"
+                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                      : isStepComplete(stepStatuses.documents)
+                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                      }`}
                   >
-                    <MessageSquare className="h-4 w-4" />
-                    Chat
-                  </Button>
+                    {isStepComplete(stepStatuses.documents) ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <CircleAlert className="h-4 w-4" />
+                    )}
+                    Document Upload &amp; Eligibility Verification
+                  </button>
+
+                  {/* Conditional Hire */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateToSection("conditional")}
+                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "conditional"
+                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                      : isStepComplete(stepStatuses.conditional)
+                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                      }`}
+                  >
+                    {isStepComplete(stepStatuses.conditional) ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <CircleAlert className="h-4 w-4" />
+                    )}
+                    Conditional Hire &amp; Compliance
+                  </button>
+
+                  {/* Final Review */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateToSection("final")}
+                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "final"
+                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                      : isStepComplete(stepStatuses.final)
+                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                      }`}
+                  >
+                    {isStepComplete(stepStatuses.final) ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <CircleAlert className="h-4 w-4" />
+                    )}
+                    Final Agency Review
+                  </button>
+
+                  {/* Official Hire */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateToSection("official")}
+                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
+                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                      : isStepComplete(stepStatuses.official)
+                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                      }`}
+                  >
+                    {isStepComplete(stepStatuses.official) ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <CircleAlert className="h-4 w-4" />
+                    )}
+                    Official Hire
+                  </button>
                 </div>
-              </div>
-            </div>
-
-            {/* Stage Pills */}
-            <div className="mt-6 flex flex-wrap gap-3">
-              {/* Profile */}
-              <button
-                type="button"
-                onClick={() => handleNavigateToSection("profile")}
-                className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "profile"
-                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : !!(stepStatuses.profile)
-                    ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-                    : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
-                  }`}
-              >
-                {!!(stepStatuses.profile) ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <CircleAlert className="h-4 w-4" />
-                )}
-                Profile &amp; Pre-Screening
-              </button>
-
-              {/* Documents */}
-              <button
-                type="button"
-                onClick={() => handleNavigateToSection("documents")}
-                className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "documents"
-                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : isStepComplete(stepStatuses.documents)
-                    ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-                    : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
-                  }`}
-              >
-                {isStepComplete(stepStatuses.documents) ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <CircleAlert className="h-4 w-4" />
-                )}
-                Document Upload &amp; Eligibility Verification
-              </button>
-
-              {/* Conditional Hire */}
-              <button
-                type="button"
-                onClick={() => handleNavigateToSection("conditional")}
-                className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "conditional"
-                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : isStepComplete(stepStatuses.conditional)
-                    ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-                    : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
-                  }`}
-              >
-                {isStepComplete(stepStatuses.conditional) ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <CircleAlert className="h-4 w-4" />
-                )}
-                Conditional Hire &amp; Compliance
-              </button>
-
-              {/* Final Review */}
-              <button
-                type="button"
-                onClick={() => handleNavigateToSection("final")}
-                className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "final"
-                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : isStepComplete(stepStatuses.final)
-                    ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-                    : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
-                  }`}
-              >
-                {isStepComplete(stepStatuses.final) ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <CircleAlert className="h-4 w-4" />
-                )}
-                Final Agency Review
-              </button>
-
-              {/* Official Hire */}
-              <button
-                type="button"
-                onClick={() => handleNavigateToSection("official")}
-                className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
-                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : isStepComplete(stepStatuses.official)
-                    ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-                    : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
-                  }`}
-              >
-                {isStepComplete(stepStatuses.official) ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <CircleAlert className="h-4 w-4" />
-                )}
-                Official Hire
-              </button>
-            </div>
+              </>
+            )}
           </div>
 
           {/* Tab Panels */}

@@ -1,5 +1,7 @@
 import axiosClient from '../axios';
 
+export type PeriodFilter = "today" | "week" | "month";
+
 // ===== Type Definitions =====
 
 export interface Applicant {
@@ -70,8 +72,8 @@ interface ApiResponse<T = unknown> {
 }
 
 interface ListParams {
-  tab?: 'all' | 'clearance';
-  period?: 'today' | 'week' | 'month' | string;
+  tab?: "all" | "clearance" | "pending" | "approved" | "rejected";
+  period?: PeriodFilter | string;
   search?: string;
   limit?: number;
   offset?: number;
