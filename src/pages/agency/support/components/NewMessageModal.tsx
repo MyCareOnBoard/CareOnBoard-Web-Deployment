@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Search, X, Check } from "lucide-react";
 
 interface User {
@@ -27,6 +26,29 @@ export default function NewMessageModal({
 }: NewMessageModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [open]);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) {
+        handleCancel();
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [open]);
 
   const toggleUserSelection = (userId: string) => {
     setSelectedUsers((prev) =>
@@ -55,110 +77,126 @@ export default function NewMessageModal({
     user.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] p-0 gap-0 bg-white rounded-[24px] border-0 shadow-lg">
-        <div className="pt-3 pb-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={handleCancel}
+      />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-[500px] bg-white rounded-[20px] shadow-2xl overflow-hidden">
+        <div className="flex flex-col">
           {/* Header */}
-          <div className="flex justify-between mb-5">
-            <DialogTitle className="text-[20px] font-bold text-[#10141a] leading-tight">
+          <div className="flex items-center justify-between px-6 pt-6 pb-5">
+            <h2 className="text-[18px] font-bold text-[#10141a]">
               New Message
-            </DialogTitle>
+            </h2>
             <button
               onClick={handleCancel}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#f8f9fa] transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#f5f5f5] transition-colors"
             >
               <X className="w-5 h-5 text-[#10141a]" />
             </button>
           </div>
 
-          {/* Search Input */}
-          <div className="relative mb-5">
-            <div className="absolute -translate-y-1/2 pointer-events-none left-3 top-1/2">
-              <Search className="w-[18px] h-[18px] text-[#a0a0a1]" />
+          {/* Content */}
+          <div className="px-6 pb-6">
+            {/* Search Input */}
+            <div className="relative mb-5">
+              <div className="absolute -translate-y-1/2 pointer-events-none left-3 top-1/2">
+                <Search className="w-[18px] h-[18px] text-[#a0a0a1]" />
+              </div>
+              <Input
+                type="text"
+                placeholder="Search here"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-11 pl-10 pr-4 bg-[#f5f5f5] border-0 rounded-[10px] text-[14px] text-[#10141a] placeholder:text-[#a0a0a1] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
+              />
             </div>
-            <Input
-              type="text"
-              placeholder="Search here"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-11 pl-10 pr-4 bg-[#f8f9fa] border-0 rounded-[10px] text-[15px] text-[#10141a] placeholder:text-[#a0a0a1] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
-            />
-          </div>
 
-          {/* User List */}
-          <div className="mb-5 max-h-[320px] overflow-y-auto -mx-1 px-1">
-            <div className="space-y-1">
-              {filteredUsers.map((user) => (
-                <div
-                  key={user.id}
-                  onClick={() => toggleUserSelection(user.id)}
-                  className="flex items-center justify-between px-1 py-3 hover:bg-[#f8f9fa] rounded-[10px] cursor-pointer transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    {/* Avatar */}
-                    <div className="relative shrink-0 w-11 h-11">
-                      {user.image ? (
-                        <img
-                          src={user.image}
-                          alt={user.name}
-                          className="object-cover w-full h-full rounded-full"
-                        />
-                      ) : (
-                        <div className="w-full h-full rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center">
-                          <span className="text-[15px] font-semibold text-[#10141a]">
-                            {user.avatar}
-                          </span>
-                        </div>
+            {/* User List */}
+            <div className="min-h-[200px] max-h-[400px] overflow-y-auto space-y-2 mb-5">
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    onClick={() => toggleUserSelection(user.id)}
+                    className="flex items-center justify-between px-3 py-3 hover:bg-[#f5f5f5] rounded-[10px] cursor-pointer transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Avatar */}
+                      <div className="relative w-12 h-12 shrink-0">
+                        {user.image ? (
+                          <img
+                            src={user.image}
+                            alt={user.name}
+                            className="object-cover w-full h-full rounded-full"
+                          />
+                        ) : (
+                          <div className="w-full h-full rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center">
+                            <span className="text-[14px] font-semibold text-[#10141a]">
+                              {user.avatar}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* User Info */}
+                      <div className="flex flex-col">
+                        <h4 className="text-[15px] font-semibold text-[#10141a] leading-tight mb-0.5">
+                          {user.name}
+                        </h4>
+                        <p className="text-[13px] text-[#808081] leading-tight">
+                          {user.role}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Checkbox */}
+                    <div
+                      className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${
+                        selectedUsers.includes(user.id)
+                          ? "bg-[#2563eb] border-[#2563eb]"
+                          : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
+                      }`}
+                    >
+                      {selectedUsers.includes(user.id) && (
+                        <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
                       )}
                     </div>
-
-                    {/* User Info */}
-                    <div className="flex flex-col">
-                      <h4 className="text-[15px] font-semibold text-[#10141a] leading-tight mb-0.5">
-                        {user.name}
-                      </h4>
-                      <p className="text-[13px] text-[#808081] leading-tight">
-                        {user.role}
-                      </p>
-                    </div>
                   </div>
-
-                  {/* Checkbox */}
-                  <div
-                    className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${
-                      selectedUsers.includes(user.id)
-                        ? "bg-[#2563eb] border-[#2563eb]"
-                        : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
-                    }`}
-                  >
-                    {selectedUsers.includes(user.id) && (
-                      <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
-                    )}
-                  </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center h-[200px] text-center text-[#808081] text-[14px]">
+                  No contacts found
                 </div>
-              ))}
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={handleCancel}
+                className="flex-1 h-12 bg-white hover:bg-[#f5f5f5] text-[#10141a] border border-[#e5e5e6] rounded-full text-[15px] font-medium transition-colors shadow-none"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleStartChat}
+                disabled={selectedUsers.length === 0}
+                className="flex-1 h-12 bg-[#7c9ff5] hover:bg-[#6b8fe5] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Start Chat
+              </Button>
             </div>
           </div>
-
-          {/* Footer Buttons */}
-          <div className="flex gap-3 pt-1">
-            <Button
-              onClick={handleCancel}
-              className="flex-1 h-12 bg-transparent hover:bg-[#f8f9fa] text-[#808081] hover:text-[#10141a] border border-[#e5e5e6] rounded-full text-[15px] font-medium transition-colors shadow-none"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleStartChat}
-              disabled={selectedUsers.length === 0}
-              className="flex-1 h-12 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Start Chat
-            </Button>
-          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

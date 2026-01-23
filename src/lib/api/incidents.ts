@@ -10,6 +10,7 @@ import { Client } from './clients';
 
 // API endpoint constants
 const INCIDENT_BASE = '/agencyIncidents';
+const USER_INCIDENT_BASE = '/incidents';
 
 // ==================== Type Definitions ====================
 
@@ -109,6 +110,77 @@ export interface NotResolvedIncidentPayload {
     reason: string;
 }
 
+/**
+ * Create Incident Payload
+ */
+export interface CreateIncidentPayload {
+    agencyId: string;
+    employeeId: string;
+    clientId: string;
+    incidentDate: string;
+    whatHappened: string;
+    actionsTaken: string;
+    staffAction: string;
+    witness: string;
+}
+
+/**
+ * User Incident Report Interface (for DSP/Employee view)
+ */
+export interface UserIncidentReport {
+    id: string;
+    employeeId: string;
+    employeeUid: string;
+    employeeName: string;
+    agencyId: string;
+    clientName: string;
+    date: string;
+    time: string;
+    whatHappened: string;
+    whatActionsTaken: string;
+    whatDidYouDo: string;
+    witness: {
+        name: string;
+        contactInfo: string;
+        relationship: string;
+    };
+    status: 'submitted' | 'under_review' | 'resolved' | 'not_resolved';
+    resolution?: 'resolved' | 'not_resolved';
+    submittedAt: string;
+    reviewedAt?: string;
+    reviewedBy?: string;
+    reviewerNotes?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+/**
+ * Create User Incident Payload (for DSP submission)
+ */
+export interface CreateUserIncidentPayload {
+    clientName: string;
+    date: string;
+    time: string;
+    whatHappened: string;
+    whatActionsTaken: string;
+    whatDidYouDo: string;
+    witness: {
+        name: string;
+        contactInfo: string;
+        relationship: string;
+    };
+}
+
+/**
+ * User Incidents Response
+ */
+export interface GetUserIncidentsResponse {
+    success: boolean;
+    data: UserIncidentReport[];
+    count: number;
+    hasMore: boolean;
+}
+
 // ==================== API Functions ====================
 
 /**
@@ -131,6 +203,23 @@ export const getAllIncidents = async (
         return response.data;
     } catch (error: any) {
         console.error('Error fetching incidents:', error);
+        throw error;
+    }
+};
+
+/**
+ * Create a new incident report
+ * @param payload - Incident creation data
+ * @returns Promise with created incident
+ */
+export const createIncident = async (
+    payload: CreateIncidentPayload
+): Promise<ApiResponse<IncidentReport>> => {
+    try {
+        const response = await axiosClient.post(INCIDENT_BASE, payload);
+        return response.data;
+    } catch (error: any) {
+        console.error('Error creating incident:', error);
         throw error;
     }
 };
@@ -276,5 +365,55 @@ export const getIncidentStatusText = (status: IncidentStatus): string => {
             return 'Not Resolved';
         default:
             return status;
+    }
+};
+
+// ==================== User Panel Incident API Functions ====================
+
+/**
+ * Get all incident reports for authenticated user (DSP/Employee)
+ * @returns Promise with user incidents response
+ */
+export const getUserIncidents = async (): Promise<GetUserIncidentsResponse> => {
+    try {
+        const response = await axiosClient.get(USER_INCIDENT_BASE);
+        return response.data;
+    } catch (error: any) {
+        console.error('Error fetching user incidents:', error);
+        throw error;
+    }
+};
+
+/**
+ * Submit a new incident report (DSP/Employee)
+ * @param payload - Create user incident payload
+ * @returns Promise with created incident
+ */
+export const submitUserIncident = async (
+    payload: CreateUserIncidentPayload
+): Promise<ApiResponse<UserIncidentReport>> => {
+    try {
+        const response = await axiosClient.post(USER_INCIDENT_BASE, payload);
+        return response.data;
+    } catch (error: any) {
+        console.error('Error submitting user incident:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get a specific incident by ID (DSP/Employee)
+ * @param incidentId - Incident ID
+ * @returns Promise with incident details
+ */
+export const getUserIncidentById = async (
+    incidentId: string
+): Promise<ApiResponse<UserIncidentReport>> => {
+    try {
+        const response = await axiosClient.get(`${USER_INCIDENT_BASE}/${incidentId}`);
+        return response.data;
+    } catch (error: any) {
+        console.error('Error fetching user incident:', error);
+        throw error;
     }
 };

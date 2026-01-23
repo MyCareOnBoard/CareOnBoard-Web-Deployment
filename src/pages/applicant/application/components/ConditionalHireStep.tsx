@@ -12,12 +12,12 @@ import { toast } from "sonner";
 
 interface ConditionalHireStepProps {
   onBack?: () => void;
-  onNext?: () => void;
+  onSuccess: () => void;
 }
 
 export default function ConditionalHireStep({
   onBack,
-  onNext,
+  onSuccess,
 }: ConditionalHireStepProps) {
   const [showLetterModal, setShowLetterModal] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
@@ -31,6 +31,7 @@ export default function ConditionalHireStep({
 
   const hasSignature = !!signatureStatus?.data?.signatureId;
   const userName = user?.fullName || user?.email?.split("@")[0] || "Applicant";
+  const agency = user?.agency?.name || "Agency Name";
 
   // Auto-submit if signature exists, or show letter modal if not signed
   useEffect(() => {
@@ -139,7 +140,7 @@ export default function ConditionalHireStep({
 
   // If showing compliance page, render it
   if (showCompliancePage) {
-    return <ComplianceStep onBack={onBack} onNext={onNext} />;
+    return <ComplianceStep onBack={onBack} onSuccess={onSuccess} />;
   }
 
   return (
@@ -189,7 +190,7 @@ export default function ConditionalHireStep({
                       </span>{" "}
                       with{" "}
                       <span className="font-semibold text-green-700">
-                        [Agency Name]
+                        {agency}
                       </span>{" "}
                       as a{" "}
                       <span className="font-semibold text-green-700">
@@ -388,8 +389,7 @@ export default function ConditionalHireStep({
                   {/* Signature Note */}
                   <div className="text-center">
                     <p className="text-red-600 font-bold text-sm">
-                      It should have a put up for accept or reject as the e
-                      signature
+                      It should have a put up for accept or reject as the e-signature
                     </p>
                   </div>
                 </div>
@@ -408,7 +408,7 @@ export default function ConditionalHireStep({
                   disabled={isSubmitting}
                   className="px-6 bg-teal-500 hover:bg-teal-600 text-white rounded-full"
                 >
-                    {isSubmitting ? "Submitting..." : "Sign Digitally"}
+                  {isSubmitting ? "Submitting..." : "Sign Digitally"}
                 </Button>
               </div>
             </div>

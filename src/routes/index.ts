@@ -11,6 +11,7 @@ import ApplicantDashboardPage from "@/pages/applicant/dashboard";
 import DocumentsPage from "@/pages/applicant/documents";
 import HelpCenterPage from "@/pages/help-center";
 import SettingsPage from "@/pages/settings";
+import AgencySettingsPage from "@/pages/agency/agency-settings";
 import ProfilePage from "@/pages/profile";
 import ApplicationStepper from "@/pages/applicant/application";
 import OnboardingSlider from "@/pages/onboarding/components/OnboardingSlider";
@@ -22,6 +23,8 @@ import UserPanelDashboardLayout from "@/layouts/UserPanelLayout";
 import AgencyDashboardLayout from "@/layouts/AgencyLayout";
 import UserPanelDashboard from "@/pages/userPanel/dashboard";
 import UserPanelMileage from "@/pages/userPanel/mileage";
+import UserPanelIncidentPage from "@/pages/userPanel/incident";
+import UserPanelMessagesPage from "@/pages/userPanel/messages";
 import ShiftManagementPage from "@/pages/userPanel/shiftManagement";
 import ManualShiftManagementPage from "@/pages/userPanel/manualShiftManagement";
 import ClientsAndServicesPage from "@/pages/userPanel/clientsAndServices";
@@ -100,6 +103,9 @@ import PrevocationalTrainingServices from "@/pages/agency/goalsAndDocuments/Prev
 import DayHabilitationIndividualizedGoals from "@/pages/agency/goalsAndDocuments/DayHabilitationIndividualizedGoals";
 import PrevocationalTrainingIndividualizedGoals
     from "@/pages/agency/goalsAndDocuments/PrevocationalTrainingIndividualizedGoals";
+import InternalUsersPage from "@/pages/agency/agency-settings/user-levels/InternalUsersPage";
+import DSPDirectoryPage from "@/pages/agency/agency-settings/user-levels/DSPDirectoryPage";
+import ClientDirectoryPage from "@/pages/agency/agency-settings/user-levels/ClientDirectoryPage";
 
 
 export const router = createBrowserRouter([
@@ -306,8 +312,20 @@ export const router = createBrowserRouter([
                 Component: HelpCenterPage,
             },
             {
-                path: Routes.agency.settings,
-                Component: SettingsPage,
+                path: Routes.agency.agencySettings,
+                Component: AgencySettingsPage,
+            },
+            {
+                path: Routes.agency.agencySettingsInternalUsers,
+                Component: InternalUsersPage,
+            },
+            {
+                path: Routes.agency.agencySettingsDSP,
+                Component: DSPDirectoryPage,
+            },
+            {
+                path: Routes.agency.agencySettingsClients,
+                Component: ClientDirectoryPage,
             },
             {
                 path: Routes.agency.profile,
@@ -405,6 +423,14 @@ export const router = createBrowserRouter([
             {
                 path: Routes.userPanel.mileage,
                 Component: UserPanelMileage,
+            },
+            {
+                path: Routes.userPanel.incident,
+                Component: UserPanelIncidentPage,
+            },
+            {
+                path: Routes.userPanel.messages,
+                Component: UserPanelMessagesPage,
             },
             {
                 path: Routes.userPanel.notes.index,

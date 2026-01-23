@@ -18,7 +18,7 @@ import {
   BarChart3,
   ChartGantt,
   Settings,
-  UserLock
+  UserLock,
 } from "lucide-react";
 
 const allNavItems: NavItem[] = [

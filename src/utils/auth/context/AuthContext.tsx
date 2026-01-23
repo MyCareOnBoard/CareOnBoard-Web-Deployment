@@ -1,8 +1,8 @@
 import type React from "react"
-import {createContext, useContext, useEffect, useState} from "react"
-import {useDispatch, useSelector} from "react-redux"
+import { createContext, useContext, useEffect, useState } from "react"
+import { useDispatch, useSelector } from "react-redux"
 import { setUser } from "@/utils/auth"
-import type {AppDispatch, RootState} from "@/store/redux/store"
+import type { AppDispatch, RootState } from "@/store/redux/store"
 import {
   loginWithEmail,
   registerWithEmail,
@@ -10,9 +10,9 @@ import {
   logout as logoutUser,
   getIdToken,
 } from "../services/authService"
-import {createUser as createBackendUser} from "../api/client"
-import {PageLoader} from "@/components/ui/loader"
-import {auth} from "@/lib/firebase";
+import { createUser as createBackendUser } from "../api/client"
+import { PageLoader } from "@/components/ui/loader"
+import { auth } from "@/lib/firebase";
 import type { User } from "../types/user.types"
 
 interface AuthContextType {
@@ -44,7 +44,7 @@ export const useAuth = () => useContext(AuthContext)
  * Wraps the app to provide auth state to all components
  * Syncs with Redux for state persistence
  */
-export function AuthProvider({children}: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const dispatch = useDispatch<AppDispatch>()
   const reduxUser = useSelector((state: RootState) => state.auth?.user)
   const [user, setUserState] = useState<User | null>(null)
@@ -53,7 +53,7 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
-      
+
       if (reduxUser) {
         setUserState(reduxUser)
         setIsInitialized(true)
@@ -75,6 +75,7 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
           updatedAt: new Date(),
           photoURL: currentUser.photoURL || undefined,
           phoneNumber: currentUser.phoneNumber || undefined,
+          userType: 'applicant' as any, // Default to applicant, will be updated from backend
         }
         setUserState(user)
         dispatch(setUser(user))
@@ -191,7 +192,7 @@ export function AuthProvider({children}: { children: React.ReactNode }) {
 
   // Show loader while checking auth state
   if (loading) {
-    return <PageLoader text="Checking authentication..."/>
+    return <PageLoader text="Checking authentication..." />
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

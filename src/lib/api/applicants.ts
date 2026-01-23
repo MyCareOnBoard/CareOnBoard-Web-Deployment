@@ -1,5 +1,9 @@
 import axiosClient from '../axios';
 
+export type PeriodFilter = "today" | "week" | "month";
+
+// ===== Type Definitions =====
+
 export interface Applicant {
   id: string;
   name: string;
@@ -8,7 +12,7 @@ export interface Applicant {
   documents: boolean;
   conditionalHire: boolean;
   finalAgencyReview: boolean;
-  avatar: string;
+  profilePictureUrl: string;
 }
 
 export interface ApplicantListResponse {
@@ -18,6 +22,8 @@ export interface ApplicantListResponse {
     limit: number;
     offset: number;
     count: number;
+    total?: number;
+    hasMore?: boolean;
   };
 }
 
@@ -26,54 +32,347 @@ export interface ApplicantActionResponse {
   message?: string;
 }
 
-const buildQuery = (params?: Record<string, string | number | undefined>) => {
+
+interface Stage {
+  completed?: boolean;
+  completedAt?: FirebaseTimestamp;
+}
+
+interface BackendApplicant {
+  uid?: string;
+  id?: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  userType?: string;
+  role?: string;
+  stages?: {
+    preScreening?: Stage;
+    documents?: Stage;
+    conditionalHire?: Stage;
+    officialHire?: Stage;
+    finalAgencyReview?: Stage;
+  };
+  profilePictureUrl?: string;
+}
+
+interface ApiResponse<T = unknown> {
+  success?: boolean;
+  data?: T;
+  applicants?: T;
+  applicant?: T;
+  results?: T;
+  users?: T;
+  pagination?: {
+    limit: number;
+    offset: number;
+    count: number;
+  };
+  count?: number;
+}
+
+interface ListParams {
+  tab?: "all" | "clearance" | "pending" | "approved" | "rejected";
+  period?: PeriodFilter | string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+  status?: string;
+  userType?: string;
+  [key: string]: string | number | undefined;
+}
+
+// Comprehensive applicant detail response types
+interface FirebaseTimestamp {
+  _seconds: number;
+  _nanoseconds: number;
+}
+
+interface AddressData {
+  address?: string;
+  city?: string;
+  zipCode?: string;
+  latlon?: {
+    lat: string;
+    lon: string;
+  };
+}
+
+interface DocumentFile {
+  fileName?: string;
+  fileUrl?: string;
+  fileType?: string;
+  expiryDate?: string;
+}
+
+interface ReferenceData {
+  name: string;
+  relationship: string;
+  phoneNumber: string;
+  email: string;
+}
+
+export interface PreScreeningData {
+  userId?: string;
+  fullName?: string;
+  email?: string;
+  dateOfBirth?: string;
+  address?: AddressData;
+  gender?: string;
+  isAtLeast18?: boolean;
+  hasHighSchoolDiploma?: boolean;
+  isLegallyEligible?: boolean;
+  hasBeenConvicted?: boolean;
+  hasReliableTransportation?: boolean;
+  declarationAgreed?: boolean;
+  createdAt?: FirebaseTimestamp;
+  resumeUrl?: string;
+  currentStep?: string;
+  status?: string;
+  updatedAt?: FirebaseTimestamp;
+}
+
+export interface EligibilityData {
+  userId?: string;
+  references?: ReferenceData[];
+  declarationAgreed?: boolean;
+  status?: string;
+  createdAt?: FirebaseTimestamp;
+  diplomaUrl?: DocumentFile;
+  i9FormUrl?: DocumentFile;
+  hepatitisBVaccinationUrl?: DocumentFile;
+  photoIdUrl?: DocumentFile;
+  socialSecurityCardUrl?: DocumentFile;
+  hepatitisBImmunityUrl?: DocumentFile;
+  w4FormUrl?: DocumentFile;
+  certificationsUrl?: DocumentFile;
+  tbTestResultUrl?: DocumentFile;
+  updatedAt?: FirebaseTimestamp;
+}
+
+export interface ComplianceData {
+  userId?: string;
+  authorizations?: {
+    drugTest?: boolean;
+    fingerprint?: boolean;
+    centralRegistry?: boolean;
+    cariCheck?: boolean;
+    sexOffenderRegistry?: boolean;
+    oigExclusion?: boolean;
+    healthTbScreening?: boolean;
+    referenceChecks?: boolean;
+  };
+  termsAcceptance?: {
+    abuseNeglectExploitation?: boolean;
+    hipaaConfidentiality?: boolean;
+    developmentalDisabilities?: boolean;
+  };
+  informationCorrect?: boolean;
+  finalizedAt?: FirebaseTimestamp;
+}
+
+export interface ConditionalHireData {
+  userId?: string;
+  signatureReference?: {
+    context?: string;
+    signaturePath?: string;
+    signatureType?: string;
+  };
+  completedAt?: FirebaseTimestamp;
+  finalizedAt?: FirebaseTimestamp;
+  status?: string;
+}
+
+export interface ReviewStepData {
+  stepKey: string;
+  confirmed?: boolean;
+  timestamp?: FirebaseTimestamp;
+  confirmedBy?: string;
+  updatedAt?: FirebaseTimestamp;
+}
+
+export interface ApplicantDetailResponse {
+  uid?: string;
+  email?: string;
+  fullName?: string;
+  emailVerified?: boolean;
+  userType?: string;
+  agencyId?: string;
+  createdAt?: FirebaseTimestamp;
+  onboardingCompleted?: boolean;
+  otpVerifiedAt?: FirebaseTimestamp;
+  otpVerified?: boolean;
+  applicationStartedAt?: FirebaseTimestamp;
+  address?: AddressData;
+  gender?: string;
+  dateOfBirth?: string;
+  applicationCompletedAt?: FirebaseTimestamp;
+  conditionalHireSignedAt?: FirebaseTimestamp;
+  conditionalHireStatus?: string;
+  conditionalHireCompletedAt?: FirebaseTimestamp;
+  applicationLastUpdatedAt?: FirebaseTimestamp;
+  applicationStatus?: string;
+  currentApplicationStep?: string;
+  officialHireStatus?: string;
+  officialHireSignedAt?: FirebaseTimestamp;
+  updatedAt?: FirebaseTimestamp;
+  profilePictureUrl?: string;
+  preScreening?: PreScreeningData;
+  eligibility?: EligibilityData;
+  compliance?: ComplianceData;
+  conditionalHire?: ConditionalHireData;
+  reviews?: Record<string, ReviewStepData>;
+  signatures?: {
+    conditionalHire?: {
+      signatureType: string;
+      signatureData: string;
+      context?: string;
+      userId?: string;
+      status?: string;
+      createdAt?: FirebaseTimestamp;
+      updatedAt?: FirebaseTimestamp;
+    } | null;
+    officialHire?: {
+      signatureType: string;
+      signatureData: string;
+      context?: string;
+      userId?: string;
+      status?: string;
+      createdAt?: FirebaseTimestamp;
+      updatedAt?: FirebaseTimestamp;
+    } | null;
+  };
+}
+
+// ===== Helper Functions =====
+
+const buildQuery = (params?: Record<string, string | number | undefined>): string => {
   if (!params) return "";
+
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       searchParams.append(key, String(value));
     }
   });
+
   const qs = searchParams.toString();
   return qs ? `?${qs}` : "";
 };
 
-// Map backend applicant to UI model
-const mapBackendToApplicant = (item: any): Applicant => {
+/**
+ * Try multiple endpoints in sequence until one succeeds
+ * Reduces deeply nested try-catch blocks
+ */
+const tryEndpoints = async <T = unknown>(endpoints: string[]): Promise<T> => {
+  const errors: Error[] = [];
+
+  for (let i = 0; i < endpoints.length; i++) {
+    try {
+      const response = await axiosClient.get<T>(endpoints[i]);
+      return response.data;
+    } catch (err: any) {
+      errors.push(err);
+      // If it's a 404 and we have more endpoints to try, continue
+      if (err?.response?.status === 404 && i < endpoints.length - 1) {
+        continue;
+      }
+      // Otherwise, throw the last error
+      throw err;
+    }
+  }
+
+  // If we get here, all endpoints failed
+  throw errors[errors.length - 1];
+};
+
+/**
+ * Map backend applicant data to UI model
+ */
+const mapBackendToApplicant = (item: BackendApplicant): Applicant => {
   const id = item?.uid || item?.id || String(Math.random());
-  const fullName = item?.fullName || [item?.firstName, item?.lastName].filter(Boolean).join(' ') || 'Unknown';
+  const fullName = item?.fullName ||
+    [item?.firstName, item?.lastName].filter(Boolean).join(' ') ||
+    'Unknown';
   const role = item?.userType === 'applicant' ? 'Applicant' : (item?.role || 'Applicant');
   const stages = item?.stages || {};
-
-  // Prefer provided avatar fields, fallback to dicebear
-  const avatar = item?.avatar || item?.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(id)}`;
 
   return {
     id,
     name: fullName,
     role,
-    profileScreening: Boolean(stages.preScreening),
-    documents: Boolean(stages.documents),
-    conditionalHire: Boolean(stages.conditionalHire),
-    finalAgencyReview: Boolean(stages.officialHire),
-    avatar,
+    profileScreening: Boolean(stages.preScreening?.completed),
+    documents: Boolean(stages.documents?.completed),
+    conditionalHire: Boolean(stages.conditionalHire?.completed),
+    finalAgencyReview: Boolean(stages.finalAgencyReview?.completed),
+    profilePictureUrl: item?.profilePictureUrl || '',
   };
 };
 
+/**
+ * Parse list response from various backend formats
+ */
+const parseListResponse = (
+  body: ApiResponse<BackendApplicant[]> | BackendApplicant[],
+  params?: ListParams
+): { data: BackendApplicant[]; pagination: any; success: boolean } => {
+  let raw: BackendApplicant[] = [];
+  let pagination: any;
+  let success = true;
+
+  // Handle array response
+  if (Array.isArray(body)) {
+    raw = body;
+    pagination = {
+      limit: params?.limit ?? 6,
+      offset: params?.offset ?? 0,
+      count: body.length,
+    };
+  }
+  // Handle object response with various formats
+  else if (body && typeof body === 'object') {
+    success = body.success ?? true;
+    pagination = body.pagination;
+
+    // Try different possible array properties
+    raw = (body.data || body.applicants || body.results || body.users || []) as BackendApplicant[];
+  }
+
+  return {
+    data: raw,
+    pagination: pagination ?? {
+      limit: params?.limit ?? 6,
+      offset: params?.offset ?? 0,
+      count: (body as ApiResponse)?.count ?? raw.length,
+    },
+    success,
+  };
+};
+
+// ===== API Methods =====
+
 export const applicantsApi = {
-  // Optimized directory view with completion percentages and stage status
-  directory: async (params?: { tab?: 'all' | 'clearance'; period?: 'today' | 'week' | 'month'; search?: string; limit?: number; offset?: number; status?: string }) => {
+  /**
+   * Optimized directory view with completion percentages and stage status
+   */
+  directory: async (params?: ListParams): Promise<ApplicantListResponse> => {
     try {
       const queryString = buildQuery(params);
-      const response = await axiosClient.get<any>(`/agencyApplicants/directory${queryString}`);
-      const body = response?.data;
+      const response = await axiosClient.get<ApiResponse<BackendApplicant[]>>(
+        `/agencyApplicants/directory${queryString}`
+      );
+
+      const body = response.data;
+
       return {
         success: body?.success ?? true,
-        data: Array.isArray(body?.data) ? body.data.map(mapBackendToApplicant) : [],
+        data: Array.isArray(body?.applicants)
+          ? body.applicants.map(mapBackendToApplicant)
+          : [],
         pagination: body?.pagination,
       };
     } catch (err: any) {
-      console.error('Error fetching directory:', err);
+      console.error('[applicantsApi.directory] Error:', err);
       return {
         success: false,
         data: [],
@@ -82,115 +381,119 @@ export const applicantsApi = {
     }
   },
 
-  list: async (params?: { period?: string; search?: string; limit?: number; offset?: number }) => {
+  /**
+   * List applicants with fallback endpoints
+   */
+  list: async (params?: ListParams): Promise<ApplicantListResponse> => {
     try {
       const queryString = buildQuery(params);
-      let response: any;
-      try {
-        response = await axiosClient.get<any>(`/agencyApplicants${queryString}`);
-      } catch (err: any) {
-        // If endpoint not found, try alternate path used by backend
-        if (err?.response?.status === 404) {
-          try {
-            response = await axiosClient.get<any>(`/applicants${queryString}`);
-          } catch (err2: any) {
-            // As a final fallback, query users filtered by applicant type
-            if (err2?.response?.status === 404) {
-              const qsUsers = buildQuery({
-                userType: 'applicant',
-                limit: params?.limit,
-                offset: params?.offset,
-                search: params?.search,
-              });
-              response = await axiosClient.get<any>(`/users${qsUsers}`);
-            } else {
-              throw err2;
-            }
-          }
-        } else {
-          throw err;
-        }
-      }
+      const fallbackQueryString = buildQuery({
+        userType: 'applicant',
+        limit: params?.limit,
+        offset: params?.offset,
+        search: params?.search,
+      });
 
-      // Back end sample: { success, count, agencyId, applicants: [...], pagination }
-      const body = response?.data;
-      let raw: any[] = [];
-      let pagination = body?.pagination;
-      let success = body?.success ?? true;
+      // Try multiple endpoints in order
+      const endpoints = [
+        `/agencyApplicants${queryString}`,
+        `/applicants${queryString}`,
+        `/users${fallbackQueryString}`,
+      ];
 
-      if (Array.isArray(body)) {
-        raw = body;
-        pagination = {
-          limit: params?.limit ?? 6,
-          offset: params?.offset ?? 0,
-          count: body.length,
-        };
-      } else if (body && typeof body === 'object') {
-        if (Array.isArray(body.data)) {
-          raw = body.data;
-        } else if (Array.isArray(body.applicants)) {
-          raw = body.applicants;
-        } else if (Array.isArray(body.results)) {
-          raw = body.results;
-        } else if (Array.isArray(body.users)) {
-          raw = body.users;
-        }
-      }
+      const body = await tryEndpoints<ApiResponse<BackendApplicant[]> | BackendApplicant[]>(endpoints);
+      const { data: raw, pagination, success } = parseListResponse(body, params);
+      const data = raw.map(mapBackendToApplicant);
 
-      const data: Applicant[] = raw.map(mapBackendToApplicant);
-
-      return {
-        success,
-        data,
-        pagination: pagination ?? {
-          limit: params?.limit ?? 6,
-          offset: params?.offset ?? 0,
-          count: body?.count ?? data.length,
-        },
-      } satisfies ApplicantListResponse;
+      return { success, data, pagination };
     } catch (error) {
       console.error('[applicantsApi.list] Error:', error);
       throw error;
     }
   },
 
-  getById: async (id: string) => {
+  /**
+   * Get applicant by ID with fallback endpoints
+   */
+  getById: async (id: string): Promise<{ success?: boolean; data: Applicant }> => {
     try {
-      let response: any;
-      try {
-        response = await axiosClient.get<any>(`/agencyApplicants/${encodeURIComponent(id)}`);
-      } catch (err: any) {
-        if (err?.response?.status === 404) {
-          try {
-            response = await axiosClient.get<any>(`/applicants/${encodeURIComponent(id)}`);
-          } catch (err2: any) {
-            if (err2?.response?.status === 404) {
-              response = await axiosClient.get<any>(`/users/${encodeURIComponent(id)}`);
-            } else {
-              throw err2;
-            }
-          }
-        } else {
-          throw err;
-        }
-      }
-      const body = response?.data;
-      let raw: any = body?.data || body?.applicant || body;
-      const mapped: Applicant = mapBackendToApplicant(raw);
-      return { success: body?.success ?? true, data: mapped } as { success?: boolean; data: Applicant };
+      const encodedId = encodeURIComponent(id);
+      const endpoints = [
+        `/agencyApplicants/${encodedId}`,
+        `/applicants/${encodedId}`,
+        `/users/${encodedId}`,
+      ];
+
+      const body = await tryEndpoints<ApiResponse<BackendApplicant>>(endpoints);
+      const raw = body?.data || body?.applicant || (body as BackendApplicant);
+      const mapped = mapBackendToApplicant(raw);
+
+      return {
+        success: body?.success ?? true,
+        data: mapped
+      };
     } catch (error) {
       console.error('[applicantsApi.getById] Error:', error);
       throw error;
     }
   },
 
-  approve: async (id: string) => {
-    const response = await axiosClient.post<ApplicantActionResponse>(`/agencyApplicants/${id}/approve`);
+  /**
+   * Get detailed applicant by ID with all nested data (preScreening, eligibility, compliance, conditionalHire)
+   * Returns the comprehensive backend response structure
+   */
+  getByIdDetailed: async (id: string): Promise<{ success?: boolean; data: ApplicantDetailResponse }> => {
+    try {
+      const encodedId = encodeURIComponent(id);
+      const response = await axiosClient.get<ApiResponse<ApplicantDetailResponse>>(
+        `/agencyApplicants/${encodedId}`
+      );
+
+      const body = response.data;
+      const raw = body?.data || body?.applicant || (body as ApplicantDetailResponse);
+
+      return {
+        success: body?.success ?? true,
+        data: raw
+      };
+    } catch (error) {
+      console.error('[applicantsApi.getByIdDetailed] Error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Approve an applicant
+   */
+  approve: async (id: string): Promise<ApplicantActionResponse> => {
+    const response = await axiosClient.post<ApplicantActionResponse>(
+      `/agencyApplicants/${id}/approve`
+    );
     return response.data;
   },
 
-  cancel: async (id: string) => {
-    const response = await axiosClient.post<ApplicantActionResponse>(`/agencyApplicants/${id}/cancel`);
+  /**
+   * Cancel an applicant
+   */
+  cancel: async (id: string): Promise<ApplicantActionResponse> => {
+    const response = await axiosClient.post<ApplicantActionResponse>(
+      `/agencyApplicants/${id}/cancel`
+    );
+    return response.data;
+  },
+
+  /**
+   * Confirm a review step for an applicant
+   */
+  confirmReviewStep: async (
+    id: string,
+    stepKey: string,
+    confirmed: boolean
+  ): Promise<{ success: boolean; message: string; reviewStep: any }> => {
+    const response = await axiosClient.post(
+      `/agencyApplicants/${id}/review`,
+      { stepKey, confirmed }
+    );
     return response.data;
   },
 };

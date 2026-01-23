@@ -20,7 +20,7 @@ import { ApplicationStatusNames, getApplicationStatus, updateApplicationStatus, 
 import { useAuth } from "@/utils/auth";
 import { APPLICATION_STEP_NAMES, APPLICATION_STEP_TITLES } from "@/lib/api/job-application";
 import { useToast } from "@/hooks/use-toast";
-import {Routes} from "@/routes/constants";
+import { Routes } from "@/routes/constants";
 
 
 const STEP_COUNT = 5;
@@ -69,7 +69,7 @@ function ApplicationContent() {
       try {
         setIsLoading(true);
         const response = await getApplicationStatus();
-        
+
         // Store the application status
         setApplicationStatus(response.status);
 
@@ -100,12 +100,13 @@ function ApplicationContent() {
   );
 
   const handleNext = async () => {
-    const newActiveStep = activeStep+1;
+    setShowSuccessDialog(false);
+    setActiveStep(activeStep + 1);
     const updatedStatus = await updateApplicationStatus({
-      status: ApplicationStatusNames[newActiveStep],
-      currentStep: APPLICATION_STEP_NAMES[newActiveStep],
+      status: ApplicationStatusNames[activeStep + 1],
+      currentStep: APPLICATION_STEP_NAMES[activeStep + 1],
     });
-    
+
     setApplicationStatus({
       hasStarted: true,
       status: updatedStatus.status,
@@ -116,17 +117,17 @@ function ApplicationContent() {
     setShowSuccessDialog(true);
   };
 
+  const handleStepSuccess = () => {
+    setShowSuccessDialog(true);
+  };
+
   const stepComponents = [
-    <ProfilePreScreeningStep key="profile" onNext={handleNext} />,
-    <DocumentUploadStep key="documents" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
-    <ConditionalHireStep key="conditional" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
-    <FinalReviewStep key="review" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
+    <ProfilePreScreeningStep key="profile" onSuccess={handleStepSuccess} />,
+    <DocumentUploadStep key="documents" onBack={() => setActiveStep(activeStep - 1)} onSuccess={handleStepSuccess} />,
+    <ConditionalHireStep key="conditional" onBack={() => setActiveStep(activeStep - 1)} onSuccess={handleStepSuccess} />,
+    <FinalReviewStep key="review" onSuccess={handleStepSuccess} />,
     <OrientationStep key="orientation" />,
   ];
-
-  const handleSuccessDialogContinue = () => {
-    setShowSuccessDialog(false);
-  };
 
   const handleCancelClick = () => {
     setShowCancelDialog(true);
@@ -136,7 +137,7 @@ function ApplicationContent() {
     try {
       setIsCancelling(true);
       const response = await cancelApplication();
-      
+
       if (response.success) {
         setShowCancelDialog(false);
         toast({
@@ -144,7 +145,7 @@ function ApplicationContent() {
           description: response.message || "Your application has been cancelled successfully.",
           variant: "success",
         });
-        
+
         setTimeout(() => {
           navigate(Routes.applicant.dashboard);
         }, 1500);
@@ -173,9 +174,9 @@ function ApplicationContent() {
     <>
       <div className="mb-[24px] flex items-center justify-between">
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">Application</h1>
-        <Button 
-          type="button" 
-          variant="destructive" 
+        <Button
+          type="button"
+          variant="destructive"
           className="gap-[13px] px-4"
           onClick={handleCancelClick}
           disabled={!applicationStatus?.hasStarted}
@@ -215,7 +216,7 @@ function ApplicationContent() {
           title={`Stage ${activeStep + 1} Submitted`}
           description={`You have successfully completed ${APPLICATION_STEP_TITLES[activeStep]}. Click 'next' to go to the next phase.`}
           buttonText="Next"
-          onButtonClick={handleSuccessDialogContinue}
+          onButtonClick={handleNext}
         />
       </SuccessDialog>
       <ConfirmDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>

@@ -32,7 +32,6 @@ export default function CommunityInclusionsPage() {
 
   // Saving state
   const [isSaving, setIsSaving] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (
     id: string,
@@ -61,12 +60,11 @@ export default function CommunityInclusionsPage() {
     return validAttendees;
   };
 
-  const saveToApi = async (status: 'saved' | 'submitted') => {
+  const saveToApi = async () => {
     const validAttendees = validateForm();
     if (!validAttendees) return;
 
-    const loadingStateSetter = status === 'saved' ? setIsSaving : setIsSubmitting;
-    loadingStateSetter(true);
+    setIsSaving(true);
 
     try {
       // Convert AttendanceRow[] to Attendee[] format expected by API
@@ -106,12 +104,9 @@ export default function CommunityInclusionsPage() {
         variant: "destructive",
       });
     } finally {
-      loadingStateSetter(false);
+      setIsSaving(false);
     }
   };
-
-  const handleSave = () => saveToApi('saved');
-  const handleSubmit = () => saveToApi('submitted');
 
   const handleAddAttendee = () => {
     const newId = (attendanceRows.length + 1).toString();
@@ -246,21 +241,12 @@ export default function CommunityInclusionsPage() {
             </button>
 
             <button
-              onClick={handleSave}
-              disabled={isSaving || isSubmitting}
+              onClick={saveToApi}
+              disabled={isSaving}
               className="h-[44px] min-w-[120px] rounded-[60px] bg-[#00b4b8] text-[14px] font-semibold text-white hover:bg-[#00a0a3] active:bg-[#008f92] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
             >
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
               {isSaving ? "Saving" : "Save"}
-            </button>
-
-            <button
-              onClick={handleSubmit}
-              disabled={isSaving || isSubmitting}
-              className="h-[44px] min-w-[120px] rounded-[60px] bg-[#00b4b8] text-[14px] font-semibold text-white hover:bg-[#00a0a3] active:bg-[#008f92] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.98]"
-            >
-              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isSubmitting ? "Submitting" : "Submit"}
             </button>
           </div>
         </div>

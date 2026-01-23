@@ -14,8 +14,7 @@ interface ReviewItem {
 }
 
 interface FinalReviewStepProps {
-  onBack?: () => void;
-  onNext?: () => void;
+  onSuccess?: () => void;
 }
 
 const STATUS_STYLES: Record<
@@ -88,7 +87,7 @@ function TimelineIndicator({ status, isFirst, isLast }: TimelineIndicatorProps) 
   );
 }
 
-export default function FinalReviewStep({ onBack, onNext }: FinalReviewStepProps) {
+export default function FinalReviewStep({ onSuccess }: FinalReviewStepProps) {
   const [checklist, setChecklist] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -238,33 +237,31 @@ export default function FinalReviewStep({ onBack, onNext }: FinalReviewStepProps
         </ol>
       </div>
 
-      <div className="flex flex-col items-start gap-4 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 pt-4">
         <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">{helperMessage}</p>
-        {onNext ? (
-            <Button
-              type="button"
-              variant={allConfirmed ? "default" : "secondary"}
-              disabled={!allConfirmed}
-              className={cn(
-                "gap-[10px] text-[14px]",
-                allConfirmed
-                  ? "shadow-[0_12px_32px_-10px_rgba(0,180,184,0.6)]"
-                  : "!bg-[#b2b2b3] text-white opacity-100"
-              )}
-              onClick={onNext}
-            >
-              <span>Next</span>
-              <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path
-                  d="M4 10H16M16 10L10 4M16 10L10 16"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </Button>
-          ) : null}
+        <Button
+          type="button"
+          variant={allConfirmed ? "default" : "secondary"}
+          disabled={!allConfirmed}
+          className={cn(
+            "gap-[10px] text-[14px]",
+            allConfirmed
+              ? "shadow-[0_12px_32px_-10px_rgba(0,180,184,0.6)]"
+              : "!bg-[#b2b2b3] text-white opacity-100"
+          )}
+          onClick={onSuccess}
+        >
+          <span>Next</span>
+          <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M4 10H16M16 10L10 4M16 10L10 16"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </Button>
       </div>
     </section>
   );

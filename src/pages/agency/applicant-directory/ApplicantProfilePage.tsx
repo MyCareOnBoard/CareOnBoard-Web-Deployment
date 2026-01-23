@@ -1,29 +1,95 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Phone, MessageSquare, ArrowLeft, ExternalLink, Eye, Upload, CheckCircle, XCircle } from "lucide-react";
+import {
+  Phone,
+  MessageSquare,
+  ArrowLeft,
+  ExternalLink,
+  Eye,
+  CheckCircle,
+  CheckCircle2,
+  CircleAlert,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Routes } from "@/routes/constants";
-import { applicantsApi, type Applicant } from "@/lib/api/applicants";
+import { applicantsApi, type Applicant, type ApplicantDetailResponse, type ComplianceData } from "@/lib/api/applicants";
+import type { EligibilityData } from "@/lib/api/applicants";
 import { useToast } from "@/hooks/use-toast";
 import { agencyApplicantsExtraApi, ApplicantDocumentItem } from "@/lib/api/agencyApplicantsExtra";
 import { officialHireApi, OfficialHireStatusResponse } from "@/lib/api/officialHire";
 import { storageApi } from "@/lib/api/storage";
 import { authorizationsApi } from "@/lib/api/authorizations";
+import { ProfileTab } from "./components/ProfileTab";
+import { DocumentsTab } from "./components/DocumentsTab";
+import { ConditionalHireTab } from "./components/ConditionalHireTab";
+import { OfficialHireTab } from "./components/OfficialHireTab";
+import { FinalReviewTab, type ReviewStepsState } from "./components/FinalReviewTab";
+
+// Type alias for document file from eligibility data
+type DocumentFile = NonNullable<EligibilityData['photoIdUrl']>;
 
 export default function ApplicantProfilePage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { toast } = useToast();
-  const [activeSection, setActiveSection] = useState<"profile" | "documents" | "conditional" | "final">("profile");
+  const [activeSection, setActiveSection] = useState<"profile" | "documents" | "conditional" | "official" | "final">("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [documentsData, setDocumentsData] = useState<ApplicantDocumentItem[]>([]);
   const [hireStatus, setHireStatus] = useState<OfficialHireStatusResponse['status'] | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
   const [authApprovals, setAuthApprovals] = useState<Record<number, boolean>>({});
+  const [complianceData, setComplianceData] = useState<ComplianceData | undefined>(undefined);
+  const [signatures, setSignatures] = useState<{
+    conditionalHire?: { signatureType: string; signatureData: string; createdAt?: { _seconds: number; _nanoseconds: number } } | null;
+    officialHire?: { signatureType: string; signatureData: string; createdAt?: { _seconds: number; _nanoseconds: number } } | null;
+  } | null>(null);
+  const [toggledAuthorizations, setToggledAuthorizations] = useState<Set<string>>(new Set());
+  const [reviewSteps, setReviewSteps] = useState<ReviewStepsState>({
+    documentsValid: { confirmed: false },
+    backgroundCheck: { confirmed: false },
+    drugTest: { confirmed: false },
+    fingerprint: { confirmed: false },
+    trainings: { confirmed: false },
+    systemProfile: { confirmed: false },
+    orientation: { confirmed: false },
+  });
+
+  // Track status of each application step for tab styling
+  const [stepStatuses, setStepStatuses] = useState<{
+    profile: string | null;
+    documents: string | null;
+    conditional: string | null;
+    final: boolean;
+    official: string | null;
+  }>({
+    profile: null,
+    documents: null,
+    conditional: null,
+    final: false,
+    official: null,
+  });
+
+  // Helper to check if a step is complete (submitted or completed)
+  const isStepComplete = (status: string | null | boolean): boolean => {
+    if (typeof status === 'boolean') return status;
+    if (!status) return false;
+    return ['submitted', 'completed', 'letter_signed', 'pre-screening_complete'].includes(status.toLowerCase());
+  };
+
+
+  type ReferenceItem = {
+    name: string;
+    relation: string;
+    mobile: string;
+    email: string;
+  };
+
+  const [references, setReferences] = useState<ReferenceItem[]>([]);
 
   const [applicant, setApplicant] = useState<{
     id: string;
@@ -34,104 +100,274 @@ export default function ApplicantProfilePage() {
     gender?: string;
     email?: string;
     avatar: string;
+    resumeUrl?: string;
     profileScreening: boolean;
     documents: boolean;
     conditionalHire: boolean;
     finalAgencyReview: boolean;
     questionnaire?: {
+      isAtLeast18?: string;
       highSchoolDiploma?: string;
       legallyEligible?: string;
       convicted?: string;
-      convictedRepeat?: string;
+      reliableTransportation?: string;
     };
   }>({
     id: id || "",
     name: "",
-    role: "Applicant",
+    role: "",
     avatar: "",
+    resumeUrl: "",
     profileScreening: false,
     documents: false,
     conditionalHire: false,
     finalAgencyReview: false,
   });
 
-  // Mock data for other tabs
-  const documents = [
-    { name: "Photo ID", icon: "📄" },
-    { name: "Social Security Card", icon: "📄" },
-    { name: "School Diploma Certificate", icon: "📄" },
-    { name: "Extra Certificates", icon: "📄" },
-    { name: "Filled I-9 form", icon: "📄" },
-    { name: "Filled W-4 form", icon: "📄" },
-  ];
-  const references = [
-    {
-      name: "Nur Nabi Rahman",
-      relation: "Colleague",
-      mobile: "+88019I3527742",
-      email: "nurnabi@liroagency",
-    },
-    {
-      name: "Nur Nabi Rahman",
-      relation: "Colleague",
-      mobile: "+88019I3527742",
-      email: "nurnabi@liroagency",
-    },
-  ];
-  const conditionalHireData = {
-    letterSigned: true,
-    signedDate: "18 January 2022",
-  };
-  const authorizations = [
-    { name: "Authorize Drug test appointment", status: "Enabled", bookingLink: true },
-    { name: "Authorize Fingerprint appointment", status: "Enabled", bookingLink: true },
-    { name: "Authorize Central Registry Check (Developmental Disabilities Abuse/Neglect Registry)", status: "Enabled", bookingLink: true },
-    { name: "Authorize CARI Check (Child Abuse Record Information, DCF)", status: "Enabled", bookingLink: true },
-    { name: "Authorize Sex Offender Registry Check (Megan's Law)", status: "Enabled", bookingLink: true },
-    { name: "Authorize OIG Exclusion List Check (LEIE)", status: "Disabled", bookingLink: false },
-    { name: "Authorize Health & TB Screening", status: "Enabled", bookingLink: true },
-    { name: "Authorize Reference Checks (Minimum 2, Non-Family)", status: "Enabled", bookingLink: true },
-  ];
+  // Document and references configuration - mirror main /documents items
+  const documentDefinitions = [
+    { type: "photo-id", label: "Photo ID" }, // documents.photoId.fileType
+    { type: "social-security-card", label: "Social Security Card" }, // documents.socialSecurityCard.fileType
+    { type: "diploma", label: "School Diploma Certificate" }, // documents.diploma.fileType
+    { type: "certifications", label: "Extra Certificates" }, // documents.certifications (array/object)
+    { type: "hepatitis-b-vaccination", label: "Hepatitis B Vaccination" }, // documents.hepatitisBVaccination.fileType
+    { type: "hepatitis-b-immunity", label: "Hepatitis B Immunity" }, // documents.hepatitisBImmunity.fileType
+    { type: "tb-test", label: "TB Test" }, // documents.tbTest
+    { type: "i9-form", label: "Filled I-9 form" }, // documents.i9Form.fileType
+    { type: "w4-form", label: "Filled W-4 form" }, // documents.w4Form.fileType
+  ] as const;
 
-  const handleNavigateToSection = (section: "profile" | "documents" | "conditional" | "final") => {
+  const documentLabelByType: Record<string, string> = documentDefinitions.reduce(
+    (acc, def) => {
+      acc[def.type] = def.label;
+      return acc;
+    },
+    {} as Record<string, string>
+  );
+
+  const handleNavigateToSection = (section: "profile" | "documents" | "conditional" | "official" | "final") => {
     setActiveSection(section);
     // No navigation, just switch tab
   };
 
-  // Fetch documents and hire status
+  const getDocumentUrlByType = (type: string) => {
+    const item = documentsData.find((doc) => doc.type === type);
+    return item?.url;
+  };
+
+  const handleToggleCompliance = async (authKey: string, checked: boolean) => {
+    if (!id) return;
+    try {
+      await authorizationsApi.update(id, { [authKey]: checked });
+      // Add to toggled set to disable the toggle
+      setToggledAuthorizations(prev => new Set(prev).add(authKey));
+      toast({
+        title: "Success",
+        description: `Authorization ${checked ? 'approved' : 'disapproved'}`,
+      });
+      // Refresh applicant data
+      fetchApplicantData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to update authorization",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConfirmReviewStep = async (stepKey: keyof ReviewStepsState) => {
+    if (!id) return;
+    setActionLoading(stepKey);
+    try {
+      // Call API to save confirmation
+      await applicantsApi.confirmReviewStep(id, stepKey, true);
+
+      setReviewSteps(prev => ({
+        ...prev,
+        [stepKey]: {
+          confirmed: true,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      toast({
+        title: "Confirmed",
+        description: "Review step confirmed successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to confirm step",
+        variant: "destructive"
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Fetch all applicant data with a single API call
   const fetchApplicantData = async () => {
     if (!id) return;
     setIsLoading(true);
     try {
-      const [detailRes, docsRes, statusRes] = await Promise.all([
-        applicantsApi.getById(id).catch(() => null),
-        agencyApplicantsExtraApi.documents(id).catch(() => ({ success: false, documents: [] })),
-        officialHireApi.status(id).catch(() => null),
-      ]);
-      if (detailRes?.data) {
-        // Map backend fields to UI model where possible
-        setApplicant(prev => ({
-          ...prev,
-          id,
-          name: detailRes.data.name ?? prev.name,
-          role: detailRes.data.role ?? prev.role,
-          avatar: (detailRes.data as any).avatar ?? prev.avatar,
-          profileScreening: detailRes.data.profileScreening,
-          documents: detailRes.data.documents,
-          conditionalHire: detailRes.data.conditionalHire,
-          finalAgencyReview: detailRes.data.finalAgencyReview,
-        }));
+      // Single comprehensive API call
+      const response = await applicantsApi.getByIdDetailed(id);
+
+      if (!response?.data) {
+        console.error('No applicant data returned');
+        return;
       }
-      if (docsRes.success) {
-        setDocumentsData(docsRes.documents);
-        const uploaded = docsRes.documents.filter((d: ApplicantDocumentItem) => d.status !== 'pending').length;
-        const verified = docsRes.documents.filter((d: ApplicantDocumentItem) => d.status === 'verified').length;
-        const total = docsRes.documents.length;
+
+      const data = response.data;
+
+      // Extract basic profile information
+      setApplicant(prev => ({
+        ...prev,
+        id,
+        name: data.fullName || prev.name,
+        role: data.userType === 'applicant' ? 'Applicant' : (prev.role || 'Applicant'),
+        avatar: data.profilePictureUrl || prev.avatar,
+        address: data.address?.address || prev.address,
+        dob: data.dateOfBirth || prev.dob,
+        gender: data.gender || prev.gender,
+        email: data.email || prev.email,
+        resumeUrl: data.preScreening?.resumeUrl || prev.resumeUrl,
+        // Stage completions based on application status
+        profileScreening: Boolean(data.preScreening?.status),
+        documents: Boolean(data.eligibility?.status),
+        conditionalHire: Boolean(data.conditionalHire?.status),
+        finalAgencyReview: data.applicationStatus === 'approved' || false,
+        // Map all pre-screening questions from preScreening data
+        questionnaire: {
+          isAtLeast18: data.preScreening?.isAtLeast18 ? 'Yes' : 'No',
+          highSchoolDiploma: data.preScreening?.hasHighSchoolDiploma ? 'Yes' : 'No',
+          legallyEligible: data.preScreening?.isLegallyEligible ? 'Yes' : 'No',
+          convicted: data.preScreening?.hasBeenConvicted ? 'Yes' : 'No',
+          reliableTransportation: data.preScreening?.hasReliableTransportation ? 'Yes' : 'No',
+        },
+      }));
+
+      // Extract documents from eligibility data
+      const eligibility = data.eligibility;
+      if (eligibility) {
+        const normalizedDocs: ApplicantDocumentItem[] = [];
+
+        // Map each document type
+        const docMap: Record<string, { url?: DocumentFile; label: string }> = {
+          'photo-id': { url: eligibility.photoIdUrl, label: 'Photo ID' },
+          'social-security-card': { url: eligibility.socialSecurityCardUrl, label: 'Social Security Card' },
+          'diploma': { url: eligibility.diplomaUrl, label: 'School Diploma Certificate' },
+          'certifications': { url: eligibility.certificationsUrl, label: 'Extra Certificates' },
+          'hepatitis-b-vaccination': { url: eligibility.hepatitisBVaccinationUrl, label: 'Hepatitis B Vaccination' },
+          'hepatitis-b-immunity': { url: eligibility.hepatitisBImmunityUrl, label: 'Hepatitis B Immunity' },
+          'tb-test': { url: eligibility.tbTestResultUrl, label: 'TB Test' },
+          'i9-form': { url: eligibility.i9FormUrl, label: 'Filled I-9 form' },
+          'w4-form': { url: eligibility.w4FormUrl, label: 'Filled W-4 form' },
+        };
+
+        Object.entries(docMap).forEach(([type, { url, label }]) => {
+          if (url?.fileUrl) {
+            normalizedDocs.push({
+              id: type,
+              type,
+              label,
+              required: false,
+              status: 'uploaded' as const,
+              url: url.fileUrl,
+              uploadedAt: undefined,
+              verifiedAt: undefined,
+              note: undefined,
+            });
+          }
+        });
+
+        setDocumentsData(normalizedDocs);
+
+        // Calculate progress
+        const total = normalizedDocs.length;
+        const verified = normalizedDocs.filter(d => d.status === 'verified').length;
         setProgressPercent(total > 0 ? Math.round((verified / total) * 100) : 0);
+
+        // Extract references
+        if (Array.isArray(eligibility.references)) {
+          const refs = eligibility.references.map(r => ({
+            name: r.name || '',
+            relation: r.relationship || '',
+            mobile: r.phoneNumber || '',
+            email: r.email || '',
+          }));
+          setReferences(refs);
+        }
       }
-      if (statusRes?.success) {
-        setHireStatus(statusRes.status);
+
+      // Extract conditional hire status
+      if (data.conditionalHire) {
+        setHireStatus({
+          status: data.conditionalHire.status || 'pending',
+          letterSigning: {
+            hasSigned: Boolean(data.conditionalHire.finalizedAt),
+            signedAt: data.conditionalHire.finalizedAt
+              ? new Date(data.conditionalHire.finalizedAt._seconds * 1000).toISOString()
+              : undefined,
+          },
+        } as any);
       }
+
+      // Extract compliance data
+      if (data.compliance) {
+        setComplianceData(data.compliance);
+      }
+
+      // Extract signatures data
+      if (data.signatures) {
+        setSignatures(data.signatures);
+      }
+
+      // Map reviews data to reviewSteps state
+      if (data.reviews && typeof data.reviews === 'object') {
+        const mappedReviews: ReviewStepsState = {
+          documentsValid: { confirmed: false },
+          backgroundCheck: { confirmed: false },
+          drugTest: { confirmed: false },
+          fingerprint: { confirmed: false },
+          trainings: { confirmed: false },
+          systemProfile: { confirmed: false },
+          orientation: { confirmed: false },
+        };
+
+        // Map each review step from the API response
+        Object.entries(data.reviews).forEach(([stepKey, reviewData]) => {
+          // Only map if the stepKey exists in our ReviewStepsState
+          if (stepKey in mappedReviews && reviewData) {
+            const firebaseTimestamp = reviewData.timestamp || reviewData.updatedAt;
+            const timestamp = firebaseTimestamp && firebaseTimestamp._seconds
+              ? new Date(firebaseTimestamp._seconds * 1000).toISOString()
+              : undefined;
+
+            mappedReviews[stepKey as keyof ReviewStepsState] = {
+              confirmed: Boolean(reviewData.confirmed),
+              timestamp,
+            };
+          }
+        });
+
+        setReviewSteps(mappedReviews);
+      }
+
+      // Extract step statuses for tab styling
+      // Check if all review steps are confirmed for final review status
+      const allReviewsConfirmed = data.reviews
+        ? Object.keys(data.reviews).length === Object.keys(reviewSteps).length
+        : false;
+
+      setStepStatuses({
+        profile: data.preScreening?.status || null,
+        documents: data.eligibility?.status || null,
+        conditional: data.conditionalHire?.status || null,
+        final: allReviewsConfirmed,
+        official: data.officialHireStatus || null,
+      });
+
     } catch (error) {
       console.error('Error fetching applicant data:', error);
     } finally {
@@ -203,13 +439,20 @@ export default function ApplicantProfilePage() {
 
   const handleConfirmHire = async () => {
     if (!id) return;
-    setActionLoading('confirm-hire');
+    setActionLoading("confirm-hire");
     try {
       await officialHireApi.confirm(id);
-      toast({ title: 'Hire Confirmed', description: 'Official hire has been confirmed successfully.' });
+      toast({
+        title: "Hire Confirmed",
+        description: "Official hire has been confirmed successfully.",
+      });
       fetchApplicantData();
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to confirm hire.', variant: 'destructive' });
+      toast({
+        title: "Error",
+        description: "Failed to confirm hire.",
+        variant: "destructive",
+      });
     } finally {
       setActionLoading(null);
     }
@@ -224,344 +467,247 @@ export default function ApplicantProfilePage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate(Routes.agency.applicantClearanceHiring)}
+              onClick={() => navigate(Routes.agency.applicantDirectory)}
               className="text-gray-600 hover:text-gray-900"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Applicant's directory
+            <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
+              Applicant&apos;s directory
             </h1>
           </div>
 
-          {/* Profile Card */}
-          <div className="p-8 mb-6 bg-white rounded-lg shadow-sm">
-            <div className="flex items-start gap-6">
-              <img
-                src={applicant.avatar}
-                alt={applicant.name}
-                className="w-32 h-32 rounded-full"
-              />
-              <div className="flex-1">
-                <Badge className="mb-3 text-green-800 bg-green-100">
-                  {applicant.role}
-                </Badge>
-                <h2 className="mb-2 text-2xl font-bold text-gray-900">
-                  {applicant.name}
-                </h2>
-                <p className="mb-4 text-gray-600">
-                  {applicant.address} • {applicant.dob}
-                </p>
-                <div className="flex gap-3">
-                  <Button 
-                    disabled
-                    className="text-gray-400 bg-gray-200 cursor-not-allowed hover:bg-gray-200"
-                  >
-                    <Phone className="w-4 h-4 mr-2" />
-                    Call
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-gray-300"
-                    onClick={() => navigate(Routes.agency.support)}
-                  >
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    Chat
-                  </Button>
+          {/* Profile Header Card */}
+          <div className="relative mb-6 rounded-[24px] bg-[rgba(255,255,255,0.8)] shadow-sm p-6 md:p-8">
+            {isLoading ? (
+              <div className="space-y-6">
+                <div className="flex flex-col gap-6 md:flex-row md:items-start">
+                  <Skeleton className="h-[145px] w-[127px] rounded-[12px]" />
+                  <div className="flex-1 space-y-4">
+                    <Skeleton className="h-6 w-24 rounded-full" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-8 w-64" />
+                      <Skeleton className="h-4 w-48" />
+                    </div>
+                    <div className="flex gap-3">
+                      <Skeleton className="h-10 w-24 rounded-full" />
+                      <Skeleton className="h-10 w-24 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-9 w-40 rounded-full" />
+                  ))}
                 </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-6 md:flex-row md:items-start">
+                  {/* Avatar */}
+                  <div className="h-[145px] w-[127px] rounded-[12px] bg-[#e0e0e0] overflow-hidden shrink-0">
+                    {applicant.avatar ? (
+                      <img
+                        src={applicant.avatar}
+                        alt={applicant.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xl font-semibold text-[#808081]">
+                        {applicant.name
+                          .split(" ")
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((w) => w[0]?.toUpperCase())
+                          .join("") || "AP"}
+                      </div>
+                    )}
+                  </div>
 
-            {/* Status Tabs */}
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => handleNavigateToSection("profile")}
-                className={`px-4 py-2 text-sm rounded-full border transition ${
-                  activeSection === "profile"
-                    ? "bg-teal-500 text-white border-teal-500"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {applicant.profileScreening && <span className="mr-1">✓</span>}
-                Profile & Pre-Screening
-              </button>
-              <button
-                onClick={() => handleNavigateToSection("documents")}
-                className={`px-4 py-2 text-sm rounded-full border transition ${
-                  activeSection === "documents"
-                    ? "bg-teal-500 text-white border-teal-500"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {documentsData.filter(d => d.status === 'verified').length > 0 && <span className="mr-1">✓</span>}
-                Document Upload & Eligibility Verification
-              </button>
-              <button
-                onClick={() => handleNavigateToSection("conditional")}
-                className={`px-4 py-2 text-sm rounded-full border transition ${
-                  activeSection === "conditional"
-                    ? "bg-teal-500 text-white border-teal-500"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {hireStatus?.letterSigning?.hasSigned && <span className="mr-1">✓</span>}
-                Conditional Hire & Compliance
-              </button>
-              <button
-                onClick={() => handleNavigateToSection("final")}
-                className={`px-4 py-2 text-sm rounded-full border transition ${
-                  activeSection === "final"
-                    ? "bg-red-500 text-white border-red-500"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {hireStatus?.overall?.status === 'completed' ? <span className="mr-1">✓</span> : <span className="mr-1">!</span>}
-                Final Agency Review
-              </button>
-            </div>
+                  {/* Name / meta / actions */}
+                  <div className="flex-1 space-y-3">
+                    <div className="inline-flex rounded-[60px] border border-[#0eaf52] bg-[#f0faf4] px-4 py-[6px]">
+                      <span className="text-[10px] font-semibold leading-[1.4] text-[#0eaf52]">
+                        {applicant.role || "Applicant"}
+                      </span>
+                    </div>
+                    <div>
+                      <h2 className="text-[24px] font-semibold leading-[1.3] text-[#10141a]">
+                        {applicant.name}
+                      </h2>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] font-medium leading-[1.6] text-[#808081]">
+                        {applicant.address && <span>{applicant.address}</span>}
+                        {applicant.address && applicant.dob && (
+                          <span className="h-[6px] w-[6px] rounded-full bg-[#b2b2b3]" />
+                        )}
+                        {applicant.dob && <span>{applicant.dob}</span>}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <Button
+                        disabled
+                        className="flex items-center gap-2 rounded-[60px] bg-[#2b82ff] px-5 py-[10px] text-[14px] font-semibold text-white shadow-none hover:bg-[#2563eb] disabled:opacity-70"
+                      >
+                        <Phone className="h-4 w-4" />
+                        Call
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2 rounded-[60px] border-[rgba(255,255,255,0.3)] bg-white/70 px-5 py-[10px] text-[14px] font-semibold text-[#10141a] shadow-none hover:bg-white"
+                        onClick={() => navigate(Routes.agency.support)}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        Chat
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stage Pills */}
+                <div className="mt-6 flex flex-wrap gap-3">
+                  {/* Profile */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateToSection("profile")}
+                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "profile"
+                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                      : !!(stepStatuses.profile)
+                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                      }`}
+                  >
+                    {!!(stepStatuses.profile) ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <CircleAlert className="h-4 w-4" />
+                    )}
+                    Profile &amp; Pre-Screening
+                  </button>
+
+                  {/* Documents */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateToSection("documents")}
+                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "documents"
+                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                      : isStepComplete(stepStatuses.documents)
+                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                      }`}
+                  >
+                    {isStepComplete(stepStatuses.documents) ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <CircleAlert className="h-4 w-4" />
+                    )}
+                    Document Upload &amp; Eligibility Verification
+                  </button>
+
+                  {/* Conditional Hire */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateToSection("conditional")}
+                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "conditional"
+                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                      : isStepComplete(stepStatuses.conditional)
+                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                      }`}
+                  >
+                    {isStepComplete(stepStatuses.conditional) ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <CircleAlert className="h-4 w-4" />
+                    )}
+                    Conditional Hire &amp; Compliance
+                  </button>
+
+                  {/* Final Review */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateToSection("final")}
+                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "final"
+                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                      : isStepComplete(stepStatuses.final)
+                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                      }`}
+                  >
+                    {isStepComplete(stepStatuses.final) ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <CircleAlert className="h-4 w-4" />
+                    )}
+                    Final Agency Review
+                  </button>
+
+                  {/* Official Hire */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateToSection("official")}
+                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
+                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                      : isStepComplete(stepStatuses.official)
+                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
+                      }`}
+                  >
+                    {isStepComplete(stepStatuses.official) ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <CircleAlert className="h-4 w-4" />
+                    )}
+                    Official Hire
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Tab Panels */}
-          {activeSection === "profile" && (
-            <div className="p-8 bg-white rounded-lg shadow-sm">
-              <h3 className="mb-6 text-lg font-semibold text-gray-900">Profile & Pre-Screening</h3>
-              <div className="space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <span className="text-sm text-gray-600">Gender</span>
-                  <span className="text-sm font-medium text-gray-900">{applicant.gender}</span>
-                </div>
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <span className="text-sm text-gray-600">Email</span>
-                  <span className="text-sm font-medium text-gray-900">{applicant.email}</span>
-                </div>
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <span className="text-sm text-gray-600">Do you have a High School Diploma or GED?</span>
-                  <span className="text-sm font-medium text-gray-900">{applicant.questionnaire?.highSchoolDiploma ?? '-'}</span>
-                </div>
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <span className="text-sm text-gray-600">Are you legally eligible to work in the U.S.?</span>
-                  <span className="text-sm font-medium text-gray-900">{applicant.questionnaire?.legallyEligible ?? '-'}</span>
-                </div>
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <span className="text-sm text-gray-600">Have you ever been convicted of a disqualifying offense under NJ law?</span>
-                  <span className="text-sm font-medium text-gray-900">{applicant.questionnaire?.convicted ?? '-'}</span>
-                </div>
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <span className="text-sm text-gray-600">Have you ever been convicted of a disqualifying offense under NJ law?</span>
-                  <span className="text-sm font-medium text-gray-900">{applicant.questionnaire?.convictedRepeat ?? '-'}</span>
-                </div>
-                {/* Resume Section */}
-                <div className="flex items-center justify-between p-4 rounded-lg bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 bg-white border border-gray-200 rounded-lg">
-                      <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">Resume</span>
-                  </div>
-                  <Button variant="outline" className="text-green-600 border-green-600 hover:bg-green-50">
-                    View Resume
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          {activeSection === "profile" && <ProfileTab applicant={applicant} />}
 
           {activeSection === "documents" && (
-            <div className="p-8 bg-white rounded-lg shadow-sm">
-              <div className="mb-8 space-y-3">
-                {documents.map((doc, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-4 border-b border-gray-200 last:border-0"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-10 h-10">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                      <span className="text-[15px] font-medium text-[#10141a]">{doc.name}</span>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      className="px-6 py-2 text-sm font-medium text-[#00b3ad] border-[#00b3ad] rounded-lg hover:bg-[#00b3ad]/5"
-                    >
-                      View Document
-                    </Button>
-                  </div>
-                ))}
-              </div>
-
-              <h3 className="mb-6 text-[18px] font-semibold text-[#10141a]">References</h3>
-              <div className="grid grid-cols-2 gap-6">
-                {references.map((ref, index) => (
-                  <div key={index} className="p-5 bg-white border border-gray-200 rounded-lg">
-                    <h4 className="mb-1 text-[15px] font-semibold text-[#10141a]">{ref.name}</h4>
-                    <p className="mb-4 text-[13px] text-gray-500">{ref.relation}</p>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-[13px]">
-                        <span className="text-gray-600">Mobile</span>
-                        <span className="font-medium text-gray-900">{ref.mobile}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[13px]">
-                        <span className="text-gray-600">Email</span>
-                        <span className="font-medium text-gray-900">{ref.email}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <DocumentsTab
+              documentDefinitions={documentDefinitions}
+              getDocumentUrlByType={getDocumentUrlByType}
+              references={references}
+            />
           )}
 
           {activeSection === "conditional" && (
-            <div className="p-8 bg-white rounded-lg shadow-sm">
-              <h3 className="mb-6 text-lg font-semibold text-gray-900">Conditional Hire</h3>
-              {isLoading ? (
-                <div className="py-12 text-center text-gray-500">Loading status...</div>
-              ) : hireStatus?.letterSigning?.hasSigned ? (
-                <div className="flex items-center justify-between p-5 border border-green-200 rounded-lg bg-green-50">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center shrink-0 w-10 h-10 bg-green-100 rounded-full">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900">
-                        Conditional Hire Letter Signed
-                      </h4>
-                      <p className="text-xs text-gray-600 mt-0.5">
-                        {hireStatus.letterSigning.signedAt ? `Signed on ${new Date(hireStatus.letterSigning.signedAt).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}` : 'Signature received'}
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="outline" className="text-gray-700 border-gray-300 hover:bg-gray-50">
-                    <Eye className="w-4 h-4 mr-2" />
-                    View Signed Letter
-                  </Button>
-                </div>
-              ) : (
-                <div className="p-6 border border-gray-200 rounded-lg bg-gray-50">
-                  <p className="mb-4 text-sm text-gray-600">Conditional hire letter not yet signed.</p>
-                  <Button
-                    onClick={handleRequestSignature}
-                    disabled={actionLoading === 'signature'}
-                    className="text-white bg-teal-500 hover:bg-teal-600"
-                  >
-                    {actionLoading === 'signature' ? 'Requesting...' : 'Request Signature'}
-                  </Button>
-                </div>
-              )}
-            </div>
+            <ConditionalHireTab
+              isLoading={isLoading}
+              hireStatus={hireStatus}
+              actionLoading={actionLoading}
+              onRequestSignature={handleRequestSignature}
+              complianceData={complianceData}
+              toggledAuthorizations={toggledAuthorizations}
+              onToggleAuthorization={handleToggleCompliance}
+              signatureData={signatures?.conditionalHire}
+            />
           )}
 
           {activeSection === "final" && (
-            <div className="p-8 bg-white rounded-lg shadow-sm">
-              <h3 className="mb-6 text-lg font-semibold text-gray-900">Final Agency Review</h3>
-              <div className="space-y-3">
-                {authorizations.map((auth, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
-                  >
-                    <span className="flex-1 text-sm font-medium text-gray-900">{auth.name}</span>
-                    <div className="flex items-center gap-4">
-                      <Badge className={auth.status === "Enabled" ? "bg-green-100 text-green-700 border-0" : "bg-red-100 text-red-700 border-0"}>
-                        {auth.status}
-                      </Badge>
-                      {auth.status === "Disabled" ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 border-red-300 hover:bg-red-50"
-                          onClick={async () => {
-                            if (!id) return;
-                            try {
-                              await agencyApplicantsExtraApi.createAuthorizationAlert(id, {
-                                authorizationType: auth.name,
-                                severity: 'high',
-                                message: `Authorization alert for ${auth.name}`,
-                              });
-                              toast({
-                                title: "Alert Sent",
-                                description: `Alert sent for ${auth.name}`,
-                              });
-                            } catch (error: any) {
-                              toast({
-                                title: "Error",
-                                description: error?.response?.data?.message || "Failed to send alert",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                        >
-                          <ExternalLink className="w-3 h-3 mr-2" />
-                          Send Alert
-                        </Button>
-                      ) : (
-                        <>
-                          <span className="text-sm text-gray-600">Approve</span>
-                          <Switch
-                            checked={authApprovals[index] ?? auth.status === "Enabled"}
-                            onCheckedChange={async (checked) => {
-                              if (!id) return;
-                              setAuthApprovals(prev => ({ ...prev, [index]: checked }));
-                              
-                              // Map authorization name to API field
-                              const authFieldMap: Record<string, string> = {
-                                "Authorize Drug test appointment": "drugTest",
-                                "Authorize Fingerprint appointment": "fingerprint",
-                                "Authorize Central Registry Check (Developmental Disabilities Abuse/Neglect Registry)": "centralRegistry",
-                                "Authorize CARI Check (Child Abuse Record Information, DCF)": "cariCheck",
-                                "Authorize Sex Offender Registry Check (Megan's Law)": "sexOffenderRegistry",
-                                "Authorize OIG Exclusion List Check (LEIE)": "oigExclusion",
-                                "Authorize Health & TB Screening": "healthTbScreening",
-                                "Authorize Reference Checks (Minimum 2, Non-Family)": "referenceChecks",
-                              };
-                              
-                              const authField = authFieldMap[auth.name];
-                              if (!authField) return;
-                              
-                              try {
-                                await authorizationsApi.update(id, { [authField]: checked });
-                                toast({
-                                  title: "Success",
-                                  description: `${auth.name} ${checked ? 'approved' : 'disapproved'}`,
-                                });
-                              } catch (error: any) {
-                                // Revert on error
-                                setAuthApprovals(prev => ({ ...prev, [index]: !checked }));
-                                toast({
-                                  title: "Error",
-                                  description: error?.response?.data?.message || "Failed to update authorization",
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
-                            disabled={auth.status === "Disabled"}
-                          />
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Send Letter Section */}
-              <div className="mt-6">
-                <p className="mb-3 text-sm text-gray-600">
-                  Everything looks good! Send Official Hire letter!
-                </p>
-                <Button
-                  onClick={handleSendOfferLetter}
-                  disabled={actionLoading === 'offer-letter'}
-                  className="text-white bg-[#00b3ad] hover:bg-[#009992]"
-                >
-                  {actionLoading === 'offer-letter' ? 'Sending...' : 'Send Letter'}
-                </Button>
-              </div>
-            </div>
+            <FinalReviewTab
+              reviewSteps={reviewSteps}
+              onConfirm={handleConfirmReviewStep}
+              actionLoading={actionLoading}
+            />
+          )}
+
+          {activeSection === "official" && (
+            <OfficialHireTab
+              isLoading={isLoading}
+              hasSigned={Boolean(signatures?.officialHire)}
+              signedAt={signatures?.officialHire?.createdAt?._seconds
+                ? new Date(signatures.officialHire.createdAt._seconds * 1000).toISOString()
+                : undefined}
+              actionLoading={actionLoading}
+              onRequestSignature={handleSendOfferLetter}
+              signatureData={signatures?.officialHire}
+            />
           )}
         </div>
       </div>

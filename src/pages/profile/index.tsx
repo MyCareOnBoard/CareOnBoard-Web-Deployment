@@ -59,20 +59,21 @@ function formatUSPhone(e164: string) {
 }
 
 function formatFullAddress(profile: ProfileInfo): string {
+  const addressStr = typeof profile.address === 'object' ? profile.address.address : profile.address;
+
   const parts = [
-    profile.address,
+    addressStr,
     profile.city,
     profile.state,
     profile.zipCode
   ].filter(Boolean)
-  
+
   if (parts.length === 0) return "Not provided"
-  
-  const streetAddress = profile.address || ""
+
   const cityStateZip = [profile.city, profile.state].filter(Boolean).join(", ")
   const fullCityStateZip = [cityStateZip, profile.zipCode].filter(Boolean).join(" ")
-  
-  return [streetAddress, fullCityStateZip].filter(Boolean).join(", ")
+
+  return [addressStr || "", fullCityStateZip].filter(Boolean).join(", ")
 }
 
 export default function ProfilePage() {
@@ -106,22 +107,22 @@ export default function ProfilePage() {
     try {
       setLoading(true)
       setError("")
-      
+
       console.log('🔄 Loading profile data...')
       const data = await getProfileInfo()
-      
+
       console.log('📥 API returned:', data)
-      
+
       // Fallback to Firebase auth if data is missing
       let fullName = data.fullName || ""
       let email = data.email || ""
       let joiningDate = data.joiningDate || ""
       let profilePicture = data.profilePicture || ""
-      
+
       const auth = getAuth()
       await auth.authStateReady?.()
       const currentUser = auth.currentUser
-      
+
       if (!fullName && currentUser?.displayName) {
         console.log("⚠️ Using Firebase displayName as fallback:", currentUser.displayName)
         fullName = currentUser.displayName
@@ -134,7 +135,7 @@ export default function ProfilePage() {
         console.log("⚠️ Using Firebase photoURL as fallback:", currentUser.photoURL)
         profilePicture = currentUser.photoURL
       }
-      
+
       // If no joining date from API, use Firebase account creation date
       if (!joiningDate && currentUser?.metadata?.creationTime) {
         const creationDate = new Date(currentUser.metadata.creationTime)
@@ -163,7 +164,7 @@ export default function ProfilePage() {
         fullName: mergedProfile.fullName || "",
         email: mergedProfile.email || "",
         phone: mergedProfile.phone || "",
-        address: mergedProfile.address || "",
+        address: typeof mergedProfile.address === 'object' ? mergedProfile.address.address : (mergedProfile.address || ""),
         city: mergedProfile.city || "",
         state: mergedProfile.state || "",
         zipCode: mergedProfile.zipCode || "",
@@ -210,7 +211,7 @@ export default function ProfilePage() {
       fullName: profile.fullName || "",
       email: profile.email || "",
       phone: profile.phone || "",
-      address: profile.address || "",
+      address: typeof profile.address === 'object' ? profile.address.address : (profile.address || ""),
       city: profile.city || "",
       state: profile.state || "",
       zipCode: profile.zipCode || "",
@@ -274,15 +275,21 @@ export default function ProfilePage() {
   const handleSave = async () => {
     if (!profile) return
 
-    console.log("💾 Starting save process...")
-    console.log("💾 Has image file:", !!imageFile)
+    console.log("Starting save process...")
+    console.log("Has image file:", !!imageFile)
 
     // Validate required fields
     if (!formData.phone?.trim()) {
       setError("Phone number is required")
       return
     }
-    if (!formData.address?.trim()) {
+
+    const street =
+      typeof formData.address === "string"
+        ? formData.address
+        : formData.address?.address
+
+    if (!street?.trim()) {
       setError("Street address is required")
       return
     }
@@ -318,7 +325,7 @@ export default function ProfilePage() {
           profilePictureFile: imageFile,
         })
         console.log("✅ Image uploaded, new URL:", accountResult.profilePicture)
-        
+
         // Update local state with new image URL
         if (accountResult.profilePicture) {
           setPhotoPreview(accountResult.profilePicture)
@@ -327,12 +334,23 @@ export default function ProfilePage() {
       }
 
       // Step 2: Update profile data
+      let normalizedAddress: ProfileInfo["address"] | "" = ""
+
+      if (typeof formData.address === "string") {
+        normalizedAddress = formData.address.trim()
+      } else if (formData.address) {
+        normalizedAddress = {
+          ...formData.address,
+          address: formData.address.address.trim(),
+        }
+      }
+
       const updateData: Partial<ProfileInfo> = {
-        phone: formData.phone.trim(),
-        address: formData.address.trim(),
-        city: formData.city.trim(),
-        state: formData.state.trim(),
-        zipCode: formData.zipCode.trim(),
+        phone: formData.phone?.trim(),
+        address: normalizedAddress,
+        city: formData.city?.trim(),
+        state: formData.state?.trim(),
+        zipCode: formData.zipCode?.trim(),
         gender: formData.gender,
         dateOfBirth: selectedDate.toISOString().split("T")[0],
         summary: formData.summary?.trim() || "",
@@ -394,10 +412,10 @@ export default function ProfilePage() {
     try {
       await deleteAccount()
       console.log("✅ Account deleted successfully")
-      
+
       localStorage.clear()
       sessionStorage.clear()
-      
+
       navigate(Routes.auth.login, { replace: true })
     } catch (err: any) {
       console.error("❌ Delete failed:", err)
@@ -444,12 +462,17 @@ export default function ProfilePage() {
   const joinLong = formatISODateToLong(profile.joiningDate || "")
   const dobLong = formatISODateToLong(profile.dateOfBirth)
 
+  const streetValue =
+    typeof formData.address === "string"
+      ? formData.address
+      : formData.address?.address || ""
+
   return (
     <div className="bg-[#EEF5F6] rounded-2xl min-h-[calc(100vh-100px)]">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-3xl font-semibold text-gray-800">Profile</h2>
-          <Button 
+          <Button
             onClick={() => navigate(Routes.applicant.application)}
             className="rounded-full bg-[#00B4B8] hover:bg-[#00a0a4] px-4 py-2 h-10 text-white gap-2"
           >
@@ -699,8 +722,16 @@ export default function ProfilePage() {
                       Street Address <span className="text-red-500">*</span>
                     </label>
                     <Input
-                      value={formData.address || ''}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      value={streetValue}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          address:
+                            typeof formData.address === "string" || !formData.address
+                              ? e.target.value
+                              : { ...formData.address, address: e.target.value },
+                        })
+                      }
                       placeholder="123 Main Street"
                       required
                     />
