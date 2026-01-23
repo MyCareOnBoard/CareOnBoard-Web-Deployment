@@ -356,7 +356,7 @@ export default function ApplicantProfilePage() {
       // Extract step statuses for tab styling
       // Check if all review steps are confirmed for final review status
       const allReviewsConfirmed = data.reviews
-        ? Object.values(data.reviews).every((review: any) => review?.confirmed === true)
+        ? Object.keys(data.reviews).length === Object.keys(reviewSteps).length
         : false;
 
       setStepStatuses({
@@ -547,12 +547,12 @@ export default function ApplicantProfilePage() {
                 onClick={() => handleNavigateToSection("profile")}
                 className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "profile"
                   ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                  : isStepComplete(stepStatuses.profile)
+                  : !!(stepStatuses.profile)
                     ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
                     : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                   }`}
               >
-                {isStepComplete(stepStatuses.profile) ? (
+                {!!(stepStatuses.profile) ? (
                   <CheckCircle2 className="h-4 w-4" />
                 ) : (
                   <CircleAlert className="h-4 w-4" />
