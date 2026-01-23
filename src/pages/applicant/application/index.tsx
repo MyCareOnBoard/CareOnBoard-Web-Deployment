@@ -112,9 +112,6 @@ function ApplicationContent() {
       status: updatedStatus.status,
       currentStep: updatedStatus.currentStep,
     });
-    
-    setActiveStep(newActiveStep);
-    setShowSuccessDialog(true);
   };
 
   const handleStepSuccess = () => {
