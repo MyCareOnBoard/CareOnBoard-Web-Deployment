@@ -27,6 +27,7 @@ import { servicesApi } from "@/lib/api/services";
 import { clientsApi } from "@/lib/api/clients";
 import { billingMonitorApi } from "@/pages/super-admin/agency-billing-monitor/api";
 import { goalsAndDocumentsApi } from "@/pages/agency/goalsAndDocuments/api";
+import { reportsApi } from "@/lib/api/reports";
 
 const rootReducer = combineReducers({
     auth: authReducer,
@@ -46,6 +47,7 @@ const rootReducer = combineReducers({
     [billingMonitorApi.reducerPath]: billingMonitorApi.reducer,
     [clientsApi.reducerPath]: clientsApi.reducer,
     [goalsAndDocumentsApi.reducerPath]: goalsAndDocumentsApi.reducer,
+    [reportsApi.reducerPath]: reportsApi.reducer,
 });
 
 const persistConfig = {
@@ -79,7 +81,8 @@ export const store = configureStore({
             .concat(servicesApi.middleware)
             .concat(billingMonitorApi.middleware)
             .concat(clientsApi.middleware)
-            .concat(goalsAndDocumentsApi.middleware),
+            .concat(goalsAndDocumentsApi.middleware)
+            .concat(reportsApi.middleware),
     devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
 
