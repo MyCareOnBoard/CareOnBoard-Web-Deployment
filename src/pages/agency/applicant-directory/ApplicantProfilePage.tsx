@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import {
   Phone,
   MessageSquare,
@@ -32,11 +32,23 @@ import { FinalReviewTab, type ReviewStepsState } from "./components/FinalReviewT
 // Type alias for document file from eligibility data
 type DocumentFile = NonNullable<EligibilityData['photoIdUrl']>;
 
+type TabSection = "profile" | "documents" | "conditional" | "official" | "final";
+
+// Get valid tab from query parameter or default to "profile"
+const getValidTab = (tab: string | null): TabSection => {
+  const validTabs: TabSection[] = ["profile", "documents", "conditional", "official", "final"];
+  return validTabs.includes(tab as TabSection) ? (tab as TabSection) : "profile";
+};
+
 export default function ApplicantProfilePage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  const [activeSection, setActiveSection] = useState<"profile" | "documents" | "conditional" | "official" | "final">("profile");
+  
+  const [activeSection, setActiveSection] = useState<TabSection>(
+    getValidTab(searchParams.get("tab"))
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [documentsData, setDocumentsData] = useState<ApplicantDocumentItem[]>([]);
@@ -145,10 +157,21 @@ export default function ApplicantProfilePage() {
     {} as Record<string, string>
   );
 
-  const handleNavigateToSection = (section: "profile" | "documents" | "conditional" | "official" | "final") => {
+  const handleNavigateToSection = (section: TabSection) => {
     setActiveSection(section);
-    // No navigation, just switch tab
+    // Update URL query parameter
+    setSearchParams({ tab: section });
   };
+
+  // Sync activeSection with query parameter changes (e.g., browser back/forward)
+  useEffect(() => {
+    const tabFromUrl = searchParams.get("tab");
+    const validTab = getValidTab(tabFromUrl);
+    setActiveSection(prev => {
+      // Only update if the tab from URL is different from current state
+      return validTab !== prev ? validTab : prev;
+    });
+  }, [searchParams]);
 
   const getDocumentUrlByType = (type: string) => {
     const item = documentsData.find((doc) => doc.type === type);

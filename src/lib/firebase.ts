@@ -7,6 +7,7 @@
 
 import { initializeApp, getApps, getApp } from "firebase/app"
 import { getAuth, connectAuthEmulator } from "firebase/auth"
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore"
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -29,14 +30,22 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 // Export auth instance for use in authentication
 export const auth = getAuth(app)
 
+// Export firestore instance for use in database operations
+// Use custom database name if provided via environment variable, otherwise use default
+const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID
+export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app)
+
 // Connect to Firebase Emulators in development mode
 if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {
   console.log('🔥 Firebase Emulators enabled')
   try {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
     console.log('✅ Connected to Auth Emulator on port 9099')
+
+    connectFirestoreEmulator(db, '127.0.0.1', 8080)
+    console.log('✅ Connected to Firestore Emulator on port 8080')
   } catch (error) {
-    console.warn('⚠️ Auth emulator connection may already be established')
+    console.warn('⚠️ Emulator connection may already be established')
   }
 }
 
