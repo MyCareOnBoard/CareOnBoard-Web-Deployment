@@ -149,6 +149,9 @@ export default function DashboardHeader(
     if (userType === UserType.SUPER_ADMIN) {
       return Routes.superAdmin.systemSettings;
     }
+    if (userType === UserType.AGENCY) {
+      return Routes.agency.agencySettings;
+    }
     return makeCommonRoute(Routes.common.settings);
   }
 
