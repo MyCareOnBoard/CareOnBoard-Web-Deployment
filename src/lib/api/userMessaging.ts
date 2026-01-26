@@ -266,6 +266,12 @@ export const sendUserMessage = async (
   conversationId: string,
   payload: SendMessagePayload
 ): Promise<ApiResponse<UserMessage>> => {
+  if (!conversationId || typeof conversationId !== 'string' || conversationId.trim() === '') {
+    const error = new Error('Invalid conversation ID: conversationId must be a non-empty string');
+    console.error('Error sending message:', error);
+    throw error;
+  }
+
   try {
     const response = await axiosClient.post(
       `${USER_MESSAGING_BASE}/${conversationId}/messages`,

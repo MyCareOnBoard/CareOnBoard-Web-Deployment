@@ -1,15 +1,22 @@
-import {useCallback, useRef} from "react";
+/**
+ * Debounce Hook
+ * Delays value updates until after a specified delay
+ */
 
-export const useDebounce = (callback: Function, delay: number) => {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+import { useState, useEffect } from 'react';
 
-  return useCallback((...args: any[]) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
+export function useDebounce<T>(value: T, delay: number = 300): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
-    timeoutRef.current = setTimeout(() => {
-      callback(...args);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
     }, delay);
-  }, [callback, delay]);
-};
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}

@@ -248,6 +248,10 @@ export const router = createBrowserRouter([
                 Component: ShiftsListPage,
             },
             {
+                path: Routes.agency.supportConversation,
+                Component: SupportPage,
+            },
+            {
                 path: Routes.agency.support,
                 Component: SupportPage,
             },
@@ -258,10 +262,6 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.activityLogs,
                 Component: ActivityLogsPage,
-            },
-            {
-                path: Routes.agency.support,
-                Component: SupportPage,
             },
             {
                 path: Routes.agency.analytics,
@@ -429,6 +429,10 @@ export const router = createBrowserRouter([
                 Component: UserPanelIncidentPage,
             },
             {
+                path: Routes.userPanel.messagesConversation,
+                Component: UserPanelMessagesPage,
+            },
+            {
                 path: Routes.userPanel.messages,
                 Component: UserPanelMessagesPage,
             },
@@ -548,6 +552,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.editClient,
                 Component: SuperAdminEditClientPage,
+            },
+            {
+                path: Routes.superAdmin.corporateSupportConversation,
+                Component: CorporateSupportPage,
             },
             {
                 path: Routes.superAdmin.corporateSupport,
