@@ -223,8 +223,18 @@ export function useConversations(
         setHasMore(snapshot.docs.length === limitCount);
         setLoading(false);
       },
-      (err) => {
+      (err: any) => {
         console.error("Error fetching conversations:", err);
+        console.error("Error code:", err?.code);
+        console.error("Error message:", err?.message);
+        // Check if it's a permission error
+        if (err?.code === "permission-denied" || err?.code === 7) {
+          console.error("Permission denied. Possible causes:");
+          console.error("1. Firestore indexes may still be building (wait a few minutes)");
+          console.error("2. User authentication may have expired");
+          console.error("3. Firestore rules may not be deployed to production");
+          console.error("4. User UID:", user?.uid);
+        }
         setError(err);
         setLoading(false);
       }

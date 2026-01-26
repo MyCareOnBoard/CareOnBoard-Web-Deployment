@@ -45,7 +45,7 @@ export default function ApplicantProfilePage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  
+
   const [activeSection, setActiveSection] = useState<TabSection>(
     getValidTab(searchParams.get("tab"))
   );
