@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router";
-import { Users, UserCog, Building2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 export default function UserLevelsTab() {
   const navigate = useNavigate();
@@ -10,22 +10,6 @@ export default function UserLevelsTab() {
       description: "Manage your internal agency accounts",
       icon: Building2,
       path: "/agency/agency-settings/user-levels/internal-users",
-      iconBg: "bg-[#00B4B8]",
-      iconColor: "text-white",
-    },
-    {
-      title: "Client Accounts",
-      description: "Manage your client accounts",
-      icon: Users,
-      path: "/agency/agency-settings/user-levels/clients",
-      iconBg: "bg-[#00B4B8]",
-      iconColor: "text-white",
-    },
-    {
-      title: "User Accounts",
-      description: "Manage your user/dsp accounts",
-      icon: UserCog,
-      path: "/agency/agency-settings/user-levels/dsp",
       iconBg: "bg-[#00B4B8]",
       iconColor: "text-white",
     },
