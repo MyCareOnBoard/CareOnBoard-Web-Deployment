@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Search, X, Check } from "lucide-react";
+import { getInitials, validateImageUrl } from "@/lib/utils/string-utils";
 
 interface User {
   id: string;
@@ -26,6 +28,17 @@ export default function NewMessageModal({
 }: NewMessageModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true); // Loading state defaults to true
+
+  // Set loading to false when users are loaded
+  useEffect(() => {
+    if (users.length > 0) {
+      setLoading(false);
+    } else if (open) {
+      // Reset loading when modal opens if no users yet
+      setLoading(true);
+    }
+  }, [users, open]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -121,7 +134,14 @@ export default function NewMessageModal({
 
             {/* User List */}
             <div className="min-h-[200px] max-h-[400px] overflow-y-auto space-y-2 mb-5">
-              {filteredUsers.length > 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center h-[200px]">
+                  <div className="text-center">
+                    <div className="w-8 h-8 rounded-full border-2 border-[#e5e7eb] border-t-[#2563eb] animate-spin mx-auto mb-2"></div>
+                    <p className="text-[14px] text-[#808081]">Loading contacts...</p>
+                  </div>
+                </div>
+              ) : filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => (
                   <div
                     key={user.id}
@@ -130,21 +150,16 @@ export default function NewMessageModal({
                   >
                     <div className="flex items-center gap-3">
                       {/* Avatar */}
-                      <div className="relative w-12 h-12 shrink-0">
-                        {user.image ? (
-                          <img
-                            src={user.image}
-                            alt={user.name}
-                            className="object-cover w-full h-full rounded-full"
-                          />
-                        ) : (
-                          <div className="w-full h-full rounded-full bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] flex items-center justify-center">
-                            <span className="text-[14px] font-semibold text-[#10141a]">
-                              {user.avatar}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      <Avatar className="w-12 h-14 shrink-0 rounded-[8px]">
+                        <AvatarImage
+                          src={validateImageUrl(user.image) || undefined}
+                          alt={user.name}
+                          className="rounded-[8px]"
+                        />
+                        <AvatarFallback className="bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] text-[#10141a] text-[14px] font-semibold rounded-[8px]">
+                          {getInitials(user.name)}
+                        </AvatarFallback>
+                      </Avatar>
 
                       {/* User Info */}
                       <div className="flex flex-col">
@@ -159,11 +174,10 @@ export default function NewMessageModal({
 
                     {/* Checkbox */}
                     <div
-                      className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${
-                        selectedUsers.includes(user.id)
-                          ? "bg-[#2563eb] border-[#2563eb]"
-                          : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
-                      }`}
+                      className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${selectedUsers.includes(user.id)
+                        ? "bg-[#2563eb] border-[#2563eb]"
+                        : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
+                        }`}
                     >
                       {selectedUsers.includes(user.id) && (
                         <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />

@@ -17,7 +17,7 @@ interface NewMessageModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   users: User[];
-  onStartChat: (selectedUserIds: string[]) => void;
+  onStartChat: (selectedUserIds: string[]) => Promise<void>;
 }
 
 export default function NewMessageModal({
@@ -28,6 +28,7 @@ export default function NewMessageModal({
 }: NewMessageModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [isStartingChat, setIsStartingChat] = useState(false);
   const [loading, setLoading] = useState(true); // Loading state defaults to true
 
   // Set loading to false when users are loaded
@@ -71,12 +72,21 @@ export default function NewMessageModal({
     );
   };
 
-  const handleStartChat = () => {
-    if (selectedUsers.length > 0) {
-      onStartChat(selectedUsers);
+  const handleStartChat = async () => {
+    if (selectedUsers.length === 0 || isStartingChat) return;
+
+    try {
+      setIsStartingChat(true);
+      await onStartChat(selectedUsers);
+      // Only reset state after successful completion
+      // The parent component will handle closing the modal via onOpenChange
       setSelectedUsers([]);
       setSearchQuery("");
-      onOpenChange(false);
+    } catch (error) {
+      // Error is handled by the parent component/context
+      // Keep modal open and preserve selections so user can retry or cancel
+    } finally {
+      setIsStartingChat(false);
     }
   };
 
@@ -175,8 +185,8 @@ export default function NewMessageModal({
                     {/* Checkbox */}
                     <div
                       className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${selectedUsers.includes(user.id)
-                          ? "bg-[#2563eb] border-[#2563eb]"
-                          : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
+                        ? "bg-[#2563eb] border-[#2563eb]"
+                        : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
                         }`}
                     >
                       {selectedUsers.includes(user.id) && (
@@ -196,16 +206,17 @@ export default function NewMessageModal({
             <div className="flex gap-3 pt-4">
               <Button
                 onClick={handleCancel}
-                className="flex-1 h-12 bg-white hover:bg-[#f5f5f5] text-[#10141a] border border-[#e5e5e6] rounded-full text-[15px] font-medium transition-colors shadow-none"
+                disabled={isStartingChat}
+                className="flex-1 h-12 bg-white hover:bg-[#f5f5f5] text-[#10141a] border border-[#e5e5e6] rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleStartChat}
-                disabled={selectedUsers.length === 0}
+                disabled={selectedUsers.length === 0 || isStartingChat}
                 className="flex-1 h-12 bg-[#7c9ff5] hover:bg-[#6b8fe5] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Start Chat
+                {isStartingChat ? "Starting..." : "Start Chat"}
               </Button>
             </div>
           </div>
