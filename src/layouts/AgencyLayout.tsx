@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { useEffect } from "react";
-import { Outlet, useNavigate } from "react-router";
+import { useEffect, useMemo } from "react";
+import { Outlet, useNavigate, useLocation } from "react-router";
 import { useAuth } from "@/utils/auth";
 import { Routes } from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -28,42 +28,90 @@ import {
 } from "lucide-react";
 
 
-const navItems: NavItem[] = [
-    { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon },
-    { label: "DSP Management", path: Routes.agency.dspManagement, icon: DSPManagementIcon },
-    { label: "Client Management", path: Routes.agency.clients, icon: UsersRound },
-    { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon },
-    { label: "Scheduling", path: Routes.agency.scheduling, icon: SchedulingIcon },
-    { label: "Notes", path: Routes.agency.notes, icon: NotesIcon },
-    { label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText },
-    { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon },
-    { label: "Support", path: Routes.agency.support, icon: SupportIcon },
-    { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon },
-    { label: "Applicant Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon },
-    { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon },
-    { label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: GoaslAndDocumentsIcon },
-    { label: "Trainings", path: Routes.agency.trainings, icon: Network },
-    { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon },
-    { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon },
-    { label: "Settings", path: Routes.agency.agencySettings, icon: Settings },
+const allNavItems: NavItem[] = [
+    { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon }, // Always accessible
+    { label: "DSP Management", path: Routes.agency.dspManagement, icon: DSPManagementIcon, accessKey: "DSP Management" },
+    { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
+    { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion" },
+    { label: "Scheduling", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: "Scheduling" },
+    { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
+    { label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText, accessKey: "Billing & Management" },
+    { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
+    { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
+    { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
+    { label: "Applicant Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
+    { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },
+    { label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: GoaslAndDocumentsIcon, accessKey: "Goals & Documents" },
+    { label: "Trainings", path: Routes.agency.trainings, icon: Network, accessKey: "Trainings" },
+    { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon, accessKey: "Mileage" },
+    { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon, accessKey: "Incident" },
+    { label: "Settings", path: Routes.agency.agencySettings, icon: Settings, accessKey: "User Levels" },
 ];
 
 
 export default function AgencyDashboardLayout({ children }: { children?: ReactNode }) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const handleLogout = async () => {
         try {
             await logout();
             navigate(Routes.auth.login, { replace: true });
         } catch (error) {
-            console.error('[DashboardLayout] Logout failed:', error);
+            console.error('[AgencyLayout] Logout failed:', error);
         }
     };
 
+    // Filter navigation items based on user access
+    const navItems = useMemo(() => {
+        // Agency owners have full access
+        if (user?.userType === UserType.AGENCY) {
+            return allNavItems;
+        }
+
+        // Agency staff have filtered access based on accessList
+        if (!user?.profile?.accessList) {
+            return allNavItems.filter(item => !item.accessKey);
+        }
+
+        const accessList = user.profile.accessList;
+
+        return allNavItems.filter(item => {
+            if (!item.accessKey) return true; // Always show items without accessKey (Dashboard, Incident, Mileage)
+            return accessList.includes(item.accessKey);
+        });
+    }, [user?.userType, user?.profile?.accessList]);
+
+    // Protect routes - redirect if user tries to access unauthorized page
     useEffect(() => {
-        if (!user || (user?.userType !== UserType.AGENCY)) {
+        if (!user) return;
+
+        // Agency owners have full access, no need to check
+        if (user.userType === UserType.AGENCY) return;
+
+        const currentPath = location.pathname;
+
+        // Find the nav item that matches the current path
+        const currentNavItem = allNavItems.find(item => currentPath.includes(item.path));
+
+        // If no nav item found or no access key required, allow access
+        if (!currentNavItem || !currentNavItem.accessKey) {
+            return;
+        }
+
+        // Check if user has access to this page
+        const userAccessList = user.profile?.accessList || [];
+        const hasAccess = userAccessList.includes(currentNavItem.accessKey);
+
+        if (!hasAccess) {
+            console.warn(`[AgencyLayout] Access denied to ${currentNavItem.label}. Redirecting to dashboard.`);
+            navigate(Routes.agency.dashboard, { replace: true });
+        }
+    }, [user, location.pathname, navigate]);
+
+    useEffect(() => {
+        if (!user || (user?.userType !== UserType.AGENCY && user?.userType !== UserType.AGENCY_STAFF)) {
             navigate(Routes.auth.login, { replace: true });
         }
     }, [user]);
@@ -73,7 +121,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
             <DashboardHeader
                 userName={user?.fullName}
                 userImage={(user as any)?.profileImage || user?.photoURL}
-                userRole={(user as any)?.role || 'DSP'}
+                userRole={(user as any)?.role || 'Agency Staff'}
                 userType={user?.userType || UserType.APPLICANT}
                 onLogout={handleLogout}
             />
@@ -84,4 +132,3 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         </div>
     );
 }
-

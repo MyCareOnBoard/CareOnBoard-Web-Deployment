@@ -32,31 +32,28 @@ export default function AgencySettingsPage() {
       <div className="flex gap-3 mb-8">
         <button
           onClick={() => setActiveTab("account")}
-          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${
-            activeTab === "account"
+          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${activeTab === "account"
               ? "bg-[#00B4B8] text-white"
               : "outline-2 outline-offset-2 outline-solid outline-gray-300 bg-gray-200 text-gray-500"
-          }`}
+            }`}
         >
           Account
         </button>
         <button
           onClick={() => setActiveTab("notification")}
-          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${
-            activeTab === "notification"
+          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${activeTab === "notification"
               ? "bg-[#00B4B8] text-white"
               : "outline-2 outline-offset-2 outline-solid outline-gray-300 bg-gray-200 text-gray-500"
-          }`}
+            }`}
         >
           Notification
         </button>
         <button
           onClick={() => setActiveTab("userLevels")}
-          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${
-            activeTab === "userLevels"
+          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${activeTab === "userLevels"
               ? "bg-[#00B4B8] text-white"
               : "outline-2 outline-offset-2 outline-solid outline-gray-300 bg-gray-200 text-gray-500"
-          }`}
+            }`}
         >
           User Levels
         </button>

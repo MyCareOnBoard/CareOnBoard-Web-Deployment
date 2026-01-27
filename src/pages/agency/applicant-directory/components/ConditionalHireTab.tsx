@@ -15,8 +15,6 @@ interface SignatureData {
 interface ConditionalHireTabProps {
   isLoading: boolean;
   hireStatus: OfficialHireStatusResponse["status"] | null;
-  actionLoading: string | null;
-  onRequestSignature: () => void;
   complianceData?: ComplianceData;
   toggledAuthorizations: Set<string>;
   onToggleAuthorization: (authKey: string, checked: boolean) => void;
@@ -38,8 +36,6 @@ const authorizationLabels: Record<string, string> = {
 export function ConditionalHireTab({
   isLoading,
   hireStatus,
-  actionLoading,
-  onRequestSignature,
   complianceData,
   toggledAuthorizations,
   onToggleAuthorization,
@@ -103,13 +99,6 @@ export function ConditionalHireTab({
               <p className="mb-3 text-[14px] text-[#808081]">
                 Conditional hire letter not yet signed.
               </p>
-              <Button
-                onClick={onRequestSignature}
-                disabled={actionLoading === "signature"}
-                className="rounded-[60px] bg-[#00b4b8] px-6 py-[10px] text-[14px] font-semibold text-white hover:bg-[#0090a8]"
-              >
-                {actionLoading === "signature" ? "Requesting..." : "Request Signature"}
-              </Button>
             </div>
           )}
         </div>

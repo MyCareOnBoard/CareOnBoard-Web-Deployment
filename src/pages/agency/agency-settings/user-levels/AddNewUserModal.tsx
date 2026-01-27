@@ -1,293 +1,395 @@
-import { useState } from "react";
-import { X, Copy, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React, { useState } from "react";
+import { X, ChevronDown, Check, Eye, EyeOff } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { motion, AnimatePresence } from "framer-motion";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface AddNewUserModalProps {
   open: boolean;
   onClose: () => void;
+  mode?: "create" | "edit";
+  initialData?: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    accessList: string[];
+  };
+  onSave?: (data: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    accessList: string[];
+  }) => Promise<void>;
 }
 
-const accessLevelOptions = [
-  { id: "dsp-management", label: "DSP Management" },
-  { id: "client-management", label: "Client Management" },
-  { id: "scheduling", label: "Scheduling" },
-  { id: "notes", label: "Notes" },
-  { id: "billing-management", label: "Billing & Management" },
-  { id: "ai-automation", label: "AI Automation" },
-  { id: "support", label: "Support" },
-  { id: "analytics", label: "Analytics" },
-  { id: "goals-documents", label: "Goals & Documents" },
-  { id: "applicant-directory", label: "Applicant Directory" },
-  { id: "reports", label: "Reports" },
-  { id: "community-inclusion", label: "Community Inclusion" },
-  { id: "trainings", label: "Trainings" },
+// Agency-specific access options
+const ACCESS_OPTIONS = [
+  "DSP Management",
+  "Client Management",
+  "Scheduling",
+  "Notes",
+  "Billing & Management",
+  "AI Automation",
+  "Support",
+  "Analytics",
+  "Goals & Documents",
+  "Applicant Directory",
+  "Reports",
+  "Community Inclusion",
+  "Trainings",
+  "User Levels",
+  "Mileage",
+  "Incident",
 ];
 
-export default function AddNewUserModal({ open, onClose }: AddNewUserModalProps) {
-  const [userName, setUserName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showResetLink, setShowResetLink] = useState(false);
-  const [passwordCopied, setPasswordCopied] = useState(false);
 
-  const generatePassword = () => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+export default function AddNewUserModal({
+  open,
+  onClose,
+  mode = "create",
+  initialData,
+  onSave,
+}: AddNewUserModalProps) {
+  const [name, setName] = useState(initialData?.name || "");
+  const [email, setEmail] = useState(initialData?.email || "");
+  const [password, setPassword] = useState(initialData?.password || "");
+  const [accessList, setAccessList] = useState<string[]>(
+    initialData?.accessList || []
+  );
+  const [isAccessOpen, setIsAccessOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showResetLinkMessage, setShowResetLinkMessage] = useState(false);
+
+  const handleGeneratePassword = () => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
     let newPassword = "";
-    for (let i = 0; i < 13; i++) {
+    for (let i = 0; i < 12; i++) {
       newPassword += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setPassword(newPassword);
   };
 
-  const toggleAccessLevel = (levelId: string) => {
-    setSelectedLevels((prev) =>
-      prev.includes(levelId)
-        ? prev.filter((id) => id !== levelId)
-        : [...prev, levelId]
+  const toggleAccess = (access: string) => {
+    setAccessList((prev) =>
+      prev.includes(access)
+        ? prev.filter((item) => item !== access)
+        : [...prev, access]
     );
   };
 
-  const handleCreateUser = () => {
-    // Simulate user creation
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      // Reset form
-      setUserName("");
-      setEmail("");
-      setPassword("");
-      setSelectedLevels([]);
+  const handleSendResetLink = async () => {
+    // TODO: Implement actual reset link functionality
+    console.log("Sending reset link to:", email);
+    setShowResetLinkMessage(true);
+    setTimeout(() => setShowResetLinkMessage(false), 3000);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      if (onSave) {
+        await onSave({ name, email, password, accessList });
+      } else {
+        // Default mock save if no onSave provided
+        console.log("Creating user:", { name, email, password, accessList });
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
       onClose();
-    }, 2000);
+    } catch (error) {
+      console.error("Error saving user:", error);
+      // Modal stays open on error so user can retry
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSendResetLink = () => {
-    setShowResetLink(true);
-    setTimeout(() => {
-      setShowResetLink(false);
-    }, 2000);
+  const handleClose = () => {
+    onClose();
   };
 
-  const copyPassword = () => {
-    navigator.clipboard.writeText(password);
-    setPasswordCopied(true);
-    setTimeout(() => setPasswordCopied(false), 2000);
-  };
+  // Use a ref to track if we're currently in a save operation
+  const isSavingRef = React.useRef(false);
+
+  // Keep the ref in sync with state
+  React.useEffect(() => {
+    isSavingRef.current = isSaving;
+  }, [isSaving]);
+
+  // Track the previous open state to detect modal opening
+  const prevOpenRef = React.useRef(false);
+
+  React.useEffect(() => {
+    // Only reset form when modal transitions from closed to open
+    // Don't reset if we're currently saving (prevents re-renders from resetting state)
+    const justOpened = open && !prevOpenRef.current;
+
+    if (justOpened && !isSavingRef.current) {
+      if (initialData) {
+        setName(initialData.name);
+        setEmail(initialData.email);
+        setPassword(initialData.password);
+        setAccessList(initialData.accessList);
+      } else {
+        setName("");
+        setEmail("");
+        setPassword("");
+        setAccessList([]);
+      }
+      setIsSaving(false);
+      setShowPassword(false);
+      setShowResetLinkMessage(false);
+    }
+
+    prevOpenRef.current = open;
+  }, [open, initialData]);
 
   return (
-    <>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end pr-8">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-            onClick={onClose}
-          />
-          
-          {/* Modal */}
-          <div 
-            className="relative bg-white rounded-[30px] border border-[rgba(255,255,255,0.3)] w-full max-w-[500px] max-h-[90vh] shadow-xl flex flex-col"
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent
+        className="w-[min(490px,95vw)] h-[min(993px,95vh)] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[18px] !left-1/2 !-translate-x-1/2 md:!left-auto md:!right-[26px] md:!translate-x-0"
+        showCloseButton={false}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between w-full h-[44px] shrink-0">
+          <DialogTitle className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
+            {mode === "create" ? "Add new user" : "Edit user"}
+          </DialogTitle>
+          <button
+            onClick={handleClose}
+            disabled={isSaving}
+            className="flex items-center justify-center p-[8px] rounded-[200px] bg-[#eff2f3] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[#e0e3e4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {/* Title Bar - Fixed */}
-            <div className="flex items-center justify-between p-5 pb-0 shrink-0">
-              <h2 className="text-[20px] font-bold leading-[1.6] text-[#10141a]">
-                Add New User
-              </h2>
+            <X className="w-4 h-4 text-[#10141a]" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <div className="flex flex-col gap-[20px] w-full flex-1 min-h-0 overflow-y-auto">
+          {/* Name Field */}
+          <div className="flex flex-col gap-[4px] w-full">
+            <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+              Name
+            </Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter name"
+              disabled={isSaving}
+              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          {/* Email Field */}
+          <div className="flex flex-col gap-[4px] w-full">
+            <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+              Email
+            </Label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter email"
+              disabled={mode === "edit" || isSaving}
+              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          {/* Password Field */}
+          <div className="flex flex-col gap-[4px] w-full">
+            <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+              Password
+            </Label>
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={
+                  mode === "edit"
+                    ? "Leave blank to keep current password"
+                    : "Enter password"
+                }
+                disabled={isSaving}
+                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white pl-[16px] pr-[44px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+              />
               <button
-                onClick={onClose}
-                className="bg-[#eff2f3] border border-[rgba(255,255,255,0.3)] rounded-full p-2 hover:bg-gray-200 transition-colors cursor-pointer"
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={isSaving}
+                className="absolute right-[12px] top-1/2 -translate-y-1/2 flex items-center justify-center text-[#808081] hover:text-[#10141a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                <X className="w-4 h-4 text-[#10141a]" />
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
               </button>
             </div>
+          </div>
 
-            {/* Form - Scrollable */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              <div className="flex flex-col gap-4">
-            {/* User Name */}
-            <div className="flex flex-col gap-[4px] w-full">
-              <label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
-                User Name
-              </label>
-              <Input
-                id="userName"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                placeholder="Enter Username"
-                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8]"
-              />
+          {/* Generate Password Button - Only show in create mode */}
+          {mode === "create" && (
+            <div className="flex items-center justify-end w-full">
+              <button
+                onClick={handleGeneratePassword}
+                disabled={isSaving}
+                className="flex items-center justify-center px-[10px] py-[6px] rounded-[6px] border-[0.5px] border-[#808081] hover:bg-[#f5f5f5] transition-colors w-fit cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
+                  Generate Password
+                </span>
+              </button>
             </div>
+          )}
 
-            {/* Email */}
+          {/* Send Reset Link */}
+          {mode === "edit" && email && (
             <div className="flex flex-col gap-[4px] w-full">
-              <label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="john-doe@agency.com"
-                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8]"
-              />
-            </div>
-
-            {/* Generate Password */}
-            <div className="flex flex-col gap-[4px] w-full">
-              <label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
-                Generate Password
-              </label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    id="password"
-                    value={password}
-                    readOnly
-                    placeholder="Click generate to create password"
-                    className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white pl-[16px] pr-[44px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8]"
-                  />
-                  {password && (
-                    <button
-                      onClick={copyPassword}
-                      className="absolute right-[12px] top-1/2 -translate-y-1/2 flex items-center justify-center p-1 rounded hover:bg-gray-100 transition-colors"
-                    >
-                      {passwordCopied ? (
-                        <Check className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <Copy className="w-4 h-4 text-[#808081]" />
-                      )}
-                    </button>
-                  )}
-                </div>
-                {!password && (
-                  <Button
-                    type="button"
-                    onClick={generatePassword}
-                    className="h-[44px] px-[20px] rounded-[12px] bg-[#00b4b8] hover:bg-[#009FA3] text-white text-[14px] font-medium whitespace-nowrap"
-                  >
-                    Generate
-                  </Button>
-                )}
-              </div>
-              {password && (
-                <button
-                  onClick={handleSendResetLink}
-                  className="text-[12px] text-[#00B4B8] hover:underline mt-1 text-left"
-                >
-                  Send a reset password link
-                </button>
+              <button
+                onClick={handleSendResetLink}
+                disabled={isSaving}
+                className="text-[12px] text-[#00B4B8] hover:underline text-left disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Send a reset password link
+              </button>
+              {showResetLinkMessage && (
+                <p className="text-[11px] text-[#22c55e]">
+                  ✓ Reset link sent to {email}
+                </p>
               )}
             </div>
+          )}
 
-            {/* Access Level */}
-            <div className="flex flex-col gap-[8px] w-full">
-              <label className="text-[12px] font-normal leading-[normal]">
-                Access Level
-              </label>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {accessLevelOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => toggleAccessLevel(option.id)}
-                    className={`h-[36px] px-[12px] rounded-[8px] text-[12px] font-medium transition-colors ${
-                      selectedLevels.includes(option.id)
-                        ? "bg-[#00B4B8] text-white"
-                        : "bg-[#f5f5f5] text-[#525253] hover:bg-[#e0e3e4]"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer Actions - Fixed */}
-        <div className="flex gap-3 p-5 pt-4 border-t border-gray-200 sm:flex-row sm:items-center sm:justify-center shrink-0">
-          <Button
-            onClick={onClose}
-            className="h-[44px] px-[24px] rounded-[30px] bg-transparent hover:bg-[#f5f5f5] text-[#10141a] text-[14px] font-medium border border-[#cccccd] w-50"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleCreateUser}
-            className="h-[44px] px-[24px] rounded-[30px] bg-[#00b4b8] hover:bg-[#009FA3] text-white text-[14px] font-medium w-50"
-          >
-            Create User
-          </Button>
-        </div>
-      </div>
-    </div>
-  )}
-
-      {/* Success Toast */}
-      <AnimatePresence>
-        {showSuccess && (
-          <>
-            <div 
-              className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-[20px] shadow-2xl p-8 flex flex-col items-center text-center min-w-[380px]"
-            >
-              <div className="flex items-center justify-center flex-shrink-0 w-16 h-16 bg-[#22C55E] rounded-full mb-4">
-                <Check className="w-8 h-8 text-white" strokeWidth={3} />
-              </div>
-              <h3 className="text-[20px] font-semibold text-[#10141a] mb-2">User Created Successfully</h3>
-              <p className="text-[14px] text-[#808081] leading-relaxed">
-                The use has been created. Please check their mail for the login credentials
-              </p>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Reset Link Toast */}
-      <AnimatePresence>
-        {showResetLink && (
-          <>
-            <div 
-              className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-[20px] shadow-2xl p-8 flex flex-col items-center text-center min-w-[380px]"
-            >
-              <div className="w-16 h-16 rounded-full bg-[#00B4B8] flex items-center justify-center flex-shrink-0 mb-4">
-                <svg
-                  className="w-8 h-8 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                  viewBox="0 0 24 24"
+          {/* Access Field with Popover */}
+          <div className="flex flex-col gap-[4px] w-full">
+            <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+              Access
+            </Label>
+            <Popover open={isAccessOpen && !isSaving} onOpenChange={setIsAccessOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  disabled={isSaving}
+                  className="flex items-center justify-between h-[44px] w-full rounded-[12px] border border-[#cccccd] bg-white px-[16px] hover:bg-[#fafafa] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-[20px] font-semibold text-[#10141a] mb-2">Reset Link Sent</h3>
-              <p className="text-[14px] text-[#808081] leading-relaxed">
-                Password reset link has been sent to this account
-              </p>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </>
+                  <span className="text-[14px] font-normal text-[#525253]">
+                    {accessList.length > 0
+                      ? `${accessList.length} selected`
+                      : "Select Access"}
+                  </span>
+                  <ChevronDown className="w-5 h-5 text-[#10141a]" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] bg-white border border-[#cccccd] rounded-[12px] p-0 shadow-lg"
+                align="start"
+              >
+                <div className="flex flex-col max-h-[300px]">
+                  {/* Header */}
+                  <div className="px-[20px] pt-[12px] pb-0 shrink-0">
+                    <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
+                      Select access
+                    </p>
+                  </div>
+
+                  {/* Options - Scrollable */}
+                  <div className="flex flex-col mt-[8px] overflow-y-auto">
+                    {ACCESS_OPTIONS.map((option) => {
+                      const isSelected = accessList.includes(option);
+                      return (
+                        <button
+                          key={option}
+                          onClick={() => toggleAccess(option)}
+                          className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${isSelected ? "bg-[#e5effa]" : ""
+                            }`}
+                        >
+                          <span
+                            className={`text-[14px] leading-[1.4] ${isSelected
+                              ? "font-semibold text-[#00b4b8]"
+                              : "font-normal text-[#808081]"
+                              }`}
+                          >
+                            {option}
+                          </span>
+                          {isSelected && (
+                            <Check className="w-5 h-5 text-[#00b4b8]" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Selected Access Badges */}
+          {accessList.length > 0 && (
+            <div className="flex flex-wrap gap-[8px] w-full">
+              {accessList.map((access) => (
+                <div
+                  key={access}
+                  className="group flex items-center gap-[6px] px-[10px] py-[6px] rounded-[6px] bg-[#00b4b8] border-[0.5px] border-[#808081] hover:bg-[#00a0a3] transition-colors"
+                >
+                  <span className="text-[14px] font-medium leading-[1.4] text-white">
+                    {access}
+                  </span>
+                  <button
+                    onClick={() => toggleAccess(access)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-white/20 rounded-full p-0.5"
+                    aria-label={`Remove ${access}`}
+                  >
+                    <X className="w-3.5 h-3.5 text-white" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer Buttons */}
+        <DialogFooter className="flex flex-row gap-[12px] items-center justify-center pt-[40px] pb-0 w-full shrink-0 mt-auto">
+          <button
+            onClick={handleClose}
+            disabled={isSaving}
+            className="flex-1 flex items-center justify-center px-[16px] py-[12px] rounded-[60px] backdrop-blur-[22px] border border-[#525253] hover:bg-[#f5f5f5] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="text-[14px] font-semibold leading-[1.4] text-[#525253]">
+              Cancel
+            </span>
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex-1 flex items-center justify-center gap-2 px-[16px] py-[12px] rounded-[60px] bg-[#2b82ff] backdrop-blur-[22px] hover:bg-[#2775e5] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving && (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
+            )}
+            <span className="text-[14px] font-semibold leading-[1.4] text-white">
+              {isSaving
+                ? mode === "create"
+                  ? "Adding user..."
+                  : "Updating user..."
+                : mode === "create"
+                  ? "Add User"
+                  : "Update User"}
+            </span>
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

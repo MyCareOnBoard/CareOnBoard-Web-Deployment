@@ -122,7 +122,7 @@ export async function getUser(): Promise<User> {
       };
     }
 
-    if (user.userType === UserType.SUPER_ADMIN) {
+    if ([UserType.SUPER_ADMIN, UserType.AGENCY_STAFF].includes(user.userType)) {
       user.profile = {
         ...user.profile,
         accessList: profileSource.accessList,
