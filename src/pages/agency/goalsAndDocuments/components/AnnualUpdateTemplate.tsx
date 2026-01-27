@@ -8,7 +8,7 @@ import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Button} from "@/components/ui/button";
 import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";
-import {useDebounce} from "@/hooks/useDebounce";
+import {useDebouncedCallback} from "@/hooks/useDebouncedCallback";
 import {
     useGetSingleGoalDocumentQuery,
     useUpsertGoalDocumentByTypeMutation,
@@ -26,6 +26,7 @@ export default function AnnualUpdateTemplate(
     
     const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
         skip: !documentType,
+        refetchOnMountOrArgChange: true
     });
     const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
     const [submitDocument, {isLoading: isSubmitting}] = useSubmitGoalDocumentMutation();
@@ -49,7 +50,7 @@ export default function AnnualUpdateTemplate(
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        if (!isLoading && document && document?.metadata && Object.keys(document?.metadata).length > 0) {
+        if (document && document.metadata) {
             const metadata = document.metadata as AnnualUpdateDocument;
             setFormData({
                 name: metadata.name || "",
@@ -69,7 +70,7 @@ export default function AnnualUpdateTemplate(
         }
     }, [document]);
 
-    const debouncedSave = useDebounce(
+    const debouncedSave = useDebouncedCallback(
         async (data: any) => {
             try {
                 setIsSaving(true);
