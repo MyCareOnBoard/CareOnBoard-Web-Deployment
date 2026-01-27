@@ -20,12 +20,14 @@ interface AddNewUserModalProps {
     name: string;
     email: string;
     password: string;
+    phone?: string;
     accessList: string[];
   };
   onSave?: (data: {
     name: string;
     email: string;
     password: string;
+    phone?: string;
     accessList: string[];
   }) => Promise<void>;
 }
@@ -45,6 +47,9 @@ const ACCESS_OPTIONS = [
   "Reports",
   "Community Inclusion",
   "Trainings",
+  "User Levels",
+  "Mileage",
+  "Incident",
 ];
 
 
@@ -129,7 +134,7 @@ export default function AddNewUserModal({
     // Only reset form when modal transitions from closed to open
     // Don't reset if we're currently saving (prevents re-renders from resetting state)
     const justOpened = open && !prevOpenRef.current;
-    
+
     if (justOpened && !isSavingRef.current) {
       if (initialData) {
         setName(initialData.name);
@@ -146,7 +151,7 @@ export default function AddNewUserModal({
       setShowPassword(false);
       setShowResetLinkMessage(false);
     }
-    
+
     prevOpenRef.current = open;
   }, [open, initialData]);
 
@@ -235,18 +240,20 @@ export default function AddNewUserModal({
             </div>
           </div>
 
-          {/* Generate Password Button */}
-          <div className="flex items-center justify-end w-full">
-            <button
-              onClick={handleGeneratePassword}
-              disabled={isSaving}
-              className="flex items-center justify-center px-[10px] py-[6px] rounded-[6px] border-[0.5px] border-[#808081] hover:bg-[#f5f5f5] transition-colors w-fit cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
-                Generate Password
-              </span>
-            </button>
-          </div>
+          {/* Generate Password Button - Only show in create mode */}
+          {mode === "create" && (
+            <div className="flex items-center justify-end w-full">
+              <button
+                onClick={handleGeneratePassword}
+                disabled={isSaving}
+                className="flex items-center justify-center px-[10px] py-[6px] rounded-[6px] border-[0.5px] border-[#808081] hover:bg-[#f5f5f5] transition-colors w-fit cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
+                  Generate Password
+                </span>
+              </button>
+            </div>
+          )}
 
           {/* Send Reset Link */}
           {mode === "edit" && email && (
@@ -305,16 +312,14 @@ export default function AddNewUserModal({
                         <button
                           key={option}
                           onClick={() => toggleAccess(option)}
-                          className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${
-                            isSelected ? "bg-[#e5effa]" : ""
-                          }`}
+                          className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${isSelected ? "bg-[#e5effa]" : ""
+                            }`}
                         >
                           <span
-                            className={`text-[14px] leading-[1.4] ${
-                              isSelected
-                                ? "font-semibold text-[#00b4b8]"
-                                : "font-normal text-[#808081]"
-                            }`}
+                            className={`text-[14px] leading-[1.4] ${isSelected
+                              ? "font-semibold text-[#00b4b8]"
+                              : "font-normal text-[#808081]"
+                              }`}
                           >
                             {option}
                           </span>
@@ -379,8 +384,8 @@ export default function AddNewUserModal({
                   ? "Adding user..."
                   : "Updating user..."
                 : mode === "create"
-                ? "Add User"
-                : "Update User"}
+                  ? "Add User"
+                  : "Update User"}
             </span>
           </button>
         </DialogFooter>

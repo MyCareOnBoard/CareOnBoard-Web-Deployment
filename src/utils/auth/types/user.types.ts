@@ -11,6 +11,7 @@ export enum UserType {
   APPLICANT = "applicant",
   EMPLOYEE = "employee",
   AGENCY = "agency",
+  AGENCY_STAFF = "agency_staff",
   SUPER_ADMIN = "super_admin",
 }
 
