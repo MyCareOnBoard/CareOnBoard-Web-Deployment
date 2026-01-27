@@ -50,7 +50,7 @@ export default function AnnualUpdateTemplate(
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        if (document && document.metadata) {
+        if (!isLoading && document && document?.metadata) {
             const metadata = document.metadata as AnnualUpdateDocument;
             setFormData({
                 name: metadata.name || "",
