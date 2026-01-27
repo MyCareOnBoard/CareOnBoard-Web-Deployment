@@ -31,7 +31,6 @@ export default function IndividualizedGoalsTemplate(
     
     const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
         skip: !documentType,
-        refetchOnMountOrArgChange: true
     });
     const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
     const [submitDocument, {isLoading: isSubmitting}] = useSubmitGoalDocumentMutation();
@@ -57,7 +56,7 @@ export default function IndividualizedGoalsTemplate(
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        if (!isLoading && document && document?.metadata) {
+        if (!isLoading && document && document?.metadata && Object.keys(document?.metadata).length > 0) {
             const metadata = document.metadata as IndividualizedGoalsDocument;
             setFormData({
                 name: metadata.name || "",
