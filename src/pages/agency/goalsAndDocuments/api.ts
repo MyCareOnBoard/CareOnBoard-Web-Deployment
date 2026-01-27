@@ -16,7 +16,7 @@ import {
 export const goalsAndDocumentsApi = createApi({
   reducerPath: "goalsAndDocumentsApi",
   baseQuery: customBaseQuery,
-  tagTypes: ['GoalDocuments', 'SingleGoalDocument'],
+  tagTypes: [],
   endpoints: (builder) => ({
     getAllGoalDocuments: builder.query<ListGoalDocumentsResponse, ListGoalDocumentsParams | void>({
       query: (params) => ({
@@ -25,7 +25,6 @@ export const goalsAndDocumentsApi = createApi({
         requiresAuth: true,
         params: params || {}
       }),
-      providesTags: ['GoalDocuments']
     }),
     getSingleGoalDocument: builder.query<GoalDocument, string>({
       query: (documentId) => ({
@@ -33,7 +32,6 @@ export const goalsAndDocumentsApi = createApi({
         method: "GET",
         requiresAuth: true
       }),
-      providesTags: ['SingleGoalDocument']
     }),
     createGoalDocument: builder.mutation<GoalDocument, CreateGoalDocumentRequest>({
       query: (data) => ({
@@ -43,7 +41,7 @@ export const goalsAndDocumentsApi = createApi({
         data
       }),
       transformResponse: (response: GoalDocumentResponse) => response.document,
-      invalidatesTags: ['GoalDocuments']
+      invalidatesTags: []
     }),
     updateGoalDocument: builder.mutation<GoalDocument, { documentId: string, data: UpdateGoalDocumentRequest }>({
       query: ({ documentId, data }) => ({
@@ -53,7 +51,6 @@ export const goalsAndDocumentsApi = createApi({
         data
       }),
       transformResponse: (response: GoalDocumentResponse) => response.document,
-      invalidatesTags: ['SingleGoalDocument', 'GoalDocuments']
     }),
     upsertGoalDocumentByType: builder.mutation<GoalDocument, { documentType: DocumentType, data: UpsertGoalDocumentRequest }>({
       query: ({ documentType, data }) => ({
@@ -63,7 +60,6 @@ export const goalsAndDocumentsApi = createApi({
         data
       }),
       transformResponse: (response: GoalDocumentResponse) => response.document,
-      invalidatesTags: ['SingleGoalDocument', 'GoalDocuments']
     }),
     submitGoalDocument: builder.mutation<GoalDocument, string>({
       query: (documentId) => ({
@@ -72,7 +68,6 @@ export const goalsAndDocumentsApi = createApi({
         requiresAuth: true
       }),
       transformResponse: (response: SubmitGoalDocumentResponse) => response.document,
-      invalidatesTags: ['SingleGoalDocument', 'GoalDocuments']
     }),
     deleteGoalDocument: builder.mutation<DeleteGoalDocumentResponse, string>({
       query: (documentId) => ({
@@ -80,7 +75,6 @@ export const goalsAndDocumentsApi = createApi({
         method: "DELETE",
         requiresAuth: true
       }),
-      invalidatesTags: ['GoalDocuments']
     })
   }),
 });

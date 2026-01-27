@@ -57,7 +57,7 @@ export default function IndividualizedGoalsTemplate(
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        if (document && document.metadata) {
+        if (!isLoading && document && document?.metadata) {
             const metadata = document.metadata as IndividualizedGoalsDocument;
             setFormData({
                 name: metadata.name || "",
