@@ -703,8 +703,6 @@ export default function ApplicantProfilePage() {
             <ConditionalHireTab
               isLoading={isLoading}
               hireStatus={hireStatus}
-              actionLoading={actionLoading}
-              onRequestSignature={handleRequestSignature}
               complianceData={complianceData}
               toggledAuthorizations={toggledAuthorizations}
               onToggleAuthorization={handleToggleCompliance}
@@ -727,8 +725,6 @@ export default function ApplicantProfilePage() {
               signedAt={signatures?.officialHire?.createdAt?._seconds
                 ? new Date(signatures.officialHire.createdAt._seconds * 1000).toISOString()
                 : undefined}
-              actionLoading={actionLoading}
-              onRequestSignature={handleSendOfferLetter}
               signatureData={signatures?.officialHire}
             />
           )}

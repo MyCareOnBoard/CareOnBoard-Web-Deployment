@@ -12,8 +12,6 @@ interface OfficialHireTabProps {
     isLoading: boolean;
     hasSigned: boolean;
     signedAt?: string;
-    actionLoading: string | null;
-    onRequestSignature: () => void;
     signatureData?: SignatureData | null;
 }
 
@@ -21,8 +19,6 @@ export function OfficialHireTab({
     isLoading,
     hasSigned,
     signedAt,
-    actionLoading,
-    onRequestSignature,
     signatureData,
 }: OfficialHireTabProps) {
     const [showSignatureModal, setShowSignatureModal] = useState(false);
@@ -81,13 +77,6 @@ export function OfficialHireTab({
                             <p className="mb-3 text-[14px] text-[#808081]">
                                 Official hire letter not yet signed.
                             </p>
-                            <Button
-                                onClick={onRequestSignature}
-                                disabled={actionLoading === "official-signature"}
-                                className="rounded-[60px] bg-[#00b4b8] px-6 py-[10px] text-[14px] font-semibold text-white hover:bg-[#0090a8]"
-                            >
-                                {actionLoading === "official-signature" ? "Requesting..." : "Request Signature"}
-                            </Button>
                         </div>
                     )}
                 </div>
