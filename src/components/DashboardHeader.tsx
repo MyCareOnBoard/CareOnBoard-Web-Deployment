@@ -84,7 +84,7 @@ export default function DashboardHeader(
   const { toast } = useToast();
 
   const { notifications, unreadCount, loading, error, markAllAsRead, markAsRead } = useNotifications();
-  
+
   // Track previous notification IDs to detect new ones
   const previousNotificationIdsRef = useRef<Set<string>>(new Set());
 
@@ -110,8 +110,8 @@ export default function DashboardHeader(
         toast({
           title: notification.title,
           description: notification.message,
-          variant: notification.priority === 'urgent' || notification.priority === 'high' 
-            ? 'warning' 
+          variant: notification.priority === 'urgent' || notification.priority === 'high'
+            ? 'warning'
             : 'info'
         });
       }
@@ -140,6 +140,7 @@ export default function DashboardHeader(
       [UserType.APPLICANT]: "applicant",
       [UserType.EMPLOYEE]: "user-panel",
       [UserType.AGENCY]: "agency",
+      [UserType.AGENCY_STAFF]: "agency",
       [UserType.SUPER_ADMIN]: "super-admin",
     }
     return route.replace(':userType', userTypeKeys[userType as UserType] || 'applicant');

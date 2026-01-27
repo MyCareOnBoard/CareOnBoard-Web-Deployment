@@ -41,6 +41,7 @@ export interface AgencyStaffMember {
     createdAt: Date | string;
     updatedAt: Date | string;
     createdBy?: string;
+    avatar?: string | null;
 }
 
 /**

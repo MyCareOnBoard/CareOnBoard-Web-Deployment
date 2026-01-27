@@ -18,6 +18,8 @@ import {
 } from "@/lib/api/agency-staff";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
+import { getInitials } from "@/lib/utils/string-utils";
+import { validateImageUrl } from "@/lib/utils/string-utils";
 
 export default function InternalUsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -302,10 +304,14 @@ export default function InternalUsersPage() {
               >
                 {/* First Column: Avatar and Name */}
                 <div className="flex min-w-0 flex-shrink-0 items-center gap-4">
-                  <Avatar className="h-[50px] w-[50px]">
-                    <AvatarImage src="" alt={user.name} />
-                    <AvatarFallback className="bg-gradient-to-br from-[#8B5CF6] via-[#A855F7] to-[#EC4899] text-[20px] font-semibold text-white">
-                      {user.name.charAt(0)}
+                  <Avatar className="w-12 h-14 rounded-[8px]">
+                    <AvatarImage
+                      src={validateImageUrl(user?.avatar) || undefined}
+                      alt={user.name}
+                      className="rounded-[8px]"
+                    />
+                    <AvatarFallback className="bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] text-[#10141a] text-[16px] font-semibold rounded-[8px]">
+                      {getInitials(user.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
