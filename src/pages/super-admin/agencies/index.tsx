@@ -132,9 +132,18 @@ export default function AgenciesPage() {
                 {/* Agency Image/Logo */}
                 <div className="relative h-[110px] w-[96px] shrink-0">
                   <div 
-                    className="absolute h-[110px] w-[96px] rounded-[12px] flex items-center justify-center"
-                    style={{ backgroundColor: agency.primaryColor || '#D9D9D9' }}
+                    className="absolute h-[110px] w-[96px] rounded-[12px] flex items-center justify-center overflow-hidden"
+                    style={{ backgroundColor: agency.logo ? 'transparent' : (agency.primaryColor || '#D9D9D9') }}
                   >
+                    {agency.logo ? (
+                      <img 
+                        src={agency.logo} 
+                        alt={agency.name}
+                        className="w-full h-full object-cover rounded-[12px]"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-black/20 rounded-[8px]"/>
+                    )}
                   </div>
                   {/* Status Badge */}
                   <div

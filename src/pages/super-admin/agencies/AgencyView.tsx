@@ -6,7 +6,7 @@ import {
 } from "./api";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
-import {Search, ChevronLeft, ChevronRight, Phone, MessageSquare, Edit} from "lucide-react";
+import {Search, ChevronLeft, ChevronRight, Phone, MessageSquare, Edit, ArrowLeft} from "lucide-react";
 import {Routes} from "@/routes/constants";
 import {toast} from "sonner";
 import {cn} from "@/lib/utils";
@@ -83,7 +83,13 @@ export default function AgencyView() {
         {/* Header */}
         <div className="px-8 py-6">
           <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
-            <div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate(Routes.superAdmin.agencies)}
+                className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-full bg-[rgba(255,255,255,0.5)] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-[#10141a]" />
+              </button>
               <h2 className="text-4xl font-bold text-[#10141a]">Agency Management</h2>
             </div>
           </div>
@@ -98,14 +104,14 @@ export default function AgencyView() {
               <div className="flex items-start gap-6">
                 {/* Agency Logo */}
                 <div
-                  className="w-[140px] h-[140px] rounded-[12px] flex items-center justify-center shrink-0"
-                  style={{backgroundColor: agency?.agencyData?.logo ? "transparent" : agency?.agencyData?.primaryColor}}
+                  className="w-[140px] h-[140px] rounded-[12px] flex items-center justify-center shrink-0 overflow-hidden"
+                  style={{backgroundColor: agency?.agencyData?.logo ? "transparent" : (agency?.agencyData?.primaryColor || '#D9D9D9')}}
                 >
                   {agency?.agencyData?.logo ? (
                     <img src={agency.agencyData?.logo} alt={agency.agencyData?.name}
                          className="w-full h-full object-cover rounded-[12px]"/>
                   ) : (
-                    <div className="w-16 h-16 bg-black rounded-[8px]"/>
+                    <div className="w-16 h-16 bg-black/20 rounded-[8px]"/>
                   )}
                 </div>
 
@@ -132,11 +138,13 @@ export default function AgencyView() {
                   {/* Action Buttons */}
                   <div className="flex items-center gap-3">
                     <Button
-                      className="min-w-[220px] bg-[#00b4b8] hover:bg-[#009da1] text-white px-6 py-3 rounded-[200px] font-semibold text-[14px] flex items-center gap-2">
+                      disabled
+                      className="min-w-[220px] bg-[#00b4b8] hover:bg-[#009da1] text-white px-6 py-3 rounded-[200px] font-semibold text-[14px] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                       <Phone className="w-5 h-5"/>
                       Call
                     </Button>
                     <Button
+                      onClick={() => navigate(Routes.superAdmin.corporateSupport)}
                       className="backdrop-blur-sm bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.7)] text-[#10141a] px-6 py-3 rounded-[200px] font-semibold text-[14px] flex items-center gap-2">
                       <MessageSquare className="w-5 h-5"/>
                       Chat

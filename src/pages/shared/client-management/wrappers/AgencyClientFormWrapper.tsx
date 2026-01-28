@@ -88,6 +88,9 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
     onSuccessNavigate: (id) => (id ? Routes.agency.clientDetails.replace(":clientId", id) : Routes.agency.clients),
     successMessage: isEditMode ? "Update Client" : "Save Client",
     pageTitle: isEditMode ? "Edit client" : "Add client",
+    backNavigate: isEditMode && clientId ? Routes.agency.clientDetails.replace(":clientId", clientId) : Routes.agency.clients,
+    clientId,
+    isEditMode,
   };
 
   const handleSuccess = (id?: string) => {

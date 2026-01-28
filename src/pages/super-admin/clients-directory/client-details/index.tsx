@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Phone, Edit } from "lucide-react";
+import { Loader2, Phone, Edit, ArrowLeft } from "lucide-react";
 import { useParams, useSearchParams, useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { Button } from "@/components/ui/button";
@@ -187,9 +187,17 @@ export default function ClientDetailsPage() {
     <div className="min-h-[calc(100vh-200px)]">
       {/* Page Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-          Client Management
-        </h1>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(Routes.superAdmin.clientDirectory)}
+            className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-full bg-[rgba(255,255,255,0.5)] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-[#10141a]" />
+          </button>
+          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
+            Client Management
+          </h1>
+        </div>
         <Button
           className="h-[44px] w-[180px] rounded-[60px] px-[11px] py-[12px] gap-2 bg-[#00b4b8] hover:bg-[#00a0a4] text-white flex items-center justify-center font-medium transition-colors"
           onClick={() => navigate(Routes.superAdmin.editClient.replace(":clientId", clientId || ""))}

@@ -2,17 +2,20 @@ import React, { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { AddClientFormData } from "@/pages/shared/client-management/types/formData";
+import { ArrowLeft } from "lucide-react";
 
 export function Stage7SystemAiAndAudit({
   footer,
   formData,
   setFormData,
   pageTitle = "Add client",
+  handleBack,
 }: {
   footer: React.ReactNode;
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
   pageTitle?: string;
+  handleBack?: () => void;
 }) {
   const stage7 = formData.stage7;
   const updateStage7 = (patch: Partial<AddClientFormData["stage7"]>) =>
@@ -57,7 +60,13 @@ export function Stage7SystemAiAndAudit({
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
-      <div className="mb-10">
+      <div className="flex items-center gap-4 mb-10">
+        <button
+          onClick={handleBack}
+          className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-full bg-[rgba(255,255,255,0.5)] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-[#10141a]" />
+        </button>
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
           {pageTitle}
         </h1>
@@ -95,7 +104,7 @@ export function Stage7SystemAiAndAudit({
 
         <div className="mb-6">
           <p className="text-[14px] font-normal text-[#10141a]">Audit Review Cycle</p>
-          <div className="mt-3 flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 mt-3">
             <button
               type="button"
               onClick={() => updateStage7({ auditCycle: "monthly" })}

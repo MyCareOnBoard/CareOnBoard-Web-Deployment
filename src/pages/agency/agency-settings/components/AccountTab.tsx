@@ -64,12 +64,10 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
   }, [])
 
   const load = useCallback(async () => {
-    console.log("🔄 Loading account info...")
     setLoading(true)
     setError("")
     try {
       const data = await getAccountInfo()
-      console.log("✅ Loaded account info:", data)
 
       let fullName = data.fullName || ""
       let email = data.email || ""
@@ -78,11 +76,9 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       const current = auth.currentUser
       
       if (!fullName && current?.displayName) {
-        console.log("⚠️ Using Firebase displayName as fallback:", current.displayName)
         fullName = current.displayName
       }
       if (!email && current?.email) {
-        console.log("⚠️ Using Firebase email as fallback:", current.email)
         email = current.email
       }
 
@@ -91,8 +87,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
         fullName,
         profilePicture: data.profilePicture,
       }
-
-      console.log("✅ Merged account info:", merged)
       
       setInfo(merged)
       setInitialFullName(merged.fullName)
@@ -104,7 +98,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       )
       
       if (merged.profilePicture) {
-        console.log("🖼️ Setting profile picture:", merged.profilePicture)
         setSelectedImage(merged.profilePicture)
       }
     } catch (e: any) {
@@ -164,16 +157,10 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
     setError("")
     
     try {
-      console.log("🚀 Calling updateAccountInfo...")
-      console.log("📤 Name:", nameChanged ? data.fullName.trim() : "unchanged")
-      console.log("📤 Image:", imageChanged ? imageFile!.name : "unchanged")
-      
       const result = await updateAccountInfo({
         fullName: nameChanged ? data.fullName.trim() : undefined,
         profilePictureFile: imageChanged ? imageFile! : undefined,
       })
-
-      console.log("✅ Save result:", result)
 
       // Update state with exact API response
       setInfo(result)
@@ -181,7 +168,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       
       // Update image states if new image was uploaded
       if (result.profilePicture) {
-        console.log("🖼️ Updating profile picture to:", result.profilePicture)
         setInitialImage(result.profilePicture)
         setSelectedImage(result.profilePicture)
       }
@@ -196,7 +182,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
         { keepDefaultValues: false }
       )
 
-      console.log("✅ Save completed successfully")
       onSaved?.(result)
       
       // Set success message
@@ -236,12 +221,8 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
     setError("")
 
     try {
-      console.log("🗑️ [AccountTab] Deleting account using profile endpoint...")
-      
       // Use deleteAccount from @/lib/api/profile (same as ProfilePage)
       await deleteAccount()
-      
-      console.log("✅ [AccountTab] Account deleted successfully")
       
       // Clear auth and storage (matches ProfilePage)
       localStorage.clear()
