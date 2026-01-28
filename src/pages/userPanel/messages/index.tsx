@@ -26,7 +26,7 @@ export default function MessagesPage() {
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [showChatView, setShowChatView] = useState(false); // Mobile: toggle between list and chat
-  
+
   // Track which messages have been marked as read to avoid duplicate calls
   const markedAsReadRef = useRef<Set<string>>(new Set());
 
@@ -66,9 +66,9 @@ export default function MessagesPage() {
     if (!messaging.currentConversation || messaging.currentMessages.length === 0 || !user?.uid) return;
 
     const unreadMessageIds = messaging.currentMessages
-      .filter((msg) => 
-        msg.senderId !== user.uid && 
-        !msg.isRead && 
+      .filter((msg) =>
+        msg.senderId !== user.uid &&
+        !msg.isRead &&
         !markedAsReadRef.current.has(msg.id) // Skip already marked
       )
       .map((msg) => msg.id);
@@ -235,6 +235,7 @@ export default function MessagesPage() {
       <NewMessageModal
         open={isNewMessageModalOpen}
         onOpenChange={setIsNewMessageModalOpen}
+        isLoadingContacts={loadingContacts}
         users={contacts.map(contact => ({
           id: contact.uid,
           name: contact.name,
