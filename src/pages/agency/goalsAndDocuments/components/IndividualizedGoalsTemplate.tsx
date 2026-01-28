@@ -8,7 +8,7 @@ import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Button} from "@/components/ui/button";
 import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";
-import {useDebounce} from "@/hooks/useDebounce";
+import {useDebouncedCallback} from "@/hooks/useDebouncedCallback";
 import {
     useGetSingleGoalDocumentQuery,
     useUpsertGoalDocumentByTypeMutation,
@@ -76,7 +76,7 @@ export default function IndividualizedGoalsTemplate(
         }
     }, [document]);
     
-    const debouncedSave = useDebounce(
+    const debouncedSave = useDebouncedCallback(
         async (data: any) => {
             try {
                 setIsSaving(true);
