@@ -1,7 +1,7 @@
 import React, {useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
-import {Search, ChevronLeft, ChevronRight, Trash2} from "lucide-react";
+import {Search, ChevronLeft, ChevronRight, Trash2, ArrowLeft} from "lucide-react";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {cn} from "@/lib/utils";
@@ -51,7 +51,13 @@ export default function SavedAgencies() {
                 {/* Header */}
                 <div className="sticky top-0 px-8 py-6 z-10">
                     <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
-                        <div>
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => navigate(Routes.superAdmin.agencies)}
+                                className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-full bg-[rgba(255,255,255,0.5)] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+                            >
+                                <ArrowLeft className="w-5 h-5 text-[#10141a]" />
+                            </button>
                             <h2 className="text-4xl font-bold text-[#10141a]">Add new agency</h2>
                         </div>
                     </div>

@@ -98,6 +98,9 @@ export function SuperAdminClientFormWrapper({ isEditMode = false }: SuperAdminCl
     onSuccessNavigate: (id) => (id ? Routes.superAdmin.clientDetails.replace(":clientId", id) : Routes.superAdmin.clientDirectory),
     successMessage: isEditMode ? "Update Client" : "Save Client",
     pageTitle: isEditMode ? "Edit client" : "Add client",
+    backNavigate: isEditMode && clientId ? Routes.superAdmin.clientDetails.replace(":clientId", clientId) : Routes.superAdmin.clientDirectory,
+    clientId,
+    isEditMode,
   };
 
   const handleSuccess = (id?: string) => {

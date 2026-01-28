@@ -784,16 +784,24 @@ export default function AddAgencyWizard() {
                 {/* Header */}
                 <div className="sticky top-0 px-8 pb-6 z-10">
                     <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
-                        <div>
-                            <h2 className="text-[28px] font-bold text-[#10141a]">Add new agency</h2>
-                            {currentStepData && (
-                                <div className="mt-2">
-                                    <p className="text-[16px] font-semibold text-[#10141a]">
-                                        {currentStepData.number}. {currentStepData.title}
-                                    </p>
-                                    <p className="text-[14px] text-[#808081] mt-1">{currentStepData.description}</p>
-                                </div>
-                            )}
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => navigate(agencyId ? Routes.superAdmin.agencyView.replace(":id", agencyId) : Routes.superAdmin.agencies)}
+                                className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-full bg-[rgba(255,255,255,0.5)] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+                            >
+                                <ArrowLeft className="w-5 h-5 text-[#10141a]" />
+                            </button>
+                            <div>
+                                <h2 className="text-[28px] font-bold text-[#10141a]">Add new agency</h2>
+                                {currentStepData && (
+                                    <div className="mt-2">
+                                        <p className="text-[16px] font-semibold text-[#10141a]">
+                                            {currentStepData.number}. {currentStepData.title}
+                                        </p>
+                                        <p className="text-[14px] text-[#808081] mt-1">{currentStepData.description}</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <div className="flex flex-col items-center gap-3">
                             <div className="flex items-center gap-2 text-[#00b4b8] cursor-pointer"

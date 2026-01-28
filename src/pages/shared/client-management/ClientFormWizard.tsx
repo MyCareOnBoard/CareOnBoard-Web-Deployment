@@ -111,6 +111,9 @@ export function ClientFormWizard({
           formData={formData}
           setFormData={setFormData}
           pageTitle={pageTitle}
+          backNavigate={config.backNavigate}
+          clientId={config.clientId}
+          isEditMode={config.isEditMode}
         />
       );
     if (stage === 2)

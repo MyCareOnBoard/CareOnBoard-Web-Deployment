@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router";
+import { Routes } from "@/routes/constants";
+import { useAuth } from "@/utils/auth";
+import { UserType } from "@/utils/auth/types/user.types";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -24,6 +28,9 @@ export function Stage1ClientIdentityAndContact({
   formData,
   setFormData,
   pageTitle = "Add client",
+  backNavigate,
+  clientId,
+  isEditMode = false,
 }: {
   showAgencySelection?: boolean;
   agencies?: Agency[];
@@ -33,10 +40,33 @@ export function Stage1ClientIdentityAndContact({
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
   pageTitle?: string;
+  backNavigate?: string;
+  clientId?: string;
+  isEditMode?: boolean;
 }) {
   const stage1 = formData.stage1;
   const updateStage1 = (patch: Partial<AddClientFormData["stage1"]>) =>
     setFormData((prev) => ({ ...prev, stage1: { ...prev.stage1, ...patch } }));
+
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
+
+  const handleBack = () => {
+    if (backNavigate) {
+      navigate(backNavigate);
+    } else if (isEditMode && clientId) {
+      // For edit mode, go to client details page
+      const detailsPath = isSuperAdmin 
+        ? Routes.superAdmin.clientDetails.replace(":clientId", clientId)
+        : Routes.agency.clientDetails.replace(":clientId", clientId);
+      navigate(detailsPath);
+    } else {
+      // For add mode, go to client directory
+      const directoryPath = isSuperAdmin ? Routes.superAdmin.clientDirectory : Routes.agency.clients;
+      navigate(directoryPath);
+    }
+  };
 
   useEffect(() => {
     if (!showAgencySelection && userAgencyId && !formData.agencyId) {
@@ -248,7 +278,13 @@ export function Stage1ClientIdentityAndContact({
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
-      <div className="mb-10">
+      <div className="mb-10 flex items-center gap-4">
+        <button
+          onClick={handleBack}
+          className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-full bg-[rgba(255,255,255,0.5)] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-[#10141a]" />
+        </button>
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
           {pageTitle}
         </h1>

@@ -64,8 +64,6 @@ export async function getAccountInfo(): Promise<AccountInfo> {
       fullName: currentUser?.displayName || '',
       profilePicture: currentUser?.photoURL || undefined,
     }
-    
-    console.log('📥 [Settings] Firebase data:', firebaseData)
 
     // Then try API
     try {
@@ -78,7 +76,6 @@ export async function getAccountInfo(): Promise<AccountInfo> {
       }
 
       const apiData = parseAccount(responseData)
-      console.log('📥 [Settings] API data:', apiData)
       
       // Merge: prefer API data, fallback to Firebase
       return {
@@ -128,8 +125,6 @@ export async function updateProfilePicture(profilePicture: string): Promise<void
  * Upload profile picture to /profilePictureUpload
  */
 async function uploadProfilePicture(file: File): Promise<string> {
-  console.log('📤 [Settings] Uploading profile picture:', file.name, file.size, 'bytes')
-  
   const formData = new FormData()
   formData.append('profilePicture', file)
   
@@ -139,15 +134,12 @@ async function uploadProfilePicture(file: File): Promise<string> {
     },
   })
   
-  console.log('✅ [Settings] Profile picture upload response:', response.data)
-  
   if (!response.data?.success || !response.data?.data?.url) {
     throw new Error(response.data?.message || 'Failed to upload profile picture')
   }
   
   // Return the URL from response.data.data.url
   const uploadedUrl = response.data.data.url
-  console.log('✅ [Settings] Extracted image URL:', uploadedUrl)
   return uploadedUrl
 }
 
@@ -160,12 +152,6 @@ export async function updateAccountInfo(data: {
   fullName?: string
   profilePictureFile?: File
 }): Promise<AccountInfo> {
-  console.log('📤 [Settings] Updating account info:', {
-    fullName: data.fullName,
-    hasImage: !!data.profilePictureFile,
-    imageSize: data.profilePictureFile?.size,
-  })
-
   const auth = getAuth()
   await auth.authStateReady?.()
   const currentUser = auth.currentUser
@@ -179,9 +165,7 @@ export async function updateAccountInfo(data: {
 
     // Step 1: Upload image if provided
     if (data.profilePictureFile) {
-      console.log('📤 [Settings] Uploading image first...')
       uploadedImageUrl = await uploadProfilePicture(data.profilePictureFile)
-      console.log('✅ [Settings] Image uploaded successfully:', uploadedImageUrl)
       
       if (!uploadedImageUrl) {
         throw new Error('Image upload returned empty URL')
@@ -199,12 +183,8 @@ export async function updateAccountInfo(data: {
       updatePayload.profilePicture = uploadedImageUrl
     }
     
-    console.log('📤 [Settings] Updating profile with payload:', updatePayload)
-    
     // Step 3: Update via API
     const response = await axiosClient.put('/users/profile', updatePayload)
-    
-    console.log('✅ [Settings] Profile update response:', response.data)
     
     // Step 4: Also update Firebase Auth
     try {
@@ -214,7 +194,6 @@ export async function updateAccountInfo(data: {
       
       if (Object.keys(firebaseUpdate).length > 0) {
         await updateProfile(currentUser, firebaseUpdate)
-        console.log('✅ [Settings] Firebase profile synced with:', firebaseUpdate)
       }
     } catch (fbError) {
       console.warn('⚠️ [Settings] Firebase sync failed (non-fatal):', fbError)
@@ -226,8 +205,6 @@ export async function updateAccountInfo(data: {
       fullName: data.fullName || currentUser.displayName || '',
       profilePicture: uploadedImageUrl || currentUser.photoURL || undefined,
     }
-    
-    console.log('✅ [Settings] Returning final account info:', finalInfo)
     
     return finalInfo
   } catch (error: any) {
@@ -241,7 +218,6 @@ export async function updateAccountInfo(data: {
         await updateProfile(currentUser, {
           displayName: data.fullName,
         })
-        console.log('✅ [Settings] Firebase profile updated (fallback)')
         
         return {
           email: currentUser.email || '',
@@ -270,14 +246,12 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
   if (stored) {
     try {
       const parsed = JSON.parse(stored)
-      console.log('📦 [Settings] Loaded from localStorage:', parsed)
       return parsed
     } catch {
       console.warn('⚠️ [Settings] Failed to parse localStorage notification_settings')
     }
   }
 
-  console.log('🔄 [Settings] Fetching from API /userProfile/notifications')
   try {
     const response = await axiosClient.get('/userProfile/notifications')
     const res = response.data
@@ -292,7 +266,6 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
     
     // Cache to localStorage
     localStorage.setItem('notification_settings', JSON.stringify(settings))
-    console.log('💾 [Settings] Cached API settings to localStorage:', settings)
     return settings
   } catch (e) {
     console.error('❌ [Settings] API fetch failed; using defaults')
@@ -310,15 +283,11 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
 export async function updateNotificationSettings(
   settings: NotificationSettings
 ): Promise<NotificationSettings> {
-  console.log('📤 [Settings] User wants to save:', settings)
-
   // Optimistic local persistence
   localStorage.setItem('notification_settings', JSON.stringify(settings))
-  console.log('💾 [Settings] Optimistically wrote to localStorage:', settings)
 
   try {
     const response = await axiosClient.put('/userProfile/notifications', settings)
-    console.log('📥 [Settings] API response:', response.data)
 
     const serverSettings = response.data?.notifications || settings
     
@@ -338,7 +307,6 @@ export async function updateNotificationSettings(
     }
 
     localStorage.setItem('notification_settings', JSON.stringify(final))
-    console.log('✅ [Settings] Final persisted settings:', final)
     return final
   } catch (e) {
     console.error('❌ [Settings] API update failed; retaining optimistic local settings')
