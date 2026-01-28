@@ -240,6 +240,7 @@ export default function MessagesPage() {
           id: contact.uid,
           name: contact.name,
           role: contact.role,
+          agency: contact?.agencyName,
           avatar: getInitials(contact.name),
           image: contact.avatar
         }))}

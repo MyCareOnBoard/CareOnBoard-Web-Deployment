@@ -9,6 +9,7 @@ interface User {
   id: string;
   name: string;
   role: string;
+  agency?: string;
   avatar: string;
   image?: string;
 }
@@ -158,7 +159,7 @@ export default function NewMessageModal({
                           {user.name}
                         </h4>
                         <p className="text-[13px] text-[#808081] leading-tight">
-                          {user.role}
+                          {user.role} {user.agency ? `| ${user?.agency}` : ""}
                         </p>
                       </div>
                     </div>

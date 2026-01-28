@@ -238,6 +238,7 @@ export default function AgencySupportPage() {
           id: contact.uid,
           name: contact.name,
           role: contact.role,
+          agency: contact.agencyName,
           avatar: getInitials(contact.name),
           image: contact.avatar
         }))}

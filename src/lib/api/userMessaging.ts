@@ -20,6 +20,7 @@ export interface AgencyContact {
   name: string;
   email: string;
   role: string;
+  agencyName?: string;
   avatar?: string;
   department?: string;
   isActive: boolean;
@@ -33,6 +34,7 @@ export interface ConversationParticipant {
   uid: string;
   name: string;
   role: string;
+  agencyName?: string;
   avatar?: string;
   email?: string;
 }
