@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { submitExpense, uploadExpenseReceipt } from "@/lib/api/expenses";
 
 export default function ExpensesPage() {
   const [message, setMessage] = useState("");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("");
+  const [date, setDate] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -49,6 +54,33 @@ export default function ExpensesPage() {
       return;
     }
 
+    if (!amount || Number.isNaN(Number(amount)) || Number(amount) <= 0) {
+      toast({
+        title: "Amount required",
+        description: "Please enter a valid amount greater than 0.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!category.trim()) {
+      toast({
+        title: "Category required",
+        description: "Please enter an expense category.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!date) {
+      toast({
+        title: "Date required",
+        description: "Please select the expense date.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!message.trim()) {
       toast({
         title: "Message required",
@@ -61,13 +93,14 @@ export default function ExpensesPage() {
     setIsSubmitting(true);
 
     try {
-      // TODO: Replace with actual API call
-      const formData = new FormData();
-      formData.append('receipt', selectedFile);
-      formData.append('message', message);
-
-      // Simulated API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const receiptUrl = await uploadExpenseReceipt(selectedFile);
+      await submitExpense({
+        receiptUrl,
+        message: message.trim(),
+        amount: Number(amount),
+        category: category.trim(),
+        date: new Date(date).toISOString(),
+      });
 
       toast({
         title: "Expense submitted successfully",
@@ -76,16 +109,22 @@ export default function ExpensesPage() {
 
       // Reset form
       setMessage("");
+      setAmount("");
+      setCategory("");
+      setDate("");
       setSelectedFile(null);
       // Reset file input
       const fileInput = document.getElementById('receipt-upload') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to submit expense:", error);
       toast({
         title: "Submission failed",
-        description: "There was an error submitting your expense. Please try again.",
+        description:
+          error?.response?.data?.message ||
+          error?.message ||
+          "There was an error submitting your expense. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -104,7 +143,7 @@ export default function ExpensesPage() {
           <span className="text-sm text-[#808081]">Work Availibility</span>
           <label className="relative inline-flex items-center cursor-pointer">
             <input type="checkbox" className="sr-only peer" defaultChecked />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00b4b8]"></div>
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00b4b8]"></div>
           </label>
         </div>
       </div>
@@ -166,6 +205,46 @@ export default function ExpensesPage() {
               </button>
             </div>
           )}
+        </div>
+
+        {/* Expense Details */}
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div>
+            <label className="block text-base font-semibold text-[#10141a] mb-2">
+              Amount
+            </label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              className="border-[#e5e5e6] rounded-xl focus:border-[#00b4b8] focus:ring-[#00b4b8] text-[#10141a]"
+            />
+          </div>
+          <div>
+            <label className="block text-base font-semibold text-[#10141a] mb-2">
+              Category
+            </label>
+            <Input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="e.g. supplies"
+              className="border-[#e5e5e6] rounded-xl focus:border-[#00b4b8] focus:ring-[#00b4b8] text-[#10141a]"
+            />
+          </div>
+          <div>
+            <label className="block text-base font-semibold text-[#10141a] mb-2">
+              Date
+            </label>
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="border-[#e5e5e6] rounded-xl focus:border-[#00b4b8] focus:ring-[#00b4b8] text-[#10141a]"
+            />
+          </div>
         </div>
 
         {/* Your Message Section */}
