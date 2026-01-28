@@ -16,6 +16,7 @@ interface User {
 interface NewMessageModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isLoadingContacts: boolean;
   users: User[];
   onStartChat: (selectedUserIds: string[]) => void;
 }
@@ -23,22 +24,12 @@ interface NewMessageModalProps {
 export default function NewMessageModal({
   open,
   onOpenChange,
+  isLoadingContacts,
   users,
   onStartChat,
 }: NewMessageModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true); // Loading state defaults to true
-
-  // Set loading to false when users are loaded
-  useEffect(() => {
-    if (users.length > 0) {
-      setLoading(false);
-    } else if (open) {
-      // Reset loading when modal opens if no users yet
-      setLoading(true);
-    }
-  }, [users, open]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -134,7 +125,7 @@ export default function NewMessageModal({
 
             {/* User List */}
             <div className="min-h-[200px] max-h-[400px] overflow-y-auto space-y-2 mb-5">
-              {loading ? (
+              {isLoadingContacts ? (
                 <div className="flex items-center justify-center h-[200px]">
                   <div className="text-center">
                     <div className="w-8 h-8 rounded-full border-2 border-[#e5e7eb] border-t-[#2563eb] animate-spin mx-auto mb-2"></div>
