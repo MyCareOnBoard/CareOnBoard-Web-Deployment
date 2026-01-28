@@ -108,8 +108,6 @@ export default function UserAccessControlPage() {
     try {
       await removeSuperAdminUser(userToRemove.id);
 
-      console.log(`✅ Super admin ${userToRemove.name} deleted permanently`);
-
       // Refresh the list
       await fetchSuperAdmins();
 
@@ -160,8 +158,6 @@ export default function UserAccessControlPage() {
           phone: "", // Optional
           accessList: data.accessList,
         });
-
-        console.log(`✅ Super admin ${data.name} created successfully`);
       } else if (editingUser) {
         // Update existing super admin
         const updateData: any = {
@@ -175,8 +171,6 @@ export default function UserAccessControlPage() {
         }
 
         await updateSuperAdminUser(editingUser.id, updateData);
-
-        console.log(`✅ Super admin ${data.name} updated successfully`);
       }
 
       // Refresh the list

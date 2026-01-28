@@ -91,7 +91,6 @@ export default function AddNewUserModal({
 
   const handleSendResetLink = async () => {
     // TODO: Implement actual reset link functionality
-    console.log("Sending reset link to:", email);
     setShowResetLinkMessage(true);
     setTimeout(() => setShowResetLinkMessage(false), 3000);
   };
@@ -103,7 +102,6 @@ export default function AddNewUserModal({
         await onSave({ name, email, password, accessList });
       } else {
         // Default mock save if no onSave provided
-        console.log("Creating user:", { name, email, password, accessList });
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
       onClose();

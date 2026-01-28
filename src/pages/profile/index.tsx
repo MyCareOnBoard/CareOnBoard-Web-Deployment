@@ -108,10 +108,7 @@ export default function ProfilePage() {
       setLoading(true)
       setError("")
 
-      console.log('🔄 Loading profile data...')
       const data = await getProfileInfo()
-
-      console.log('📥 API returned:', data)
 
       // Fallback to Firebase auth if data is missing
       let fullName = data.fullName || ""
@@ -124,15 +121,12 @@ export default function ProfilePage() {
       const currentUser = auth.currentUser
 
       if (!fullName && currentUser?.displayName) {
-        console.log("⚠️ Using Firebase displayName as fallback:", currentUser.displayName)
         fullName = currentUser.displayName
       }
       if (!email && currentUser?.email) {
-        console.log("⚠️ Using Firebase email as fallback:", currentUser.email)
         email = currentUser.email
       }
       if (!profilePicture && currentUser?.photoURL) {
-        console.log("⚠️ Using Firebase photoURL as fallback:", currentUser.photoURL)
         profilePicture = currentUser.photoURL
       }
 
@@ -140,7 +134,6 @@ export default function ProfilePage() {
       if (!joiningDate && currentUser?.metadata?.creationTime) {
         const creationDate = new Date(currentUser.metadata.creationTime)
         joiningDate = creationDate.toISOString().split('T')[0]
-        console.log("⚠️ Using Firebase account creation date as joining date:", joiningDate)
       }
 
       const mergedProfile: ProfileInfo = {
@@ -151,13 +144,10 @@ export default function ProfilePage() {
         profilePicture,
       }
 
-      console.log("✅ Merged profile data:", mergedProfile)
-
       setProfile(mergedProfile)
 
       // Set photo preview
       setPhotoPreview(profilePicture)
-      console.log("🖼️ Set photo preview to:", profilePicture || "(empty - will show placeholder)")
 
       // Initialize form data
       const initialData: Partial<ProfileInfo> = {
@@ -231,8 +221,6 @@ export default function ProfilePage() {
         setSelectedDate(dateObj)
       }
     }
-
-    console.log("📝 Edit form initialized:", editFormData)
   }
 
   const handleImageClick = () => {
@@ -320,11 +308,9 @@ export default function ProfilePage() {
     try {
       // Step 1: If image changed, upload it via Settings API (same as AccountTab)
       if (imageFile) {
-        console.log("📤 Uploading profile picture via Settings API...")
         const accountResult = await updateAccountInfo({
           profilePictureFile: imageFile,
         })
-        console.log("✅ Image uploaded, new URL:", accountResult.profilePicture)
 
         // Update local state with new image URL
         if (accountResult.profilePicture) {
@@ -361,8 +347,6 @@ export default function ProfilePage() {
       if (formData.fullName !== undefined && formData.fullName !== profile.fullName) {
         updateData.fullName = formData.fullName.trim()
       }
-
-      console.log("📤 Updating profile data:", updateData)
 
       await updateProfileInfo(updateData)
 
@@ -411,7 +395,6 @@ export default function ProfilePage() {
 
     try {
       await deleteAccount()
-      console.log("✅ Account deleted successfully")
 
       localStorage.clear()
       sessionStorage.clear()
