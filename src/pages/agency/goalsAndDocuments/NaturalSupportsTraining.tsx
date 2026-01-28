@@ -1,15 +1,38 @@
-import React, {useState} from "react";
-import {useNavigate} from "react-router";
+import React, {useState, useCallback, useRef, useEffect} from "react";
+import {useNavigate, useLocation} from "react-router";
 import {Routes} from "@/routes/constants";
-import {ChevronLeft} from "lucide-react";
+import {ChevronLeft, Loader2} from "lucide-react";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import {Button} from "@/components/ui/button";
+import {searchClients, Client} from "@/lib/api/clients";
+import {useAuth} from "@/utils/auth";
+import {toast} from "sonner";
+import {useDebouncedCallback} from "@/hooks/useDebouncedCallback";
+import {
+    useGetSingleGoalDocumentQuery,
+    useUpsertGoalDocumentByTypeMutation,
+    useSubmitGoalDocumentMutation
+} from "./api";
+import {DocumentType, NaturalSupportsTrainingDocument} from "@/lib/api/goals-and-documents";
+import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 
 export default function NaturalSupportsTraining() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const {user} = useAuth();
+    const documentId = new URLSearchParams(location.search).get("id");
+    const documentType = DocumentType.NATURAL_SUPPORTS_TRAINING;
+    
+    const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
+        skip: !documentType,
+        refetchOnMountOrArgChange: true
+    });
+    const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
+    const [submitDocument, {isLoading: isSubmitting}] = useSubmitGoalDocumentMutation();
     const [formData, setFormData] = useState({
         name: "",
+        clientId: "",
         birthDate: "",
         ispOutcome: "",
         nameOfTrainer: "",
@@ -28,30 +51,160 @@ export default function NaturalSupportsTraining() {
         completionDate: "",
     });
 
+    const [showClientDropdown, setShowClientDropdown] = useState(false);
+    const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
+    const [isSearchingClients, setIsSearchingClients] = useState(false);
+    const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (document && document.metadata) {
+            const metadata = document.metadata as NaturalSupportsTrainingDocument;
+            setFormData({
+                name: metadata.name || "",
+                clientId: (metadata as any).clientId || "",
+                birthDate: metadata.birthDate || "",
+                ispOutcome: metadata.ispOutcome || "",
+                nameOfTrainer: metadata.nameOfTrainer || "",
+                trainingParticipants: metadata.trainingParticipants || [
+                    {name: "", signature: ""},
+                    {name: "", signature: ""},
+                    {name: "", signature: ""},
+                    {name: "", signature: ""},
+                ],
+                trainings: metadata.trainings || [
+                    {type: "", date: "", startTime: "", endTime: "", description: ""},
+                    {type: "", date: "", startTime: "", endTime: "", description: ""},
+                    {type: "", date: "", startTime: "", endTime: "", description: ""},
+                ],
+                completedBy: metadata.completedBy || "",
+                completionDate: metadata.completionDate || "",
+            });
+        }
+    }, [document]);
+
+    useEffect(() => {
+        return () => {
+            if (clientSearchTimeoutRef.current) clearTimeout(clientSearchTimeoutRef.current);
+        };
+    }, []);
+
+    const debouncedSave = useDebouncedCallback(
+        async (data: any) => {
+            try {
+                setIsSaving(true);
+                const result = await upsertDocument({
+                    documentType,
+                    data: { 
+                        metadata: data, 
+                        agencyId: user?.agencyId,
+                        clientId: data.clientId || undefined
+                    }
+                }).unwrap();
+                
+                if (result.id && !documentId) {
+                    const newUrl = `${location.pathname}?id=${result.id}`;
+                    window.history.replaceState({}, '', newUrl);
+                }
+            } catch (error) {
+                console.error('Failed to save document:', error);
+            } finally {
+                setIsSaving(false);
+            }
+        },
+        1000
+    );
+
     const handleInputChange = (field: string, value: string) => {
-        setFormData((prev) => ({...prev, [field]: value}));
+        const updatedData = {...formData, [field]: value};
+        setFormData(updatedData);
+        debouncedSave(updatedData);
     };
 
     const handleParticipantChange = (index: number, field: string, value: string) => {
         const updated = [...formData.trainingParticipants];
         updated[index] = {...updated[index], [field]: value};
-        setFormData((prev) => ({...prev, trainingParticipants: updated}));
+        const updatedData = {...formData, trainingParticipants: updated};
+        setFormData(updatedData);
+        debouncedSave(updatedData);
     };
 
     const handleTrainingChange = (index: number, field: string, value: string) => {
         const updated = [...formData.trainings];
         updated[index] = {...updated[index], [field]: value};
-        setFormData((prev) => ({...prev, trainings: updated}));
+        const updatedData = {...formData, trainings: updated};
+        setFormData(updatedData);
+        debouncedSave(updatedData);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleClientSearch = useCallback(async (query: string) => {
+        if (clientSearchTimeoutRef.current) {
+            clearTimeout(clientSearchTimeoutRef.current);
+        }
+
+        if (query.trim().length < 2) {
+            setClientSearchResults([]);
+            setShowClientDropdown(false);
+            return;
+        }
+
+        clientSearchTimeoutRef.current = setTimeout(async () => {
+            try {
+                setIsSearchingClients(true);
+                const results = await searchClients(query, user?.agencyId);
+                setClientSearchResults(results);
+                setShowClientDropdown(results.length > 0);
+            } catch (error) {
+                console.error("Failed to search clients:", error);
+                setClientSearchResults([]);
+            } finally {
+                setIsSearchingClients(false);
+            }
+        }, 300);
+    }, [user?.agencyId]);
+
+    const handleClientSelect = (client: Client) => {
+        const clientName = client.firstName && client.lastName 
+            ? `${client.firstName} ${client.lastName}` 
+            : client.id;
+        const updatedData = {
+            ...formData,
+            name: clientName,
+            clientId: client.id,
+        };
+        setFormData(updatedData);
+        setShowClientDropdown(false);
+        setClientSearchResults([]);
+        debouncedSave(updatedData);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Form submitted:", formData);
+
+        if (!document?.id) {
+            toast.error('Please save the document first before submitting');
+            return;
+        }
+        
+        if (!formData.name || !formData.birthDate) {
+            toast.error('Please fill in Name and ISP Date');
+            return;
+        }
+        
+        try {
+            await submitDocument(document?.id ?? "").unwrap();
+            toast.success('Document submitted successfully!');
+            navigate(Routes.agency.goalsAndDocuments.index);
+        } catch (error: any) {
+            console.error('Error submitting document:', error);
+            toast.error(error?.data?.message || 'Failed to submit document.');
+        }
     };
 
     const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric", year: "numeric"});
 
     return (
+        <VoiceRecordingProvider pageTitle="Natural Supports Training">
         <div className="min-h-[calc(100vh-200px)]">
             {/* Header with Back Button */}
             <div className="mb-8">
@@ -91,17 +244,51 @@ export default function NaturalSupportsTraining() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Basic Information */}
                     <div className="flex gap-6 mb-6">
-                        <div className="flex-1">
+                        <div className="flex-1 relative">
                             <label
                                 className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
                                 Name
                             </label>
-                            <Input
-                                type="text"
-                                value={""}
-                                placeholder=""
-                                className="w-full"
-                            />
+                            <div className="relative">
+                                <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
+                                    <input
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={async (e) => {
+                                            const value = e.target.value;
+                                            setFormData(prev => ({ ...prev, name: value, clientId: "" }));
+                                            await handleClientSearch(value);
+                                        }}
+                                        placeholder="Search client name..."
+                                        className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                                    />
+                                    {isSearchingClients && (
+                                        <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+                                    )}
+                                </div>
+                                {showClientDropdown && clientSearchResults.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
+                                        {clientSearchResults.map((client) => (
+                                            <button
+                                                key={client.id}
+                                                onClick={() => handleClientSelect(client)}
+                                                className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
+                                            >
+                                                <p className="text-[14px] font-normal text-black">
+                                                    {client.firstName && client.lastName 
+                                                        ? `${client.firstName} ${client.lastName}` 
+                                                        : client.id}
+                                                </p>
+                                                {client.primaryAddress?.address && (
+                                                    <p className="text-[12px] font-normal text-[#808081]">
+                                                        {client.primaryAddress.address}
+                                                    </p>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <div className="flex-1">
                             <label
@@ -109,10 +296,11 @@ export default function NaturalSupportsTraining() {
                                 ISP Date
                             </label>
                             <Input
-                                type="text"
-                                value={""}
+                                type="date"
+                                value={formData.birthDate}
+                                onChange={(e) => handleInputChange("birthDate", e.target.value)}
                                 placeholder=""
-                                className="w-full"
+                                className="w-full block"
                             />
                         </div>
                     </div>
@@ -125,7 +313,8 @@ export default function NaturalSupportsTraining() {
                         </label>
                         <Input
                             type="text"
-                            value={""}
+                            value={formData.ispOutcome}
+                            onChange={(e) => handleInputChange("ispOutcome", e.target.value)}
                             placeholder=""
                             className="w-full"
                         />
@@ -138,7 +327,8 @@ export default function NaturalSupportsTraining() {
                         </label>
                         <Input
                             type="text"
-                            value={""}
+                            value={formData.nameOfTrainer}
+                            onChange={(e) => handleInputChange("nameOfTrainer", e.target.value)}
                             placeholder=""
                             className="w-full"
                         />
@@ -182,7 +372,7 @@ export default function NaturalSupportsTraining() {
                                                 <Input
                                                     type="text"
                                                     value={outcome.name}
-                                                    onChange={(e) => console.log(e)}
+                                                    onChange={(e) => handleParticipantChange(index, "name", e.target.value)}
                                                     className="h-auto p-0 border-0 bg-transparent text-center focus-visible:ring-0 text-[14px] w-full"
                                                 />
                                             </div>
@@ -190,8 +380,8 @@ export default function NaturalSupportsTraining() {
                                             <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                                                 <Input
                                                     type="text"
-                                                    value={outcome.name}
-                                                    onChange={(e) => console.log(e)}
+                                                    value={outcome.signature}
+                                                    onChange={(e) => handleParticipantChange(index, "signature", e.target.value)}
                                                     className="h-auto p-0 border-0 bg-transparent text-center focus-visible:ring-0 text-[14px] w-full"
                                                 />
                                             </div>
@@ -210,11 +400,12 @@ export default function NaturalSupportsTraining() {
                                     <div className="flex-1">
                                         <label
                                             className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-                                            Training Topic #1
+                                            Training Topic #{index + 1}
                                         </label>
                                         <Input
                                             type="text"
-                                            value={""}
+                                            value={training.type}
+                                            onChange={(e) => handleTrainingChange(index, "type", e.target.value)}
                                             placeholder=""
                                             className="w-full"
                                         />
@@ -226,10 +417,11 @@ export default function NaturalSupportsTraining() {
                                                 Date
                                             </label>
                                             <Input
-                                                type="text"
-                                                value={""}
+                                                type="date"
+                                                value={training.date}
+                                                onChange={(e) => handleTrainingChange(index, "date", e.target.value)}
                                                 placeholder=""
-                                                className="w-full"
+                                                className="w-full block"
                                             />
                                         </div>
                                         <div className="flex-1">
@@ -238,10 +430,11 @@ export default function NaturalSupportsTraining() {
                                                 Start Time
                                             </label>
                                             <Input
-                                                type="text"
-                                                value={""}
+                                                type="time"
+                                                value={training.startTime}
+                                                onChange={(e) => handleTrainingChange(index, "startTime", e.target.value)}
                                                 placeholder=""
-                                                className="w-full"
+                                                className="w-full block"
                                             />
                                         </div>
                                         <div className="flex-1">
@@ -250,22 +443,25 @@ export default function NaturalSupportsTraining() {
                                                 End Time
                                             </label>
                                             <Input
-                                                type="text"
-                                                value={""}
+                                                type="time"
+                                                value={training.endTime}
+                                                onChange={(e) => handleTrainingChange(index, "endTime", e.target.value)}
                                                 placeholder=""
-                                                className="w-full"
+                                                className="w-full block"
                                             />
                                         </div>
                                     </div>
                                     <div className="flex-1">
                                         <label
                                             className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-                                            Brief Description of Content of Training Topic #1:
+                                            Brief Description of Content of Training Topic #{index + 1}:
                                         </label>
                                         <Textarea
-                                            value={""}
+                                            value={training.description}
+                                            onChange={(e) => handleTrainingChange(index, "description", e.target.value)}
                                             placeholder=""
                                             className="w-full bg-white border border-[#cccccd]"
+                                            rows={4}
                                         />
                                     </div>
                                 </div>
@@ -281,6 +477,7 @@ export default function NaturalSupportsTraining() {
                         <Input
                             type="text"
                             value={formData.completedBy}
+                            onChange={(e) => handleInputChange("completedBy", e.target.value)}
                             placeholder=""
                             className="max-w-md"
                         />
@@ -290,18 +487,23 @@ export default function NaturalSupportsTraining() {
                     </div>
 
                     {/* Submit Button */}
-                    <div className={"flex justify-end"}>
+                    <div className={"flex justify-between items-center"}>
+                        <div className="text-sm text-gray-500">
+                            {isSaving && "Saving draft..."}
+                            {!isSaving && document?.id && "Draft saved"}
+                        </div>
                         <Button
                             type={"button"}
                             onClick={handleSubmit}
-                            disabled={false}
-                            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
+                            disabled={isSubmitting || !documentId}
+                            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm disabled:opacity-50"
                         >
-                            Submit
+                            {isSubmitting ? "Submitting..." : "Submit"}
                         </Button>
                     </div>
                 </form>
             </div>
         </div>
+        </VoiceRecordingProvider>
     );
 }

@@ -1,7 +1,7 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useCallback, useRef} from "react";
 import {useNavigate, useLocation} from "react-router";
 import {Routes} from "@/routes/constants";
-import {ChevronLeft} from "lucide-react";
+import {ChevronLeft, Loader2} from "lucide-react";
 import {Input} from "@/components/ui/input";
 import ContentEditableCell from "@/components/ContentEditableCell";
 import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
@@ -9,6 +9,7 @@ import {Button} from "@/components/ui/button";
 import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";
 import {useDebouncedCallback} from "@/hooks/useDebouncedCallback";
+import {searchClients, Client} from "@/lib/api/clients";
 import {
     useGetSingleGoalDocumentQuery,
     useUpsertGoalDocumentByTypeMutation,
@@ -38,6 +39,7 @@ export default function IndividualizedGoalsTemplate(
     
     const [formData, setFormData] = useState({
         name: "",
+        clientId: "",
         ispDate: "",
         outcomes: [
             {outcomeNumber: "", outcomeDescription: ""},
@@ -55,12 +57,17 @@ export default function IndividualizedGoalsTemplate(
     ]);
     
     const [isSaving, setIsSaving] = useState(false);
+    const [showClientDropdown, setShowClientDropdown] = useState(false);
+    const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
+    const [isSearchingClients, setIsSearchingClients] = useState(false);
+    const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (document && document.metadata) {
             const metadata = document.metadata as IndividualizedGoalsDocument;
             setFormData({
                 name: metadata.name || "",
+                clientId: (metadata as any).clientId || "",
                 ispDate: metadata.ispDate || "",
                 outcomes: metadata.outcomes || [
                     {outcomeNumber: "", outcomeDescription: ""},
@@ -76,13 +83,23 @@ export default function IndividualizedGoalsTemplate(
         }
     }, [document]);
     
+    useEffect(() => {
+        return () => {
+            if (clientSearchTimeoutRef.current) clearTimeout(clientSearchTimeoutRef.current);
+        };
+    }, []);
+    
     const debouncedSave = useDebouncedCallback(
         async (data: any) => {
             try {
                 setIsSaving(true);
                 const result = await upsertDocument({
                     documentType,
-                    data: { metadata: data, agencyId: user?.agencyId }
+                    data: { 
+                        metadata: data, 
+                        agencyId: user?.agencyId,
+                        clientId: data.clientId || undefined
+                    }
                 }).unwrap();
                 
                 if (result.id && !documentId) {
@@ -120,6 +137,47 @@ export default function IndividualizedGoalsTemplate(
         setIndividuals(updatedIndividuals);
         const updatedData = {...formData, involvedPersons: updated};
         setFormData(updatedData);
+        debouncedSave(updatedData);
+    };
+
+    const handleClientSearch = useCallback(async (query: string) => {
+        if (clientSearchTimeoutRef.current) {
+            clearTimeout(clientSearchTimeoutRef.current);
+        }
+
+        if (query.trim().length < 2) {
+            setClientSearchResults([]);
+            setShowClientDropdown(false);
+            return;
+        }
+
+        clientSearchTimeoutRef.current = setTimeout(async () => {
+            try {
+                setIsSearchingClients(true);
+                const results = await searchClients(query, user?.agencyId);
+                setClientSearchResults(results);
+                setShowClientDropdown(results.length > 0);
+            } catch (error) {
+                console.error("Failed to search clients:", error);
+                setClientSearchResults([]);
+            } finally {
+                setIsSearchingClients(false);
+            }
+        }, 300);
+    }, [user?.agencyId]);
+
+    const handleClientSelect = (client: Client) => {
+        const clientName = client.firstName && client.lastName 
+            ? `${client.firstName} ${client.lastName}` 
+            : client.id;
+        const updatedData = {
+            ...formData,
+            name: clientName,
+            clientId: client.id,
+        };
+        setFormData(updatedData);
+        setShowClientDropdown(false);
+        setClientSearchResults([]);
         debouncedSave(updatedData);
     };
 
@@ -190,18 +248,51 @@ export default function IndividualizedGoalsTemplate(
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Basic Information */}
                         <div className="flex gap-6 mb-6">
-                            <div className="flex-1">
+                            <div className="flex-1 relative">
                                 <label
                                     className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
                                     Name
                                 </label>
-                                <Input
-                                    type="text"
-                                    value={formData.name}
-                                    onChange={(e) => handleInputChange("name", e.target.value)}
-                                    placeholder=""
-                                    className="w-full"
-                                />
+                                <div className="relative">
+                                    <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
+                                        <input
+                                            type="text"
+                                            value={formData.name}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                setFormData(prev => ({ ...prev, name: value, clientId: "" }));
+                                                handleClientSearch(value);
+                                            }}
+                                            placeholder="Search client name..."
+                                            className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                                        />
+                                        {isSearchingClients && (
+                                            <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+                                        )}
+                                    </div>
+                                    {showClientDropdown && clientSearchResults.length > 0 && (
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
+                                            {clientSearchResults.map((client) => (
+                                                <button
+                                                    key={client.id}
+                                                    onClick={() => handleClientSelect(client)}
+                                                    className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
+                                                >
+                                                    <p className="text-[14px] font-normal text-black">
+                                                        {client.firstName && client.lastName 
+                                                            ? `${client.firstName} ${client.lastName}` 
+                                                            : client.id}
+                                                    </p>
+                                                    {client.primaryAddress?.address && (
+                                                        <p className="text-[12px] font-normal text-[#808081]">
+                                                            {client.primaryAddress.address}
+                                                        </p>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex-1">
                                 <label
