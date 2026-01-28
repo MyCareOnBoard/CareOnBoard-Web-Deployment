@@ -11,7 +11,7 @@ import { ConversationList } from "@/components/chat/ConversationList";
 import { MessageList } from "@/components/chat/MessageList";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ConversationHeader } from "@/components/chat/ConversationHeader";
-import { getUserContacts, AgencyContact } from "@/lib/api/userMessaging";
+import { AgencyContact } from "@/lib/api/userMessaging";
 import NewMessageModal from "./components/NewMessageModal";
 import { getInitials } from "@/lib/utils/string-utils";
 
