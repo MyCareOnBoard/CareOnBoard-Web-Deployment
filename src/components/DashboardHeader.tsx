@@ -287,13 +287,17 @@ export default function DashboardHeader(
               <DropdownMenuContent align="end" className="w-[214px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-xl p-0 backdrop-blur-sm">
                 <div className="py-0">
                   <DropdownMenuItem
+                    disabled={userType === UserType.SUPER_ADMIN}
                     className={cn(
-                      "cursor-pointer px-4 py-2 rounded-none gap-3",
+                      "px-4 py-2 rounded-none gap-3",
+                      userType === UserType.SUPER_ADMIN 
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer",
                       location.pathname === makeCommonRoute(Routes.common.profile)
                         ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
                         : "hover:bg-white/50 focus:bg-white/50"
                     )}
-                    onClick={() => navigate(makeCommonRoute(Routes.common.profile))}
+                    onClick={() => userType !== UserType.SUPER_ADMIN && navigate(makeCommonRoute(Routes.common.profile))}
                   >
                     <User className={cn("w-4 h-4", location.pathname === makeCommonRoute(Routes.common.profile) ? "text-[#00b4b8]" : "text-[#808081]")} />
                     <span className={cn(

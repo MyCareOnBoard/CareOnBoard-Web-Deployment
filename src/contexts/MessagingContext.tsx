@@ -13,12 +13,13 @@ import {
 } from "@/lib/hooks/useMessaging";
 import { useMultiplePresence, usePresenceManager, UserPresence } from "@/lib/hooks/usePresence";
 import {
-  createUserConversation,
-  sendUserMessage,
-  markUserMessagesAsRead,
-  leaveUserConversation,
-  getUserContacts,
-  getUserConversationById,
+  useGetContactsQuery,
+  useCreateConversationMutation,
+  useSendMessageMutation,
+  useMarkMessagesAsReadMutation,
+  useLeaveConversationMutation,
+  useGetConversationByIdQuery,
+  AgencyContact,
 } from "@/lib/api/userMessaging";
 import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +39,7 @@ interface MessagingContextType {
   createConversation: (participantIds: string[]) => Promise<Conversation | null>;
   markAsRead: (conversationId: string, messageIds: string[]) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
-  getContacts: () => Promise<any[]>;
+  getContacts: () => Promise<AgencyContact[]>;
   getPresence: (userId: string) => UserPresence | null;
   refreshConversation: (conversationId: string) => Promise<void>;
 }
@@ -56,6 +57,15 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
 
   // Initialize presence manager
   usePresenceManager();
+
+  // RTK Query hooks
+  const { data: contactsData, refetch: refetchContacts } = useGetContactsQuery(undefined, {
+    skip: false, // Always fetch contacts
+  });
+  const [createConversationMutation] = useCreateConversationMutation();
+  const [sendMessageMutation] = useSendMessageMutation();
+  const [markMessagesAsReadMutation] = useMarkMessagesAsReadMutation();
+  const [leaveConversationMutation] = useLeaveConversationMutation();
 
   // Subscribe to conversations list
   const {
@@ -99,7 +109,7 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   const sendMessage = useCallback(
     async (conversationId: string, content: string) => {
       if (!content.trim()) return;
-      
+
       if (!conversationId || typeof conversationId !== 'string' || conversationId.trim() === '') {
         console.error("Invalid conversation ID:", conversationId);
         toast({
@@ -111,19 +121,22 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       }
 
       try {
-        await sendUserMessage(conversationId, { content: content.trim() });
+        await sendMessageMutation({
+          conversationId,
+          payload: { content: content.trim() }
+        }).unwrap();
         // Real-time update will come via Firestore subscription
       } catch (error: any) {
         console.error("Error sending message:", error);
         toast({
           title: "Error",
-          description: error.message || "Failed to send message",
+          description: error.data?.message || error.message || "Failed to send message",
           variant: "destructive",
         });
         throw error;
       }
     },
-    [toast]
+    [sendMessageMutation, toast]
   );
 
   // Create conversation
@@ -132,12 +145,11 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       if (participantIds.length === 0) return null;
 
       try {
-        const response = await createUserConversation({ participantIds });
+        const response = await createConversationMutation({ participantIds }).unwrap();
         if (response.success && response.data) {
           // Map API response to Conversation type
-          // Add userType to participants if missing and exclude the old participants array
           const { participants, ...rest } = response.data;
-          
+
           // Ensure id is present
           if (!rest.id) {
             console.error("Conversation created but missing ID:", response.data);
@@ -148,16 +160,16 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
             });
             return null;
           }
-          
+
           const mappedConversation: Conversation = {
             ...rest,
-            id: rest.id, // Explicitly ensure id is set
+            id: rest.id,
             participantDetails: participants?.map(p => ({
               uid: p.uid,
               name: p.name,
               role: p.role,
               avatar: p.avatar,
-              userType: (p as any).userType || p.role || 'user', // Default to role if userType missing
+              userType: (p as any).userType || p.role || 'user',
             })) || [],
           };
           // Select the new conversation
@@ -169,13 +181,13 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
         console.error("Error creating conversation:", error);
         toast({
           title: "Error",
-          description: error.message || "Failed to create conversation",
+          description: error.data?.message || error.message || "Failed to create conversation",
           variant: "destructive",
         });
         throw error;
       }
     },
-    [toast]
+    [createConversationMutation, toast]
   );
 
   // Mark messages as read
@@ -184,21 +196,24 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       if (messageIds.length === 0) return;
 
       try {
-        await markUserMessagesAsRead(conversationId, { messageIds });
+        await markMessagesAsReadMutation({
+          conversationId,
+          payload: { messageIds }
+        }).unwrap();
         // Real-time update will come via Firestore subscription
       } catch (error: any) {
         console.error("Error marking messages as read:", error);
         // Don't show toast for read errors, just log
       }
     },
-    []
+    [markMessagesAsReadMutation]
   );
 
   // Delete conversation
   const deleteConversation = useCallback(
     async (conversationId: string) => {
       try {
-        await leaveUserConversation(conversationId);
+        await leaveConversationMutation(conversationId).unwrap();
         if (selectedConversationId === conversationId) {
           setSelectedConversationId(null);
         }
@@ -210,20 +225,20 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
         console.error("Error deleting conversation:", error);
         toast({
           title: "Error",
-          description: error.message || "Failed to delete conversation",
+          description: error.data?.message || error.message || "Failed to delete conversation",
           variant: "destructive",
         });
         throw error;
       }
     },
-    [selectedConversationId, toast]
+    [leaveConversationMutation, selectedConversationId, toast]
   );
 
   // Get contacts
-  const getContacts = useCallback(async () => {
+  const getContacts = useCallback(async (): Promise<AgencyContact[]> => {
     try {
-      const response = await getUserContacts();
-      return response.data || [];
+      const result = await refetchContacts();
+      return result.data?.data || [];
     } catch (error: any) {
       console.error("Error fetching contacts:", error);
       toast({
@@ -233,7 +248,7 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       });
       return [];
     }
-  }, [toast]);
+  }, [refetchContacts, toast]);
 
   // Get presence for a user
   const getPresence = useCallback(
@@ -243,15 +258,12 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
     [presenceMap]
   );
 
-  // Refresh conversation
+  // Refresh conversation (trigger refetch)
   const refreshConversation = useCallback(
     async (conversationId: string) => {
-      try {
-        await getUserConversationById(conversationId);
-        // Real-time update will come via Firestore subscription
-      } catch (error: any) {
-        console.error("Error refreshing conversation:", error);
-      }
+      // The Firestore subscription handles real-time updates
+      // This is a no-op since we use real-time subscriptions
+      console.log("Refreshing conversation:", conversationId);
     },
     []
   );

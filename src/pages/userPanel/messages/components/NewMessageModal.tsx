@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -30,8 +30,34 @@ export default function NewMessageModal({
   onStartChat,
 }: NewMessageModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [isStartingChat, setIsStartingChat] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced search handler
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set new debounce timer (300ms)
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(value);
+    }, 300);
+  }, []);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -70,13 +96,11 @@ export default function NewMessageModal({
     try {
       setIsStartingChat(true);
       await onStartChat(selectedUsers);
-      // Only reset state after successful completion
-      // The parent component will handle closing the modal via onOpenChange
       setSelectedUsers([]);
       setSearchQuery("");
+      setDebouncedSearchQuery("");
     } catch (error) {
       // Error is handled by the parent component/context
-      // Keep modal open and preserve selections so user can retry or cancel
     } finally {
       setIsStartingChat(false);
     }
@@ -85,12 +109,50 @@ export default function NewMessageModal({
   const handleCancel = () => {
     setSelectedUsers([]);
     setSearchQuery("");
+    setDebouncedSearchQuery("");
     onOpenChange(false);
   };
 
-  const filteredUsers = users.filter((user) =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter users by name OR agency name (case-insensitive)
+  const filteredUsers = useMemo(() => {
+    if (!debouncedSearchQuery.trim()) return users;
+
+    const searchLower = debouncedSearchQuery.toLowerCase().trim();
+    return users.filter((user) =>
+      user.name.toLowerCase().includes(searchLower) ||
+      (user.agency && user.agency.toLowerCase().includes(searchLower))
+    );
+  }, [users, debouncedSearchQuery]);
+
+  // Group users by agency, with super admins at the end
+  const groupedContacts = useMemo(() => {
+    const groups: { [key: string]: User[] } = {};
+    const superAdmins: User[] = [];
+
+    filteredUsers.forEach((user) => {
+      if (user.role === "Super Admin") {
+        superAdmins.push(user);
+      } else {
+        const groupKey = user.agency || "Other";
+        if (!groups[groupKey]) {
+          groups[groupKey] = [];
+        }
+        groups[groupKey].push(user);
+      }
+    });
+
+    // Sort agency names alphabetically
+    const sortedGroups = Object.keys(groups)
+      .sort((a, b) => a.localeCompare(b))
+      .map((key) => ({ name: key, users: groups[key] }));
+
+    // Add super admins at the end if any exist
+    if (superAdmins.length > 0) {
+      sortedGroups.push({ name: "Super Admins", users: superAdmins });
+    }
+
+    return sortedGroups;
+  }, [filteredUsers]);
 
   if (!open) return null;
 
@@ -127,9 +189,9 @@ export default function NewMessageModal({
               </div>
               <Input
                 type="text"
-                placeholder="Search here"
+                placeholder="Search by name or agency"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="h-11 pl-10 pr-4 bg-[#f5f5f5] border-0 rounded-[10px] text-[14px] text-[#10141a] placeholder:text-[#a0a0a1] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
               />
             </div>
@@ -143,48 +205,59 @@ export default function NewMessageModal({
                     <p className="text-[14px] text-[#808081]">Loading contacts...</p>
                   </div>
                 </div>
-              ) : filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    onClick={() => toggleUserSelection(user.id)}
-                    className="flex items-center justify-between px-3 py-3 hover:bg-[#f5f5f5] rounded-[10px] cursor-pointer transition-colors group"
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Avatar */}
-                      <Avatar className="w-12 h-14 shrink-0 rounded-[8px]">
-                        <AvatarImage
-                          src={validateImageUrl(user.image) || undefined}
-                          alt={user.name}
-                          className="rounded-[8px]"
-                        />
-                        <AvatarFallback className="bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] text-[#10141a] text-[14px] font-semibold rounded-[8px]">
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
+              ) : groupedContacts.length > 0 ? (
+                groupedContacts.map((group) => (
+                  <div key={group.name} className="mb-4">
+                    {/* Group Header */}
+                    <div className="px-3 py-2 mb-1">
+                      <h3 className="text-[12px] font-semibold text-[#808081] uppercase tracking-wide">
+                        {group.name}
+                      </h3>
+                    </div>
+                    {/* Group Users */}
+                    {group.users.map((user) => (
+                      <div
+                        key={user.id}
+                        onClick={() => toggleUserSelection(user.id)}
+                        className="flex items-center justify-between px-3 py-3 hover:bg-[#f5f5f5] rounded-[10px] cursor-pointer transition-colors group"
+                      >
+                        <div className="flex items-center gap-3">
+                          {/* Avatar */}
+                          <Avatar className="w-12 h-14 shrink-0 rounded-[8px]">
+                            <AvatarImage
+                              src={validateImageUrl(user.image) || undefined}
+                              alt={user.name}
+                              className="rounded-[8px]"
+                            />
+                            <AvatarFallback className="bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] text-[#10141a] text-[14px] font-semibold rounded-[8px]">
+                              {getInitials(user.name)}
+                            </AvatarFallback>
+                          </Avatar>
 
-                      {/* User Info */}
-                      <div className="flex flex-col">
-                        <h4 className="text-[15px] font-semibold text-[#10141a] leading-tight mb-0.5">
-                          {user.name}
-                        </h4>
-                        <p className="text-[13px] text-[#808081] leading-tight">
-                          {user.role} {user.agency ? `| ${user?.agency}` : ""}
-                        </p>
+                          {/* User Info */}
+                          <div className="flex flex-col">
+                            <h4 className="text-[15px] font-semibold text-[#10141a] leading-tight mb-0.5">
+                              {user.name}
+                            </h4>
+                            <p className="text-[13px] text-[#808081] leading-tight">
+                              {user.role}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Checkbox */}
+                        <div
+                          className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${selectedUsers.includes(user.id)
+                            ? "bg-[#2563eb] border-[#2563eb]"
+                            : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
+                            }`}
+                        >
+                          {selectedUsers.includes(user.id) && (
+                            <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                          )}
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Checkbox */}
-                    <div
-                      className={`w-5 h-5 rounded-[4px] border-[1.5px] flex items-center justify-center transition-all ${selectedUsers.includes(user.id)
-                        ? "bg-[#2563eb] border-[#2563eb]"
-                        : "border-[#d1d5db] group-hover:border-[#a0a0a1]"
-                        }`}
-                    >
-                      {selectedUsers.includes(user.id) && (
-                        <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
-                      )}
-                    </div>
+                    ))}
                   </div>
                 ))
               ) : (

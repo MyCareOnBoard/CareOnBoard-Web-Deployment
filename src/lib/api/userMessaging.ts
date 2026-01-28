@@ -1,10 +1,13 @@
 /**
  * User Messaging API Service
  * Handles all API calls related to user/employee messaging
+ * Uses Redux RTK Query for state management
  */
 
-import axiosClient from '../axios';
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { customBaseQuery } from "@/lib/baseQuery";
 import { ApiResponse } from '../api-types';
+
 
 // API endpoint constants
 const USER_MESSAGING_BASE = '/userMessaging';
@@ -149,161 +152,152 @@ export interface GetContactsResponse {
   data: AgencyContact[];
 }
 
-// ==================== API Functions ====================
+/**
+ * Get Messages Params
+ */
+export interface GetMessagesParams {
+  conversationId: string;
+  page?: number;
+  limit?: number;
+}
 
 /**
- * Get all conversations for authenticated user
- * @returns Promise with conversations response
+ * Send Message Params
  */
-export const getUserConversations = async (): Promise<GetConversationsResponse> => {
-  try {
-    const response = await axiosClient.get(USER_MESSAGING_BASE);
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching user conversations:', error);
-    throw error;
-  }
-};
+export interface SendMessageParams {
+  conversationId: string;
+  payload: SendMessagePayload;
+}
 
 /**
- * Create new conversation
- * @param payload - Create conversation payload
- * @returns Promise with created conversation
+ * Mark Messages Read Params
  */
-export const createUserConversation = async (
-  payload: CreateConversationPayload
-): Promise<GetConversationResponse> => {
-  try {
-    const response = await axiosClient.post(USER_MESSAGING_BASE, payload);
-    return response.data;
-  } catch (error: any) {
-    console.error('Error creating conversation:', error);
-    throw error;
-  }
-};
+export interface MarkMessagesReadParams {
+  conversationId: string;
+  payload: MarkAsReadPayload;
+}
 
-/**
- * Get agency members available for messaging
- * @returns Promise with contacts response
- */
-export const getUserContacts = async (): Promise<GetContactsResponse> => {
-  try {
-    const response = await axiosClient.get(`${USER_MESSAGING_BASE}/contacts`);
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching contacts:', error);
-    throw error;
-  }
-};
+// ==================== RTK Query API ====================
 
-/**
- * Get specific conversation by ID
- * @param conversationId - Conversation ID
- * @returns Promise with conversation details
- */
-export const getUserConversationById = async (
-  conversationId: string
-): Promise<GetConversationResponse> => {
-  try {
-    const response = await axiosClient.get(`${USER_MESSAGING_BASE}/${conversationId}`);
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching conversation:', error);
-    throw error;
-  }
-};
+export const userMessagingApi = createApi({
+  reducerPath: "userMessagingApi",
+  baseQuery: customBaseQuery,
+  tagTypes: ['Conversations', 'Messages', 'Contacts'],
+  endpoints: (builder) => ({
+    // Get all conversations for authenticated user
+    getConversations: builder.query<GetConversationsResponse, void>({
+      query: () => ({
+        url: USER_MESSAGING_BASE,
+        method: "GET",
+        requiresAuth: true
+      }),
+      providesTags: ['Conversations'],
+    }),
 
-/**
- * Leave/delete conversation
- * @param conversationId - Conversation ID
- * @returns Promise with success response
- */
-export const leaveUserConversation = async (
-  conversationId: string
-): Promise<ApiResponse<void>> => {
-  try {
-    const response = await axiosClient.delete(`${USER_MESSAGING_BASE}/${conversationId}`);
-    return response.data;
-  } catch (error: any) {
-    console.error('Error leaving conversation:', error);
-    throw error;
-  }
-};
+    // Get specific conversation by ID
+    getConversationById: builder.query<GetConversationResponse, string>({
+      query: (conversationId) => ({
+        url: `${USER_MESSAGING_BASE}/${conversationId}`,
+        method: "GET",
+        requiresAuth: true
+      }),
+      providesTags: (_result, _error, id) => [{ type: 'Conversations', id }],
+    }),
 
-/**
- * Get messages in conversation
- * @param conversationId - Conversation ID
- * @param page - Page number (optional)
- * @param limit - Messages per page (optional)
- * @returns Promise with messages response
- */
-export const getUserConversationMessages = async (
-  conversationId: string,
-  page?: number,
-  limit?: number
-): Promise<GetMessagesResponse> => {
-  try {
-    const params: any = {};
-    if (page !== undefined) params.page = page;
-    if (limit !== undefined) params.limit = limit;
+    // Get contacts available for messaging
+    getContacts: builder.query<GetContactsResponse, void>({
+      query: () => ({
+        url: `${USER_MESSAGING_BASE}/contacts`,
+        method: "GET",
+        requiresAuth: true
+      }),
+      providesTags: ['Contacts'],
+    }),
 
-    const response = await axiosClient.get(
-      `${USER_MESSAGING_BASE}/${conversationId}/messages`,
-      { params }
-    );
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching messages:', error);
-    throw error;
-  }
-};
+    // Get messages in conversation
+    getMessages: builder.query<GetMessagesResponse, GetMessagesParams>({
+      query: ({ conversationId, page, limit }) => {
+        const params = new URLSearchParams();
+        if (page !== undefined) params.append('page', page.toString());
+        if (limit !== undefined) params.append('limit', limit.toString());
+        const queryString = params.toString();
 
-/**
- * Send message in conversation
- * @param conversationId - Conversation ID
- * @param payload - Send message payload
- * @returns Promise with created message
- */
-export const sendUserMessage = async (
-  conversationId: string,
-  payload: SendMessagePayload
-): Promise<ApiResponse<UserMessage>> => {
-  if (!conversationId || typeof conversationId !== 'string' || conversationId.trim() === '') {
-    const error = new Error('Invalid conversation ID: conversationId must be a non-empty string');
-    console.error('Error sending message:', error);
-    throw error;
-  }
+        return {
+          url: `${USER_MESSAGING_BASE}/${conversationId}/messages${queryString ? `?${queryString}` : ''}`,
+          method: "GET",
+          requiresAuth: true
+        };
+      },
+      providesTags: (_result, _error, { conversationId }) => [
+        { type: 'Messages', id: conversationId }
+      ],
+    }),
 
-  try {
-    const response = await axiosClient.post(
-      `${USER_MESSAGING_BASE}/${conversationId}/messages`,
-      payload
-    );
-    return response.data;
-  } catch (error: any) {
-    console.error('Error sending message:', error);
-    throw error;
-  }
-};
+    // Create new conversation
+    createConversation: builder.mutation<GetConversationResponse, CreateConversationPayload>({
+      query: (payload) => ({
+        url: USER_MESSAGING_BASE,
+        method: "POST",
+        data: payload,
+        requiresAuth: true
+      }),
+      invalidatesTags: ['Conversations'],
+    }),
 
-/**
- * Mark messages as read
- * @param conversationId - Conversation ID
- * @param payload - Mark as read payload
- * @returns Promise with success response
- */
-export const markUserMessagesAsRead = async (
-  conversationId: string,
-  payload: MarkAsReadPayload
-): Promise<ApiResponse<void>> => {
-  try {
-    const response = await axiosClient.post(
-      `${USER_MESSAGING_BASE}/${conversationId}/read`,
-      payload
-    );
-    return response.data;
-  } catch (error: any) {
-    console.error('Error marking messages as read:', error);
-    throw error;
-  }
-};
+    // Send message in conversation
+    sendMessage: builder.mutation<ApiResponse<UserMessage>, SendMessageParams>({
+      query: ({ conversationId, payload }) => {
+        if (!conversationId || typeof conversationId !== 'string' || conversationId.trim() === '') {
+          throw new Error('Invalid conversation ID: conversationId must be a non-empty string');
+        }
+        return {
+          url: `${USER_MESSAGING_BASE}/${conversationId}/messages`,
+          method: "POST",
+          data: payload,
+          requiresAuth: true
+        };
+      },
+      invalidatesTags: (_result, _error, { conversationId }) => [
+        { type: 'Messages', id: conversationId },
+        'Conversations'
+      ],
+    }),
+
+    // Mark messages as read
+    markMessagesAsRead: builder.mutation<ApiResponse<void>, MarkMessagesReadParams>({
+      query: ({ conversationId, payload }) => ({
+        url: `${USER_MESSAGING_BASE}/${conversationId}/read`,
+        method: "POST",
+        data: payload,
+        requiresAuth: true
+      }),
+      invalidatesTags: (_result, _error, { conversationId }) => [
+        { type: 'Messages', id: conversationId },
+        'Conversations'
+      ],
+    }),
+
+    // Leave/delete conversation
+    leaveConversation: builder.mutation<ApiResponse<void>, string>({
+      query: (conversationId) => ({
+        url: `${USER_MESSAGING_BASE}/${conversationId}`,
+        method: "DELETE",
+        requiresAuth: true
+      }),
+      invalidatesTags: ['Conversations'],
+    }),
+  }),
+});
+
+// Export RTK Query hooks
+export const {
+  useGetConversationsQuery,
+  useGetConversationByIdQuery,
+  useGetContactsQuery,
+  useGetMessagesQuery,
+  useCreateConversationMutation,
+  useSendMessageMutation,
+  useMarkMessagesAsReadMutation,
+  useLeaveConversationMutation,
+} = userMessagingApi;
+

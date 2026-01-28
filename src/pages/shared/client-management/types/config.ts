@@ -8,4 +8,7 @@ export type ClientFormConfig = {
     onSuccessNavigate: (clientId?: string) => string;
     successMessage?: string;
     pageTitle?: string;
+    backNavigate?: string;
+    clientId?: string;
+    isEditMode?: boolean;
 };

@@ -66,7 +66,6 @@ export default function ResetPasswordPage() {
       setEmail(userEmail)
       setIsValidCode(true)
       setVerifying(false)
-      console.log("[ResetPassword] Code verified for email:", userEmail)
     } catch (error: any) {
       console.error("[ResetPassword] Code verification error:", error)
 
