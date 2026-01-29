@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import IncidentDetailModal from "./components/IncidentDetailModal";
 import { 
-  getAllIncidents, 
-  IncidentReport, 
+  getAllIncidents,
+  IncidentReport,
   IncidentStatus,
   getIncidentStatusText 
 } from "@/lib/api/incidents";
-import { Client } from "@/lib/api/clients";
+import { Client, getClientById } from "@/lib/api/clients";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 
@@ -18,60 +18,93 @@ export default function IncidentPage() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [summary, setSummary] = useState({
-    total: 0,
-    submitted: 0,
-    under_review: 0,
-    resolved: 0,
-    not_resolved: 0,
-  });
+  const itemsPerPage = 10;
   const { toast } = useToast();
 
-  // Fetch incidents on mount and when page changes
+  // Fetch incidents on mount and page change
   useEffect(() => {
     if (user?.agencyId) {
       fetchIncidents();
     } else {
       setLoading(false);
     }
-  }, [currentPage, user?.agencyId]);
+  }, [user?.agencyId, currentPage]);
+
+  // Helper function to enrich incidents with full client data
+  const enrichIncidentsWithClientData = async (incidentsList: IncidentReport[]) => {
+    if (!user?.agencyId) return incidentsList;
+
+    const enrichedIncidents = await Promise.all(
+      incidentsList.map(async (incident) => {
+        // If client data is already complete, return as is
+        if (incident.client?.firstName && incident.client?.lastName) {
+          return incident;
+        }
+
+        // If we have a clientId but incomplete client data, fetch it
+        if (incident.clientId) {
+          try {
+            const clientData = await getClientById(incident.clientId, user.agencyId);
+
+            if (clientData) {
+              return {
+                ...incident,
+                client: clientData
+              };
+            }
+          } catch (error) {
+            console.error(`Error fetching client ${incident.clientId}:`, error);
+          }
+        }
+
+        return incident;
+      })
+    );
+
+    return enrichedIncidents;
+  };
 
   const fetchIncidents = async () => {
     if (!user?.agencyId) return;
 
     try {
       setLoading(true);
+      
       const response = await getAllIncidents(user.agencyId, {
         page: currentPage,
-        limit: 10,
+        limit: itemsPerPage,
       });
 
       if (response.success && response.data) {
-        setIncidents(response.data.incidents || []);
-        setSummary(response.data.summary || {
-          total: 0,
-          submitted: 0,
-          under_review: 0,
-          resolved: 0,
-          not_resolved: 0,
-        });
-        setTotalPages(response.data.totalPages || 1);
+        // Handle both array response and object with incidents array
+        const incidentsArray = Array.isArray(response.data) 
+          ? response.data 
+          : response.data.incidents || [];
+        
+        // Enrich incidents with full client data
+        const enrichedIncidents = await enrichIncidentsWithClientData(incidentsArray);
+        setIncidents(enrichedIncidents);
+        
+        // Get pagination info
+        const totalPagesValue = Array.isArray(response.data) 
+          ? 1 
+          : (response.data as any).pagination?.totalPages || 1;
+        setTotalPages(totalPagesValue);
+      } else {
+        setIncidents([]);
+        setTotalPages(1);
       }
     } catch (error: any) {
       console.error('Error fetching incidents:', error);
-      console.error('Error details:', {
-        status: error?.response?.status,
-        statusText: error?.response?.statusText,
-        data: error?.response?.data,
-        message: error?.message
+      
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to load incidents. Please try again.",
+        variant: "destructive",
       });
       
-      // Set empty state on error
       setIncidents([]);
       setTotalPages(1);
-      
-      // Don't show toast - backend endpoint may not be implemented yet
-      // Just log the error for debugging
     } finally {
       setLoading(false);
     }
@@ -80,14 +113,15 @@ export default function IncidentPage() {
   const getStatusBadge = (status: IncidentStatus) => {
     switch (status) {
       case IncidentStatus.SUBMITTED:
+        // Display as "Under Review" for submitted incidents
         return (
-          <span className="px-3 py-1 rounded-full text-[13px] font-medium border border-[#6b7280] text-[#6b7280] bg-transparent">
-            Submitted
+          <span className="px-3 py-1 rounded-full text-[13px] font-medium border border-[#FF6C10] text-[#FF6C10] bg-transparent">
+            Under Review
           </span>
         );
       case IncidentStatus.UNDER_REVIEW:
         return (
-          <span className="px-3 py-1 rounded-full text-[13px] font-medium border border-[#3b82f6] text-[#3b82f6] bg-transparent">
+          <span className="px-3 py-1 rounded-full text-[13px] font-medium border border-[#FF6C10] text-[#FF6C10] bg-transparent">
             Under Review
           </span>
         );
@@ -113,37 +147,102 @@ export default function IncidentPage() {
   };
 
   const handleStatusUpdate = async (incidentId: string, newStatus: "resolved" | "not-resolved" | "cancelled") => {
-    // This will be handled in the modal
+    // Optimistically update local state
+    setIncidents((prevIncidents) =>
+      prevIncidents.map((inc) =>
+        inc._id === incidentId
+          ? {
+              ...inc,
+              status:
+                newStatus === "resolved"
+                  ? IncidentStatus.RESOLVED
+                  : newStatus === "not-resolved"
+                  ? IncidentStatus.NOT_RESOLVED
+                  : inc.status,
+            }
+          : inc
+      )
+    );
+    
+    // Close modal
     setSelectedIncident(null);
+    
+    // Refresh from server
     await fetchIncidents();
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { day: 'numeric', month: 'long' });
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  };
-
   const getInitials = (fullName: string | undefined) => {
-    if (!fullName) return '';
-    const names = fullName.split(' ');
-    return names.map(n => n[0]).join('').toUpperCase();
+    if (!fullName) return '??';
+    
+    const names = fullName.trim().split(' ');
+    if (names.length === 0) return '??';
+    
+    return names.map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   const getClientInitials = (client: Client | undefined) => {
-    if (!client) return '';
+    if (!client) return '??';
+    
     const first = client.firstName?.[0] || '';
     const last = client.lastName?.[0] || '';
-    return (first + last).toUpperCase();
+    const initials = (first + last).toUpperCase();
+    
+    return initials || '??';
   };
 
-  const getClientName = (client: Client | undefined) => {
-    if (!client) return '';
-    return `${client.firstName || ''} ${client.lastName || ''}`.trim();
+  const getClientName = (incident: IncidentReport) => {
+    if (incident.client?.firstName || incident.client?.lastName) {
+      return `${incident.client.firstName || ''} ${incident.client.lastName || ''}`.trim();
+    }
+    if (incident.clientName) {
+      return incident.clientName;
+    }
+    return 'N/A';
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const formatTime = (timeString: string) => {
+    if (!timeString) return 'N/A';
+    
+    // If time is in HH:mm format (from the form)
+    if (timeString.includes(':') && !timeString.includes('T')) {
+      try {
+        const [hours, minutes] = timeString.split(':');
+        const hour = parseInt(hours);
+        const isPM = hour >= 12;
+        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        return `${displayHour}:${minutes} ${isPM ? 'PM' : 'AM'}`;
+      } catch {
+        return timeString;
+      }
+    }
+    
+    // If it's a full date string, extract time
+    try {
+      const date = new Date(timeString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      });
+    } catch {
+      return 'N/A';
+    }
   };
 
   return (
@@ -156,11 +255,21 @@ export default function IncidentPage() {
       </div>
 
       {/* Incident Log Section */}
-      <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm overflow-hidden">
+      <div className="overflow-hidden bg-white shadow-sm rounded-xl sm:rounded-2xl">
         <div className="p-4 sm:p-6 border-b border-[#e5e7eb]">
-          <h2 className="text-[20px] sm:text-[22px] lg:text-[24px] font-bold text-[#10141a] mb-1">
-            Incident Log
-          </h2>
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-[20px] sm:text-[22px] lg:text-[24px] font-bold text-[#10141a]">
+              Incident Log
+            </h2>
+            <button
+              onClick={() => fetchIncidents()}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 text-[14px] font-medium text-[#00b8d4] hover:bg-[#f3f4f6] rounded-lg transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
           <p className="text-[13px] sm:text-[14px] text-[#6b7280]">
             These are your Pending Incident Approvals
           </p>
@@ -168,12 +277,12 @@ export default function IncidentPage() {
 
         {/* Loading State */}
         {loading ? (
-          <div className="p-8 sm:p-12 text-center">
+          <div className="p-8 text-center sm:p-12">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#00b8d4] border-r-transparent align-[-0.125em]"></div>
             <p className="mt-4 text-[14px] text-[#6b7280]">Loading incidents...</p>
           </div>
-        ) : incidents.length === 0 ? (
-          <div className="p-8 sm:p-12 text-center">
+        ) : !incidents || incidents.length === 0 ? (
+          <div className="p-8 text-center sm:p-12">
             <p className="text-[14px] text-[#6b7280]">No pending incidents</p>
           </div>
         ) : (
@@ -187,15 +296,15 @@ export default function IncidentPage() {
                     {/* Client & DSP Row */}
                     <div className="flex gap-4">
                       {/* Client */}
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                          <span className="text-[14px] font-semibold text-gray-600">
+                      <div className="flex items-center flex-1 gap-3">
+                        <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 overflow-hidden bg-gradient-to-br from-[#00b8d4] to-[#0097b2] rounded-full">
+                          <span className="text-[14px] font-semibold text-white">
                             {getClientInitials(incident.client)}
                           </span>
                         </div>
                         <div className="min-w-0">
                           <div className="text-[14px] sm:text-[15px] font-semibold text-[#10141a] truncate">
-                            {getClientName(incident.client)}
+                            {getClientName(incident)}
                           </div>
                           <div className="text-[12px] sm:text-[13px] text-[#6b7280]">
                             Client
@@ -204,15 +313,15 @@ export default function IncidentPage() {
                       </div>
 
                       {/* DSP */}
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                          <span className="text-[14px] font-semibold text-gray-600">
+                      <div className="flex items-center flex-1 gap-3">
+                        <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 overflow-hidden bg-gradient-to-br from-[#6366f1] to-[#4f46e5] rounded-full">
+                          <span className="text-[14px] font-semibold text-white">
                             {getInitials(incident.employee?.fullName)}
                           </span>
                         </div>
                         <div className="min-w-0">
                           <div className="text-[14px] sm:text-[15px] font-semibold text-[#10141a] truncate">
-                            {incident.employee?.fullName}
+                            {incident.employee?.fullName || incident.employeeId || 'N/A'}
                           </div>
                           <div className="text-[12px] sm:text-[13px] text-[#6b7280]">
                             DSP
@@ -221,19 +330,23 @@ export default function IncidentPage() {
                       </div>
                     </div>
 
-                    {/* Status & Time Row */}
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                    {/* Status & Time Row - FIXED */}
+                    <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="flex-shrink-0">
                         {getStatusBadge(incident.status)}
                       </div>
                       <div className="flex items-center gap-3 sm:gap-4 text-[12px] sm:text-[13px]">
                         <div>
                           <span className="text-[#6b7280]">Date: </span>
-                          <span className="font-medium text-[#10141a]">{formatDate(incident.incidentDate)}</span>
+                          <span className="font-medium text-[#10141a]">
+                            {formatDate(incident.date || incident.incidentDate)}
+                          </span>
                         </div>
                         <div>
                           <span className="text-[#6b7280]">Time: </span>
-                          <span className="font-medium text-[#10141a]">{formatTime(incident.incidentDate)}</span>
+                          <span className="font-medium text-[#10141a]">
+                            {formatTime(incident.time || incident.incidentDate)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -241,9 +354,9 @@ export default function IncidentPage() {
                     {/* Details Button */}
                     <button
                       onClick={() => setSelectedIncident(incident)}
-                      className="w-full px-6 py-2 rounded-full bg-[#B2B2B3] text-white text-[14px] font-medium hover:bg-[#d1d5db] transition-colors cursor-pointer"
+                      className="w-full px-6 py-2 rounded-full bg-[#00b8d4] text-white text-[14px] font-medium hover:bg-[#00a5c0] transition-colors cursor-pointer"
                     >
-                      Details
+                      View Details
                     </button>
                   </div>
 
@@ -251,14 +364,14 @@ export default function IncidentPage() {
                   <div className="hidden lg:flex lg:items-center lg:gap-6">
                     {/* Client */}
                     <div className="flex items-center gap-3 w-[200px]">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                        <span className="text-[14px] font-semibold text-gray-600">
+                      <div className="flex items-center justify-center w-10 h-10 overflow-hidden bg-gradient-to-br from-[#00b8d4] to-[#0097b2] rounded-full">
+                        <span className="text-[14px] font-semibold text-white">
                           {getClientInitials(incident.client)}
                         </span>
                       </div>
                       <div>
                         <div className="text-[15px] font-semibold text-[#10141a]">
-                          {getClientName(incident.client)}
+                          {getClientName(incident)}
                         </div>
                         <div className="text-[13px] text-[#6b7280]">
                           Client
@@ -268,14 +381,14 @@ export default function IncidentPage() {
 
                     {/* DSP */}
                     <div className="flex items-center gap-3 w-[200px]">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                        <span className="text-[14px] font-semibold text-gray-600">
+                      <div className="flex items-center justify-center w-10 h-10 overflow-hidden bg-gradient-to-br from-[#6366f1] to-[#4f46e5] rounded-full">
+                        <span className="text-[14px] font-semibold text-white">
                           {getInitials(incident.employee?.fullName)}
                         </span>
                       </div>
                       <div>
                         <div className="text-[15px] font-semibold text-[#10141a]">
-                          {incident.employee?.fullName}
+                          {incident.employee?.fullName || incident.employeeId || 'N/A'}
                         </div>
                         <div className="text-[13px] text-[#6b7280]">
                           DSP
@@ -288,19 +401,19 @@ export default function IncidentPage() {
                       {getStatusBadge(incident.status)}
                     </div>
 
-                    {/* Date */}
-                    <div className="w-[100px]">
+                    {/* Date - FIXED */}
+                    <div className="w-[120px]">
                       <div className="text-[13px] text-[#6b7280] mb-1">Date</div>
                       <div className="text-[15px] font-medium text-[#10141a]">
-                        {formatDate(incident.incidentDate)}
+                        {formatDate(incident.date || incident.incidentDate)}
                       </div>
                     </div>
 
-                    {/* Time */}
+                    {/* Time - FIXED */}
                     <div className="w-[100px]">
                       <div className="text-[13px] text-[#6b7280] mb-1">Time</div>
                       <div className="text-[15px] font-medium text-[#10141a]">
-                        {formatTime(incident.incidentDate)}
+                        {formatTime(incident.time || incident.incidentDate)}
                       </div>
                     </div>
 
@@ -308,9 +421,9 @@ export default function IncidentPage() {
                     <div className="ml-auto">
                       <button
                         onClick={() => setSelectedIncident(incident)}
-                        className="px-6 py-2 rounded-full bg-[#B2B2B3] text-white text-[14px] font-medium hover:bg-[#d1d5db] transition-colors cursor-pointer"
+                        className="px-4 py-2 rounded-full bg-[#00b8d4] text-white text-[14px] font-medium hover:bg-[#00a5c0] transition-colors cursor-pointer"
                       >
-                        Details
+                        View Details
                       </button>
                     </div>
                   </div>
@@ -323,7 +436,7 @@ export default function IncidentPage() {
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center w-8 h-8 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-5 h-5 text-[#6b7280]" />
               </button>
@@ -333,7 +446,7 @@ export default function IncidentPage() {
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center w-8 h-8 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="w-5 h-5 text-[#6b7280]" />
               </button>
