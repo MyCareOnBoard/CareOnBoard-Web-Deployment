@@ -7,13 +7,14 @@ import { searchClients, Client, ClientService, getAgencyClientById } from "@/lib
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
-import {Routes} from "@/routes/constants";
+import { Routes } from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
-import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation } from "@/lib/api/shifts";
+import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation, ShiftResponse } from "@/lib/api/shifts";
 import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
+import { createGoalDocument, DocumentType, CreateGoalDocumentRequest } from "@/lib/api/goals-and-documents";
 
 interface AddScheduleModalProps {
   isOpen: boolean;
@@ -54,6 +55,7 @@ export interface ScheduleFormData {
   planOfCare: File | null;
   submissionStatus?: SubmissionStatus;
   selectedWeekdays?: WeekdaySchedule[];
+  goalsType: string;
 }
 
 export interface WeekdaySchedule {
@@ -83,7 +85,7 @@ const WEEKDAY_OPTIONS = [
   { label: "Fri", dayIndex: 5 },
 ];
 
-const noteTypes: {id: string, title: string}[] = [
+const noteTypes: { id: string, title: string }[] = [
   {
     id: "community-based",
     title: "Community Based / Individual Supports",
@@ -114,6 +116,16 @@ const noteTypes: {id: string, title: string}[] = [
   },
 ];
 
+const goalsTypes: { id: string; title: string }[] = [
+  { id: DocumentType.COMMUNITY_INCLUSION_SERVICES, title: "Community Inclusion Services" },
+  { id: DocumentType.COMMUNITY_INCLUSION_INDIVIDUALIZED_GOALS, title: "Community Inclusion – Individualized Goals" },
+  { id: DocumentType.DAY_HABILITATION_SERVICES, title: "Day Habilitation Services" },
+  { id: DocumentType.DAY_HABILITATION_INDIVIDUALIZED_GOALS, title: "Day Habilitation – Individualized Goals" },
+  { id: DocumentType.PREVOCATIONAL_TRAINING_SERVICES, title: "Prevocational Training Services" },
+  { id: DocumentType.PREVOCATIONAL_TRAINING_INDIVIDUALIZED_GOALS, title: "Prevocational Training – Individualized Goals" },
+  { id: DocumentType.NATURAL_SUPPORTS_TRAINING, title: "Natural Supports Training" },
+];
+
 
 const initialFormData: ScheduleFormData = {
   client: "",
@@ -132,6 +144,47 @@ const initialFormData: ScheduleFormData = {
   clockOutTime: "",
   ispOutcome: "",
   planOfCare: null,
+  goalsType: "",
+};
+
+const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
+
+// Convert 12-hour format (e.g., "08:00:AM") to 24-hour format (e.g., "08:00")
+const convertTo24Hour = (time12h: string): string => {
+  if (!time12h) return "";
+
+  // Handle formats like "08:00:AM", "08.00:AM", "8:00AM", etc.
+  const match = time12h.match(/(\d{1,2})[.:](\d{2}):?(AM|PM)/i);
+  if (!match) return "";
+
+  let hours = parseInt(match[1]);
+  const minutes = match[2];
+  const period = match[3].toUpperCase();
+
+  if (period === "PM" && hours !== 12) {
+    hours += 12;
+  } else if (period === "AM" && hours === 12) {
+    hours = 0;
+  }
+
+  return `${hours.toString().padStart(2, "0")}:${minutes}`;
+};
+
+// Convert 24-hour format (e.g., "14:30") to 12-hour format (e.g., "02:30:PM")
+const convertTo12Hour = (time24h: string): string => {
+  if (!time24h) return "";
+
+  const [hoursStr, minutes] = time24h.split(":");
+  let hours = parseInt(hoursStr);
+  const period = hours >= 12 ? "PM" : "AM";
+
+  if (hours === 0) {
+    hours = 12;
+  } else if (hours > 12) {
+    hours -= 12;
+  }
+
+  return `${hours.toString().padStart(2, "0")}:${minutes}:${period}`;
 };
 
 export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, editData, mode = "create" }: AddScheduleModalProps) {
@@ -146,9 +199,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showNotesTypeDropdown, setShowNotesTypeDropdown] = useState(false);
+  const [showGoalsTypeDropdown, setShowGoalsTypeDropdown] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showDspDropdown, setShowDspDropdown] = useState(false);
-  
+
   // Weekday scheduling state (for recurring schedules)
   const [selectedWeekdays, setSelectedWeekdays] = useState<WeekdaySchedule[]>([]);
   const [configuringWeekday, setConfiguringWeekday] = useState<{ day: string; dayIndex: number } | null>(null);
@@ -192,7 +246,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     if (isOpen) {
       if (editData && mode === "edit") {
         setFormData(editData);
-        
+
         // Fetch client data to populate services dropdown
         if (editData.clientId) {
           getAgencyClientById(editData.clientId)
@@ -241,19 +295,19 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
       // Get all dates in the range
       const dateRange = eachDayOfIntervalDateFns({ start: data.startDate, end: data.endDate });
-      
+
       // If weekdays are selected, filter dates by selected weekdays
       if (selectedWeekdays.length > 0) {
         const selectedDayIndices = new Set(selectedWeekdays.map(w => w.dayIndex));
-        
+
         dateRange.forEach((date) => {
           const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
-          
+
           // Only create shift if this day is in selected weekdays
           if (selectedDayIndices.has(dayOfWeek)) {
             // Find the weekday schedule for this day to get its specific times
             const weekdaySchedule = selectedWeekdays.find(w => w.dayIndex === dayOfWeek);
-            
+
             if (weekdaySchedule) {
               const baseShiftData = {
                 employeeId: data.assignedDspId,
@@ -263,6 +317,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 endTime: weekdaySchedule.clockOutTime,
                 clientId: data.clientId,
                 notesType: data.notesType || undefined,
+                goalsType: data.goalsType || undefined,
                 serviceCode: data.serviceCode,
                 schedulingType: data.schedulingType,
                 ispOutcome: data.ispOutcome || undefined,
@@ -272,7 +327,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 submissionStatus: SubmissionStatus.DRAFT,
                 date: format(date, "yyyy-MM-dd")
               };
-              
+
               requests.push(baseShiftData);
             }
           }
@@ -288,6 +343,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             endTime: data.clockOutTime,
             clientId: data.clientId,
             notesType: data.notesType || undefined,
+            goalsType: data.goalsType || undefined,
             serviceCode: data.serviceCode,
             schedulingType: data.schedulingType,
             ispOutcome: data.ispOutcome || undefined,
@@ -297,7 +353,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             submissionStatus: SubmissionStatus.DRAFT,
             date: format(date, "yyyy-MM-dd")
           };
-          
+
           requests.push(baseShiftData);
         });
       }
@@ -311,6 +367,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         endTime: data.clockOutTime,
         clientId: data.clientId,
         notesType: data.notesType || undefined,
+        goalsType: data.goalsType || undefined,
         serviceCode: data.serviceCode,
         schedulingType: data.schedulingType,
         ispOutcome: data.ispOutcome || undefined,
@@ -320,7 +377,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         submissionStatus: SubmissionStatus.DRAFT,
         date: format(data.date, "yyyy-MM-dd")
       };
-      
+
       requests.push(baseShiftData);
     }
 
@@ -355,7 +412,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         setIsSearchingClients(false);
       }
     }, 300);
-  }, []);
+  }, [user?.agencyId]);
 
   // Search DSPs/employees with debouncing
   const handleDspSearch = useCallback(async (query: string) => {
@@ -417,8 +474,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const handleClientSelect = (client: Client) => {
     setFormData(prev => ({
       ...prev,
-      client: client.firstName && client.lastName 
-        ? `${client.firstName} ${client.lastName}` 
+      client: client.firstName && client.lastName
+        ? `${client.firstName} ${client.lastName}`
         : client.id,
       clientId: client.id,
       clientLocation: getClientPrimaryAddress(client),
@@ -450,11 +507,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     const monthEnd = endOfMonth(currentMonth);
     const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
     const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
-    
+
     return eachDayOfInterval({ start: startDate, end: endDate });
   }, [currentMonth]);
-
-  const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
   const selectedService = useMemo(
     () =>
@@ -492,48 +547,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     setFormData(prev => ({ ...prev, planOfCare: file }));
   };
 
-  // Convert 12-hour format (e.g., "08:00:AM") to 24-hour format (e.g., "08:00")
-  const convertTo24Hour = (time12h: string): string => {
-    if (!time12h) return "";
-    
-    // Handle formats like "08:00:AM", "08.00:AM", "8:00AM", etc.
-    const match = time12h.match(/(\d{1,2})[.:](\d{2}):?(AM|PM)/i);
-    if (!match) return "";
-    
-    let hours = parseInt(match[1]);
-    const minutes = match[2];
-    const period = match[3].toUpperCase();
-    
-    if (period === "PM" && hours !== 12) {
-      hours += 12;
-    } else if (period === "AM" && hours === 12) {
-      hours = 0;
-    }
-    
-    return `${hours.toString().padStart(2, "0")}:${minutes}`;
-  };
-
-  // Convert 24-hour format (e.g., "14:30") to 12-hour format (e.g., "02:30:PM")
-  const convertTo12Hour = (time24h: string): string => {
-    if (!time24h) return "";
-    
-    const [hoursStr, minutes] = time24h.split(":");
-    let hours = parseInt(hoursStr);
-    const period = hours >= 12 ? "PM" : "AM";
-    
-    if (hours === 0) {
-      hours = 12;
-    } else if (hours > 12) {
-      hours -= 12;
-    }
-    
-    return `${hours.toString().padStart(2, "0")}:${minutes}:${period}`;
-  };
-
   // Handle weekday toggle
   const handleWeekdayToggle = (day: string, dayIndex: number) => {
     const existing = selectedWeekdays.find(w => w.dayIndex === dayIndex);
-    
+
     if (existing) {
       // Remove the day if already selected
       setSelectedWeekdays(prev => prev.filter(w => w.dayIndex !== dayIndex));
@@ -559,8 +576,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         const existing = prev.find(w => w.dayIndex === configuringWeekday.dayIndex);
         if (existing) {
           // Update existing
-          return prev.map(w => 
-            w.dayIndex === configuringWeekday.dayIndex 
+          return prev.map(w =>
+            w.dayIndex === configuringWeekday.dayIndex
               ? { ...w, clockInTime: formData.clockInTime, clockOutTime: formData.clockOutTime }
               : w
           );
@@ -574,7 +591,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           }];
         }
       });
-      
+
       // Clear configuring state
       setConfiguringWeekday(null);
     }
@@ -631,7 +648,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       if (invalidWeekdays.length > 0) {
         newErrors.clockInTime = `Please set times for all selected weekdays`;
       }
-      
+
       // Check if a weekday is currently being configured
       if (configuringWeekday) {
         newErrors.clockInTime = `Please finish setting times for ${configuringWeekday.day} or deselect it`;
@@ -686,7 +703,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       // When weekdays are selected, validate each weekday has times
       const invalidWeekdays = selectedWeekdays.filter(w => !w.clockInTime || !w.clockOutTime);
       if (invalidWeekdays.length > 0) return false;
-      
+
       // If a weekday is currently being configured, form is not valid
       if (configuringWeekday) return false;
     } else {
@@ -1010,6 +1027,35 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         await Promise.allSettled(activityLogPromises as Promise<unknown>[]);
       }
 
+      // Create goal documents if goalsType is set
+      if (formData.goalsType) {
+        const goalPromises = results
+          .filter((r): r is PromiseFulfilledResult<ShiftResponse> =>
+            r.status === "fulfilled" && r.value.success
+          )
+          .map((result) => {
+            const shift = result.value.shift;
+            return createGoalDocument({
+              agencyId: user?.agencyId || "",
+              clientId: formData.clientId || undefined,
+              createdBy: user?.id,
+              documentType: formData.goalsType as DocumentType,
+              status: SubmissionStatus.DRAFT,
+              metadata: {
+                name: formData.client,
+                shiftId: shift?.id,
+                completedBy: formData.assignedDsp,
+                completionDate: shift?.date || format(new Date(), "yyyy-MM-dd"),
+              } as any,
+            }).catch((err) => {
+              console.error("Failed to create goal document:", err);
+              return null;
+            });
+          });
+
+        await Promise.allSettled(goalPromises);
+      }
+
       const failures = results.filter((r) => r.status === "rejected");
       const successes = results.filter((r) => r.status === "fulfilled");
 
@@ -1068,819 +1114,844 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
   return (
     <>
-    {isOpen && (
-      <div className="fixed inset-0 z-50 flex items-center justify-end pr-8">
-        {/* Backdrop */}
-        <div 
-          className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-          onClick={onClose}
-        />
-        
-        {/* Modal */}
-        <div 
-          className="relative bg-white rounded-[30px] border border-[rgba(255,255,255,0.3)] w-full max-w-[500px] max-h-[90vh] shadow-xl flex flex-col"
-        >
-        {/* Title Bar - Fixed */}
-        <div className="flex items-center justify-between p-5 pb-0 shrink-0">
-          <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-            {mode === "edit" ? "Edit Schedule" : "Add new Schedule"}
-          </h2>
-          <button
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end pr-8">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
             onClick={onClose}
-            disabled={isSubmitting}
-            className="bg-[#eff2f3] border border-[rgba(255,255,255,0.3)] rounded-full p-2 hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+
+          {/* Modal */}
+          <div
+            className="relative bg-white rounded-[30px] border border-[rgba(255,255,255,0.3)] w-full max-w-[500px] max-h-[90vh] shadow-xl flex flex-col"
           >
-            <X className="w-4 h-4 text-[#10141a]" />
-          </button>
-        </div>
-
-        {/* Form - Scrollable */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          <div className="flex flex-col gap-4">
-          {/* Client Field */}
-          <div className="flex flex-col gap-1 relative">
-            <label className="text-[12px] font-normal text-[#10141a]">Client</label>
-            <div className={`bg-white border rounded-xl h-11 px-4 flex items-center ${errors.client ? "border-[#D53411]" : "border-[#cccccd]"}`}>
-              <input
-                type="text"
-                value={formData.client}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData(prev => ({ ...prev, client: value, clientId: "", clientLocation: null }));
-                  handleClientSearch(value);
-                  clearError("client");
-                }}
-                placeholder="Search client name..."
-                className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
-              />
-              {isSearchingClients && (
-                <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
-              )}
+            {/* Title Bar - Fixed */}
+            <div className="flex items-center justify-between p-5 pb-0 shrink-0">
+              <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
+                {mode === "edit" ? "Edit Schedule" : "Add new Schedule"}
+              </h2>
+              <button
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="bg-[#eff2f3] border border-[rgba(255,255,255,0.3)] rounded-full p-2 hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X className="w-4 h-4 text-[#10141a]" />
+              </button>
             </div>
-            {errors.client && (
-              <span className="text-[12px] font-normal text-[#D53411]">{errors.client}</span>
-            )}
-            {/* Client Dropdown */}
-            {showClientDropdown && clientSearchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
-                {clientSearchResults.map((client) => (
-                  <button
-                    key={client.id}
-                    onClick={() => {
-                      handleClientSelect(client);
-                      clearError("client");
-                    }}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
-                  >
-                    <p className="text-[14px] font-normal text-black">
-                      {client.firstName && client.lastName 
-                        ? `${client.firstName} ${client.lastName}` 
-                        : client.id}
-                    </p>
-                    <p className="text-[12px] font-normal text-[#808081]">
-                      {formatShiftLocation(getClientPrimaryAddress(client))}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* Assigned DSP Field */}
-          <div className="flex flex-col gap-1 relative">
-            <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
-            <div className={`bg-white border rounded-xl h-11 px-4 flex items-center ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}>
-              <input
-                type="text"
-                value={formData.assignedDsp}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData(prev => ({ ...prev, assignedDsp: value, assignedDspId: "", billingRate: "" }));
-                  handleDspSearch(value);
-                  clearError("assignedDsp");
-                }}
-                placeholder="Search DSP name..."
-                className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
-              />
-              {isSearchingDsps && (
-                <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
-              )}
-            </div>
-            {errors.assignedDsp && (
-              <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
-            )}
-            {/* DSP Dropdown */}
-            {showDspDropdown && dspSearchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
-                {dspSearchResults.map((employee) => (
-                  <button
-                    key={employee.id}
-                    onClick={() => {
-                      handleDspSelect(employee);
-                      clearError("assignedDsp");
-                    }}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
-                  >
-                    <p className="text-[14px] font-normal text-black">{employee.fullName}</p>
-                    <p className="text-[12px] font-normal text-[#808081]">{employee.email}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-            {/* Billing Rate Display */}
-            {/* {formData.billingRate && !errors.assignedDsp && (
+            {/* Form - Scrollable */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <div className="flex flex-col gap-4">
+                {/* Client Field */}
+                <div className="flex flex-col gap-1 relative">
+                  <label className="text-[12px] font-normal text-[#10141a]">Client</label>
+                  <div className={`bg-white border rounded-xl h-11 px-4 flex items-center ${errors.client ? "border-[#D53411]" : "border-[#cccccd]"}`}>
+                    <input
+                      type="text"
+                      value={formData.client}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData(prev => ({ ...prev, client: value, clientId: "", clientLocation: null }));
+                        handleClientSearch(value);
+                        clearError("client");
+                      }}
+                      placeholder="Search client name..."
+                      className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                    />
+                    {isSearchingClients && (
+                      <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+                    )}
+                  </div>
+                  {errors.client && (
+                    <span className="text-[12px] font-normal text-[#D53411]">{errors.client}</span>
+                  )}
+                  {/* Client Dropdown */}
+                  {showClientDropdown && clientSearchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
+                      {clientSearchResults.map((client) => (
+                        <button
+                          key={client.id}
+                          onClick={() => {
+                            handleClientSelect(client);
+                            clearError("client");
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
+                        >
+                          <p className="text-[14px] font-normal text-black">
+                            {client.firstName && client.lastName
+                              ? `${client.firstName} ${client.lastName}`
+                              : client.id}
+                          </p>
+                          <p className="text-[12px] font-normal text-[#808081]">
+                            {formatShiftLocation(getClientPrimaryAddress(client))}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Assigned DSP Field */}
+                <div className="flex flex-col gap-1 relative">
+                  <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
+                  <div className={`bg-white border rounded-xl h-11 px-4 flex items-center ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}>
+                    <input
+                      type="text"
+                      value={formData.assignedDsp}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData(prev => ({ ...prev, assignedDsp: value, assignedDspId: "", billingRate: "" }));
+                        handleDspSearch(value);
+                        clearError("assignedDsp");
+                      }}
+                      placeholder="Search DSP name..."
+                      className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                    />
+                    {isSearchingDsps && (
+                      <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+                    )}
+                  </div>
+                  {errors.assignedDsp && (
+                    <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
+                  )}
+                  {/* DSP Dropdown */}
+                  {showDspDropdown && dspSearchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
+                      {dspSearchResults.map((employee) => (
+                        <button
+                          key={employee.id}
+                          onClick={() => {
+                            handleDspSelect(employee);
+                            clearError("assignedDsp");
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
+                        >
+                          <p className="text-[14px] font-normal text-black">{employee.fullName}</p>
+                          <p className="text-[12px] font-normal text-[#808081]">{employee.email}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Billing Rate Display */}
+                  {/* {formData.billingRate && !errors.assignedDsp && (
               <span className="text-[12px] font-normal text-[#808081]">
                 Billing Rate : {formData.billingRate}
               </span>
             )} */}
-          </div>
-
-          {/* Service Code */}
-          {/* Service Code */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Service</label>
-            <Select
-              value={formData.serviceCode}
-              onValueChange={(value) => setFormData((prev) => ({ ...prev, serviceCode: value }))}
-              disabled={selectedClientServices.length === 0}
-            >
-              <SelectTrigger className="w-full h-11 rounded-xl border-[#cccccd] bg-white">
-                <SelectValue
-                  placeholder={
-                    selectedClientServices.length === 0 ? "No services available" : "Select service"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {selectedClientServices.map((service) => (
-                  <SelectItem key={`${service.code}-${service.name}`} value={service.code}>
-                    {service.name ? `${service.name} — ${service.code}` : service.code}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedService && (selectedService.rate || selectedService.payType) && (
-              <span className="text-[12px] font-normal text-[#808081]">
-                Service rate:{" "}
-                {selectedService.rate ? `$${selectedService.rate}` : "Not set"}
-                {selectedService.payType &&
-                  ` • ${
-                    selectedService.payType === "hourly"
-                      ? "Hourly"
-                      : selectedService.payType === "15-min"
-                      ? "15 minutes"
-                      : selectedService.payType === "daily"
-                      ? "Daily"
-                      : selectedService.payType
-                  }`}
-              </span>
-            )}
-          </div>
-
-          {/* Notes Type */}
-          <div className="flex flex-col gap-1 relative">
-            <label className="text-[12px] font-normal text-[#10141a]">Notes Type</label>
-            <button
-              onClick={() => {
-                setShowNotesTypeDropdown(!showNotesTypeDropdown);
-              }}
-              className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer"
-            >
-              <span className="flex-1 text-left text-[14px] font-normal text-black">
-                {formData.notesType
-                  ? noteTypes.find((elt) => elt.id === formData.notesType)?.title
-                  : "Select notes type"
-                }
-              </span>
-              <ChevronDown className="w-5 h-5 text-[#10141a]" />
-            </button>
-            
-            {showNotesTypeDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-10">
-                {noteTypes.map((notesType) => (
-                  <button
-                    key={notesType.id}
-                    onClick={() => {
-                      setFormData(prev => ({ ...prev, notesType: notesType.id }));
-                      setShowNotesTypeDropdown(false);
-                    }}
-                    className="w-full px-4 py-3 text-left text-[14px] font-normal text-[#10141a] hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer"
-                  >
-                    {notesType.title}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Scheduling Type */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Scheduling Type</label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => {
-                  setFormData(prev => ({ ...prev, schedulingType: "one-time" }));
-                  clearError("schedulingType");
-                }}
-                className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                  formData.schedulingType === "one-time"
-                    ? "bg-[#00b4b8] text-white"
-                    : errors.schedulingType
-                      ? "border border-[#D53411] text-[#10141a]"
-                      : "border border-[#808081] text-[#10141a]"
-                }`}
-              >
-                One time
-              </button>
-              <button
-                onClick={() => {
-                  setFormData(prev => ({ ...prev, schedulingType: "recurring" }));
-                  clearError("schedulingType");
-                }}
-                className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                  formData.schedulingType === "recurring"
-                    ? "bg-[#00b4b8] text-white"
-                    : errors.schedulingType
-                      ? "border border-[#D53411] text-[#10141a]"
-                      : "border border-[#808081] text-[#10141a]"
-                }`}
-              >
-                Recurring
-              </button>
-            </div>
-            {errors.schedulingType && (
-              <span className="text-[12px] font-normal text-[#D53411]">{errors.schedulingType}</span>
-            )}
-          </div>
-
-          {/* Date Fields - Conditional based on scheduling type */}
-          {formData.schedulingType === "recurring" ? (
-            <>
-              {/* Select Starting Date */}
-              <div className="flex flex-col gap-1 relative">
-                <label className="text-[12px] font-normal text-[#10141a]">Select Starting Date</label>
-                <button
-                  onClick={() => {
-                    setShowStartDatePicker(!showStartDatePicker);
-                    setShowEndDatePicker(false);
-                  }}
-                  className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${
-                    errors.startDate ? "border-[#D53411]" : showStartDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
-                  }`}
-                >
-                  <span className={`flex-1 text-left text-[14px] font-normal ${formData.startDate ? "text-[#10141a]" : "text-[#b2b2b3]"}`}>
-                    {formData.startDate ? format(formData.startDate, "d MMMM") : "Select date"}
-                  </span>
-                  <Calendar className="w-5 h-5 text-[#10141a]" />
-                </button>
-                {errors.startDate && (
-                  <span className="text-[12px] font-normal text-[#D53411]">{errors.startDate}</span>
-                )}
-
-                {/* Start Date Picker Dropdown */}
-                {showStartDatePicker && (
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
-                    {/* Month Navigation */}
-                    <div className="flex items-center justify-center gap-2.5 px-5 py-2">
-                      <button
-                        onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                        className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
-                      >
-                        <ChevronLeft className="w-5 h-5 text-[#808081]" />
-                      </button>
-                      <span className="flex-1 text-[16px] font-semibold leading-[1.6] text-[#10141a] text-center">
-                        {format(currentMonth, "MMMM yyyy")}
-                      </span>
-                      <button
-                        onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                        className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
-                      >
-                        <ChevronRight className="w-5 h-5 text-[#10141a]" />
-                      </button>
-                    </div>
-                    {/* Divider */}
-                    <div className="h-px bg-[#e5e5e6] w-full" />
-                    {/* Week Days */}
-                    <div className="flex items-center justify-center pt-2 w-full">
-                      {weekDays.map((day) => (
-                        <div key={day} className="flex-1 px-2 py-0.5 text-center text-[12px] font-medium text-[#10141a]">
-                          {day}
-                        </div>
-                      ))}
-                    </div>
-                    {/* Calendar Grid */}
-                    <div className="flex flex-col w-full pb-2">
-                      {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, weekIndex) => (
-                        <div key={weekIndex} className="flex items-center justify-center py-1 w-full">
-                          {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => {
-                            const isCurrentMonth = isSameMonth(day, currentMonth);
-                            const isSelected = formData.startDate && isSameDay(day, formData.startDate);
-
-                            return (
-                              <button
-                                key={dayIndex}
-                                onClick={() => handleStartDateSelect(day)}
-                                className={`
-                                  flex-1 flex items-center justify-center p-2 text-center transition-colors cursor-pointer
-                                  ${isSelected 
-                                    ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold" 
-                                    : isCurrentMonth 
-                                      ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]" 
-                                      : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
-                                  }
-                                `}
-                              >
-                                <span className="text-[14px] leading-[1.4]">
-                                  {format(day, "d")}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Select End Date */}
-              <div className="flex flex-col gap-1 relative">
-                <label className="text-[12px] font-normal text-[#10141a]">Select End Date</label>
-                <button
-                  onClick={() => {
-                    setShowEndDatePicker(!showEndDatePicker);
-                    setShowStartDatePicker(false);
-                  }}
-                  className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${
-                    errors.endDate ? "border-[#D53411]" : showEndDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
-                  }`}
-                >
-                  <span className={`flex-1 text-left text-[14px] font-normal ${formData.endDate ? "text-[#10141a]" : "text-[#b2b2b3]"}`}>
-                    {formData.endDate ? format(formData.endDate, "d MMMM") : "Select date"}
-                  </span>
-                  <Calendar className="w-5 h-5 text-[#10141a]" />
-                </button>
-                {errors.endDate && (
-                  <span className="text-[12px] font-normal text-[#D53411]">{errors.endDate}</span>
-                )}
-
-                {/* End Date Picker Dropdown */}
-                {showEndDatePicker && (
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
-                    {/* Month Navigation */}
-                    <div className="flex items-center justify-center gap-2.5 px-5 py-2">
-                      <button
-                        onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                        className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
-                      >
-                        <ChevronLeft className="w-5 h-5 text-[#808081]" />
-                      </button>
-                      <span className="flex-1 text-[16px] font-semibold leading-[1.6] text-[#10141a] text-center">
-                        {format(currentMonth, "MMMM yyyy")}
-                      </span>
-                      <button
-                        onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                        className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
-                      >
-                        <ChevronRight className="w-5 h-5 text-[#10141a]" />
-                      </button>
-                    </div>
-                    {/* Divider */}
-                    <div className="h-px bg-[#e5e5e6] w-full" />
-                    {/* Week Days */}
-                    <div className="flex items-center justify-center pt-2 w-full">
-                      {weekDays.map((day) => (
-                        <div key={day} className="flex-1 px-2 py-0.5 text-center text-[12px] font-medium text-[#10141a]">
-                          {day}
-                        </div>
-                      ))}
-                    </div>
-                    {/* Calendar Grid */}
-                    <div className="flex flex-col w-full pb-2">
-                      {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, weekIndex) => (
-                        <div key={weekIndex} className="flex items-center justify-center py-1 w-full">
-                          {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => {
-                            const isCurrentMonth = isSameMonth(day, currentMonth);
-                            const isSelected = formData.endDate && isSameDay(day, formData.endDate);
-
-                            return (
-                              <button
-                                key={dayIndex}
-                                onClick={() => handleEndDateSelect(day)}
-                                className={`
-                                  flex-1 flex items-center justify-center p-2 text-center transition-colors cursor-pointer
-                                  ${isSelected 
-                                    ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold" 
-                                    : isCurrentMonth 
-                                      ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]" 
-                                      : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
-                                  }
-                                `}
-                              >
-                                <span className="text-[14px] leading-[1.4]">
-                                  {format(day, "d")}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Weekdays Selection */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-normal text-[#10141a]">Weekdays</label>
-                <div className="flex flex-wrap gap-2">
-                  {WEEKDAY_OPTIONS.map((weekday) => {
-                    const isSelected = selectedWeekdays.some(w => w.dayIndex === weekday.dayIndex);
-                    const isConfiguring = configuringWeekday?.dayIndex === weekday.dayIndex;
-                    return (
-                      <button
-                        key={weekday.dayIndex}
-                        onClick={() => handleWeekdayToggle(weekday.label, weekday.dayIndex)}
-                        className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                          isSelected
-                            ? "bg-[#00b4b8] text-white border-[0.5px] border-[#808081]"
-                            : isConfiguring
-                              ? "bg-[#ffa500] text-white border-[0.5px] border-[#ff8c00]"
-                              : "border border-[#808081] text-[#10141a]"
-                        }`}
-                      >
-                        {weekday.label}
-                      </button>
-                    );
-                  })}
                 </div>
-                {configuringWeekday && (
-                  <p className="text-[12px] font-normal text-[#ffa500] mt-1">
-                    Now select clock in and clock out times for {configuringWeekday.day}
-                  </p>
-                )}
-              </div>
-            </>
-          ) : (
-            /* Select Date - for one-time scheduling */
-            <div className="flex flex-col gap-1 relative">
-              <label className="text-[12px] font-normal text-[#10141a]">Select Date</label>
-              <button
-                onClick={() => setShowDatePicker(!showDatePicker)}
-                className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${
-                  errors.date ? "border-[#D53411]" : showDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
-                }`}
-              >
-                <span className={`flex-1 text-left text-[14px] font-normal ${formData.date ? "text-[#10141a]" : "text-[#b2b2b3]"}`}>
-                  {formData.date ? format(formData.date, "d MMMM") : "Select date"}
-                </span>
-                <Calendar className="w-5 h-5 text-[#10141a]" />
-              </button>
-              {errors.date && (
-                <span className="text-[12px] font-normal text-[#D53411]">{errors.date}</span>
-              )}
 
-              {/* Date Picker Dropdown */}
-              {showDatePicker && (
-                <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
-                  {/* Month Navigation */}
-                  <div className="flex items-center justify-center gap-2.5 px-5 py-2">
-                    <button
-                      onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                      className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
-                    >
-                      <ChevronLeft className="w-5 h-5 text-[#808081]" />
-                    </button>
-                    <span className="flex-1 text-[16px] font-semibold leading-[1.6] text-[#10141a] text-center">
-                      {format(currentMonth, "MMMM yyyy")}
+                {/* Service Code */}
+                {/* Service Code */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Service</label>
+                  <Select
+                    value={formData.serviceCode}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, serviceCode: value }))}
+                    disabled={selectedClientServices.length === 0}
+                  >
+                    <SelectTrigger className="w-full h-11 rounded-xl border-[#cccccd] bg-white">
+                      <SelectValue
+                        placeholder={
+                          selectedClientServices.length === 0 ? "No services available" : "Select service"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedClientServices.map((service) => (
+                        <SelectItem key={`${service.code}-${service.name}`} value={service.code}>
+                          {service.name ? `${service.name} — ${service.code}` : service.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedService && (selectedService.rate || selectedService.payType) && (
+                    <span className="text-[12px] font-normal text-[#808081]">
+                      Service rate:{" "}
+                      {selectedService.rate ? `$${selectedService.rate}` : "Not set"}
+                      {selectedService.payType &&
+                        ` • ${selectedService.payType === "hourly"
+                          ? "Hourly"
+                          : selectedService.payType === "15-min"
+                            ? "15 minutes"
+                            : selectedService.payType === "daily"
+                              ? "Daily"
+                              : selectedService.payType
+                        }`}
                     </span>
+                  )}
+                </div>
+
+                {/* Notes Type */}
+                <div className="flex flex-col gap-1 relative">
+                  <label className="text-[12px] font-normal text-[#10141a]">Notes Type</label>
+                  <button
+                    onClick={() => {
+                      setShowNotesTypeDropdown(!showNotesTypeDropdown);
+                    }}
+                    className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer"
+                  >
+                    <span className="flex-1 text-left text-[14px] font-normal text-black">
+                      {formData.notesType
+                        ? noteTypes.find((elt) => elt.id === formData.notesType)?.title
+                        : "Select notes type"
+                      }
+                    </span>
+                    <ChevronDown className="w-5 h-5 text-[#10141a]" />
+                  </button>
+
+                  {showNotesTypeDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-10">
+                      {noteTypes.map((notesType) => (
+                        <button
+                          key={notesType.id}
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, notesType: notesType.id }));
+                            setShowNotesTypeDropdown(false);
+                          }}
+                          className="w-full px-4 py-3 text-left text-[14px] font-normal text-[#10141a] hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer"
+                        >
+                          {notesType.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Goals Type */}
+                <div className="flex flex-col gap-1 relative">
+                  <label className="text-[12px] font-normal text-[#10141a]">Goals Type</label>
+                  <button
+                    onClick={() => {
+                      setShowGoalsTypeDropdown(!showGoalsTypeDropdown);
+                    }}
+                    className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer"
+                  >
+                    <span className="flex-1 text-left text-[14px] font-normal text-black">
+                      {formData.goalsType
+                        ? goalsTypes.find((elt) => elt.id === formData.goalsType)?.title
+                        : "Select goals type"
+                      }
+                    </span>
+                    <ChevronDown className="w-5 h-5 text-[#10141a]" />
+                  </button>
+
+                  {showGoalsTypeDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-10 max-h-[200px] overflow-y-auto">
+                      {goalsTypes.map((goalsType) => (
+                        <button
+                          key={goalsType.id}
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, goalsType: goalsType.id }));
+                            setShowGoalsTypeDropdown(false);
+                          }}
+                          className="w-full px-4 py-3 text-left text-[14px] font-normal text-[#10141a] hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer"
+                        >
+                          {goalsType.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Scheduling Type */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Scheduling Type</label>
+                  <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                      className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, schedulingType: "one-time" }));
+                        clearError("schedulingType");
+                      }}
+                      className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.schedulingType === "one-time"
+                        ? "bg-[#00b4b8] text-white"
+                        : errors.schedulingType
+                          ? "border border-[#D53411] text-[#10141a]"
+                          : "border border-[#808081] text-[#10141a]"
+                        }`}
                     >
-                      <ChevronRight className="w-5 h-5 text-[#10141a]" />
+                      One time
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, schedulingType: "recurring" }));
+                        clearError("schedulingType");
+                      }}
+                      className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.schedulingType === "recurring"
+                        ? "bg-[#00b4b8] text-white"
+                        : errors.schedulingType
+                          ? "border border-[#D53411] text-[#10141a]"
+                          : "border border-[#808081] text-[#10141a]"
+                        }`}
+                    >
+                      Recurring
                     </button>
                   </div>
-                  {/* Divider */}
-                  <div className="h-px bg-[#e5e5e6] w-full" />
-                  {/* Week Days */}
-                  <div className="flex items-center justify-center pt-2 w-full">
-                    {weekDays.map((day) => (
-                      <div key={day} className="flex-1 px-2 py-0.5 text-center text-[12px] font-medium text-[#10141a]">
-                        {day}
-                      </div>
-                    ))}
-                  </div>
-                  {/* Calendar Grid */}
-                  <div className="flex flex-col w-full pb-2">
-                    {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, weekIndex) => (
-                      <div key={weekIndex} className="flex items-center justify-center py-1 w-full">
-                        {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => {
-                          const isCurrentMonth = isSameMonth(day, currentMonth);
-                          const isSelected = formData.date && isSameDay(day, formData.date);
+                  {errors.schedulingType && (
+                    <span className="text-[12px] font-normal text-[#D53411]">{errors.schedulingType}</span>
+                  )}
+                </div>
 
+                {/* Date Fields - Conditional based on scheduling type */}
+                {formData.schedulingType === "recurring" ? (
+                  <>
+                    {/* Select Starting Date */}
+                    <div className="flex flex-col gap-1 relative">
+                      <label className="text-[12px] font-normal text-[#10141a]">Select Starting Date</label>
+                      <button
+                        onClick={() => {
+                          setShowStartDatePicker(!showStartDatePicker);
+                          setShowEndDatePicker(false);
+                        }}
+                        className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${errors.startDate ? "border-[#D53411]" : showStartDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
+                          }`}
+                      >
+                        <span className={`flex-1 text-left text-[14px] font-normal ${formData.startDate ? "text-[#10141a]" : "text-[#b2b2b3]"}`}>
+                          {formData.startDate ? format(formData.startDate, "d MMMM") : "Select date"}
+                        </span>
+                        <Calendar className="w-5 h-5 text-[#10141a]" />
+                      </button>
+                      {errors.startDate && (
+                        <span className="text-[12px] font-normal text-[#D53411]">{errors.startDate}</span>
+                      )}
+
+                      {/* Start Date Picker Dropdown */}
+                      {showStartDatePicker && (
+                        <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
+                          {/* Month Navigation */}
+                          <div className="flex items-center justify-center gap-2.5 px-5 py-2">
+                            <button
+                              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                              className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
+                            >
+                              <ChevronLeft className="w-5 h-5 text-[#808081]" />
+                            </button>
+                            <span className="flex-1 text-[16px] font-semibold leading-[1.6] text-[#10141a] text-center">
+                              {format(currentMonth, "MMMM yyyy")}
+                            </span>
+                            <button
+                              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                              className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
+                            >
+                              <ChevronRight className="w-5 h-5 text-[#10141a]" />
+                            </button>
+                          </div>
+                          {/* Divider */}
+                          <div className="h-px bg-[#e5e5e6] w-full" />
+                          {/* Week Days */}
+                          <div className="flex items-center justify-center pt-2 w-full">
+                            {weekDays.map((day) => (
+                              <div key={day} className="flex-1 px-2 py-0.5 text-center text-[12px] font-medium text-[#10141a]">
+                                {day}
+                              </div>
+                            ))}
+                          </div>
+                          {/* Calendar Grid */}
+                          <div className="flex flex-col w-full pb-2">
+                            {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, weekIndex) => (
+                              <div key={weekIndex} className="flex items-center justify-center py-1 w-full">
+                                {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => {
+                                  const isCurrentMonth = isSameMonth(day, currentMonth);
+                                  const isSelected = formData.startDate && isSameDay(day, formData.startDate);
+
+                                  return (
+                                    <button
+                                      key={dayIndex}
+                                      onClick={() => handleStartDateSelect(day)}
+                                      className={`
+                                  flex-1 flex items-center justify-center p-2 text-center transition-colors cursor-pointer
+                                  ${isSelected
+                                          ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold"
+                                          : isCurrentMonth
+                                            ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]"
+                                            : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
+                                        }
+                                `}
+                                    >
+                                      <span className="text-[14px] leading-[1.4]">
+                                        {format(day, "d")}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Select End Date */}
+                    <div className="flex flex-col gap-1 relative">
+                      <label className="text-[12px] font-normal text-[#10141a]">Select End Date</label>
+                      <button
+                        onClick={() => {
+                          setShowEndDatePicker(!showEndDatePicker);
+                          setShowStartDatePicker(false);
+                        }}
+                        className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${errors.endDate ? "border-[#D53411]" : showEndDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
+                          }`}
+                      >
+                        <span className={`flex-1 text-left text-[14px] font-normal ${formData.endDate ? "text-[#10141a]" : "text-[#b2b2b3]"}`}>
+                          {formData.endDate ? format(formData.endDate, "d MMMM") : "Select date"}
+                        </span>
+                        <Calendar className="w-5 h-5 text-[#10141a]" />
+                      </button>
+                      {errors.endDate && (
+                        <span className="text-[12px] font-normal text-[#D53411]">{errors.endDate}</span>
+                      )}
+
+                      {/* End Date Picker Dropdown */}
+                      {showEndDatePicker && (
+                        <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
+                          {/* Month Navigation */}
+                          <div className="flex items-center justify-center gap-2.5 px-5 py-2">
+                            <button
+                              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                              className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
+                            >
+                              <ChevronLeft className="w-5 h-5 text-[#808081]" />
+                            </button>
+                            <span className="flex-1 text-[16px] font-semibold leading-[1.6] text-[#10141a] text-center">
+                              {format(currentMonth, "MMMM yyyy")}
+                            </span>
+                            <button
+                              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                              className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
+                            >
+                              <ChevronRight className="w-5 h-5 text-[#10141a]" />
+                            </button>
+                          </div>
+                          {/* Divider */}
+                          <div className="h-px bg-[#e5e5e6] w-full" />
+                          {/* Week Days */}
+                          <div className="flex items-center justify-center pt-2 w-full">
+                            {weekDays.map((day) => (
+                              <div key={day} className="flex-1 px-2 py-0.5 text-center text-[12px] font-medium text-[#10141a]">
+                                {day}
+                              </div>
+                            ))}
+                          </div>
+                          {/* Calendar Grid */}
+                          <div className="flex flex-col w-full pb-2">
+                            {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, weekIndex) => (
+                              <div key={weekIndex} className="flex items-center justify-center py-1 w-full">
+                                {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => {
+                                  const isCurrentMonth = isSameMonth(day, currentMonth);
+                                  const isSelected = formData.endDate && isSameDay(day, formData.endDate);
+
+                                  return (
+                                    <button
+                                      key={dayIndex}
+                                      onClick={() => handleEndDateSelect(day)}
+                                      className={`
+                                  flex-1 flex items-center justify-center p-2 text-center transition-colors cursor-pointer
+                                  ${isSelected
+                                          ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold"
+                                          : isCurrentMonth
+                                            ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]"
+                                            : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
+                                        }
+                                `}
+                                    >
+                                      <span className="text-[14px] leading-[1.4]">
+                                        {format(day, "d")}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Weekdays Selection */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-normal text-[#10141a]">Weekdays</label>
+                      <div className="flex flex-wrap gap-2">
+                        {WEEKDAY_OPTIONS.map((weekday) => {
+                          const isSelected = selectedWeekdays.some(w => w.dayIndex === weekday.dayIndex);
+                          const isConfiguring = configuringWeekday?.dayIndex === weekday.dayIndex;
                           return (
                             <button
-                              key={dayIndex}
-                              onClick={() => handleDateSelect(day)}
-                              className={`
-                                flex-1 flex items-center justify-center p-2 text-center transition-colors cursor-pointer
-                                ${isSelected 
-                                  ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold" 
-                                  : isCurrentMonth 
-                                    ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]" 
-                                    : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
-                                }
-                              `}
+                              key={weekday.dayIndex}
+                              onClick={() => handleWeekdayToggle(weekday.label, weekday.dayIndex)}
+                              className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${isSelected
+                                ? "bg-[#00b4b8] text-white border-[0.5px] border-[#808081]"
+                                : isConfiguring
+                                  ? "bg-[#ffa500] text-white border-[0.5px] border-[#ff8c00]"
+                                  : "border border-[#808081] text-[#10141a]"
+                                }`}
                             >
-                              <span className="text-[14px] leading-[1.4]">
-                                {format(day, "d")}
-                              </span>
+                              {weekday.label}
                             </button>
                           );
                         })}
                       </div>
+                      {configuringWeekday && (
+                        <p className="text-[12px] font-normal text-[#ffa500] mt-1">
+                          Now select clock in and clock out times for {configuringWeekday.day}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  /* Select Date - for one-time scheduling */
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-[12px] font-normal text-[#10141a]">Select Date</label>
+                    <button
+                      onClick={() => setShowDatePicker(!showDatePicker)}
+                      className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${errors.date ? "border-[#D53411]" : showDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
+                        }`}
+                    >
+                      <span className={`flex-1 text-left text-[14px] font-normal ${formData.date ? "text-[#10141a]" : "text-[#b2b2b3]"}`}>
+                        {formData.date ? format(formData.date, "d MMMM") : "Select date"}
+                      </span>
+                      <Calendar className="w-5 h-5 text-[#10141a]" />
+                    </button>
+                    {errors.date && (
+                      <span className="text-[12px] font-normal text-[#D53411]">{errors.date}</span>
+                    )}
+
+                    {/* Date Picker Dropdown */}
+                    {showDatePicker && (
+                      <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
+                        {/* Month Navigation */}
+                        <div className="flex items-center justify-center gap-2.5 px-5 py-2">
+                          <button
+                            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                            className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
+                          >
+                            <ChevronLeft className="w-5 h-5 text-[#808081]" />
+                          </button>
+                          <span className="flex-1 text-[16px] font-semibold leading-[1.6] text-[#10141a] text-center">
+                            {format(currentMonth, "MMMM yyyy")}
+                          </span>
+                          <button
+                            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                            className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
+                          >
+                            <ChevronRight className="w-5 h-5 text-[#10141a]" />
+                          </button>
+                        </div>
+                        {/* Divider */}
+                        <div className="h-px bg-[#e5e5e6] w-full" />
+                        {/* Week Days */}
+                        <div className="flex items-center justify-center pt-2 w-full">
+                          {weekDays.map((day) => (
+                            <div key={day} className="flex-1 px-2 py-0.5 text-center text-[12px] font-medium text-[#10141a]">
+                              {day}
+                            </div>
+                          ))}
+                        </div>
+                        {/* Calendar Grid */}
+                        <div className="flex flex-col w-full pb-2">
+                          {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, weekIndex) => (
+                            <div key={weekIndex} className="flex items-center justify-center py-1 w-full">
+                              {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => {
+                                const isCurrentMonth = isSameMonth(day, currentMonth);
+                                const isSelected = formData.date && isSameDay(day, formData.date);
+
+                                return (
+                                  <button
+                                    key={dayIndex}
+                                    onClick={() => handleDateSelect(day)}
+                                    className={`
+                                flex-1 flex items-center justify-center p-2 text-center transition-colors cursor-pointer
+                                ${isSelected
+                                        ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold"
+                                        : isCurrentMonth
+                                          ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]"
+                                          : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
+                                      }
+                              `}
+                                  >
+                                    <span className="text-[14px] leading-[1.4]">
+                                      {format(day, "d")}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Clock In Time */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Clock In Time</label>
+                  <div className="flex flex-wrap gap-2">
+                    {/* Custom time badge if selected time is not in predefined list */}
+                    {formData.clockInTime && !clockInTimeOptions.includes(formData.clockInTime) && (
+                      <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#00b4b8] text-white">
+                        <span className="text-[14px] font-medium">{formData.clockInTime}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, clockInTime: "" }));
+                          }}
+                          className="ml-1 hover:opacity-70 transition-opacity"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    {clockInTimeOptions.map((time, index) => (
+                      <button
+                        key={`${time}-${index}`}
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, clockInTime: time }));
+                          clearError("clockInTime");
+                        }}
+                        className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.clockInTime === time
+                          ? "bg-[#00b4b8] text-white"
+                          : errors.clockInTime
+                            ? "border border-[#D53411] text-[#10141a]"
+                            : "border border-[#808081] text-[#10141a]"
+                          }`}
+                      >
+                        {time}
+                      </button>
+                    ))}
+                    <TimePicker
+                      value={convertTo24Hour(formData.clockInTime)}
+                      onChange={(time24h) => {
+                        const time12h = convertTo12Hour(time24h);
+                        setFormData(prev => ({ ...prev, clockInTime: time12h }));
+                        clearError("clockInTime");
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${errors.clockInTime
+                          ? "border border-[#D53411] text-[#10141a]"
+                          : "border border-[#808081] text-[#10141a]"
+                          }`}
+                      >
+                        Enter Time
+                      </button>
+                    </TimePicker>
+                  </div>
+                  {errors.clockInTime && (
+                    <span className="text-[12px] font-normal text-[#D53411]">{errors.clockInTime}</span>
+                  )}
+                </div>
+
+                {/* Clock Out Time */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Clock Out Time</label>
+                  <div className="flex flex-wrap gap-2">
+                    {/* Custom time badge if selected time is not in predefined list */}
+                    {formData.clockOutTime && !clockOutTimeOptions.includes(formData.clockOutTime) && (
+                      <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#00b4b8] text-white">
+                        <span className="text-[14px] font-medium">{formData.clockOutTime}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, clockOutTime: "" }));
+                          }}
+                          className="ml-1 hover:opacity-70 transition-opacity"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    {clockOutTimeOptions.map((time, index) => (
+                      <button
+                        key={`${time}-${index}`}
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, clockOutTime: time }));
+                          clearError("clockOutTime");
+                        }}
+                        className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.clockOutTime === time
+                          ? "bg-[#00b4b8] text-white"
+                          : errors.clockOutTime
+                            ? "border border-[#D53411] text-[#10141a]"
+                            : "border border-[#808081] text-[#10141a]"
+                          }`}
+                      >
+                        {time}
+                      </button>
+                    ))}
+                    <TimePicker
+                      value={convertTo24Hour(formData.clockOutTime)}
+                      onChange={(time24h) => {
+                        const time12h = convertTo12Hour(time24h);
+                        setFormData(prev => ({ ...prev, clockOutTime: time12h }));
+                        clearError("clockOutTime");
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${errors.clockOutTime
+                          ? "border border-[#D53411] text-[#10141a]"
+                          : "border border-[#808081] text-[#10141a]"
+                          }`}
+                      >
+                        Enter Time
+                      </button>
+                    </TimePicker>
+                  </div>
+                  {errors.clockOutTime && (
+                    <span className="text-[12px] font-normal text-[#D53411]">{errors.clockOutTime}</span>
+                  )}
+                </div>
+
+                {/* Selected Weekdays Display (only for recurring with selected weekdays) */}
+                {formData.schedulingType === "recurring" && selectedWeekdays.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {selectedWeekdays.map((weekday) => (
+                      <div
+                        key={weekday.dayIndex}
+                        className="flex items-center gap-2 h-[36px] px-2 rounded-lg bg-[rgba(0,216,65,0.08)] border-b border-[rgba(255,255,255,0.3)]"
+                      >
+                        <Clock className="w-5 h-5 text-[#00d841] shrink-0" />
+                        <span className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
+                          {weekday.day} ( {weekday.clockInTime}-{weekday.clockOutTime} )
+                        </span>
+                      </div>
                     ))}
                   </div>
+                )}
+
+                {/* ISP Outcome */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">ISP Outcome</label>
+                  <div className="bg-[#f5f5f5] border border-[#e0e0e0] rounded-xl h-11 px-4 flex items-center">
+                    <input
+                      type="text"
+                      value={formData.ispOutcome}
+                      readOnly
+                      placeholder={formData.ispOutcome ? "" : "No ISP outcome available"}
+                      className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent cursor-not-allowed"
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
 
-          {/* Clock In Time */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Clock In Time</label>
-            <div className="flex flex-wrap gap-2">
-              {/* Custom time badge if selected time is not in predefined list */}
-              {formData.clockInTime && !clockInTimeOptions.includes(formData.clockInTime) && (
-                <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#00b4b8] text-white">
-                  <span className="text-[14px] font-medium">{formData.clockInTime}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData(prev => ({ ...prev, clockInTime: "" }));
-                    }}
-                    className="ml-1 hover:opacity-70 transition-opacity"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                {/* Plan of Care */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Plan of care</label>
+                  {!pocDocument?.url && (
+                    <label className="bg-white border border-[#cccccd] rounded-xl px-4 py-3 flex items-center justify-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                      <Upload className="w-5 h-5 text-[#b2b2b3]" />
+                      <span className="text-[14px] font-normal text-[#b2b2b3]">
+                        Upload plan of care
+                      </span>
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx"
+                      />
+                    </label>
+                  )}
+                  {/* Client's POC Document Link */}
+                  {pocDocument && pocDocument.url && (
+                    <a
+                      href={pocDocument.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 bg-[rgba(0,180,216,0.08)] border border-[rgba(0,180,216,0.2)] rounded-lg h-[36px] px-3 mt-1 hover:bg-[rgba(0,180,216,0.12)] transition-colors group"
+                    >
+                      <FileText className="w-4 h-4 text-[#00b4d8] group-hover:text-[#0096c7]" />
+                      <span className="text-[13px] font-medium text-[#10141a] flex-1 truncate">
+                        {pocDocument.fileName || pocDocument.title || "View Plan of Care"}
+                      </span>
+                      <ExternalLink className="w-3.5 h-3.5 text-[#00b4d8] group-hover:text-[#0096c7] shrink-0" />
+                    </a>
+                  )}
+                  {/* Selected File Chip */}
+                  {formData.planOfCare && (
+                    <div className="flex items-center gap-2 bg-[rgba(0,216,65,0.08)] rounded-lg h-[36px] px-2 mt-1">
+                      <FileText className="w-5 h-5 text-[#00d841]" />
+                      <span className="text-[14px] font-medium text-[#10141a]">
+                        {formData.planOfCare.name || "Plan of care PDF"}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-              
-              {clockInTimeOptions.map((time, index) => (
-                <button
-                  key={`${time}-${index}`}
-                  onClick={() => {
-                    setFormData(prev => ({ ...prev, clockInTime: time }));
-                    clearError("clockInTime");
-                  }}
-                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                    formData.clockInTime === time
-                      ? "bg-[#00b4b8] text-white"
-                      : errors.clockInTime
-                        ? "border border-[#D53411] text-[#10141a]"
-                        : "border border-[#808081] text-[#10141a]"
-                  }`}
-                >
-                  {time}
-                </button>
-              ))}
-              <TimePicker
-                value={convertTo24Hour(formData.clockInTime)}
-                onChange={(time24h) => {
-                  const time12h = convertTo12Hour(time24h);
-                  setFormData(prev => ({ ...prev, clockInTime: time12h }));
-                  clearError("clockInTime");
-                }}
-              >
-                <button
-                  type="button"
-                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                    errors.clockInTime
-                      ? "border border-[#D53411] text-[#10141a]"
-                      : "border border-[#808081] text-[#10141a]"
-                  }`}
-                >
-                  Enter Time
-                </button>
-              </TimePicker>
-            </div>
-            {errors.clockInTime && (
-              <span className="text-[12px] font-normal text-[#D53411]">{errors.clockInTime}</span>
-            )}
-          </div>
-
-          {/* Clock Out Time */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Clock Out Time</label>
-            <div className="flex flex-wrap gap-2">
-              {/* Custom time badge if selected time is not in predefined list */}
-              {formData.clockOutTime && !clockOutTimeOptions.includes(formData.clockOutTime) && (
-                <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#00b4b8] text-white">
-                  <span className="text-[14px] font-medium">{formData.clockOutTime}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData(prev => ({ ...prev, clockOutTime: "" }));
-                    }}
-                    className="ml-1 hover:opacity-70 transition-opacity"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-              
-              {clockOutTimeOptions.map((time, index) => (
-                <button
-                  key={`${time}-${index}`}
-                  onClick={() => {
-                    setFormData(prev => ({ ...prev, clockOutTime: time }));
-                    clearError("clockOutTime");
-                  }}
-                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                    formData.clockOutTime === time
-                      ? "bg-[#00b4b8] text-white"
-                      : errors.clockOutTime
-                        ? "border border-[#D53411] text-[#10141a]"
-                        : "border border-[#808081] text-[#10141a]"
-                  }`}
-                >
-                  {time}
-                </button>
-              ))}
-              <TimePicker
-                value={convertTo24Hour(formData.clockOutTime)}
-                onChange={(time24h) => {
-                  const time12h = convertTo12Hour(time24h);
-                  setFormData(prev => ({ ...prev, clockOutTime: time12h }));
-                  clearError("clockOutTime");
-                }}
-              >
-                <button
-                  type="button"
-                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
-                    errors.clockOutTime
-                      ? "border border-[#D53411] text-[#10141a]"
-                      : "border border-[#808081] text-[#10141a]"
-                  }`}
-                >
-                  Enter Time
-                </button>
-              </TimePicker>
-            </div>
-            {errors.clockOutTime && (
-              <span className="text-[12px] font-normal text-[#D53411]">{errors.clockOutTime}</span>
-            )}
-          </div>
-
-          {/* Selected Weekdays Display (only for recurring with selected weekdays) */}
-          {formData.schedulingType === "recurring" && selectedWeekdays.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {selectedWeekdays.map((weekday) => (
-                <div
-                  key={weekday.dayIndex}
-                  className="flex items-center gap-2 h-[36px] px-2 rounded-lg bg-[rgba(0,216,65,0.08)] border-b border-[rgba(255,255,255,0.3)]"
-                >
-                  <Clock className="w-5 h-5 text-[#00d841] shrink-0" />
-                  <span className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
-                    {weekday.day} ( {weekday.clockInTime}-{weekday.clockOutTime} )
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ISP Outcome */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">ISP Outcome</label>
-            <div className="bg-[#f5f5f5] border border-[#e0e0e0] rounded-xl h-11 px-4 flex items-center">
-              <input
-                type="text"
-                value={formData.ispOutcome}
-                readOnly
-                placeholder={formData.ispOutcome ? "" : "No ISP outcome available"}
-                className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent cursor-not-allowed"
-              />
-            </div>
-          </div>
-
-          {/* Plan of Care */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Plan of care</label>
-            {!pocDocument?.url && (
-            <label className="bg-white border border-[#cccccd] rounded-xl px-4 py-3 flex items-center justify-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
-              <Upload className="w-5 h-5 text-[#b2b2b3]" />
-              <span className="text-[14px] font-normal text-[#b2b2b3]">
-                Upload plan of care
-              </span>
-              <input
-                type="file"
-                onChange={handleFileUpload}
-                className="hidden"
-                accept=".pdf,.doc,.docx"
-              />
-            </label>
-            )}
-            {/* Client's POC Document Link */}
-            {pocDocument && pocDocument.url && (
-              <a
-                href={pocDocument.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-[rgba(0,180,216,0.08)] border border-[rgba(0,180,216,0.2)] rounded-lg h-[36px] px-3 mt-1 hover:bg-[rgba(0,180,216,0.12)] transition-colors group"
-              >
-                <FileText className="w-4 h-4 text-[#00b4d8] group-hover:text-[#0096c7]" />
-                <span className="text-[13px] font-medium text-[#10141a] flex-1 truncate">
-                  {pocDocument.fileName || pocDocument.title || "View Plan of Care"}
-                </span>
-                <ExternalLink className="w-3.5 h-3.5 text-[#00b4d8] group-hover:text-[#0096c7] shrink-0" />
-              </a>
-            )}
-            {/* Selected File Chip */}
-            {formData.planOfCare && (
-              <div className="flex items-center gap-2 bg-[rgba(0,216,65,0.08)] rounded-lg h-[36px] px-2 mt-1">
-                <FileText className="w-5 h-5 text-[#00d841]" />
-                <span className="text-[14px] font-medium text-[#10141a]">
-                  {formData.planOfCare.name || "Plan of care PDF"}
-                </span>
               </div>
-            )}
-          </div>
+            </div>
+
+            {/* Action Buttons - Fixed (used for both create and edit) */}
+            <div className="flex gap-3 p-5 pt-0 shrink-0">
+              <Button
+                onClick={handleSaveDraft}
+                disabled={isSubmitting}
+                variant="outline"
+                className="flex-1 border-[#00B5B8] text-[#00B5B8] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-[#00B5B8]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !isFormValid || (mode === "edit" && formData.submissionStatus === SubmissionStatus.SUBMITTED)}
+                className="flex-1 bg-[#00B5B8] hover:bg-[#00A0A4] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Scheduling...
+                  </>
+                ) : (
+                  "Schedule"
+                )}
+              </Button>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Action Buttons - Fixed (used for both create and edit) */}
-        <div className="flex gap-3 p-5 pt-0 shrink-0">
-          <Button
-            onClick={handleSaveDraft}
-            disabled={isSubmitting}
-            variant="outline"
-            className="flex-1 border-[#00B5B8] text-[#00B5B8] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-[#00B5B8]/10 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Save
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !isFormValid || (mode === "edit" && formData.submissionStatus === SubmissionStatus.SUBMITTED)}
-            className="flex-1 bg-[#00B5B8] hover:bg-[#00A0A4] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Scheduling...
-              </>
-            ) : (
-              "Schedule"
-            )}
-          </Button>
-        </div>
-      </div>
-      </div>
-    )}
+      {/* Schedule Success Modal */}
+      {scheduledShiftInfo && (
+        <ScheduleSuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => {
+            setShowSuccessModal(false);
+            setScheduledShiftInfo(null);
+          }}
+          clientName={scheduledShiftInfo.clientName}
+          dspName={scheduledShiftInfo.dspName}
+          duration={scheduledShiftInfo.duration}
+          date={scheduledShiftInfo.date}
+        />
+      )}
 
-    {/* Schedule Success Modal */}
-    {scheduledShiftInfo && (
-      <ScheduleSuccessModal
-        isOpen={showSuccessModal}
-        onClose={() => {
-          setShowSuccessModal(false);
-          setScheduledShiftInfo(null);
-        }}
-        clientName={scheduledShiftInfo.clientName}
-        dspName={scheduledShiftInfo.dspName}
-        duration={scheduledShiftInfo.duration}
-        date={scheduledShiftInfo.date}
-      />
-    )}
+      {/* Schedule Saved Modal */}
+      {savedShiftInfo && (
+        <ScheduleSavedModal
+          isOpen={showSavedModal}
+          onClose={() => {
+            setShowSavedModal(false);
+            setSavedShiftInfo(null);
+          }}
+          clientName={savedShiftInfo.clientName}
+          dspName={savedShiftInfo.dspName}
+          date={savedShiftInfo.date}
+        />
+      )}
 
-    {/* Schedule Saved Modal */}
-    {savedShiftInfo && (
-      <ScheduleSavedModal
-        isOpen={showSavedModal}
-        onClose={() => {
-          setShowSavedModal(false);
-          setSavedShiftInfo(null);
-        }}
-        clientName={savedShiftInfo.clientName}
-        dspName={savedShiftInfo.dspName}
-        date={savedShiftInfo.date}
-      />
-    )}
-
-    {/* Schedule Updated Modal */}
-    {updatedShiftInfo && (
-      <ScheduleSuccessModal
-        isOpen={showUpdatedModal}
-        onClose={() => {
-          setShowUpdatedModal(false);
-          setUpdatedShiftInfo(null);
-        }}
-        clientName={updatedShiftInfo.clientName}
-        dspName={updatedShiftInfo.dspName}
-        duration={updatedShiftInfo.duration}
-        date={updatedShiftInfo.date}
-      />
-    )}
+      {/* Schedule Updated Modal */}
+      {updatedShiftInfo && (
+        <ScheduleSuccessModal
+          isOpen={showUpdatedModal}
+          onClose={() => {
+            setShowUpdatedModal(false);
+            setUpdatedShiftInfo(null);
+          }}
+          clientName={updatedShiftInfo.clientName}
+          dspName={updatedShiftInfo.dspName}
+          duration={updatedShiftInfo.duration}
+          date={updatedShiftInfo.date}
+        />
+      )}
     </>
   );
 }

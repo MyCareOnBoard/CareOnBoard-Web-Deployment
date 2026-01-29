@@ -6,7 +6,7 @@
 import axiosClient from '../axios';
 
 // API endpoint constants
-const GOALS_DOCS_BASE = '/goals-and-documents';
+const GOALS_DOCS_BASE = '/goalsAndDocuments';
 
 // ==================== Type Definitions ====================
 
@@ -127,6 +127,8 @@ export interface GoalDocument {
 export interface CreateGoalDocumentRequest {
     agencyId: string;
     clientId?: string;
+    status?: SubmissionStatus;
+    createdBy?: string;
     documentType: DocumentType;
     metadata: NaturalSupportsTrainingDocument | AnnualUpdateDocument | IndividualizedGoalsDocument;
 }
@@ -230,6 +232,24 @@ export const getGoalDocumentById = async (documentId: string): Promise<GoalDocum
         return response.data;
     } catch (error) {
         console.error('Failed to fetch goal document:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get all goal documents for a specific client
+ * @param clientId - The ID of the client
+ * @returns Promise with list of documents
+ */
+export const getClientGoalDocuments = async (clientId: string): Promise<ListGoalDocumentsResponse> => {
+    try {
+        const response = await axiosClient.get<ListGoalDocumentsResponse>(
+            `${GOALS_DOCS_BASE}/client/${clientId}`
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch client goal documents:', error);
         throw error;
     }
 };
@@ -347,10 +367,10 @@ export const getDraftDocuments = async (
     agencyId?: string,
     documentType?: DocumentType
 ): Promise<ListGoalDocumentsResponse> => {
-    return listGoalDocuments({ 
-        status: SubmissionStatus.DRAFT, 
+    return listGoalDocuments({
+        status: SubmissionStatus.DRAFT,
         agencyId,
-        documentType 
+        documentType
     });
 };
 
@@ -364,10 +384,10 @@ export const getSubmittedDocuments = async (
     agencyId?: string,
     documentType?: DocumentType
 ): Promise<ListGoalDocumentsResponse> => {
-    return listGoalDocuments({ 
-        status: SubmissionStatus.SUBMITTED, 
+    return listGoalDocuments({
+        status: SubmissionStatus.SUBMITTED,
         agencyId,
-        documentType 
+        documentType
     });
 };
 
