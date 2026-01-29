@@ -1029,31 +1029,54 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
       // Create goal documents if goalsType is set
       if (formData.goalsType) {
-        const goalPromises = results
+        const successfulShifts = results
           .filter((r): r is PromiseFulfilledResult<ShiftResponse> =>
             r.status === "fulfilled" && r.value.success
           )
-          .map((result) => {
-            const shift = result.value.shift;
-            return createGoalDocument({
+          .map((result) => result.value.shift)
+          .filter((shift): shift is NonNullable<typeof shift> => shift != null);
+
+        // Create goal documents with shiftId at top level
+        const goalResults = await Promise.all(
+          successfulShifts.map((shift) =>
+            createGoalDocument({
               agencyId: user?.agencyId || "",
               clientId: formData.clientId || undefined,
               createdBy: user?.id,
               documentType: formData.goalsType as DocumentType,
               status: SubmissionStatus.DRAFT,
+              shiftId: shift.id,
               metadata: {
                 name: formData.client,
-                shiftId: shift?.id,
                 completedBy: formData.assignedDsp,
-                completionDate: shift?.date || format(new Date(), "yyyy-MM-dd"),
+                completionDate: shift.date || format(new Date(), "yyyy-MM-dd"),
               } as any,
             }).catch((err) => {
               console.error("Failed to create goal document:", err);
               return null;
-            });
-          });
+            })
+          )
+        );
 
-        await Promise.allSettled(goalPromises);
+        // Update shifts with goalsAndDocumentsId
+        const shiftUpdates = successfulShifts
+          .map((shift, index) => {
+            const goalResult = goalResults[index];
+            if (goalResult && goalResult.document?.id) {
+              return updateShift(shift.id, {
+                goalsAndDocumentsId: goalResult.document.id,
+              }).catch((err) => {
+                console.error(`Failed to update shift ${shift.id} with goal doc ID:`, err);
+                return null;
+              });
+            }
+            return null;
+          })
+          .filter(Boolean);
+
+        if (shiftUpdates.length > 0) {
+          await Promise.all(shiftUpdates);
+        }
       }
 
       const failures = results.filter((r) => r.status === "rejected");

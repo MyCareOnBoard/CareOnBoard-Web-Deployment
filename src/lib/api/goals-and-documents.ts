@@ -117,6 +117,7 @@ export interface GoalDocument {
     createdAt: string;
     updatedAt: string;
     submittedAt?: string;
+    shiftId?: string;
 }
 
 // ==================== Request/Response Types ====================
@@ -131,6 +132,7 @@ export interface CreateGoalDocumentRequest {
     createdBy?: string;
     documentType: DocumentType;
     metadata: NaturalSupportsTrainingDocument | AnnualUpdateDocument | IndividualizedGoalsDocument;
+    shiftId?: string;
 }
 
 /**
