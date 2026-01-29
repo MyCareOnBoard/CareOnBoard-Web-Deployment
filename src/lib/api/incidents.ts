@@ -32,23 +32,34 @@ export interface IncidentReport {
     agencyId: string;
     employeeId: string;
     clientId: string;
-    status: IncidentStatus;
-    reportedDate: string;
-    incidentDate: string;
+    clientName?: string;
+    date?: string; // ADD THIS - Date from form (YYYY-MM-DD)
+    time?: string; // ADD THIS - Time from form (HH:mm)
+    incidentDate: string; // Existing field - backend timestamp
     whatHappened: string;
-    actionsTaken: string;
-    staffAction: string;
-    witness: string;
-    reviewerId?: string;
-    reviewerNotes?: string;
-    reviewedAt?: string;
-    reason?: string;
+    whatActionsTaken?: string;
+    actionsTaken?: string;
+    whatDidYouDo?: string;
+    staffAction?: string;
+    witness?: string | {
+        name?: string;
+        contactInfo?: string;
+        relationship?: string;
+    };
+    status: IncidentStatus;
     createdAt: string;
     updatedAt: string;
-    // Populated fields
-    employee?: Employee;
+    reportedDate?: string;
+    employee?: {
+        _id: string;
+        fullName?: string;
+        firstName?: string;
+        lastName?: string;
+    };
     client?: Client;
-    reviewer?: Employee;
+    reviewerId?: string;
+    reviewerNotes?: string;
+    notResolvedReason?: string;
 }
 
 /**
@@ -159,6 +170,7 @@ export interface UserIncidentReport {
  */
 export interface CreateUserIncidentPayload {
     clientName: string;
+    clientId?: string;
     date: string;
     time: string;
     whatHappened: string;
@@ -292,16 +304,31 @@ export const markIncidentUnderReview = async (
  */
 export const resolveIncident = async (
     incidentId: string,
-    payload: ResolveIncidentPayload
+    data: {
+        reviewerId: string;
+        reviewerNotes: string;
+    }
 ): Promise<ApiResponse<IncidentReport>> => {
     try {
+        console.log('API Call - Resolve Incident:', {
+            endpoint: `/agencyIncidents/${incidentId}/resolve`,
+            incidentId,
+            payload: data
+        });
         const response = await axiosClient.post(
             `${INCIDENT_BASE}/${incidentId}/resolve`,
-            payload
+            data
         );
         return response.data;
     } catch (error: any) {
-        console.error('Error resolving incident:', error);
+        console.error('Resolve incident API error:', {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            errorData: error.response?.data,
+            errorMessage: error.response?.data?.message,
+            errorDetails: error.response?.data?.error,
+            fullError: error
+        });
         throw error;
     }
 };
@@ -314,16 +341,31 @@ export const resolveIncident = async (
  */
 export const markIncidentNotResolved = async (
     incidentId: string,
-    payload: NotResolvedIncidentPayload
+    data: {
+        reviewerId: string;
+        reason: string;
+    }
 ): Promise<ApiResponse<IncidentReport>> => {
     try {
+        console.log('API Call - Mark Not Resolved:', {
+            endpoint: `/agencyIncidents/${incidentId}/not-resolved`,
+            incidentId,
+            payload: data
+        });
         const response = await axiosClient.post(
             `${INCIDENT_BASE}/${incidentId}/not-resolved`,
-            payload
+            data
         );
         return response.data;
     } catch (error: any) {
-        console.error('Error marking incident as not resolved:', error);
+        console.error('Mark not resolved API error:', {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            errorData: error.response?.data,
+            errorMessage: error.response?.data?.message,
+            errorDetails: error.response?.data?.error,
+            fullError: error
+        });
         throw error;
     }
 };
