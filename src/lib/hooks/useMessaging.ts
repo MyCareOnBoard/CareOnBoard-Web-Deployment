@@ -29,6 +29,7 @@ export interface ConversationParticipant {
   role: string;
   avatar?: string | null;
   userType: string;
+  agencyName?: string;
 }
 
 export interface Conversation {

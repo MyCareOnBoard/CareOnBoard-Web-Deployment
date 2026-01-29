@@ -23,6 +23,8 @@ export interface ConversationListProps {
   currentUserId?: string;
   filterTab?: "all" | "dsp" | "administration" | "agency";
   onFilterChange?: (tab: "all" | "dsp" | "administration" | "agency") => void;
+  /** Show agency name alongside role (for super admin) */
+  showAgencyName?: boolean;
 }
 
 export const ConversationList = React.memo(function ConversationList({
@@ -35,6 +37,7 @@ export const ConversationList = React.memo(function ConversationList({
   currentUserId,
   filterTab = "all",
   onFilterChange,
+  showAgencyName = false,
 }: ConversationListProps) {
   // Debounce search query to avoid filtering on every keystroke
   const sanitizedSearchQuery = useMemo(() => sanitizeSearchQuery(searchQuery), [searchQuery]);
@@ -148,8 +151,8 @@ export const ConversationList = React.memo(function ConversationList({
             <button
               onClick={() => onFilterChange("all")}
               className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors ${filterTab === "all"
-                  ? "bg-[#2563eb] text-white"
-                  : "bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]"
+                ? "bg-[#2563eb] text-white"
+                : "bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]"
                 }`}
             >
               All
@@ -157,8 +160,8 @@ export const ConversationList = React.memo(function ConversationList({
             <button
               onClick={() => onFilterChange("dsp")}
               className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors ${filterTab === "dsp"
-                  ? "bg-[#2563eb] text-white"
-                  : "bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]"
+                ? "bg-[#2563eb] text-white"
+                : "bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]"
                 }`}
             >
               DSP
@@ -166,8 +169,8 @@ export const ConversationList = React.memo(function ConversationList({
             <button
               onClick={() => onFilterChange("administration")}
               className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors ${filterTab === "administration"
-                  ? "bg-[#2563eb] text-white"
-                  : "bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]"
+                ? "bg-[#2563eb] text-white"
+                : "bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]"
                 }`}
             >
               Administration
@@ -207,8 +210,8 @@ export const ConversationList = React.memo(function ConversationList({
                 key={conversation.id}
                 onClick={() => onSelectConversation(conversation.id)}
                 className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors rounded-[8px] mx-2 my-1 ${isSelected
-                    ? "bg-[#e0f7fa]"
-                    : "bg-[#f7f7f7] hover:bg-[#f0f0f0]"
+                  ? "bg-[#e0f7fa]"
+                  : "bg-[#f7f7f7] hover:bg-[#f0f0f0]"
                   }`}
               >
                 {/* Avatar with Online Status */}
@@ -241,7 +244,12 @@ export const ConversationList = React.memo(function ConversationList({
                     )}
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className="text-[13px] text-[#808081] font-normal leading-tight">{participant.role}</p>
+                    <p className="text-[13px] text-[#808081] font-normal leading-tight truncate">
+                      {participant.role}
+                      {showAgencyName && participant.agencyName && (
+                        <span> | {participant.agencyName}</span>
+                      )}
+                    </p>
                     {/* Unread Badge - positioned bottom right, aligned with role */}
                     {unreadCount > 0 && (
                       <div className="flex-shrink-0 w-5 h-5 bg-[#ef4444] rounded-full flex items-center justify-center ml-2">
@@ -267,6 +275,7 @@ export const ConversationList = React.memo(function ConversationList({
     prevProps.searchQuery === nextProps.searchQuery &&
     prevProps.loading === nextProps.loading &&
     prevProps.currentUserId === nextProps.currentUserId &&
-    prevProps.filterTab === nextProps.filterTab
+    prevProps.filterTab === nextProps.filterTab &&
+    prevProps.showAgencyName === nextProps.showAgencyName
   );
 });
