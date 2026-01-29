@@ -9,11 +9,12 @@ import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import { Routes } from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
-import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation } from "@/lib/api/shifts";
+import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation, ShiftResponse } from "@/lib/api/shifts";
 import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
+import { createGoalDocument, DocumentType, CreateGoalDocumentRequest } from "@/lib/api/goals-and-documents";
 
 interface AddScheduleModalProps {
   isOpen: boolean;
@@ -54,6 +55,7 @@ export interface ScheduleFormData {
   planOfCare: File | null;
   submissionStatus?: SubmissionStatus;
   selectedWeekdays?: WeekdaySchedule[];
+  goalsType: string;
 }
 
 export interface WeekdaySchedule {
@@ -114,6 +116,16 @@ const noteTypes: { id: string, title: string }[] = [
   },
 ];
 
+const goalsTypes: { id: string; title: string }[] = [
+  { id: DocumentType.COMMUNITY_INCLUSION_SERVICES, title: "Community Inclusion Services" },
+  { id: DocumentType.COMMUNITY_INCLUSION_INDIVIDUALIZED_GOALS, title: "Community Inclusion – Individualized Goals" },
+  { id: DocumentType.DAY_HABILITATION_SERVICES, title: "Day Habilitation Services" },
+  { id: DocumentType.DAY_HABILITATION_INDIVIDUALIZED_GOALS, title: "Day Habilitation – Individualized Goals" },
+  { id: DocumentType.PREVOCATIONAL_TRAINING_SERVICES, title: "Prevocational Training Services" },
+  { id: DocumentType.PREVOCATIONAL_TRAINING_INDIVIDUALIZED_GOALS, title: "Prevocational Training – Individualized Goals" },
+  { id: DocumentType.NATURAL_SUPPORTS_TRAINING, title: "Natural Supports Training" },
+];
+
 
 const initialFormData: ScheduleFormData = {
   client: "",
@@ -132,6 +144,47 @@ const initialFormData: ScheduleFormData = {
   clockOutTime: "",
   ispOutcome: "",
   planOfCare: null,
+  goalsType: "",
+};
+
+const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
+
+// Convert 12-hour format (e.g., "08:00:AM") to 24-hour format (e.g., "08:00")
+const convertTo24Hour = (time12h: string): string => {
+  if (!time12h) return "";
+
+  // Handle formats like "08:00:AM", "08.00:AM", "8:00AM", etc.
+  const match = time12h.match(/(\d{1,2})[.:](\d{2}):?(AM|PM)/i);
+  if (!match) return "";
+
+  let hours = parseInt(match[1]);
+  const minutes = match[2];
+  const period = match[3].toUpperCase();
+
+  if (period === "PM" && hours !== 12) {
+    hours += 12;
+  } else if (period === "AM" && hours === 12) {
+    hours = 0;
+  }
+
+  return `${hours.toString().padStart(2, "0")}:${minutes}`;
+};
+
+// Convert 24-hour format (e.g., "14:30") to 12-hour format (e.g., "02:30:PM")
+const convertTo12Hour = (time24h: string): string => {
+  if (!time24h) return "";
+
+  const [hoursStr, minutes] = time24h.split(":");
+  let hours = parseInt(hoursStr);
+  const period = hours >= 12 ? "PM" : "AM";
+
+  if (hours === 0) {
+    hours = 12;
+  } else if (hours > 12) {
+    hours -= 12;
+  }
+
+  return `${hours.toString().padStart(2, "0")}:${minutes}:${period}`;
 };
 
 export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, editData, mode = "create" }: AddScheduleModalProps) {
@@ -146,6 +199,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showNotesTypeDropdown, setShowNotesTypeDropdown] = useState(false);
+  const [showGoalsTypeDropdown, setShowGoalsTypeDropdown] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showDspDropdown, setShowDspDropdown] = useState(false);
 
@@ -263,6 +317,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 endTime: weekdaySchedule.clockOutTime,
                 clientId: data.clientId,
                 notesType: data.notesType || undefined,
+                goalsType: data.goalsType || undefined,
                 serviceCode: data.serviceCode,
                 schedulingType: data.schedulingType,
                 ispOutcome: data.ispOutcome || undefined,
@@ -288,6 +343,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             endTime: data.clockOutTime,
             clientId: data.clientId,
             notesType: data.notesType || undefined,
+            goalsType: data.goalsType || undefined,
             serviceCode: data.serviceCode,
             schedulingType: data.schedulingType,
             ispOutcome: data.ispOutcome || undefined,
@@ -311,6 +367,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         endTime: data.clockOutTime,
         clientId: data.clientId,
         notesType: data.notesType || undefined,
+        goalsType: data.goalsType || undefined,
         serviceCode: data.serviceCode,
         schedulingType: data.schedulingType,
         ispOutcome: data.ispOutcome || undefined,
@@ -355,7 +412,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         setIsSearchingClients(false);
       }
     }, 300);
-  }, []);
+  }, [user?.agencyId]);
 
   // Search DSPs/employees with debouncing
   const handleDspSearch = useCallback(async (query: string) => {
@@ -454,8 +511,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     return eachDayOfInterval({ start: startDate, end: endDate });
   }, [currentMonth]);
 
-  const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-
   const selectedService = useMemo(
     () =>
       selectedClientServices.find(
@@ -490,44 +545,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setFormData(prev => ({ ...prev, planOfCare: file }));
-  };
-
-  // Convert 12-hour format (e.g., "08:00:AM") to 24-hour format (e.g., "08:00")
-  const convertTo24Hour = (time12h: string): string => {
-    if (!time12h) return "";
-
-    // Handle formats like "08:00:AM", "08.00:AM", "8:00AM", etc.
-    const match = time12h.match(/(\d{1,2})[.:](\d{2}):?(AM|PM)/i);
-    if (!match) return "";
-
-    let hours = parseInt(match[1]);
-    const minutes = match[2];
-    const period = match[3].toUpperCase();
-
-    if (period === "PM" && hours !== 12) {
-      hours += 12;
-    } else if (period === "AM" && hours === 12) {
-      hours = 0;
-    }
-
-    return `${hours.toString().padStart(2, "0")}:${minutes}`;
-  };
-
-  // Convert 24-hour format (e.g., "14:30") to 12-hour format (e.g., "02:30:PM")
-  const convertTo12Hour = (time24h: string): string => {
-    if (!time24h) return "";
-
-    const [hoursStr, minutes] = time24h.split(":");
-    let hours = parseInt(hoursStr);
-    const period = hours >= 12 ? "PM" : "AM";
-
-    if (hours === 0) {
-      hours = 12;
-    } else if (hours > 12) {
-      hours -= 12;
-    }
-
-    return `${hours.toString().padStart(2, "0")}:${minutes}:${period}`;
   };
 
   // Handle weekday toggle
@@ -1010,6 +1027,35 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         await Promise.allSettled(activityLogPromises as Promise<unknown>[]);
       }
 
+      // Create goal documents if goalsType is set
+      if (formData.goalsType) {
+        const goalPromises = results
+          .filter((r): r is PromiseFulfilledResult<ShiftResponse> =>
+            r.status === "fulfilled" && r.value.success
+          )
+          .map((result) => {
+            const shift = result.value.shift;
+            return createGoalDocument({
+              agencyId: user?.agencyId || "",
+              clientId: formData.clientId || undefined,
+              createdBy: user?.id,
+              documentType: formData.goalsType as DocumentType,
+              status: SubmissionStatus.DRAFT,
+              metadata: {
+                name: formData.client,
+                shiftId: shift?.id,
+                completedBy: formData.assignedDsp,
+                completionDate: shift?.date || format(new Date(), "yyyy-MM-dd"),
+              } as any,
+            }).catch((err) => {
+              console.error("Failed to create goal document:", err);
+              return null;
+            });
+          });
+
+        await Promise.allSettled(goalPromises);
+      }
+
       const failures = results.filter((r) => r.status === "rejected");
       const successes = results.filter((r) => r.status === "fulfilled");
 
@@ -1272,6 +1318,42 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   )}
                 </div>
 
+                {/* Goals Type */}
+                <div className="flex flex-col gap-1 relative">
+                  <label className="text-[12px] font-normal text-[#10141a]">Goals Type</label>
+                  <button
+                    onClick={() => {
+                      setShowGoalsTypeDropdown(!showGoalsTypeDropdown);
+                    }}
+                    className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer"
+                  >
+                    <span className="flex-1 text-left text-[14px] font-normal text-black">
+                      {formData.goalsType
+                        ? goalsTypes.find((elt) => elt.id === formData.goalsType)?.title
+                        : "Select goals type"
+                      }
+                    </span>
+                    <ChevronDown className="w-5 h-5 text-[#10141a]" />
+                  </button>
+
+                  {showGoalsTypeDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-10 max-h-[200px] overflow-y-auto">
+                      {goalsTypes.map((goalsType) => (
+                        <button
+                          key={goalsType.id}
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, goalsType: goalsType.id }));
+                            setShowGoalsTypeDropdown(false);
+                          }}
+                          className="w-full px-4 py-3 text-left text-[14px] font-normal text-[#10141a] hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer"
+                        >
+                          {goalsType.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Scheduling Type */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[12px] font-normal text-[#10141a]">Scheduling Type</label>
@@ -1282,10 +1364,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                         clearError("schedulingType");
                       }}
                       className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.schedulingType === "one-time"
-                          ? "bg-[#00b4b8] text-white"
-                          : errors.schedulingType
-                            ? "border border-[#D53411] text-[#10141a]"
-                            : "border border-[#808081] text-[#10141a]"
+                        ? "bg-[#00b4b8] text-white"
+                        : errors.schedulingType
+                          ? "border border-[#D53411] text-[#10141a]"
+                          : "border border-[#808081] text-[#10141a]"
                         }`}
                     >
                       One time
@@ -1296,10 +1378,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                         clearError("schedulingType");
                       }}
                       className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.schedulingType === "recurring"
-                          ? "bg-[#00b4b8] text-white"
-                          : errors.schedulingType
-                            ? "border border-[#D53411] text-[#10141a]"
-                            : "border border-[#808081] text-[#10141a]"
+                        ? "bg-[#00b4b8] text-white"
+                        : errors.schedulingType
+                          ? "border border-[#D53411] text-[#10141a]"
+                          : "border border-[#808081] text-[#10141a]"
                         }`}
                     >
                       Recurring
@@ -1497,10 +1579,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                               key={weekday.dayIndex}
                               onClick={() => handleWeekdayToggle(weekday.label, weekday.dayIndex)}
                               className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${isSelected
-                                  ? "bg-[#00b4b8] text-white border-[0.5px] border-[#808081]"
-                                  : isConfiguring
-                                    ? "bg-[#ffa500] text-white border-[0.5px] border-[#ff8c00]"
-                                    : "border border-[#808081] text-[#10141a]"
+                                ? "bg-[#00b4b8] text-white border-[0.5px] border-[#808081]"
+                                : isConfiguring
+                                  ? "bg-[#ffa500] text-white border-[0.5px] border-[#ff8c00]"
+                                  : "border border-[#808081] text-[#10141a]"
                                 }`}
                             >
                               {weekday.label}
@@ -1628,10 +1710,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                           clearError("clockInTime");
                         }}
                         className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.clockInTime === time
-                            ? "bg-[#00b4b8] text-white"
-                            : errors.clockInTime
-                              ? "border border-[#D53411] text-[#10141a]"
-                              : "border border-[#808081] text-[#10141a]"
+                          ? "bg-[#00b4b8] text-white"
+                          : errors.clockInTime
+                            ? "border border-[#D53411] text-[#10141a]"
+                            : "border border-[#808081] text-[#10141a]"
                           }`}
                       >
                         {time}
@@ -1648,8 +1730,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                       <button
                         type="button"
                         className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${errors.clockInTime
-                            ? "border border-[#D53411] text-[#10141a]"
-                            : "border border-[#808081] text-[#10141a]"
+                          ? "border border-[#D53411] text-[#10141a]"
+                          : "border border-[#808081] text-[#10141a]"
                           }`}
                       >
                         Enter Time
@@ -1689,10 +1771,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                           clearError("clockOutTime");
                         }}
                         className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.clockOutTime === time
-                            ? "bg-[#00b4b8] text-white"
-                            : errors.clockOutTime
-                              ? "border border-[#D53411] text-[#10141a]"
-                              : "border border-[#808081] text-[#10141a]"
+                          ? "bg-[#00b4b8] text-white"
+                          : errors.clockOutTime
+                            ? "border border-[#D53411] text-[#10141a]"
+                            : "border border-[#808081] text-[#10141a]"
                           }`}
                       >
                         {time}
@@ -1709,8 +1791,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                       <button
                         type="button"
                         className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${errors.clockOutTime
-                            ? "border border-[#D53411] text-[#10141a]"
-                            : "border border-[#808081] text-[#10141a]"
+                          ? "border border-[#D53411] text-[#10141a]"
+                          : "border border-[#808081] text-[#10141a]"
                           }`}
                       >
                         Enter Time

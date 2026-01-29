@@ -6,7 +6,7 @@
 import axiosClient from '../axios';
 
 // API endpoint constants
-const GOALS_DOCS_BASE = '/goals-and-documents';
+const GOALS_DOCS_BASE = '/goalsAndDocuments';
 
 // ==================== Type Definitions ====================
 
@@ -127,6 +127,8 @@ export interface GoalDocument {
 export interface CreateGoalDocumentRequest {
     agencyId: string;
     clientId?: string;
+    status?: SubmissionStatus;
+    createdBy?: string;
     documentType: DocumentType;
     metadata: NaturalSupportsTrainingDocument | AnnualUpdateDocument | IndividualizedGoalsDocument;
 }
