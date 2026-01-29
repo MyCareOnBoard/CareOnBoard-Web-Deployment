@@ -12,6 +12,7 @@ import {useDebouncedCallback} from "@/hooks/useDebouncedCallback";
 import {searchClients, Client} from "@/lib/api/clients";
 import {
     useGetSingleGoalDocumentQuery,
+    useGetGoalDocumentByFirebaseIdQuery,
     useUpsertGoalDocumentByTypeMutation,
     useSubmitGoalDocumentMutation
 } from "../api";
@@ -29,14 +30,20 @@ export default function IndividualizedGoalsTemplate(
     const location = useLocation();
     const {user} = useAuth();
     const documentId = new URLSearchParams(location.search).get("id");
-    
+    const firebaseId = new URLSearchParams(location.search).get("firebaseId");
+
     const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
-        skip: !documentType,
+        skip: !documentType || !!firebaseId,
+        refetchOnMountOrArgChange: true
+    });
+
+    const {data: firebaseDocument, isLoading: isLoadingFirebaseDoc} = useGetGoalDocumentByFirebaseIdQuery(firebaseId!, {
+        skip: !firebaseId,
         refetchOnMountOrArgChange: true
     });
     const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
     const [submitDocument, {isLoading: isSubmitting}] = useSubmitGoalDocumentMutation();
-    
+
     const [formData, setFormData] = useState({
         name: "",
         clientId: "",
@@ -55,16 +62,18 @@ export default function IndividualizedGoalsTemplate(
     const [individuals, setIndividuals] = useState<string[]>([
         "", "", "", "", "", ""
     ]);
-    
+
     const [isSaving, setIsSaving] = useState(false);
+    const isReadOnly = !!firebaseId;
     const [showClientDropdown, setShowClientDropdown] = useState(false);
     const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
     const [isSearchingClients, setIsSearchingClients] = useState(false);
     const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-        if (document && document.metadata) {
-            const metadata = document.metadata as IndividualizedGoalsDocument;
+        const sourceDoc = firebaseDocument || document;
+        if (sourceDoc && sourceDoc.metadata) {
+            const metadata = sourceDoc.metadata as IndividualizedGoalsDocument;
             setFormData({
                 name: metadata.name || "",
                 clientId: (metadata as any).clientId || "",
@@ -81,27 +90,27 @@ export default function IndividualizedGoalsTemplate(
             });
             setIndividuals(metadata.involvedPersons || ["", "", "", "", "", ""]);
         }
-    }, [document]);
-    
+    }, [document, firebaseDocument]);
+
     useEffect(() => {
         return () => {
             if (clientSearchTimeoutRef.current) clearTimeout(clientSearchTimeoutRef.current);
         };
     }, []);
-    
+
     const debouncedSave = useDebouncedCallback(
         async (data: any) => {
             try {
                 setIsSaving(true);
                 const result = await upsertDocument({
                     documentType,
-                    data: { 
-                        metadata: data, 
+                    data: {
+                        metadata: data,
                         agencyId: user?.agencyId,
                         clientId: data.clientId || undefined
                     }
                 }).unwrap();
-                
+
                 if (result.id && !documentId) {
                     const newUrl = `${location.pathname}?id=${result.id}`;
                     window.history.replaceState({}, '', newUrl);
@@ -114,14 +123,16 @@ export default function IndividualizedGoalsTemplate(
         },
         1000
     );
-    
+
     const handleInputChange = (field: string, value: string) => {
+        if (isReadOnly) return;
         const updatedData = {...formData, [field]: value};
         setFormData(updatedData);
         debouncedSave(updatedData);
     };
 
     const handleOutcomeChange = (index: number, field: keyof Outcome, value: string) => {
+        if (isReadOnly) return;
         const updated = [...formData.outcomes];
         updated[index] = {...updated[index], [field]: value};
         const updatedData = {...formData, outcomes: updated};
@@ -130,6 +141,7 @@ export default function IndividualizedGoalsTemplate(
     };
 
     const handleInvolvedPersonChange = (index: number, value: string) => {
+        if (isReadOnly) return;
         const updated = [...formData.involvedPersons];
         updated[index] = value;
         const updatedIndividuals = [...individuals];
@@ -167,8 +179,8 @@ export default function IndividualizedGoalsTemplate(
     }, [user?.agencyId]);
 
     const handleClientSelect = (client: Client) => {
-        const clientName = client.firstName && client.lastName 
-            ? `${client.firstName} ${client.lastName}` 
+        const clientName = client.firstName && client.lastName
+            ? `${client.firstName} ${client.lastName}`
             : client.id;
         const updatedData = {
             ...formData,
@@ -183,17 +195,22 @@ export default function IndividualizedGoalsTemplate(
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
+        if (isReadOnly) {
+            toast.info('This document is read-only and cannot be submitted');
+            return;
+        }
+
         if (!document?.id) {
             toast.error('Please save the document first before submitting');
             return;
         }
-        
+
         if (!formData.name || !formData.ispDate) {
             toast.error('Please fill in Name and ISP Date');
             return;
         }
-        
+
         try {
             await submitDocument(document?.id ?? "").unwrap();
             toast.success('Document submitted successfully!');
@@ -254,24 +271,28 @@ export default function IndividualizedGoalsTemplate(
                                     Name
                                 </label>
                                 <div className="relative">
-                                    <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
+                                    <div
+                                        className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
                                         <input
                                             type="text"
                                             value={formData.name}
                                             onChange={(e) => {
                                                 const value = e.target.value;
-                                                setFormData(prev => ({ ...prev, name: value, clientId: "" }));
+                                                setFormData(prev => ({...prev, name: value, clientId: ""}));
                                                 handleClientSearch(value);
                                             }}
                                             placeholder="Search client name..."
                                             className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                                            disabled={isReadOnly}
+                                            readOnly={isReadOnly}
                                         />
                                         {isSearchingClients && (
-                                            <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+                                            <Loader2 className="w-4 h-4 animate-spin text-[#808081]"/>
                                         )}
                                     </div>
                                     {showClientDropdown && clientSearchResults.length > 0 && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
+                                        <div
+                                            className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                                             {clientSearchResults.map((client) => (
                                                 <button
                                                     key={client.id}
@@ -279,8 +300,8 @@ export default function IndividualizedGoalsTemplate(
                                                     className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
                                                 >
                                                     <p className="text-[14px] font-normal text-black">
-                                                        {client.firstName && client.lastName 
-                                                            ? `${client.firstName} ${client.lastName}` 
+                                                        {client.firstName && client.lastName
+                                                            ? `${client.firstName} ${client.lastName}`
                                                             : client.id}
                                                     </p>
                                                     {client.primaryAddress?.address && (
@@ -305,6 +326,7 @@ export default function IndividualizedGoalsTemplate(
                                     onChange={(e) => handleInputChange("ispDate", e.target.value)}
                                     placeholder=""
                                     className="w-full min-w-full block"
+                                    disabled={isReadOnly}
                                 />
                             </div>
                         </div>
@@ -312,7 +334,8 @@ export default function IndividualizedGoalsTemplate(
                         <div className="overflow-x-auto mb-6">
                             <div className="w-full min-w-[1163px]">
                                 {/* Table Header */}
-                                <div className="border border-[#b2b2b3] rounded-tl-[2px] rounded-tr-[2px] overflow-hidden">
+                                <div
+                                    className="border border-[#b2b2b3] rounded-tl-[2px] rounded-tr-[2px] overflow-hidden">
                                     <div className="border-b border-[#b2b2b3] bg-[#eef4f5] min-h-[60px]">
                                         <div className="grid grid-cols-2 gap-0 h-[60px]">
                                             <div
@@ -322,7 +345,8 @@ export default function IndividualizedGoalsTemplate(
                                                     Outcome #
                                                 </p>
                                             </div>
-                                            <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
+                                            <div
+                                                className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
                                                 <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
                                                     Community Inclusion Services Outcome(s) from ISP
                                                 </p>
@@ -342,21 +366,23 @@ export default function IndividualizedGoalsTemplate(
                                                 } hover:bg-white`}
                                             >
                                                 {/* Standard Required */}
-                                                <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
+                                                <div
+                                                    className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                                                     <Input
                                                         type="text"
                                                         value={outcome.outcomeNumber}
                                                         onChange={(e) => handleOutcomeChange(index, "outcomeNumber", e.target.value)}
-                                                        className="h-auto p-0 border-0 bg-transparent text-center focus-visible:ring-0 text-[14px] w-full"
+                                                        className="w-full"
+                                                        disabled={isReadOnly}
                                                     />
                                                 </div>
                                                 {/* Employee Performance */}
-                                                <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
+                                                <div
+                                                    className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                                                     <ContentEditableCell
                                                         value={outcome.outcomeDescription}
                                                         onChange={(value) => handleOutcomeChange(index, "outcomeDescription", value)}
                                                         fieldName="Community Inclusion Services Outcome(s) from ISP"
-                                                        pageTitle={pageTitle}
                                                     />
                                                 </div>
                                             </div>
@@ -378,8 +404,8 @@ export default function IndividualizedGoalsTemplate(
                                 type="text"
                                 value={individual}
                                 onChange={(e) => handleInvolvedPersonChange(index, e.target.value)}
-                                placeholder=""
                                 className="w-full"
+                                disabled={isReadOnly}
                             />)}
                         </div>
 
@@ -396,6 +422,7 @@ export default function IndividualizedGoalsTemplate(
                                 onChange={(e) => handleInputChange("completedBy", e.target.value)}
                                 placeholder=""
                                 className="max-w-md"
+                                disabled={isReadOnly}
                             />
                             <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">
                                 {currentDate}
@@ -403,20 +430,27 @@ export default function IndividualizedGoalsTemplate(
                         </div>
 
                         {/* Submit Button */}
-                        <div className={"flex justify-between items-center"}>
-                            <div className="text-sm text-gray-500">
-                                {isSaving && "Saving draft..."}
-                                {!isSaving && documentId && "Draft saved"}
+                        {!isReadOnly && (
+                            <div className={"flex justify-between items-center"}>
+                                <div className="text-sm text-gray-500">
+                                    {isSaving && "Saving draft..."}
+                                    {!isSaving && document?.id && "Draft saved"}
+                                </div>
+                                <Button
+                                    type={"button"}
+                                    onClick={handleSubmit}
+                                    disabled={isSubmitting || !documentId}
+                                    className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm disabled:opacity-50"
+                                >
+                                    {isSubmitting ? "Submitting..." : "Submit"}
+                                </Button>
                             </div>
-                            <Button
-                                type={"button"}
-                                onClick={handleSubmit}
-                                disabled={isSubmitting || !documentId}
-                                className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm disabled:opacity-50"
-                            >
-                                {isSubmitting ? "Submitting..." : "Submit"}
-                            </Button>
-                        </div>
+                        )}
+                        {isReadOnly && (
+                            <div className="text-sm text-gray-500 text-center py-4">
+                                This document has been submitted and is read-only.
+                            </div>
+                        )}
                     </form>
                 </div>
             </div>

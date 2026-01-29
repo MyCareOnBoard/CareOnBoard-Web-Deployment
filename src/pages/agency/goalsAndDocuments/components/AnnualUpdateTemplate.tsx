@@ -12,6 +12,7 @@ import {useDebouncedCallback} from "@/hooks/useDebouncedCallback";
 import {searchClients, Client} from "@/lib/api/clients";
 import {
     useGetSingleGoalDocumentQuery,
+    useGetGoalDocumentByFirebaseIdQuery,
     useUpsertGoalDocumentByTypeMutation,
     useSubmitGoalDocumentMutation
 } from "../api";
@@ -24,9 +25,15 @@ export default function AnnualUpdateTemplate(
     const location = useLocation();
     const {user} = useAuth();
     const documentId = new URLSearchParams(location.search).get("id");
+    const firebaseId = new URLSearchParams(location.search).get("firebaseId");
     
     const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
-        skip: !documentType,
+        skip: !documentType || !!firebaseId,
+        refetchOnMountOrArgChange: true
+    });
+    
+    const {data: firebaseDocument, isLoading: isLoadingFirebaseDoc} = useGetGoalDocumentByFirebaseIdQuery(firebaseId!, {
+        skip: !firebaseId,
         refetchOnMountOrArgChange: true
     });
     const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
@@ -50,14 +57,16 @@ export default function AnnualUpdateTemplate(
     });
 
     const [isSaving, setIsSaving] = useState(false);
+    const isReadOnly = !!firebaseId;
     const [showClientDropdown, setShowClientDropdown] = useState(false);
     const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
     const [isSearchingClients, setIsSearchingClients] = useState(false);
     const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-        if (document && document.metadata) {
-            const metadata = document.metadata as AnnualUpdateDocument;
+        const sourceDoc = firebaseDocument || document;
+        if (sourceDoc && sourceDoc.metadata) {
+            const metadata = sourceDoc.metadata as AnnualUpdateDocument;
             setFormData({
                 name: metadata.name || "",
                 clientId: (metadata as any).clientId || "",
@@ -75,7 +84,7 @@ export default function AnnualUpdateTemplate(
                 completionDate: metadata.completionDate || "",
             });
         }
-    }, [document]);
+    }, [document, firebaseDocument]);
 
     useEffect(() => {
         return () => {
@@ -110,6 +119,7 @@ export default function AnnualUpdateTemplate(
     );
 
     const handleInputChange = (field: string, value: string) => {
+        if (isReadOnly) return;
         const updatedData = {...formData, [field]: value};
         setFormData(updatedData);
         debouncedSave(updatedData);
@@ -158,6 +168,11 @@ export default function AnnualUpdateTemplate(
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (isReadOnly) {
+            toast.info('This document is read-only and cannot be submitted');
+            return;
+        }
         
         if (!document?.id) {
             toast.error('Please save the document first before submitting');
@@ -239,6 +254,8 @@ export default function AnnualUpdateTemplate(
                                         }}
                                         placeholder="Search client name..."
                                         className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                                        disabled={isReadOnly}
+                                        readOnly={isReadOnly}
                                     />
                                     {isSearchingClients && (
                                         <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
@@ -278,6 +295,7 @@ export default function AnnualUpdateTemplate(
                                 onChange={(e) => handleInputChange("ispStartDate", e.target.value)}
                                 placeholder=""
                                 className="w-full"
+                                disabled={isReadOnly}
                             />
                         </div>
                         <div>
@@ -290,6 +308,7 @@ export default function AnnualUpdateTemplate(
                                 onChange={(e) => handleInputChange("ispEndDate", e.target.value)}
                                 placeholder=""
                                 className="w-full"
+                                disabled={isReadOnly}
                             />
                         </div>
                     </div>
@@ -306,6 +325,7 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
+                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -320,6 +340,7 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
+                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -334,6 +355,7 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
+                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -349,6 +371,7 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
+                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -364,6 +387,7 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
+                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -379,6 +403,7 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
+                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -394,6 +419,7 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
+                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -409,6 +435,7 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
+                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -423,6 +450,7 @@ export default function AnnualUpdateTemplate(
                             onChange={(e) => handleInputChange("completedBy", e.target.value)}
                             placeholder=""
                             className="max-w-md"
+                            disabled={isReadOnly}
                         />
                         <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">
                             {currentDate}
@@ -430,20 +458,27 @@ export default function AnnualUpdateTemplate(
                     </div>
 
                     {/* Submit Button */}
-                    <div className={"flex justify-between items-center"}>
-                        <div className="text-sm text-gray-500">
-                            {isSaving && "Saving draft..."}
-                            {!isSaving && document?.id && "Draft saved"}
+                    {!isReadOnly && (
+                        <div className={"flex justify-between items-center"}>
+                            <div className="text-sm text-gray-500">
+                                {isSaving && "Saving draft..."}
+                                {!isSaving && document?.id && "Draft saved"}
+                            </div>
+                            <Button
+                                type={"button"}
+                                onClick={handleSubmit}
+                                disabled={isSubmitting || !documentId}
+                                className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm disabled:opacity-50"
+                            >
+                                {isSubmitting ? "Submitting..." : "Submit"}
+                            </Button>
                         </div>
-                        <Button
-                            type={"button"}
-                            onClick={handleSubmit}
-                            disabled={isSubmitting || !documentId}
-                            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm disabled:opacity-50"
-                        >
-                            {isSubmitting ? "Submitting..." : "Submit"}
-                        </Button>
-                    </div>
+                    )}
+                    {isReadOnly && (
+                        <div className="text-sm text-gray-500 text-center py-4">
+                            This document has been submitted and is read-only.
+                        </div>
+                    )}
                 </form>
             </div>
         </div>
