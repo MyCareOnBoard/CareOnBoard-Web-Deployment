@@ -33,6 +33,14 @@ export const goalsAndDocumentsApi = createApi({
         requiresAuth: true
       }),
     }),
+    getGoalDocumentByFirebaseId: builder.query<GoalDocument, string>({
+      query: (firebaseId) => ({
+        url: `/goalsAndDocuments/firebase/${firebaseId}`,
+        method: "GET",
+        requiresAuth: true
+      }),
+      transformResponse: (response: { success: boolean; data: GoalDocument }) => response.data,
+    }),
     createGoalDocument: builder.mutation<GoalDocument, CreateGoalDocumentRequest>({
       query: (data) => ({
         url: `/goalsAndDocuments`,
@@ -46,6 +54,15 @@ export const goalsAndDocumentsApi = createApi({
     updateGoalDocument: builder.mutation<GoalDocument, { documentId: string, data: UpdateGoalDocumentRequest }>({
       query: ({ documentId, data }) => ({
         url: `/goalsAndDocuments/document/${documentId}`,
+        method: "PUT",
+        requiresAuth: true,
+        data
+      }),
+      transformResponse: (response: GoalDocumentResponse) => response.document,
+    }),
+    updateGoalDocumentByFirebaseId: builder.mutation<GoalDocument, { firebaseId: string, data: UpdateGoalDocumentRequest }>({
+      query: ({ firebaseId, data }) => ({
+        url: `/goalsAndDocuments/firebase/${firebaseId}`,
         method: "PUT",
         requiresAuth: true,
         data
@@ -82,8 +99,10 @@ export const goalsAndDocumentsApi = createApi({
 export const {
   useGetAllGoalDocumentsQuery,
   useGetSingleGoalDocumentQuery,
+  useGetGoalDocumentByFirebaseIdQuery,
   useCreateGoalDocumentMutation,
   useUpdateGoalDocumentMutation,
+  useUpdateGoalDocumentByFirebaseIdMutation,
   useUpsertGoalDocumentByTypeMutation,
   useSubmitGoalDocumentMutation,
   useDeleteGoalDocumentMutation
