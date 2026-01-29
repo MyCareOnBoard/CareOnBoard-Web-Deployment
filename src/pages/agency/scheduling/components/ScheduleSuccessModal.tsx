@@ -57,10 +57,10 @@ export default function ScheduleSuccessModal({
         {/* Button */}
         <div className="flex gap-3 items-center w-full">
           <Button
-            onClick={onEditShift || onClose}
+            onClick={onClose}
             className="flex-1 bg-[#b2b2b3] hover:bg-[#9a9a9b] text-white rounded-full px-4 py-4 h-auto text-[14px] font-semibold"
           >
-            Edit Shift
+            Close
           </Button>
         </div>
       </div>

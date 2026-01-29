@@ -97,6 +97,7 @@ export interface Shift {
     updatedAt?: string;
     notesType?: string;
     goalsType?: string;
+    goalsAndDocumentsId?: string;
     employee?: Employee;
     agency?: Agency;
 }
@@ -120,6 +121,7 @@ export interface CreateShiftRequest {
     availableAt?: string;
     notesType?: string;
     goalsType?: string;
+    goalsAndDocumentsId?: string;
     serviceCode?: string;
     schedulingType?: string;
     ispOutcome?: string;
@@ -146,6 +148,7 @@ export interface UpdateShiftRequest {
     actionStatus?: ShiftActionStatus | null;
     notesType?: string;
     goalsType?: string;
+    goalsAndDocumentsId?: string;
     serviceCode?: string;
     schedulingType?: string;
     ispOutcome?: string;
