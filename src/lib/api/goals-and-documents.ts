@@ -235,6 +235,24 @@ export const getGoalDocumentById = async (documentId: string): Promise<GoalDocum
 };
 
 /**
+ * Get all goal documents for a specific client
+ * @param clientId - The ID of the client
+ * @returns Promise with list of documents
+ */
+export const getClientGoalDocuments = async (clientId: string): Promise<ListGoalDocumentsResponse> => {
+    try {
+        const response = await axiosClient.get<ListGoalDocumentsResponse>(
+            `${GOALS_DOCS_BASE}/client/${clientId}`
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch client goal documents:', error);
+        throw error;
+    }
+};
+
+/**
  * List all goal documents with optional filters
  * @param params - Optional query parameters for filtering
  * @returns Promise with list of documents
@@ -347,10 +365,10 @@ export const getDraftDocuments = async (
     agencyId?: string,
     documentType?: DocumentType
 ): Promise<ListGoalDocumentsResponse> => {
-    return listGoalDocuments({ 
-        status: SubmissionStatus.DRAFT, 
+    return listGoalDocuments({
+        status: SubmissionStatus.DRAFT,
         agencyId,
-        documentType 
+        documentType
     });
 };
 
@@ -364,10 +382,10 @@ export const getSubmittedDocuments = async (
     agencyId?: string,
     documentType?: DocumentType
 ): Promise<ListGoalDocumentsResponse> => {
-    return listGoalDocuments({ 
-        status: SubmissionStatus.SUBMITTED, 
+    return listGoalDocuments({
+        status: SubmissionStatus.SUBMITTED,
         agencyId,
-        documentType 
+        documentType
     });
 };
 

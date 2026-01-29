@@ -1,17 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams } from "react-router";
 import { router } from "@/routes";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import NewMessageModal from "./components/NewMessageModal";
+import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
+import { NewMessageModal } from "@/components/chat/NewMessageModal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import { useMessaging } from "@/contexts/MessagingContext";
 import { ConversationList } from "@/components/chat/ConversationList";
-import { MessageList } from "@/components/chat/MessageList";
-import { MessageInput } from "@/components/chat/MessageInput";
-import { ConversationHeader } from "@/components/chat/ConversationHeader";
+import { ChatPanel } from "@/components/chat/ChatPanel";
 import { AgencyContact } from "@/lib/api/userMessaging";
 import { getInitials } from "@/lib/utils/string-utils";
 
@@ -99,7 +97,7 @@ export default function SuperAdminCorporateSupportPage() {
     }
   };
 
-  const handleCreateConversation = async (selectedUserIds: string[]) => {
+  const handleCreateConversation = useCallback(async (selectedUserIds: string[]) => {
     if (selectedUserIds.length === 0) return;
 
     try {
@@ -110,9 +108,9 @@ export default function SuperAdminCorporateSupportPage() {
     } catch (error: any) {
       // Error already handled in context
     }
-  };
+  }, [messaging]);
 
-  const handleDeleteConversation = async () => {
+  const handleDeleteConversation = useCallback(async () => {
     if (!messaging.currentConversation) return;
 
     try {
@@ -121,28 +119,37 @@ export default function SuperAdminCorporateSupportPage() {
     } catch (error: any) {
       // Error already handled in context
     }
-  };
+  }, [messaging]);
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = useCallback(async (content: string) => {
     if (!messaging.currentConversation) return;
     await messaging.sendMessage(messaging.currentConversation.id, content);
-  };
+  }, [messaging]);
 
   // Handle conversation selection on mobile
-  const handleSelectConversation = (id: string) => {
+  const handleSelectConversation = useCallback((id: string) => {
     messaging.selectConversation(id);
-    setShowChatView(true); // Show chat view on mobile
-    // Navigate to conversation URL
+    setShowChatView(true);
     router.navigate(`/super-admin/corporate-support/${id}`);
-  };
+  }, [messaging]);
 
   // Handle back button on mobile chat view
-  const handleBackToList = () => {
+  const handleBackToList = useCallback(() => {
     setShowChatView(false);
     messaging.selectConversation(null);
-    // Navigate back to base corporate support route
     router.navigate("/super-admin/corporate-support");
-  };
+  }, [messaging]);
+
+  // Memoize contacts for NewMessageModal to prevent re-renders
+  const mappedContacts = useMemo(() =>
+    contacts.map(contact => ({
+      id: contact.uid,
+      name: contact.name,
+      role: contact.role,
+      agency: contact.agencyName,
+      avatar: getInitials(contact.name),
+      image: contact.avatar
+    })), [contacts]);
 
   return (
     <>
@@ -177,55 +184,16 @@ export default function SuperAdminCorporateSupportPage() {
           </div>
 
           {/* Right Panel - Chat Area */}
-          <div className={`${showChatView ? 'flex' : 'hidden'} lg:flex flex-1 flex-col bg-[#f9fafb] min-w-0`}>
-            {messaging.currentConversation ? (
-              <>
-                {/* Chat Header with Back Button on Mobile */}
-                <div className="flex-shrink-0">
-                  <div className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-[#e5e7eb] bg-white">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleBackToList}
-                      className="p-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </Button>
-                    <span className="text-sm font-medium text-[#10141a]">Back to Conversations</span>
-                  </div>
-                  <ConversationHeader
-                    conversation={messaging.currentConversation}
-                    currentUserId={user?.uid}
-                    onDelete={() => setIsDeleteDialogOpen(true)}
-                  />
-                </div>
-
-                {/* Messages Area */}
-                <div className="flex-1 min-h-0 overflow-hidden">
-                  <MessageList
-                    messages={messaging.currentMessages}
-                    currentUserId={user?.uid}
-                    loading={messaging.loading}
-                  />
-                </div>
-
-                {/* Message Input */}
-                <div className="flex-shrink-0">
-                  <MessageInput
-                    onSend={(content) => handleSendMessage(content)}
-                    disabled={messaging.loading}
-                    placeholder="Type a message..."
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center justify-center flex-1">
-                <p className="text-[14px] sm:text-[16px] text-[#808081] px-4 text-center">Select a conversation to start messaging</p>
-              </div>
-            )}
-          </div>
+          <ChatPanel
+            conversation={messaging.currentConversation}
+            messages={messaging.currentMessages}
+            currentUserId={user?.uid}
+            loading={messaging.loading}
+            showChatView={showChatView}
+            onBackToList={handleBackToList}
+            onSendMessage={handleSendMessage}
+            onDelete={() => setIsDeleteDialogOpen(true)}
+          />
         </div>
       </div>
 
@@ -234,44 +202,21 @@ export default function SuperAdminCorporateSupportPage() {
         open={isNewMessageModalOpen}
         onOpenChange={setIsNewMessageModalOpen}
         isLoadingContacts={loadingContacts}
-        users={contacts.map(contact => ({
-          id: contact.uid,
-          name: contact.name,
-          role: contact.role,
-          agency: contact.agencyName,
-          avatar: getInitials(contact.name),
-          image: contact.avatar
-        }))}
+        users={mappedContacts}
         onStartChat={handleCreateConversation}
       />
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[20px] font-semibold">Delete Conversation</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-[14px] text-[#6b7280]">
-              Are you sure you want to delete this conversation? This action cannot be undone.
-            </p>
-          </div>
-          <DialogFooter className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleDeleteConversation}
-              className="bg-[#ef4444] hover:bg-[#dc2626] text-white"
-            >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <ConfirmDialogContent
+          title="Delete Conversation"
+          description="Are you sure you want to delete this conversation? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={handleDeleteConversation}
+          onCancel={() => setIsDeleteDialogOpen(false)}
+        />
+      </ConfirmDialog>
     </>
   );
 }
