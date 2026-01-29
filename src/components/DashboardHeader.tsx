@@ -112,7 +112,7 @@ export default function DashboardHeader(
           description: notification.message,
           variant: notification.priority === 'urgent' || notification.priority === 'high'
             ? 'warning'
-            : 'info'
+            : 'default'
         });
       }
     });
@@ -290,7 +290,7 @@ export default function DashboardHeader(
                     disabled={userType === UserType.SUPER_ADMIN}
                     className={cn(
                       "px-4 py-2 rounded-none gap-3",
-                      userType === UserType.SUPER_ADMIN 
+                      userType === UserType.SUPER_ADMIN
                         ? "opacity-50 cursor-not-allowed"
                         : "cursor-pointer",
                       location.pathname === makeCommonRoute(Routes.common.profile)
