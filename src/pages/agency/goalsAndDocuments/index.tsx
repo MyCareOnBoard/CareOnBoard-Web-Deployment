@@ -2,6 +2,8 @@ import React from "react";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {NoteCard, NoteCardType} from "@/pages/userPanel/notes";
+import {Button} from "@/components/ui/button";
+import {List} from "lucide-react";
 import UserIcon from "@/assets/icons/user-heroicon.svg?react";
 import ChatBubbleIcon from "@/assets/icons/chat-bubble-heroicon.svg?react";
 import WrenchIcon from "@/assets/icons/wrench-heroicon.svg?react";
@@ -71,12 +73,23 @@ export default function GoalsAndDocumentsPage() {
         <div className="min-h-[calc(100vh-200px)]">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
-                    Goals & Documents
-                </h1>
-                <p className="text-[14px] font-medium text-[#808081] mt-2">
-                    Manage goals and documentation for various services
-                </p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
+                            Goals & Documents
+                        </h1>
+                        <p className="text-[14px] font-medium text-[#808081] mt-2">
+                            Manage goals and documentation for various services
+                        </p>
+                    </div>
+                    <Button
+                        onClick={() => navigate(`${Routes.agency.goalsAndDocuments.index}/list`)}
+                        className="flex items-center gap-2 bg-[#2B82FF] hover:bg-[#1a5fbf] text-white"
+                    >
+                        <List size={20} />
+                        View All Documents
+                    </Button>
+                </div>
             </div>
 
             {/* Cards Grid */}

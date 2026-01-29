@@ -95,6 +95,7 @@ import AgencyDSPReports from "@/pages/agency/reports/dspReports";
 import AgencyTimesheetReports from "@/pages/agency/reports/timesheetReports";
 import AgencyNoteReports from "@/pages/agency/reports/noteReports";
 import GoalsAndDocumentsPage from "@/pages/agency/goalsAndDocuments";
+import GoalsAndDocumentsList from "@/pages/agency/goalsAndDocuments/GoalsAndDocumentsList";
 import NaturalSupportsTraining from "@/pages/agency/goalsAndDocuments/NaturalSupportsTraining";
 import CommunityInclusionServices from "@/pages/agency/goalsAndDocuments/CommunityInclusionServices";
 import CommunityInclusionIndividualizedGoals from "@/pages/agency/goalsAndDocuments/CommunityInclusionIndividualizedGoals";
@@ -354,6 +355,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.goalsAndDocuments.index,
                 Component: GoalsAndDocumentsPage,
+            },
+            {
+                path: `${Routes.agency.goalsAndDocuments.index}/list`,
+                Component: GoalsAndDocumentsList,
             },
             {
                 path: Routes.agency.goalsAndDocuments.naturalSupportsTraining,
