@@ -58,30 +58,30 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   // Initialize presence manager
   usePresenceManager();
 
-  // RTK Query hooks
+  // RTK Query hooks - skip if user is not authenticated
   const { data: contactsData, refetch: refetchContacts } = useGetContactsQuery(undefined, {
-    skip: false, // Always fetch contacts
+    skip: !user, // Skip if no authenticated user
   });
   const [createConversationMutation] = useCreateConversationMutation();
   const [sendMessageMutation] = useSendMessageMutation();
   const [markMessagesAsReadMutation] = useMarkMessagesAsReadMutation();
   const [leaveConversationMutation] = useLeaveConversationMutation();
 
-  // Subscribe to conversations list
+  // Subscribe to conversations list (already checks for user internally)
   const {
     conversations,
     loading: conversationsLoading,
     error: conversationsError,
   } = useConversations({ limit: 50 });
 
-  // Subscribe to selected conversation
+  // Subscribe to selected conversation (already checks for user internally)
   const {
     conversation: currentConversation,
     loading: conversationLoading,
     error: conversationError,
   } = useConversation(selectedConversationId);
 
-  // Subscribe to messages in selected conversation
+  // Subscribe to messages in selected conversation (already checks for user internally)
   const {
     messages: currentMessages,
     loading: messagesLoading,

@@ -9,6 +9,7 @@ import {
   sendPasswordResetEmail,
   logout as logoutUser,
   getIdToken,
+  deleteCurrentUser,
 } from "../services/authService"
 import { createUser as createBackendUser } from "../api/client"
 import { PageLoader } from "@/components/ui/loader"
@@ -127,17 +128,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(response.error || "Registration failed")
     }
 
-    // Update local state and Redux
-    setUserState(response.user)
-    dispatch(setUser(response.user))
-
-    // Create user in backend
+    // Create user in backend FIRST (before updating state so presence/heartbeat don't run)
     try {
       await createBackendUser(fullName, agencyId)
     } catch (error: any) {
       console.error('[signup] Failed to create user in backend:', error)
-      // Don't throw - Firebase account is already created, just log the error
+      try {
+        await deleteCurrentUser()
+      } catch (deleteErr: any) {
+        console.error('[signup] Failed to remove Firebase user after backend error:', deleteErr)
+      }
+      throw error
     }
+
+    // Update local state and Redux AFTER backend user is created
+    setUserState(response.user)
+    dispatch(setUser(response.user))
   }
 
   /**

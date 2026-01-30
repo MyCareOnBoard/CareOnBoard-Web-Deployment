@@ -14,6 +14,7 @@ import {
   updateProfile,
   verifyPasswordResetCode,
   confirmPasswordReset,
+  deleteUser,
   type User as FirebaseUser,
 } from 'firebase/auth'
 import type { User } from '../types/user.types'
@@ -211,6 +212,20 @@ export async function logout(): Promise<void> {
     await signOut(auth)
   } catch (error) {
     console.error('Logout error:', error)
+    throw error
+  }
+}
+
+/**
+ * Delete the current Firebase Auth user (e.g. when backend user creation fails after signup)
+ */
+export async function deleteCurrentUser(): Promise<void> {
+  const user = auth.currentUser
+  if (!user) return
+  try {
+    await deleteUser(user)
+  } catch (error) {
+    console.error('Error deleting Firebase user:', error)
     throw error
   }
 }

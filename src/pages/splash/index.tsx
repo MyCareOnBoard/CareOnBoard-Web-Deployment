@@ -14,7 +14,7 @@ export default function SplashScreen() {
     const timer = setTimeout(() => {
       setIsAnimating(false)
       setTimeout(() => {
-        navigate(Routes.auth.login + `?agencyId=${id}`)
+        navigate(Routes.auth.signup + `?agencyId=${id}`)
       }, 600)
     }, 4000)
 
