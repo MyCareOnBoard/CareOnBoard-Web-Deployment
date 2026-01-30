@@ -160,7 +160,7 @@ export default function SignUpPage() {
         title: successMsg.title,
         description: successMsg.description,
       })
-      navigate(Routes.auth.login + (agencyId ? `?agencyId=${agencyId}` : ""))
+      navigate(Routes.onboarding.index)
     } catch (error: any) {
       const errorMessage = getAuthErrorMessage(error)
       toast({

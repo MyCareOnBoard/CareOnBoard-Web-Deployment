@@ -1,7 +1,7 @@
-import axios, {AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError} from 'axios';
-import {getIdToken} from '@/utils/auth';
-import {auth} from '@/lib/firebase';
-import {Routes} from "@/routes/constants";
+import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import { getIdToken } from '@/utils/auth';
+import { auth } from '@/lib/firebase';
+import { Routes } from "@/routes/constants";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
