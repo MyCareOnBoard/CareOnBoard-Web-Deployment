@@ -11,20 +11,12 @@ interface Quote {
 
 const quotes: Quote[] = [
   {
-    text: "To know even one life has breathed easier because you have lived — that is to have succeeded.",
-    author: "Ralph Waldo Emerson",
-  },
-  {
-    text: "Behind every great hospital is a team that works together, cares deeply, and manages wisely.",
-    author: "Unknown",
-  },
-  {
     text: "The best way to find yourself is to lose yourself in the service of others.",
     author: "Mahatma Gandhi",
   },
   {
-    text: "Caring for others is an expression of what it means to be fully human.",
-    author: "Hillary Clinton",
+    text: "True success isn’t only about what you do for yourself. It’s about how you lift others up, bring light into their lives, and leave a positive impact. You’re capable of that—keep going.",
+    author: "Ernest Madu",
   },
 ]
 
@@ -58,10 +50,11 @@ export default function AuthLayout() {
   }, [])
 
   return (
-    <div className="flex items-center justify-between p-[30px] min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-b from-white via-[#f8fafc] to-white">
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-6 w-full px-4 sm:px-6 lg:px-[30px] py-4 sm:py-6">
       {/* Left Banner - Teal branding section */}
       <div
-        className="hidden lg:flex bg-[#00b4b8] flex-col h-[calc(100vh-60px)] justify-between p-[60px] rounded-lg w-[528px] relative overflow-hidden"
+        className="hidden lg:flex bg-[#00b4b8] flex-col h-[calc(100vh-60px)] justify-between p-[60px] rounded-[20px] w-[528px] relative overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.12)]"
       >
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 pointer-events-none">
@@ -127,7 +120,7 @@ export default function AuthLayout() {
                 </div>
                 {/* Quote Text */}
                 <p
-                  className="font-semibold text-[20px] leading-[1.6] text-white"
+                  className="font-semibold text-[16px] leading-[1.6] text-white"
                   style={{fontFamily: 'Urbanist, sans-serif'}}
                 >
                   {quotes[currentQuote].text}
@@ -163,11 +156,16 @@ export default function AuthLayout() {
       </div>
 
       {/* Right Content - Form area */}
-      <div className="flex flex-1 flex-col gap-[10px] h-[calc(100vh-60px)] items-center justify-center min-w-0">
-        <div className="flex flex-col gap-[48px] items-start justify-center rounded-[16px] w-full max-w-[496px]">
-          <Outlet/>
+      <div className="flex flex-1 flex-col gap-[10px] min-h-[calc(100vh-32px)] lg:h-[calc(100vh-60px)] items-center justify-center min-w-0 w-full">
+        <div className="w-full max-w-[520px]">
+          <div className="bg-white/90 backdrop-blur-md border border-[#e5eef5] rounded-[24px] shadow-[0_20px_60px_rgba(16,24,40,0.12)] px-6 sm:px-10 py-8 sm:py-10">
+            <div className="flex flex-col gap-[32px] sm:gap-[40px] items-start justify-center">
+              <Outlet/>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
     </div>
   )
 }

@@ -159,18 +159,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Page Header */}
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold text-gray-900">Login to account</h2>
-        <p className="text-sm text-gray-500">Please enter your information to access your account</p>
+        <h2 className="text-3xl sm:text-4xl font-semibold text-slate-900 tracking-tight">Login to account</h2>
+        <p className="text-sm sm:text-base text-slate-500">Please enter your information to access your account</p>
       </div>
 
       {/* Login Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Email Field */}
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-medium text-gray-900">
+          <Label htmlFor="email" className="text-sm font-medium text-slate-700">
             Email Address
           </Label>
           <Input
@@ -181,7 +181,7 @@ export default function LoginPage() {
             onChange={handleEmailChange}
             onBlur={handleEmailBlur}
             required
-            className={`h-12 rounded-2xl border-gray-200 bg-white text-base placeholder:text-gray-400 ${errors.email ? 'border-red-500 focus-visible:ring-red-500' : ''
+            className={`h-12 rounded-2xl border-slate-200 bg-slate-50 text-base placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-[#00B4B8]/40 focus-visible:border-[#00B4B8] ${errors.email ? 'border-red-500 focus-visible:ring-red-500' : ''
               }`}
           />
           {errors.email && (
@@ -193,7 +193,7 @@ export default function LoginPage() {
 
         {/* Password Field with Toggle */}
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-sm font-medium text-gray-900">
+          <Label htmlFor="password" className="text-sm font-medium text-slate-700">
             Password
           </Label>
           <div className="relative">
@@ -205,13 +205,13 @@ export default function LoginPage() {
               onChange={handlePasswordChange}
               onBlur={handlePasswordBlur}
               required
-              className={`h-12 rounded-2xl border-gray-200 bg-white text-base placeholder:text-gray-400 pr-12 ${errors.password ? 'border-red-500 focus-visible:ring-red-500' : ''
+              className={`h-12 rounded-2xl border-slate-200 bg-slate-50 text-base placeholder:text-slate-400 pr-12 focus-visible:ring-2 focus-visible:ring-[#00B4B8]/40 focus-visible:border-[#00B4B8] ${errors.password ? 'border-red-500 focus-visible:ring-red-500' : ''
                 }`}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute text-gray-600 -translate-y-1/2 right-4 top-1/2 hover:text-gray-900"
+              className="absolute text-slate-500 -translate-y-1/2 right-4 top-1/2 hover:text-slate-900"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -230,13 +230,13 @@ export default function LoginPage() {
               id="remember"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="border-gray-300 rounded-md"
+              className="border-slate-300 rounded-md"
             />
-            <label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer">
+            <label htmlFor="remember" className="text-sm text-slate-600 cursor-pointer">
               Remember me
             </label>
           </div>
-          <Link to={Routes.auth.forgotPassword} className="text-sm text-[#17a2b8] hover:text-[#148a9c] font-medium">
+          <Link to={Routes.auth.forgotPassword} className="text-sm text-[#00B4B8] hover:text-[#148a9c] font-semibold">
             Forgot password?
           </Link>
         </div>
@@ -244,7 +244,7 @@ export default function LoginPage() {
         <Button
           type="submit"
           disabled={loading}
-          className="w-full h-12 bg-[#00B4B8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold mt-4 transition-all"
+          className="w-full h-12 bg-[#00B4B8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold mt-4 transition-all shadow-[0_12px_24px_rgba(0,180,184,0.25)]"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
@@ -257,7 +257,7 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <p className="pt-2 text-sm text-center text-gray-600">
+      <p className="pt-2 text-sm text-center text-slate-600">
         Don't have an account?{" "}
         <Link
           to={Routes.auth.signup + (agencyId ? `?agencyId=${agencyId}` : "")}
