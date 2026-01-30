@@ -146,7 +146,7 @@ export default function CommunityInclusionsPage() {
       <div className="relative overflow-hidden rounded-[16px] sm:rounded-[20px] lg:rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
         <div className="relative p-3 sm:p-4 md:p-[19px]">
           {/* Section Header */}
-          <div className="mb-4 sm:mb-[20px] flex justify-between items-start">
+          <div className="mb-4 sm:mb-[20px] flex flex-wrap justify-between items-start gap-3">
             <div>
               <h2 className="text-[16px] sm:text-[18px] md:text-[20px] font-medium leading-[1.4] sm:leading-[1.6] text-[#10141a]">
                 Community Inclusions
@@ -161,7 +161,7 @@ export default function CommunityInclusionsPage() {
               className="flex items-center gap-2 text-[#808081] hover:text-[#00b4b8] transition-colors cursor-pointer"
             >
               <FileClock className="w-5 h-5" />
-              <span className="text-[14px] font-normal">Community Inclusion History</span>
+              <span className="hidden sm:inline text-[14px] font-normal">Community Inclusion History</span>
             </button>
           </div>
 
@@ -169,9 +169,9 @@ export default function CommunityInclusionsPage() {
           <div className="space-y-4 sm:space-y-5 md:space-y-[22px]">
             {attendanceRows.map((row, index) => (
               <div key={row.id}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[377px_351px_351px] gap-3 sm:gap-3.5 md:gap-[14px] items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-3.5 md:gap-[14px] items-end">
                   {/* Name Field */}
-                  <div className="flex flex-col gap-[4px] sm:col-span-2 lg:col-span-1">
+                  <div className="flex flex-col gap-[4px] sm:col-span-2 xl:col-span-1">
                     <label className="text-[11px] sm:text-[12px] font-normal leading-[normal] text-[#10141a]">
                       Name
                     </label>
@@ -224,7 +224,7 @@ export default function CommunityInclusionsPage() {
 
                 {/* Divider on mobile/tablet */}
                 {index < attendanceRows.length - 1 && (
-                  <div className="lg:hidden mt-4 sm:mt-5 border-t border-[rgba(204,204,205,0.3)]" />
+                  <div className="xl:hidden mt-4 sm:mt-5 border-t border-[rgba(204,204,205,0.3)]" />
                 )}
               </div>
             ))}

@@ -1863,16 +1863,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   <label className="text-[12px] font-normal text-[#10141a]">Plan of care</label>
                   {!pocDocument?.url && (
                     <label className="bg-white border border-[#cccccd] rounded-xl px-4 py-3 flex items-center justify-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
-                      <Upload className="w-5 h-5 text-[#b2b2b3]" />
-                      <span className="text-[14px] font-normal text-[#b2b2b3]">
-                        Upload plan of care
+                      <span className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent cursor-not-allowed">
+                        No plan of care available
                       </span>
-                      <input
-                        type="file"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        accept=".pdf,.doc,.docx"
-                      />
                     </label>
                   )}
                   {/* Client's POC Document Link */}
