@@ -1,8 +1,12 @@
-import React, { useState } from "react";
-import { X, Calendar, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { X, Calendar, ChevronLeft, ChevronRight, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import TimePicker from "@/components/TimePicker";
+import { searchClients, Client } from "@/lib/api/clients";
+import { searchEmployees, Employee } from "@/lib/api/employees";
+import { useToast } from "@/hooks/use-toast";
+import { mileageApi } from "@/lib/api/mileage";
 
 interface AddMileageModalProps {
   isOpen: boolean;
@@ -12,7 +16,9 @@ interface AddMileageModalProps {
 
 interface MileageFormData {
   client: string;
+  clientId?: string;
   assignDsp: string;
+  assignDspId?: string;
   startIn: string;
   dropOff: string;
   selectDate: Date | null;
@@ -22,7 +28,9 @@ interface MileageFormData {
 
 const initialFormData: MileageFormData = {
   client: "",
+  clientId: "",
   assignDsp: "",
+  assignDspId: "",
   startIn: "",
   dropOff: "",
   selectDate: null,
@@ -31,22 +39,160 @@ const initialFormData: MileageFormData = {
 };
 
 export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: AddMileageModalProps) {
+  const { toast } = useToast(); // <-- Use like in AddScheduleModal
+
   const [formData, setFormData] = useState<MileageFormData>(initialFormData);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  // Calendar days calculation
-  const calendarDays = React.useMemo(() => {
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
-    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
-    const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
-    
-    return eachDayOfInterval({ start: startDate, end: endDate });
-  }, [currentMonth]);
+  // --- Client & DSP search/autocomplete states ---
+  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
+  const [dspSearchResults, setDspSearchResults] = useState<Employee[]>([]);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [showDspDropdown, setShowDspDropdown] = useState(false);
+  const [isSearchingClients, setIsSearchingClients] = useState(false);
+  const [isSearchingDsps, setIsSearchingDsps] = useState(false);
 
-  const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+  const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // --- Location search states ---
+  const [startLocationResults, setStartLocationResults] = useState<any[]>([]);
+  const [showStartLocationDropdown, setShowStartLocationDropdown] = useState(false);
+  const [isSearchingStartLocation, setIsSearchingStartLocation] = useState(false);
+  const startLocationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [dropOffLocationResults, setDropOffLocationResults] = useState<any[]>([]);
+  const [showDropOffLocationDropdown, setShowDropOffLocationDropdown] = useState(false);
+  const [isSearchingDropOffLocation, setIsSearchingDropOffLocation] = useState(false);
+  const dropOffLocationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // --- Client search handler ---
+  const handleClientSearch = (query: string) => {
+    if (clientSearchTimeoutRef.current) clearTimeout(clientSearchTimeoutRef.current);
+    if (query.trim().length < 2) {
+      setClientSearchResults([]);
+      setShowClientDropdown(false);
+      return;
+    }
+    clientSearchTimeoutRef.current = setTimeout(async () => {
+      setIsSearchingClients(true);
+      try {
+        const results = await searchClients(query);
+        setClientSearchResults(results);
+        setShowClientDropdown(results.length > 0);
+      } finally {
+        setIsSearchingClients(false);
+      }
+    }, 300);
+  };
+
+  const handleClientSelect = (client: Client) => {
+    setFormData(prev => ({
+      ...prev,
+      client: client.firstName && client.lastName ? `${client.firstName} ${client.lastName}` : client.id,
+      clientId: client.id,
+    }));
+    setShowClientDropdown(false);
+    setClientSearchResults([]);
+  };
+
+  // --- DSP search handler ---
+  const handleDspSearch = (query: string) => {
+    if (dspSearchTimeoutRef.current) clearTimeout(dspSearchTimeoutRef.current);
+    if (query.trim().length < 2) {
+      setDspSearchResults([]);
+      setShowDspDropdown(false);
+      return;
+    }
+    dspSearchTimeoutRef.current = setTimeout(async () => {
+      setIsSearchingDsps(true);
+      try {
+        const results = await searchEmployees(query);
+        setDspSearchResults(results);
+        setShowDspDropdown(results.length > 0);
+      } finally {
+        setIsSearchingDsps(false);
+      }
+    }, 300);
+  };
+
+  const handleDspSelect = (employee: Employee) => {
+    setFormData(prev => ({
+      ...prev,
+      assignDsp: employee.fullName,
+      assignDspId: employee.id,
+    }));
+    setShowDspDropdown(false);
+    setDspSearchResults([]);
+  };
+
+  // --- Location search handlers ---
+  const handleStartLocationSearch = (query: string) => {
+    if (startLocationTimeoutRef.current) clearTimeout(startLocationTimeoutRef.current);
+    if (query.trim().length < 3) {
+      setStartLocationResults([]);
+      setShowStartLocationDropdown(false);
+      return;
+    }
+    startLocationTimeoutRef.current = setTimeout(async () => {
+      setIsSearchingStartLocation(true);
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`
+        );
+        const data = await response.json();
+        setStartLocationResults(data);
+        setShowStartLocationDropdown(data.length > 0);
+      } catch {
+        setStartLocationResults([]);
+        setShowStartLocationDropdown(false);
+      } finally {
+        setIsSearchingStartLocation(false);
+      }
+    }, 400);
+  };
+
+  const handleStartLocationSelect = (location: any) => {
+    setFormData(prev => ({
+      ...prev,
+      startIn: location.display_name || "",
+    }));
+    setShowStartLocationDropdown(false);
+    setStartLocationResults([]);
+  };
+
+  const handleDropOffLocationSearch = (query: string) => {
+    if (dropOffLocationTimeoutRef.current) clearTimeout(dropOffLocationTimeoutRef.current);
+    if (query.trim().length < 3) {
+      setDropOffLocationResults([]);
+      setShowDropOffLocationDropdown(false);
+      return;
+    }
+    dropOffLocationTimeoutRef.current = setTimeout(async () => {
+      setIsSearchingDropOffLocation(true);
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`
+        );
+        const data = await response.json();
+        setDropOffLocationResults(data);
+        setShowDropOffLocationDropdown(data.length > 0);
+      } catch {
+        setDropOffLocationResults([]);
+        setShowDropOffLocationDropdown(false);
+      } finally {
+        setIsSearchingDropOffLocation(false);
+      }
+    }, 400);
+  };
+
+  const handleDropOffLocationSelect = (location: any) => {
+    setFormData(prev => ({
+      ...prev,
+      dropOff: location.display_name || "",
+    }));
+    setShowDropOffLocationDropdown(false);
+    setDropOffLocationResults([]);
+  };
 
   const handleInputChange = (field: keyof Omit<MileageFormData, 'selectDate' | 'schedulingType'>, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -62,17 +208,14 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
     if (!time12h) return "";
     const match = time12h.match(/(\d{1,2})[.:](\d{2}):?(AM|PM)/i);
     if (!match) return "";
-    
     let hours = parseInt(match[1]);
     const minutes = match[2];
     const period = match[3].toUpperCase();
-    
     if (period === "PM" && hours !== 12) {
       hours += 12;
     } else if (period === "AM" && hours === 12) {
       hours = 0;
     }
-    
     return `${hours.toString().padStart(2, "0")}:${minutes}`;
   };
 
@@ -82,13 +225,11 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
     const [hoursStr, minutes] = time24h.split(":");
     let hours = parseInt(hoursStr);
     const period = hours >= 12 ? "PM" : "AM";
-    
     if (hours === 0) {
       hours = 12;
     } else if (hours > 12) {
       hours -= 12;
     }
-    
     return `${hours.toString().padStart(2, "0")}:${minutes}:${period}`;
   };
 
@@ -97,40 +238,83 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
   };
 
   const handleSaveAndCancel = () => {
-    // Save as draft logic
-    console.log("Saving as draft:", formData);
     setFormData(initialFormData);
     onClose();
   };
 
   const handleSchedule = async () => {
-    // Validate form
-    if (!formData.client || !formData.assignDsp || !formData.startIn || !formData.dropOff || !formData.selectDate || !formData.selectTime) {
-      console.error("Please fill all required fields");
+    const missingFields: string[] = [];
+    if (!formData.client || !formData.clientId) missingFields.push("Client");
+    if (!formData.assignDsp || !formData.assignDspId) missingFields.push("Assign DSP");
+    if (!formData.startIn) missingFields.push("Start in");
+    if (!formData.dropOff) missingFields.push("Drop Off");
+    if (!formData.selectDate) missingFields.push("Select Date");
+    if (!formData.selectTime) missingFields.push("Select Time");
+    if (!formData.schedulingType) missingFields.push("Scheduling Type");
+
+    if (missingFields.length > 0) {
+      toast({
+        title: "Missing Required Fields",
+        description: `Please fill in the following required fields: ${missingFields.join(", ")}`,
+        variant: "destructive",
+      });
       return;
     }
 
     setIsSubmitting(true);
-
     try {
-      // Schedule mileage logic - replace with actual API call
-      console.log("Scheduling mileage:", formData);
-      
-      // Reset form
+      const payload: any = {
+        clientId: formData.clientId,
+        dspId: formData.assignDspId,
+        startIn: formData.startIn,
+        dropOff: formData.dropOff,
+        date: formData.selectDate ? formData.selectDate.toISOString() : "",
+        time: formData.selectTime,
+      };
+
+      if (formData.schedulingType === "recurring") {
+        payload.frequency = "weekly";
+      }
+
+      await mileageApi.create(payload);
+
+      toast({
+        title: "Success",
+        description: "Mileage scheduled successfully.",
+        variant: "success",
+      });
+
       setFormData(initialFormData);
-      
-      // Notify parent component
       if (onMileageCreated) {
         onMileageCreated();
       }
-      
       onClose();
     } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to schedule mileage.",
+        variant: "destructive",
+      });
       console.error("Failed to schedule mileage:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Calendar days calculation
+  const calendarDays = React.useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start: startDate, end: endDate });
+  }, [currentMonth]);
+
+  const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
   if (!isOpen) return null;
 
@@ -141,7 +325,6 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
         className="absolute inset-0 bg-black/30 backdrop-blur-sm"
         onClick={onClose}
       />
-      
       {/* Modal */}
       <div className="relative bg-white rounded-[30px] border border-[rgba(255,255,255,0.3)] w-full max-w-[500px] max-h-[90vh] shadow-xl flex flex-col">
         {/* Title Bar - Fixed */}
@@ -162,58 +345,157 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
         <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="flex flex-col gap-4">
             {/* Client */}
-            <div className="flex flex-col gap-1">
+            <div className="relative flex flex-col gap-1">
               <label className="text-[12px] font-normal text-[#10141a]">Client</label>
               <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
                 <input
                   type="text"
                   placeholder="Search client name..."
                   value={formData.client}
-                  onChange={(e) => handleInputChange("client", e.target.value)}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, client: e.target.value }));
+                    handleClientSearch(e.target.value);
+                  }}
+                  onFocus={() => {
+                    if (clientSearchResults.length > 0) setShowClientDropdown(true);
+                  }}
                   className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                  autoComplete="off"
                 />
+                {isSearchingClients && (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+                )}
               </div>
+              {showClientDropdown && clientSearchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
+                  {clientSearchResults.map((client) => (
+                    <button
+                      key={client.id}
+                      onClick={() => handleClientSelect(client)}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
+                    >
+                      <p className="text-[14px] font-normal text-black">
+                        {client.firstName && client.lastName
+                          ? `${client.firstName} ${client.lastName}`
+                          : client.id}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Assign DSP */}
-            <div className="flex flex-col gap-1">
+            <div className="relative flex flex-col gap-1">
               <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
               <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
                 <input
                   type="text"
                   placeholder="Search DSP name..."
                   value={formData.assignDsp}
-                  onChange={(e) => handleInputChange("assignDsp", e.target.value)}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, assignDsp: e.target.value }));
+                    handleDspSearch(e.target.value);
+                  }}
+                  onFocus={() => {
+                    if (dspSearchResults.length > 0) setShowDspDropdown(true);
+                  }}
                   className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                  autoComplete="off"
                 />
+                {isSearchingDsps && (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+                )}
               </div>
+              {showDspDropdown && dspSearchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
+                  {dspSearchResults.map((employee) => (
+                    <button
+                      key={employee.id}
+                      onClick={() => handleDspSelect(employee)}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
+                    >
+                      <p className="text-[14px] font-normal text-black">{employee.fullName}</p>
+                      <p className="text-[12px] font-normal text-[#808081]">{employee.email}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Start in */}
             <div className="flex flex-col gap-1">
               <label className="text-[12px] font-normal text-[#10141a]">Start in</label>
-              <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
+              <div className="relative bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
                 <input
                   type="text"
                   placeholder="Search Location"
                   value={formData.startIn}
-                  onChange={(e) => handleInputChange("startIn", e.target.value)}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, startIn: e.target.value }));
+                    handleStartLocationSearch(e.target.value);
+                  }}
+                  onFocus={() => {
+                    if (startLocationResults.length > 0) setShowStartLocationDropdown(true);
+                  }}
                   className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                  autoComplete="off"
                 />
+                {isSearchingStartLocation && (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+                )}
+                {/* Location Dropdown - ensure it's inside the input container */}
+                {showStartLocationDropdown && startLocationResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-[44px] mt-0 bg-white border border-[#cccccd] rounded-xl shadow-lg z-[100] max-h-[200px] overflow-y-auto">
+                    {startLocationResults.map((location) => (
+                      <button
+                        key={location.place_id}
+                        onClick={() => handleStartLocationSelect(location)}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
+                      >
+                        <p className="text-[14px] font-normal text-black">{location.display_name}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Drop Off */}
             <div className="flex flex-col gap-1">
               <label className="text-[12px] font-normal text-[#10141a]">Drop Off</label>
-              <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
+              <div className="relative bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
                 <input
                   type="text"
                   placeholder="Search Location"
                   value={formData.dropOff}
-                  onChange={(e) => handleInputChange("dropOff", e.target.value)}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, dropOff: e.target.value }));
+                    handleDropOffLocationSearch(e.target.value);
+                  }}
+                  onFocus={() => {
+                    if (dropOffLocationResults.length > 0) setShowDropOffLocationDropdown(true);
+                  }}
                   className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
+                  autoComplete="off"
                 />
+                {isSearchingDropOffLocation && (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+                )}
+                {/* Location Dropdown - ensure it's inside the input container */}
+                {showDropOffLocationDropdown && dropOffLocationResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-[44px] mt-0 bg-white border border-[#cccccd] rounded-xl shadow-lg z-[100] max-h-[200px] overflow-y-auto">
+                    {dropOffLocationResults.map((location) => (
+                      <button
+                        key={location.place_id}
+                        onClick={() => handleDropOffLocationSelect(location)}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
+                      >
+                        <p className="text-[14px] font-normal text-black">{location.display_name}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -247,7 +529,7 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
             </div>
 
             {/* Select Date */}
-            <div className="flex flex-col gap-1 relative">
+            <div className="relative flex flex-col gap-1">
               <label className="text-[12px] font-normal text-[#10141a]">Select Date</label>
               <button
                 onClick={() => setShowDatePicker(!showDatePicker)}
@@ -268,7 +550,7 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
                   <div className="flex items-center justify-center gap-2.5 px-5 py-2">
                     <button
                       onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                      className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
+                      className="flex items-center justify-center w-5 h-5 rounded cursor-pointer hover:bg-gray-100"
                     >
                       <ChevronLeft className="w-5 h-5 text-[#808081]" />
                     </button>
@@ -277,7 +559,7 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
                     </span>
                     <button
                       onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                      className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
+                      className="flex items-center justify-center w-5 h-5 rounded cursor-pointer hover:bg-gray-100"
                     >
                       <ChevronRight className="w-5 h-5 text-[#10141a]" />
                     </button>
@@ -285,7 +567,7 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
                   {/* Divider */}
                   <div className="h-px bg-[#e5e5e6] w-full" />
                   {/* Week Days */}
-                  <div className="flex items-center justify-center pt-2 w-full">
+                  <div className="flex items-center justify-center w-full pt-2">
                     {weekDays.map((day) => (
                       <div key={day} className="flex-1 px-2 py-0.5 text-center text-[12px] font-medium text-[#10141a]">
                         {day}
@@ -295,7 +577,7 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
                   {/* Calendar Grid */}
                   <div className="flex flex-col w-full pb-2">
                     {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, weekIndex) => (
-                      <div key={weekIndex} className="flex items-center justify-center py-1 w-full">
+                      <div key={weekIndex} className="flex items-center justify-center w-full py-1">
                         {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => {
                           const isCurrentMonth = isSameMonth(day, currentMonth);
                           const isSelected = formData.selectDate && isSameDay(day, formData.selectDate);
