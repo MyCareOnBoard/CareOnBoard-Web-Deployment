@@ -2,8 +2,8 @@ import React, {useState} from "react";
 import {useToast} from "@/hooks/use-toast";
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
-import {Eye, EyeOff, RefreshCw} from "lucide-react";
-import {MultiSelect, MultiSelectItem} from "@/components/ui/multi-select";
+import {Eye, EyeOff, RefreshCw, ChevronDown, Check, X} from "lucide-react";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ interface Step3LeadershipProps {
 
 export default function Step3Leadership({formData, onChange, services = [], fieldsWithErrors = []}: Step3LeadershipProps) {
     const [showPassword, setShowPassword] = useState(false);
+    const [isServicesOpen, setIsServicesOpen] = useState(false);
     const {toast} = useToast();
 
     const generatePassword = () => {
@@ -31,6 +32,14 @@ export default function Step3Leadership({formData, onChange, services = [], fiel
             title: "Password Generated",
             description: "A secure password has been generated",
         });
+    };
+
+    const toggleService = (serviceName: string) => {
+        const currentServices = formData.services || [];
+        const newServices = currentServices.includes(serviceName)
+            ? currentServices.filter((s: string) => s !== serviceName)
+            : [...currentServices, serviceName];
+        onChange("services", newServices);
     };
 
     return (
@@ -153,31 +162,101 @@ export default function Step3Leadership({formData, onChange, services = [], fiel
                         Used to auto-populate billing, scheduling, and EVV rules.
                     </p>
                 </div>
-                <div className="space-y-6 mt-6 grid grid-cols-3 gap-6">
-                    <div>
-                        <Label htmlFor="services" className="mb-2 text-[14px] font-medium text-[#10141a]">
+                <div className="space-y-6 mt-6">
+                    <div className="flex flex-col gap-[4px] w-full max-w-[350px]">
+                        <Label className="text-[14px] font-medium text-[#10141a]">
                             Select Services
                         </Label>
-                        <MultiSelect
-                            value={formData.services}
-                            onValueChange={(value) => onChange("services", value)}
-                            placeholder="Select multiple services"
-                            buttonClassName={cn(
-                                fieldsWithErrors.includes("services") && "border-red-500"
-                            )}
-                        >
-                            {services.map((service) => (
-                                <MultiSelectItem key={service.code} value={service.name}>
-                                    {service.name}
-                                </MultiSelectItem>
-                            ))}
-                        </MultiSelect>
+                        
+                        <Popover open={isServicesOpen} onOpenChange={setIsServicesOpen}>
+                            <PopoverTrigger asChild>
+                                <button
+                                    className={cn(
+                                        "flex items-center justify-between h-[44px] w-full rounded-[12px] border border-[#cccccd] bg-white px-[16px] hover:bg-[#fafafa] transition-colors",
+                                        fieldsWithErrors.includes("services") && "border-red-500"
+                                    )}
+                                >
+                                    <span className="text-[14px] font-normal text-[#525253]">
+                                        {formData.services && formData.services.length > 0
+                                            ? `${formData.services.length} selected`
+                                            : "Select Services"}
+                                    </span>
+                                    <ChevronDown className="w-5 h-5 text-[#10141a]" />
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                className="w-[var(--radix-popover-trigger-width)] bg-white border border-[#cccccd] rounded-[12px] p-0 shadow-lg"
+                                align="start"
+                            >
+                                <div className="flex flex-col max-h-[300px]">
+                                    {/* Header */}
+                                    <div className="px-[20px] pt-[12px] pb-0 shrink-0">
+                                        <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
+                                            Select services
+                                        </p>
+                                    </div>
+
+                                    {/* Options - Scrollable */}
+                                    <div className="flex flex-col mt-[8px] overflow-y-auto">
+                                        {services.map((service) => {
+                                            const isSelected = formData.services?.includes(service.name) || false;
+                                            return (
+                                                <button
+                                                    key={service.code}
+                                                    onClick={() => toggleService(service.name)}
+                                                    className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${
+                                                        isSelected ? "bg-[#e5effa]" : ""
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`text-[14px] leading-[1.4] ${
+                                                            isSelected
+                                                                ? "font-semibold text-[#00b4b8]"
+                                                                : "font-normal text-[#808081]"
+                                                        }`}
+                                                    >
+                                                        {service.name}
+                                                    </span>
+                                                    {isSelected && (
+                                                        <Check className="w-5 h-5 text-[#00b4b8]" />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                        
                         {fieldsWithErrors.includes("services") && (
                             <p className="text-red-500 mt-1 text-[12px]">
                                 Services are required.
                             </p>
                         )}
+
                     </div>
+                    {/* Selected Services Badges */}
+                    {formData.services && formData.services.length > 0 && (
+                        <div className="flex flex-wrap gap-[8px] w-full">
+                            {formData.services.map((serviceName: string) => (
+                                <div
+                                    key={serviceName}
+                                    className="group flex items-center gap-[6px] px-[10px] py-[6px] rounded-[6px] bg-[#00b4b8] border-[0.5px] border-[#808081] hover:bg-[#00a0a3] transition-colors"
+                                >
+                                    <span className="text-[14px] font-medium leading-[1.4] text-white">
+                                        {serviceName}
+                                    </span>
+                                    <button
+                                        onClick={() => toggleService(serviceName)}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-white/20 rounded-full p-0.5"
+                                        aria-label={`Remove ${serviceName}`}
+                                    >
+                                        <X className="w-3.5 h-3.5 text-white" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

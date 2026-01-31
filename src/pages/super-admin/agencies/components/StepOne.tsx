@@ -1,10 +1,89 @@
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import React from "react";
-import {cn} from "@/lib/utils"
+import React, {useCallback, useEffect, useRef, useState} from "react";
+import {cn} from "@/lib/utils";
+
+type AddressSuggestion = {
+    display_name?: string;
+    place_id: string;
+    lat: string;
+    lon: string;
+    address?: {
+        county?: string;
+        state?: string;
+        postcode?: string;
+        state_district?: string;
+    };
+};
 
 export default function Step1AgencyIdentity({formData, onChange, fieldsWithErrors}: any) {
+    const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+    const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+    const [searchingAddress, setSearchingAddress] = useState(false);
+    const addressInputRef = useRef<HTMLDivElement>(null);
+    const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (addressInputRef.current && !addressInputRef.current.contains(event.target as Node)) {
+                setShowAddressSuggestions(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+            if (addressSearchTimeoutRef.current) {
+                clearTimeout(addressSearchTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const handleAddressSearch = useCallback((query: string) => {
+        if (addressSearchTimeoutRef.current) {
+            clearTimeout(addressSearchTimeoutRef.current);
+        }
+        if (query.trim().length < 3) {
+            setShowAddressSuggestions(false);
+            setAddressSuggestions([]);
+            return;
+        }
+        addressSearchTimeoutRef.current = setTimeout(async () => {
+            try {
+                setSearchingAddress(true);
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+                        query
+                    )}&limit=5&addressdetails=1`
+                );
+                if (!response.ok) {
+                    throw new Error("Failed to fetch address suggestions");
+                }
+                const data = await response.json();
+                setAddressSuggestions(data);
+                setShowAddressSuggestions(data.length > 0);
+            } catch (error) {
+                console.error("Failed to fetch address suggestions:", error);
+                setAddressSuggestions([]);
+                setShowAddressSuggestions(false);
+            } finally {
+                setSearchingAddress(false);
+            }
+        }, 500);
+    }, []);
+
+    const handleSelectAddressSuggestion = (suggestion: AddressSuggestion) => {
+        setShowAddressSuggestions(false);
+        setAddressSuggestions([]);
+        const county = suggestion.address?.county || suggestion.address?.state_district || "";
+        const state = suggestion.address?.state || "";
+        const postcode = suggestion.address?.postcode || "";
+        const countyStateValue = county && state ? `${county} / ${state}` : county || state;
+        onChange("primaryAddress", suggestion.display_name || "");
+        onChange("county_or_state", countyStateValue);
+        onChange("zipCode", postcode);
+    };
+
     return (
         <div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -152,16 +231,48 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
                         <Label htmlFor="primaryAddress" className="mb-2 text-[14px] font-medium text-[#10141a]">
                             Primary Agency Address
                         </Label>
-                        <Input
-                            id="primaryAddress"
-                            value={formData.primaryAddress}
-                            onChange={(e) => onChange("primaryAddress", e.target.value)}
-                            placeholder="Enter primary address"
-                            className={cn(
-                                "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
-                                fieldsWithErrors.includes("primaryAddress") && "border-red-500"
+                        <div className="relative" ref={addressInputRef}>
+                            <Input
+                                id="primaryAddress"
+                                value={formData.primaryAddress}
+                                onChange={(e) => {
+                                    onChange("primaryAddress", e.target.value);
+                                    handleAddressSearch(e.target.value);
+                                }}
+                                onFocus={() => {
+                                    if (addressSuggestions.length > 0) {
+                                        setShowAddressSuggestions(true);
+                                    }
+                                }}
+                                placeholder="Enter primary address"
+                                className={cn(
+                                    "h-[44px] rounded-[12px] border-[#cccccd] bg-white focus:border-[#00b4b8] focus:ring-[#00b4b8]",
+                                    fieldsWithErrors.includes("primaryAddress") && "border-red-500"
+                                )}
+                            />
+                            {showAddressSuggestions && addressSuggestions.length > 0 && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                                    {searchingAddress && (
+                                        <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
+                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
+                                            Searching...
+                                        </div>
+                                    )}
+                                    {!searchingAddress &&
+                                        addressSuggestions.map((suggestion) => (
+                                            <div
+                                                key={suggestion.place_id}
+                                                onClick={() => handleSelectAddressSuggestion(suggestion)}
+                                                className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
+                                            >
+                                                <span className="line-clamp-2">
+                                                    {suggestion.display_name}
+                                                </span>
+                                            </div>
+                                        ))}
+                                </div>
                             )}
-                        />
+                        </div>
                         {fieldsWithErrors.includes("primaryAddress") && (
                             <p className="text-red-500 text-sm mt-1">
                                 Primary address is required.
