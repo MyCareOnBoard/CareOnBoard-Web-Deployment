@@ -8,7 +8,6 @@ export default function SlideThree() {
     'Pass a Criminal Background Check and Fingerprinting.',
     'Provide proof of work eligibility in the U.S.. ',
     'Complete mandatory DSP trainings (online & in-person). ',
-    'Have reliable transportation to work sites.'
   ]
   return (
     <div className="flex flex-col items-center px-6 text-center">
