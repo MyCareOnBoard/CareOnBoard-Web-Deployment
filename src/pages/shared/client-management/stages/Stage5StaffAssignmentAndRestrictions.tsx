@@ -383,11 +383,11 @@ export function Stage5StaffAssignmentAndRestrictions({
             value={stage5.prefersFamiliar}
             onChange={(v) => updateStage5({ prefersFamiliar: v })}
           />
-          <YesNoRadio
+          {/* <YesNoRadio
             label="No male/female staff?"
             value={stage5.noMaleFemaleStaff}
             onChange={(v) => updateStage5({ noMaleFemaleStaff: v })}
-          />
+          /> */}
           <YesNoRadio
             label="Medical restrictions requiring trained DSP?"
             value={stage5.medicalRestrictionsTrained}
