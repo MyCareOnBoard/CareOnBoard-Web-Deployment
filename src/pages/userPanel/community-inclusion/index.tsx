@@ -141,9 +141,10 @@ export default function UserCommunityInclusionPage() {
 
                 {/* Form Rows */}
                 <div className="space-y-6">
-                    {attendanceRows.map((row) => (
-                        <div key={row.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                            <div className="flex flex-col gap-2">
+                    {attendanceRows.map((row, index) => (
+                        <div key={row.id}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-end">
+                            <div className="flex flex-col gap-2 sm:col-span-2 xl:col-span-1">
                                 <label className="text-[14px] text-[#10141a]">Name</label>
                                 <Input
                                     value={row.name}
@@ -177,6 +178,10 @@ export default function UserCommunityInclusionPage() {
                                     </div>
                                 </TimePicker>
                             </div>
+                            </div>
+                                {index < attendanceRows.length - 1 && (
+                                    <div className="xl:hidden mt-6 border-t border-[rgba(204,204,205,0.3)]" />
+                                )}
                         </div>
                     ))}
                 </div>

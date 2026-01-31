@@ -138,7 +138,7 @@ export default function CommunityInclusionsPage() {
       {/* Page Header */}
       <div className="mb-4 sm:mb-6">
         <h1 className="text-[24px] sm:text-[28px] md:text-[32px] lg:text-[40px] font-semibold leading-[1.4] sm:leading-[1.6] text-[#10141a]">
-          Client Management
+          Community Inclusion
         </h1>
       </div>
 
