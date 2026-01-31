@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { AddClientFormData, Service } from "@/pages/shared/client-management/types/formData";
 import { listServices, useListServicesQuery, type Service as ApiService } from "@/lib/api/services";
+import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 
 function ServiceAuthorizationFields({
   service,
@@ -522,81 +523,25 @@ export function Stage2GuardianAndFunding({
   const updateStage2 = (patch: Partial<AddClientFormData["stage2"]>) =>
     setFormData((prev) => ({ ...prev, stage2: { ...prev.stage2, ...patch } }));
 
-  const [addressSuggestions, setAddressSuggestions] = useState<
-    Array<{
-      display_name?: string;
-      place_id: string;
-      lat: string;
-      lon: string;
-    }>
-  >([]);
-  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
-  const [searchingAddress, setSearchingAddress] = useState(false);
   const addressInputRef = useRef<HTMLDivElement>(null);
-  const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const guardianAddressAutocomplete = useGooglePlacesAutocomplete();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (addressInputRef.current && !addressInputRef.current.contains(event.target as Node)) {
-        setShowAddressSuggestions(false);
+        guardianAddressAutocomplete.setShowSuggestions(false);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      if (addressSearchTimeoutRef.current) {
-        clearTimeout(addressSearchTimeoutRef.current);
-      }
-    };
-  }, []);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [guardianAddressAutocomplete.setShowSuggestions]);
 
-  const handleAddressSearch = useCallback(async (query: string) => {
-    if (addressSearchTimeoutRef.current) {
-      clearTimeout(addressSearchTimeoutRef.current);
+  const handleSelectAddressSuggestion = async (placeId: string) => {
+    const details = await guardianAddressAutocomplete.selectSuggestion(placeId);
+    if (details) {
+      updateStage2({ guardianAddress: details.formattedAddress });
     }
-
-    if (query.trim().length < 3) {
-      setShowAddressSuggestions(false);
-      setAddressSuggestions([]);
-      return;
-    }
-
-    addressSearchTimeoutRef.current = setTimeout(async () => {
-      try {
-        setSearchingAddress(true);
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            query
-          )}&limit=5&addressdetails=1`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch address suggestions");
-        }
-
-        const data = await response.json();
-        setAddressSuggestions(data);
-        setShowAddressSuggestions(data.length > 0);
-      } catch (error) {
-        console.error("Failed to fetch address suggestions:", error);
-        setAddressSuggestions([]);
-        setShowAddressSuggestions(false);
-      } finally {
-        setSearchingAddress(false);
-      }
-    }, 500);
-  }, []);
-
-  const handleSelectAddressSuggestion = (suggestion: {
-    display_name?: string;
-    place_id: string;
-    lat: string;
-    lon: string;
-  }) => {
-    updateStage2({ guardianAddress: suggestion.display_name || "" });
-    setShowAddressSuggestions(false);
-    setAddressSuggestions([]);
   };
 
   const createEmptyService = useMemo(
@@ -701,33 +646,33 @@ export function Stage2GuardianAndFunding({
                 onChange={(e) => {
                   const v = e.target.value;
                   updateStage2({ guardianAddress: v });
-                  handleAddressSearch(v);
+                  guardianAddressAutocomplete.handleInputChange(v);
                 }}
                 onFocus={() => {
-                  if (addressSuggestions.length > 0) {
-                    setShowAddressSuggestions(true);
+                  if (guardianAddressAutocomplete.suggestions.length > 0) {
+                    guardianAddressAutocomplete.setShowSuggestions(true);
                   }
                 }}
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                 placeholder="Enter address"
               />
 
-              {showAddressSuggestions && addressSuggestions.length > 0 && (
+              {guardianAddressAutocomplete.showSuggestions && guardianAddressAutocomplete.suggestions.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
-                  {searchingAddress && (
+                  {guardianAddressAutocomplete.isSearching && (
                     <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
                       Searching...
                     </div>
                   )}
-                  {!searchingAddress &&
-                    addressSuggestions.map((suggestion) => (
+                  {!guardianAddressAutocomplete.isSearching &&
+                    guardianAddressAutocomplete.suggestions.map((suggestion) => (
                       <div
-                        key={suggestion.place_id}
-                        onClick={() => handleSelectAddressSuggestion(suggestion)}
+                        key={suggestion.placeId}
+                        onClick={() => handleSelectAddressSuggestion(suggestion.placeId)}
                         className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
                       >
-                        <span className="line-clamp-2">{suggestion.display_name}</span>
+                        <span className="line-clamp-2">{suggestion.description}</span>
                       </div>
                     ))}
                 </div>

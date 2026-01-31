@@ -14,6 +14,8 @@ import { format, parse } from "date-fns";
 import { useSignDocumentMutation, useCheckSignatureStatusQuery } from "@/pages/applicant/application/api";
 import { searchClients, Client } from "@/lib/api/clients";
 import { useAuth } from "@/utils/auth";
+import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
+import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 
 interface FormData {
   client: string;
@@ -111,12 +113,10 @@ export default function ManualShiftManagementPage() {
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
-  const [locationSuggestions, setLocationSuggestions] = useState<Array<{ display_name?: string; place_id: string; lat: string; lon: string }>>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searchingLocation, setSearchingLocation] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<{ display_name?: string; place_id?: string; lat?: string; lon?: string } | null>(null);
   const locationInputRef = useRef<HTMLDivElement>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const locationAutocomplete = useGooglePlacesAutocomplete();
+  const { reverseGeocode } = useReverseGeocode();
   // Signature upload mutation
   const [signDocument] = useSignDocumentMutation();
 
@@ -185,7 +185,7 @@ export default function ManualShiftManagementPage() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (locationInputRef.current && !locationInputRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
+        locationAutocomplete.setShowSuggestions(false);
       }
       if (clientInputRef.current && !clientInputRef.current.contains(event.target as Node)) {
         setShowClientDropdown(false);
@@ -195,15 +195,11 @@ export default function ManualShiftManagementPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      // Clear any pending search timeouts
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
       if (clientSearchTimeoutRef.current) {
         clearTimeout(clientSearchTimeoutRef.current);
       }
     };
-  }, []);
+  }, [locationAutocomplete.setShowSuggestions]);
 
   // Load saved draft shifts
   useEffect(() => {
@@ -310,12 +306,10 @@ export default function ManualShiftManagementPage() {
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     
-    // If it's the location field, trigger search for suggestions
     if (field === "location") {
-      handleLocationSearch(value);
+      locationAutocomplete.handleInputChange(value);
     }
     
-    // If it's the client field, trigger client search
     if (field === "client") {
       handleClientSearch(value);
     }
@@ -371,50 +365,16 @@ export default function ManualShiftManagementPage() {
     setClientSearchResults([]);
   };
 
-  const handleLocationSearch = async (query: string) => {
-    // Clear existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+  const handleSelectSuggestion = async (placeId: string) => {
+    const details = await locationAutocomplete.selectSuggestion(placeId);
+    if (details) {
+      setFormData((prev) => ({ ...prev, location: details.formattedAddress }));
+      setSelectedLocation({
+        display_name: details.formattedAddress,
+        lat: String(details.lat),
+        lon: String(details.lng),
+      });
     }
-
-    // If query is too short, hide suggestions
-    if (query.trim().length < 3) {
-      setShowSuggestions(false);
-      setLocationSuggestions([]);
-      return;
-    }
-
-    // Debounce the search
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        setSearchingLocation(true);
-        
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`
-        );
-        
-        if (!response.ok) {
-          throw new Error("Failed to fetch suggestions");
-        }
-
-        const data = await response.json();
-        setLocationSuggestions(data);
-        setShowSuggestions(data.length > 0);
-      } catch (error) {
-        console.error("Failed to fetch location suggestions:", error);
-        setLocationSuggestions([]);
-        setShowSuggestions(false);
-      } finally {
-        setSearchingLocation(false);
-      }
-    }, 500); // 500ms debounce
-  };
-
-  const handleSelectSuggestion = (suggestion: { display_name?: string; place_id?: string; lat?: string; lon?: string }) => {
-    setFormData((prev) => ({ ...prev, location: suggestion.display_name || '' }));
-    setSelectedLocation(suggestion);
-    setShowSuggestions(false);
-    setLocationSuggestions([]);
   };
 
   const handleGetLocation = async () => {
@@ -1043,8 +1003,8 @@ export default function ManualShiftManagementPage() {
                   className="border-[#e5e5e6] rounded-md pr-10"
                   placeholder="Type to search for location..."
                   onFocus={() => {
-                    if (locationSuggestions.length > 0) {
-                      setShowSuggestions(true);
+                    if (locationAutocomplete.suggestions.length > 0) {
+                      locationAutocomplete.setShowSuggestions(true);
                     }
                   }}
                 />
@@ -1060,24 +1020,23 @@ export default function ManualShiftManagementPage() {
                   />
                 </button>
                 
-                {/* Suggestions Dropdown */}
-                {showSuggestions && locationSuggestions.length > 0 && (
+                {locationAutocomplete.showSuggestions && locationAutocomplete.suggestions.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
-                    {searchingLocation && (
+                    {locationAutocomplete.isSearching && (
                       <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent"></div>
                         Searching...
                       </div>
                     )}
-                    {!searchingLocation && locationSuggestions.map((suggestion) => (
+                    {!locationAutocomplete.isSearching && locationAutocomplete.suggestions.map((suggestion) => (
                       <div
-                        key={suggestion.place_id}
-                        onClick={() => handleSelectSuggestion(suggestion)}
+                        key={suggestion.placeId}
+                        onClick={() => handleSelectSuggestion(suggestion.placeId)}
                         className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
                       >
                         <div className="flex items-start gap-2">
                           <MapPin className="w-4 h-4 text-[#00b4b8] shrink-0 mt-0.5" />
-                          <span className="line-clamp-2">{suggestion.display_name}</span>
+                          <span className="line-clamp-2">{suggestion.description}</span>
                         </div>
                       </div>
                     ))}

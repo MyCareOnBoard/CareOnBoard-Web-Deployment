@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CalendarDays, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { AddClientFormData } from "@/pages/shared/client-management/types/formData";
 import { Agency } from "@/lib/api/clients";
+import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 
 export function Stage1ClientIdentityAndContact({
   showAgencySelection = false,
@@ -76,204 +77,56 @@ export function Stage1ClientIdentityAndContact({
 
   const [isDobOpen, setIsDobOpen] = useState(false);
 
-  const [addressSuggestions, setAddressSuggestions] = useState<
-    Array<{
-      display_name?: string;
-      place_id: string;
-      lat: string;
-      lon: string;
-      address?: {
-        county?: string;
-        state?: string;
-        postcode?: string;
-        state_district?: string;
-        city?: string;
-        town?: string;
-        village?: string;
-      };
-    }>
-  >([]);
-  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
-  const [searchingAddress, setSearchingAddress] = useState(false);
   const addressInputRef = useRef<HTMLDivElement>(null);
-  const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const [secondaryAddressSuggestions, setSecondaryAddressSuggestions] = useState<
-    Array<{
-      display_name?: string;
-      place_id: string;
-      lat: string;
-      lon: string;
-      address?: {
-        county?: string;
-        state?: string;
-        postcode?: string;
-        state_district?: string;
-        city?: string;
-        town?: string;
-        village?: string;
-      };
-    }>
-  >([]);
-  const [showSecondaryAddressSuggestions, setShowSecondaryAddressSuggestions] = useState(false);
-  const [searchingSecondaryAddress, setSearchingSecondaryAddress] = useState(false);
   const secondaryAddressInputRef = useRef<HTMLDivElement>(null);
-  const secondaryAddressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const primaryAddress = useGooglePlacesAutocomplete();
+  const secondaryAddress = useGooglePlacesAutocomplete();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (addressInputRef.current && !addressInputRef.current.contains(event.target as Node)) {
-        setShowAddressSuggestions(false);
+        primaryAddress.setShowSuggestions(false);
       }
       if (secondaryAddressInputRef.current && !secondaryAddressInputRef.current.contains(event.target as Node)) {
-        setShowSecondaryAddressSuggestions(false);
+        secondaryAddress.setShowSuggestions(false);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      if (addressSearchTimeoutRef.current) {
-        clearTimeout(addressSearchTimeoutRef.current);
-      }
-      if (secondaryAddressSearchTimeoutRef.current) {
-        clearTimeout(secondaryAddressSearchTimeoutRef.current);
-      }
-    };
-  }, []);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [primaryAddress.setShowSuggestions, secondaryAddress.setShowSuggestions]);
 
-  const handleAddressSearch = useCallback(async (query: string) => {
-    if (addressSearchTimeoutRef.current) {
-      clearTimeout(addressSearchTimeoutRef.current);
+  const handleSelectAddressSuggestion = async (placeId: string) => {
+    const details = await primaryAddress.selectSuggestion(placeId);
+    if (details) {
+      const countyStateValue =
+        details.county && details.state
+          ? `${details.county} / ${details.state}`
+          : details.county || details.state;
+      updateStage1({
+        address: details.formattedAddress,
+        location: { lat: String(details.lat), lon: String(details.lng) },
+        countyState: countyStateValue,
+        zipCode: details.zipCode,
+      });
     }
-
-    if (query.trim().length < 3) {
-      setShowAddressSuggestions(false);
-      setAddressSuggestions([]);
-      return;
-    }
-
-    addressSearchTimeoutRef.current = setTimeout(async () => {
-      try {
-        setSearchingAddress(true);
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            query
-          )}&limit=5&addressdetails=1`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch address suggestions");
-        }
-
-        const data = await response.json();
-        setAddressSuggestions(data);
-        setShowAddressSuggestions(data.length > 0);
-      } catch (error) {
-        console.error("Failed to fetch address suggestions:", error);
-        setAddressSuggestions([]);
-        setShowAddressSuggestions(false);
-      } finally {
-        setSearchingAddress(false);
-      }
-    }, 500);
-  }, []);
-
-  const handleSelectAddressSuggestion = (suggestion: {
-    display_name?: string;
-    place_id: string;
-    lat: string;
-    lon: string;
-    address?: {
-      county?: string;
-      state?: string;
-      postcode?: string;
-      state_district?: string;
-    };
-  }) => {
-    setShowAddressSuggestions(false);
-    setAddressSuggestions([]);
-
-    const county = suggestion.address?.county || suggestion.address?.state_district || "";
-    const state = suggestion.address?.state || "";
-    const postcode = suggestion.address?.postcode || "";
-
-    const countyStateValue =
-      county && state ? `${county} / ${state}` : county || state;
-
-    updateStage1({
-      address: suggestion.display_name || "",
-      location: { lat: suggestion.lat, lon: suggestion.lon },
-      countyState: countyStateValue,
-      zipCode: postcode,
-    });
   };
 
-  const handleSecondaryAddressSearch = useCallback(async (query: string) => {
-    if (secondaryAddressSearchTimeoutRef.current) {
-      clearTimeout(secondaryAddressSearchTimeoutRef.current);
+  const handleSelectSecondaryAddressSuggestion = async (placeId: string) => {
+    const details = await secondaryAddress.selectSuggestion(placeId);
+    if (details) {
+      const countyStateValue =
+        details.county && details.state
+          ? `${details.county} / ${details.state}`
+          : details.county || details.state;
+      updateStage1({
+        secondaryAddress: details.formattedAddress,
+        secondaryLocation: { lat: String(details.lat), lon: String(details.lng) },
+        secondaryCountyState: countyStateValue,
+        secondaryZipCode: details.zipCode,
+      });
     }
-
-    if (query.trim().length < 3) {
-      setShowSecondaryAddressSuggestions(false);
-      setSecondaryAddressSuggestions([]);
-      return;
-    }
-
-    secondaryAddressSearchTimeoutRef.current = setTimeout(async () => {
-      try {
-        setSearchingSecondaryAddress(true);
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            query
-          )}&limit=5&addressdetails=1`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch address suggestions");
-        }
-
-        const data = await response.json();
-        setSecondaryAddressSuggestions(data);
-        setShowSecondaryAddressSuggestions(data.length > 0);
-      } catch (error) {
-        console.error("Failed to fetch address suggestions:", error);
-        setSecondaryAddressSuggestions([]);
-        setShowSecondaryAddressSuggestions(false);
-      } finally {
-        setSearchingSecondaryAddress(false);
-      }
-    }, 500);
-  }, []);
-
-  const handleSelectSecondaryAddressSuggestion = (suggestion: {
-    display_name?: string;
-    place_id: string;
-    lat: string;
-    lon: string;
-    address?: {
-      county?: string;
-      state?: string;
-      postcode?: string;
-      state_district?: string;
-    };
-  }) => {
-    setShowSecondaryAddressSuggestions(false);
-    setSecondaryAddressSuggestions([]);
-
-    const county = suggestion.address?.county || suggestion.address?.state_district || "";
-    const state = suggestion.address?.state || "";
-    const postcode = suggestion.address?.postcode || "";
-
-    const countyStateValue =
-      county && state ? `${county} / ${state}` : county || state;
-
-    updateStage1({
-      secondaryAddress: suggestion.display_name || "",
-      secondaryLocation: { lat: suggestion.lat, lon: suggestion.lon },
-      secondaryCountyState: countyStateValue,
-      secondaryZipCode: postcode,
-    });
   };
 
   return (
@@ -484,34 +337,34 @@ export function Stage1ClientIdentityAndContact({
                 onChange={(e) => {
                   const v = e.target.value;
                   updateStage1({ address: v, location: undefined });
-                  handleAddressSearch(v);
+                  primaryAddress.handleInputChange(v);
                 }}
                 onFocus={() => {
-                  if (addressSuggestions.length > 0) {
-                    setShowAddressSuggestions(true);
+                  if (primaryAddress.suggestions.length > 0) {
+                    primaryAddress.setShowSuggestions(true);
                   }
                 }}
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                 placeholder="Enter primary address"
               />
 
-              {showAddressSuggestions && addressSuggestions.length > 0 && (
+              {primaryAddress.showSuggestions && primaryAddress.suggestions.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
-                  {searchingAddress && (
+                  {primaryAddress.isSearching && (
                     <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
                       Searching...
                     </div>
                   )}
-                  {!searchingAddress &&
-                    addressSuggestions.map((suggestion) => (
+                  {!primaryAddress.isSearching &&
+                    primaryAddress.suggestions.map((suggestion) => (
                       <div
-                        key={suggestion.place_id}
-                        onClick={() => handleSelectAddressSuggestion(suggestion)}
+                        key={suggestion.placeId}
+                        onClick={() => handleSelectAddressSuggestion(suggestion.placeId)}
                         className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
                       >
                         <span className="line-clamp-2">
-                          {suggestion.display_name}
+                          {suggestion.description}
                         </span>
                       </div>
                     ))}
@@ -555,34 +408,34 @@ export function Stage1ClientIdentityAndContact({
                   onChange={(e) => {
                     const v = e.target.value;
                     updateStage1({ secondaryAddress: v, secondaryLocation: undefined });
-                    handleSecondaryAddressSearch(v);
+                    secondaryAddress.handleInputChange(v);
                   }}
                   onFocus={() => {
-                    if (secondaryAddressSuggestions.length > 0) {
-                      setShowSecondaryAddressSuggestions(true);
+                    if (secondaryAddress.suggestions.length > 0) {
+                      secondaryAddress.setShowSuggestions(true);
                     }
                   }}
                   className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                   placeholder="Enter secondary address"
                 />
 
-                {showSecondaryAddressSuggestions && secondaryAddressSuggestions.length > 0 && (
+                {secondaryAddress.showSuggestions && secondaryAddress.suggestions.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
-                    {searchingSecondaryAddress && (
+                    {secondaryAddress.isSearching && (
                       <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
                         Searching...
                       </div>
                     )}
-                    {!searchingSecondaryAddress &&
-                      secondaryAddressSuggestions.map((suggestion) => (
+                    {!secondaryAddress.isSearching &&
+                      secondaryAddress.suggestions.map((suggestion) => (
                         <div
-                          key={suggestion.place_id}
-                          onClick={() => handleSelectSecondaryAddressSuggestion(suggestion)}
+                          key={suggestion.placeId}
+                          onClick={() => handleSelectSecondaryAddressSuggestion(suggestion.placeId)}
                           className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
                         >
                           <span className="line-clamp-2">
-                            {suggestion.display_name}
+                            {suggestion.description}
                           </span>
                         </div>
                       ))}

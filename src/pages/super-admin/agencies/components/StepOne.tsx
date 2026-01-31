@@ -1,87 +1,42 @@
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import React, {useCallback, useEffect, useRef, useState} from "react";
+import React, {useEffect, useRef} from "react";
 import {cn} from "@/lib/utils";
-
-type AddressSuggestion = {
-    display_name?: string;
-    place_id: string;
-    lat: string;
-    lon: string;
-    address?: {
-        county?: string;
-        state?: string;
-        postcode?: string;
-        state_district?: string;
-    };
-};
+import {useGooglePlacesAutocomplete} from "@/hooks/useGooglePlacesAutocomplete";
 
 export default function Step1AgencyIdentity({formData, onChange, fieldsWithErrors}: any) {
-    const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
-    const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
-    const [searchingAddress, setSearchingAddress] = useState(false);
     const addressInputRef = useRef<HTMLDivElement>(null);
-    const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const {
+        suggestions,
+        isSearching,
+        showSuggestions,
+        setShowSuggestions,
+        handleInputChange,
+        selectSuggestion,
+    } = useGooglePlacesAutocomplete();
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (addressInputRef.current && !addressInputRef.current.contains(event.target as Node)) {
-                setShowAddressSuggestions(false);
+                setShowSuggestions(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-            if (addressSearchTimeoutRef.current) {
-                clearTimeout(addressSearchTimeoutRef.current);
-            }
-        };
-    }, []);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [setShowSuggestions]);
 
-    const handleAddressSearch = useCallback((query: string) => {
-        if (addressSearchTimeoutRef.current) {
-            clearTimeout(addressSearchTimeoutRef.current);
+    const handleSelectAddressSuggestion = async (placeId: string) => {
+        const details = await selectSuggestion(placeId);
+        if (details) {
+            const countyStateValue =
+                details.county && details.state
+                    ? `${details.county} / ${details.state}`
+                    : details.county || details.state;
+            onChange("primaryAddress", details.formattedAddress);
+            onChange("county_or_state", countyStateValue);
+            onChange("zipCode", details.zipCode);
         }
-        if (query.trim().length < 3) {
-            setShowAddressSuggestions(false);
-            setAddressSuggestions([]);
-            return;
-        }
-        addressSearchTimeoutRef.current = setTimeout(async () => {
-            try {
-                setSearchingAddress(true);
-                const response = await fetch(
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-                        query
-                    )}&limit=5&addressdetails=1`
-                );
-                if (!response.ok) {
-                    throw new Error("Failed to fetch address suggestions");
-                }
-                const data = await response.json();
-                setAddressSuggestions(data);
-                setShowAddressSuggestions(data.length > 0);
-            } catch (error) {
-                console.error("Failed to fetch address suggestions:", error);
-                setAddressSuggestions([]);
-                setShowAddressSuggestions(false);
-            } finally {
-                setSearchingAddress(false);
-            }
-        }, 500);
-    }, []);
-
-    const handleSelectAddressSuggestion = (suggestion: AddressSuggestion) => {
-        setShowAddressSuggestions(false);
-        setAddressSuggestions([]);
-        const county = suggestion.address?.county || suggestion.address?.state_district || "";
-        const state = suggestion.address?.state || "";
-        const postcode = suggestion.address?.postcode || "";
-        const countyStateValue = county && state ? `${county} / ${state}` : county || state;
-        onChange("primaryAddress", suggestion.display_name || "");
-        onChange("county_or_state", countyStateValue);
-        onChange("zipCode", postcode);
     };
 
     return (
@@ -237,11 +192,11 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
                                 value={formData.primaryAddress}
                                 onChange={(e) => {
                                     onChange("primaryAddress", e.target.value);
-                                    handleAddressSearch(e.target.value);
+                                    handleInputChange(e.target.value);
                                 }}
                                 onFocus={() => {
-                                    if (addressSuggestions.length > 0) {
-                                        setShowAddressSuggestions(true);
+                                    if (suggestions.length > 0) {
+                                        setShowSuggestions(true);
                                     }
                                 }}
                                 placeholder="Enter primary address"
@@ -250,23 +205,23 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
                                     fieldsWithErrors.includes("primaryAddress") && "border-red-500"
                                 )}
                             />
-                            {showAddressSuggestions && addressSuggestions.length > 0 && (
+                            {showSuggestions && suggestions.length > 0 && (
                                 <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
-                                    {searchingAddress && (
+                                    {isSearching && (
                                         <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
                                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
                                             Searching...
                                         </div>
                                     )}
-                                    {!searchingAddress &&
-                                        addressSuggestions.map((suggestion) => (
+                                    {!isSearching &&
+                                        suggestions.map((suggestion) => (
                                             <div
-                                                key={suggestion.place_id}
-                                                onClick={() => handleSelectAddressSuggestion(suggestion)}
+                                                key={suggestion.placeId}
+                                                onClick={() => handleSelectAddressSuggestion(suggestion.placeId)}
                                                 className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
                                             >
                                                 <span className="line-clamp-2">
-                                                    {suggestion.display_name}
+                                                    {suggestion.description}
                                                 </span>
                                             </div>
                                         ))}
