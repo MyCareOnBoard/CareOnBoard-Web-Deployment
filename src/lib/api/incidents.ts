@@ -28,7 +28,7 @@ export enum IncidentStatus {
  * Incident Report Interface
  */
 export interface IncidentReport {
-    _id: string;
+    id: string;
     agencyId: string;
     employeeId: string;
     clientId: string;
@@ -51,7 +51,7 @@ export interface IncidentReport {
     updatedAt: string;
     reportedDate?: string;
     employee?: {
-        _id: string;
+        id: string;
         fullName?: string;
         firstName?: string;
         lastName?: string;

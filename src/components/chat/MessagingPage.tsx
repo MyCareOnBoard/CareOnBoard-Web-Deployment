@@ -89,7 +89,7 @@ export function MessagingPage({
         if (isNewMessageModalOpen) {
             fetchContacts();
         }
-    }, [isNewMessageModalOpen, fetchContacts]);
+    }, [isNewMessageModalOpen]);
 
     // Show chat view when conversation is selected (for mobile)
     useEffect(() => {

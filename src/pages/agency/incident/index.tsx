@@ -150,7 +150,7 @@ export default function IncidentPage() {
     // Optimistically update local state
     setIncidents((prevIncidents) =>
       prevIncidents.map((inc) =>
-        inc._id === incidentId
+        inc.id === incidentId
           ? {
               ...inc,
               status:
@@ -290,7 +290,7 @@ export default function IncidentPage() {
             {/* Incident List */}
             <div className="divide-y divide-[#e5e7eb]">
               {incidents.map((incident) => (
-                <div key={incident._id} className="p-4 sm:p-6">
+                <div key={incident.id} className="p-4 sm:p-6">
                   {/* Mobile/Tablet Layout */}
                   <div className="flex flex-col gap-4 lg:hidden">
                     {/* Client & DSP Row */}
