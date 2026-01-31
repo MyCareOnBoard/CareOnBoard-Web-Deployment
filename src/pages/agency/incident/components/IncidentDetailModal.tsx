@@ -48,7 +48,7 @@ export default function IncidentDetailModal({ incident, onClose, onStatusUpdate 
 
     try {
       setLoading(true);
-      await resolveIncident(incident._id, {
+      await resolveIncident(incident.id, {
         reviewerId: user.id,
         reviewerNotes: resolveNotes.trim(),
       });
@@ -56,7 +56,7 @@ export default function IncidentDetailModal({ incident, onClose, onStatusUpdate 
         title: "Success",
         description: "Incident has been resolved",
       });
-      onStatusUpdate(incident._id, "resolved");
+      onStatusUpdate(incident.id, "resolved");
       onClose();
     } catch (error: any) {
       const errorMessage =
@@ -95,7 +95,7 @@ export default function IncidentDetailModal({ incident, onClose, onStatusUpdate 
 
     try {
       setLoading(true);
-      await markIncidentNotResolved(incident._id, {
+      await markIncidentNotResolved(incident.id, {
         reviewerId: user.id,
         reason: notResolvedReason.trim(),
       });
@@ -103,7 +103,7 @@ export default function IncidentDetailModal({ incident, onClose, onStatusUpdate 
         title: "Success",
         description: "Incident has been marked as not resolved",
       });
-      onStatusUpdate(incident._id, "not-resolved");
+      onStatusUpdate(incident.id, "not-resolved");
       onClose();
     } catch (error: any) {
       const errorMessage =
