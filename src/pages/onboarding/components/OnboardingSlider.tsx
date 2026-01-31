@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
 import SlideOne from "./SlideOne";
-import SlideTwo from "./SlideTwo";
+// import SlideTwo from "./SlideTwo";
 import SlideThree from "./SlideThree";
 import SlideFour from "./SlideFour";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -19,7 +19,7 @@ export default function OnboardingSlider() {
 
   const slides = [
     { id: "s1", comp: <SlideOne />, badge: "Introduction to Agency & DDD" },
-    { id: "s2", comp: <SlideTwo />, badge: "Role Overview" },
+    // { id: "s2", comp: <SlideTwo />, badge: "Role Overview" },
     { id: "s3", comp: <SlideThree />, badge: "Minimum Requirements" },
     {
       id: "s4",

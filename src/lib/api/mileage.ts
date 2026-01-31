@@ -102,4 +102,9 @@ export const mileageApi = {
     const response = await axiosClient.post<RideActionResponse>(`/mileage/${id}/cancel`, payload);
     return response.data;
   },
+
+  create: async (payload: any) => {
+    const response = await axiosClient.post(`/agencyMileage`, payload);
+    return response.data;
+  },
 };
