@@ -2,7 +2,7 @@ import {useState, useEffect, useMemo} from "react";
 import {useNavigate} from "react-router";
 import {Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado} from "lucide-react";
 import {Button} from "@/components/ui/button";
-import {Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation} from "@/lib/api/shifts";
+import {Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation, getAvailableShifts} from "@/lib/api/shifts";
 import {format} from "date-fns";
 import {ClockOutModal} from "./ClockOutModal";
 import {LocationErrorModal} from "./LocationErrorModal";
@@ -219,7 +219,6 @@ function ShiftCard({
   };
 
   const getActionButton = () => {
-    console.log("shift", shift.actionStatus);
     if (!showAction || !shift.actionStatus) return null;
     if (panel === 'today' && isShiftExpired(shift)) return null;
 
@@ -713,24 +712,9 @@ export default function ShiftManagementPage() {
 
       try {
         setUpcomingLoading(true);
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const todayShiftsResponse = await listShifts({
-          date: today,
-          employeeId: employeeId,
-          agencyId: agencyId,
-        });
-        if (todayShiftsResponse.success) {
-          const filteredShifts = todayShiftsResponse.shifts.filter(shift => {
-            if (currentShift && shift.id === currentShift.id) {
-              return false;
-            }
-            if (isShiftPassed(shift.endTime, shift.date)) {
-              return false;
-            }
-            return true;
-          });
-          setUpcomingShifts(filteredShifts);
-        }
+
+        const todayShiftsResponse = await getAvailableShifts(20, agencyId, employeeId);
+        setUpcomingShifts(todayShiftsResponse.shifts);
     } catch (error: any) {
       console.error('Failed to load upcoming shifts:', error);
       toast.error('Failed to load upcoming shifts', {
