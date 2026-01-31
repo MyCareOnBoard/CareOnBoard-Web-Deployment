@@ -7,6 +7,7 @@ import { searchClients, Client } from "@/lib/api/clients";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import { mileageApi } from "@/lib/api/mileage";
+import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 
 interface AddMileageModalProps {
   isOpen: boolean;
@@ -54,16 +55,9 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- Location search states ---
-  const [startLocationResults, setStartLocationResults] = useState<any[]>([]);
-  const [showStartLocationDropdown, setShowStartLocationDropdown] = useState(false);
-  const [isSearchingStartLocation, setIsSearchingStartLocation] = useState(false);
-  const startLocationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const [dropOffLocationResults, setDropOffLocationResults] = useState<any[]>([]);
-  const [showDropOffLocationDropdown, setShowDropOffLocationDropdown] = useState(false);
-  const [isSearchingDropOffLocation, setIsSearchingDropOffLocation] = useState(false);
-  const dropOffLocationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // --- Location autocomplete hooks ---
+  const startLocationAutocomplete = useGooglePlacesAutocomplete();
+  const dropOffLocationAutocomplete = useGooglePlacesAutocomplete();
 
   // --- Client search handler ---
   const handleClientSearch = (query: string) => {
@@ -125,73 +119,19 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
     setDspSearchResults([]);
   };
 
-  // --- Location search handlers ---
-  const handleStartLocationSearch = (query: string) => {
-    if (startLocationTimeoutRef.current) clearTimeout(startLocationTimeoutRef.current);
-    if (query.trim().length < 3) {
-      setStartLocationResults([]);
-      setShowStartLocationDropdown(false);
-      return;
+  // --- Location select handlers ---
+  const handleStartLocationSelect = async (placeId: string) => {
+    const details = await startLocationAutocomplete.selectSuggestion(placeId);
+    if (details) {
+      setFormData(prev => ({ ...prev, startIn: details.formattedAddress }));
     }
-    startLocationTimeoutRef.current = setTimeout(async () => {
-      setIsSearchingStartLocation(true);
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`
-        );
-        const data = await response.json();
-        setStartLocationResults(data);
-        setShowStartLocationDropdown(data.length > 0);
-      } catch {
-        setStartLocationResults([]);
-        setShowStartLocationDropdown(false);
-      } finally {
-        setIsSearchingStartLocation(false);
-      }
-    }, 400);
   };
 
-  const handleStartLocationSelect = (location: any) => {
-    setFormData(prev => ({
-      ...prev,
-      startIn: location.display_name || "",
-    }));
-    setShowStartLocationDropdown(false);
-    setStartLocationResults([]);
-  };
-
-  const handleDropOffLocationSearch = (query: string) => {
-    if (dropOffLocationTimeoutRef.current) clearTimeout(dropOffLocationTimeoutRef.current);
-    if (query.trim().length < 3) {
-      setDropOffLocationResults([]);
-      setShowDropOffLocationDropdown(false);
-      return;
+  const handleDropOffLocationSelect = async (placeId: string) => {
+    const details = await dropOffLocationAutocomplete.selectSuggestion(placeId);
+    if (details) {
+      setFormData(prev => ({ ...prev, dropOff: details.formattedAddress }));
     }
-    dropOffLocationTimeoutRef.current = setTimeout(async () => {
-      setIsSearchingDropOffLocation(true);
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`
-        );
-        const data = await response.json();
-        setDropOffLocationResults(data);
-        setShowDropOffLocationDropdown(data.length > 0);
-      } catch {
-        setDropOffLocationResults([]);
-        setShowDropOffLocationDropdown(false);
-      } finally {
-        setIsSearchingDropOffLocation(false);
-      }
-    }, 400);
-  };
-
-  const handleDropOffLocationSelect = (location: any) => {
-    setFormData(prev => ({
-      ...prev,
-      dropOff: location.display_name || "",
-    }));
-    setShowDropOffLocationDropdown(false);
-    setDropOffLocationResults([]);
   };
 
   const handleInputChange = (field: keyof Omit<MileageFormData, 'selectDate' | 'schedulingType'>, value: string) => {
@@ -433,27 +373,27 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
                   value={formData.startIn}
                   onChange={(e) => {
                     setFormData(prev => ({ ...prev, startIn: e.target.value }));
-                    handleStartLocationSearch(e.target.value);
+                    startLocationAutocomplete.handleInputChange(e.target.value);
                   }}
                   onFocus={() => {
-                    if (startLocationResults.length > 0) setShowStartLocationDropdown(true);
+                    if (startLocationAutocomplete.suggestions.length > 0) startLocationAutocomplete.setShowSuggestions(true);
                   }}
                   className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
                   autoComplete="off"
                 />
-                {isSearchingStartLocation && (
+                {startLocationAutocomplete.isSearching && (
                   <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
                 )}
-                {/* Location Dropdown - ensure it's inside the input container */}
-                {showStartLocationDropdown && startLocationResults.length > 0 && (
+                {startLocationAutocomplete.showSuggestions && startLocationAutocomplete.suggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-[44px] mt-0 bg-white border border-[#cccccd] rounded-xl shadow-lg z-[100] max-h-[200px] overflow-y-auto">
-                    {startLocationResults.map((location) => (
+                    {startLocationAutocomplete.suggestions.map((suggestion) => (
                       <button
-                        key={location.place_id}
-                        onClick={() => handleStartLocationSelect(location)}
+                        key={suggestion.placeId}
+                        type="button"
+                        onClick={() => handleStartLocationSelect(suggestion.placeId)}
                         className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
                       >
-                        <p className="text-[14px] font-normal text-black">{location.display_name}</p>
+                        <p className="text-[14px] font-normal text-black">{suggestion.description}</p>
                       </button>
                     ))}
                   </div>
@@ -471,27 +411,27 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
                   value={formData.dropOff}
                   onChange={(e) => {
                     setFormData(prev => ({ ...prev, dropOff: e.target.value }));
-                    handleDropOffLocationSearch(e.target.value);
+                    dropOffLocationAutocomplete.handleInputChange(e.target.value);
                   }}
                   onFocus={() => {
-                    if (dropOffLocationResults.length > 0) setShowDropOffLocationDropdown(true);
+                    if (dropOffLocationAutocomplete.suggestions.length > 0) dropOffLocationAutocomplete.setShowSuggestions(true);
                   }}
                   className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
                   autoComplete="off"
                 />
-                {isSearchingDropOffLocation && (
+                {dropOffLocationAutocomplete.isSearching && (
                   <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
                 )}
-                {/* Location Dropdown - ensure it's inside the input container */}
-                {showDropOffLocationDropdown && dropOffLocationResults.length > 0 && (
+                {dropOffLocationAutocomplete.showSuggestions && dropOffLocationAutocomplete.suggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-[44px] mt-0 bg-white border border-[#cccccd] rounded-xl shadow-lg z-[100] max-h-[200px] overflow-y-auto">
-                    {dropOffLocationResults.map((location) => (
+                    {dropOffLocationAutocomplete.suggestions.map((suggestion) => (
                       <button
-                        key={location.place_id}
-                        onClick={() => handleDropOffLocationSelect(location)}
+                        key={suggestion.placeId}
+                        type="button"
+                        onClick={() => handleDropOffLocationSelect(suggestion.placeId)}
                         className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
                       >
-                        <p className="text-[14px] font-normal text-black">{location.display_name}</p>
+                        <p className="text-[14px] font-normal text-black">{suggestion.description}</p>
                       </button>
                     ))}
                   </div>

@@ -18,6 +18,7 @@ import {
 import {toast} from "sonner";
 import {useAuth} from "@/utils/auth/context/AuthContext";
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
+import {useReverseGeocode} from "@/hooks/useReverseGeocode";
 
 const convertTimeToISODate = (timeStringReplaced: string, dateString: string): Date => {
   const timeString = timeStringReplaced.replace(".", ":");
@@ -833,6 +834,8 @@ export default function ShiftManagementPage() {
     ]);
   };
 
+  const { reverseGeocode } = useReverseGeocode();
+
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -840,25 +843,11 @@ export default function ShiftManagementPage() {
           const {latitude, longitude} = position.coords;
 
           try {
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+            const result = await reverseGeocode(latitude, longitude);
+            setUserLocation(
+              result?.formattedAddress ?? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
             );
-            const data = await response.json();
-
-            if (data.address) {
-              const address = [
-                data.address.road || data.address.suburb,
-                data.address.city || data.address.town || data.address.village,
-                data.address.state
-              ]
-                .filter(Boolean)
-                .join(", ");
-
-              setUserLocation(address || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-            } else {
-              setUserLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-            }
-          } catch (error) {
+          } catch {
             setUserLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
           }
         },

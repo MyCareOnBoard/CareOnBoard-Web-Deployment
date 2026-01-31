@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,6 +20,7 @@ import CalendarDaysIcon from "@/assets/icons/calendar-days.svg?react";
 import { Loader } from "lucide-react";
 import { format, differenceInYears, subYears } from "date-fns";
 import { uploadResume, submitPreScreening, getPreScreening, updatePreScreening, type PreScreeningData } from "@/lib/api/job-application";
+import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 
 const DEFAULT_DOB = new Date();
 
@@ -90,25 +91,8 @@ export default function ProfilePreScreeningStep({ onSuccess }: ProfilePreScreeni
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useAuth();
 
-  // Address autocomplete state
-  const [addressSuggestions, setAddressSuggestions] = useState<
-    Array<{
-      display_name?: string;
-      place_id: string;
-      lat: string;
-      lon: string;
-      address?: {
-        county?: string;
-        state?: string;
-        postcode?: string;
-        state_district?: string;
-      };
-    }>
-  >([]);
-  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
-  const [searchingAddress, setSearchingAddress] = useState(false);
   const addressInputRef = useRef<HTMLDivElement>(null);
-  const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const addressAutocomplete = useGooglePlacesAutocomplete();
 
   const form = useForm<ProfilePreScreeningFormValues>({
     resolver: zodResolver(profilePreScreeningSchema),
@@ -141,22 +125,16 @@ export default function ProfilePreScreeningStep({ onSuccess }: ProfilePreScreeni
   const ellibility = form.watch("booleanQuestions.eligibleToWork");
   const isEligible = ellibility === "Yes";
 
-  // Handle click outside for address suggestions
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (addressInputRef.current && !addressInputRef.current.contains(event.target as Node)) {
-        setShowAddressSuggestions(false);
+        addressAutocomplete.setShowSuggestions(false);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      if (addressSearchTimeoutRef.current) {
-        clearTimeout(addressSearchTimeoutRef.current);
-      }
-    };
-  }, []);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [addressAutocomplete.setShowSuggestions]);
 
   useEffect(() => {
     if (dateOfBirth) {
@@ -225,74 +203,20 @@ export default function ProfilePreScreeningStep({ onSuccess }: ProfilePreScreeni
     fetchExistingData();
   }, [user]);
 
-  const handleAddressSearch = useCallback(async (query: string) => {
-    if (addressSearchTimeoutRef.current) {
-      clearTimeout(addressSearchTimeoutRef.current);
+  const handleSelectAddressSuggestion = async (placeId: string) => {
+    const details = await addressAutocomplete.selectSuggestion(placeId);
+    if (details) {
+      form.setValue("address", {
+        address: details.formattedAddress,
+        city: details.city,
+        zipCode: details.zipCode,
+        latlon: { lat: String(details.lat), lon: String(details.lng) },
+      }, {
+        shouldValidate: true,
+        shouldDirty: true,
+        shouldTouch: true,
+      });
     }
-
-    if (query.trim().length < 3) {
-      setShowAddressSuggestions(false);
-      setAddressSuggestions([]);
-      return;
-    }
-
-    addressSearchTimeoutRef.current = setTimeout(async () => {
-      try {
-        setSearchingAddress(true);
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            query
-          )}&limit=5&addressdetails=1`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch address suggestions");
-        }
-
-        const data = await response.json();
-        setAddressSuggestions(data);
-        setShowAddressSuggestions(data.length > 0);
-      } catch (error) {
-        console.error("Failed to fetch address suggestions:", error);
-        setAddressSuggestions([]);
-        setShowAddressSuggestions(false);
-      } finally {
-        setSearchingAddress(false);
-      }
-    }, 500);
-  }, []);
-
-  const handleSelectAddressSuggestion = (suggestion: {
-    display_name?: string;
-    place_id: string;
-    lat: string;
-    lon: string;
-    address?: {
-      county?: string;
-      state?: string;
-      postcode?: string;
-      state_district?: string;
-      city?: string;
-      town?: string;
-      village?: string;
-    };
-  }) => {
-    setShowAddressSuggestions(false);
-    setAddressSuggestions([]);
-
-    const zipCode = suggestion.address?.postcode || "";
-    const city = suggestion.address?.city || suggestion.address?.town || suggestion.address?.village || "";
-
-    form.setValue("address", {
-      address: suggestion.display_name || "",
-      city: city,
-      zipCode: zipCode,
-      latlon: { lat: suggestion.lat, lon: suggestion.lon },
-    }, {
-      shouldValidate: true,
-      shouldDirty: true,
-      shouldTouch: true,
-    });
   };
 
   const handleSubmit = async (values: ProfilePreScreeningFormValues) => {
@@ -504,31 +428,31 @@ export default function ProfilePreScreeningStep({ onSuccess }: ProfilePreScreeni
                           const v = e.target.value;
                           field.onChange(v);
                           form.setValue("address.latlon", undefined);
-                          handleAddressSearch(v);
+                          addressAutocomplete.handleInputChange(v);
                         }}
                         onFocus={() => {
-                          if (addressSuggestions.length > 0) {
-                            setShowAddressSuggestions(true);
+                          if (addressAutocomplete.suggestions.length > 0) {
+                            addressAutocomplete.setShowSuggestions(true);
                           }
                         }}
                       />
-                      {showAddressSuggestions && addressSuggestions.length > 0 && (
+                      {addressAutocomplete.showSuggestions && addressAutocomplete.suggestions.length > 0 && (
                         <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
-                          {searchingAddress && (
+                          {addressAutocomplete.isSearching && (
                             <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
                               <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
                               Searching...
                             </div>
                           )}
-                          {!searchingAddress &&
-                            addressSuggestions.map((suggestion) => (
+                          {!addressAutocomplete.isSearching &&
+                            addressAutocomplete.suggestions.map((suggestion) => (
                               <div
-                                key={suggestion.place_id}
-                                onClick={() => handleSelectAddressSuggestion(suggestion)}
+                                key={suggestion.placeId}
+                                onClick={() => handleSelectAddressSuggestion(suggestion.placeId)}
                                 className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
                               >
                                 <span className="line-clamp-2">
-                                  {suggestion.display_name}
+                                  {suggestion.description}
                                 </span>
                               </div>
                             ))}
