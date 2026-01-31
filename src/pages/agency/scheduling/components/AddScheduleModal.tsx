@@ -1164,7 +1164,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             </div>
 
             {/* Form - Scrollable */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="flex-1 overflow-y-auto px-5 py-4">
               <div className="flex flex-col gap-4">
                 {/* Client Field */}
                 <div className="flex flex-col gap-1 relative">
