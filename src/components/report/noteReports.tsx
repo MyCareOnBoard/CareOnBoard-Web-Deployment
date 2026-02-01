@@ -29,6 +29,7 @@ export default function NoteReport() {
     const [selectedDSP, setSelectedDSP] = useState<NoteReportType | null>(null);
     const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
     const [noteType, setNoteType] = useState<string>("all");
+    const [triggerRefetch, setTriggerRefetch] = useState<number>(0);
 
     const handleDateSelect = (
         name: string,
@@ -40,12 +41,17 @@ export default function NoteReport() {
         }));
     };
 
+    const handleGenerateReport = () => {
+        setTriggerRefetch(prev => prev + 1);
+    };
+
     const filters = useMemo(() => ({
         noteType,
         startDate: dates.startDate?.toISOString().slice(0, 10),
         endDate: dates.endDate?.toISOString().slice(0, 10),
-        isLifetime: false
-    }), [noteType, dates.startDate, dates.endDate]);
+        isLifetime: false,
+        _trigger: triggerRefetch
+    }), [noteType, dates.startDate, dates.endDate, triggerRefetch]);
 
     const { data: agencyData, isLoading: agencyLoading } = useGetNotesReportQuery(filters, {
         skip: isSuperAdmin
@@ -97,7 +103,8 @@ export default function NoteReport() {
                         setDate={(e) => handleDateSelect("endDate", e)}
                     />
                     <Button
-                        className="h-[44px] rounded-[8px] bg-[#00b4b8] text-white"
+                        onClick={handleGenerateReport}
+                        className="h-[44px] rounded-[8px] bg-[#00b4b8] text-white hover:bg-[#009ea1]"
                     >
                         Generate
                     </Button>

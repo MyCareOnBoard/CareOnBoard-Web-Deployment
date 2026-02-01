@@ -1,20 +1,19 @@
 import React, {useState, useMemo} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
-import {Search, X, FileText, Loader2} from "lucide-react";
+import {Search, X, Users, Loader2} from "lucide-react";
 import CustomDatePicker from "@/components/ui/datePicker";
-import {cn} from "@/lib/utils";
 import {useAuth} from "@/utils/auth";
 import {UserType} from "@/utils/auth/types";
 import {
-    useGetShiftsReportQuery,
-    useGetSuperAdminShiftsReportQuery,
-    useGetClientApprovedNotesQuery,
-    ShiftReport,
-    ApprovedNote
+    useGetCommunityInclusionReportQuery,
+    useGetSuperAdminCommunityInclusionReportQuery,
+    useGetClientCommunityInclusionDetailsQuery,
+    CommunityInclusionReport as CommunityInclusionReportType,
+    CommunityInclusionDetail
 } from "@/lib/api/reports";
 
-export default function TimesheetReport() {
+export default function CommunityInclusionReport() {
     const {user} = useAuth();
     const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
 
@@ -27,9 +26,8 @@ export default function TimesheetReport() {
     });
 
     const [searchQuery, setSearchQuery] = useState<string>("");
-    const [selectedClient, setSelectedClient] = useState<ShiftReport | null>(null);
-    const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
-    const [status, setStatus] = useState<"all" | "ongoing" | "scheduled" | "finished">("all");
+    const [selectedClient, setSelectedClient] = useState<CommunityInclusionReportType | null>(null);
+    const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
     const [triggerRefetch, setTriggerRefetch] = useState<number>(0);
 
     const handleDateSelect = (
@@ -47,25 +45,24 @@ export default function TimesheetReport() {
     };
 
     const filters = useMemo(() => ({
-        status,
         startDate: dates.startDate?.toISOString().slice(0, 10),
         endDate: dates.endDate?.toISOString().slice(0, 10),
         isLifetime: false,
         _trigger: triggerRefetch
-    }), [status, dates.startDate, dates.endDate, triggerRefetch]);
+    }), [dates.startDate, dates.endDate, triggerRefetch]);
 
-    const { data: agencyData, isLoading: agencyLoading } = useGetShiftsReportQuery(filters, {
+    const { data: agencyData, isLoading: agencyLoading } = useGetCommunityInclusionReportQuery(filters, {
         skip: isSuperAdmin
     });
     
-    const { data: superAdminData, isLoading: superAdminLoading } = useGetSuperAdminShiftsReportQuery(filters, {
+    const { data: superAdminData, isLoading: superAdminLoading } = useGetSuperAdminCommunityInclusionReportQuery(filters, {
         skip: !isSuperAdmin
     });
 
     const data = isSuperAdmin ? superAdminData : agencyData;
     const isLoading = isSuperAdmin ? superAdminLoading : agencyLoading;
 
-    const { data: notesData, isLoading: notesLoading } = useGetClientApprovedNotesQuery(
+    const { data: detailsData, isLoading: detailsLoading } = useGetClientCommunityInclusionDetailsQuery(
         selectedClient?.id || "",
         { skip: !selectedClient }
     );
@@ -78,9 +75,9 @@ export default function TimesheetReport() {
         );
     }, [data?.data, searchQuery]);
 
-    const handleClientClick = (client: ShiftReport) => {
+    const handleClientClick = (client: CommunityInclusionReportType) => {
         setSelectedClient(client);
-        setShowNotesModal(true);
+        setShowDetailsModal(true);
     };
 
     return (
@@ -113,8 +110,8 @@ export default function TimesheetReport() {
             <div className={"mt-3 bg-[#FFFFFF4D] rounded-xl p-4 flex-1 flex flex-col"}>
                 <div className={"flex items-center justify-between"}>
                     <div>
-                        <h4 className={"font-semibold text-lg"}>Timesheet Report</h4>
-                        <p className={"text-[#808081]"}>Report For Timesheet</p>
+                        <h4 className={"font-semibold text-lg"}>Community Inclusion Report</h4>
+                        <p className={"text-[#808081]"}>Report For Community Inclusion Activities</p>
                     </div>
                     <div className={"flex items-center gap-4"}>
                         <div className="relative w-[240px] animate-in fade-in slide-in-from-right-2 duration-300">
@@ -128,49 +125,6 @@ export default function TimesheetReport() {
                                 className="w-full pl-10 pr-10 h-10 border-0 rounded-full bg-[#f8f9fa] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
                             />
                         </div>
-                        <Button
-                            className={cn("h-[44px] rounded-3xl w-[80px]",
-                                status === "all"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("all")}
-                        >
-                            All
-                        </Button>
-                        <Button
-                            className={cn(
-                                "h-[44px] rounded-3xl w-[100px]",
-                                status === "ongoing"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("ongoing")}
-                        >
-                            Ongoing
-                        </Button>
-                        <Button
-                            className={cn(
-                                "h-[44px] rounded-3xl w-[100px]",
-                                status === "scheduled"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("scheduled")}
-                        >
-                            Scheduled
-                        </Button>
-                        <Button
-                            className={cn(
-                                "h-[44px] rounded-3xl w-[100px]",
-                                status === "finished"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("finished")}
-                        >
-                            Finished
-                        </Button>
                     </div>
                 </div>
 
@@ -203,19 +157,28 @@ export default function TimesheetReport() {
 
                                         <div>
                                             <p className="text-[14px] font-medium text-[#808081] mb-0">
-                                                Total DSPs
+                                                Total Activities
                                             </p>
                                             <p className="text-[14px] font-medium text-black">
-                                                {client.totalDSPs}
+                                                {client.totalActivities}
                                             </p>
                                         </div>
 
                                         <div>
                                             <p className="text-[14px] font-medium text-[#808081] mb-0">
-                                                Approved Notes
+                                                Total Attendees
                                             </p>
                                             <p className="text-[14px] font-medium text-black">
-                                                {client.approvedNotesCount}
+                                                {client.totalAttendees}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-[14px] font-medium text-[#808081] mb-0">
+                                                Total Hours
+                                            </p>
+                                            <p className="text-[14px] font-medium text-black">
+                                                {client.totalHours.toFixed(1)} hrs
                                             </p>
                                         </div>
 
@@ -234,14 +197,14 @@ export default function TimesheetReport() {
                                             <Button
                                                 className="bg-[#00b4b8] border border-[#00b4b8] text-white hover:bg-[#009ea1] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]"
                                             >
-                                                View Notes
+                                                View Details
                                             </Button>
                                         </div>
                                     </div>
                                 ))
                             ) : (
                                 <div className="flex items-center justify-center py-20">
-                                    <p className="text-[16px] text-[#808081]">No shifts found</p>
+                                    <p className="text-[16px] text-[#808081]">No community inclusion records found</p>
                                 </div>
                             )}
                         </div>
@@ -249,9 +212,9 @@ export default function TimesheetReport() {
                 </div>
             </div>
 
-            {showNotesModal && selectedClient && (
+            {showDetailsModal && selectedClient && (
                 <>
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => setShowNotesModal(false)} />
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => setShowDetailsModal(false)} />
                     <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-3xl max-h-[80vh] overflow-hidden">
                         <div className="bg-white rounded-lg shadow-xl">
                             <div className="flex items-center justify-between p-6 border-b">
@@ -260,11 +223,11 @@ export default function TimesheetReport() {
                                         {selectedClient.fullName}
                                     </h2>
                                     <p className="text-sm text-[#808081] mt-1">
-                                        Approved Notes ({notesData?.total || 0})
+                                        Community Inclusion Details ({detailsData?.total || 0} activities)
                                     </p>
                                 </div>
                                 <button
-                                    onClick={() => setShowNotesModal(false)}
+                                    onClick={() => setShowDetailsModal(false)}
                                     className="text-gray-400 hover:text-gray-600 transition-colors"
                                 >
                                     <X className="h-6 w-6" />
@@ -272,38 +235,46 @@ export default function TimesheetReport() {
                             </div>
 
                             <div className="p-6 overflow-y-auto max-h-[60vh]">
-                                {notesLoading ? (
+                                {detailsLoading ? (
                                     <div className="flex justify-center py-8">
                                         <Loader2 className="h-8 w-8 animate-spin text-[#00b4b8]" />
                                     </div>
-                                ) : notesData?.data.length === 0 ? (
+                                ) : detailsData?.data.length === 0 ? (
                                     <div className="text-center py-8">
-                                        <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                                        <p className="text-gray-500">No approved notes found</p>
+                                        <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                                        <p className="text-gray-500">No community inclusion records found</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {notesData?.data.map((note: ApprovedNote) => (
+                                        {detailsData?.data.map((activity: CommunityInclusionDetail) => (
                                             <div
-                                                key={note.id}
+                                                key={activity.id}
                                                 className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                                             >
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1">
                                                         <p className="font-medium text-[#10141a]">
-                                                            {note.employeeName}
+                                                            Activity Date: {new Date(activity.date).toLocaleDateString()}
                                                         </p>
-                                                        <p className="text-sm text-[#808081] mt-1">
-                                                            {note.activityType}
-                                                        </p>
+                                                        <div className="text-sm text-[#808081] mt-2">
+                                                            <p>Attendees: {activity.attendees.length}</p>
+                                                            <div className="mt-1">
+                                                                {activity.attendees.map((attendee: any, idx: number) => (
+                                                                    <span key={idx} className="inline-block mr-2 text-xs">
+                                                                        {attendee.name}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
                                                         <p className="text-xs text-[#808081] mt-2">
-                                                            Submitted: {new Date(note.submittedAt).toLocaleDateString()} • 
-                                                            Approved: {new Date(note.approvedAt).toLocaleDateString()}
+                                                            Created: {new Date(activity.createdAt).toLocaleDateString()}
                                                         </p>
                                                     </div>
-                                                    <span className="ml-4 px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
-                                                        {note.noteCount} {note.noteCount === 1 ? 'Note' : 'Notes'}
-                                                    </span>
+                                                    <div className="ml-4 text-right">
+                                                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
+                                                            {activity.attendees.length} Attendees
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -313,7 +284,7 @@ export default function TimesheetReport() {
 
                             <div className="flex justify-end p-6 border-t">
                                 <Button
-                                    onClick={() => setShowNotesModal(false)}
+                                    onClick={() => setShowDetailsModal(false)}
                                     className="bg-gray-200 text-gray-700 hover:bg-gray-300"
                                 >
                                     Close

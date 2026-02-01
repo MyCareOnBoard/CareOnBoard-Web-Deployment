@@ -1,20 +1,20 @@
 import React, {useState, useMemo} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
-import {Search, X, FileText, Loader2} from "lucide-react";
+import {Search, X, DollarSign, Loader2} from "lucide-react";
 import CustomDatePicker from "@/components/ui/datePicker";
 import {cn} from "@/lib/utils";
 import {useAuth} from "@/utils/auth";
 import {UserType} from "@/utils/auth/types";
 import {
-    useGetShiftsReportQuery,
-    useGetSuperAdminShiftsReportQuery,
-    useGetClientApprovedNotesQuery,
-    ShiftReport,
-    ApprovedNote
+    useGetExpenseReportQuery,
+    useGetSuperAdminExpenseReportQuery,
+    useGetDSPExpenseDetailsQuery,
+    ExpenseReport as ExpenseReportType,
+    ExpenseDetail
 } from "@/lib/api/reports";
 
-export default function TimesheetReport() {
+export default function ExpenseReport() {
     const {user} = useAuth();
     const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
 
@@ -27,9 +27,9 @@ export default function TimesheetReport() {
     });
 
     const [searchQuery, setSearchQuery] = useState<string>("");
-    const [selectedClient, setSelectedClient] = useState<ShiftReport | null>(null);
-    const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
-    const [status, setStatus] = useState<"all" | "ongoing" | "scheduled" | "finished">("all");
+    const [selectedDSP, setSelectedDSP] = useState<ExpenseReportType | null>(null);
+    const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
+    const [status, setStatus] = useState<"all" | "pending" | "approved" | "rejected">("all");
     const [triggerRefetch, setTriggerRefetch] = useState<number>(0);
 
     const handleDateSelect = (
@@ -54,33 +54,34 @@ export default function TimesheetReport() {
         _trigger: triggerRefetch
     }), [status, dates.startDate, dates.endDate, triggerRefetch]);
 
-    const { data: agencyData, isLoading: agencyLoading } = useGetShiftsReportQuery(filters, {
+    const { data: agencyData, isLoading: agencyLoading } = useGetExpenseReportQuery(filters, {
         skip: isSuperAdmin
     });
     
-    const { data: superAdminData, isLoading: superAdminLoading } = useGetSuperAdminShiftsReportQuery(filters, {
+    const { data: superAdminData, isLoading: superAdminLoading } = useGetSuperAdminExpenseReportQuery(filters, {
         skip: !isSuperAdmin
     });
 
     const data = isSuperAdmin ? superAdminData : agencyData;
     const isLoading = isSuperAdmin ? superAdminLoading : agencyLoading;
 
-    const { data: notesData, isLoading: notesLoading } = useGetClientApprovedNotesQuery(
-        selectedClient?.id || "",
-        { skip: !selectedClient }
+    const { data: detailsData, isLoading: detailsLoading } = useGetDSPExpenseDetailsQuery(
+        { employeeId: selectedDSP?.id || "", status },
+        { skip: !selectedDSP }
     );
 
-    const filteredClients = useMemo(() => {
+    const filteredDSPs = useMemo(() => {
         if (!data?.data) return [];
         
-        return data.data.filter(client => 
-            client.fullName.toLowerCase().includes(searchQuery.toLowerCase())
+        return data.data.filter(dsp => 
+            dsp.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            dsp.email.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [data?.data, searchQuery]);
 
-    const handleClientClick = (client: ShiftReport) => {
-        setSelectedClient(client);
-        setShowNotesModal(true);
+    const handleDSPClick = (dsp: ExpenseReportType) => {
+        setSelectedDSP(dsp);
+        setShowDetailsModal(true);
     };
 
     return (
@@ -113,8 +114,8 @@ export default function TimesheetReport() {
             <div className={"mt-3 bg-[#FFFFFF4D] rounded-xl p-4 flex-1 flex flex-col"}>
                 <div className={"flex items-center justify-between"}>
                     <div>
-                        <h4 className={"font-semibold text-lg"}>Timesheet Report</h4>
-                        <p className={"text-[#808081]"}>Report For Timesheet</p>
+                        <h4 className={"font-semibold text-lg"}>Expense Report</h4>
+                        <p className={"text-[#808081]"}>Report For Expenses</p>
                     </div>
                     <div className={"flex items-center gap-4"}>
                         <div className="relative w-[240px] animate-in fade-in slide-in-from-right-2 duration-300">
@@ -141,35 +142,24 @@ export default function TimesheetReport() {
                         <Button
                             className={cn(
                                 "h-[44px] rounded-3xl w-[100px]",
-                                status === "ongoing"
+                                status === "pending"
                                     ? "bg-[#00b4b8] text-white"
                                     : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
                             )}
-                            onClick={() => setStatus("ongoing")}
+                            onClick={() => setStatus("pending")}
                         >
-                            Ongoing
+                            Pending
                         </Button>
                         <Button
                             className={cn(
                                 "h-[44px] rounded-3xl w-[100px]",
-                                status === "scheduled"
+                                status === "approved"
                                     ? "bg-[#00b4b8] text-white"
                                     : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
                             )}
-                            onClick={() => setStatus("scheduled")}
+                            onClick={() => setStatus("approved")}
                         >
-                            Scheduled
-                        </Button>
-                        <Button
-                            className={cn(
-                                "h-[44px] rounded-3xl w-[100px]",
-                                status === "finished"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("finished")}
-                        >
-                            Finished
+                            Approved
                         </Button>
                     </div>
                 </div>
@@ -181,41 +171,53 @@ export default function TimesheetReport() {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {filteredClients.length > 0 ? (
-                                filteredClients.map((client) => (
+                            {filteredDSPs.length > 0 ? (
+                                filteredDSPs.map((dsp) => (
                                     <div
-                                        key={client.id}
+                                        key={dsp.id}
                                         className="flex justify-between gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] items-center p-4 cursor-pointer hover:bg-white/70 transition-colors"
-                                        onClick={() => handleClientClick(client)}
+                                        onClick={() => handleDSPClick(dsp)}
                                     >
                                         <div className={"flex gap-4 items-center"}>
                                             <div className="w-[52.5px] h-[60px] rounded-[8px] overflow-hidden flex-shrink-0">
                                                 <div className="w-full h-full flex items-center justify-center bg-[#00b4b8] text-white rounded-[8px]">
-                                                    {client.fullName.charAt(0).toUpperCase()}
+                                                    {dsp.fullName.charAt(0).toUpperCase()}
                                                 </div>
                                             </div>
                                             <div>
                                                 <p className="text-[16px] font-semibold leading-[1.6] text-black">
-                                                    {client.fullName}
+                                                    {dsp.fullName}
+                                                </p>
+                                                <p className="text-[12px] text-[#808081]">
+                                                    {dsp.email}
                                                 </p>
                                             </div>
                                         </div>
 
                                         <div>
                                             <p className="text-[14px] font-medium text-[#808081] mb-0">
-                                                Total DSPs
+                                                Role
                                             </p>
                                             <p className="text-[14px] font-medium text-black">
-                                                {client.totalDSPs}
+                                                {dsp.role}
                                             </p>
                                         </div>
 
                                         <div>
                                             <p className="text-[14px] font-medium text-[#808081] mb-0">
-                                                Approved Notes
+                                                Total Expenses
                                             </p>
                                             <p className="text-[14px] font-medium text-black">
-                                                {client.approvedNotesCount}
+                                                {dsp.totalExpenses}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-[14px] font-medium text-[#808081] mb-0">
+                                                Total Amount
+                                            </p>
+                                            <p className="text-[14px] font-medium text-black">
+                                                ${dsp.totalAmount.toFixed(2)}
                                             </p>
                                         </div>
 
@@ -225,7 +227,7 @@ export default function TimesheetReport() {
                                                     Agency
                                                 </p>
                                                 <p className="text-[14px] font-medium text-black">
-                                                    {(client as any).agencyName || "N/A"}
+                                                    {(dsp as any).agencyName || "N/A"}
                                                 </p>
                                             </div>
                                         )}
@@ -234,14 +236,14 @@ export default function TimesheetReport() {
                                             <Button
                                                 className="bg-[#00b4b8] border border-[#00b4b8] text-white hover:bg-[#009ea1] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]"
                                             >
-                                                View Notes
+                                                View Details
                                             </Button>
                                         </div>
                                     </div>
                                 ))
                             ) : (
                                 <div className="flex items-center justify-center py-20">
-                                    <p className="text-[16px] text-[#808081]">No shifts found</p>
+                                    <p className="text-[16px] text-[#808081]">No expense records found</p>
                                 </div>
                             )}
                         </div>
@@ -249,22 +251,22 @@ export default function TimesheetReport() {
                 </div>
             </div>
 
-            {showNotesModal && selectedClient && (
+            {showDetailsModal && selectedDSP && (
                 <>
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => setShowNotesModal(false)} />
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => setShowDetailsModal(false)} />
                     <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-3xl max-h-[80vh] overflow-hidden">
                         <div className="bg-white rounded-lg shadow-xl">
                             <div className="flex items-center justify-between p-6 border-b">
                                 <div>
                                     <h2 className="text-2xl font-bold text-[#10141a]">
-                                        {selectedClient.fullName}
+                                        {selectedDSP.fullName}
                                     </h2>
                                     <p className="text-sm text-[#808081] mt-1">
-                                        Approved Notes ({notesData?.total || 0})
+                                        Expense Details ({detailsData?.total || 0} expenses)
                                     </p>
                                 </div>
                                 <button
-                                    onClick={() => setShowNotesModal(false)}
+                                    onClick={() => setShowDetailsModal(false)}
                                     className="text-gray-400 hover:text-gray-600 transition-colors"
                                 >
                                     <X className="h-6 w-6" />
@@ -272,38 +274,47 @@ export default function TimesheetReport() {
                             </div>
 
                             <div className="p-6 overflow-y-auto max-h-[60vh]">
-                                {notesLoading ? (
+                                {detailsLoading ? (
                                     <div className="flex justify-center py-8">
                                         <Loader2 className="h-8 w-8 animate-spin text-[#00b4b8]" />
                                     </div>
-                                ) : notesData?.data.length === 0 ? (
+                                ) : detailsData?.data.length === 0 ? (
                                     <div className="text-center py-8">
-                                        <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                                        <p className="text-gray-500">No approved notes found</p>
+                                        <DollarSign className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                                        <p className="text-gray-500">No expense records found</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {notesData?.data.map((note: ApprovedNote) => (
+                                        {detailsData?.data.map((expense: ExpenseDetail) => (
                                             <div
-                                                key={note.id}
+                                                key={expense.id}
                                                 className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                                             >
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1">
                                                         <p className="font-medium text-[#10141a]">
-                                                            {note.employeeName}
+                                                            {expense.category}
                                                         </p>
                                                         <p className="text-sm text-[#808081] mt-1">
-                                                            {note.activityType}
+                                                            {expense.description}
                                                         </p>
                                                         <p className="text-xs text-[#808081] mt-2">
-                                                            Submitted: {new Date(note.submittedAt).toLocaleDateString()} • 
-                                                            Approved: {new Date(note.approvedAt).toLocaleDateString()}
+                                                            Date: {new Date(expense.date).toLocaleDateString()} • 
+                                                            Submitted: {new Date(expense.submittedAt).toLocaleDateString()}
                                                         </p>
                                                     </div>
-                                                    <span className="ml-4 px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
-                                                        {note.noteCount} {note.noteCount === 1 ? 'Note' : 'Notes'}
-                                                    </span>
+                                                    <div className="ml-4 text-right">
+                                                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                                                            expense.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                            expense.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                                            'bg-yellow-100 text-yellow-800'
+                                                        }`}>
+                                                            {expense.status.toUpperCase()}
+                                                        </span>
+                                                        <p className="text-lg font-semibold text-[#10141a] mt-2">
+                                                            ${expense.amount.toFixed(2)}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -313,7 +324,7 @@ export default function TimesheetReport() {
 
                             <div className="flex justify-end p-6 border-t">
                                 <Button
-                                    onClick={() => setShowNotesModal(false)}
+                                    onClick={() => setShowDetailsModal(false)}
                                     className="bg-gray-200 text-gray-700 hover:bg-gray-300"
                                 >
                                     Close

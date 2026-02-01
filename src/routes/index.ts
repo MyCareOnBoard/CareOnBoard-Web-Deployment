@@ -82,6 +82,11 @@ import SuperAdminClientReports from "@/pages/super-admin/reports/clientsReport";
 import SuperAdminDSPReports from "@/pages/super-admin/reports/dspReports";
 import SuperAdminTimesheetReports from "@/pages/super-admin/reports/timesheetReports";
 import SuperAdminNoteReports from "@/pages/super-admin/reports/noteReports";
+import SuperAdminMileageReports from "@/components/report/mileageReports";
+import SuperAdminExpenseReports from "@/components/report/expenseReports";
+import SuperAdminBillingReports from "@/components/report/billingReports";
+import SuperAdminIncidentReports from "@/components/report/incidentReports";
+import SuperAdminCommunityInclusionReports from "@/components/report/communityInclusionReports";
 import SuperAdminSystemSettingsPage from "@/pages/super-admin/system-settings";
 import AgencyTrainings from "@/pages/agency/trainings";
 import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
@@ -94,6 +99,11 @@ import AgencyClientReports from "@/pages/agency/reports/clientsReport";
 import AgencyDSPReports from "@/pages/agency/reports/dspReports";
 import AgencyTimesheetReports from "@/pages/agency/reports/timesheetReports";
 import AgencyNoteReports from "@/pages/agency/reports/noteReports";
+import AgencyMileageReports from "@/components/report/mileageReports";
+import AgencyExpenseReports from "@/components/report/expenseReports";
+import AgencyBillingReports from "@/components/report/billingReports";
+import AgencyIncidentReports from "@/components/report/incidentReports";
+import AgencyCommunityInclusionReports from "@/components/report/communityInclusionReports";
 import GoalsAndDocumentsPage from "@/pages/agency/goalsAndDocuments";
 import GoalsAndDocumentsList from "@/pages/agency/goalsAndDocuments/GoalsAndDocumentsList";
 import NaturalSupportsTraining from "@/pages/agency/goalsAndDocuments/NaturalSupportsTraining";
@@ -353,6 +363,26 @@ export const router = createBrowserRouter([
                 Component: AgencyNoteReports,
             },
             {
+                path: Routes.agency.reports.mileage,
+                Component: AgencyMileageReports,
+            },
+            {
+                path: Routes.agency.reports.expense,
+                Component: AgencyExpenseReports,
+            },
+            {
+                path: Routes.agency.reports.billing,
+                Component: AgencyBillingReports,
+            },
+            {
+                path: Routes.agency.reports.incidents,
+                Component: AgencyIncidentReports,
+            },
+            {
+                path: Routes.agency.reports.community_inclusions,
+                Component: AgencyCommunityInclusionReports,
+            },
+            {
                 path: Routes.agency.goalsAndDocuments.index,
                 Component: GoalsAndDocumentsPage,
             },
@@ -541,6 +571,26 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.reports.notes,
                 Component: SuperAdminNoteReports,
+            },
+            {
+                path: Routes.superAdmin.reports.mileage,
+                Component: SuperAdminMileageReports,
+            },
+            {
+                path: Routes.superAdmin.reports.expense,
+                Component: SuperAdminExpenseReports,
+            },
+            {
+                path: Routes.superAdmin.reports.billing,
+                Component: SuperAdminBillingReports,
+            },
+            {
+                path: Routes.superAdmin.reports.incidents,
+                Component: SuperAdminIncidentReports,
+            },
+            {
+                path: Routes.superAdmin.reports.community_inclusions,
+                Component: SuperAdminCommunityInclusionReports,
             },
             {
                 path: Routes.superAdmin.clientDirectory,
