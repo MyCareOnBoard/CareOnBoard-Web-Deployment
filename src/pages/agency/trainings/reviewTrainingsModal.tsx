@@ -136,7 +136,9 @@ export default function ReviewTrainingsModal(
                                         {training.name}
                                     </p>
                                     {training.completedAt && <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
-                                        Completed in {training.completedAt}
+                                        Completed in {typeof training.completedAt === 'string' 
+                                            ? training.completedAt 
+                                            : new Date((training.completedAt as any)?._seconds * 1000).toLocaleDateString()}
                                     </p>}
                                     {!training.completedAt && <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
                                         Not Completed
