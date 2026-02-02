@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { X, Calendar, ChevronLeft, ChevronRight, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
@@ -6,13 +6,16 @@ import TimePicker from "@/components/TimePicker";
 import { searchClients, Client } from "@/lib/api/clients";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
-import { mileageApi } from "@/lib/api/mileage";
+import { mileageApi, CreateMileageRideRequest, MileageRide, UpdateAgencyRideRequest } from "@/lib/api/mileage";
 import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 
 interface AddMileageModalProps {
   isOpen: boolean;
   onClose: () => void;
   onMileageCreated?: () => void;
+  onMileageUpdated?: () => void;
+  mode?: "create" | "edit";
+  initialRide?: MileageRide | null;
 }
 
 interface MileageFormData {
@@ -22,6 +25,10 @@ interface MileageFormData {
   assignDspId?: string;
   startIn: string;
   dropOff: string;
+  pickupLatLon: { lat: number; lng: number } | null;
+  dropOffLatLon: { lat: number; lng: number } | null;
+  estimatedDistance: number;
+  estimatedDuration: number;
   selectDate: Date | null;
   selectTime: string;
   schedulingType: "one-time" | "recurring";
@@ -34,12 +41,23 @@ const initialFormData: MileageFormData = {
   assignDspId: "",
   startIn: "",
   dropOff: "",
+  pickupLatLon: null,
+  dropOffLatLon: null,
+  estimatedDistance: 0,
+  estimatedDuration: 0,
   selectDate: null,
   selectTime: "",
   schedulingType: "one-time",
 };
 
-export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: AddMileageModalProps) {
+export default function AddMileageModal({
+  isOpen,
+  onClose,
+  onMileageCreated,
+  onMileageUpdated,
+  mode = "create",
+  initialRide = null,
+}: AddMileageModalProps) {
   const { toast } = useToast(); // <-- Use like in AddScheduleModal
 
   const [formData, setFormData] = useState<MileageFormData>(initialFormData);
@@ -51,6 +69,7 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
   const [showDspDropdown, setShowDspDropdown] = useState(false);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
   const [isSearchingDsps, setIsSearchingDsps] = useState(false);
+  const [isEstimatingDistance, setIsEstimatingDistance] = useState(false);
 
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -123,19 +142,35 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
   const handleStartLocationSelect = async (placeId: string) => {
     const details = await startLocationAutocomplete.selectSuggestion(placeId);
     if (details) {
-      setFormData(prev => ({ ...prev, startIn: details.formattedAddress }));
+      setFormData(prev => ({
+        ...prev,
+        startIn: details.formattedAddress,
+        pickupLatLon: { lat: details.lat, lng: details.lng },
+      }));
     }
   };
 
   const handleDropOffLocationSelect = async (placeId: string) => {
     const details = await dropOffLocationAutocomplete.selectSuggestion(placeId);
     if (details) {
-      setFormData(prev => ({ ...prev, dropOff: details.formattedAddress }));
+      setFormData(prev => ({
+        ...prev,
+        dropOff: details.formattedAddress,
+        dropOffLatLon: { lat: details.lat, lng: details.lng },
+      }));
     }
   };
 
   const handleInputChange = (field: keyof Omit<MileageFormData, 'selectDate' | 'schedulingType'>, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      if (field === "startIn") {
+        return { ...prev, startIn: value, pickupLatLon: null, estimatedDistance: 0, estimatedDuration: 0 };
+      }
+      if (field === "dropOff") {
+        return { ...prev, dropOff: value, dropOffLatLon: null, estimatedDistance: 0, estimatedDuration: 0 };
+      }
+      return { ...prev, [field]: value };
+    });
   };
 
   const handleDateSelect = (date: Date) => {
@@ -173,9 +208,132 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
     return `${hours.toString().padStart(2, "0")}:${minutes}:${period}`;
   };
 
+  const formatDuration = (seconds: number): string => {
+    if (!seconds || seconds <= 0) return "0 min";
+    const totalMinutes = Math.round(seconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0) {
+      return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} min`;
+    }
+    return `${minutes} min`;
+  };
+
   const handleSchedulingTypeChange = (type: "one-time" | "recurring") => {
     setFormData((prev) => ({ ...prev, schedulingType: type }));
   };
+
+  const parseScheduledTime = (value: unknown): Date | null => {
+    if (!value) return null;
+    if (typeof value === "string") return new Date(value);
+    if (typeof value === "object" && value !== null) {
+      const o = value as { seconds?: number; _seconds?: number };
+      const s = o.seconds ?? o._seconds;
+      if (typeof s === "number") return new Date(s * 1000);
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    if (!isOpen || mode !== "edit" || !initialRide) return;
+
+    const scheduledDate = parseScheduledTime(initialRide.scheduledStartTime);
+    const time24 = scheduledDate ? format(scheduledDate, "HH:mm") : "";
+    const time12 = time24 ? convertTo12Hour(time24) : "";
+
+    setFormData({
+      client: initialRide.clientName || "",
+      clientId: initialRide.clientId,
+      assignDsp: initialRide.caregiverName || "",
+      assignDspId: initialRide.caregiverId,
+      startIn: initialRide.pickupLocation || initialRide.location || "",
+      dropOff: initialRide.dropOffLocation || "",
+      pickupLatLon: initialRide.pickupLatLon ?? null,
+      dropOffLatLon: initialRide.dropOffLatLon ?? null,
+      estimatedDistance: initialRide.estimatedDistance ?? 0,
+      estimatedDuration: initialRide.estimatedDuration ?? 0,
+      selectDate: scheduledDate,
+      selectTime: time12,
+      schedulingType: "one-time",
+    });
+  }, [isOpen, mode, initialRide]);
+
+  useEffect(() => {
+    if (isOpen && mode === "create") {
+      setFormData(initialFormData);
+    }
+  }, [isOpen, mode]);
+
+  const fetchEstimatedDistance = (
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number }
+  ): Promise<{ distanceKm: number; durationSeconds: number } | null> => {
+    if (!window.google?.maps?.DistanceMatrixService) {
+      return Promise.resolve(null);
+    }
+
+    return new Promise((resolve) => {
+      const service = new window.google.maps.DistanceMatrixService();
+      service.getDistanceMatrix(
+        {
+          origins: [origin],
+          destinations: [destination],
+          travelMode: window.google.maps.TravelMode.DRIVING,
+          unitSystem: window.google.maps.UnitSystem.METRIC,
+        },
+        (response, status) => {
+          if (status !== "OK" || !response?.rows?.[0]?.elements?.[0]) {
+            resolve(null);
+            return;
+          }
+
+          const element = response.rows[0].elements[0];
+          if (element.status !== "OK" || !element.distance?.value || !element.duration?.value) {
+            resolve(null);
+            return;
+          }
+
+          const distanceKm = Number((element.distance.value / 1000).toFixed(2));
+          resolve({ distanceKm, durationSeconds: element.duration.value });
+        }
+      );
+    });
+  };
+
+  const distanceEstimateRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    const pickupLatLon = formData.pickupLatLon;
+    const dropOffLatLon = formData.dropOffLatLon;
+
+    if (!pickupLatLon || !dropOffLatLon) {
+      return;
+    }
+
+    const debounceMs = 500;
+    const timeoutId = setTimeout(() => {
+      const requestId = ++distanceEstimateRequestIdRef.current;
+      setIsEstimatingDistance(true);
+      fetchEstimatedDistance(pickupLatLon, dropOffLatLon)
+        .then((result) => {
+          if (requestId !== distanceEstimateRequestIdRef.current) return;
+          if (result !== null) {
+            setFormData((prev) => ({
+              ...prev,
+              estimatedDistance: result.distanceKm,
+              estimatedDuration: result.durationSeconds,
+            }));
+          }
+        })
+        .finally(() => {
+          if (requestId === distanceEstimateRequestIdRef.current) {
+            setIsEstimatingDistance(false);
+          }
+        });
+    }, debounceMs);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.pickupLatLon, formData.dropOffLatLon]);
 
   const handleSaveAndCancel = () => {
     setFormData(initialFormData);
@@ -201,33 +359,88 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
       return;
     }
 
+    const clientId = formData.clientId;
+    const caregiverId = formData.assignDspId;
+    if (!clientId || !caregiverId) {
+      toast({
+        title: "Missing Required Fields",
+        description: "Client and caregiver are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const payload: any = {
-        clientId: formData.clientId,
-        dspId: formData.assignDspId,
-        startIn: formData.startIn,
-        dropOff: formData.dropOff,
-        date: formData.selectDate ? formData.selectDate.toISOString() : "",
-        time: formData.selectTime,
+      const time24 = convertTo24Hour(formData.selectTime);
+      const scheduledStartTime = formData.selectDate && time24
+        ? (() => {
+            const scheduled = new Date(formData.selectDate);
+            const [hours, minutes] = time24.split(":").map(Number);
+            scheduled.setHours(hours, minutes, 0, 0);
+            return scheduled.toISOString();
+          })()
+        : "";
+
+      const basePayload = {
+        clientId,
+        caregiverId,
+        pickupLocation: formData.startIn,
+        dropOffLocation: formData.dropOff,
+        estimatedDistance: formData.estimatedDistance,
+        estimatedDuration: formData.estimatedDuration,
+        pickupLatLon: formData.pickupLatLon ?? undefined,
+        dropOffLatLon: formData.dropOffLatLon ?? undefined,
+        notes: "",
       };
 
-      if (formData.schedulingType === "recurring") {
-        payload.frequency = "weekly";
+      if (mode === "edit" && initialRide?.id) {
+        const updatePayload: UpdateAgencyRideRequest = {
+          caregiverId: basePayload.caregiverId,
+          pickupLocation: basePayload.pickupLocation,
+          dropOffLocation: basePayload.dropOffLocation,
+          scheduledStartTime,
+          estimatedDistance: basePayload.estimatedDistance,
+          estimatedDuration: basePayload.estimatedDuration,
+          pickupLatLon: basePayload.pickupLatLon,
+          dropOffLatLon: basePayload.dropOffLatLon,
+          notes: basePayload.notes,
+        };
+        await mileageApi.updateAgency(initialRide.id, updatePayload);
+        toast({
+          title: "Success",
+          description: "Mileage updated successfully.",
+          variant: "success",
+        });
+        if (onMileageUpdated) onMileageUpdated();
+      } else {
+        const payload: CreateMileageRideRequest =
+          formData.schedulingType === "recurring"
+            ? {
+                ...basePayload,
+                frequency: "weekly",
+                daysOfWeek: formData.selectDate ? [formData.selectDate.getDay()] : [],
+                time: time24,
+                startDate: formData.selectDate ? formData.selectDate.toISOString() : "",
+              }
+            : {
+                ...basePayload,
+                scheduledStartTime: scheduledStartTime,
+              };
+
+        await mileageApi.create(payload);
+
+        toast({
+          title: "Success",
+          description: "Mileage scheduled successfully.",
+          variant: "success",
+        });
+        if (onMileageCreated) {
+          onMileageCreated();
+        }
       }
-
-      await mileageApi.create(payload);
-
-      toast({
-        title: "Success",
-        description: "Mileage scheduled successfully.",
-        variant: "success",
-      });
 
       setFormData(initialFormData);
-      if (onMileageCreated) {
-        onMileageCreated();
-      }
       onClose();
     } catch (error) {
       toast({
@@ -270,7 +483,7 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
         {/* Title Bar - Fixed */}
         <div className="flex items-center justify-between p-5 pb-0 shrink-0">
           <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-            Add new Mileage
+            {mode === "edit" ? "Edit Mileage" : "Add new Mileage"}
           </h2>
           <button
             onClick={onClose}
@@ -437,6 +650,14 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
                   </div>
                 )}
               </div>
+              <div className="flex items-center justify-between text-[12px] font-normal text-[#808081]">
+                <span>Estimated Distance</span>
+                <span>{formData.estimatedDistance ? `${formData.estimatedDistance}KM` : "0KM"}</span>
+              </div>
+              <div className="flex items-center justify-between text-[12px] font-normal text-[#808081]">
+                <span>Estimated Duration</span>
+                <span>{formatDuration(formData.estimatedDuration)}</span>
+              </div>
             </div>
 
             {/* Scheduling Type */}
@@ -446,7 +667,8 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
                 <button
                   type="button"
                   onClick={() => setFormData((prev) => ({ ...prev, schedulingType: "one-time" }))}
-                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
+                  disabled={mode === "edit"}
+                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                     formData.schedulingType === "one-time"
                       ? "bg-[#00b4b8] text-white"
                       : "border border-[#808081] text-[#10141a]"
@@ -457,7 +679,8 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
                 <button
                   type="button"
                   onClick={() => setFormData((prev) => ({ ...prev, schedulingType: "recurring" }))}
-                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${
+                  disabled={mode === "edit"}
+                  className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                     formData.schedulingType === "recurring"
                       ? "bg-[#00b4b8] text-white"
                       : "border border-[#808081] text-[#10141a]"
@@ -577,14 +800,20 @@ export default function AddMileageModal({ isOpen, onClose, onMileageCreated }: A
             disabled={isSubmitting}
             className="flex-1 h-11 bg-transparent hover:bg-[#f3f4f6] text-[#6b7280] hover:text-[#374151] border border-[#e5e7eb] rounded-xl text-[14px] font-medium transition-colors shadow-none"
           >
-            Save and Cancel
+            Save
           </Button>
           <Button
             onClick={handleSchedule}
             disabled={isSubmitting}
             className="flex-1 h-11 bg-[#00b4b8] hover:bg-[#009ba1] text-white rounded-xl text-[14px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Scheduling..." : "Schedule"}
+            {isSubmitting
+              ? mode === "edit"
+                ? "Updating..."
+                : "Scheduling..."
+              : mode === "edit"
+                ? "Update"
+                : "Schedule"}
           </Button>
         </div>
       </div>
