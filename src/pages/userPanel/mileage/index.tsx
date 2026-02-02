@@ -4,6 +4,28 @@ import UpcomingRides from "./components/UpcomingRides";
 import { mileageApi, MileageRide } from "@/lib/api/mileage";
 import { useToast } from "@/hooks/use-toast";
 
+type FirebaseTimestampLike = { seconds?: number; _seconds?: number };
+
+const parseRideDate = (value?: string | Date | FirebaseTimestampLike | null): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof value === "object") {
+    const seconds = value.seconds ?? value._seconds;
+    if (typeof seconds === "number") {
+      const parsed = new Date(seconds * 1000);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+  return null;
+};
+
+const isSameLocalDay = (date: Date, today: Date): boolean =>
+  date.toDateString() === today.toDateString();
+
 export default function MileagePage() {
   const [totalMileage, setTotalMileage] = useState(0);
   const [rides, setRides] = useState<MileageRide[]>([]);
@@ -33,15 +55,37 @@ export default function MileagePage() {
     const inProgress = rides.find((ride) => ride.status === "in_progress");
     if (inProgress) return inProgress;
     const scheduled = rides
-      .filter((ride) => ride.status === "scheduled")
-      .sort((a, b) => new Date(a.scheduledStartTime).getTime() - new Date(b.scheduledStartTime).getTime());
-    return scheduled[0] ?? null;
+      .filter((ride) => {
+        const rideDate = parseRideDate(ride.scheduledStartTime);
+        return ride.status === "scheduled" && rideDate ? isSameLocalDay(rideDate, new Date()) : false;
+      })
+      .sort((a, b) => {
+        const aDate = parseRideDate(a.scheduledStartTime);
+        const bDate = parseRideDate(b.scheduledStartTime);
+        const aTime = aDate ? aDate.getTime() : Number.POSITIVE_INFINITY;
+        const bTime = bDate ? bDate.getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      });
+
+    const today = new Date();
+    const scheduledToday = scheduled.filter((ride) => {
+      const rideDate = parseRideDate(ride.scheduledStartTime);
+
+      return rideDate ? isSameLocalDay(rideDate, today) : false;
+    });
+    return scheduledToday[0] ?? scheduled[0] ?? null;
   }, [rides]);
 
   const upcomingRides = useMemo(() => {
     return rides
       .filter((ride) => ride.status === "scheduled" && ride.id !== currentRide?.id)
-      .sort((a, b) => new Date(a.scheduledStartTime).getTime() - new Date(b.scheduledStartTime).getTime());
+      .sort((a, b) => {
+        const aDate = parseRideDate(a.scheduledStartTime);
+        const bDate = parseRideDate(b.scheduledStartTime);
+        const aTime = aDate ? aDate.getTime() : Number.POSITIVE_INFINITY;
+        const bTime = bDate ? bDate.getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      });
   }, [rides, currentRide]);
 
   const handleStart = async (rideId: string) => {
