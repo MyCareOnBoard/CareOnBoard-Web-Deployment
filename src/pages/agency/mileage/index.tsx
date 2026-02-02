@@ -40,7 +40,7 @@ export default function MileagePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await mileageApi.listAgency({ limit: 100 });
+      const res = await mileageApi.listAgency({ limit: 10 });
       setRides(res.data ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load mileage");
@@ -178,9 +178,9 @@ export default function MileagePage() {
                 These are your Past Mileage
               </p>
             </div>
-            <button className="p-2 hover:bg-[#f3f4f6] rounded-lg transition-colors cursor-pointer">
+            {/* <button className="p-2 hover:bg-[#f3f4f6] rounded-lg transition-colors cursor-pointer">
               <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
+            </button> */}
           </div>
         </div>
 

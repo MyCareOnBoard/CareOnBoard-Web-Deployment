@@ -132,7 +132,7 @@ export default function AddMileageModal({
     setFormData(prev => ({
       ...prev,
       assignDsp: employee.fullName,
-      assignDspId: employee.id,
+      assignDspId: employee.uid,
     }));
     setShowDspDropdown(false);
     setDspSearchResults([]);
