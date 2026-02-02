@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import StopRideModal from "./modals/StopRideModal";
 import StartRideModal from "./modals/StartRideModal";
@@ -13,11 +14,24 @@ interface CurrentRideProps {
   actionLoading?: boolean;
 }
 
-const formatTime = (iso?: string | null) => {
-  if (!iso) return "--";
-  const date = new Date(iso);
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-};
+/** Parse Firebase/Firestore timestamp (ISO string, { seconds/_seconds }, or Date) to Date; format as time string. */
+function formatRideTime(value: string | { seconds?: number; _seconds?: number } | Date | null | undefined): string {
+  if (value == null) return "--";
+  let date: Date;
+  if (typeof value === "string") {
+    date = new Date(value);
+  } else if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === "object" && value !== null) {
+    const s = (value as { seconds?: number; _seconds?: number }).seconds ?? (value as { _seconds?: number })._seconds;
+    if (typeof s !== "number") return "--";
+    date = new Date(s * 1000);
+  } else {
+    return "--";
+  }
+  if (Number.isNaN(date.getTime())) return "--";
+  return format(date, "h:mm a");
+}
 
 export default function CurrentRide({ ride, onStart, onStop, onCancel, actionLoading }: CurrentRideProps) {
   const [isStopModalOpen, setIsStopModalOpen] = useState(false);
@@ -84,7 +98,7 @@ export default function CurrentRide({ ride, onStart, onStop, onCancel, actionLoa
               <p className="text-xs text-[#808081] mb-1">
                 {status === "in_progress" ? "Started at" : "Scheduled at"}
               </p>
-              <p className="text-sm font-medium text-[#10141a]">{formatTime(status === "in_progress" ? ride.startedAt : ride.scheduledStartTime)}</p>
+              <p className="text-sm font-medium text-[#10141a]">{formatRideTime(status === "in_progress" ? ride.startedAt : ride.scheduledStartTime)}</p>
             </div>
 
             <div>

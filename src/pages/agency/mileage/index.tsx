@@ -1,38 +1,107 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowUpRight } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Plus, ArrowUpRight, Loader2, Pencil, Trash2, XCircle } from "lucide-react";
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import AddMileageModal from "./components/AddMileageModal";
+import { mileageApi, MileageRide } from "@/lib/api/mileage";
 
-interface MileageEntry {
-  id: string;
-  client: {
-    name: string;
-    avatar: string;
-    role: string;
-  };
-  dsp: {
-    name: string;
-    avatar: string;
-    role: string;
-  };
-  checkInLocation: string;
-  dropOffLocation: string;
-  distance: string;
-  duration: string;
-  date: string;
-  time: string;
+function formatDuration(seconds?: number | null): string {
+  if (!seconds || seconds <= 0) return "—";
+  const totalMinutes = Math.round(seconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) {
+    return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} min`;
+  }
+  return `${minutes} min`;
 }
+
+const getInitials = (name: string) =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
 
 export default function MileagePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingRide, setEditingRide] = useState<MileageRide | null>(null);
+  const [rideToDelete, setRideToDelete] = useState<MileageRide | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [rideToCancel, setRideToCancel] = useState<MileageRide | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [rides, setRides] = useState<MileageRide[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - replace with actual data
-  const mileageHistory: MileageEntry[] = [];
+  const fetchRides = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await mileageApi.listAgency({ limit: 10 });
+      setRides(res.data ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load mileage");
+      setRides([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRides();
+  }, [fetchRides]);
 
   const handleMileageCreated = () => {
-    // Refresh mileage list or update state
-    console.log("Mileage created successfully");
+    fetchRides();
   };
+
+  const handleEditRide = (ride: MileageRide) => {
+    setEditingRide(ride);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (ride: MileageRide) => {
+    setRideToDelete(ride);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!rideToDelete) return;
+    setIsDeleting(true);
+    try {
+      await mileageApi.deleteAgency(rideToDelete.id);
+      setRideToDelete(null);
+      await fetchRides();
+    } catch (e) {
+      console.error("Failed to delete ride:", e);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelClick = (ride: MileageRide) => {
+    setRideToCancel(ride);
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!rideToCancel) return;
+    setIsCancelling(true);
+    try {
+      await mileageApi.cancelAgency(rideToCancel.id);
+      setRideToCancel(null);
+      await fetchRides();
+    } catch (e) {
+      console.error("Failed to cancel ride:", e);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const activeCount = rides.filter((r) => r.status === "scheduled" || r.status === "in_progress").length;
+  const completedCount = rides.filter((r) => r.status === "completed").length;
+  const cancelledCount = rides.filter((r) => r.status === "cancelled").length;
 
   return (
     <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
@@ -67,14 +136,14 @@ export default function MileagePage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 lg:flex lg:justify-end">
           <div className="text-center p-3 sm:p-0">
-            <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">0</div>
+            <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">{activeCount}</div>
             <div className="flex items-center justify-center gap-1.5 sm:gap-2">
               <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#22c55e]"></div>
               <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Active</span>
             </div>
           </div>
           <div className="text-center p-3 sm:p-0">
-            <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">0</div>
+            <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">{completedCount}</div>
             <div className="flex items-center justify-center gap-1.5 sm:gap-2">
               <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3b82f6]"></div>
               <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Completed</span>
@@ -88,10 +157,10 @@ export default function MileagePage() {
             </div>
           </div>
           <div className="text-center p-3 sm:p-0">
-            <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">0</div>
+            <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">{cancelledCount}</div>
             <div className="flex items-center justify-center gap-1.5 sm:gap-2">
               <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3b82f6]"></div>
-              <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Incomplete</span>
+              <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Cancelled</span>
             </div>
           </div>
         </div>
@@ -109,87 +178,132 @@ export default function MileagePage() {
                 These are your Past Mileage
               </p>
             </div>
-            <button className="p-2 hover:bg-[#f3f4f6] rounded-lg transition-colors cursor-pointer">
+            {/* <button className="p-2 hover:bg-[#f3f4f6] rounded-lg transition-colors cursor-pointer">
               <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
+            </button> */}
           </div>
         </div>
 
         {/* Table */}
         <div className="overflow-x-auto">
-          {mileageHistory.length > 0 ? (
+          {loading ? (
+            <div className="p-8 sm:p-10 lg:p-12 flex items-center justify-center gap-2">
+              <Loader2 className="w-6 h-6 animate-spin text-[#6b7280]" />
+              <span className="text-[#6b7280] text-[14px]">Loading mileage…</span>
+            </div>
+          ) : error ? (
+            <div className="p-8 sm:p-10 lg:p-12 text-center">
+              <p className="text-red-600 text-[14px]">{error}</p>
+            </div>
+          ) : rides.length > 0 ? (
             <div className="divide-y divide-[#e5e7eb]">
-              {mileageHistory.map((entry) => (
-                <div key={entry.id} className="p-6 hover:bg-[#f9fafb] transition-colors">
-                  <div className="flex items-center gap-8">
-                    {/* Client & DSP */}
-                    <div className="flex items-center gap-6 min-w-[300px]">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={entry.client.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.client.name)}&background=e5e7eb&color=374151`}
-                          alt={entry.client.name}
-                          className="object-cover w-12 h-12 rounded-full"
-                        />
-                        <div>
-                          <div className="font-semibold text-[15px] text-[#10141a]">
-                            {entry.client.name}
+              {rides.map((entry) => {
+                const pickup = entry.pickupLocation ?? entry.location ?? "";
+                const dropOff = entry.dropOffLocation ?? "";
+                const distanceKm = entry.actualDistance ?? entry.estimatedDistance ?? null;
+                const distanceStr = distanceKm != null ? `${distanceKm} km` : "—";
+                const durationStr = formatDuration(entry.estimatedDuration ?? null);
+                return (
+                  <div key={entry.id} className="p-6 hover:bg-[#f9fafb] transition-colors">
+                    <div className="flex items-center gap-8">
+                      {/* Client & DSP */}
+                      <div className="flex items-center gap-6 min-w-[300px]">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
+                            {entry.clientAvatarUrl && (
+                              <AvatarImage
+                                src={entry.clientAvatarUrl}
+                                alt={entry.clientName}
+                                className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                              />
+                            )}
+                            <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                              {getInitials(entry.clientName || "Client")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-semibold text-[15px] text-[#10141a]">
+                              {entry.clientName || "—"}
+                            </div>
+                            <div className="text-[13px] text-[#9ca3af]">Client</div>
                           </div>
-                          <div className="text-[13px] text-[#9ca3af]">
-                            {entry.client.role}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
+                            {entry.caregiverAvatarUrl && (
+                              <AvatarImage
+                                src={entry.caregiverAvatarUrl}
+                                alt={entry.caregiverName}
+                                className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                              />
+                            )}
+                            <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                              {getInitials(entry.caregiverName || "DSP")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-semibold text-[15px] text-[#10141a]">
+                              {entry.caregiverName || "—"}
+                            </div>
+                            <div className="text-[13px] text-[#9ca3af]">DSP</div>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={entry.dsp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.dsp.name)}&background=e5e7eb&color=374151`}
-                          alt={entry.dsp.name}
-                          className="object-cover w-12 h-12 rounded-full"
-                        />
-                        <div>
-                          <div className="font-semibold text-[15px] text-[#10141a]">
-                            {entry.dsp.name}
-                          </div>
-                          <div className="text-[13px] text-[#9ca3af]">
-                            {entry.dsp.role}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Locations */}
-                    <div className="grid flex-1 grid-cols-4 gap-6">
-                      <div>
-                        <div className="text-[13px] text-[#9ca3af] mb-1">
-                          Check In Location
+                      {/* Locations */}
+                      <div className="grid flex-1 grid-cols-4 gap-6">
+                        <div>
+                          <div className="text-[13px] text-[#9ca3af] mb-1">Check In</div>
+                          <div className="text-[15px] text-[#10141a]">{pickup || "—"}</div>
                         </div>
-                        <div className="text-[15px] text-[#10141a]">
-                          {entry.checkInLocation}
+                        <div>
+                          <div className="text-[13px] text-[#9ca3af] mb-1">Drop Off</div>
+                          <div className="text-[15px] text-[#10141a]">{dropOff || "—"}</div>
                         </div>
-                      </div>
-                      <div>
-                        <div className="text-[13px] text-[#9ca3af] mb-1">
-                          Drop Off Location
+                        <div>
+                          <div className="text-[13px] text-[#9ca3af] mb-1">Distance</div>
+                          <div className="text-[15px] text-[#10141a]">{distanceStr}</div>
                         </div>
-                        <div className="text-[15px] text-[#10141a]">
-                          {entry.dropOffLocation}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[13px] text-[#9ca3af] mb-1">Distance</div>
-                        <div className="text-[15px] text-[#10141a]">
-                          {entry.distance}
+                        <div>
+                          <div className="text-[13px] text-[#9ca3af] mb-1">Duration</div>
+                          <div className="text-[15px] text-[#10141a]">{durationStr}</div>
                         </div>
                       </div>
-                      <div>
-                        <div className="text-[13px] text-[#9ca3af] mb-1">Duration</div>
-                        <div className="text-[15px] text-[#10141a]">
-                          {entry.duration}
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEditRide(entry)}
+                          className="p-2 rounded-lg hover:bg-[#f3f4f6] transition-colors cursor-pointer"
+                          aria-label="Edit mileage"
+                          title="Edit mileage"
+                          >
+                          <Pencil className="w-4 h-4 text-[#10141a]" />
+                        </button>
+                        {entry.status === "scheduled" && (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelClick(entry)}
+                            className="p-2 rounded-lg hover:bg-[#f3f4f6] transition-colors cursor-pointer"
+                            aria-label="Cancel ride"
+                            title="Cancel ride"
+                          >
+                            <XCircle className="w-4 h-4 text-amber-600" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(entry)}
+                          className="p-2 rounded-lg hover:bg-[#f3f4f6] transition-colors cursor-pointer"
+                          aria-label="Delete mileage"
+                          title="Delete mileage"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </button>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="p-8 sm:p-10 lg:p-12 text-center">
@@ -202,8 +316,38 @@ export default function MileagePage() {
       {/* Add Mileage Modal */}
       <AddMileageModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingRide(null);
+        }}
         onMileageCreated={handleMileageCreated}
+        onMileageUpdated={handleMileageCreated}
+        mode={editingRide ? "edit" : "create"}
+        initialRide={editingRide}
+      />
+
+      {/* Delete confirmation */}
+      <DeleteConfirmationModal
+        isOpen={!!rideToDelete}
+        onClose={() => !isDeleting && setRideToDelete(null)}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+        title="Delete mileage?"
+        message="Are you sure you want to delete this mileage record? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+
+      {/* Cancel ride confirmation */}
+      <DeleteConfirmationModal
+        isOpen={!!rideToCancel}
+        onClose={() => !isCancelling && setRideToCancel(null)}
+        onConfirm={handleCancelConfirm}
+        isDeleting={isCancelling}
+        title="Cancel ride?"
+        message="Are you sure you want to cancel this ride? The ride will be marked as cancelled."
+        confirmText="Cancel ride"
+        cancelText="Keep"
       />
     </div>
   );

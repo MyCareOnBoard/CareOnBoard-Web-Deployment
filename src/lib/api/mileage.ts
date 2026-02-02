@@ -7,16 +7,30 @@ export interface Coordinates {
   longitude: number;
 }
 
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
 export interface MileageRide {
   id: string;
   agencyId: string;
   caregiverId: string;
+  caregiverName?: string;
   clientId: string;
   clientName: string;
+  clientAvatarUrl?: string | null;
+  caregiverAvatarUrl?: string | null;
   location: string;
+  pickupLocation?: string;
+  dropOffLocation?: string;
   scheduledStartTime: string;
   estimatedDistance: number | null;
+  estimatedDuration?: number | null;
   actualDistance: number | null;
+  pickupLatLon?: LatLng | null;
+  dropOffLatLon?: LatLng | null;
+  isRecurring?: boolean;
   status: RideStatus;
   startLocation: Coordinates | null;
   endLocation: Coordinates | null;
@@ -33,6 +47,16 @@ export interface MileageListResponse {
   success: boolean;
   data: MileageRide[];
   totalMileage: number;
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+  };
+}
+
+export interface AgencyMileageListResponse {
+  success: boolean;
+  data: MileageRide[];
   pagination: {
     limit: number;
     offset: number;
@@ -57,6 +81,49 @@ export interface StopRidePayload {
 export interface CancelRidePayload {
   cancelReason: string;
 }
+
+export type RecurringFrequency = "daily" | "weekly" | "monthly";
+
+export interface CreateMileageRideBase {
+  clientId: string;
+  caregiverId: string;
+  pickupLocation: string;
+  dropOffLocation: string;
+  estimatedDistance: number;
+  estimatedDuration?: number;
+  pickupLatLon?: LatLng;
+  dropOffLatLon?: LatLng;
+  notes?: string;
+}
+
+export interface UpdateAgencyRideRequest {
+  caregiverId?: string;
+  pickupLocation?: string;
+  dropOffLocation?: string;
+  scheduledStartTime?: string;
+  estimatedDistance?: number;
+  estimatedDuration?: number;
+  pickupLatLon?: LatLng;
+  dropOffLatLon?: LatLng;
+  notes?: string;
+}
+
+export interface CreateOneTimeMileageRideRequest extends CreateMileageRideBase {
+  scheduledStartTime: string;
+}
+
+export interface CreateRecurringMileageRideRequest extends CreateMileageRideBase {
+  frequency: RecurringFrequency;
+  daysOfWeek?: number[];
+  dayOfMonth?: number;
+  time: string;
+  startDate: string;
+  endDate?: string | null;
+}
+
+export type CreateMileageRideRequest =
+  | CreateOneTimeMileageRideRequest
+  | CreateRecurringMileageRideRequest;
 
 export interface RideActionResponse {
   success: boolean;
@@ -83,6 +150,19 @@ export const mileageApi = {
     return response.data;
   },
 
+  listAgency: async (params?: {
+    limit?: number;
+    offset?: number;
+    status?: RideStatus;
+    caregiverId?: string;
+    clientId?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const response = await axiosClient.get<AgencyMileageListResponse>(`/agencyMileage${buildQuery(params)}`);
+    return response.data;
+  },
+
   getById: async (id: string) => {
     const response = await axiosClient.get<MileageRideResponse>(`/mileage/${id}`);
     return response.data;
@@ -103,8 +183,23 @@ export const mileageApi = {
     return response.data;
   },
 
-  create: async (payload: any) => {
+  create: async (payload: CreateMileageRideRequest) => {
     const response = await axiosClient.post(`/agencyMileage`, payload);
+    return response.data;
+  },
+
+  updateAgency: async (id: string, payload: UpdateAgencyRideRequest) => {
+    const response = await axiosClient.put(`/agencyMileage/${id}`, payload);
+    return response.data;
+  },
+
+  deleteAgency: async (id: string) => {
+    const response = await axiosClient.delete(`/agencyMileage/${id}`);
+    return response.data;
+  },
+
+  cancelAgency: async (id: string, reason?: string) => {
+    const response = await axiosClient.put(`/agencyMileage/${id}/cancel`, reason ? { reason } : {});
     return response.data;
   },
 };
