@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import StopRideModal from "./modals/StopRideModal";
 import StartRideModal from "./modals/StartRideModal";
 import CancelRideModal from "./modals/CancelRideModal";
@@ -77,11 +78,23 @@ export default function CurrentRide({ ride, onStart, onStop, onCancel, actionLoa
 
         <div className="flex items-center justify-between">
           <div className="flex items-center ">
-            <img
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Brooklyn"
-              alt={ride.clientName}
-              className="rounded-full w-14 h-14"
-            />
+            <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
+              {ride.clientAvatarUrl && (
+                <AvatarImage
+                  src={ride.clientAvatarUrl}
+                  alt={ride.clientName}
+                  className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                />
+              )}
+              <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                {ride.clientName
+                  .split(" ")
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((w) => w[0]?.toUpperCase())
+                  .join("")}
+              </AvatarFallback>
+            </Avatar>
             <div>
               <h3 className="text-base font-semibold text-[#10141a]">{ride.clientName}</h3>
               <p className="text-sm text-[#808081]">Client</p>

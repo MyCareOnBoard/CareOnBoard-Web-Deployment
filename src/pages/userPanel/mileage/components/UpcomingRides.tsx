@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import RideCard from "./RideCard";
 import { MileageRide } from "@/lib/api/mileage";
 
@@ -7,10 +8,24 @@ interface UpcomingRidesProps {
   actionLoading?: boolean;
 }
 
-const formatTime = (iso?: string | null) => {
-  if (!iso) return "--";
-  const date = new Date(iso);
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+type FirebaseTimestampLike = { seconds?: number; _seconds?: number };
+
+const formatTime = (value?: string | Date | FirebaseTimestampLike | null) => {
+  if (!value) return "--";
+  let date: Date;
+  if (typeof value === "string") {
+    date = new Date(value);
+  } else if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === "object") {
+    const seconds = value.seconds ?? value._seconds;
+    if (typeof seconds !== "number") return "--";
+    date = new Date(seconds * 1000);
+  } else {
+    return "--";
+  }
+  if (Number.isNaN(date.getTime())) return "--";
+  return format(date, "h:mm a");
 };
 
 export default function UpcomingRides({ rides, onCancel, actionLoading }: UpcomingRidesProps) {
@@ -30,6 +45,7 @@ export default function UpcomingRides({ rides, onCancel, actionLoading }: Upcomi
             key={ride.id}
             id={ride.id}
             clientName={ride.clientName}
+            clientAvatarUrl={ride.clientAvatarUrl ?? ""}
             location={ride.location}
             time={formatTime(ride.scheduledStartTime)}
             distance={ride.estimatedDistance != null ? `${ride.estimatedDistance}Km` : "--"}

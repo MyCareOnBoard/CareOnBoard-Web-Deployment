@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import CancelRideModal from "./modals/CancelRideModal";
 
 interface RideCardProps {
   id: string;
   clientName: string;
+  clientAvatarUrl: string;
   location: string;
   time: string;
   distance: string;
@@ -16,6 +18,7 @@ interface RideCardProps {
 export default function RideCard({
   id,
   clientName,
+  clientAvatarUrl,
   location,
   time,
   distance,
@@ -40,35 +43,48 @@ export default function RideCard({
 
   return (
     <>
-      <div className="flex items-center justify-between p-4 bg-[#f8f9fa] rounded-xl hover:bg-[#f0f1f2] transition-colors">
-        <div className="flex items-center flex-1 gap-4">
-          <img
-            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${clientName}-${id}`}
-            alt={clientName}
-            className="w-12 h-12 rounded-full"
-          />
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold text-[#10141a]">{clientName}</h3>
+      <div className="flex flex-col gap-4 p-4 bg-[#f8f9fa] rounded-xl hover:bg-[#f0f1f2] transition-colors md:flex-row md:items-center">
+        <div className="flex items-center gap-4 min-w-0 md:w-[220px]">
+          <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
+            {clientAvatarUrl && (
+              <AvatarImage
+                src={clientAvatarUrl}
+                alt={clientName}
+                className="w-full h-full object-cover aspect-auto rounded-[8px]"
+              />
+            )}
+            <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+              {clientName
+                .split(" ")
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((w) => w[0]?.toUpperCase())
+                .join("")}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-[#10141a] truncate">{clientName}</h3>
             <p className="text-xs text-[#808081]">Client</p>
           </div>
         </div>
 
-        <div className="flex items-center flex-1 gap-12">
-          <div>
+        <div className="grid flex-1 min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="min-w-0">
             <p className="text-xs text-[#808081] mb-1">Location</p>
-            <p className="text-sm font-medium text-[#10141a]">{location}</p>
+            <p className="text-sm font-medium text-[#10141a] break-words">{location}</p>
           </div>
 
-          <div>
-            <p className="text-xs text-[#808081] mb-1">Starts at</p>
+          <div className="min-w-0">
+            <p className="text-xs text-[#808081] mb-1 whitespace-nowrap">Starts at</p>
             <p className="text-sm font-medium text-[#10141a]">{time}</p>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-[#808081] mb-1">Distance</p>
             <p className="text-sm font-medium text-[#10141a]">{distance}</p>
           </div>
-
+        </div>
+        <div className="flex justify-start sm:justify-end md:ml-4">
           <Button
             onClick={() => setIsCancelModalOpen(true)}
             disabled={actionLoading}
