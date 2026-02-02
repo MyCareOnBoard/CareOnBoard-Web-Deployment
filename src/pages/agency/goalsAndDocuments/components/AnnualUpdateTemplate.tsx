@@ -254,7 +254,6 @@ export default function AnnualUpdateTemplate(
                                         }}
                                         placeholder="Search client name..."
                                         className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
-                                        disabled={isReadOnly}
                                         readOnly={isReadOnly}
                                     />
                                     {isSearchingClients && (
@@ -295,7 +294,6 @@ export default function AnnualUpdateTemplate(
                                 onChange={(e) => handleInputChange("ispStartDate", e.target.value)}
                                 placeholder=""
                                 className="w-full"
-                                disabled={isReadOnly}
                             />
                         </div>
                         <div>
@@ -308,7 +306,6 @@ export default function AnnualUpdateTemplate(
                                 onChange={(e) => handleInputChange("ispEndDate", e.target.value)}
                                 placeholder=""
                                 className="w-full"
-                                disabled={isReadOnly}
                             />
                         </div>
                     </div>
@@ -325,7 +322,6 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
-                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -340,7 +336,6 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
-                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -355,7 +350,6 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
-                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -371,7 +365,6 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
-                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -387,7 +380,6 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
-                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -403,7 +395,6 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
-                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -419,7 +410,6 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
-                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -435,7 +425,6 @@ export default function AnnualUpdateTemplate(
                             placeholder=""
                             className="w-full bg-white border border-[#cccccd]"
                             rows={4}
-                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -450,7 +439,6 @@ export default function AnnualUpdateTemplate(
                             onChange={(e) => handleInputChange("completedBy", e.target.value)}
                             placeholder=""
                             className="max-w-md"
-                            disabled={isReadOnly}
                         />
                         <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">
                             {currentDate}

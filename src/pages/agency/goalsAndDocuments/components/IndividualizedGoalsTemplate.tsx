@@ -283,7 +283,6 @@ export default function IndividualizedGoalsTemplate(
                                             }}
                                             placeholder="Search client name..."
                                             className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
-                                            disabled={isReadOnly}
                                             readOnly={isReadOnly}
                                         />
                                         {isSearchingClients && (
@@ -326,7 +325,6 @@ export default function IndividualizedGoalsTemplate(
                                     onChange={(e) => handleInputChange("ispDate", e.target.value)}
                                     placeholder=""
                                     className="w-full min-w-full block"
-                                    disabled={isReadOnly}
                                 />
                             </div>
                         </div>
@@ -373,7 +371,6 @@ export default function IndividualizedGoalsTemplate(
                                                         value={outcome.outcomeNumber}
                                                         onChange={(e) => handleOutcomeChange(index, "outcomeNumber", e.target.value)}
                                                         className="w-full"
-                                                        disabled={isReadOnly}
                                                     />
                                                 </div>
                                                 {/* Employee Performance */}
@@ -405,7 +402,6 @@ export default function IndividualizedGoalsTemplate(
                                 value={individual}
                                 onChange={(e) => handleInvolvedPersonChange(index, e.target.value)}
                                 className="w-full"
-                                disabled={isReadOnly}
                             />)}
                         </div>
 
@@ -422,7 +418,6 @@ export default function IndividualizedGoalsTemplate(
                                 onChange={(e) => handleInputChange("completedBy", e.target.value)}
                                 placeholder=""
                                 className="max-w-md"
-                                disabled={isReadOnly}
                             />
                             <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">
                                 {currentDate}
