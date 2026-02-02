@@ -295,7 +295,6 @@ export default function NaturalSupportsTraining() {
                                         }}
                                         placeholder="Search client name..."
                                         className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
-                                        disabled={isReadOnly}
                                         readOnly={isReadOnly}
                                     />
                                     {isSearchingClients && (
@@ -337,7 +336,6 @@ export default function NaturalSupportsTraining() {
                                 onChange={(e) => handleInputChange("birthDate", e.target.value)}
                                 placeholder=""
                                 className="w-full block"
-                                disabled={isReadOnly}
                             />
                         </div>
                     </div>
@@ -354,7 +352,6 @@ export default function NaturalSupportsTraining() {
                             onChange={(e) => handleInputChange("ispOutcome", e.target.value)}
                             placeholder=""
                             className="w-full"
-                            disabled={isReadOnly}
                         />
                     </div>
                     {/* Name of Trainer */}
@@ -369,7 +366,6 @@ export default function NaturalSupportsTraining() {
                             onChange={(e) => handleInputChange("nameOfTrainer", e.target.value)}
                             placeholder=""
                             className="w-full"
-                            disabled={isReadOnly}
                         />
                     </div>
 
@@ -413,7 +409,6 @@ export default function NaturalSupportsTraining() {
                                                     value={outcome.name}
                                                     onChange={(e) => handleParticipantChange(index, "name", e.target.value)}
                                                     className="h-auto p-0 border-0 bg-transparent text-center focus-visible:ring-0 text-[14px] w-full"
-                                                    disabled={isReadOnly}
                                                 />
                                             </div>
                                             {/* Employee Performance */}
@@ -423,7 +418,6 @@ export default function NaturalSupportsTraining() {
                                                     value={outcome.signature}
                                                     onChange={(e) => handleParticipantChange(index, "signature", e.target.value)}
                                                     className="h-auto p-0 border-0 bg-transparent text-center focus-visible:ring-0 text-[14px] w-full"
-                                                    disabled={isReadOnly}
                                                 />
                                             </div>
                                         </div>
@@ -449,7 +443,6 @@ export default function NaturalSupportsTraining() {
                                             onChange={(e) => handleTrainingChange(index, "type", e.target.value)}
                                             placeholder=""
                                             className="w-full"
-                                            disabled={isReadOnly}
                                         />
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -464,7 +457,6 @@ export default function NaturalSupportsTraining() {
                                                 onChange={(e) => handleTrainingChange(index, "date", e.target.value)}
                                                 placeholder=""
                                                 className="w-full block"
-                                                disabled={isReadOnly}
                                             />
                                         </div>
                                         <div className="flex-1">
@@ -478,7 +470,6 @@ export default function NaturalSupportsTraining() {
                                                 onChange={(e) => handleTrainingChange(index, "startTime", e.target.value)}
                                                 placeholder=""
                                                 className="w-full block"
-                                                disabled={isReadOnly}
                                             />
                                         </div>
                                         <div className="flex-1">
@@ -492,7 +483,6 @@ export default function NaturalSupportsTraining() {
                                                 onChange={(e) => handleTrainingChange(index, "endTime", e.target.value)}
                                                 placeholder=""
                                                 className="w-full block"
-                                                disabled={isReadOnly}
                                             />
                                         </div>
                                     </div>
@@ -507,7 +497,6 @@ export default function NaturalSupportsTraining() {
                                             placeholder=""
                                             className="w-full bg-white border border-[#cccccd]"
                                             rows={4}
-                                            disabled={isReadOnly}
                                         />
                                     </div>
                                 </div>
@@ -526,7 +515,6 @@ export default function NaturalSupportsTraining() {
                             onChange={(e) => handleInputChange("completedBy", e.target.value)}
                             placeholder=""
                             className="max-w-md"
-                            disabled={isReadOnly}
                         />
                         <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">
                             {currentDate}

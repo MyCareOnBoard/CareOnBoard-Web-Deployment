@@ -59,6 +59,39 @@ export default function GenerateReport() {
     {id: "all", label: "All"},
   ];
 
+  const mileageFilters = [
+    {id: "all", label: "All"},
+    {id: "scheduled", label: "Scheduled"},
+    {id: "in_progress", label: "In Progress"},
+    {id: "completed", label: "Completed"},
+    {id: "cancelled", label: "Cancelled"},
+  ];
+
+  const expenseFilters = [
+    {id: "all", label: "All"},
+    {id: "pending", label: "Pending"},
+    {id: "approved", label: "Approved"},
+    {id: "rejected", label: "Rejected"},
+  ];
+
+  const billingFilters = [
+    {id: "all", label: "All"},
+    {id: "pending", label: "Pending"},
+    {id: "approved", label: "Approved"},
+    {id: "paid", label: "Paid"},
+  ];
+
+  const incidentFilters = [
+    {id: "all", label: "All"},
+    {id: "pending", label: "Pending"},
+    {id: "under_review", label: "Under Review"},
+    {id: "resolved", label: "Resolved"},
+  ];
+
+  const communityInclusionFilters = [
+    {id: "all", label: "All"},
+  ];
+
   const notesTypes = [
     {
       id: "community-based",
@@ -95,6 +128,11 @@ export default function GenerateReport() {
     "dsp": statusTypes,
     "shifts": shiftsTypes,
     "notes": notesFilters,
+    "mileage": mileageFilters,
+    "expense": expenseFilters,
+    "billing": billingFilters,
+    "incidents": incidentFilters,
+    "community_inclusions": communityInclusionFilters,
   }
 
   const reportFilterTypes = formData.reportType ? filters[formData.reportType as keyof typeof filters] : [];
@@ -109,7 +147,20 @@ export default function GenerateReport() {
     setTimeout(() => {
       setIsGenerating(false);
       const userRoutes: any = Routes[userRoutesPrefix[user?.userType as UserType] as keyof typeof Routes];
-      navigate(userRoutes.reports[formData.reportType]);
+      
+      const reportFilters = {
+        status: formData.status,
+        noteType: formData.noteType,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        isLifetime: formData.isLifetime
+      };
+      
+      sessionStorage.setItem('reportFilters', JSON.stringify(reportFilters));
+      
+      navigate(userRoutes.reports[formData.reportType], { 
+        state: reportFilters 
+      });
     }, 3000);
   };
 
@@ -142,6 +193,11 @@ export default function GenerateReport() {
                   <SelectItem value={"dsp"}>DSPs</SelectItem>
                   <SelectItem value={"shifts"}>Shifts</SelectItem>
                   <SelectItem value={"notes"}>Notes</SelectItem>
+                  <SelectItem value={"mileage"}>Mileage</SelectItem>
+                  <SelectItem value={"expense"}>Expenses</SelectItem>
+                  <SelectItem value={"billing"}>Billing</SelectItem>
+                  <SelectItem value={"incidents"}>Incidents</SelectItem>
+                  <SelectItem value={"community_inclusions"}>Community Inclusions</SelectItem>
                 </SelectContent>
               </Select>
             </div>

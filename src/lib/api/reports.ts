@@ -97,10 +97,102 @@ export interface AgencySummary {
   createdAt: string;
 }
 
+export interface MileageReport {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  totalRides: number;
+  totalMiles: number;
+}
+
+export interface MileageDetail {
+  id: string;
+  clientName: string;
+  pickupLocation: string;
+  dropOffLocation: string;
+  scheduledStartTime: string;
+  estimatedDistance: number;
+  actualDistance: number | null;
+  status: string;
+}
+
+export interface ExpenseReport {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  totalExpenses: number;
+  totalAmount: number;
+}
+
+export interface ExpenseDetail {
+  id: string;
+  category: string;
+  description: string;
+  amount: number;
+  date: string;
+  submittedAt: string;
+  status: string;
+}
+
+export interface BillingReport {
+  id: string;
+  fullName: string;
+  totalClaims: number;
+  totalAmount: number;
+  approvedAmount: number;
+}
+
+export interface BillingDetail {
+  id: string;
+  claimNumber: string;
+  serviceType: string;
+  serviceDate: string;
+  amount: number;
+  submittedAt: string;
+  status: string;
+}
+
+export interface IncidentReport {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  totalIncidents: number;
+  resolvedIncidents: number;
+}
+
+export interface IncidentDetail {
+  id: string;
+  incidentType: string;
+  clientName: string;
+  description: string;
+  date: string;
+  submittedAt: string;
+  status: string;
+  severity: string;
+}
+
+export interface CommunityInclusionReport {
+  id: string;
+  fullName: string;
+  totalActivities: number;
+  totalAttendees: number;
+  totalHours: number;
+}
+
+export interface CommunityInclusionDetail {
+  id: string;
+  date: string;
+  attendees: any[];
+  createdAt: string;
+}
+
 export const reportsApi = createApi({
   reducerPath: "reportsApi",
   baseQuery: customBaseQuery,
-  tagTypes: ["ClientsReport", "DSPsReport", "ShiftsReport", "NotesReport", "AgenciesSummary"],
+  tagTypes: ["ClientsReport", "DSPsReport", "ShiftsReport", "NotesReport", "AgenciesSummary", "MileageReport", "ExpenseReport", "BillingReport", "IncidentReport", "CommunityInclusionReport"],
   endpoints: (builder) => ({
     // Clients Report
     getClientsReport: builder.query<
@@ -268,6 +360,201 @@ export const reportsApi = createApi({
       }),
       providesTags: ["AgenciesSummary"],
     }),
+
+    // Mileage Report
+    getMileageReport: builder.query<
+      { success: boolean; data: MileageReport[]; total: number },
+      ReportFilters
+    >({
+      query: (filters) => ({
+        url: "/reports/mileage",
+        method: "GET",
+        params: filters,
+        requiresAuth: true,
+      }),
+      providesTags: ["MileageReport"],
+    }),
+
+    getDSPMileageDetails: builder.query<
+      { success: boolean; data: MileageDetail[]; total: number },
+      { employeeId: string; status?: string }
+    >({
+      query: ({ employeeId, status }) => ({
+        url: `/reports/mileage/dsps/${employeeId}/rides`,
+        method: "GET",
+        params: status ? { status } : {},
+        requiresAuth: true,
+      }),
+    }),
+
+    // Expense Report
+    getExpenseReport: builder.query<
+      { success: boolean; data: ExpenseReport[]; total: number },
+      ReportFilters
+    >({
+      query: (filters) => ({
+        url: "/reports/expenses",
+        method: "GET",
+        params: filters,
+        requiresAuth: true,
+      }),
+      providesTags: ["ExpenseReport"],
+    }),
+
+    getDSPExpenseDetails: builder.query<
+      { success: boolean; data: ExpenseDetail[]; total: number },
+      { employeeId: string; status?: string }
+    >({
+      query: ({ employeeId, status }) => ({
+        url: `/reports/expenses/dsps/${employeeId}/expenses`,
+        method: "GET",
+        params: status ? { status } : {},
+        requiresAuth: true,
+      }),
+    }),
+
+    // Billing Report
+    getBillingReport: builder.query<
+      { success: boolean; data: BillingReport[]; total: number },
+      ReportFilters
+    >({
+      query: (filters) => ({
+        url: "/reports/billing",
+        method: "GET",
+        params: filters,
+        requiresAuth: true,
+      }),
+      providesTags: ["BillingReport"],
+    }),
+
+    getClientBillingDetails: builder.query<
+      { success: boolean; data: BillingDetail[]; total: number },
+      { clientId: string; status?: string }
+    >({
+      query: ({ clientId, status }) => ({
+        url: `/reports/billing/clients/${clientId}/claims`,
+        method: "GET",
+        params: status ? { status } : {},
+        requiresAuth: true,
+      }),
+    }),
+
+    // Incident Report
+    getIncidentReport: builder.query<
+      { success: boolean; data: IncidentReport[]; total: number },
+      ReportFilters
+    >({
+      query: (filters) => ({
+        url: "/reports/incidents",
+        method: "GET",
+        params: filters,
+        requiresAuth: true,
+      }),
+      providesTags: ["IncidentReport"],
+    }),
+
+    getDSPIncidentDetails: builder.query<
+      { success: boolean; data: IncidentDetail[]; total: number },
+      { employeeId: string; status?: string }
+    >({
+      query: ({ employeeId, status }) => ({
+        url: `/reports/incidents/dsps/${employeeId}/incidents`,
+        method: "GET",
+        params: status ? { status } : {},
+        requiresAuth: true,
+      }),
+    }),
+
+    // Community Inclusion Report
+    getCommunityInclusionReport: builder.query<
+      { success: boolean; data: CommunityInclusionReport[]; total: number },
+      ReportFilters
+    >({
+      query: (filters) => ({
+        url: "/reports/community-inclusions",
+        method: "GET",
+        params: filters,
+        requiresAuth: true,
+      }),
+      providesTags: ["CommunityInclusionReport"],
+    }),
+
+    getClientCommunityInclusionDetails: builder.query<
+      { success: boolean; data: CommunityInclusionDetail[]; total: number },
+      string
+    >({
+      query: (clientId) => ({
+        url: `/reports/community-inclusions/clients/${clientId}/activities`,
+        method: "GET",
+        requiresAuth: true,
+      }),
+    }),
+
+    // Super Admin Reports for new types
+    getSuperAdminMileageReport: builder.query<
+      { success: boolean; data: MileageReport[]; total: number },
+      ReportFilters
+    >({
+      query: (filters) => ({
+        url: "/superAdminReports/mileage",
+        method: "GET",
+        params: filters,
+        requiresAuth: true,
+      }),
+      providesTags: ["MileageReport"],
+    }),
+
+    getSuperAdminExpenseReport: builder.query<
+      { success: boolean; data: ExpenseReport[]; total: number },
+      ReportFilters
+    >({
+      query: (filters) => ({
+        url: "/superAdminReports/expenses",
+        method: "GET",
+        params: filters,
+        requiresAuth: true,
+      }),
+      providesTags: ["ExpenseReport"],
+    }),
+
+    getSuperAdminBillingReport: builder.query<
+      { success: boolean; data: BillingReport[]; total: number },
+      ReportFilters
+    >({
+      query: (filters) => ({
+        url: "/superAdminReports/billing",
+        method: "GET",
+        params: filters,
+        requiresAuth: true,
+      }),
+      providesTags: ["BillingReport"],
+    }),
+
+    getSuperAdminIncidentReport: builder.query<
+      { success: boolean; data: IncidentReport[]; total: number },
+      ReportFilters
+    >({
+      query: (filters) => ({
+        url: "/superAdminReports/incidents",
+        method: "GET",
+        params: filters,
+        requiresAuth: true,
+      }),
+      providesTags: ["IncidentReport"],
+    }),
+
+    getSuperAdminCommunityInclusionReport: builder.query<
+      { success: boolean; data: CommunityInclusionReport[]; total: number },
+      ReportFilters
+    >({
+      query: (filters) => ({
+        url: "/superAdminReports/community-inclusions",
+        method: "GET",
+        params: filters,
+        requiresAuth: true,
+      }),
+      providesTags: ["CommunityInclusionReport"],
+    }),
   }),
 });
 
@@ -285,4 +572,19 @@ export const {
   useGetSuperAdminShiftsReportQuery,
   useGetSuperAdminNotesReportQuery,
   useGetAgenciesSummaryReportQuery,
+  useGetMileageReportQuery,
+  useGetDSPMileageDetailsQuery,
+  useGetExpenseReportQuery,
+  useGetDSPExpenseDetailsQuery,
+  useGetBillingReportQuery,
+  useGetClientBillingDetailsQuery,
+  useGetIncidentReportQuery,
+  useGetDSPIncidentDetailsQuery,
+  useGetCommunityInclusionReportQuery,
+  useGetClientCommunityInclusionDetailsQuery,
+  useGetSuperAdminMileageReportQuery,
+  useGetSuperAdminExpenseReportQuery,
+  useGetSuperAdminBillingReportQuery,
+  useGetSuperAdminIncidentReportQuery,
+  useGetSuperAdminCommunityInclusionReportQuery,
 } = reportsApi;
