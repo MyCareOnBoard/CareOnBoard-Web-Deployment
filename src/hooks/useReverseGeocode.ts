@@ -33,31 +33,37 @@ export function useReverseGeocode() {
         lat: number,
         lng: number
     ): Promise<ReverseGeocodeResult | null> => {
-        const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
-        if (!apiKey) return null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const google = (window as any).google;
+        if (!google?.maps?.Geocoder) {
+            return null;
+        }
 
-        const url = new URL(
-            "https://maps.googleapis.com/maps/api/geocode/json"
-        );
-        url.searchParams.set("latlng", `${lat},${lng}`);
-        url.searchParams.set("key", apiKey);
+        return new Promise((resolve) => {
+            const geocoder = new google.maps.Geocoder();
 
-        const response = await fetch(url.toString());
-        if (!response.ok) return null;
+            geocoder.geocode(
+                { location: { lat, lng } },
+                (results: any[] | null, status: string) => {
+                    if (status !== "OK" || !results?.[0]) {
+                        console.warn("Geocoding failed:", status);
+                        resolve(null);
+                        return;
+                    }
 
-        const data = await response.json();
-        if (data.status !== "OK" || !data.results?.[0]) return null;
+                    const result = results[0];
+                    const components = result.address_components ?? [];
+                    const parsed = parseAddressComponents(components);
 
-        const result = data.results[0];
-        const components = result.address_components ?? [];
-        const parsed = parseAddressComponents(components);
-
-        return {
-            formattedAddress: result.formatted_address ?? "",
-            ...parsed,
-            lat,
-            lng,
-        };
+                    resolve({
+                        formattedAddress: result.formatted_address ?? "",
+                        ...parsed,
+                        lat,
+                        lng,
+                    });
+                }
+            );
+        });
     };
 
     return { reverseGeocode };
