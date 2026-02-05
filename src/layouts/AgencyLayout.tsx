@@ -22,7 +22,6 @@ import MileageIcon from "@/assets/icons/mileage.svg?react";
 
 import {
     UsersRound,
-    ReceiptText,
     Network,
     Settings
 } from "lucide-react";
@@ -35,7 +34,7 @@ const allNavItems: NavItem[] = [
     { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion" },
     { label: "Scheduling", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: "Scheduling" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
-    { label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText, accessKey: "Billing & Management" },
+    // { label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText, accessKey: "Billing & Management" },
     { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
     { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
     { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
