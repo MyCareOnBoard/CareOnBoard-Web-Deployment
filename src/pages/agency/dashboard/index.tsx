@@ -83,6 +83,14 @@ export default function AgencyDashboardPage() {
     toast.success("Copied to clipboard!");
   }
 
+  const copyMobileAppLink = async () => {
+    const iosStoreUrl = import.meta.env.VITE_MOBILE_APP_IOS_STORE_URL || 'https://apps.apple.com/app/6757762941';
+    const androidStoreUrl = import.meta.env.VITE_MOBILE_APP_ANDROID_STORE_URL || 'https://play.google.com/store/apps/details?id=com.careonboard.applicant';
+    const message = `Download Care On Board App:\n\niOS: ${iosStoreUrl}\nAndroid: ${androidStoreUrl}\n\nAgency ID: ${user?.agencyId}`;
+    await navigator.clipboard.writeText(message);
+    toast.success("Mobile app download info copied to clipboard!");
+  }
+
   return (
     <div className="min-h-[calc(100vh-200px)]">
       {/* Header */}
@@ -90,10 +98,16 @@ export default function AgencyDashboardPage() {
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
           Dashboard
         </h1>
-        <Button
-          onClick={copyToClipboard}
-          className="bg-[#00b4b8] text-white px-4 py-2 rounded-full"
-        >Copy DSP Agency URL</Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={copyToClipboard}
+            className="bg-[#00b4b8] text-white px-4 py-2 rounded-full"
+          >Copy DSP Agency URL</Button>
+          <Button
+            onClick={copyMobileAppLink}
+            className="bg-[#00b4b8] text-white px-4 py-2 rounded-full"
+          >Copy Mobile App Link</Button>
+        </div>
       </div>
 
       {/* Main Content Grid */}
