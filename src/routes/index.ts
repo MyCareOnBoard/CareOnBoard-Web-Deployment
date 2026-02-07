@@ -117,6 +117,7 @@ import PrevocationalTrainingIndividualizedGoals
 import InternalUsersPage from "@/pages/agency/agency-settings/user-levels/InternalUsersPage";
 import DSPDirectoryPage from "@/pages/agency/agency-settings/user-levels/DSPDirectoryPage";
 import ClientDirectoryPage from "@/pages/agency/agency-settings/user-levels/ClientDirectoryPage";
+import MobileAppRedirect from "@/pages/app/MobileAppRedirect";
 
 
 export const router = createBrowserRouter([
@@ -127,6 +128,10 @@ export const router = createBrowserRouter([
     {
         path: Routes.agencySplash,
         Component: SplashScreen,
+    },
+    {
+        path: Routes.mobileAppRedirect,
+        Component: MobileAppRedirect,
     },
     {
         Component: OnboardingLayout,

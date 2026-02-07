@@ -1,6 +1,7 @@
 export const Routes = {
     root: "/",
     agencySplash: "/:id",
+    mobileAppRedirect: "/app/:agencyId",
     splash: "/splash",
     app: "/",
     applicant: {
