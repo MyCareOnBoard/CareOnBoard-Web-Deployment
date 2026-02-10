@@ -111,14 +111,7 @@ export async function registerWithEmail(fullName: string, email: string, passwor
  */
 export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const appOrigin =
-      typeof window !== 'undefined' ? window.location.origin : process.env.VITE_APP_URL || 'http://localhost:3000'
-
-    const actionCodeSettings = {
-      url: `${appOrigin}/auth/reset-password`,
-      handleCodeInApp: true,
-    }
-    await firebaseSendPasswordResetEmail(auth, email, actionCodeSettings)
+    await firebaseSendPasswordResetEmail(auth, email)
 
     return {
       success: true,
