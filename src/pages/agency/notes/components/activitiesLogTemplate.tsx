@@ -101,8 +101,12 @@ export default function AgencyActivitiesLogTemplate(
     };
 
     if (date && id === "") {
+      if (!submissionId) {
+        console.warn('Cannot update note: submissionId is undefined');
+        return;
+      }
       await mutateNote({
-        submissionId: submissionId!,
+        submissionId: submissionId,
         data: {
           id: id,
           startDate: format(date, "yyyy-MM-dd"),
@@ -111,6 +115,10 @@ export default function AgencyActivitiesLogTemplate(
         }
       }).unwrap();
     } else if (date && id !== "") {
+      if (!submissionId) {
+        console.warn('Cannot update note: submissionId is undefined');
+        return;
+      }
       debouncedMutateNote({
         submissionId: submissionId!,
         data: {

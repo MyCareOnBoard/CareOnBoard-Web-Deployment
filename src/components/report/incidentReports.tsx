@@ -1,21 +1,23 @@
 import React, {useState, useMemo} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
-import {Search, X, AlertTriangle, Loader2} from "lucide-react";
+import {Search, X, AlertTriangle, Loader2, ArrowLeft} from "lucide-react";
 import CustomDatePicker from "@/components/ui/datePicker";
 import {cn} from "@/lib/utils";
 import {useAuth} from "@/utils/auth";
 import {UserType} from "@/utils/auth/types";
+import {useNavigate} from "react-router";
+import {Routes} from "@/routes/constants";
 import {
     useGetIncidentReportQuery,
     useGetSuperAdminIncidentReportQuery,
-    useGetDSPIncidentDetailsQuery,
     IncidentReport as IncidentReportType,
     IncidentDetail
 } from "@/lib/api/reports";
 
 export default function IncidentReport() {
     const {user} = useAuth();
+    const navigate = useNavigate();
     const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
 
     const [dates, setDates] = useState<{
@@ -31,6 +33,7 @@ export default function IncidentReport() {
     const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
     const [status, setStatus] = useState<"all" | "pending" | "under_review" | "resolved">("all");
     const [triggerRefetch, setTriggerRefetch] = useState<number>(0);
+    const [incidentDetails, setIncidentDetails] = useState<IncidentDetail[]>([]);
 
     const handleDateSelect = (
         name: string,
@@ -65,11 +68,6 @@ export default function IncidentReport() {
     const data = isSuperAdmin ? superAdminData : agencyData;
     const isLoading = isSuperAdmin ? superAdminLoading : agencyLoading;
 
-    const { data: detailsData, isLoading: detailsLoading } = useGetDSPIncidentDetailsQuery(
-        { employeeId: selectedDSP?.id || "", status },
-        { skip: !selectedDSP }
-    );
-
     const filteredDSPs = useMemo(() => {
         if (!data?.data) return [];
         
@@ -82,12 +80,26 @@ export default function IncidentReport() {
     const handleDSPClick = (dsp: IncidentReportType) => {
         setSelectedDSP(dsp);
         setShowDetailsModal(true);
+        
+        // Use incidents from the initial response
+        if (dsp.incidents && dsp.incidents.length > 0) {
+            setIncidentDetails(dsp.incidents);
+        } else {
+            setIncidentDetails([]);
+        }
     };
 
     return (
         <div className="min-h-[calc(100vh-200px)] flex flex-col">
             <div className={"mb-8 flex items-center justify-between"}>
-                <div>
+                <div className="flex items-center gap-4">
+                    <Button
+                        onClick={() => navigate(isSuperAdmin ? Routes.superAdmin.reports.index : Routes.agency.reports.index)}
+                        variant="ghost"
+                        className="h-10 w-10 p-0 hover:bg-gray-100"
+                    >
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
                     <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
                         Report
                     </h1>
@@ -129,49 +141,7 @@ export default function IncidentReport() {
                                 className="w-full pl-10 pr-10 h-10 border-0 rounded-full bg-[#f8f9fa] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
                             />
                         </div>
-                        <Button
-                            className={cn("h-[44px] rounded-3xl w-[80px]",
-                                status === "all"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("all")}
-                        >
-                            All
-                        </Button>
-                        <Button
-                            className={cn(
-                                "h-[44px] rounded-3xl w-[100px]",
-                                status === "pending"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("pending")}
-                        >
-                            Pending
-                        </Button>
-                        <Button
-                            className={cn(
-                                "h-[44px] rounded-3xl w-[120px]",
-                                status === "under_review"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("under_review")}
-                        >
-                            Under Review
-                        </Button>
-                        <Button
-                            className={cn(
-                                "h-[44px] rounded-3xl w-[100px]",
-                                status === "resolved"
-                                    ? "bg-[#00b4b8] text-white"
-                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
-                            )}
-                            onClick={() => setStatus("resolved")}
-                        >
-                            Resolved
-                        </Button>
+
                     </div>
                 </div>
 
@@ -245,6 +215,7 @@ export default function IncidentReport() {
 
                                         <div className="flex items-center gap-2 flex-shrink-0">
                                             <Button
+                                                onClick={() => handleDSPClick(dsp)}
                                                 className="bg-[#00b4b8] border border-[#00b4b8] text-white hover:bg-[#009ea1] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]"
                                             >
                                                 View Details
@@ -263,95 +234,131 @@ export default function IncidentReport() {
             </div>
 
             {showDetailsModal && selectedDSP && (
-                <>
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => setShowDetailsModal(false)} />
-                    <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-3xl max-h-[80vh] overflow-hidden">
-                        <div className="bg-white rounded-lg shadow-xl">
-                            <div className="flex items-center justify-between p-6 border-b">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-[#10141a]">
-                                        {selectedDSP.fullName}
-                                    </h2>
-                                    <p className="text-sm text-[#808081] mt-1">
-                                        Incident Details ({detailsData?.total || 0} incidents)
-                                    </p>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div 
+                        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                        onClick={() => setShowDetailsModal(false)}
+                    />
+                    <div className="relative w-full max-w-[90%] sm:max-w-[600px] lg:max-w-[800px] bg-white rounded-[16px] sm:rounded-[20px] lg:rounded-[24px] shadow-lg max-h-[90vh] overflow-y-auto">
+                        <div className="p-4 sm:p-6 lg:p-8">
+                            {incidentDetails.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <AlertTriangle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                                    <p className="text-gray-500">No incident records found</p>
                                 </div>
-                                <button
-                                    onClick={() => setShowDetailsModal(false)}
-                                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                                >
-                                    <X className="h-6 w-6" />
-                                </button>
-                            </div>
-
-                            <div className="p-6 overflow-y-auto max-h-[60vh]">
-                                {detailsLoading ? (
-                                    <div className="flex justify-center py-8">
-                                        <Loader2 className="h-8 w-8 animate-spin text-[#00b4b8]" />
-                                    </div>
-                                ) : detailsData?.data.length === 0 ? (
-                                    <div className="text-center py-8">
-                                        <AlertTriangle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                                        <p className="text-gray-500">No incident records found</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {detailsData?.data.map((incident: IncidentDetail) => (
-                                            <div
-                                                key={incident.id}
-                                                className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                                            >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
-                                                        <p className="font-medium text-[#10141a]">
-                                                            {incident.incidentType}
-                                                        </p>
-                                                        <p className="text-sm text-[#808081] mt-1">
-                                                            Client: {incident.clientName}
-                                                        </p>
-                                                        <p className="text-sm text-[#808081] mt-1">
-                                                            {incident.description}
-                                                        </p>
-                                                        <p className="text-xs text-[#808081] mt-2">
-                                                            Date: {new Date(incident.date).toLocaleDateString()} • 
-                                                            Submitted: {new Date(incident.submittedAt).toLocaleDateString()}
-                                                        </p>
-                                                    </div>
-                                                    <div className="ml-4 text-right">
-                                                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                                            incident.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                                                            incident.status === 'under_review' ? 'bg-blue-100 text-blue-800' :
-                                                            'bg-yellow-100 text-yellow-800'
-                                                        }`}>
-                                                            {incident.status.replace('_', ' ').toUpperCase()}
+                            ) : (
+                                <>
+                                    {incidentDetails.map((incident: IncidentDetail, index: number) => (
+                                        <div key={incident.id}>
+                                            {index > 0 && <div className="my-6 border-t border-gray-200" />}
+                                            
+                                            <div className="flex items-start justify-between mb-4 sm:mb-6">
+                                                <div>
+                                                    <h2 className="text-[20px] sm:text-[22px] lg:text-[24px] font-bold text-[#10141a]">
+                                                        Incident Details
+                                                    </h2>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-2 sm:gap-4">
+                                                        <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">
+                                                            <span className="font-medium">Type:</span> {incident.incidentType}
                                                         </span>
-                                                        <p className={`text-xs font-medium mt-2 ${
+                                                        <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">
+                                                            <span className="font-medium">Date:</span> {new Date(incident.date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {index === 0 && (
+                                                    <button
+                                                        onClick={() => setShowDetailsModal(false)}
+                                                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#f3f4f6] transition-colors flex-shrink-0"
+                                                    >
+                                                        <X className="w-5 h-5 text-[#6b7280]" />
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            <div className="flex flex-col gap-4 mb-4 sm:flex-row sm:gap-6 sm:mb-6">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 overflow-hidden bg-gradient-to-br from-[#6366f1] to-[#4f46e5] rounded-full sm:w-12 sm:h-12">
+                                                        <span className="text-[14px] sm:text-[16px] font-semibold text-white">
+                                                            {selectedDSP.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="text-[14px] sm:text-[15px] lg:text-[16px] font-semibold text-[#10141a] truncate">
+                                                            {selectedDSP.fullName}
+                                                        </div>
+                                                        <div className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">
+                                                            DSP
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 overflow-hidden bg-gradient-to-br from-[#00b8d4] to-[#0097b2] rounded-full sm:w-12 sm:h-12">
+                                                        <span className="text-[14px] sm:text-[16px] font-semibold text-white">
+                                                            {incident.clientName ? incident.clientName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="text-[14px] sm:text-[15px] lg:text-[16px] font-semibold text-[#10141a] truncate">
+                                                            {incident.clientName || 'N/A'}
+                                                        </div>
+                                                        <div className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">
+                                                            Client
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="mb-4 sm:mb-6">
+                                                <label className="block text-[13px] sm:text-[14px] font-semibold text-[#10141a] mb-2">
+                                                    Description
+                                                </label>
+                                                <div className="p-3 sm:p-4 bg-[#d1fae5] rounded-lg sm:rounded-xl text-[13px] sm:text-[14px] text-[#10141a] leading-relaxed whitespace-pre-wrap">
+                                                    {incident.description || 'N/A'}
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                                                        incident.status === 'resolved' ? 'bg-green-100 text-green-800' :
+                                                        incident.status === 'under_review' ? 'bg-blue-100 text-blue-800' :
+                                                        'bg-yellow-100 text-yellow-800'
+                                                    }`}>
+                                                        {incident.status.replace('_', ' ').toUpperCase()}
+                                                    </span>
+                                                    {incident.severity && (
+                                                        <span className={`text-xs font-medium ${
                                                             incident.severity === 'critical' ? 'text-red-600' :
                                                             incident.severity === 'high' ? 'text-orange-600' :
                                                             incident.severity === 'medium' ? 'text-yellow-600' :
                                                             'text-gray-600'
                                                         }`}>
-                                                            {incident.severity.toUpperCase()}
-                                                        </p>
-                                                    </div>
+                                                            Severity: {incident.severity.toUpperCase()}
+                                                        </span>
+                                                    )}
                                                 </div>
+                                                <p className="text-xs text-[#6b7280]">
+                                                    Submitted: {new Date(incident.submittedAt).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                                </p>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                                        </div>
+                                    ))}
 
-                            <div className="flex justify-end p-6 border-t">
-                                <Button
-                                    onClick={() => setShowDetailsModal(false)}
-                                    className="bg-gray-200 text-gray-700 hover:bg-gray-300"
-                                >
-                                    Close
-                                </Button>
-                            </div>
+                                    <div className="flex justify-end mt-6">
+                                        <Button
+                                            onClick={() => setShowDetailsModal(false)}
+                                            className="px-8 h-10 sm:h-11 bg-[#00b8d4] hover:bg-[#00a5c0] text-white rounded-xl text-[13px] sm:text-[14px] font-medium transition-colors shadow-none"
+                                        >
+                                            Close
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
-                </>
+                </div>
             )}
         </div>
     )

@@ -130,8 +130,12 @@ export default function AgencyCommunityBasedNote(
     const endTime = field === "endTime" ? value : newActivity.endTime;
 
     if (date && startTime && endTime && id === "") {
+      if (!submissionId) {
+        console.warn('Cannot update note: submissionId is undefined');
+        return;
+      }
       await mutateNote({
-        submissionId: submissionId!,
+        submissionId: submissionId,
         data: {
           id: id,
           startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
@@ -143,8 +147,12 @@ export default function AgencyCommunityBasedNote(
         }
       }).unwrap();
     } else if (date && startTime && endTime && id !== "") {
+      if (!submissionId) {
+        console.warn('Cannot update note: submissionId is undefined');
+        return;
+      }
       debouncedMutateNote({
-        submissionId: submissionId!,
+        submissionId: submissionId,
         data: {
           id: id,
           startDate: format(date, "yyyy-MM-dd") + "T" + startTime,

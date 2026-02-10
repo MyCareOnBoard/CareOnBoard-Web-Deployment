@@ -1,10 +1,12 @@
 import React, {useState, useMemo} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
-import {Search, X, Users, Loader2} from "lucide-react";
+import {Search, X, Users, Loader2, ArrowLeft} from "lucide-react";
 import CustomDatePicker from "@/components/ui/datePicker";
 import {useAuth} from "@/utils/auth";
 import {UserType} from "@/utils/auth/types";
+import {useNavigate} from "react-router";
+import {Routes} from "@/routes/constants";
 import {
     useGetCommunityInclusionReportQuery,
     useGetSuperAdminCommunityInclusionReportQuery,
@@ -15,6 +17,7 @@ import {
 
 export default function CommunityInclusionReport() {
     const {user} = useAuth();
+    const navigate = useNavigate();
     const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
 
     const [dates, setDates] = useState<{
@@ -83,7 +86,14 @@ export default function CommunityInclusionReport() {
     return (
         <div className="min-h-[calc(100vh-200px)] flex flex-col">
             <div className={"mb-8 flex items-center justify-between"}>
-                <div>
+                <div className="flex items-center gap-4">
+                    <Button
+                        onClick={() => navigate(isSuperAdmin ? Routes.superAdmin.reports.index : Routes.agency.reports.index)}
+                        variant="ghost"
+                        className="h-10 w-10 p-0 hover:bg-gray-100"
+                    >
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
                     <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
                         Report
                     </h1>
@@ -251,29 +261,60 @@ export default function CommunityInclusionReport() {
                                                 key={activity.id}
                                                 className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                                             >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
-                                                        <p className="font-medium text-[#10141a]">
-                                                            Activity Date: {new Date(activity.date).toLocaleDateString()}
-                                                        </p>
-                                                        <div className="text-sm text-[#808081] mt-2">
-                                                            <p>Attendees: {activity.attendees.length}</p>
-                                                            <div className="mt-1">
-                                                                {activity.attendees.map((attendee: any, idx: number) => (
-                                                                    <span key={idx} className="inline-block mr-2 text-xs">
-                                                                        {attendee.name}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <p className="font-semibold text-[16px] text-[#10141a]">
+                                                                Activity Date: {new Date(activity.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                                            </p>
+                                                            <p className="text-xs text-[#808081] mt-1">
+                                                                Created: {new Date(activity.createdAt).toLocaleString('en-US', { 
+                                                                    day: 'numeric', 
+                                                                    month: 'long', 
+                                                                    year: 'numeric',
+                                                                    hour: 'numeric',
+                                                                    minute: '2-digit',
+                                                                    hour12: true
+                                                                })}
+                                                            </p>
                                                         </div>
-                                                        <p className="text-xs text-[#808081] mt-2">
-                                                            Created: {new Date(activity.createdAt).toLocaleDateString()}
-                                                        </p>
-                                                    </div>
-                                                    <div className="ml-4 text-right">
                                                         <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
                                                             {activity.attendees.length} Attendees
                                                         </span>
+                                                    </div>
+
+                                                    {/* Attendees Cards */}
+                                                    <div className="space-y-2">
+                                                        <p className="text-sm font-semibold text-[#10141a]">Attendees:</p>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                            {activity.attendees.map((attendee: any, idx: number) => (
+                                                                <div 
+                                                                    key={idx} 
+                                                                    className="p-3 bg-gradient-to-br from-[#f0f9ff] to-[#e0f2fe] border border-[#bae6fd] rounded-lg"
+                                                                >
+                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0097b2] flex items-center justify-center">
+                                                                            <span className="text-white text-xs font-semibold">
+                                                                                {attendee.name?.charAt(0)?.toUpperCase() || '?'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <p className="font-semibold text-[14px] text-[#10141a]">
+                                                                            {attendee.name || 'Unknown'}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="space-y-1 text-xs text-[#475569]">
+                                                                        <div className="flex justify-between">
+                                                                            <span className="font-medium">Sign In:</span>
+                                                                            <span className="font-semibold text-[#0ea5e9]">{attendee.signIn || 'N/A'}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span className="font-medium">Sign Out:</span>
+                                                                            <span className="font-semibold text-[#f97316]">{attendee.signOut || 'N/A'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

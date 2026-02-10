@@ -50,9 +50,14 @@ export default function AgencyRespiteLog(
   const handleSave = async () => {
     if (!date || !noteId) return;
 
+    if (!submissionId) {
+      console.warn('Cannot update note: submissionId is undefined');
+      return;
+    }
+
     try {
       await mutateNote({
-        submissionId: submissionId!,
+        submissionId: submissionId,
         data: {
           id: noteId,
           startDate: format(date, "yyyy-MM-dd"),

@@ -1,11 +1,13 @@
 import React, {useState, useMemo} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
-import {Search, X, DollarSign, Loader2} from "lucide-react";
+import {Search, X, DollarSign, Loader2, ArrowLeft} from "lucide-react";
 import CustomDatePicker from "@/components/ui/datePicker";
 import {cn} from "@/lib/utils";
 import {useAuth} from "@/utils/auth";
 import {UserType} from "@/utils/auth/types";
+import {useNavigate} from "react-router";
+import {Routes} from "@/routes/constants";
 import {
     useGetExpenseReportQuery,
     useGetSuperAdminExpenseReportQuery,
@@ -16,6 +18,7 @@ import {
 
 export default function ExpenseReport() {
     const {user} = useAuth();
+    const navigate = useNavigate();
     const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
 
     const [dates, setDates] = useState<{
@@ -87,7 +90,14 @@ export default function ExpenseReport() {
     return (
         <div className="min-h-[calc(100vh-200px)] flex flex-col">
             <div className={"mb-8 flex items-center justify-between"}>
-                <div>
+                <div className="flex items-center gap-4">
+                    <Button
+                        onClick={() => navigate(isSuperAdmin ? Routes.superAdmin.reports.index : Routes.agency.reports.index)}
+                        variant="ghost"
+                        className="h-10 w-10 p-0 hover:bg-gray-100"
+                    >
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
                     <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
                         Report
                     </h1>
