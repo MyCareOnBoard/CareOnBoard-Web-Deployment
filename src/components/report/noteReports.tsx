@@ -1,10 +1,12 @@
 import React, {useState, useMemo} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
-import {Search, X, FileText, Loader2} from "lucide-react";
+import {Search, X, FileText, Loader2, ArrowLeft} from "lucide-react";
 import CustomDatePicker from "@/components/ui/datePicker";
 import {useAuth} from "@/utils/auth";
 import {UserType} from "@/utils/auth/types";
+import {useNavigate} from "react-router";
+import {Routes} from "@/routes/constants";
 import {
     useGetNotesReportQuery,
     useGetSuperAdminNotesReportQuery,
@@ -12,9 +14,11 @@ import {
     NoteReport as NoteReportType,
     DSPApprovedNote
 } from "@/lib/api/reports";
+import AgencyEditNote from "@/pages/agency/notes/editNote";
 
 export default function NoteReport() {
     const {user} = useAuth();
+    const navigate = useNavigate();
     const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
 
     const [dates, setDates] = useState<{
@@ -30,6 +34,8 @@ export default function NoteReport() {
     const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
     const [noteType, setNoteType] = useState<string>("all");
     const [triggerRefetch, setTriggerRefetch] = useState<number>(0);
+    const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+    const [showNoteDetailsModal, setShowNoteDetailsModal] = useState<boolean>(false);
 
     const handleDateSelect = (
         name: string,
@@ -86,7 +92,14 @@ export default function NoteReport() {
     return (
         <div className="min-h-[calc(100vh-200px)] flex flex-col">
             <div className={"mb-8 flex items-center justify-between"}>
-                <div>
+                <div className="flex items-center gap-4">
+                    <Button
+                        onClick={() => navigate(isSuperAdmin ? Routes.superAdmin.reports.index : Routes.agency.reports.index)}
+                        variant="ghost"
+                        className="h-10 w-10 p-0 hover:bg-gray-100"
+                    >
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
                     <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
                         Report
                     </h1>
@@ -260,7 +273,13 @@ export default function NoteReport() {
                                         {notesData?.data.map((note: DSPApprovedNote) => (
                                             <div
                                                 key={note.id}
-                                                className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                                                className="p-4 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                                                onClick={() => {
+                                                    if (note.id) {
+                                                        setSelectedNoteId(note.id);
+                                                        setShowNoteDetailsModal(true);
+                                                    }
+                                                }}
                                             >
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1">
@@ -275,9 +294,24 @@ export default function NoteReport() {
                                                             Approved: {new Date(note.approvedAt).toLocaleDateString()}
                                                         </p>
                                                     </div>
-                                                    <span className="ml-4 px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
-                                                        {note.noteCount} {note.noteCount === 1 ? 'Note' : 'Notes'}
-                                                    </span>
+                                                    <div className="flex flex-col items-end gap-2">
+                                                        <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+                                                            {note.noteCount} {note.noteCount === 1 ? 'Note' : 'Notes'}
+                                                        </span>
+                                                        <Button
+                                                            size="sm"
+                                                            className="bg-[#00b4b8] hover:bg-[#009a9d] text-white"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (note.id) {
+                                                                    setSelectedNoteId(note.id);
+                                                                    setShowNoteDetailsModal(true);
+                                                                }
+                                                            }}
+                                                        >
+                                                            View Details
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -297,6 +331,13 @@ export default function NoteReport() {
                     </div>
                 </>
             )}
+
+            <AgencyEditNote
+                isOpen={showNoteDetailsModal}
+                setIsOpen={setShowNoteDetailsModal}
+                submissionId={selectedNoteId}
+                reRoute={false}
+            />
         </div>
     )
 }

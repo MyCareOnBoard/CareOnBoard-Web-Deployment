@@ -9,6 +9,7 @@ export interface ReportFilters {
   endDate?: string;
   isLifetime?: boolean;
   agencyId?: string;
+  groupBy?: string;
 }
 
 export interface ClientReport {
@@ -161,6 +162,7 @@ export interface IncidentReport {
   role: string;
   totalIncidents: number;
   resolvedIncidents: number;
+  incidents?: IncidentDetail[];
 }
 
 export interface IncidentDetail {
@@ -580,6 +582,7 @@ export const {
   useGetClientBillingDetailsQuery,
   useGetIncidentReportQuery,
   useGetDSPIncidentDetailsQuery,
+    useLazyGetDSPIncidentDetailsQuery,
   useGetCommunityInclusionReportQuery,
   useGetClientCommunityInclusionDetailsQuery,
   useGetSuperAdminMileageReportQuery,
