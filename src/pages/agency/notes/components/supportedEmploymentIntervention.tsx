@@ -160,8 +160,12 @@ export default function AgencySupportedEmploymentIntervention(
     const training = newIntervention.training;
 
     if (training && id === "") {
+      if (!submissionId) {
+        console.warn('Cannot update note: submissionId is undefined');
+        return;
+      }
       await mutateNote({
-        submissionId: submissionId!,
+        submissionId: submissionId,
         data: {
           id: id,
           startDate: format(new Date(), "yyyy-MM-dd"),
@@ -176,8 +180,12 @@ export default function AgencySupportedEmploymentIntervention(
         }
       }).unwrap();
     } else if (training && id !== "") {
+      if (!submissionId) {
+        console.warn('Cannot update note: submissionId is undefined');
+        return;
+      }
       debouncedMutateNote({
-        submissionId: submissionId!,
+        submissionId: submissionId,
         data: {
           id: id,
           startDate: format(new Date(), "yyyy-MM-dd"),
@@ -229,8 +237,12 @@ export default function AgencySupportedEmploymentIntervention(
     const date = newService.datesOfSeServices.date;
 
     if (date && id === "") {
+      if (!submissionId) {
+        console.warn('Cannot update note: submissionId is undefined');
+        return;
+      }
       await mutateNote({
-        submissionId: submissionId!,
+        submissionId: submissionId,
         data: {
           id: id,
           startDate: format(date, "yyyy-MM-dd"),
@@ -247,8 +259,12 @@ export default function AgencySupportedEmploymentIntervention(
         }
       }).unwrap();
     } else if (date && id !== "") {
+      if (!submissionId) {
+        console.warn('Cannot update note: submissionId is undefined');
+        return;
+      }
       debouncedMutateNote({
-        submissionId: submissionId!,
+        submissionId: submissionId,
         data: {
           id: id,
           startDate: format(date, "yyyy-MM-dd"),
@@ -313,13 +329,21 @@ export default function AgencySupportedEmploymentIntervention(
       }
 
       if (["jobType", "ISPOutcome", "totalHours"].includes(name)) {
+        if (!submissionId) {
+          console.warn('Cannot update note: submissionId is undefined');
+          return updateNoteInfo;
+        }
         debounceUpdateNote({
-          submissionId: submissionId!,
+          submissionId: submissionId,
           data: modifiedNoteInfo
         })
       } else {
+        if (!submissionId) {
+          console.warn('Cannot update note: submissionId is undefined');
+          return updateNoteInfo;
+        }
         updateLog({
-          submissionId: submissionId!,
+          submissionId: submissionId,
           data: modifiedNoteInfo
         }).unwrap();
       }
