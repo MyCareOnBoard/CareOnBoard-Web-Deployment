@@ -21,6 +21,8 @@ export interface PlanOfCare {
   planOfCare: Plan;
   serviceCode: string;
   serviceName: string;
+  goalsAndDocumentId?: string;
+  goalsType?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

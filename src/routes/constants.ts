@@ -99,6 +99,16 @@ export const Routes = {
         settings: "/user-panel/settings",
         profile: "/user-panel/profile",
         communityInclusion: "/user-panel/community-inclusion",
+        goalsAndDocuments: {
+            index: "/user-panel/goals-and-documents",
+            naturalSupportsTraining: "/user-panel/goals-and-documents/natural-supports-training",
+            communityInclusionServices: "/user-panel/goals-and-documents/community-inclusion-services",
+            communityInclusionIndividualizedGoals: "/user-panel/goals-and-documents/community-inclusion-individualized-goals",
+            dayHabilitationIndividualizedGoals: "/user-panel/goals-and-documents/day-habilitation-individualized-goals",
+            prevocationalTrainingIndividualizedGoals: "/user-panel/goals-and-documents/prevocational-training-individualized-goals",
+            dayHabilitationServices: "/user-panel/goals-and-documents/day-habilitation-services",
+            prevocationalTrainingServices: "/user-panel/goals-and-documents/prevocational-training-services",
+        },
     },
     superAdmin: {
         dashboard: "/super-admin/dashboard",
