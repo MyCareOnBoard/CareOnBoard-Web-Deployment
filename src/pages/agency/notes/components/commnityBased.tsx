@@ -8,7 +8,6 @@ import ContentEditableCell from "@/components/ContentEditableCell";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import React, {useEffect, useState} from "react";
 import {useUpdateSubmittedNoteMutation, useUpdateActivityLogMutation} from "@/pages/agency/notes/api";
-import {useDebounce} from "@/hooks/useDebounce";
 import {format} from "date-fns";
 import {SubmittedNoteDetails} from "@/pages/agency/notes/apiTypes";
 
@@ -84,15 +83,6 @@ export default function AgencyCommunityBasedNote(
 
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
 
-  const debouncedMutateNote = useDebounce(
-    async (params: any) => {
-      await mutateNote(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    },
-    500
-  );
-
   const updateActivity = async (
     id: string,
     index: number,
@@ -129,7 +119,9 @@ export default function AgencyCommunityBasedNote(
     const startTime = field === "startTime" ? value : newActivity.startTime;
     const endTime = field === "endTime" ? value : newActivity.endTime;
 
-    if (date && startTime && endTime && id === "") {
+    const hasAnyValue = date || startTime || endTime || newActivity.activity || newActivity.description;
+
+    if (hasAnyValue && id === "") {
       if (!submissionId) {
         console.warn('Cannot update note: submissionId is undefined');
         return;
@@ -138,30 +130,32 @@ export default function AgencyCommunityBasedNote(
         submissionId: submissionId,
         data: {
           id: id,
-          startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
-          endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
+          startDate: date && startTime ? format(date, "yyyy-MM-dd") + "T" + startTime : "",
+          endDate: date && endTime ? format(date, "yyyy-MM-dd") + "T" + endTime : "",
           metadata: {
             activity: newActivity.activity,
             description: newActivity.description,
           }
         }
       }).unwrap();
-    } else if (date && startTime && endTime && id !== "") {
+    } else if (hasAnyValue && id !== "") {
       if (!submissionId) {
         console.warn('Cannot update note: submissionId is undefined');
         return;
       }
-      debouncedMutateNote({
+      await mutateNote({
         submissionId: submissionId,
         data: {
           id: id,
-          startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
-          endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
+          startDate: date && startTime ? format(date, "yyyy-MM-dd") + "T" + startTime : "",
+          endDate: date && endTime ? format(date, "yyyy-MM-dd") + "T" + endTime : "",
           metadata: {
             activity: newActivity.activity,
             description: newActivity.description,
           }
         }
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
       });
     }
   }

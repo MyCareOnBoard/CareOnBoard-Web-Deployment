@@ -20,7 +20,6 @@ import {
   useGetSingleActivityLogQuery,
   useSubmitActivityLogNotesMutation, useUpdateActivityLogMutation
 } from "@/pages/userPanel/notes/api";
-import {useDebounce} from "@/hooks/useDebounce";
 import {toast} from "sonner";
 import {useAuth} from "@/utils/auth";
 
@@ -113,24 +112,6 @@ export default function SupportedEmploymentInterventionPage() {
     reportingEndDate: null,
   })
 
-  const debouncedMutateNote = useDebounce(
-    async (params: any) => {
-      await mutateNote(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    },
-    500
-  );
-
-  const debounceUpdateNote = useDebounce(
-    async (params: any) => {
-      await updateLog(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    },
-    500
-  )
-
   const updateIntervention = async (
     id: string,
     index: number,
@@ -182,7 +163,7 @@ export default function SupportedEmploymentInterventionPage() {
         }
       }).unwrap();
     } else if (training && id !== "") {
-      debouncedMutateNote({
+      await mutateNote({
         activityLog: activityLogId!,
         data: {
           id: id,
@@ -196,6 +177,8 @@ export default function SupportedEmploymentInterventionPage() {
           },
           index
         }
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
       });
     }
   };
@@ -254,7 +237,7 @@ export default function SupportedEmploymentInterventionPage() {
         }
       }).unwrap();
     } else if (date && id !== "") {
-      debouncedMutateNote({
+      await mutateNote({
         activityLog: activityLogId!,
         data: {
           id: id,
@@ -270,6 +253,8 @@ export default function SupportedEmploymentInterventionPage() {
             type: "service"
           }
         }
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
       });
     }
   };
@@ -346,8 +331,8 @@ export default function SupportedEmploymentInterventionPage() {
 
       // Combine all note IDs from both tables
       const allNoteIds = [
-        ...interventions.map((intervention) => intervention.id),
-        ...services.map((service) => service.id)
+        ...interventions.filter((i) => !!i.id).map((intervention) => intervention.id),
+        ...services.filter((s) => !!s.id).map((service) => service.id)
       ];
 
       await submitNotes({
@@ -381,17 +366,12 @@ export default function SupportedEmploymentInterventionPage() {
           : ""
       }
 
-      if (["jobType", "ISPOutcome", "totalHours"].includes(name)) {
-        debounceUpdateNote({
-          activityLog: activityLogId!,
-          data: modifiedNoteInfo
-        })
-      } else {
-        updateLog({
-          activityLog: activityLogId!,
-          data: modifiedNoteInfo
-        }).unwrap();
-      }
+      updateLog({
+        activityLog: activityLogId!,
+        data: modifiedNoteInfo
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity log:', error);
+      });
 
       return updateNoteInfo;
     })

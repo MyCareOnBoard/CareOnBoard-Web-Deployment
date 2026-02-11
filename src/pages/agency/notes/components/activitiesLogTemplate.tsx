@@ -6,7 +6,6 @@ import ContentEditableCell from "@/components/ContentEditableCell";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import React, {useEffect, useState} from "react";
 import {useUpdateSubmittedNoteMutation} from "@/pages/agency/notes/api";
-import {useDebounce} from "@/hooks/useDebounce";
 import {format} from "date-fns";
 import {SubmittedNoteDetails} from "@/pages/agency/notes/apiTypes";
 import InformationCircleIcon from "@/assets/icons/information-circle.svg?react";
@@ -50,15 +49,6 @@ export default function AgencyActivitiesLogTemplate(
 
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
 
-  const debouncedMutateNote = useDebounce(
-    async (params: any) => {
-      await mutateNote(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    },
-    500
-  );
-
   const updateActivity = async (
     id: string,
     index: number,
@@ -100,7 +90,9 @@ export default function AgencyActivitiesLogTemplate(
       notes: newActivity.notes,
     };
 
-    if (date && id === "") {
+    const hasAnyValue = date || metadata.units || metadata.strategies || metadata.activities || metadata.location || metadata.notes;
+
+    if (hasAnyValue && id === "") {
       if (!submissionId) {
         console.warn('Cannot update note: submissionId is undefined');
         return;
@@ -109,24 +101,26 @@ export default function AgencyActivitiesLogTemplate(
         submissionId: submissionId,
         data: {
           id: id,
-          startDate: format(date, "yyyy-MM-dd"),
-          endDate: format(date, "yyyy-MM-dd"),
+          startDate: date ? format(date, "yyyy-MM-dd") : "",
+          endDate: date ? format(date, "yyyy-MM-dd") : "",
           metadata: metadata
         }
       }).unwrap();
-    } else if (date && id !== "") {
+    } else if (hasAnyValue && id !== "") {
       if (!submissionId) {
         console.warn('Cannot update note: submissionId is undefined');
         return;
       }
-      debouncedMutateNote({
+      await mutateNote({
         submissionId: submissionId!,
         data: {
           id: id,
-          startDate: format(date, "yyyy-MM-dd"),
-          endDate: format(date, "yyyy-MM-dd"),
+          startDate: date ? format(date, "yyyy-MM-dd") : "",
+          endDate: date ? format(date, "yyyy-MM-dd") : "",
           metadata: metadata
         }
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
       });
     }
   }

@@ -11,7 +11,6 @@ import TimePicker from "@/components/TimePicker";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import React, {useEffect, useState} from "react";
 import {useUpdateSubmittedNoteMutation, useUpdateActivityLogMutation} from "@/pages/agency/notes/api";
-import {useDebounce} from "@/hooks/useDebounce";
 import {format} from "date-fns";
 import {SubmittedNoteDetails} from "@/pages/agency/notes/apiTypes";
 
@@ -107,24 +106,6 @@ export default function AgencySupportedEmploymentIntervention(
 
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric", year: "numeric"});
 
-  const debouncedMutateNote = useDebounce(
-    async (params: any) => {
-      await mutateNote(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    },
-    500
-  );
-
-  const debounceUpdateNote = useDebounce(
-    async (params: any) => {
-      await updateLog(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    },
-    500
-  )
-
   const updateIntervention = async (
     id: string,
     index: number,
@@ -157,9 +138,9 @@ export default function AgencySupportedEmploymentIntervention(
       [field]: value
     };
 
-    const training = newIntervention.training;
+    const hasAnyValue = newIntervention.training || newIntervention.employerVision || newIntervention.achievementPlan;
 
-    if (training && id === "") {
+    if (hasAnyValue && id === "") {
       if (!submissionId) {
         console.warn('Cannot update note: submissionId is undefined');
         return;
@@ -179,12 +160,12 @@ export default function AgencySupportedEmploymentIntervention(
           index
         }
       }).unwrap();
-    } else if (training && id !== "") {
+    } else if (hasAnyValue && id !== "") {
       if (!submissionId) {
         console.warn('Cannot update note: submissionId is undefined');
         return;
       }
-      debouncedMutateNote({
+      await mutateNote({
         submissionId: submissionId,
         data: {
           id: id,
@@ -198,6 +179,8 @@ export default function AgencySupportedEmploymentIntervention(
           },
           index
         }
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
       });
     }
   };
@@ -235,8 +218,11 @@ export default function AgencySupportedEmploymentIntervention(
     };
 
     const date = newService.datesOfSeServices.date;
+    const hasAnyValue = date || newService.datesOfSeServices.seProfessional || newService.noOfHours.start || 
+                        newService.noOfHours.end || newService.noOfHours.total || newService.servicesProvided || 
+                        newService.EmployeeProgress;
 
-    if (date && id === "") {
+    if (hasAnyValue && id === "") {
       if (!submissionId) {
         console.warn('Cannot update note: submissionId is undefined');
         return;
@@ -245,8 +231,8 @@ export default function AgencySupportedEmploymentIntervention(
         submissionId: submissionId,
         data: {
           id: id,
-          startDate: format(date, "yyyy-MM-dd"),
-          endDate: format(date, "yyyy-MM-dd"),
+          startDate: date ? format(date, "yyyy-MM-dd") : "",
+          endDate: date ? format(date, "yyyy-MM-dd") : "",
           metadata: {
             seProfessional: newService.datesOfSeServices.seProfessional,
             noOfHoursStart: newService.noOfHours.start,
@@ -258,17 +244,17 @@ export default function AgencySupportedEmploymentIntervention(
           }
         }
       }).unwrap();
-    } else if (date && id !== "") {
+    } else if (hasAnyValue && id !== "") {
       if (!submissionId) {
         console.warn('Cannot update note: submissionId is undefined');
         return;
       }
-      debouncedMutateNote({
+      await mutateNote({
         submissionId: submissionId,
         data: {
           id: id,
-          startDate: format(date, "yyyy-MM-dd"),
-          endDate: format(date, "yyyy-MM-dd"),
+          startDate: date ? format(date, "yyyy-MM-dd") : "",
+          endDate: date ? format(date, "yyyy-MM-dd") : "",
           metadata: {
             seProfessional: newService.datesOfSeServices.seProfessional,
             noOfHoursStart: newService.noOfHours.start,
@@ -279,6 +265,8 @@ export default function AgencySupportedEmploymentIntervention(
             type: "service"
           }
         }
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
       });
     }
   };
@@ -328,25 +316,17 @@ export default function AgencySupportedEmploymentIntervention(
           : ""
       }
 
-      if (["jobType", "ISPOutcome", "totalHours"].includes(name)) {
-        if (!submissionId) {
-          console.warn('Cannot update note: submissionId is undefined');
-          return updateNoteInfo;
-        }
-        debounceUpdateNote({
-          submissionId: submissionId,
-          data: modifiedNoteInfo
-        })
-      } else {
-        if (!submissionId) {
-          console.warn('Cannot update note: submissionId is undefined');
-          return updateNoteInfo;
-        }
-        updateLog({
-          submissionId: submissionId,
-          data: modifiedNoteInfo
-        }).unwrap();
+      if (!submissionId) {
+        console.warn('Cannot update note: submissionId is undefined');
+        return updateNoteInfo;
       }
+      
+      updateLog({
+        submissionId: submissionId,
+        data: modifiedNoteInfo
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity log:', error);
+      });
 
       return updateNoteInfo;
     })

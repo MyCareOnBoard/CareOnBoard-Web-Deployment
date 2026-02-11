@@ -18,7 +18,6 @@ import {
   useSubmitActivityLogNotesMutation, useUpdateActivityLogMutation
 } from "@/pages/userPanel/notes/api";
 import {toast} from "sonner";
-import {useDebounce} from "@/hooks/useDebounce";
 import {useAuth} from "@/utils/auth";
 
 type ActivityRow = {
@@ -94,15 +93,6 @@ export default function CommunityBasedPage() {
 
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
 
-  const debouncedMutateNote = useDebounce(
-    async (params: any) => {
-      await mutateNote(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    },
-    500
-  );
-
   const updateActivity = async (
     id: string,
     index: number,
@@ -153,7 +143,7 @@ export default function CommunityBasedPage() {
         }
       }).unwrap();
     } else if (date && startTime && endTime && id !== "") {
-      debouncedMutateNote({
+      await mutateNote({
         activityLog: activityLogId!,
         data: {
           id: id,
@@ -164,6 +154,8 @@ export default function CommunityBasedPage() {
             description: newActivity.description,
           }
         }
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
       });
     }
   }
@@ -197,14 +189,11 @@ export default function CommunityBasedPage() {
 
   const handleSubmit = async () => {
     try {
-      const errors = activities.filter((activity) => !activity.id);
-      if (errors.length > 0) {
-        toast.error(`Please fill in all required fields for these dates ${errors.map(activity => activity.date).toString()}`);
-        return;
-      }
       await submitNotes({
         activityLog: activityLogId!,
-        logNoteIds: activities.map((activity) => activity.id)
+        logNoteIds: activities.filter(
+            (activity) => !!activity.id
+        ).map((activity) => activity.id)
       }).unwrap();
       setActivities(initialActivities);
       toast.success('Note submitted successfully!');
