@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { deleteShift, updateShiftStatus, Shift, ShiftStatus, formatShiftLocation } from "@/lib/api/shifts";
+import { deleteShift, updateShift, updateShiftStatus, Shift, ShiftStatus, formatShiftLocation } from "@/lib/api/shifts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
+import TimePicker from "@/components/TimePicker";
 
 type ShiftDetailsModalProps = {
   isOpen: boolean;
@@ -132,6 +133,7 @@ export default function ShiftDetailsModal({
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isSavingTime, setIsSavingTime] = useState(false);
   const [currentShift, setCurrentShift] = useState<Shift>(shift);
 
   // Update currentShift when shift prop changes
@@ -213,6 +215,43 @@ export default function ShiftDetailsModal({
     });
   };
 
+  const handleTimeUpdate = async (field: "clockedInAt" | "clockedOutAt", timeValue: string) => {
+    if (isSavingTime) return;
+    setIsSavingTime(true);
+    try {
+      // Build an ISO string by combining the shift date with the picked time
+      const shiftDate = currentShift.date ? parseISO(currentShift.date) : new Date();
+      const [hours, minutes] = timeValue.split(":").map(Number);
+      const combined = new Date(Date.UTC(
+        shiftDate.getFullYear(),
+        shiftDate.getMonth(),
+        shiftDate.getDate(),
+        hours,
+        minutes,
+        0,
+        0
+      ));
+      const isoString = combined.toISOString();
+
+      const response = await updateShift(currentShift.id, { [field]: isoString });
+      setCurrentShift(response.shift);
+      onShiftUpdated?.(response.shift);
+      toast({
+        title: "Shift updated",
+        description: `${field === "clockedInAt" ? "Clock in" : "Clock out"} time saved.`,
+      });
+    } catch (error) {
+      console.error(`Failed to update ${field}:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to update ${field === "clockedInAt" ? "clock in" : "clock out"} time.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingTime(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
@@ -280,21 +319,36 @@ export default function ShiftDetailsModal({
           </div>
           <div className="flex gap-2 mt-2">
             <span className="w-[90px] text-[#808081]">Clock In</span>
-            <span className="text-[#10141a] font-semibold">{currentShift.clockedInAt || "--------"}</span>
+            {currentShift.clockedInAt ? (
+              <span className="text-[#10141a] font-semibold">{currentShift.clockedInAt}</span>
+            ) : (
+              <TimePicker value="" onChange={(val) => handleTimeUpdate("clockedInAt", val)}>
+                <span className="text-[#10141a] font-semibold cursor-pointer hover:text-[#00b4b8] transition-colors">
+                  {isSavingTime ? "Saving..." : "--------"}
+                </span>
+              </TimePicker>
+            )}
           </div>
           <div className="flex gap-2 mt-2">
             <span className="w-[90px] text-[#808081]">Clock Out</span>
-            <span className="text-[#10141a] font-semibold">{currentShift.clockedOutAt || "--------"}</span>
+            {currentShift.clockedOutAt ? (
+              <span className="text-[#10141a] font-semibold">{currentShift.clockedOutAt}</span>
+            ) : (
+              <TimePicker value="" onChange={(val) => handleTimeUpdate("clockedOutAt", val)}>
+                <span className="text-[#10141a] font-semibold cursor-pointer hover:text-[#00b4b8] transition-colors">
+                  {isSavingTime ? "Saving..." : "--------"}
+                </span>
+              </TimePicker>
+            )}
           </div>
         </div>
 
         {callout && (
           <div
-            className={`mb-4 flex gap-2 rounded-[8px] border border-[rgba(255,255,255,0.3)] p-3 text-[14px] leading-[1.4] ${
-              callout.tone === "completed"
-                ? "bg-[rgba(0,216,65,0.08)]"
-                : "bg-[rgba(213,52,17,0.08)]"
-            }`}
+            className={`mb-4 flex gap-2 rounded-[8px] border border-[rgba(255,255,255,0.3)] p-3 text-[14px] leading-[1.4] ${callout.tone === "completed"
+              ? "bg-[rgba(0,216,65,0.08)]"
+              : "bg-[rgba(213,52,17,0.08)]"
+              }`}
           >
             {callout.tone === "completed" ? (
               <CheckCircle2 className="mt-0.5 h-5 w-5 text-[#0EAF52]" />
@@ -310,81 +364,75 @@ export default function ShiftDetailsModal({
 
         <div className="mt-auto">
           <div className="flex w-full justify-between gap-2">
-          <button
-            onClick={() =>
-              onSendNotification ? onSendNotification(currentShift) : handleNotImplemented("Send Notification")
-            }
-            disabled={!onSendNotification}
-            className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${
-              onSendNotification
+            <button
+              onClick={() =>
+                onSendNotification ? onSendNotification(currentShift) : handleNotImplemented("Send Notification")
+              }
+              disabled={!onSendNotification}
+              className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${onSendNotification
                 ? "bg-[#b2b2b3] hover:bg-[#9a9a9b] cursor-pointer active:bg-[#828283]"
                 : "bg-[#b2b2b3] opacity-50 cursor-not-allowed"
-            }`}
-          >
-            Send Notification
-          </button>
-          <button
-            onClick={() => (onMessage ? onMessage(currentShift) : handleNotImplemented("Message"))}
-            disabled={!onMessage}
-            className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${
-              onMessage
+                }`}
+            >
+              Send Notification
+            </button>
+            <button
+              onClick={() => (onMessage ? onMessage(currentShift) : handleNotImplemented("Message"))}
+              disabled={!onMessage}
+              className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${onMessage
                 ? "bg-[#b2b2b3] hover:bg-[#9a9a9b] cursor-pointer active:bg-[#828283]"
                 : "bg-[#b2b2b3] opacity-50 cursor-not-allowed"
-            }`}
-          >
-            Message
-          </button>
-          <button
-            onClick={() => (onCall ? onCall(currentShift) : handleNotImplemented("Call"))}
-            disabled={!onCall}
-            className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${
-              onCall
+                }`}
+            >
+              Message
+            </button>
+            <button
+              onClick={() => (onCall ? onCall(currentShift) : handleNotImplemented("Call"))}
+              disabled={!onCall}
+              className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${onCall
                 ? "bg-[#b2b2b3] hover:bg-[#9a9a9b] cursor-pointer active:bg-[#828283]"
                 : "bg-[#b2b2b3] opacity-50 cursor-not-allowed"
-            }`}
-          >
-            Call
-          </button>
-        </div>
+                }`}
+            >
+              Call
+            </button>
+          </div>
 
-        <div className="mt-3 flex w-full justify-between gap-2">
-          <button
-            onClick={handleMarkCompleted}
-            disabled={!canMarkCompleted || isUpdating}
-            className={`h-9 w-[235px] rounded-full text-[14px] font-semibold text-white transition-colors ${
-              canMarkCompleted && !isUpdating
+          <div className="mt-3 flex w-full justify-between gap-2">
+            <button
+              onClick={handleMarkCompleted}
+              disabled={!canMarkCompleted || isUpdating}
+              className={`h-9 w-[235px] rounded-full text-[14px] font-semibold text-white transition-colors ${canMarkCompleted && !isUpdating
                 ? "bg-[#00b4b8] hover:bg-[#00a0a4] cursor-pointer active:bg-[#008c90]"
                 : "bg-[#00b4b8] opacity-50 cursor-not-allowed"
-            }`}
-          >
-            {isUpdating ? "Updating..." : "Mark As Completed"}
-          </button>
-          <button
-            onClick={handleDeleteClick}
-            disabled={isDeleting}
-            className={`h-9 w-[235px] rounded-full text-[14px] font-semibold text-white transition-colors ${
-              isDeleting
+                }`}
+            >
+              {isUpdating ? "Updating..." : "Mark As Completed"}
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              disabled={isDeleting}
+              className={`h-9 w-[235px] rounded-full text-[14px] font-semibold text-white transition-colors ${isDeleting
                 ? "bg-[#d53411] opacity-50 cursor-not-allowed"
                 : "bg-[#d53411] hover:bg-[#c02e0f] cursor-pointer active:bg-[#ab280d]"
-            }`}
-          >
-            Delete Shift
-          </button>
-        </div>
+                }`}
+            >
+              Delete Shift
+            </button>
+          </div>
 
-        <button
-          onClick={() =>
-            onAssignManual ? onAssignManual(currentShift) : handleNotImplemented("Assign Manual Shift")
-          }
-          disabled={!onAssignManual}
-          className={`mt-3 w-full h-9 rounded-full border text-[14px] font-semibold transition-colors ${
-            onAssignManual
+          <button
+            onClick={() =>
+              onAssignManual ? onAssignManual(currentShift) : handleNotImplemented("Assign Manual Shift")
+            }
+            disabled={!onAssignManual}
+            className={`mt-3 w-full h-9 rounded-full border text-[14px] font-semibold transition-colors ${onAssignManual
               ? "border-[#525253] text-[#525253] hover:bg-[#f5f5f5] cursor-pointer active:bg-[#ebebeb]"
               : "border-[#b2b2b3] text-[#b2b2b3] opacity-50 cursor-not-allowed"
-          }`}
-        >
-          Assign Manual Shift
-        </button>
+              }`}
+          >
+            Assign Manual Shift
+          </button>
         </div>
       </div>
 

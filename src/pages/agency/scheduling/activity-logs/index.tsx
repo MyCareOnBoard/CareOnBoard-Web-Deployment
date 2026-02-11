@@ -17,11 +17,11 @@ const formatTime = (time?: string): string => {
   if (!time) return "-";
   try {
     if (time.includes("AM") || time.includes("PM")) return time;
-    const [hours, minutes] = time.split(":");
+    const [hours, minutes] = time.split('T')[1].split(":");
     const hour = parseInt(hours, 10);
     const ampm = hour >= 12 ? "PM" : "AM";
     const formattedHour = hour % 12 || 12;
-    return `${formattedHour}.${minutes || "00"} ${ampm}`;
+    return `${formattedHour}:${minutes || "00"} ${ampm}`;
   } catch {
     return time;
   }
@@ -205,7 +205,7 @@ export default function ActivityLogsPage() {
     if (user?.agencyId) {
       fetchShifts();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.agencyId]);
 
   const incompleteShifts = useMemo(() => {
@@ -221,7 +221,7 @@ export default function ActivityLogsPage() {
     switch (activeFilter) {
       case "active":
         return shifts.filter(
-          (shift) => 
+          (shift) =>
             (shift.status === ShiftStatus.ONGOING || shift.status === ShiftStatus.AVAILABLE) &&
             !isShiftMissed(shift)
         );
@@ -295,11 +295,10 @@ export default function ActivityLogsPage() {
                     <button
                       key={filter.key}
                       onClick={() => setActiveFilter(filter.key)}
-                      className={`px-4 py-2 rounded-full text-[14px] font-medium leading-[1.4] transition-colors cursor-pointer ${
-                        isActive
-                          ? "bg-[#00b4b8] text-white"
-                          : "border border-[#808081] text-[#808081] hover:bg-white/60"
-                      }`}
+                      className={`px-4 py-2 rounded-full text-[14px] font-medium leading-[1.4] transition-colors cursor-pointer ${isActive
+                        ? "bg-[#00b4b8] text-white"
+                        : "border border-[#808081] text-[#808081] hover:bg-white/60"
+                        }`}
                     >
                       {filter.label}
                     </button>
@@ -393,19 +392,19 @@ export default function ActivityLogsPage() {
                           </span>
                         </div>
 
-                         <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
-                           <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
-                           <span className="text-[#10141a]">
-                             {shift.clockedInAt ? formatTime(shift.clockedInAt) : "--:-- --"}
-                           </span>
-                         </div>
+                        <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
+                          <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
+                          <span className="text-[#10141a]">
+                            {shift.clockedInAt ? formatTime(shift.clockedInAt) : "--:-- --"}
+                          </span>
+                        </div>
 
-                         <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
-                           <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
-                           <span className="text-[#10141a]">
-                             {shift.clockedOutAt ? formatTime(shift.clockedOutAt) : "--:-- --"}
-                           </span>
-                         </div>
+                        <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
+                          <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
+                          <span className="text-[#10141a]">
+                            {shift.clockedOutAt ? formatTime(shift.clockedOutAt) : "--:-- --"}
+                          </span>
+                        </div>
                       </div>
 
                       <Button
