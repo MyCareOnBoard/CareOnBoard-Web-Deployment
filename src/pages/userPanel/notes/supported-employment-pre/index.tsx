@@ -19,7 +19,6 @@ import {
   useGetSingleActivityLogQuery,
   useSubmitActivityLogNotesMutation, useUpdateActivityLogMutation
 } from "@/pages/userPanel/notes/api";
-import {useDebounce} from "@/hooks/useDebounce";
 import {toast} from "sonner";
 import {useAuth} from "@/utils/auth";
 
@@ -112,24 +111,6 @@ export default function SupportedEmploymentPrePage() {
     reportingEndDate: null,
   })
 
-  const debouncedMutateNote = useDebounce(
-    async (params: any) => {
-      await mutateNote(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    },
-    500
-  );
-
-  const debounceUpdateNote = useDebounce(
-    async (params: any) => {
-      await updateLog(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    },
-    500
-  )
-
 
   const updateService = async (
     id: string,
@@ -185,7 +166,7 @@ export default function SupportedEmploymentPrePage() {
         }
       }).unwrap();
     } else if (date && id !== "") {
-      debouncedMutateNote({
+      await mutateNote({
         activityLog: activityLogId!,
         data: {
           id: id,
@@ -201,6 +182,8 @@ export default function SupportedEmploymentPrePage() {
             howDidThisAssist: newService.howDidThisAssist
           }
         }
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
       });
     }
   };
@@ -250,14 +233,9 @@ export default function SupportedEmploymentPrePage() {
         return;
       }
 
-      const errors = services.filter((service) => !service.id);
-      if (errors.length > 0) {
-        toast.error(`Please fill in all required fields for these dates ${errors.map(service => service.datesOfSeServices.date).toString()}`);
-        return;
-      }
       await submitNotes({
         activityLog: activityLogId!,
-        logNoteIds: services.map((service) => service.id)
+        logNoteIds: services.filter((s) => !!s.id).map((service) => service.id)
       }).unwrap();
       setServices(initialServices);
       toast.success('Note submitted successfully!');
@@ -284,17 +262,12 @@ export default function SupportedEmploymentPrePage() {
           : ""
       }
 
-      if (["jobType", "ISPOutcome", "totalHours"].includes(name)) {
-        debounceUpdateNote({
-          activityLog: activityLogId!,
-          data: modifiedNoteInfo
-        })
-      } else {
-        updateLog({
-          activityLog: activityLogId!,
-          data: modifiedNoteInfo
-        }).unwrap();
-      }
+      updateLog({
+        activityLog: activityLogId!,
+        data: modifiedNoteInfo
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity log:', error);
+      });
 
       return updateNoteInfo;
     })

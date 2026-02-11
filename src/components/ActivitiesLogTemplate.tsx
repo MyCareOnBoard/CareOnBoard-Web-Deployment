@@ -16,7 +16,6 @@ import {
   useGetSingleActivityLogQuery,
   useSubmitActivityLogNotesMutation
 } from "@/pages/userPanel/notes/api";
-import {useDebounce} from "@/hooks/useDebounce";
 import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";
 
@@ -48,15 +47,6 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
   const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
   const {user} = useAuth();
-
-  const debouncedMutateNote = useDebounce(
-    async (params: any) => {
-      await mutateNote(params).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    },
-    500
-  );
 
   const navigate = useNavigate();
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
@@ -121,7 +111,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
         }
       }).unwrap();
     } else if (date && id !== "") {
-      debouncedMutateNote({
+      await mutateNote({
         activityLog: activityLogId!,
         data: {
           id: id,
@@ -129,6 +119,8 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
           endDate: format(date, "yyyy-MM-dd"),
           metadata: metadata
         }
+      }).unwrap().catch(error => {
+        console.error('Failed to update activity:', error);
       });
     }
   }
@@ -142,14 +134,9 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
 
   const handleSubmit = async () => {
     try {
-      const errors = activities.filter((activity) => !activity.id);
-      if (errors.length > 0) {
-        toast.error(`Please fill in all required fields for these dates ${errors.map(activity => activity.date).toString()}`);
-        return;
-      }
       await submitNotes({
         activityLog: activityLogId!,
-        logNoteIds: activities.map((activity) => activity.id)
+        logNoteIds: activities.filter((a) => !!a.id).map((activity) => activity.id)
       }).unwrap();
       setActivities(initialActivities);
       toast.success('Note submitted successfully!');
