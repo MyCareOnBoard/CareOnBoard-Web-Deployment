@@ -30,8 +30,16 @@ export const goalsAndDocumentsApi = createApi({
       query: (documentId) => ({
         url: `/goalsAndDocuments/${documentId}`,
         method: "GET",
+        params: { documentId },
         requiresAuth: true
       }),
+      transformResponse: (response: any) => {
+        console.log("[Goals API] Raw response:", response);
+        // API may return { success, document } or { success, data } or the document directly
+        if (response?.document) return response.document;
+        if (response?.data) return response.data;
+        return response as GoalDocument;
+      },
     }),
     getGoalDocumentByFirebaseId: builder.query<GoalDocument, string>({
       query: (firebaseId) => ({

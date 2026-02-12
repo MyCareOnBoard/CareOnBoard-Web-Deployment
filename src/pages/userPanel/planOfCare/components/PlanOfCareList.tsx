@@ -1,10 +1,22 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InlineLoader } from "@/components/ui/loader";
 import { Eye } from "lucide-react";
 import ServicesAvatar from "@/assets/icons/services-avatar.png";
+import { Routes } from "@/routes/constants";
 import type { PlanOfCare } from "../types";
 import { getInitials } from "../utils";
+
+const goalsTypeRouteMap: Record<string, string> = {
+  natural_supports_training: Routes.userPanel.goalsAndDocuments.naturalSupportsTraining,
+  community_inclusion_services: Routes.userPanel.goalsAndDocuments.communityInclusionServices,
+  community_inclusion_individualized_goals: Routes.userPanel.goalsAndDocuments.communityInclusionIndividualizedGoals,
+  day_habilitation_services: Routes.userPanel.goalsAndDocuments.dayHabilitationServices,
+  day_habilitation_individualized_goals: Routes.userPanel.goalsAndDocuments.dayHabilitationIndividualizedGoals,
+  prevocational_training_services: Routes.userPanel.goalsAndDocuments.prevocationalTrainingServices,
+  prevocational_training_individualized_goals: Routes.userPanel.goalsAndDocuments.prevocationalTrainingIndividualizedGoals,
+};
 
 interface PlanOfCareListProps {
   plans: PlanOfCare[];
@@ -15,6 +27,8 @@ interface PlanOfCareListProps {
 
 
 export function PlanOfCareList({ plans, isLoading, isError, onViewPlan }: PlanOfCareListProps) {
+  const navigate = useNavigate();
+
   useEffect(() => {
     console.log("Plan of care response:", plans);
   }, [plans]);
@@ -61,25 +75,37 @@ export function PlanOfCareList({ plans, isLoading, isError, onViewPlan }: PlanOf
             <div className="col-span-2 flex items-center">
               <div>
                 <p className="text-xs text-gray-500 mb-0.5">Date</p>
-                <p className="text-sm text-gray-900">{plan.date || "—"}</p>
+                <p className="text-sm font-semibold text-gray-900">{plan.date || "—"}</p>
               </div>
             </div>
 
             <div className="col-span-2 flex items-center">
               <div>
                 <p className="text-xs text-gray-500 mb-0.5">Location</p>
-                <p className="text-sm text-gray-900">{plan.location || "—"}</p>
+                <p className="text-sm font-semibold text-gray-900">{plan.location || "—"}</p>
               </div>
             </div>
 
-            <div className="col-span-3 flex items-center">
+            <div className="col-span-2 flex items-center">
               <div>
-                <p className="text-xs text-gray-500 mb-0.5">Service</p>
-                <p className="text-sm text-gray-900">{plan.service || "—"}</p>
+                <p className="text-xs text-gray-500 mb-0.5">Service Name</p>
+                <p className="text-sm font-semibold text-gray-900">{plan.serviceName || plan.service || plan.serviceCode || "—"}</p>
               </div>
             </div>
 
-            <div className="col-span-2 flex items-center justify-end">
+            <div className="col-span-3 flex items-center justify-end gap-2">
+              {plan.goalsAndDocumentId && plan.goalsType && goalsTypeRouteMap[plan.goalsType] && (
+                <button
+                  onClick={() => {
+                    const route = goalsTypeRouteMap[plan.goalsType!];
+                    navigate(`${route}?firebaseId=${plan.goalsAndDocumentId}&fromList=true`);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#00B4B8] text-white text-sm rounded-full hover:bg-[#00A0A4] transition-colors hover:cursor-pointer"
+                >
+                  <Eye className="w-4 h-4" />
+                  View Goals
+                </button>
+              )}
               <button
                 onClick={() => onViewPlan(plan)}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-full hover:bg-gray-300 transition-colors hover:cursor-pointer"
