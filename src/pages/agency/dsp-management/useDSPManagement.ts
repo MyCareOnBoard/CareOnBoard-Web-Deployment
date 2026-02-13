@@ -91,8 +91,6 @@ export function useDSPList() {
       setIsLoading(true);
       setError(null);
 
-      console.log('📡 Fetching employees with agencyId:', agencyId);
-
       // Fetch employees - stats endpoint may not be available yet
       const employeesResponse = await listEmployees({
         agencyId,
@@ -100,10 +98,7 @@ export function useDSPList() {
         limit: 100
       });
 
-      console.log('✅ Employees fetched:', employeesResponse);
-
       const transformedDSPs = employeesResponse.employees.map((employee) => {
-        console.log('📋 Transforming employee:', { id: employee.id, userId: employee.userId, fullName: employee.fullName });
         return transformEmployeeToDSP(employee);
       });
       setDsps(transformedDSPs);
@@ -209,16 +204,12 @@ export function useDSPDetails(dspId: string | null) {
       setIsLoading(true);
       setError(null);
 
-      console.log('🔍 Fetching DSP details for ID:', dspId);
-      console.log('🔍 Agency ID:', agencyId);
-
       const [employeeData, trainingsData, shiftsData] = await Promise.all([
         getEmployeeById(dspId),
         getEmployeeTrainings(dspId),
         listShifts({ employeeId: dspId, agencyId }),
       ]);
 
-      console.log('✅ Employee data received:', employeeData);
       setDsp(transformEmployeeToDSP(employeeData));
       setTrainings(trainingsData);
       setShifts(shiftsData.shifts || []);

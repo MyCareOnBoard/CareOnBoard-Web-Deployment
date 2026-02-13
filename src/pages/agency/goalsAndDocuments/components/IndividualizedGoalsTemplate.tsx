@@ -31,6 +31,9 @@ export default function IndividualizedGoalsTemplate(
     const {user} = useAuth();
     const documentId = new URLSearchParams(location.search).get("id");
     const firebaseId = new URLSearchParams(location.search).get("firebaseId");
+    const isUserPanel = location.pathname.startsWith("/user-panel/");
+    const backRoute = isUserPanel ? Routes.userPanel.planOfCare : Routes.agency.goalsAndDocuments.index;
+    const backLabel = isUserPanel ? "Back to Plan of Care" : "Back to Goals & Documents";
 
     const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
         skip: !documentType || !!firebaseId,
@@ -214,7 +217,7 @@ export default function IndividualizedGoalsTemplate(
         try {
             await submitDocument(document?.id ?? "").unwrap();
             toast.success('Document submitted successfully!');
-            navigate(Routes.agency.goalsAndDocuments.index);
+            navigate(backRoute);
         } catch (error: any) {
             console.error('Error submitting document:', error);
             toast.error(error?.data?.message || 'Failed to submit document.');
@@ -229,11 +232,11 @@ export default function IndividualizedGoalsTemplate(
                 {/* Header with Back Button */}
                 <div className="mb-8">
                     <button
-                        onClick={() => navigate(Routes.agency.goalsAndDocuments.index)}
+                        onClick={() => navigate(backRoute)}
                         className="cursor-pointer flex items-center gap-2 text-[14px] font-medium text-[#808081] hover:text-[#2B82FF] transition-colors mb-4"
                     >
                         <ChevronLeft size={20}/>
-                        Back to Goals & Documents
+                        {backLabel}
                     </button>
                 </div>
 

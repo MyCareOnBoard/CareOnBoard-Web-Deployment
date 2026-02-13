@@ -62,9 +62,6 @@ export default function PlanOfCarePage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Plan of Care</h1>
           </div>
-          <Button className="bg-[#00B4B8] hover:bg-[#00A0A4] hover:cursor-pointer text-white rounded-full px-6">
-            + Manual Timesheet
-          </Button>
         </div>
 
         {/* Plan of Care List */}

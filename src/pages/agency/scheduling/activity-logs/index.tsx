@@ -11,7 +11,7 @@ import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleMod
 import { useAuth } from "@/utils/auth";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 
-type ActivityFilter = "active" | "completed" | "missed" | "incomplete";
+type ActivityFilter = "all" | "active" | "completed" | "missed" | "incomplete";
 
 const formatTime = (time?: string): string => {
   if (!time) return "-";
@@ -42,6 +42,7 @@ const parseTimeToParts = (time: string): { hours: number; minutes: number } | nu
 };
 
 const isShiftMissed = (shift: Shift): boolean => {
+  console.log(shift);
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (shift.clockedInAt) return false;
   if (!shift.date) return false;
@@ -82,6 +83,8 @@ const isShiftMissed = (shift: Shift): boolean => {
     );
   }
 
+  console.log(endDateTime.getTime(), Date.now());
+
   return endDateTime.getTime() < Date.now();
 };
 
@@ -104,6 +107,8 @@ const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
 
 const getStatusInfoForTab = (shift: Shift, tab: ActivityFilter) => {
   switch (tab) {
+    case "all":
+      return getStatusInfo(shift.status, shift.approved);
     case "active":
       if (shift.status === ShiftStatus.ONGOING) {
         return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
@@ -139,7 +144,7 @@ export default function ActivityLogsPage() {
   const [editFormData, setEditFormData] = useState<ScheduleFormData | null>(null);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [activityPage, setActivityPage] = useState(1);
-  const [activeFilter, setActiveFilter] = useState<ActivityFilter>("active");
+  const [activeFilter, setActiveFilter] = useState<ActivityFilter>("all");
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -219,6 +224,8 @@ export default function ActivityLogsPage() {
 
   const filteredShifts = useMemo(() => {
     switch (activeFilter) {
+      case "all":
+        return shifts;
       case "active":
         return shifts.filter(
           (shift) =>
@@ -248,6 +255,7 @@ export default function ActivityLogsPage() {
   }, [activeFilter]);
 
   const filterButtons: { key: ActivityFilter; label: string }[] = [
+    { key: "all", label: "All" },
     { key: "active", label: "Active" },
     { key: "completed", label: "Completed" },
     { key: "missed", label: "Missed" },

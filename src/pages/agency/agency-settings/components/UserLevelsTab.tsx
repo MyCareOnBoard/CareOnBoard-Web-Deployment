@@ -283,7 +283,7 @@ export default function InternalUsersPage() {
               </h3>
               <p className="mb-4 max-w-md text-[13px] text-[#808081]">
                 Get started by adding your first internal agency team member. You can assign user
-                levels to control what they can see and do in Care On Board.
+                levels to control what they can see and do in CareOnBoard.
               </p>
               <Button
                 onClick={() => setShowAddUserModal(true)}
