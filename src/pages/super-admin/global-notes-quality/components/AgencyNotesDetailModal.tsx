@@ -24,6 +24,7 @@ import {
 } from "@/lib/api/global-notes-quality";
 import { getEmployeeById } from "@/lib/api/employees";
 import { getAgencyById } from "@/lib/api/agencies";
+import { getUserById } from "@/lib/api/users";
 
 import type { RowItem } from "../types";
 import { getInitials } from "../types";
@@ -33,24 +34,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 /*  Helpers                                       */
 /* ────────────────────────────────────────────── */
 
-/** Fields that hold employee/user IDs whose names we want to resolve */
-const EMPLOYEE_ID_KEYS = new Set(["employeeId", "submittedBy", "approvedBy"]);
+/** Fields that hold employee IDs resolved via /employees/:id */
+const EMPLOYEE_ID_KEYS = new Set(["employeeId"]);
+/** Fields that hold user IDs resolved via /users/:id */
+const USER_ID_KEYS = new Set(["submittedBy", "approvedBy"]);
+/** All person-ID keys (union of employee + user) */
+const PERSON_ID_KEYS = new Set([...EMPLOYEE_ID_KEYS, ...USER_ID_KEYS]);
 /** Fields that hold agency IDs */
 const AGENCY_ID_KEYS = new Set(["agencyId"]);
 /** Fields that contain ISO date strings */
 const isISODate = (v: unknown): v is string =>
 	typeof v === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v);
 /** Keys we skip entirely (shown in header or not useful raw) */
-const HIDDEN_KEYS = new Set(["id"]);
+const HIDDEN_KEYS = new Set(["id", "createdAt", "updatedAt"]);
 /** Keys containing arrays of IDs – shown as count badge */
 const ARRAY_ID_KEYS = new Set(["submittedLogNoteIds"]);
 
-const DATE_KEYS = new Set([
-	"submittedAt",
-	"approvedAt",
-	"createdAt",
-	"updatedAt",
-]);
+const DATE_KEYS = new Set(["submittedAt", "approvedAt"]);
 
 const formatLabel = (key: string): string =>
 	key
@@ -147,20 +147,23 @@ export function AgencyNotesDetailModal({
 	/* ── Resolve IDs → names ─────────────────── */
 	const resolveNames = useCallback(async (notesList: AgencyNoteDetail[]) => {
 		const employeeIds = new Set<string>();
+		const userIds = new Set<string>();
 		const agencyIds = new Set<string>();
 
 		for (const note of notesList) {
 			for (const [key, value] of Object.entries(note)) {
 				if (typeof value !== "string" || !value) continue;
 				if (EMPLOYEE_ID_KEYS.has(key)) employeeIds.add(value);
+				if (USER_ID_KEYS.has(key)) userIds.add(value);
 				if (AGENCY_ID_KEYS.has(key)) agencyIds.add(value);
 			}
 		}
 
 		const updates: Record<string, string> = {};
 
-		await Promise.allSettled(
-			[...employeeIds].map(async (id) => {
+		await Promise.allSettled([
+			/* Employee IDs → GET /employees/:id */
+			...[...employeeIds].map(async (id) => {
 				try {
 					const emp = await getEmployeeById(id);
 					if (emp.fullName) updates[id] = emp.fullName;
@@ -168,10 +171,17 @@ export function AgencyNotesDetailModal({
 					/* leave as ID */
 				}
 			}),
-		);
-
-		await Promise.allSettled(
-			[...agencyIds].map(async (id) => {
+			/* User IDs (submittedBy / approvedBy) → GET /users/:id */
+			...[...userIds].map(async (id) => {
+				try {
+					const user = await getUserById(id);
+					if (user.fullName) updates[id] = user.fullName;
+				} catch {
+					/* leave as ID */
+				}
+			}),
+			/* Agency IDs → GET /agencies/:id */
+			...[...agencyIds].map(async (id) => {
 				try {
 					const ag = await getAgencyById(id);
 					if (ag.name) updates[id] = ag.name;
@@ -179,7 +189,7 @@ export function AgencyNotesDetailModal({
 					/* leave as ID */
 				}
 			}),
-		);
+		]);
 
 		if (Object.keys(updates).length > 0) {
 			setNameCache((prev) => ({ ...prev, ...updates }));
@@ -193,7 +203,7 @@ export function AgencyNotesDetailModal({
 	/* ── Render helpers ──────────────────────── */
 	const displayValue = (key: string, value: unknown): string => {
 		if (value == null || value === "") return "—";
-		if (typeof value === "string" && (EMPLOYEE_ID_KEYS.has(key) || AGENCY_ID_KEYS.has(key))) {
+		if (typeof value === "string" && (PERSON_ID_KEYS.has(key) || AGENCY_ID_KEYS.has(key))) {
 			return nameCache[value] ?? value;
 		}
 		if (typeof value === "number") return value.toLocaleString();
@@ -204,7 +214,7 @@ export function AgencyNotesDetailModal({
 	};
 
 	const iconForKey = (key: string) => {
-		if (EMPLOYEE_ID_KEYS.has(key))
+		if (PERSON_ID_KEYS.has(key))
 			return <User className="size-3.5 text-[#00b4b8] shrink-0" />;
 		if (AGENCY_ID_KEYS.has(key))
 			return <Building2 className="size-3.5 text-indigo-500 shrink-0" />;
@@ -287,7 +297,7 @@ export function AgencyNotesDetailModal({
 
 							/* Categorise fields */
 							const personFields = keys.filter(
-								(k) => EMPLOYEE_ID_KEYS.has(k) || AGENCY_ID_KEYS.has(k),
+								(k) => PERSON_ID_KEYS.has(k) || AGENCY_ID_KEYS.has(k),
 							);
 							const dateFields = keys.filter((k) => DATE_KEYS.has(k) || isISODate(note[k]));
 							const metaFields = keys.filter(
