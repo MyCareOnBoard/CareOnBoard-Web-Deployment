@@ -1,4 +1,4 @@
-# Care On Board
+# CareOnBoard
 
 CareOnBoard is a HIPAA-compliant SaaS platform designed to simplify and modernize caregiver onboarding and compliance management for agencies serving individuals with developmental disabilities (DDD) and home care needs. A modern React application built with TypeScript, Vite, and React Router.
 
