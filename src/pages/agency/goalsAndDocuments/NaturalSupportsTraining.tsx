@@ -26,6 +26,9 @@ export default function NaturalSupportsTraining() {
     const documentId = new URLSearchParams(location.search).get("id");
     const firebaseId = new URLSearchParams(location.search).get("firebaseId");
     const fromList = new URLSearchParams(location.search).get("fromList") === "true";
+    const isUserPanel = location.pathname.startsWith("/user-panel/");
+    const backRoute = isUserPanel ? Routes.userPanel.planOfCare : Routes.agency.goalsAndDocuments.index;
+    const backLabel = isUserPanel ? "Back to Plan of Care" : "Back to Goals & Documents";
     const documentType = DocumentType.NATURAL_SUPPORTS_TRAINING;
     
     const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
@@ -228,7 +231,7 @@ export default function NaturalSupportsTraining() {
         try {
             await submitDocument(document?.id ?? "").unwrap();
             toast.success('Document submitted successfully!');
-            navigate(Routes.agency.goalsAndDocuments.index);
+            navigate(backRoute);
         } catch (error: any) {
             console.error('Error submitting document:', error);
             toast.error(error?.data?.message || 'Failed to submit document.');
@@ -243,11 +246,11 @@ export default function NaturalSupportsTraining() {
             {/* Header with Back Button */}
             <div className="mb-8">
                 <button
-                    onClick={() => navigate(Routes.agency.goalsAndDocuments.index)}
+                    onClick={() => navigate(backRoute)}
                     className="cursor-pointer flex items-center gap-2 text-[14px] font-medium text-[#808081] hover:text-[#2B82FF] transition-colors mb-4"
                 >
                     <ChevronLeft size={20}/>
-                    Back to Goals & Documents
+                    {backLabel}
                 </button>
             </div>
 
