@@ -51,11 +51,11 @@ export default function MobileAppRedirect() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold mb-4">
-          {isMobile ? 'Open Care On Board App' : 'Download Care On Board App'}
+          {isMobile ? 'Open CareOnBoard App' : 'Download CareOnBoard App'}
         </h1>
         <p className="text-lg opacity-90 mb-8">
           {isMobile 
-            ? 'Click the button below to open the Care On Board mobile app.'
+            ? 'Click the button below to open the CareOnBoard mobile app.'
             : 'This link is meant for mobile devices. Click below to view the app in the store.'}
         </p>
         <button
