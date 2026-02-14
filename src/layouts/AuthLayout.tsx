@@ -86,7 +86,7 @@ export default function AuthLayout() {
             </div>
             <p className="font-bold text-[27.75px] text-white tracking-[0.2775px]"
                style={{fontFamily: 'Urbanist, sans-serif'}}>
-              CareOnBoard
+              CareOnboard
             </p>
           </div>
 
