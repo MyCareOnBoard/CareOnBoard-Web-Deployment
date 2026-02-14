@@ -80,13 +80,13 @@ export default function AuthLayout() {
             <div className="w-[37px] h-[37px] flex items-center justify-center">
               <img
                 src="/logo.svg"
-                alt="CareOnBoard"
+                alt="CareOnboard"
                 className="w-full h-full"
               />
             </div>
             <p className="font-bold text-[27.75px] text-white tracking-[0.2775px]"
                style={{fontFamily: 'Urbanist, sans-serif'}}>
-              CareOnBoard
+              CareOnboard
             </p>
           </div>
 
@@ -96,7 +96,7 @@ export default function AuthLayout() {
               className="font-bold text-[40px] leading-[1.4] text-white w-full"
               style={{fontFamily: 'Urbanist, sans-serif'}}
             >
-              Welcome to {agency ? agency : "CareOnBoard"} Application Portal
+              Welcome to {agency ? agency : "CareOnboard"} Application Portal
             </h1>
             <p
               className="font-normal text-[20px] leading-[1.6] text-[#f3f6f7] w-full"
