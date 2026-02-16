@@ -90,8 +90,9 @@ export default function Step8Branding(
                         <button
                             key={color}
                             type="button"
+                            disabled={true}
                             onClick={() => onChange("themeColor", color)}
-                            className={`w-6 h-6 rounded-full transition-all ${
+                            className={`w-6 h-6 rounded-full transition-all opacity-[0.2] ${
                                 formData.themeColor === color ? "ring-2 ring-offset-2 ring-[#00b4b8]" : ""
                             }`}
                             style={{backgroundColor: color}}
@@ -102,9 +103,10 @@ export default function Step8Branding(
                         <div>
                             <input
                                 type="color"
+                                disabled={true}
                                 value={formData.themeColor}
                                 onChange={(e) => onChange("themeColor", e.target.value)}
-                                className="w-6 h-6 rounded-full cursor-pointer"
+                                className="w-6 h-6 rounded-full opacity-[0.6]"
                             />
                         </div>
                         <input
@@ -112,6 +114,7 @@ export default function Step8Branding(
                             value={formData.themeColor}
                             onChange={(e) => onChange("themeColor", e.target.value)}
                             placeholder="#000000"
+                            disabled={true}
                             className={cn(
                                 "text-[14px] font-mono text-[#10141a] bg-white py-1 px-4 border border-[#e5e5e6] rounded focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] outline-none w-28",
                                 fieldsWithErrors.includes("themeColor") && "border-red-500"
@@ -138,9 +141,9 @@ export default function Step8Branding(
                         fieldsWithErrors.includes("letterhead") && "border-red-500"
                     )}
                 >
-                    <label htmlFor="letterhead-upload" className="flex items-center gap-2 cursor-pointer">
-                        <Upload className="w-5 h-5 text-[#808081]"/>
-                        <span className="text-[14px] text-[#808081]">
+                    <label htmlFor="letterhead-upload" className="flex items-center gap-2 pointer-events-none">
+                        <Upload className="w-5 h-5 text-[#808081] opacity-[0.2]"/>
+                        <span className="text-[14px] text-[#808081] opacity-[0.2]">
               {letterheadPreview ? "Change letterhead" : "Upload here"}
             </span>
                         <input
@@ -149,6 +152,7 @@ export default function Step8Branding(
                             accept="image/*,.pdf"
                             onChange={(e) => handleFileUpload("letterhead", e.target.files?.[0] || null)}
                             className="hidden"
+                            disabled={true}
                         />
                     </label>
                 </div>

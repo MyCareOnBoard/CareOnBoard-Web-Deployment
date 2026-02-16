@@ -150,13 +150,13 @@ const STEPS = [
         title: "Operational Settings",
         description: "Defines how the agency operates internally.",
         requiredFields: [
-            "schedulingRules",
+            // "schedulingRules",
             "maxShiftPerDay",
             "travelTimeRules",
-            "mileageSettings",
+            // "mileageSettings",
             "mileageRate",
-            "incidentReportingSettings",
-            "expenseReportSettings",
+            // "incidentReportingSettings",
+            // "expenseReportSettings",
             "allowedFileTypes",
             "allowRecurringSchedules",
             "allowOverlappingVisits",
@@ -178,8 +178,8 @@ const STEPS = [
         description: "Aesthetic and identity settings.",
         requiredFields: [
             "logo",
-            "themeColor",
-            "letterhead"
+            // "themeColor",
+            // "letterhead"
         ]
     },
     {
@@ -189,12 +189,12 @@ const STEPS = [
         description: "Needed for Timesheets, Invoices, and Exports.",
         requiredFields: [
             "billingFormat",
-            "dddFormat",
-            "hhaExchangeFormat",
-            "allowCustomReport",
+            // "dddFormat",
+            // "hhaExchangeFormat",
+            // "allowCustomReport",
             "invoiceName",
-            "invoiceEmail",
-            "paycheck"
+            // "invoiceEmail",
+            // "paycheck"
         ]
     },
     {
