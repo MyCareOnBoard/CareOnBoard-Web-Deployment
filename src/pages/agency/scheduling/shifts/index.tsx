@@ -149,6 +149,7 @@ export default function ShiftsListPage() {
       billingRate: "",
       serviceCode: shift.serviceCode || "183535",
       notesType: anyShift.notesType || "",
+      comment: anyShift.comment || "",
       schedulingType: (shift.schedulingType as "one-time" | "recurring" | "") || "one-time",
       date: shift.date ? new Date(shift.date) : null,
       startDate: null,

@@ -96,6 +96,9 @@ export interface Shift {
     createdAt?: string;
     updatedAt?: string;
     notesType?: string;
+    comment?: string;
+    commentedBy?: string;
+    completedBy?: string;
     goalsType?: string;
     goalsAndDocumentsId?: string;
     employee?: Employee;
@@ -120,6 +123,8 @@ export interface CreateShiftRequest {
     status: ShiftStatus;
     availableAt?: string;
     notesType?: string;
+    comment?: string;
+    commentedBy?: string;
     goalsType?: string;
     goalsAndDocumentsId?: string;
     serviceCode?: string;
@@ -147,6 +152,9 @@ export interface UpdateShiftRequest {
     status?: ShiftStatus;
     actionStatus?: ShiftActionStatus | null;
     notesType?: string;
+    comment?: string;
+    commentedBy?: string;
+    completedBy?: string;
     goalsType?: string;
     goalsAndDocumentsId?: string;
     serviceCode?: string;
