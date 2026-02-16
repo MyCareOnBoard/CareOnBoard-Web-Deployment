@@ -71,16 +71,16 @@ export default function SplashScreen() {
                 <span className="inline-block animate-letter-bounce" style={{ animationDelay: "0.25s" }}>
                   e
                 </span>
-                <span className="inline-block w-2 sm:w-3" />
+                {/* <span className="inline-block w-2 sm:w-3" /> */}
                 <span className="inline-block animate-letter-bounce" style={{ animationDelay: "0.3s" }}>
-                  o
+                  O
                 </span>
                 <span className="inline-block animate-letter-bounce" style={{ animationDelay: "0.35s" }}>
                   n
                 </span>
-                <span className="inline-block w-2 sm:w-3" />
+                {/* <span className="inline-block w-2 sm:w-3" /> */}
                 <span className="inline-block animate-letter-bounce" style={{ animationDelay: "0.4s" }}>
-                  B
+                  b
                 </span>
                 <span className="inline-block animate-letter-bounce" style={{ animationDelay: "0.45s" }}>
                   o

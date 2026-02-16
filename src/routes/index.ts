@@ -516,6 +516,34 @@ export const router = createBrowserRouter([
                 path: Routes.userPanel.communityInclusion,
                 Component: UserPanelCommunityInclusionPage,
             },
+            {
+                path: Routes.userPanel.goalsAndDocuments.naturalSupportsTraining,
+                Component: NaturalSupportsTraining,
+            },
+            {
+                path: Routes.userPanel.goalsAndDocuments.communityInclusionServices,
+                Component: CommunityInclusionServices,
+            },
+            {
+                path: Routes.userPanel.goalsAndDocuments.communityInclusionIndividualizedGoals,
+                Component: CommunityInclusionIndividualizedGoals,
+            },
+            {
+                path: Routes.userPanel.goalsAndDocuments.dayHabilitationServices,
+                Component: DayHabilitationServices,
+            },
+            {
+                path: Routes.userPanel.goalsAndDocuments.dayHabilitationIndividualizedGoals,
+                Component: DayHabilitationIndividualizedGoals,
+            },
+            {
+                path: Routes.userPanel.goalsAndDocuments.prevocationalTrainingServices,
+                Component: PrevocationalTrainingServices,
+            },
+            {
+                path: Routes.userPanel.goalsAndDocuments.prevocationalTrainingIndividualizedGoals,
+                Component: PrevocationalTrainingIndividualizedGoals,
+            },
         ],
     },
     {

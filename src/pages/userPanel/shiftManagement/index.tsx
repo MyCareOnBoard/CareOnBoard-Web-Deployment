@@ -1,24 +1,17 @@
-import {useState, useEffect, useMemo} from "react";
-import {useNavigate} from "react-router";
-import {Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation, getAvailableShifts} from "@/lib/api/shifts";
-import {format} from "date-fns";
-import {ClockOutModal} from "./ClockOutModal";
-import {LocationErrorModal} from "./LocationErrorModal";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router";
+import { Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation, listShifts, categorizeShifts, clockIn as apiClockIn, shiftStarted as apiShiftStarted, clockOut as apiClockOut } from "@/lib/api/shifts";
+import { format } from "date-fns";
+import { ClockOutModal } from "./ClockOutModal";
+import { LocationErrorModal } from "./LocationErrorModal";
 import ExpandIcon from "@/assets/icons/arrow-expand-01.svg?react";
-import {Routes} from "@/routes/constants";
-import {
-  getTodayShifts,
-  clockIn as apiClockIn,
-  shiftStarted as apiShiftStarted,
-  clockOut as apiClockOut,
-  listShifts,
-} from "@/lib/api/shifts";
-import {toast} from "sonner";
-import {useAuth} from "@/utils/auth/context/AuthContext";
-import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
-import {useReverseGeocode} from "@/hooks/useReverseGeocode";
+import { Routes } from "@/routes/constants";
+import { toast } from "sonner";
+import { useAuth } from "@/utils/auth/context/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 
 const convertTimeToISODate = (timeStringReplaced: string, dateString: string): Date => {
   const timeString = timeStringReplaced.replace(".", ":");
@@ -92,12 +85,41 @@ const getInitialsFromName = (name: string) => {
   const last = parts[parts.length - 1].charAt(0);
   return `${first}${last}`.toUpperCase();
 };
+const GEOFENCE_RADIUS_METERS = 50;
 
-const checkLocationMatch = (userLocation: string, shiftLocation?: Shift["location"] | null): boolean => {
-  const normalizedUserLocation = userLocation.toLowerCase().trim();
-  const normalizedShiftLocation = formatShiftLocation(shiftLocation).toLowerCase().trim();
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371e3;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
 
-  return normalizedUserLocation === normalizedShiftLocation;
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+};
+
+const checkLocationMatch = (
+  userCoords: { lat: number; lng: number } | null,
+  shiftLocation?: Shift["location"] | null
+): boolean => {
+  if (!shiftLocation) return true;
+  if (!userCoords) return false;
+
+  const shiftLatLon = shiftLocation.latlon;
+  if (shiftLatLon?.lat && shiftLatLon?.lon) {
+    const shiftLat = parseFloat(shiftLatLon.lat);
+    const shiftLon = parseFloat(shiftLatLon.lon);
+
+    if (!isNaN(shiftLat) && !isNaN(shiftLon)) {
+      const distance = calculateDistance(userCoords.lat, userCoords.lng, shiftLat, shiftLon);
+      return distance <= GEOFENCE_RADIUS_METERS;
+    }
+  }
+
+  return true;
 };
 
 const isShiftExpiringSoon = (startTime: string, endTime: string, date: string): boolean => {
@@ -148,7 +170,7 @@ const calculateTimeUntilStart = (startTime: string, date: string): string => {
 
 const isShiftPassed = (endTime: string | undefined, date: string): boolean => {
   if (!endTime) return false;
-  
+
   try {
     const now = new Date();
     const endDateTime = convertTimeToISODate(endTime, date);
@@ -199,13 +221,13 @@ interface ShiftCardProps {
 }
 
 function ShiftCard({
-                     shift,
-                     panel,
-                     showDate = false,
-                     showAction = true,
-                     onActionClick,
-                     isLoading = false
-                   }: ShiftCardProps) {
+  shift,
+  panel,
+  showDate = false,
+  showAction = true,
+  onActionClick,
+  isLoading = false
+}: ShiftCardProps) {
   const getStatusColor = (status?: string) => {
     if (!status) return "";
 
@@ -246,7 +268,7 @@ function ShiftCard({
         disabled={isLoading}
         className={`${config.color} text-white rounded-full px-4 py-2 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
       >
-        {isLoading ? <Loader2 size={16} className="animate-spin"/> : <Clock size={16}/>}
+        {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
         {config.label}
       </Button>
     );
@@ -546,20 +568,20 @@ interface ShiftSectionProps {
 }
 
 function ShiftSection({
-                        title,
-                        subtitle,
-                        shifts,
-                        panel,
-                        backgroundColor,
-                        isExpanded = false,
-                        onExpandToggle,
-                        showExpandButton = true,
-                        showDate = false,
-                        maxVisibleShifts = 2,
-                        showAction = true,
-                        onActionClick,
-                        isLoading = false,
-                      }: ShiftSectionProps) {
+  title,
+  subtitle,
+  shifts,
+  panel,
+  backgroundColor,
+  isExpanded = false,
+  onExpandToggle,
+  showExpandButton = true,
+  showDate = false,
+  maxVisibleShifts = 2,
+  showAction = true,
+  onActionClick,
+  isLoading = false,
+}: ShiftSectionProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
@@ -603,7 +625,7 @@ function ShiftSection({
           >
             <ExpandIcon
               className={`transform transition-transform ${isExpanded ? "rotate-90" : ""}`}
-              style={{width: "16px", height: "16px"}}
+              style={{ width: "16px", height: "16px" }}
             />
             {isExpanded ? "Collapse" : "Expand"}
           </Button>
@@ -639,7 +661,7 @@ function ShiftSection({
             variant="outline"
             className="bg-white/50 backdrop-blur border border-white/30 rounded-full p-1.5 h-auto disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/70"
           >
-            <ChevronRight size={20} className="rotate-180"/>
+            <ChevronRight size={20} className="rotate-180" />
           </Button>
           <span className="text-[16px] font-medium text-[#10141a] min-w-[60px] text-center">
             {currentPage}<span className="text-[14px] text-[#808081]">/{totalPages}</span>
@@ -651,7 +673,7 @@ function ShiftSection({
             variant="outline"
             className="bg-white/50 backdrop-blur border border-white/30 rounded-full p-1.5 h-auto disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/70"
           >
-            <ChevronRight size={20}/>
+            <ChevronRight size={20} />
           </Button>
         </div>
       )}
@@ -660,7 +682,7 @@ function ShiftSection({
 }
 
 export default function ShiftManagementPage() {
-  const {user} = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [previousExpanded, setPreviousExpanded] = useState(false);
@@ -670,12 +692,10 @@ export default function ShiftManagementPage() {
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [clockOutShiftId, setClockOutShiftId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<string>("Getting location...");
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState(false);
   const [showLocationErrorModal, setShowLocationErrorModal] = useState(false);
-  const [todayLoading, setTodayLoading] = useState(true);
-  const [upcomingLoading, setUpcomingLoading] = useState(true);
-  const [previousLoading, setPreviousLoading] = useState(true);
-  const [shiftsLoading, setShiftsLoading] = useState(false);
+  const [shiftsLoading, setShiftsLoading] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
   const currentDate = new Date();
@@ -702,30 +722,6 @@ export default function ShiftManagementPage() {
     return () => clearInterval(interval);
   }, [todayShift]);
 
-  const loadUpcomingShifts = async (currentShift: Shift | null = null) => {
-    const agencyId = user?.agencyId;
-    const employeeId = user?.profile?.id;
-
-    if (!agencyId) {
-      console.warn('No user ID available for fetching shifts');
-      return;
-    }
-
-      try {
-        setUpcomingLoading(true);
-
-        const todayShiftsResponse = await getAvailableShifts(20, agencyId, employeeId);
-        setUpcomingShifts(todayShiftsResponse.shifts);
-    } catch (error: any) {
-      console.error('Failed to load upcoming shifts:', error);
-      toast.error('Failed to load upcoming shifts', {
-        description: error?.response?.data?.error || 'Please try again later'
-      });
-    } finally {
-      setUpcomingLoading(false);
-    }
-  };
-
   const loadShifts = async () => {
     const agencyId = user?.agencyId;
     const employeeId = user?.profile?.id;
@@ -735,103 +731,32 @@ export default function ShiftManagementPage() {
       return;
     }
 
-    const loadTodayShifts = async () => {
-      try {
-        setTodayLoading(true);
-        const todayResponse = await getTodayShifts(agencyId, employeeId);
-        if (todayResponse.success) {
-          setTodayShift(todayResponse.shift);
-        }
-      } catch (error: any) {
-        console.error('Failed to load today shifts:', error);
-        toast.error('Failed to load today shifts', {
-          description: error?.response?.data?.error || 'Please try again later'
-        });
-      } finally {
-        setTodayLoading(false);
-      }
-    };
-
-    const loadUpcomingShiftsLocal = async (currentShift: Shift | null = null) => {
-      return loadUpcomingShifts(currentShift);
-    };
-
-    const loadPreviousShifts = async () => {
-      try {
-        setPreviousLoading(true);
-        const allShiftsResponse = await listShifts({
-          employeeId: employeeId,
-          agencyId: agencyId,
-          limit: 100,
-        });
-        if (allShiftsResponse.success) {
-          const now = new Date();
-          const previousShiftsList = allShiftsResponse.shifts.filter(shift => {
-            if (shift.status === ShiftStatus.COMPLETED) {
-              return true;
-            }
-            if (!shift.date) return false;
-            let endDateTime: Date;
-            if (shift.endTime) {
-              try {
-                endDateTime = convertTimeToISODate(shift.endTime, shift.date);
-              } catch {
-                const date = new Date(shift.date);
-                endDateTime = new Date(
-                  date.getFullYear(),
-                  date.getMonth(),
-                  date.getDate(),
-                  23,
-                  59,
-                  59
-                );
-              }
-            } else {
-              const date = new Date(shift.date);
-              endDateTime = new Date(
-                date.getFullYear(),
-                date.getMonth(),
-                date.getDate(),
-                23,
-                59,
-                59
-              );
-            }
-            return endDateTime.getTime() < now.getTime();
-          });
-          setPreviousShifts(previousShiftsList);
-        }
-      } catch (error: any) {
-        console.error('Failed to load previous shifts:', error);
-        toast.error('Failed to load previous shifts', {
-          description: error?.response?.data?.error || 'Please try again later'
-        });
-      } finally {
-        setPreviousLoading(false);
-      }
-    };
-
-    let currentShift: Shift | null = null;
     try {
-      setTodayLoading(true);
-      const todayResponse = await getTodayShifts(agencyId, employeeId);
-      if (todayResponse.success) {
-        currentShift = todayResponse.shift;
-        setTodayShift(currentShift);
+      setShiftsLoading(true);
+
+      // Single API call to get all shifts
+      const response = await listShifts({
+        employeeId: employeeId,
+        agencyId: agencyId,
+        limit: 100,
+        client: true, // Populate client data
+      });
+
+      if (response.success) {
+        // Categorize shifts client-side
+        const { current, upcoming, previous } = categorizeShifts(response.shifts);
+        setTodayShift(current);
+        setUpcomingShifts(upcoming);
+        setPreviousShifts(previous);
       }
     } catch (error: any) {
-      console.error('Failed to load today shifts:', error);
-      toast.error('Failed to load today shifts', {
+      console.error('Failed to load shifts:', error);
+      toast.error('Failed to load shifts', {
         description: error?.response?.data?.error || 'Please try again later'
       });
     } finally {
-      setTodayLoading(false);
+      setShiftsLoading(false);
     }
-    
-    await Promise.all([
-      loadUpcomingShiftsLocal(currentShift),
-      loadPreviousShifts()
-    ]);
   };
 
   const { reverseGeocode } = useReverseGeocode();
@@ -840,7 +765,8 @@ export default function ShiftManagementPage() {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          const {latitude, longitude} = position.coords;
+          const { latitude, longitude } = position.coords;
+          setUserCoords({ lat: latitude, lng: longitude });
 
           try {
             const result = await reverseGeocode(latitude, longitude);
@@ -884,14 +810,14 @@ export default function ShiftManagementPage() {
     if (!shift) return;
 
     if (shift.actionStatus === ShiftActionStatus.CLOCK_IN) {
-      if (locationError || userLocation === "Getting location...") {
+      if (locationError || !userCoords) {
         toast.error('Location unavailable', {
           description: 'Please enable location services and try again'
         });
         return;
       }
 
-      if (!checkLocationMatch(userLocation, shift.location)) {
+      if (!checkLocationMatch(userCoords, shift.location)) {
         setShowLocationErrorModal(true);
         return;
       }
@@ -913,7 +839,7 @@ export default function ShiftManagementPage() {
 
       if (response?.success) {
         setTodayShift(response.shift);
-        await loadUpcomingShifts(response.shift);
+        await loadShifts();
         toast.success('Action completed successfully');
       }
     } catch (error: any) {
@@ -946,10 +872,7 @@ export default function ShiftManagementPage() {
         const agencyId = user?.agencyId;
         const employeeId = user?.id;
         if (agencyId && employeeId) {
-          const todayResponse = await getTodayShifts(agencyId, employeeId);
-          if (todayResponse.success) {
-            setTodayShift(todayResponse.shift);
-          }
+          await loadShifts();
         }
       }
     } catch (error: any) {
@@ -987,7 +910,7 @@ export default function ShiftManagementPage() {
             onClick={() => navigate(Routes.userPanel.manualShiftManagement)}
             className="bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap"
           >
-            <Plus size={20}/>
+            <Plus size={20} />
             Manual Timesheet
           </Button>
         </div>
@@ -999,7 +922,7 @@ export default function ShiftManagementPage() {
           <div className="flex items-center gap-2 sm:gap-3">
             <div
               className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center shrink-0">
-              <Calendar size={18} className="sm:w-5 sm:h-5"/>
+              <Calendar size={18} className="sm:w-5 sm:h-5" />
             </div>
             <div>
               <p
@@ -1013,7 +936,7 @@ export default function ShiftManagementPage() {
           <div className="flex items-center gap-2 sm:gap-3">
             <div
               className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center shrink-0">
-              <Clock size={18} className="sm:w-5 sm:h-5"/>
+              <Clock size={18} className="sm:w-5 sm:h-5" />
             </div>
             <div>
               <p
@@ -1027,7 +950,7 @@ export default function ShiftManagementPage() {
           <div className="flex items-center gap-2 sm:gap-3">
             <div
               className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center shrink-0">
-              <MapPin size={18} className={`sm:w-5 sm:h-5 ${locationError ? "text-red-500" : ""}`}/>
+              <MapPin size={18} className={`sm:w-5 sm:h-5 ${locationError ? "text-red-500" : ""}`} />
             </div>
             <div className="max-w-[200px] sm:max-w-[250px]">
               <p
@@ -1041,19 +964,19 @@ export default function ShiftManagementPage() {
         </div>
 
         <div className="space-y-6">
-          {todayLoading ? (
+          {shiftsLoading ? (
             <div
               className="bg-[rgba(14,175,82,0.1)] backdrop-blur border border-white/30 rounded-[30px] p-5 min-h-[200px] flex items-center justify-center">
               <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-[#0eaf52]"/>
-                <p className="text-[14px] text-[#808081]">Loading current shift...</p>
+                <Loader2 className="w-10 h-10 animate-spin text-[#0eaf52]" />
+                <p className="text-[14px] text-[#808081]">Loading shifts...</p>
               </div>
             </div>
           ) : todayShift ? (
             <ShiftSection
               title="Current Shift"
               subtitle="This is your current active shift."
-              shifts={[{...todayShift, timeRemaining: timeRemaining !== null ? timeRemaining : undefined}]}
+              shifts={[{ ...todayShift, timeRemaining: timeRemaining !== null ? timeRemaining : undefined }]}
               panel="today"
               backgroundColor="bg-[rgba(14,175,82,0.1)]"
               showExpandButton={false}
@@ -1063,15 +986,7 @@ export default function ShiftManagementPage() {
             />
           ) : null}
 
-          {upcomingLoading ? (
-            <div
-              className="bg-[rgba(43,130,255,0.1)] backdrop-blur border border-white/30 rounded-[30px] p-5 min-h-[200px] flex items-center justify-center">
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-[#2B82FF]"/>
-                <p className="text-[14px] text-[#808081]">Loading upcoming shifts...</p>
-              </div>
-            </div>
-          ) : (
+          {!shiftsLoading && (
             <ShiftSection
               title="Upcoming Shifts"
               subtitle="These are your shifts for the day."
@@ -1086,15 +1001,7 @@ export default function ShiftManagementPage() {
             />
           )}
 
-          {previousLoading ? (
-            <div
-              className="bg-white/30 backdrop-blur border border-white/30 rounded-[30px] p-5 min-h-[200px] flex items-center justify-center">
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-[#808081]"/>
-                <p className="text-[14px] text-[#808081]">Loading previous shifts...</p>
-              </div>
-            </div>
-          ) : (
+          {!shiftsLoading && (
             <ShiftSection
               title="Previous Shifts"
               subtitle="These are your Previous shifts"

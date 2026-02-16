@@ -1,5 +1,12 @@
 export type PlanOfCareStatus = "active" | "inactive" | "archived" | string;
 
+export interface Plan {
+  autoReminder: boolean;
+  fileName: string;
+  title: string;
+  url: string;
+}
+
 export interface PlanOfCare {
   id: string;
   agencyId: string;
@@ -11,6 +18,11 @@ export interface PlanOfCare {
   service: string;
   content: string;
   status: PlanOfCareStatus;
+  planOfCare: Plan;
+  serviceCode: string;
+  serviceName: string;
+  goalsAndDocumentId?: string;
+  goalsType?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

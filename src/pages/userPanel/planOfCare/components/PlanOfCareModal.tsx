@@ -9,7 +9,6 @@ interface PlanOfCareModalProps {
   open: boolean;
   isLoading: boolean;
   plan: PlanOfCare | null;
-  clientName: string;
   onClose: () => void;
 }
 
@@ -17,14 +16,15 @@ export function PlanOfCareModal({
   open,
   isLoading,
   plan,
-  clientName,
   onClose,
 }: PlanOfCareModalProps) {
   if (!open) {
     return null;
   }
 
-  const displayName = plan?.clientName || clientName || "Client";
+  console.log(plan)
+
+  const displayName = plan?.clientName || "Client";
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -70,14 +70,24 @@ export function PlanOfCareModal({
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Service</p>
-                  <p className="text-sm text-gray-900">{plan.service || "—"}</p>
+                  <p className="text-sm text-gray-900">{plan.service || plan.serviceCode}</p>
                 </div>
               </div>
-              <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
-                <p className="text-sm text-gray-900 whitespace-pre-wrap">
-                  {plan.content || "No plan of care content available."}
-                </p>
-              </div>
+              {plan.planOfCare?.url ? (
+                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                  <iframe
+                    src={plan.planOfCare.url}
+                    title={plan.planOfCare.title || "Plan of Care PDF"}
+                    className="w-full h-[60vh] border-0"
+                  />
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
+                  <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                    {plan.content || "No plan of care content available."}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

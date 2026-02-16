@@ -11,17 +11,17 @@ import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleMod
 import { useAuth } from "@/utils/auth";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 
-type ActivityFilter = "active" | "completed" | "missed" | "incomplete";
+type ActivityFilter = "all" | "active" | "completed" | "missed" | "incomplete";
 
 const formatTime = (time?: string): string => {
   if (!time) return "-";
   try {
     if (time.includes("AM") || time.includes("PM")) return time;
-    const [hours, minutes] = time.split(":");
+    const [hours, minutes] = time.split('T')[1].split(":");
     const hour = parseInt(hours, 10);
     const ampm = hour >= 12 ? "PM" : "AM";
     const formattedHour = hour % 12 || 12;
-    return `${formattedHour}.${minutes || "00"} ${ampm}`;
+    return `${formattedHour}:${minutes || "00"} ${ampm}`;
   } catch {
     return time;
   }
@@ -42,6 +42,7 @@ const parseTimeToParts = (time: string): { hours: number; minutes: number } | nu
 };
 
 const isShiftMissed = (shift: Shift): boolean => {
+  console.log(shift);
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (shift.clockedInAt) return false;
   if (!shift.date) return false;
@@ -82,6 +83,8 @@ const isShiftMissed = (shift: Shift): boolean => {
     );
   }
 
+  console.log(endDateTime.getTime(), Date.now());
+
   return endDateTime.getTime() < Date.now();
 };
 
@@ -104,6 +107,8 @@ const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
 
 const getStatusInfoForTab = (shift: Shift, tab: ActivityFilter) => {
   switch (tab) {
+    case "all":
+      return getStatusInfo(shift.status, shift.approved);
     case "active":
       if (shift.status === ShiftStatus.ONGOING) {
         return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
@@ -139,7 +144,7 @@ export default function ActivityLogsPage() {
   const [editFormData, setEditFormData] = useState<ScheduleFormData | null>(null);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [activityPage, setActivityPage] = useState(1);
-  const [activeFilter, setActiveFilter] = useState<ActivityFilter>("active");
+  const [activeFilter, setActiveFilter] = useState<ActivityFilter>("all");
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -161,6 +166,7 @@ export default function ActivityLogsPage() {
       billingRate: "",
       serviceCode: shift.serviceCode || "183535",
       notesType: anyShift.notesType || "",
+      comment: anyShift.comment || "",
       schedulingType: (shift.schedulingType as "one-time" | "recurring" | "") || "one-time",
       date: shift.date ? new Date(shift.date) : null,
       startDate: null,
@@ -205,7 +211,7 @@ export default function ActivityLogsPage() {
     if (user?.agencyId) {
       fetchShifts();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.agencyId]);
 
   const incompleteShifts = useMemo(() => {
@@ -219,9 +225,11 @@ export default function ActivityLogsPage() {
 
   const filteredShifts = useMemo(() => {
     switch (activeFilter) {
+      case "all":
+        return shifts;
       case "active":
         return shifts.filter(
-          (shift) => 
+          (shift) =>
             (shift.status === ShiftStatus.ONGOING || shift.status === ShiftStatus.AVAILABLE) &&
             !isShiftMissed(shift)
         );
@@ -248,6 +256,7 @@ export default function ActivityLogsPage() {
   }, [activeFilter]);
 
   const filterButtons: { key: ActivityFilter; label: string }[] = [
+    { key: "all", label: "All" },
     { key: "active", label: "Active" },
     { key: "completed", label: "Completed" },
     { key: "missed", label: "Missed" },
@@ -295,11 +304,10 @@ export default function ActivityLogsPage() {
                     <button
                       key={filter.key}
                       onClick={() => setActiveFilter(filter.key)}
-                      className={`px-4 py-2 rounded-full text-[14px] font-medium leading-[1.4] transition-colors cursor-pointer ${
-                        isActive
-                          ? "bg-[#00b4b8] text-white"
-                          : "border border-[#808081] text-[#808081] hover:bg-white/60"
-                      }`}
+                      className={`px-4 py-2 rounded-full text-[14px] font-medium leading-[1.4] transition-colors cursor-pointer ${isActive
+                        ? "bg-[#00b4b8] text-white"
+                        : "border border-[#808081] text-[#808081] hover:bg-white/60"
+                        }`}
                     >
                       {filter.label}
                     </button>
@@ -393,19 +401,19 @@ export default function ActivityLogsPage() {
                           </span>
                         </div>
 
-                         <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
-                           <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
-                           <span className="text-[#10141a]">
-                             {shift.clockedInAt ? formatTime(shift.clockedInAt) : "--:-- --"}
-                           </span>
-                         </div>
+                        <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
+                          <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
+                          <span className="text-[#10141a]">
+                            {shift.clockedInAt ? formatTime(shift.clockedInAt) : "--:-- --"}
+                          </span>
+                        </div>
 
-                         <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
-                           <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
-                           <span className="text-[#10141a]">
-                             {shift.clockedOutAt ? formatTime(shift.clockedOutAt) : "--:-- --"}
-                           </span>
-                         </div>
+                        <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
+                          <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
+                          <span className="text-[#10141a]">
+                            {shift.clockedOutAt ? formatTime(shift.clockedOutAt) : "--:-- --"}
+                          </span>
+                        </div>
                       </div>
 
                       <Button

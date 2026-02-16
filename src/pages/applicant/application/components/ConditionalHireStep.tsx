@@ -385,13 +385,6 @@ export default function ConditionalHireStep({
                       signing or accepting or rejecting.
                     </p>
                   </div>
-
-                  {/* Signature Note */}
-                  <div className="text-center">
-                    <p className="text-red-600 font-bold text-sm">
-                      It should have a put up for accept or reject as the e-signature
-                    </p>
-                  </div>
                 </div>
               </div>
 

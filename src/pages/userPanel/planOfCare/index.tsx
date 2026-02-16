@@ -9,7 +9,7 @@ import { PlanOfCarePagination } from "./components/PlanOfCarePagination";
 export default function PlanOfCarePage() {
   const { data: planOfCareResponse, isLoading, isError } = useGetPlanOfCareListQuery();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [selectedClientName, setSelectedClientName] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState<PlanOfCare | null>(null);
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const pageSize = 10;
@@ -30,18 +30,16 @@ export default function PlanOfCarePage() {
     selectedPlanId ?? "",
     { skip: !selectedPlanId }
   );
-  const selectedPlan = selectedPlanResponse?.data ?? null;
 
   const handleViewPlanOfCare = (plan: PlanOfCare) => {
-    setSelectedPlanId(plan.id);
-    setSelectedClientName(plan.clientName);
+    setSelectedPlan(plan)
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedPlanId(null);
-    setSelectedClientName("");
+    setSelectedPlan(null);
   };
 
   const handlePreviousPage = () => {
@@ -64,9 +62,6 @@ export default function PlanOfCarePage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Plan of Care</h1>
           </div>
-          <Button className="bg-[#00B4B8] hover:bg-[#00A0A4] hover:cursor-pointer text-white rounded-full px-6">
-            + Manual Timesheet
-          </Button>
         </div>
 
         {/* Plan of Care List */}
@@ -98,10 +93,9 @@ export default function PlanOfCarePage() {
 
       {/* Plan of Care Modal */}
       <PlanOfCareModal
-        open={showModal && !!selectedPlanId}
+        open={showModal && !!selectedPlan?.id}
         isLoading={isPlanLoading}
         plan={selectedPlan}
-        clientName={selectedClientName}
         onClose={handleCloseModal}
       />
     </div>

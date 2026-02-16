@@ -96,6 +96,9 @@ export interface Shift {
     createdAt?: string;
     updatedAt?: string;
     notesType?: string;
+    comment?: string;
+    commentedBy?: string;
+    completedBy?: string;
     goalsType?: string;
     goalsAndDocumentsId?: string;
     employee?: Employee;
@@ -120,6 +123,8 @@ export interface CreateShiftRequest {
     status: ShiftStatus;
     availableAt?: string;
     notesType?: string;
+    comment?: string;
+    commentedBy?: string;
     goalsType?: string;
     goalsAndDocumentsId?: string;
     serviceCode?: string;
@@ -147,6 +152,9 @@ export interface UpdateShiftRequest {
     status?: ShiftStatus;
     actionStatus?: ShiftActionStatus | null;
     notesType?: string;
+    comment?: string;
+    commentedBy?: string;
+    completedBy?: string;
     goalsType?: string;
     goalsAndDocumentsId?: string;
     serviceCode?: string;
@@ -314,6 +322,96 @@ export interface ResetShiftsResponse {
     cleared: number;
     seeded: number;
 }
+
+export interface CategorizedShifts {
+    current: Shift | null;
+    upcoming: Shift[];
+    previous: Shift[];
+}
+
+const parseShiftDateTime = (timeStr?: string, dateStr?: string): Date | null => {
+    if (!timeStr || !dateStr) return null;
+    try {
+        const timeMatch = timeStr.match(/(\d+):(\d+):?\s*(AM|PM)/i);
+        if (!timeMatch) return null;
+
+        let hours = parseInt(timeMatch[1], 10);
+        const minutes = parseInt(timeMatch[2], 10);
+        const period = timeMatch[3].toUpperCase();
+
+        if (period === 'PM' && hours !== 12) {
+            hours += 12;
+        } else if (period === 'AM' && hours === 12) {
+            hours = 0;
+        }
+
+        const date = new Date(dateStr);
+        date.setHours(hours, minutes, 0, 0);
+        return date;
+    } catch {
+        return null;
+    }
+};
+
+const timeToMinutes = (timeStr?: string): number => {
+    if (!timeStr) return 0;
+    const match = timeStr.match(/(\d+):(\d+):?\s*(AM|PM)/i);
+    if (!match) return 0;
+
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const period = match[3].toUpperCase();
+
+    if (period === 'PM' && hours !== 12) {
+        hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+        hours = 0;
+    }
+
+    return hours * 60 + minutes;
+};
+
+export const categorizeShifts = (shifts: Shift[]): CategorizedShifts => {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    const current: Shift[] = [];
+    const upcoming: Shift[] = [];
+    const previous: Shift[] = [];
+
+    for (const shift of shifts) {
+        const isToday = shift.date === today;
+        const endDateTime = parseShiftDateTime(shift.endTime, shift.date);
+        const startDateTime = parseShiftDateTime(shift.startTime, shift.date);
+        const isPast = endDateTime ? endDateTime < now : shift.date < today;
+
+        if (shift.status === ShiftStatus.COMPLETED || shift.status === ShiftStatus.EXPIRED || isPast) {
+            previous.push(shift);
+        } else if (isToday && (shift.status === ShiftStatus.ONGOING || shift.status === ShiftStatus.AVAILABLE)) {
+            current.push(shift);
+        } else if (shift.date > today || (isToday && startDateTime && startDateTime > now)) {
+            upcoming.push(shift);
+        } else if (shift.status === ShiftStatus.PENDING && shift.date >= today) {
+            upcoming.push(shift);
+        }
+    }
+
+    current.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+
+    upcoming.sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
+    });
+
+    previous.sort((a, b) => b.date.localeCompare(a.date));
+
+    return {
+        current: current[0] || null,
+        upcoming,
+        previous
+    };
+};
 
 // ==================== API Functions ====================
 
