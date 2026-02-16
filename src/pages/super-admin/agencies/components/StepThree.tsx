@@ -25,26 +25,26 @@ export default function Step5Operational({formData, onChange, fieldsWithErrors}:
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Scheduling rules */}
-      <div>
-        <Label htmlFor="schedulingRules" className="mb-2 text-[14px] font-medium text-[#10141a]">
-          Scheduling rules
-        </Label>
-        <Input
-          id="schedulingRules"
-          value={formData.schedulingRules}
-          onChange={(e) => onChange("schedulingRules", e.target.value)}
-          placeholder="Enter scheduling rules"
-          className={cn(
-            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
-            fieldsWithErrors.includes("schedulingRules") && "border-red-500"
-          )}
-        />
-        {fieldsWithErrors.includes("schedulingRules") && (
-          <p className="text-red-500 mt-1 text-[12px]">
-            Scheduling rules is required.
-          </p>
-        )}
-      </div>
+      {/*<div>*/}
+      {/*  <Label htmlFor="schedulingRules" className="mb-2 text-[14px] font-medium text-[#10141a]">*/}
+      {/*    Scheduling rules*/}
+      {/*  </Label>*/}
+      {/*  <Input*/}
+      {/*    id="schedulingRules"*/}
+      {/*    value={formData.schedulingRules}*/}
+      {/*    onChange={(e) => onChange("schedulingRules", e.target.value)}*/}
+      {/*    placeholder="Enter scheduling rules"*/}
+      {/*    className={cn(*/}
+      {/*      "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",*/}
+      {/*      fieldsWithErrors.includes("schedulingRules") && "border-red-500"*/}
+      {/*    )}*/}
+      {/*  />*/}
+      {/*  {fieldsWithErrors.includes("schedulingRules") && (*/}
+      {/*    <p className="text-red-500 mt-1 text-[12px]">*/}
+      {/*      Scheduling rules is required.*/}
+      {/*    </p>*/}
+      {/*  )}*/}
+      {/*</div>*/}
 
       {/* Max shift per day */}
       <div>
@@ -62,12 +62,11 @@ export default function Step5Operational({formData, onChange, fieldsWithErrors}:
             <SelectValue placeholder="Select number of shift"/>
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="1">1</SelectItem>
+            <SelectItem value="2">2</SelectItem>
+            <SelectItem value="3">3</SelectItem>
+            <SelectItem value="4">4</SelectItem>
             <SelectItem value="5">5</SelectItem>
-            <SelectItem value="10">10</SelectItem>
-            <SelectItem value="15">15</SelectItem>
-            <SelectItem value="20">20</SelectItem>
-            <SelectItem value="25">25</SelectItem>
-            <SelectItem value="30">30</SelectItem>
           </SelectContent>
         </Select>
         {fieldsWithErrors.includes("maxShiftPerDay") && (
@@ -80,13 +79,13 @@ export default function Step5Operational({formData, onChange, fieldsWithErrors}:
       {/* Travel time rules */}
       <div>
         <Label htmlFor="travelTimeRules" className="mb-2 text-[14px] font-medium text-[#10141a]">
-          Travel time rules
+          Interval between shifts
         </Label>
         <Input
           id="travelTimeRules"
           value={formData.travelTimeRules}
           onChange={(e) => onChange("travelTimeRules", e.target.value)}
-          placeholder="Enter Travel time rules"
+          placeholder="Enter interval between shifts"
           className={cn(
             "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
             fieldsWithErrors.includes("travelTimeRules") && "border-red-500"
@@ -94,32 +93,32 @@ export default function Step5Operational({formData, onChange, fieldsWithErrors}:
         />
         {fieldsWithErrors.includes("travelTimeRules") && (
           <p className="text-red-500 mt-1 text-[12px]">
-            Travel time rules is required.
+            Interval between shifts
           </p>
         )}
       </div>
 
       {/* Mileage Settings */}
-      <div>
-        <Label htmlFor="mileageSettings" className="mb-2 text-[14px] font-medium text-[#10141a]">
-          Mileage Settings
-        </Label>
-        <Input
-          id="mileageSettings"
-          value={formData.mileageSettings}
-          onChange={(e) => onChange("mileageSettings", e.target.value)}
-          placeholder="Enter Mileage Settings"
-          className={cn(
-            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
-            fieldsWithErrors.includes("mileageSettings") && "border-red-500"
-          )}
-        />
-        {fieldsWithErrors.includes("mileageSettings") && (
-          <p className="text-red-500 mt-1 text-[12px]">
-            Mileage settings is required.
-          </p>
-        )}
-      </div>
+      {/*<div>*/}
+      {/*  <Label htmlFor="mileageSettings" className="mb-2 text-[14px] font-medium text-[#10141a]">*/}
+      {/*    Mileage Settings*/}
+      {/*  </Label>*/}
+      {/*  <Input*/}
+      {/*    id="mileageSettings"*/}
+      {/*    value={formData.mileageSettings}*/}
+      {/*    onChange={(e) => onChange("mileageSettings", e.target.value)}*/}
+      {/*    placeholder="Enter Mileage Settings"*/}
+      {/*    className={cn(*/}
+      {/*      "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",*/}
+      {/*      fieldsWithErrors.includes("mileageSettings") && "border-red-500"*/}
+      {/*    )}*/}
+      {/*  />*/}
+      {/*  {fieldsWithErrors.includes("mileageSettings") && (*/}
+      {/*    <p className="text-red-500 mt-1 text-[12px]">*/}
+      {/*      Mileage settings is required.*/}
+      {/*    </p>*/}
+      {/*  )}*/}
+      {/*</div>*/}
 
       {/* Mileage rate */}
       <div>
@@ -146,26 +145,26 @@ export default function Step5Operational({formData, onChange, fieldsWithErrors}:
       </div>
 
       {/* Incident Reporting Settings */}
-      <div>
-        <Label htmlFor="incidentReportingSettings" className="mb-2 text-[14px] font-medium text-[#10141a]">
-          Incident Reporting Settings
-        </Label>
-        <Input
-          id="incidentReportingSettings"
-          value={formData.incidentReportingSettings}
-          onChange={(e) => onChange("incidentReportingSettings", e.target.value)}
-          placeholder="Enter Incident Reporting Settings"
-          className={cn(
-            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
-            fieldsWithErrors.includes("incidentReportingSettings") && "border-red-500"
-          )}
-        />
-        {fieldsWithErrors.includes("incidentReportingSettings") && (
-          <p className="text-red-500 mt-1 text-[12px]">
-            Incident reporting settings are required.
-          </p>
-        )}
-      </div>
+      {/*<div>*/}
+      {/*  <Label htmlFor="incidentReportingSettings" className="mb-2 text-[14px] font-medium text-[#10141a]">*/}
+      {/*    Incident Reporting Settings*/}
+      {/*  </Label>*/}
+      {/*  <Input*/}
+      {/*    id="incidentReportingSettings"*/}
+      {/*    value={formData.incidentReportingSettings}*/}
+      {/*    onChange={(e) => onChange("incidentReportingSettings", e.target.value)}*/}
+      {/*    placeholder="Enter Incident Reporting Settings"*/}
+      {/*    className={cn(*/}
+      {/*      "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",*/}
+      {/*      fieldsWithErrors.includes("incidentReportingSettings") && "border-red-500"*/}
+      {/*    )}*/}
+      {/*  />*/}
+      {/*  {fieldsWithErrors.includes("incidentReportingSettings") && (*/}
+      {/*    <p className="text-red-500 mt-1 text-[12px]">*/}
+      {/*      Incident reporting settings are required.*/}
+      {/*    </p>*/}
+      {/*  )}*/}
+      {/*</div>*/}
 
       {/* Who receives notifications */}
       <div>
@@ -196,26 +195,26 @@ export default function Step5Operational({formData, onChange, fieldsWithErrors}:
       </div>
 
       {/* Expense Report Settings */}
-      <div>
-        <Label htmlFor="expenseReportSettings" className="mb-2 text-[14px] font-medium text-[#10141a]">
-          Expense Report Settings
-        </Label>
-        <Input
-          id="expenseReportSettings"
-          value={formData.expenseReportSettings}
-          onChange={(e) => onChange("expenseReportSettings", e.target.value)}
-          placeholder="Enter Expense Report Settings"
-          className={cn(
-            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
-            fieldsWithErrors.includes("expenseReportSettings") && "border-red-500"
-          )}
-        />
-        {fieldsWithErrors.includes("expenseReportSettings") && (
-          <p className="text-red-500 mt-1 text-[12px]">
-            Expense report settings are required.
-          </p>
-        )}
-      </div>
+      {/*<div>*/}
+      {/*  <Label htmlFor="expenseReportSettings" className="mb-2 text-[14px] font-medium text-[#10141a]">*/}
+      {/*    Expense Report Settings*/}
+      {/*  </Label>*/}
+      {/*  <Input*/}
+      {/*    id="expenseReportSettings"*/}
+      {/*    value={formData.expenseReportSettings}*/}
+      {/*    onChange={(e) => onChange("expenseReportSettings", e.target.value)}*/}
+      {/*    placeholder="Enter Expense Report Settings"*/}
+      {/*    className={cn(*/}
+      {/*      "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",*/}
+      {/*      fieldsWithErrors.includes("expenseReportSettings") && "border-red-500"*/}
+      {/*    )}*/}
+      {/*  />*/}
+      {/*  {fieldsWithErrors.includes("expenseReportSettings") && (*/}
+      {/*    <p className="text-red-500 mt-1 text-[12px]">*/}
+      {/*      Expense report settings are required.*/}
+      {/*    </p>*/}
+      {/*  )}*/}
+      {/*</div>*/}
 
       {/* Allowed file types */}
       <div>
