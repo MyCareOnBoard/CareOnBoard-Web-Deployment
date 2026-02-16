@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { deleteShift, updateShift, updateShiftStatus, Shift, ShiftStatus, formatShiftLocation } from "@/lib/api/shifts";
+import { deleteShift, updateShift, Shift, ShiftStatus, formatShiftLocation } from "@/lib/api/shifts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/utils/auth";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import TimePicker from "@/components/TimePicker";
 
@@ -130,16 +131,20 @@ export default function ShiftDetailsModal({
   if (!isOpen || !shift) return null;
 
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSavingTime, setIsSavingTime] = useState(false);
   const [currentShift, setCurrentShift] = useState<Shift>(shift);
+  const [commentInput, setCommentInput] = useState("");
+  const [isSavingComment, setIsSavingComment] = useState(false);
 
   // Update currentShift when shift prop changes
   useEffect(() => {
     if (shift) {
       setCurrentShift(shift);
+      setCommentInput(shift.comment || "");
     }
   }, [shift]);
 
@@ -155,12 +160,29 @@ export default function ShiftDetailsModal({
     if (!canMarkCompleted || isUpdating) return;
     setIsUpdating(true);
     try {
-      const response = await updateShiftStatus(currentShift.id, {
+      const trimmedComment = commentInput.trim();
+      const currentComment = (currentShift.comment || "").trim();
+      const hasUnsavedComment = trimmedComment && trimmedComment !== currentComment;
+
+      const payload: {
+        status: ShiftStatus;
+        actionStatus: null;
+        completedBy?: string;
+        comment?: string;
+        commentedBy?: string;
+      } = {
         status: ShiftStatus.COMPLETED,
         actionStatus: null,
-      });
-      // Update local state immediately to disable the button
+        completedBy: user?.uid || undefined,
+      };
+      if (hasUnsavedComment) {
+        payload.comment = trimmedComment;
+        payload.commentedBy = user?.uid || undefined;
+      }
+
+      const response = await updateShift(currentShift.id, payload);
       setCurrentShift(response.shift);
+      setCommentInput(response.shift.comment || "");
       onShiftUpdated?.(response.shift);
       onMarkCompleted?.(response.shift);
       toast({
@@ -176,6 +198,32 @@ export default function ShiftDetailsModal({
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleSaveComment = async () => {
+    if (!commentInput.trim() || isSavingComment) return;
+    setIsSavingComment(true);
+    try {
+      const response = await updateShift(currentShift.id, {
+        comment: commentInput.trim(),
+        commentedBy: user?.uid || undefined,
+      });
+      setCurrentShift(response.shift);
+      onShiftUpdated?.(response.shift);
+      toast({
+        title: "Comment saved",
+        description: "Shift comment has been updated.",
+      });
+    } catch (error) {
+      console.error("Failed to save comment:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save comment.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingComment(false);
     }
   };
 
@@ -363,6 +411,15 @@ export default function ShiftDetailsModal({
         )}
 
         <div className="mt-auto">
+          <div className="mb-3">
+            <textarea
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+              placeholder="Add a comment..."
+              rows={3}
+              className="w-full rounded-[8px] border-2 border-[#d1d5db] bg-white p-3 text-[14px] leading-[1.4] text-[#10141a] placeholder:text-[#808081] resize-none focus:outline-none focus:ring-2 focus:ring-[#00b4b8] focus:border-[#00b4b8]"
+            />
+          </div>
           <div className="flex w-full justify-between gap-2">
             <button
               onClick={() =>
@@ -377,14 +434,14 @@ export default function ShiftDetailsModal({
               Send Notification
             </button>
             <button
-              onClick={() => (onMessage ? onMessage(currentShift) : handleNotImplemented("Message"))}
-              disabled={!onMessage}
-              className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${onMessage
-                ? "bg-[#b2b2b3] hover:bg-[#9a9a9b] cursor-pointer active:bg-[#828283]"
-                : "bg-[#b2b2b3] opacity-50 cursor-not-allowed"
+              onClick={handleSaveComment}
+              disabled={!commentInput.trim() || isSavingComment}
+              className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${commentInput.trim() && !isSavingComment
+                ? "bg-[#3b82f6] hover:bg-[#2563eb] cursor-pointer active:bg-[#1d4ed8]"
+                : "bg-[#3b82f6] opacity-50 cursor-not-allowed"
                 }`}
             >
-              Message
+              {isSavingComment ? "Saving..." : "Comment"}
             </button>
             <button
               onClick={() => (onCall ? onCall(currentShift) : handleNotImplemented("Call"))}

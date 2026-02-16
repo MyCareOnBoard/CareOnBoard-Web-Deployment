@@ -45,6 +45,7 @@ export interface ScheduleFormData {
   billingRate: string;
   serviceCode: string;
   notesType: string;
+  comment?: string;
   schedulingType: "one-time" | "recurring" | "";
   date: Date | null;
   startDate: Date | null;
@@ -136,6 +137,7 @@ const initialFormData: ScheduleFormData = {
   billingRate: "",
   serviceCode: "",
   notesType: "",
+  comment: "",
   schedulingType: "one-time",
   date: null,
   startDate: null,
@@ -317,6 +319,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 endTime: weekdaySchedule.clockOutTime,
                 clientId: data.clientId,
                 notesType: data.notesType || undefined,
+                comment: data.comment || undefined,
                 goalsType: data.goalsType || undefined,
                 serviceCode: data.serviceCode,
                 schedulingType: data.schedulingType,
@@ -343,6 +346,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             endTime: data.clockOutTime,
             clientId: data.clientId,
             notesType: data.notesType || undefined,
+            comment: data.comment || undefined,
             goalsType: data.goalsType || undefined,
             serviceCode: data.serviceCode,
             schedulingType: data.schedulingType,
@@ -367,6 +371,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         endTime: data.clockOutTime,
         clientId: data.clientId,
         notesType: data.notesType || undefined,
+        comment: data.comment || undefined,
         goalsType: data.goalsType || undefined,
         serviceCode: data.serviceCode,
         schedulingType: data.schedulingType,
@@ -753,6 +758,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             startTime: formData.clockInTime,
             endTime: formData.clockOutTime,
             notesType: formData.notesType || undefined,
+            comment: formData.comment || undefined,
             serviceCode: formData.serviceCode,
             schedulingType: formData.schedulingType,
             ispOutcome: formData.ispOutcome,
@@ -923,6 +929,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           startTime: formData.clockInTime,
           endTime: formData.clockOutTime,
           notesType: formData.notesType || undefined,
+          comment: formData.comment || undefined,
           serviceCode: formData.serviceCode,
           schedulingType: formData.schedulingType,
           ispOutcome: formData.ispOutcome,
