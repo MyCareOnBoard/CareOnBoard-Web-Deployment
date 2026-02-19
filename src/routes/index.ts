@@ -46,6 +46,8 @@ import AgencyAddClientPage from "@/pages/shared/client-management/wrappers/Agenc
 import AgencyEditClientPage from "@/pages/shared/client-management/wrappers/AgencyEditClientPage";
 import AgencyCommunityInclusionsPage from "@/pages/agency/community-inclusion";
 import AgencyCommunityInclusionHistoryPage from "@/pages/agency/community-inclusion/history";
+import AgencyDayProgramPage from "@/pages/agency/day-program";
+import AgencyDayProgramHistoryPage from "@/pages/agency/day-program/history";
 import BillingAndApprovalsPage from "@/pages/agency/billing-and-approvals";
 import ClientClaimsPage from "@/pages/agency/billing-and-approvals/client-claims";
 import SchedulingPage from "@/pages/agency/scheduling";
@@ -238,6 +240,14 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.communityInclusionHistory,
                 Component: AgencyCommunityInclusionHistoryPage,
+            },
+            {
+                path: Routes.agency.dayProgram,
+                Component: AgencyDayProgramPage,
+            },
+            {
+                path: Routes.agency.dayProgramHistory,
+                Component: AgencyDayProgramHistoryPage,
             },
             {
                 path: Routes.agency.billingAndApprovals,
