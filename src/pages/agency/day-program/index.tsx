@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import TimePicker from "@/components/TimePicker";
 import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
-import { createCommunityInclusion, type Attendee } from "@/lib/api/community-inclusions";
+import { createDayProgram, type Attendee } from "@/lib/api/day-programs";
 import { Routes } from "@/routes/constants";
 
 import { useNavigate } from "react-router";
@@ -16,7 +16,7 @@ interface AttendanceRow {
   signOut: string;
 }
 
-export default function CommunityInclusionsPage() {
+export default function DayProgramPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -75,14 +75,14 @@ export default function CommunityInclusionsPage() {
         signOut: row.signOut,
       }));
 
-      // Call API to create community inclusion
-      await createCommunityInclusion({
+      // Call API to create day program
+      await createDayProgram({
         attendees,
       });
 
       toast({
-        title: status === 'submitted' ? "Submitted Successfully" : "Saved Successfully",
-        description: `Community inclusion ${status} successfully!`,
+        title: "Saved Successfully",
+        description: "Day program saved successfully!",
       });
 
       // Reset form after successful save
@@ -95,12 +95,12 @@ export default function CommunityInclusionsPage() {
         { id: "6", name: "", signIn: "", signOut: "" },
       ]);
     } catch (error: any) {
-      console.error(`Failed to ${status} community inclusion:`, error);
+      console.error("Failed to save day program:", error);
       toast({
-        title: `${status === 'submitted' ? "Submission" : "Save"} Failed`,
+        title: "Save Failed",
         description:
           error?.response?.data?.message ||
-          `Failed to ${status} community inclusion. Please try again.`,
+          "Failed to save day program. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -138,18 +138,18 @@ export default function CommunityInclusionsPage() {
       {/* Page Header */}
       <div className="mb-4 sm:mb-6">
         <h1 className="text-[24px] sm:text-[28px] md:text-[32px] lg:text-[40px] font-semibold leading-[1.4] sm:leading-[1.6] text-[#10141a]">
-          Community Inclusion
+          Day Program
         </h1>
       </div>
 
-      {/* Community Inclusions Card */}
+      {/* Day Programs Card */}
       <div className="relative overflow-hidden rounded-[16px] sm:rounded-[20px] lg:rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
         <div className="relative p-3 sm:p-4 md:p-[19px]">
           {/* Section Header */}
           <div className="mb-4 sm:mb-[20px] flex flex-wrap justify-between items-start gap-3">
             <div>
               <h2 className="text-[16px] sm:text-[18px] md:text-[20px] font-medium leading-[1.4] sm:leading-[1.6] text-[#10141a]">
-                Community Inclusions
+                Day Programs
               </h2>
               <p className="text-[14px] text-[#808081] font-normal mt-1">
                 List Of Attendees on {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
@@ -157,11 +157,11 @@ export default function CommunityInclusionsPage() {
             </div>
 
             <button
-              onClick={() => navigate(Routes.agency.communityInclusionHistory)}
+              onClick={() => navigate(Routes.agency.dayProgramHistory)}
               className="flex items-center gap-2 text-[#808081] hover:text-[#00b4b8] transition-colors cursor-pointer"
             >
               <FileClock className="w-5 h-5" />
-              <span className="hidden sm:inline text-[14px] font-normal">Community Inclusion History</span>
+              <span className="hidden sm:inline text-[14px] font-normal">Day Program History</span>
             </button>
           </div>
 

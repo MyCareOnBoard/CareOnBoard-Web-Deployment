@@ -23,7 +23,8 @@ import MileageIcon from "@/assets/icons/mileage.svg?react";
 import {
     UsersRound,
     Network,
-    Settings
+    Settings,
+    Sun
 } from "lucide-react";
 
 
@@ -32,6 +33,7 @@ const allNavItems: NavItem[] = [
     { label: "DSP Management", path: Routes.agency.dspManagement, icon: DSPManagementIcon, accessKey: "DSP Management" },
     { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
     { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion" },
+    { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun, accessKey: "Day Program" },
     { label: "Scheduling", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: "Scheduling" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
     // { label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText, accessKey: "Billing & Management" },
