@@ -86,6 +86,40 @@ const DigitalSignatureModal = ({
     setIsDrawing(false);
   };
 
+  const getTouchPos = (canvas: HTMLCanvasElement, touch: React.Touch) => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: touch.clientX - rect.left,
+      y: touch.clientY - rect.top
+    };
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!canvasRef.current || !contextRef.current) return;
+    const touch = e.touches[0];
+    const pos = getTouchPos(canvasRef.current, touch);
+    contextRef.current.beginPath();
+    contextRef.current.moveTo(pos.x, pos.y);
+    setIsDrawing(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!isDrawing || !canvasRef.current || !contextRef.current) return;
+    const touch = e.touches[0];
+    const pos = getTouchPos(canvasRef.current, touch);
+    contextRef.current.lineTo(pos.x, pos.y);
+    contextRef.current.stroke();
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!contextRef.current) return;
+    contextRef.current.closePath();
+    setIsDrawing(false);
+  };
+
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -266,29 +300,9 @@ const DigitalSignatureModal = ({
                         onMouseMove={draw}
                         onMouseUp={stopDrawing}
                         onMouseLeave={stopDrawing}
-                        onTouchStart={(e) => {
-                          const touch = e.touches[0];
-                          const mouseEvent = new MouseEvent('mousedown', {
-                            clientX: touch.clientX,
-                            clientY: touch.clientY
-                          });
-                          if (!canvasRef.current) return;
-                          canvasRef.current.dispatchEvent(mouseEvent);
-                        }}
-                        onTouchMove={(e) => {
-                          const touch = e.touches[0];
-                          const mouseEvent = new MouseEvent('mousemove', {
-                            clientX: touch.clientX,
-                            clientY: touch.clientY
-                          });
-                          if (!canvasRef.current) return;
-                          canvasRef.current.dispatchEvent(mouseEvent);
-                        }}
-                        onTouchEnd={() => {
-                          const mouseEvent = new MouseEvent('mouseup', {});
-                          if (!canvasRef.current) return;
-                          canvasRef.current.dispatchEvent(mouseEvent);
-                        }}
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
                         className="w-full h-48 bg-white border-2 border-dashed border-gray-300 rounded cursor-crosshair"
                       />
                       <button
