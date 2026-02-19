@@ -113,12 +113,12 @@ export async function getUser(): Promise<User> {
     if ([UserType.EMPLOYEE, UserType.APPLICANT].includes(user.userType)) {
       user.agency = {
         id: backendUser.agencyId,
-        name: backendUser.agency.name,
-        email: backendUser.agency.email,
-        phone: backendUser.agency.phone,
-        address: backendUser.agency.address,
-        city: backendUser.agency.city,
-        state: backendUser.agency.state,
+        name: backendUser.agency?.name,
+        email: backendUser.agency?.email,
+        phone: backendUser.agency?.phone,
+        address: backendUser.agency?.address,
+        city: backendUser.agency?.city,
+        state: backendUser.agency?.state,
       };
     }
 

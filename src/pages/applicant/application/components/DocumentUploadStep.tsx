@@ -55,16 +55,16 @@ const files = [
   },
   {
     id: "hepatitis-b-vaccination",
-    label: "Upload Hepatitis B vaccination series documents.",
-    placeholder: "Upload Hepatitis B vaccination series documents.",
+    label: "Upload Hepatitis B vaccination series documents or chest x ray.",
+    placeholder: "Upload Hepatitis B vaccination series documents or chest x ray.",
     requiresExpiry: false
   },
-  {
-    id: "hepatitis-b-immunity",
-    label: "Upload Hepatitis B immunity (titer result)",
-    placeholder: "Upload Hepatitis B immunity (titer result)",
-    requiresExpiry: false
-  },
+  // {
+  //   id: "hepatitis-b-immunity",
+  //   label: "Upload Hepatitis B immunity (titer result)",
+  //   placeholder: "Upload Hepatitis B immunity (titer result)",
+  //   requiresExpiry: false
+  // },
   {
     id: "tb-test",
     label: "Upload tb test result.",
