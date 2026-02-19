@@ -422,10 +422,9 @@ export default function DocumentUploadStep({ onSuccess }: DocumentUploadStepProp
                     <SelectValue placeholder="Select Relationship" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
                     <SelectItem value="colleague">Colleague</SelectItem>
-                    <SelectItem value="family">Family</SelectItem>
-                    <SelectItem value="friend">Friend</SelectItem>
-                    <SelectItem value="professor">Professor</SelectItem>
                     <SelectItem value="others">Others</SelectItem>
                   </SelectContent>
                 </Select>
