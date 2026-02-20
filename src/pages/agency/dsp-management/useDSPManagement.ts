@@ -3,7 +3,6 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/redux/store";
 import {
   listEmployees,
-  getEmployeeTrainings,
   searchEmployees,
   updateEmployee,
   type Employee,
@@ -242,12 +241,12 @@ export function useDSPDetails(dspId: string | null) {
       setIsLoading(true);
       setError(null);
 
-      const [trainingsData, shiftsData] = await Promise.all([
-        getEmployeeTrainings(dspId),
-        listShifts({ employeeId: dspId, agencyId, client: true, employee: true }),
+      const [ shiftsData ] = await Promise.all([
+        // getEmployeeTrainings(dspId),
+        listShifts({ employeeId: dspId, agencyId, client: true }),
       ]);
 
-      setTrainings(trainingsData);
+      // setTrainings(trainingsData);
       setShifts(shiftsData.shifts || []);
     } catch (err: any) {
       console.error("Failed to fetch DSP details:", err);
@@ -267,47 +266,6 @@ export function useDSPDetails(dspId: string | null) {
     isLoading,
     error,
     refetch: fetchDetails,
-  };
-}
-
-/**
- * Hook to manage DSP trainings
- */
-export function useDSPTrainings(dspId: string | null) {
-  const [trainings, setTrainings] = useState<EmployeeTraining[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchTrainings = useCallback(async () => {
-    if (!dspId) return;
-
-    try {
-      setIsLoading(true);
-      setError(null);
-      const data = await getEmployeeTrainings(dspId);
-      setTrainings(data);
-    } catch (err: any) {
-      console.error("Failed to fetch trainings:", err);
-      setError(err.message || "Failed to load trainings");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [dspId]);
-
-  useEffect(() => {
-    fetchTrainings();
-  }, [fetchTrainings]);
-
-  const completedCount = trainings.filter(t => t.status === 'completed').length;
-  const totalCount = trainings.length;
-
-  return {
-    trainings,
-    completedCount,
-    totalCount,
-    isLoading,
-    error,
-    refetch: fetchTrainings,
   };
 }
 

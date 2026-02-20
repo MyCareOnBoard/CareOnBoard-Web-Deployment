@@ -8,7 +8,7 @@ import {
 	DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { updateCurrentEmployee, type UpdateCurrentEmployeeRequest } from "@/lib/api/employees";
+import { updateEmployee, type UpdateEmployeeRequest } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import type { DSP } from "../types";
 
@@ -56,7 +56,7 @@ export function EditProfileModal({
 	const handleSave = async () => {
 		setSaving(true);
 		try {
-			const payload: UpdateCurrentEmployeeRequest = {};
+			const payload: UpdateEmployeeRequest = {};
 			if (form.fullName && form.fullName !== dsp.fullName) payload.fullName = form.fullName;
 			if (form.phone && form.phone !== dsp.phoneNumber) payload.phoneNumber = form.phone;
 			if (form.address && form.address !== dsp.address) payload.address = form.address;
@@ -69,7 +69,7 @@ export function EditProfileModal({
 				return;
 			}
 
-			await updateCurrentEmployee(payload);
+			await updateEmployee(dsp.id, payload);
 
 			toast({
 				title: "Profile Updated",

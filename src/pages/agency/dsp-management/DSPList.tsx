@@ -237,7 +237,7 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                         onClick={() => onSelectDsp(dsp)}
                         className="px-6 py-2 bg-[#00B4B8] text-white text-sm rounded-full hover:bg-[#00A0A4] transition-colors cursor-pointer"
                       >
-                        Assign Shift
+                        Details
                       </button>
                     ) : (
                       <button
