@@ -8,7 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ActivityTab } from "./components/ActivityTab";
 import { ShiftsTab } from "./components/ShiftsTab";
 import { ProfileTab } from "./components/ProfileTab";
-import { formatShiftLocation } from "@/lib/api/shifts";
+import { EditProfileModal } from "./components/EditProfileModal";
+import { RequestDocumentModal } from "./components/RequestDocumentModal";
 
 interface DSPProfileProps {
   dsp: DSP;
@@ -18,6 +19,9 @@ interface DSPProfileProps {
 
 export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
   const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile">("Activity");
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showRequestDocument, setShowRequestDocument] = useState(false);
+  const [currentDsp, setCurrentDsp] = useState<DSP>(dsp);
   const { toast } = useToast();
 
   const { shifts, isLoading: detailsLoading } = useDSPDetails(dsp.id);
@@ -40,25 +44,18 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
       setDocuments(docs);
     } catch (error) {
       console.error('Failed to fetch documents:', error);
+      setDocuments([]);
     } finally {
       setDocumentsLoading(false);
     }
   };
 
-  const handleRequestDocument = async () => {
-    try {
-      await requestEmployeeDocument(dsp.id, 'general', 'Please upload required documents');
-      toast({
-        title: "Document Request Sent",
-        description: `A document request has been sent to ${dsp.fullName}`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send document request",
-        variant: "destructive",
-      });
-    }
+  const handleRequestDocument = () => {
+    setShowRequestDocument(true);
+  };
+
+  const handleProfileUpdated = (updated: Partial<DSP>) => {
+    setCurrentDsp((prev) => ({ ...prev, ...updated }));
   };
 
   const getDocumentStatusColor = (status: string) => {
@@ -69,15 +66,41 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
         return 'bg-red-100 text-red-700';
       case 'expiring-soon':
         return 'bg-orange-100 text-orange-700';
+      case 'unavailable':
+        return 'bg-gray-200 text-gray-600';
       default:
         return 'bg-gray-100 text-gray-700';
     }
   };
 
-  const getDocumentActionButton = (status: string) => {
-    if (status === 'expired' || status === 'expiring-soon') {
+  const handleSendDocumentAlert = async (doc: EmployeeDocument) => {
+    try {
+      await requestEmployeeDocument(
+        currentDsp.id,
+        doc.documentType,
+        `Your document "${doc.documentName}" is ${doc.status === 'expired' ? 'expired' : 'expiring soon'}. Please upload an updated version.`
+      );
+      toast({
+        title: "Alert Sent",
+        description: `An alert has been sent to ${currentDsp.fullName} about their ${doc.status} document.`,
+      });
+    } catch (error) {
+      console.error('Failed to send document alert:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send alert. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getDocumentActionButton = (status: string, doc?: EmployeeDocument) => {
+    if ((status === 'expired' || status === 'expiring-soon') && doc) {
       return (
-        <button className="px-4 py-1 bg-red-500 text-white text-xs rounded-full hover:bg-red-600 transition-colors cursor-pointer">
+        <button
+          onClick={() => handleSendDocumentAlert(doc)}
+          className="px-4 py-1 bg-red-500 text-white text-xs rounded-full hover:bg-red-600 transition-colors cursor-pointer"
+        >
           Send Alert
         </button>
       );
@@ -125,23 +148,23 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
           <Avatar className="h-24 w-24 border-2 border-gray-200">
-            <AvatarImage src={dsp.profilePicture} alt={dsp.fullName} />
+            <AvatarImage src={currentDsp.profilePicture} alt={currentDsp.fullName} />
             <AvatarFallback className="bg-gray-200 text-gray-700 text-lg font-medium">
-              {getInitials(dsp.fullName)}
+              {getInitials(currentDsp.fullName)}
             </AvatarFallback>
           </Avatar>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl font-bold text-gray-900">{dsp.fullName}</h2>
+              <h2 className="text-xl font-bold text-gray-900">{currentDsp.fullName}</h2>
               <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                dsp.status === "active" 
+                currentDsp.status === "active" 
                   ? "bg-green-100 text-green-700" 
                   : "bg-gray-200 text-gray-700"
               }`}>
-                {dsp.status}
+                {currentDsp.status}
               </span>
             </div>
-            <p className="text-sm text-gray-600">{dsp.role} · {dsp.age} yrs old</p>
+            <p className="text-sm text-gray-600">{currentDsp.role} · {currentDsp.age} yrs old</p>
             <div className="flex items-center gap-2 mt-3">
               <button
                 onClick={onChatClick}
@@ -151,7 +174,8 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
                 Chat
               </button>
               <button
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-full hover:bg-gray-50 transition-colors"
+                onClick={() => setShowEditProfile(true)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-full hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -200,8 +224,8 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
       {/* Tab Content */}
       {activeTab === "Activity" && (
         <ActivityTab
-          dspId={dsp.id}
-          dspName={dsp.fullName}
+          dspId={currentDsp.id}
+          dspName={currentDsp.fullName}
           detailsLoading={detailsLoading}
           trainingsLoading={trainingsLoading}
           documentsLoading={documentsLoading}
@@ -216,21 +240,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
 
       {activeTab === "Shifts" && (
         <ShiftsTab
-          shifts={shifts.map(shift => ({
-            id: shift.id,
-            employeeId: shift.employee?.id || '',
-            clientId: shift.client?.id || '',
-            clientName: shift.client ? `${shift.client.firstName || ''} ${shift.client.lastName || ''}`.trim() || 'Unknown Client' : 'Unknown Client',
-            clientImage: shift.client?.profileImage,
-            date: shift.date,
-            startTime: shift.startTime,
-            endTime: shift.endTime || '',
-            location: formatShiftLocation(shift.location),
-            duration: shift.sessionDuration || '',
-            status: shift.status,
-            clockedInAt: shift.clockedInAt,
-            clockedOutAt: shift.clockedOutAt,
-          }))}
+          shifts={shifts}
           isLoading={detailsLoading}
           getInitials={getInitials}
         />
@@ -238,11 +248,27 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
 
       {activeTab === "Profile" && (
         <ProfileTab
-          dsp={dsp}
+          dsp={currentDsp}
           onDeactivate={handleDeactivateUser}
           onActivate={handleActivateUser}
         />
       )}
+
+      {/* Modals */}
+      <EditProfileModal
+        open={showEditProfile}
+        onClose={() => setShowEditProfile(false)}
+        dsp={currentDsp}
+        onUpdated={handleProfileUpdated}
+      />
+
+      <RequestDocumentModal
+        open={showRequestDocument}
+        onClose={() => setShowRequestDocument(false)}
+        employeeId={currentDsp.id}
+        employeeName={currentDsp.fullName}
+        onRequested={fetchDocuments}
+      />
     </div>
   );
 }

@@ -12,7 +12,7 @@ export interface EmployeeDocument {
   documentName: string;
   fileName?: string;
   fileUrl?: string;
-  status: 'available' | 'expired' | 'expiring-soon' | 'pending';
+  status: 'available' | 'expired' | 'expiring-soon' | 'pending' | 'unavailable';
   uploadedAt?: string;
   expiryDate?: string;
   verifiedAt?: string;
@@ -171,6 +171,10 @@ export async function deleteEmployeeDocument(employeeId: string, documentId: str
 /**
  * Request new document from employee
  * Endpoint: POST /employees/:employeeId/documents/request
+ * 
+ * ⚠️ NOTE: This endpoint is NOT yet implemented on the backend.
+ * Backend team needs to add: POST /employees/:employeeId/documents/request
+ * Expected payload: { documentType: string, message?: string }
  */
 export async function requestEmployeeDocument(employeeId: string, documentType: string, message?: string): Promise<void> {
   try {
@@ -180,6 +184,10 @@ export async function requestEmployeeDocument(employeeId: string, documentType: 
     });
   } catch (err: any) {
     console.error('requestEmployeeDocument error:', err);
+    // Provide clear message if endpoint doesn't exist (404)
+    if (err.response?.status === 404) {
+      throw new Error('Document request feature is not yet available. The backend endpoint needs to be implemented.');
+    }
     throw new Error(err.response?.data?.message || err.message || 'Failed to request employee document');
   }
 }
