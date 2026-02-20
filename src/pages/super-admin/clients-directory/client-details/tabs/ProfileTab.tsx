@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CalendarDays, Mail, MapPin, Phone, User, AlertCircle, Loader2, Trash2, CheckCircle } from "lucide-react";
+import { CalendarDays, Layers, Mail, MapPin, Phone, User, AlertCircle, Loader2, Trash2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Client, updateClient, deleteClient } from "@/lib/api/clients";
 import { useToast } from "@/hooks/use-toast";
@@ -226,6 +226,12 @@ export function ProfileTab({
           icon={<CalendarDays className="w-4 h-4" />}
           label="Joining Date"
           value={formatDate(client.createdAt)}
+        />
+        <DetailRow
+          icon={<Layers className="w-4 h-4" />}
+          label="Tier"
+          value={client.tier ? `Tier ${client.tier}` : "Not specified"}
+          valueClassName={!client.tier ? "text-[#b2b2b3]" : ""}
         />
         <div className="bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] flex gap-[12px] items-start pl-[8px] pr-[16px] py-[8px] rounded-[20px] w-full">
           <div className="backdrop-blur-sm border border-[#808081] rounded-[200px] p-[10px] shrink-0 flex items-center justify-center">

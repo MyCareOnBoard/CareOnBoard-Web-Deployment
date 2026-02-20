@@ -42,7 +42,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             medicaidId: client.medicaidId || "",
             dddId: client.dddId || "",
             ssn: client.ssn || "",
-            nursingLevel: client.nursingLevel,
+            tier: client.tier,
             address: client.primaryAddress?.address || client.address || "",
             location: client.primaryAddress?.location || client.location,
             countyState: client.primaryAddress?.countyState || client.countyState || "",

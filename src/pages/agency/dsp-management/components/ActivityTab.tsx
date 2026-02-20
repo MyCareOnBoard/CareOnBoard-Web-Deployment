@@ -15,7 +15,7 @@ interface ActivityTabProps {
   documents: EmployeeDocument[];
   onRequestDocument: () => void;
   getDocumentStatusColor: (status: string) => string;
-  getDocumentActionButton: (status: string) => React.ReactNode;
+  getDocumentActionButton: (status: string, doc?: EmployeeDocument) => React.ReactNode;
 }
 
 export function ActivityTab({

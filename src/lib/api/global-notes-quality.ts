@@ -59,3 +59,21 @@ export async function listGlobalNotesQualityUsers(): Promise<GlobalNotesQualityU
   );
   return response.data;
 }
+
+export type AgencyNoteDetail = {
+  id: string;
+  [key: string]: unknown;
+};
+
+export type AgencyNotesResponse = {
+  success: boolean;
+  notes: AgencyNoteDetail[];
+  totalNotes: number;
+};
+
+export async function getAgencyNotes(agencyId: string): Promise<AgencyNotesResponse> {
+  const response = await axiosClient.get<AgencyNotesResponse>(
+    `/agencyManagement/global-notes-quality/agencies/${agencyId}/notes`,
+  );
+  return response.data;
+}

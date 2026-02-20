@@ -14,6 +14,7 @@ import {Employee, UserType} from "@/utils/auth/types/user.types";
 import type {Audience, MetricKey, QualityMetric, RowItem} from "./types";
 import {GlobalNotesAiView} from "./components/GlobalNotesAiView";
 import {GlobalNotesTotalsView} from "./components/GlobalNotesTotalsView";
+import {AgencyNotesDetailModal} from "./components/AgencyNotesDetailModal";
 
 export default function GlobalNotesQualityPage() {
 	const [view, setView] = useState<"overview" | "list">("overview");
@@ -36,6 +37,9 @@ export default function GlobalNotesQualityPage() {
 	const [usersData, setUsersData] = useState<RowItem[]>([]);
 	const [usersLoading, setUsersLoading] = useState(false);
 	const [isUsersApiAvailable, setIsUsersApiAvailable] = useState<boolean | null>(null);
+
+	const [detailModalOpen, setDetailModalOpen] = useState(false);
+	const [selectedAgency, setSelectedAgency] = useState<RowItem | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -325,8 +329,21 @@ export default function GlobalNotesQualityPage() {
 					totalPages={totalPages}
 					onPrevPage={() => setCurrentPage((p) => Math.max(1, p - 1))}
 					onNextPage={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+					onViewDetails={(row) => {
+						setSelectedAgency(row);
+						setDetailModalOpen(true);
+					}}
 				/>
 			)}
+
+			<AgencyNotesDetailModal
+				open={detailModalOpen}
+				onClose={() => {
+					setDetailModalOpen(false);
+					setSelectedAgency(null);
+				}}
+				agency={selectedAgency}
+			/>
 
 			<Dialog
 				open={aiThinking}

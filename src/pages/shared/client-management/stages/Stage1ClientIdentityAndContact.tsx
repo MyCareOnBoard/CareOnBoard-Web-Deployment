@@ -300,18 +300,20 @@ export function Stage1ClientIdentityAndContact({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Nursing Level (optional)</label>
+            <label className="text-[12px] font-normal text-[#10141a]">Tier</label>
             <Select
-              value={stage1.nursingLevel}
-              onValueChange={(v) => updateStage1({ nursingLevel: v })}
+              value={stage1.tier}
+              onValueChange={(v) => updateStage1({ tier: v })}
             >
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-                <SelectValue placeholder="Select level" />
+                <SelectValue placeholder="Select tier" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="level-1">Level 1</SelectItem>
-                <SelectItem value="level-2">Level 2</SelectItem>
-                <SelectItem value="level-3">Level 3</SelectItem>
+                <SelectItem value="A">Tier A</SelectItem>
+                <SelectItem value="B">Tier B</SelectItem>
+                <SelectItem value="C">Tier C</SelectItem>
+                <SelectItem value="D">Tier D</SelectItem>
+                <SelectItem value="E">Tier E</SelectItem>
               </SelectContent>
             </Select>
           </div>

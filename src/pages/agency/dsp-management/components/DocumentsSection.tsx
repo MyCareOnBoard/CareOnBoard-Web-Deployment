@@ -6,7 +6,7 @@ interface DocumentsSectionProps {
   isLoading: boolean;
   onRequestDocument: () => void;
   getDocumentStatusColor: (status: string) => string;
-  getDocumentActionButton: (status: string) => React.ReactNode;
+  getDocumentActionButton: (status: string, doc?: EmployeeDocument) => React.ReactNode;
 }
 
 export function DocumentsSection({
@@ -55,9 +55,9 @@ export function DocumentsSection({
               </div>
               <div className="flex items-center gap-3">
                 <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getDocumentStatusColor(doc.status)}`}>
-                  {doc.status === 'expiring-soon' ? 'Expiring Soon' : doc.status}
+                  {doc.status === 'expiring-soon' ? 'Expiring Soon' : doc.status === 'unavailable' ? 'Unavailable' : doc.status}
                 </span>
-                {getDocumentActionButton(doc.status)}
+                {getDocumentActionButton(doc.status, doc)}
               </div>
             </div>
           ))

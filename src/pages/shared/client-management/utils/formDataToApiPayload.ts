@@ -70,7 +70,7 @@ export function formDataToApiPayload(
     medicaidId: s1.medicaidId || undefined,
     dddId: s1.dddId || undefined,
     ssn: s1.ssn || undefined,
-    nursingLevel: s1.nursingLevel || undefined,
+    tier: s1.tier || undefined,
     guardianName: s2.guardianName || undefined,
     guardianRelationship: s2.guardianRelationship || undefined,
     guardianEmail: s2.guardianEmail || undefined,
