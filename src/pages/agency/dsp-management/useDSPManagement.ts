@@ -207,7 +207,7 @@ export function useDSPDetails(dspId: string | null) {
       const [employeeData, trainingsData, shiftsData] = await Promise.all([
         getEmployeeById(dspId),
         getEmployeeTrainings(dspId),
-        listShifts({ employeeId: dspId, agencyId }),
+        listShifts({ employeeId: dspId, agencyId, client: true, employee: true }),
       ]);
 
       setDsp(transformEmployeeToDSP(employeeData));
@@ -283,6 +283,9 @@ export function useUpdateDSPStatus() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const user = useSelector((state: RootState) => state.auth.user);
+  const agencyId = user?.agencyId;
+
   const updateStatus = useCallback(async (
     dspId: string,
     status: 'active' | 'inactive' | 'suspended'
@@ -290,7 +293,7 @@ export function useUpdateDSPStatus() {
     try {
       setIsUpdating(true);
       setError(null);
-      await updateEmployee(dspId, { status });
+      await updateEmployee(dspId, { status }, agencyId);
       return true;
     } catch (err: any) {
       console.error("Failed to update DSP status:", err);
@@ -299,7 +302,7 @@ export function useUpdateDSPStatus() {
     } finally {
       setIsUpdating(false);
     }
-  }, []);
+  }, [agencyId]);
 
   return {
     updateStatus,
