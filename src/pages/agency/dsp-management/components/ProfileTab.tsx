@@ -60,7 +60,11 @@ export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
             </div>
             <p className="text-sm text-gray-600">Address</p>
           </div>
-          <p className="text-sm text-gray-900 font-normal">{dsp.address}</p>
+          <p className="text-sm text-gray-900 font-normal">
+            {typeof dsp.address === "object" && dsp.address !== null
+              ? [(dsp.address as any).address, (dsp.address as any).city, (dsp.address as any).zipCode].filter(Boolean).join(", ") || "N/A"
+              : dsp.address || "N/A"}
+          </p>
         </div>
 
         {/* Joining Date */}

@@ -40,6 +40,7 @@ import Expenses from "@/pages/userPanel/expenses";
 import UserPanelCommunityInclusionPage from "@/pages/userPanel/community-inclusion";
 import AgencyDashboardPage from "@/pages/agency/dashboard";
 import DSPManagementPage from "@/pages/agency/dsp-management";
+import DSPProfilePage from "@/pages/agency/dsp-management/DSPProfilePage";
 import ClientsPage from "@/pages/agency/clients-management";
 import ClientDetailsPage from "@/pages/agency/client-details";
 import AgencyAddClientPage from "@/pages/shared/client-management/wrappers/AgencyAddClientPage";
@@ -216,6 +217,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.dspManagement,
                 Component: DSPManagementPage,
+            },
+            {
+                path: Routes.agency.dspProfile,
+                Component: DSPProfilePage,
             },
             {
                 path: Routes.agency.clients,

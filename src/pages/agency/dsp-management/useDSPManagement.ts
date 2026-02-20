@@ -55,13 +55,13 @@ function transformEmployeeToDSP(employee: Employee): DSP {
     profilePicture: employee.profilePicture || "",
     tagId: employee.tagId || "",
     role: employee.role || "DSP",
-    address: employee.address || "",
     phoneNumber: employee.phoneNumber || "",
     emergencyContact: employee.emergencyContact || {
       name: "",
       relationship: "",
       phone: ""
     },
+    address: normalizeAddress(employee.address),
     status: normalizedStatus,
     createdAt: employee.createdAt,
     updatedAt: employee.updatedAt,
@@ -71,6 +71,14 @@ function transformEmployeeToDSP(employee: Employee): DSP {
     completedTrainings: 0,
     totalTrainings: 0,
   };
+}
+
+function normalizeAddress(address: any): string {
+  if (!address) return "";
+  if (typeof address === "string") return address;
+  // API returns address as an object {address, city, zipCode, latlon}
+  const parts = [address.address, address.city, address.zipCode].filter(Boolean);
+  return parts.join(", ");
 }
 
 function isDSPEmployee(employee: Employee): boolean {

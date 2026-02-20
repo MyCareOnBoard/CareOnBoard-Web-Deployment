@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DSP } from "./types";
+import { Routes } from "@/routes/constants";
 
 interface DSPStats {
   active: number;
@@ -15,10 +17,13 @@ interface DSPListProps {
   dsps: DSP[];
   stats: DSPStats;
   isLoading?: boolean;
-  onSelectDsp: (dsp: DSP) => void;
 }
 
-export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
+export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
+  const navigate = useNavigate();
+  const navigateToProfile = (dsp: DSP) => {
+    navigate(Routes.agency.dspProfile.replace(":dspId", dsp.id));
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "All">("active");
   const [page, setPage] = useState(1);
@@ -199,7 +204,7 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                 >
                   <div className="flex items-center gap-4">
                     <button
-                      onClick={() => onSelectDsp(dsp)}
+                      onClick={() => navigateToProfile(dsp)}
                       className="flex items-center gap-4 cursor-pointer"
                     >
                       <Avatar className="h-12 w-12 cursor-pointer">
@@ -208,7 +213,7 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                           {getInitials(dsp.fullName)}
                         </AvatarFallback>
                       </Avatar>
-                      <div onClick={() => onSelectDsp(dsp)} className="text-left cursor-pointer">
+                      <div onClick={() => navigateToProfile(dsp)} className="text-left cursor-pointer">
                         <p className="font-semibold text-gray-900 text-sm">{dsp.fullName}</p>
                         <p className="text-xs text-gray-500">DSP</p>
                       </div>
@@ -234,7 +239,7 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                   </div>
                     {dsp.status === "active" ? (
                       <button
-                        onClick={() => onSelectDsp(dsp)}
+                        onClick={() => navigateToProfile(dsp)}
                         className="px-6 py-2 bg-[#00B4B8] text-white text-sm rounded-full hover:bg-[#00A0A4] transition-colors cursor-pointer"
                       >
                         Details

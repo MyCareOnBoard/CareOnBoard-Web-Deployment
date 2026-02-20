@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronLeft, MessageSquare } from "lucide-react";
 import { DSP } from "./types";
-import { useDSPDetails, useDSPTrainings, useUpdateDSPStatus } from "./useDSPManagement";
+import { useDSPDetails,  useUpdateDSPStatus } from "./useDSPManagement";
 import { Routes } from "@/routes/constants";
 import { listEmployeeDocuments, EmployeeDocument, requestEmployeeDocument } from "@/lib/api/employee-documents";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +27,7 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
 
   const navigate = useNavigate();
   const { shifts, isLoading: detailsLoading } = useDSPDetails(dsp.id);
-  const { completedCount, totalCount, isLoading: trainingsLoading } = useDSPTrainings(dsp.id);
+  // const { completedCount, totalCount, isLoading: trainingsLoading } = useDSPTrainings(dsp.id);
   const { updateStatus } = useUpdateDSPStatus();
   
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
@@ -230,10 +230,10 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
           dspName={currentDsp.fullName}
           shifts={shifts}
           detailsLoading={detailsLoading}
-          trainingsLoading={trainingsLoading}
+          // trainingsLoading={trainingsLoading}
           documentsLoading={documentsLoading}
-          totalCount={totalCount}
-          completedCount={completedCount}
+          // totalCount={totalCount}
+          // completedCount={completedCount}
           documents={documents}
           onRequestDocument={handleRequestDocument}
           getDocumentStatusColor={getDocumentStatusColor}
