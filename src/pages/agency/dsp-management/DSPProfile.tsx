@@ -193,7 +193,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
             className={`px-6 py-2 rounded-full text-sm font-medium border transition-colors ${
               activeTab === "Activity"
                 ? "bg-gray-900 text-white"
-                : "text-gray-600 hover:bg-gray-100"
+                : "text-gray-600 hover:bg-gray-100 hover:cursor-pointer"
             }`}
           >
             Activity
@@ -203,7 +203,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
             className={`px-6 py-2 rounded-full border text-sm font-medium transition-colors ${
               activeTab === "Shifts"
                 ? "bg-gray-900 text-white"
-                : " text-gray-600 hover:bg-gray-100"
+                : " text-gray-600 hover:bg-gray-100 hover:cursor-pointer"
             }`}
           >
             Shifts
@@ -213,7 +213,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
             className={`px-6 py-2 rounded-full text-sm border font-medium transition-colors ${
               activeTab === "Profile"
                 ? "bg-gray-900 text-white"
-                : " text-gray-600 hover:bg-gray-100"
+                : " text-gray-600 hover:bg-gray-100 hover:cursor-pointer"
             }`}
           >
             Profile
