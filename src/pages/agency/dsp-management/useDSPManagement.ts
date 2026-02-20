@@ -5,7 +5,6 @@ import {
   listEmployees,
   getEmployeeTrainings,
   searchEmployees,
-  getEmployeeStats,
   updateEmployee,
   type Employee,
   type EmployeeStats,
@@ -37,6 +36,9 @@ function transformEmployeeToDSP(employee: Employee): DSP {
   let normalizedStatus: "active" | "inactive" | "pending" | "suspended" = "pending";
   if (employee.status) {
     const statusLower = employee.status.toLowerCase();
+    if (statusLower === "terminated") {
+      normalizedStatus = "inactive";
+    }
     if (statusLower === "active" || statusLower === "inactive" || statusLower === "pending" || statusLower === "suspended") {
       normalizedStatus = statusLower as "active" | "inactive" | "pending" | "suspended";
     }
@@ -72,6 +74,34 @@ function transformEmployeeToDSP(employee: Employee): DSP {
   };
 }
 
+function isDSPEmployee(employee: Employee): boolean {
+  const normalizedRole = employee.role?.toLowerCase();
+  if (!normalizedRole) return true;
+  return normalizedRole === "dsp";
+}
+
+function computeDSPStats(dsps: DSP[]): EmployeeStats {
+  const active = dsps.filter((dsp) => dsp.status === "active").length;
+  const inactive = dsps.filter(
+    (dsp) => dsp.status === "inactive" || dsp.status === "suspended" || dsp.status === "pending"
+  ).length;
+  return {
+    active,
+    inactive,
+    total: dsps.length,
+  };
+}
+
+function uniqueEmployeesById(employees: Employee[]): Employee[] {
+  const employeesMap = new Map<string, Employee>();
+  employees.forEach((employee) => {
+    if (!employeesMap.has(employee.id)) {
+      employeesMap.set(employee.id, employee);
+    }
+  });
+  return Array.from(employeesMap.values());
+}
+
 /**
  * Hook to manage DSP list data
  */
@@ -99,38 +129,36 @@ export function useDSPList() {
       setIsLoading(true);
       setError(null);
 
-      // Fetch employees - stats endpoint may not be available yet
-      const employeesResponse = await listEmployees({
-        agencyId,
-        // Note: Backend may not support role filtering yet
-        limit: 100
-      });
+      const pageSize = 100;
+      let page = 1;
+      let total = 0;
+      let allEmployees: Employee[] = [];
 
-      const transformedDSPs = employeesResponse.employees.map((employee) => {
+      do {
+        const employeesResponse = await listEmployees({
+          agencyId,
+          limit: pageSize,
+          page,
+        });
+
+        const batch = employeesResponse.employees || [];
+        allEmployees = allEmployees.concat(batch);
+        total = employeesResponse.total || allEmployees.length;
+
+        if (batch.length === 0) {
+          break;
+        }
+
+        page += 1;
+      } while (allEmployees.length < total && page <= 20);
+
+      const employees = uniqueEmployeesById(allEmployees).filter(isDSPEmployee);
+
+      const transformedDSPs = employees.map((employee) => {
         return transformEmployeeToDSP(employee);
       });
       setDsps(transformedDSPs);
-
-      // Try to fetch stats, but don't fail if endpoint doesn't exist
-      try {
-        const statsResponse = await getEmployeeStats(agencyId);
-        setStats({
-          active: statsResponse.active,
-          inactive: statsResponse.inactive,
-          total: statsResponse.total
-        });
-      } catch (statsErr) {
-        console.warn('⚠️ Stats endpoint not available, using defaults:', statsErr);
-        // Calculate stats from employees list
-        // Match the filtering logic in DSPList.tsx
-        const active = transformedDSPs.filter(d => d.status === 'active').length;
-        const inactive = transformedDSPs.filter(d => d.status === 'inactive' || d.status === 'suspended').length;
-        setStats({
-          active,
-          inactive,
-          total: transformedDSPs.length
-        });
-      }
+      setStats(computeDSPStats(transformedDSPs));
     } catch (err: any) {
       console.error("❌ Failed to fetch DSPs:", err);
       console.error("❌ Error details:", {
@@ -176,7 +204,9 @@ export function useDSPSearch() {
     try {
       setIsSearching(true);
       const employees = await searchEmployees(query, agencyId);
-      const transformedDSPs = employees.map(transformEmployeeToDSP);
+      const transformedDSPs = employees
+        .filter(isDSPEmployee)
+        .map(transformEmployeeToDSP);
       setResults(transformedDSPs);
     } catch (err) {
       console.error("Search failed:", err);

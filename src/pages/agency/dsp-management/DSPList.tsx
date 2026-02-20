@@ -32,7 +32,7 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
     const matchesSearch = dsp.fullName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "All" || 
       (statusFilter === "active" && dsp.status === "active") ||
-      (statusFilter === "inactive" && (dsp.status === "inactive" || dsp.status === "suspended"));
+      (statusFilter === "inactive" && (dsp.status === "inactive" || dsp.status === "suspended" || dsp.status === "pending"));
     return matchesSearch && matchesStatus;
   });
 
