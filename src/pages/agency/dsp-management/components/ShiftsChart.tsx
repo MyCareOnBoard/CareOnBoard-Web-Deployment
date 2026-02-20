@@ -195,8 +195,8 @@ export function ShiftsChart({ shifts, isLoading }: ShiftsChartProps) {
               onClick={() => setFilter(opt.key)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                 filter === opt.key
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                  ? "bg-teal-500 text-white"
+                  : "text-gray-500 hover:text-teal-600 hover:bg-teal-50"
               }`}
             >
               {opt.label}
@@ -222,7 +222,7 @@ export function ShiftsChart({ shifts, isLoading }: ShiftsChartProps) {
       <div className="min-h-48">
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#00B4B8]" />
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-500" />
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={220}>

@@ -168,14 +168,14 @@ export function EditProfileModal({
 					<button
 						onClick={onClose}
 						disabled={saving}
-						className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors"
+						className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-full hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors"
 					>
 						Cancel
 					</button>
 					<button
 						onClick={handleSave}
 						disabled={saving}
-						className="px-5 py-2 text-sm font-medium text-white bg-[#00B4B8] rounded-full hover:bg-[#00A0A4] transition-colors disabled:opacity-50"
+						className="px-5 py-2 text-sm font-medium text-white bg-teal-500 rounded-full hover:bg-teal-600 transition-colors disabled:opacity-50"
 					>
 						{saving ? "Saving..." : "Save Changes"}
 					</button>

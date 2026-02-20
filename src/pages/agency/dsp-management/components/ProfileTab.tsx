@@ -106,7 +106,7 @@ export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
 
     </div>
       <div className="flex items-center gap-4 ">
-        <button className="px-6 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+        <button className="px-6 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors cursor-pointer">
           Report
         </button>
         {dsp.status === "active" ? (

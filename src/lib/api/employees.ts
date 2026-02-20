@@ -322,7 +322,8 @@ export async function deleteEmployee(employeeId: string): Promise<{ success: boo
  */
 export async function getEmployeeTrainings(employeeId: string): Promise<EmployeeTraining[]> {
   try {
-    const response = await axiosClient.get<EmployeeTrainingsResponse>(`/employees/${employeeId}/trainings`);
+    const response = await axiosClient.get<EmployeeTrainingsResponse>(`/employees/trainings/${employeeId}`);
+    console.log('getEmployeeTrainings response:', response.data);
 
     if (!response.data.success) {
       throw new Error('Failed to fetch trainings');
