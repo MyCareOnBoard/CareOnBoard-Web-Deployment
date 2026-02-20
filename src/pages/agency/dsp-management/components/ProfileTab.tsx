@@ -60,7 +60,11 @@ export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
             </div>
             <p className="text-sm text-gray-600">Address</p>
           </div>
-          <p className="text-sm text-gray-900 font-normal">{dsp.address}</p>
+          <p className="text-sm text-gray-900 font-normal">
+            {typeof dsp.address === "object" && dsp.address !== null
+              ? [(dsp.address as any).address, (dsp.address as any).city, (dsp.address as any).zipCode].filter(Boolean).join(", ") || "N/A"
+              : dsp.address || "N/A"}
+          </p>
         </div>
 
         {/* Joining Date */}
@@ -102,7 +106,7 @@ export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
 
     </div>
       <div className="flex items-center gap-4 ">
-        <button className="px-6 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+        <button className="px-6 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors cursor-pointer">
           Report
         </button>
         {dsp.status === "active" ? (

@@ -3,10 +3,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/redux/store";
 import {
   listEmployees,
-  getEmployeeById,
-  getEmployeeTrainings,
   searchEmployees,
-  getEmployeeStats,
   updateEmployee,
   type Employee,
   type EmployeeStats,
@@ -34,6 +31,18 @@ function calculateAge(dateOfBirth?: string): number | undefined {
  * Transform Employee to DSP with computed fields
  */
 function transformEmployeeToDSP(employee: Employee): DSP {
+  // Normalize status to lowercase to handle case sensitivity issues from backend
+  let normalizedStatus: "active" | "inactive" | "pending" | "suspended" = "pending";
+  if (employee.status) {
+    const statusLower = employee.status.toLowerCase();
+    if (statusLower === "terminated") {
+      normalizedStatus = "inactive";
+    }
+    if (statusLower === "active" || statusLower === "inactive" || statusLower === "pending" || statusLower === "suspended") {
+      normalizedStatus = statusLower as "active" | "inactive" | "pending" | "suspended";
+    }
+  }
+
   return {
     id: employee.id,
     userId: employee.userId,
@@ -46,14 +55,14 @@ function transformEmployeeToDSP(employee: Employee): DSP {
     profilePicture: employee.profilePicture || "",
     tagId: employee.tagId || "",
     role: employee.role || "DSP",
-    address: employee.address || "",
     phoneNumber: employee.phoneNumber || "",
     emergencyContact: employee.emergencyContact || {
       name: "",
       relationship: "",
       phone: ""
     },
-    status: (employee.status as "active" | "inactive" | "pending" | "suspended") || "pending",
+    address: normalizeAddress(employee.address),
+    status: normalizedStatus,
     createdAt: employee.createdAt,
     updatedAt: employee.updatedAt,
     // Computed fields for UI
@@ -62,6 +71,42 @@ function transformEmployeeToDSP(employee: Employee): DSP {
     completedTrainings: 0,
     totalTrainings: 0,
   };
+}
+
+function normalizeAddress(address: any): string {
+  if (!address) return "";
+  if (typeof address === "string") return address;
+  // API returns address as an object {address, city, zipCode, latlon}
+  const parts = [address.address, address.city, address.zipCode].filter(Boolean);
+  return parts.join(", ");
+}
+
+function isDSPEmployee(employee: Employee): boolean {
+  const normalizedRole = employee.role?.toLowerCase();
+  if (!normalizedRole) return true;
+  return normalizedRole === "dsp";
+}
+
+function computeDSPStats(dsps: DSP[]): EmployeeStats {
+  const active = dsps.filter((dsp) => dsp.status === "active").length;
+  const inactive = dsps.filter(
+    (dsp) => dsp.status === "inactive" || dsp.status === "suspended" || dsp.status === "pending"
+  ).length;
+  return {
+    active,
+    inactive,
+    total: dsps.length,
+  };
+}
+
+function uniqueEmployeesById(employees: Employee[]): Employee[] {
+  const employeesMap = new Map<string, Employee>();
+  employees.forEach((employee) => {
+    if (!employeesMap.has(employee.id)) {
+      employeesMap.set(employee.id, employee);
+    }
+  });
+  return Array.from(employeesMap.values());
 }
 
 /**
@@ -91,37 +136,36 @@ export function useDSPList() {
       setIsLoading(true);
       setError(null);
 
-      // Fetch employees - stats endpoint may not be available yet
-      const employeesResponse = await listEmployees({
-        agencyId,
-        // Note: Backend may not support role filtering yet
-        limit: 100
-      });
+      const pageSize = 100;
+      let page = 1;
+      let total = 0;
+      let allEmployees: Employee[] = [];
 
-      const transformedDSPs = employeesResponse.employees.map((employee) => {
+      do {
+        const employeesResponse = await listEmployees({
+          agencyId,
+          limit: pageSize,
+          page,
+        });
+
+        const batch = employeesResponse.employees || [];
+        allEmployees = allEmployees.concat(batch);
+        total = employeesResponse.total || allEmployees.length;
+
+        if (batch.length === 0) {
+          break;
+        }
+
+        page += 1;
+      } while (allEmployees.length < total && page <= 20);
+
+      const employees = uniqueEmployeesById(allEmployees).filter(isDSPEmployee);
+
+      const transformedDSPs = employees.map((employee) => {
         return transformEmployeeToDSP(employee);
       });
       setDsps(transformedDSPs);
-
-      // Try to fetch stats, but don't fail if endpoint doesn't exist
-      try {
-        const statsResponse = await getEmployeeStats(agencyId);
-        setStats({
-          active: statsResponse.active,
-          inactive: statsResponse.inactive,
-          total: statsResponse.total
-        });
-      } catch (statsErr) {
-        console.warn('⚠️ Stats endpoint not available, using defaults:', statsErr);
-        // Calculate stats from employees list
-        const active = transformedDSPs.filter(d => d.status === 'active').length;
-        const inactive = transformedDSPs.filter(d => d.status !== 'active').length;
-        setStats({
-          active,
-          inactive,
-          total: transformedDSPs.length
-        });
-      }
+      setStats(computeDSPStats(transformedDSPs));
     } catch (err: any) {
       console.error("❌ Failed to fetch DSPs:", err);
       console.error("❌ Error details:", {
@@ -167,7 +211,9 @@ export function useDSPSearch() {
     try {
       setIsSearching(true);
       const employees = await searchEmployees(query, agencyId);
-      const transformedDSPs = employees.map(transformEmployeeToDSP);
+      const transformedDSPs = employees
+        .filter(isDSPEmployee)
+        .map(transformEmployeeToDSP);
       setResults(transformedDSPs);
     } catch (err) {
       console.error("Search failed:", err);
@@ -188,7 +234,6 @@ export function useDSPSearch() {
  * Hook to manage single DSP details
  */
 export function useDSPDetails(dspId: string | null) {
-  const [dsp, setDsp] = useState<DSP | null>(null);
   const [trainings, setTrainings] = useState<EmployeeTraining[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -204,14 +249,12 @@ export function useDSPDetails(dspId: string | null) {
       setIsLoading(true);
       setError(null);
 
-      const [employeeData, trainingsData, shiftsData] = await Promise.all([
-        getEmployeeById(dspId),
-        getEmployeeTrainings(dspId),
-        listShifts({ employeeId: dspId, agencyId, client: true, employee: true }),
+      const [ shiftsData ] = await Promise.all([
+        // getEmployeeTrainings(dspId),
+        listShifts({ employeeId: dspId, agencyId, client: true }),
       ]);
 
-      setDsp(transformEmployeeToDSP(employeeData));
-      setTrainings(trainingsData);
+      // setTrainings(trainingsData);
       setShifts(shiftsData.shifts || []);
     } catch (err: any) {
       console.error("Failed to fetch DSP details:", err);
@@ -226,53 +269,11 @@ export function useDSPDetails(dspId: string | null) {
   }, [fetchDetails]);
 
   return {
-    dsp,
     trainings,
     shifts,
     isLoading,
     error,
     refetch: fetchDetails,
-  };
-}
-
-/**
- * Hook to manage DSP trainings
- */
-export function useDSPTrainings(dspId: string | null) {
-  const [trainings, setTrainings] = useState<EmployeeTraining[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchTrainings = useCallback(async () => {
-    if (!dspId) return;
-
-    try {
-      setIsLoading(true);
-      setError(null);
-      const data = await getEmployeeTrainings(dspId);
-      setTrainings(data);
-    } catch (err: any) {
-      console.error("Failed to fetch trainings:", err);
-      setError(err.message || "Failed to load trainings");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [dspId]);
-
-  useEffect(() => {
-    fetchTrainings();
-  }, [fetchTrainings]);
-
-  const completedCount = trainings.filter(t => t.status === 'completed').length;
-  const totalCount = trainings.length;
-
-  return {
-    trainings,
-    completedCount,
-    totalCount,
-    isLoading,
-    error,
-    refetch: fetchTrainings,
   };
 }
 

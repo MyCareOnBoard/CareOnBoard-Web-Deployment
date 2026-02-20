@@ -194,9 +194,8 @@ export default function ConditionalHireStep({
                       </span>{" "}
                       as a{" "}
                       <span className="font-semibold text-green-700">
-                        Direct Support Professional (DSP)
-                      </span>{" "}
-                      Staff member. Your employment is conditional upon the
+                        Staff member.
+                      </span>{" "} Your employment is conditional upon the
                       successful completion of all pre-employment requirements
                       and state-mandated training.
                     </p>
