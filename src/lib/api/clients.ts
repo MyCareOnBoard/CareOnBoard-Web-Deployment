@@ -42,7 +42,7 @@ export interface Client {
   medicaidId?: string;
   dddId?: string;
   ssn?: string;
-  nursingLevel?: string;
+  tier?: string;
   billingRate?: string;
   services?: ClientService[];
   ispOutcomes?: string;
@@ -300,7 +300,7 @@ export interface CreateClientRequest {
   medicaidId?: string;
   dddId?: string;
   ssn?: string;
-  nursingLevel?: string;
+  tier?: string;
   service?: string;
   serviceCode?: string;
   billingRate?: string;
@@ -405,7 +405,7 @@ export interface UpdateClientRequest {
   medicaidId?: string;
   dddId?: string;
   ssn?: string;
-  nursingLevel?: string;
+  tier?: string;
   service?: string;
   serviceCode?: string;
   billingRate?: string;

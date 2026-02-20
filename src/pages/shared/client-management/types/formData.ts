@@ -7,7 +7,7 @@ export type Stage1ClientIdentityAndContactData = {
     medicaidId: string;
     dddId: string;
     ssn: string;
-    nursingLevel?: string;
+    tier?: string;
     address: string;
     location?: { lat: string; lon: string };
     countyState: string;
@@ -241,7 +241,7 @@ export function createInitialAddClientFormData(): AddClientFormData {
             medicaidId: "",
             dddId: "",
             ssn: "",
-            nursingLevel: undefined,
+            tier: undefined,
             address: "",
             location: undefined,
             countyState: "",
