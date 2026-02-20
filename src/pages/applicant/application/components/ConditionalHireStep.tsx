@@ -297,7 +297,7 @@ export default function ConditionalHireStep({
                         <p className="text-green-700 text-xs">
                           All certificates, verifications, and required
                           documentation must be submitted and approved by
-                          [Agency Name] before your conditional employment
+                          <span className="font-semibold text-green-700">{agency}</span> before your conditional employment
                           status can be converted to regular employment.
                         </p>
                       </div>
