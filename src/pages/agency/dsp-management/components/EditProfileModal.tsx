@@ -10,8 +10,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { updateEmployee, type UpdateEmployeeRequest } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
-import { useSelector } from "react-redux";
-import { RootState } from "@/store/redux/store";
 import type { DSP } from "../types";
 
 interface EditProfileModalProps {
@@ -29,15 +27,12 @@ export function EditProfileModal({
 }: EditProfileModalProps) {
 	const { toast } = useToast();
 	const [saving, setSaving] = useState(false);
-	const user = useSelector((state: RootState) => state.auth.user);
-	const agencyId = user?.agencyId;
 
 	const [form, setForm] = useState({
 		fullName: "",
 		phone: "",
 		address: "",
 		dateOfBirth: "",
-		bio: "",
 	});
 
 	/* Seed form when modal opens / dsp changes */
@@ -50,7 +45,6 @@ export function EditProfileModal({
 				dateOfBirth: dsp.dateOfBirth
 					? dsp.dateOfBirth.slice(0, 10) // yyyy-mm-dd for <input type="date">
 					: "",
-				bio: dsp.bio ?? "",
 			});
 		}
 	}, [open, dsp]);
@@ -68,7 +62,6 @@ export function EditProfileModal({
 			if (form.address && form.address !== dsp.address) payload.address = form.address;
 			if (form.dateOfBirth && form.dateOfBirth !== dsp.dateOfBirth?.slice(0, 10))
 				payload.dateOfBirth = form.dateOfBirth;
-			if (form.bio && form.bio !== dsp.bio) payload.bio = form.bio;
 
 			if (Object.keys(payload).length === 0) {
 				toast({ title: "No changes", description: "Nothing to update." });
@@ -76,7 +69,7 @@ export function EditProfileModal({
 				return;
 			}
 
-			await updateEmployee(dsp.id, payload, agencyId);
+			await updateEmployee(dsp.id, payload);
 
 			toast({
 				title: "Profile Updated",
@@ -167,19 +160,7 @@ export function EditProfileModal({
 						/>
 					</div>
 
-					{/* Bio */}
-					<div className="space-y-1.5">
-						<label className="text-sm font-medium text-gray-700">
-							Bio
-						</label>
-						<textarea
-							value={form.bio}
-							onChange={(e) => handleChange("bio", e.target.value)}
-							placeholder="Enter bio"
-							rows={3}
-							className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
-						/>
-					</div>
+		
 				</div>
 
 				{/* Actions */}
@@ -187,14 +168,14 @@ export function EditProfileModal({
 					<button
 						onClick={onClose}
 						disabled={saving}
-						className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors"
+						className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-full hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors"
 					>
 						Cancel
 					</button>
 					<button
 						onClick={handleSave}
 						disabled={saving}
-						className="px-5 py-2 text-sm font-medium text-white bg-[#00B4B8] rounded-full hover:bg-[#00A0A4] transition-colors disabled:opacity-50"
+						className="px-5 py-2 text-sm font-medium text-white bg-teal-500 rounded-full hover:bg-teal-600 transition-colors disabled:opacity-50"
 					>
 						{saving ? "Saving..." : "Save Changes"}
 					</button>

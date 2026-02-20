@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronLeft, MessageSquare } from "lucide-react";
 import { DSP } from "./types";
-import { useDSPDetails, useDSPTrainings, useUpdateDSPStatus } from "./useDSPManagement";
+import { useDSPDetails,  useUpdateDSPStatus } from "./useDSPManagement";
+import { Routes } from "@/routes/constants";
 import { listEmployeeDocuments, EmployeeDocument, requestEmployeeDocument } from "@/lib/api/employee-documents";
+import { getEmployeeTrainings } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import { ActivityTab } from "./components/ActivityTab";
 import { ShiftsTab } from "./components/ShiftsTab";
@@ -14,19 +17,22 @@ import { RequestDocumentModal } from "./components/RequestDocumentModal";
 interface DSPProfileProps {
   dsp: DSP;
   onBack: () => void;
-  onChatClick: () => void;
 }
 
-export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
+export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
   const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile">("Activity");
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showRequestDocument, setShowRequestDocument] = useState(false);
   const [currentDsp, setCurrentDsp] = useState<DSP>(dsp);
   const { toast } = useToast();
 
+  const navigate = useNavigate();
   const { shifts, isLoading: detailsLoading } = useDSPDetails(dsp.id);
-  const { completedCount, totalCount, isLoading: trainingsLoading } = useDSPTrainings(dsp.id);
   const { updateStatus } = useUpdateDSPStatus();
+
+  const [totalCount, setTotalCount] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [trainingsLoading, setTrainingsLoading] = useState(false);
   
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
@@ -34,8 +40,24 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
   useEffect(() => {
     if (dsp.id) {
       fetchDocuments();
+      fetchTrainings();
     }
   }, [dsp.id]);
+
+  const fetchTrainings = async () => {
+    try {
+      setTrainingsLoading(true);
+      const trainings = await getEmployeeTrainings(dsp.id);
+      setTotalCount(trainings.length);
+      setCompletedCount(trainings.filter((t) => t.status === 'completed').length);
+    } catch (error) {
+      console.error('Failed to fetch trainings:', error);
+      setTotalCount(0);
+      setCompletedCount(0);
+    } finally {
+      setTrainingsLoading(false);
+    }
+  };
 
   const fetchDocuments = async () => {
     try {
@@ -138,7 +160,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
       {/* Back Button */}
       <button
         onClick={onBack}
-        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
+        className="flex items-center gap-2 text-gray-600 hover:text-teal-600 transition-colors mb-4"
       >
         <ChevronLeft className="w-5 h-5" />
         <span className="text-sm font-medium">Back to Directory</span>
@@ -167,15 +189,15 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
             <p className="text-sm text-gray-600">{currentDsp.role} · {currentDsp.age} yrs old</p>
             <div className="flex items-center gap-2 mt-3">
               <button
-                onClick={onChatClick}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm rounded-full hover:bg-gray-800 transition-colors"
+                onClick={() => navigate(Routes.agency.support)}
+                className="flex items-center gap-2 px-4 py-2 bg-teal-500 text-white text-sm rounded-full hover:bg-teal-600 transition-colors"
               >
                 <MessageSquare className="w-4 h-4" />
                 Chat
               </button>
               <button
                 onClick={() => setShowEditProfile(true)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-full hover:bg-gray-50 transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-full hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors cursor-pointer"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -190,30 +212,30 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab("Activity")}
-            className={`px-6 py-2 rounded-full text-sm font-medium border transition-colors ${
+            className={`px-6 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
               activeTab === "Activity"
-                ? "bg-gray-900 text-white"
-                : "text-gray-600 hover:bg-gray-100 hover:cursor-pointer"
+                ? "bg-teal-500 text-white border-teal-500"
+                : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
             }`}
           >
             Activity
           </button>
           <button
             onClick={() => setActiveTab("Shifts")}
-            className={`px-6 py-2 rounded-full border text-sm font-medium transition-colors ${
+            className={`px-6 py-2 rounded-full border text-sm font-medium transition-colors cursor-pointer ${
               activeTab === "Shifts"
-                ? "bg-gray-900 text-white"
-                : " text-gray-600 hover:bg-gray-100 hover:cursor-pointer"
+                ? "bg-teal-500 text-white border-teal-500"
+                : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
             }`}
           >
             Shifts
           </button>
           <button
             onClick={() => setActiveTab("Profile")}
-            className={`px-6 py-2 rounded-full text-sm border font-medium transition-colors ${
+            className={`px-6 py-2 rounded-full text-sm border font-medium transition-colors cursor-pointer ${
               activeTab === "Profile"
-                ? "bg-gray-900 text-white"
-                : " text-gray-600 hover:bg-gray-100 hover:cursor-pointer"
+                ? "bg-teal-500 text-white border-teal-500"
+                : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
             }`}
           >
             Profile
@@ -226,6 +248,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
         <ActivityTab
           dspId={currentDsp.id}
           dspName={currentDsp.fullName}
+          shifts={shifts}
           detailsLoading={detailsLoading}
           trainingsLoading={trainingsLoading}
           documentsLoading={documentsLoading}
@@ -267,6 +290,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
         onClose={() => setShowRequestDocument(false)}
         employeeId={currentDsp.id}
         employeeName={currentDsp.fullName}
+        documents={documents}
         onRequested={fetchDocuments}
       />
     </div>

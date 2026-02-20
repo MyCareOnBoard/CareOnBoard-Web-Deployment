@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DSP } from "./types";
+import { Routes } from "@/routes/constants";
 
 interface DSPStats {
   active: number;
@@ -15,10 +16,13 @@ interface DSPListProps {
   dsps: DSP[];
   stats: DSPStats;
   isLoading?: boolean;
-  onSelectDsp: (dsp: DSP) => void;
 }
 
-export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
+export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
+  const navigate = useNavigate();
+  const navigateToProfile = (dsp: DSP) => {
+    navigate(Routes.agency.dspProfile.replace(":dspId", dsp.id));
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "All">("active");
   const [page, setPage] = useState(1);
@@ -32,7 +36,7 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
     const matchesSearch = dsp.fullName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "All" || 
       (statusFilter === "active" && dsp.status === "active") ||
-      (statusFilter === "inactive" && (dsp.status === "inactive" || dsp.status === "suspended"));
+      (statusFilter === "inactive" && (dsp.status === "inactive" || dsp.status === "suspended" || dsp.status === "pending"));
     return matchesSearch && matchesStatus;
   });
 
@@ -53,6 +57,11 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
       .toUpperCase()
       .slice(0, 2);
   };
+
+  // Reset page when filter or search changes
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, searchQuery]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -137,7 +146,7 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                     <button
                       key={dsp.id}
                       onClick={() => handleSuggestionClick(dsp)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors text-left cursor-pointer"
+                      className="w-full flex items-center gap-3 p-3 hover:bg-teal-50 hover:text-teal-700 transition-colors text-left cursor-pointer"
                     >
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={dsp.profilePicture} alt={dsp.fullName} />
@@ -159,8 +168,8 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                 onClick={() => setStatusFilter("active")}
                 className={`px-6 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
                   statusFilter === "active"
-                    ? "bg-gray-900 text-white"
-                    : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                    ? "bg-teal-500 text-white border border-teal-500"
+                    : "bg-white text-gray-600 border border-gray-300 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
                 }`}
               >
                 Active
@@ -169,8 +178,8 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                 onClick={() => setStatusFilter("inactive")}
                 className={`px-6 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
                   statusFilter === "inactive"
-                    ? "bg-gray-900 text-white"
-                    : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                    ? "bg-teal-500 text-white border border-teal-500"
+                    : "bg-white text-gray-600 border border-gray-300 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
                 }`}
               >
                 Inactive
@@ -182,7 +191,7 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
         {/* DSP List */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00B4B8]"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
           </div>
         ) : (
           <div className="space-y-2">
@@ -190,11 +199,11 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
               return (
                 <div
                   key={dsp.id}
-                  className="flex items-center justify-between py-4 px-4 bg-gray-50 rounded-lg hover:bg-[#e6f0fa] cursor-pointer transition-colors"
+                  className="flex items-center justify-between py-4 px-4 bg-gray-50 rounded-lg hover:bg-teal-50 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     <button
-                      onClick={() => onSelectDsp(dsp)}
+                      onClick={() => navigateToProfile(dsp)}
                       className="flex items-center gap-4 cursor-pointer"
                     >
                       <Avatar className="h-12 w-12 cursor-pointer">
@@ -203,7 +212,7 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                           {getInitials(dsp.fullName)}
                         </AvatarFallback>
                       </Avatar>
-                      <div onClick={() => onSelectDsp(dsp)} className="text-left cursor-pointer">
+                      <div onClick={() => navigateToProfile(dsp)} className="text-left cursor-pointer">
                         <p className="font-semibold text-gray-900 text-sm">{dsp.fullName}</p>
                         <p className="text-xs text-gray-500">DSP</p>
                       </div>
@@ -229,14 +238,14 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
                   </div>
                     {dsp.status === "active" ? (
                       <button
-                        onClick={() => onSelectDsp(dsp)}
-                        className="px-6 py-2 bg-[#00B4B8] text-white text-sm rounded-full hover:bg-[#00A0A4] transition-colors cursor-pointer"
+                        onClick={() => navigateToProfile(dsp)}
+                        className="px-6 py-2 bg-teal-500 text-white text-sm rounded-full hover:bg-teal-600 transition-colors cursor-pointer"
                       >
-                        Assign Shift
+                        Details
                       </button>
                     ) : (
                       <button
-                        className="px-6 py-2 bg-gray-200 text-gray-600 text-sm rounded-full cursor-pointer"
+                        className="px-6 py-2 bg-gray-200 text-gray-600 text-sm rounded-full hover:bg-teal-50 hover:text-teal-700 transition-colors cursor-pointer"
                       >
                         Send Alert
                       </button>
@@ -249,25 +258,21 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
 
         {/* Pagination */}
         <div className="flex items-center justify-center gap-2 pt-4">
-          <span className="text-sm text-gray-600">{page} / {totalPages}</span>
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
             onClick={() => setPage(Math.max(1, page - 1))}
             disabled={page === 1}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
+          </button>
+          <span className="text-sm text-gray-600 px-1">{page} / {totalPages}</span>
+          <button
             onClick={() => setPage(Math.min(totalPages, page + 1))}
             disabled={page === totalPages}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             <ChevronRight className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
       </div>
     </>

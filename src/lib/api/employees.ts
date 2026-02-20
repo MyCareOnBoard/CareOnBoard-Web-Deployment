@@ -220,6 +220,42 @@ export async function getCurrentEmployee(): Promise<Employee> {
 }
 
 /**
+ * Update Current Employee Request
+ * Matches PATCH /employees/me body schema
+ */
+export interface UpdateCurrentEmployeeRequest {
+  employeeId?: string;
+  fullName?: string;
+  dateOfBirth?: string; // Format: "YYYY-MM-DD"
+  address?: string;
+  phoneNumber?: string;
+  profilePicture?: string;
+  workAvailability?: boolean;
+}
+
+/**
+ * ✅ Update current employee profile
+ * Endpoint: PATCH /employees/me
+ */
+export async function updateCurrentEmployee(data: UpdateCurrentEmployeeRequest): Promise<Employee> {
+  const { employeeId, ...body } = data;
+  try {
+    const response = await axiosClient.patch<EmployeeResponse>('/employees/me', body, {
+      params: employeeId ? { employeeId } : undefined,
+    });
+
+    if (!response.data.success) {
+      throw new Error('Failed to update employee profile');
+    }
+
+    return response.data.employee;
+  } catch (err: any) {
+    console.error('updateCurrentEmployee error:', err);
+    throw new Error(err.response?.data?.message || err.message || 'Failed to update employee profile');
+  }
+}
+
+/**
  * ✅ Get employee by ID
  * Endpoint: GET /employees/:employeeId
  */
@@ -284,11 +320,10 @@ export async function deleteEmployee(employeeId: string): Promise<{ success: boo
  * ✅ Get employee trainings
  * Endpoint: GET /employees/trainings
  */
-export async function getEmployeeTrainings(employeeId?: string): Promise<EmployeeTraining[]> {
+export async function getEmployeeTrainings(employeeId: string): Promise<EmployeeTraining[]> {
   try {
-    const response = await axiosClient.get<EmployeeTrainingsResponse>('/employees/trainings', {
-      params: employeeId ? { employeeId } : undefined,
-    });
+    const response = await axiosClient.get<EmployeeTrainingsResponse>(`/employees/trainings/${employeeId}`);
+    console.log('getEmployeeTrainings response:', response.data);
 
     if (!response.data.success) {
       throw new Error('Failed to fetch trainings');
