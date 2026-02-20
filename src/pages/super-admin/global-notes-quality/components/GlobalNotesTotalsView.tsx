@@ -22,6 +22,7 @@ export function GlobalNotesTotalsView({
   totalPages,
   onPrevPage,
   onNextPage,
+  onViewDetails,
 }: {
   audience: Audience;
   onAudienceChange: (next: Audience) => void;
@@ -36,6 +37,7 @@ export function GlobalNotesTotalsView({
   totalPages: number;
   onPrevPage: () => void;
   onNextPage: () => void;
+  onViewDetails?: (row: RowItem) => void;
 }) {
   const renderMetric = (value: number | null) => {
     if (typeof value !== "number") return "—";
@@ -121,6 +123,7 @@ export function GlobalNotesTotalsView({
                   variant="outline"
                   size="sm"
                   className="h-9 rounded-xl bg-gray-100 px-3 text-xs text-muted-foreground border-gray-400"
+                  onClick={() => onViewDetails?.(row)}
                 >
                   View Details
                 </Button>

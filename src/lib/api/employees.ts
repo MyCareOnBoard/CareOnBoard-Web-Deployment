@@ -104,17 +104,25 @@ export interface CreateEmployeeRequest {
 
 /**
  * Update Employee Request
+ * Matches PUT /employees/:employeeId body schema
  */
 export interface UpdateEmployeeRequest {
   fullName?: string;
-  phone?: string;
+  phoneNumber?: string;
   address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  dateOfBirth?: string;
-  gender?: "Male" | "Female" | "Other" | string;
+  dateOfBirth?: string; // Format: "YYYY-MM-DD"
+  emergencyContact?: {
+    name?: string;
+    relationship?: string;
+    phoneNumber?: string;
+    email?: string;
+  };
   status?: 'active' | 'inactive' | 'pending' | 'suspended';
+  agencyId?: string;
+  role?: string;
+  workAvailability?: boolean;
+  profilePictureUrl?: string;
+  bio?: string;
 }
 
 /**
@@ -233,10 +241,14 @@ export async function getEmployeeById(employeeId: string): Promise<Employee> {
 /**
  * ✅ Update employee
  * Endpoint: PUT /employees/:employeeId
+ * Agencies can update employees belonging to their agency.
+ * Requires agencyId as query param for non-agency users.
  */
-export async function updateEmployee(employeeId: string, data: UpdateEmployeeRequest): Promise<Employee> {
+export async function updateEmployee(employeeId: string, data: UpdateEmployeeRequest, agencyId?: string): Promise<Employee> {
   try {
-    const response = await axiosClient.put<EmployeeResponse>(`/employees/${employeeId}`, data);
+    const response = await axiosClient.put<EmployeeResponse>(`/employees/${employeeId}`, data, {
+      params: agencyId ? { agencyId } : undefined,
+    });
 
     if (!response.data.success) {
       throw new Error('Failed to update employee');
