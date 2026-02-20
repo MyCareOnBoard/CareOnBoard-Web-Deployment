@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { EmployeeDocument } from "@/lib/api/employee-documents";
+import { type Shift } from "@/lib/api/shifts";
 import { ShiftsChart } from "./ShiftsChart";
 import { TrainingSection } from "./TrainingSection";
 import { DocumentsSection } from "./DocumentsSection";
@@ -7,6 +7,7 @@ import { DocumentsSection } from "./DocumentsSection";
 interface ActivityTabProps {
   dspId: string;
   dspName: string;
+  shifts: Shift[];
   detailsLoading: boolean;
   trainingsLoading: boolean;
   documentsLoading: boolean;
@@ -19,8 +20,8 @@ interface ActivityTabProps {
 }
 
 export function ActivityTab({
-  dspId,
-  dspName,
+  dspName: _dspName,
+  shifts,
   detailsLoading,
   trainingsLoading,
   documentsLoading,
@@ -31,9 +32,6 @@ export function ActivityTab({
   getDocumentStatusColor,
   getDocumentActionButton,
 }: ActivityTabProps) {
-  const [shiftsFilter, setShiftsFilter] = useState<
-    "year" | "month" | "week" | "lifetime"
-  >("week");
 
   return (
     <div className="space-y-6">
@@ -41,8 +39,7 @@ export function ActivityTab({
       <div className="grid grid-cols-2 gap-6">
         {/* Left Column: Shifts Chart */}
         <ShiftsChart
-          filter={shiftsFilter}
-          onFilterChange={setShiftsFilter}
+          shifts={shifts}
           isLoading={detailsLoading}
         />
 

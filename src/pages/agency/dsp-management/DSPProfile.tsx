@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronLeft, MessageSquare } from "lucide-react";
 import { DSP } from "./types";
 import { useDSPDetails, useDSPTrainings, useUpdateDSPStatus } from "./useDSPManagement";
+import { Routes } from "@/routes/constants";
 import { listEmployeeDocuments, EmployeeDocument, requestEmployeeDocument } from "@/lib/api/employee-documents";
 import { useToast } from "@/hooks/use-toast";
 import { ActivityTab } from "./components/ActivityTab";
@@ -14,16 +16,16 @@ import { RequestDocumentModal } from "./components/RequestDocumentModal";
 interface DSPProfileProps {
   dsp: DSP;
   onBack: () => void;
-  onChatClick: () => void;
 }
 
-export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
+export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
   const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile">("Activity");
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showRequestDocument, setShowRequestDocument] = useState(false);
   const [currentDsp, setCurrentDsp] = useState<DSP>(dsp);
   const { toast } = useToast();
 
+  const navigate = useNavigate();
   const { shifts, isLoading: detailsLoading } = useDSPDetails(dsp.id);
   const { completedCount, totalCount, isLoading: trainingsLoading } = useDSPTrainings(dsp.id);
   const { updateStatus } = useUpdateDSPStatus();
@@ -167,7 +169,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
             <p className="text-sm text-gray-600">{currentDsp.role} · {currentDsp.age} yrs old</p>
             <div className="flex items-center gap-2 mt-3">
               <button
-                onClick={onChatClick}
+                onClick={() => navigate(Routes.agency.support)}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm rounded-full hover:bg-gray-800 transition-colors"
               >
                 <MessageSquare className="w-4 h-4" />
@@ -226,6 +228,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
         <ActivityTab
           dspId={currentDsp.id}
           dspName={currentDsp.fullName}
+          shifts={shifts}
           detailsLoading={detailsLoading}
           trainingsLoading={trainingsLoading}
           documentsLoading={documentsLoading}
@@ -267,6 +270,7 @@ export function DSPProfile({ dsp, onBack, onChatClick }: DSPProfileProps) {
         onClose={() => setShowRequestDocument(false)}
         employeeId={currentDsp.id}
         employeeName={currentDsp.fullName}
+        documents={documents}
         onRequested={fetchDocuments}
       />
     </div>

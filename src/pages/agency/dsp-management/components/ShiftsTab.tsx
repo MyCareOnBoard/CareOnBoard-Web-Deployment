@@ -12,9 +12,17 @@ interface ShiftsTabProps {
 
 function getClientName(shift: Shift): string {
   if (!shift.client) return "Unknown Client";
-  const first = shift.client.firstName || "";
-  const last = shift.client.lastName || "";
+  const c = shift.client as any;
+  if (c.name) return c.name;
+  const first = c.firstName || "";
+  const last = c.lastName || "";
   return `${first} ${last}`.trim() || "Unknown Client";
+}
+
+function getClientAvatar(shift: Shift): string | undefined {
+  if (!shift.client) return undefined;
+  const c = shift.client as any;
+  return c.avatar ?? c.profileImage;
 }
 
 export function ShiftsTab({ shifts, isLoading, getInitials }: ShiftsTabProps) {
@@ -109,7 +117,7 @@ export function ShiftsTab({ shifts, isLoading, getInitials }: ShiftsTabProps) {
               <div key={shift.id} className="flex items-center justify-between py-4 px-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-12 w-12">
-                    <AvatarImage src={shift.client?.profileImage} alt={clientName} />
+                    <AvatarImage src={getClientAvatar(shift)} alt={clientName} />
                     <AvatarFallback className="bg-gray-200 text-gray-700 text-sm font-medium">
                       {getInitials(clientName)}
                     </AvatarFallback>
@@ -144,11 +152,14 @@ export function ShiftsTab({ shifts, isLoading, getInitials }: ShiftsTabProps) {
                   
                   {shiftsTab === "upcoming" && (
                     <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 rounded-md bg-green-100 text-green-700 text-xs font-medium">
-                        {shift.sessionDuration || 'N/A'}
-                      </span>
-                      <button className="px-3 py-1 border border-gray-300 text-gray-600 text-xs rounded-md hover:bg-gray-50 cursor-pointer">
-                        Details
+                      <button className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 cursor-pointer transition-colors">
+                        Approve
+                      </button>
+                      <button className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-200 cursor-pointer border border-gray-300 transition-colors">
+                        Edit
+                      </button>
+                      <button className="px-3 py-1 bg-red-50 text-red-600 text-xs font-medium rounded-md hover:bg-red-100 cursor-pointer border border-red-200 transition-colors">
+                        Cancel
                       </button>
                     </div>
                   )}
@@ -162,13 +173,20 @@ export function ShiftsTab({ shifts, isLoading, getInitials }: ShiftsTabProps) {
                   )}
                   
                   {shiftsTab === "previous" && (
-                    <span className={`px-3 py-1 rounded-md text-xs font-medium ${
-                      shift.status === 'completed' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-gray-200 text-gray-700'
-                    }`}>
-                      {shift.status === 'completed' ? 'Completed' : shift.sessionDuration || shift.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-md text-xs font-medium ${
+                        shift.status === 'completed'
+                          ? 'bg-green-100 text-green-700'
+                          : shift.status === 'expired'
+                          ? 'bg-gray-200 text-gray-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {shift.status === 'completed' ? 'Visit Completed' : shift.status === 'expired' ? 'Incomplete' : shift.status}
+                      </span>
+                      <button className="px-3 py-1 border border-gray-300 text-gray-600 text-xs rounded-md hover:bg-gray-50 cursor-pointer transition-colors">
+                        Details
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

@@ -54,6 +54,11 @@ export function DSPList({ dsps, stats, isLoading, onSelectDsp }: DSPListProps) {
       .slice(0, 2);
   };
 
+  // Reset page when filter or search changes
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, searchQuery]);
+
   // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

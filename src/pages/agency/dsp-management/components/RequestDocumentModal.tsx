@@ -6,8 +6,7 @@ import {
 	DialogTitle,
 	DialogDescription,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { requestEmployeeDocument } from "@/lib/api/employee-documents";
+import { requestEmployeeDocument, type EmployeeDocument, isExpiringSoon } from "@/lib/api/employee-documents";
 import { useToast } from "@/hooks/use-toast";
 
 const DOCUMENT_TYPES = [
@@ -28,6 +27,7 @@ interface RequestDocumentModalProps {
 	onClose: () => void;
 	employeeId: string;
 	employeeName: string;
+	documents?: EmployeeDocument[];
 	onRequested?: () => void;
 }
 
@@ -36,12 +36,21 @@ export function RequestDocumentModal({
 	onClose,
 	employeeId,
 	employeeName,
+	documents = [],
 	onRequested,
 }: RequestDocumentModalProps) {
 	const { toast } = useToast();
 	const [sending, setSending] = useState(false);
 	const [documentType, setDocumentType] = useState("");
-	const [message, setMessage] = useState("");
+	const [expiryDate, setExpiryDate] = useState("");
+
+	/** Find existing document for selected type to surface expiry info */
+	const existingDoc = documentType
+		? documents.find((d) => d.documentType === documentType)
+		: null;
+
+	const expiringSoon = existingDoc ? isExpiringSoon(existingDoc.expiryDate) : false;
+	const isExpired = existingDoc?.status === "expired";
 
 	const handleSend = async () => {
 		if (!documentType) {
@@ -55,7 +64,11 @@ export function RequestDocumentModal({
 
 		setSending(true);
 		try {
-			await requestEmployeeDocument(employeeId, documentType, message || undefined);
+			await requestEmployeeDocument(
+				employeeId,
+				documentType,
+				expiryDate || undefined,
+			);
 
 			toast({
 				title: "Document Request Sent",
@@ -78,7 +91,7 @@ export function RequestDocumentModal({
 
 	const resetAndClose = () => {
 		setDocumentType("");
-		setMessage("");
+		setExpiryDate("");
 		onClose();
 	};
 
@@ -114,17 +127,33 @@ export function RequestDocumentModal({
 						</select>
 					</div>
 
-					{/* Message */}
+					{/* Expiry status banner */}
+					{existingDoc && (isExpired || expiringSoon) && (
+						<div
+							className={`rounded-md px-4 py-2 text-sm font-medium ${
+								isExpired
+									? "bg-red-50 text-red-700 border border-red-200"
+									: "bg-amber-50 text-amber-700 border border-amber-200"
+							}`}
+						>
+							{isExpired
+								? `This document expired on ${new Date(existingDoc.expiryDate!).toLocaleDateString()}.`
+								: `This document is expiring soon (${new Date(existingDoc.expiryDate!).toLocaleDateString()}).`}
+						</div>
+					)}
+
+					{/* Expiry Date */}
 					<div className="space-y-1.5">
 						<label className="text-sm font-medium text-gray-700">
-							Message <span className="text-muted-foreground font-normal">(optional)</span>
+							Requested Expiry Date{" "}
+							<span className="text-muted-foreground font-normal">(optional)</span>
 						</label>
-						<textarea
-							value={message}
-							onChange={(e) => setMessage(e.target.value)}
-							placeholder="Add a note for the employee..."
-							rows={3}
-							className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+						<input
+							type="date"
+							value={expiryDate}
+							onChange={(e) => setExpiryDate(e.target.value)}
+							min={new Date().toISOString().slice(0, 10)}
+							className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 						/>
 					</div>
 				</div>

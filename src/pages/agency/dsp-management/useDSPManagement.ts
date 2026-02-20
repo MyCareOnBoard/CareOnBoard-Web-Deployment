@@ -3,7 +3,6 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/redux/store";
 import {
   listEmployees,
-  getEmployeeById,
   getEmployeeTrainings,
   searchEmployees,
   getEmployeeStats,
@@ -34,6 +33,15 @@ function calculateAge(dateOfBirth?: string): number | undefined {
  * Transform Employee to DSP with computed fields
  */
 function transformEmployeeToDSP(employee: Employee): DSP {
+  // Normalize status to lowercase to handle case sensitivity issues from backend
+  let normalizedStatus: "active" | "inactive" | "pending" | "suspended" = "pending";
+  if (employee.status) {
+    const statusLower = employee.status.toLowerCase();
+    if (statusLower === "active" || statusLower === "inactive" || statusLower === "pending" || statusLower === "suspended") {
+      normalizedStatus = statusLower as "active" | "inactive" | "pending" | "suspended";
+    }
+  }
+
   return {
     id: employee.id,
     userId: employee.userId,
@@ -53,7 +61,7 @@ function transformEmployeeToDSP(employee: Employee): DSP {
       relationship: "",
       phone: ""
     },
-    status: (employee.status as "active" | "inactive" | "pending" | "suspended") || "pending",
+    status: normalizedStatus,
     createdAt: employee.createdAt,
     updatedAt: employee.updatedAt,
     // Computed fields for UI
@@ -114,8 +122,9 @@ export function useDSPList() {
       } catch (statsErr) {
         console.warn('⚠️ Stats endpoint not available, using defaults:', statsErr);
         // Calculate stats from employees list
+        // Match the filtering logic in DSPList.tsx
         const active = transformedDSPs.filter(d => d.status === 'active').length;
-        const inactive = transformedDSPs.filter(d => d.status !== 'active').length;
+        const inactive = transformedDSPs.filter(d => d.status === 'inactive' || d.status === 'suspended').length;
         setStats({
           active,
           inactive,
@@ -188,7 +197,6 @@ export function useDSPSearch() {
  * Hook to manage single DSP details
  */
 export function useDSPDetails(dspId: string | null) {
-  const [dsp, setDsp] = useState<DSP | null>(null);
   const [trainings, setTrainings] = useState<EmployeeTraining[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -204,13 +212,11 @@ export function useDSPDetails(dspId: string | null) {
       setIsLoading(true);
       setError(null);
 
-      const [employeeData, trainingsData, shiftsData] = await Promise.all([
-        getEmployeeById(dspId),
+      const [trainingsData, shiftsData] = await Promise.all([
         getEmployeeTrainings(dspId),
         listShifts({ employeeId: dspId, agencyId, client: true, employee: true }),
       ]);
 
-      setDsp(transformEmployeeToDSP(employeeData));
       setTrainings(trainingsData);
       setShifts(shiftsData.shifts || []);
     } catch (err: any) {
@@ -226,7 +232,6 @@ export function useDSPDetails(dspId: string | null) {
   }, [fetchDetails]);
 
   return {
-    dsp,
     trainings,
     shifts,
     isLoading,

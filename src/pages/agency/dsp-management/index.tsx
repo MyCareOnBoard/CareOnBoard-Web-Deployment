@@ -3,22 +3,14 @@ import { DSP } from "./types";
 import { useDSPList } from "./useDSPManagement";
 import { DSPList } from "./DSPList";
 import { DSPProfile } from "./DSPProfile";
-import { ChatModal, MessageSentModal } from "./ChatModal";
 import AddScheduleModal from "@/pages/agency/scheduling/components/AddScheduleModal";
 
 export default function DSPManagementPage() {
   const [selectedDsp, setSelectedDsp] = useState<DSP | null>(null);
-  const [showChatModal, setShowChatModal] = useState(false);
-  const [showMessageSentModal, setShowMessageSentModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   // Fetch DSPs from API
   const { dsps, stats, isLoading, error } = useDSPList();
-
-  const handleChatSuccess = () => {
-    setShowMessageSentModal(true);
-    setTimeout(() => setShowMessageSentModal(false), 2000);
-  };
 
   if (error) {
     return (
@@ -60,7 +52,6 @@ export default function DSPManagementPage() {
           <DSPProfile
             dsp={selectedDsp}
             onBack={() => setSelectedDsp(null)}
-            onChatClick={() => setShowChatModal(true)}
           />
         )}
       </div>
@@ -68,19 +59,6 @@ export default function DSPManagementPage() {
       {/* Modals */}
       {selectedDsp && (
         <>
-          <ChatModal
-            dsp={selectedDsp}
-            isOpen={showChatModal}
-            onClose={() => setShowChatModal(false)}
-            onSuccess={handleChatSuccess}
-          />
-
-          <MessageSentModal
-            dspName={selectedDsp.fullName}
-            isOpen={showMessageSentModal}
-            onClose={() => setShowMessageSentModal(false)}
-          />
-
           <AddScheduleModal
             isOpen={showScheduleModal}
             onClose={() => setShowScheduleModal(false)}
