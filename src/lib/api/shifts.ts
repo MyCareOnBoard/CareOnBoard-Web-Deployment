@@ -65,32 +65,11 @@ export const formatShiftLocation = (location?: ShiftLocation | string | null): s
 };
 
 /**
- * Lighter client/employee shapes returned inline by GET /shifts
- */
-export interface ShiftClientSummary {
-    id: string;
-    name: string;
-    avatar?: string;
-    email?: string;
-    phone?: string;
-}
-
-export interface ShiftEmployeeSummary {
-    id: string;
-    name: string;
-    avatar?: string;
-    email?: string;
-    phone?: string;
-    role?: string;
-    tagId?: string;
-}
-
-/**
  * Shift interface
  */
 export interface Shift {
     id: string;
-    client?: Client | ShiftClientSummary;
+    client?: Client;
     date: string;
     location?: ShiftLocation;
     startTime: string;
@@ -122,7 +101,7 @@ export interface Shift {
     completedBy?: string;
     goalsType?: string;
     goalsAndDocumentsId?: string;
-    employee?: Employee | ShiftEmployeeSummary;
+    employee?: Employee;
     agency?: Agency;
 }
 
@@ -284,42 +263,6 @@ export interface ShiftStatsResponse {
     startDate: string; // YYYY-MM-DD
     endDate: string;   // YYYY-MM-DD
     buckets: ShiftStatsBucket[];
-}
-
-/**
- * Employee-specific shift statistics
- * Returned by GET /shifts/stats?employeeId=...&agencyId=...
- */
-export interface EmployeeShiftStatistics {
-    total: number;
-    byStatus: {
-        pending: number;
-        available: number;
-        ongoing: number;
-        completed: number;
-        expired: number;
-    };
-    byType: {
-        automatic: number;
-        manual: number;
-    };
-    bySubmissionStatus: {
-        draft: number;
-        submitted: number;
-    };
-    combined: {
-        automatic_submitted: number;
-        automatic_draft: number;
-        manual_submitted: number;
-        manual_draft: number;
-    };
-}
-
-export interface EmployeeShiftStatsResponse {
-    success: boolean;
-    employeeId: string;
-    agencyId: string;
-    statistics: EmployeeShiftStatistics;
 }
 
 /**
@@ -555,28 +498,6 @@ export const getShiftStats = async (
         return response.data;
     } catch (error) {
         console.error('Failed to fetch shift stats:', error);
-        throw error;
-    }
-};
-
-/**
- * Get employee-specific shift statistics
- * Endpoint: GET /shifts/stats?employeeId=...&agencyId=...
- */
-export const getEmployeeShiftStats = async (
-    employeeId: string,
-    agencyId: string,
-): Promise<EmployeeShiftStatsResponse> => {
-    try {
-        const response = await axiosClient.get<EmployeeShiftStatsResponse>(
-            `${SHIFT_BASE}/stats`,
-            {
-                params: { employeeId, agencyId },
-            }
-        );
-        return response.data;
-    } catch (error) {
-        console.error('Failed to fetch employee shift stats:', error);
         throw error;
     }
 };
