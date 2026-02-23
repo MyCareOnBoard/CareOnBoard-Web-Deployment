@@ -48,7 +48,14 @@ export interface Client {
   ispOutcomes?: string;
 
   // Add Client wizard sections (Stage 2–7)
-  guardianInfo?: ClientGuardianInfo;
+  guardianName?: string;
+  guardianRelationship?: string;
+  guardianEmail?: string;
+  guardianPhone?: string;
+  guardianAddress?: string;
+  supportCoordinatorName?: string;
+  supportCoordinatorAgency?: string;
+  supportCoordinatorContact?: string;
   healthcareSafety?: ClientHealthcareSafety;
   documents?: ClientDocument[];
   // Flattened healthcare fields (when stored at top level)
@@ -775,7 +782,7 @@ export const clientsApi = createApi({
         if (params?.search) queryParams.append('search', params.search);
         if (params?.limit) queryParams.append('limit', params.limit.toString());
         if (params?.agency !== undefined) queryParams.append('agency', params.agency.toString());
-        
+
         return {
           url: `/clients${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
           method: "GET",
@@ -795,7 +802,7 @@ export const clientsApi = createApi({
         if (params?.service) queryParams.append('service', params.service);
         if (params?.search) queryParams.append('search', params.search);
         if (params?.limit) queryParams.append('limit', params.limit.toString());
-        
+
         return {
           url: `/clientManagement${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
           method: "GET",
@@ -811,7 +818,7 @@ export const clientsApi = createApi({
       query: ({ clientId, agencyId }) => {
         const queryParams = new URLSearchParams();
         if (agencyId) queryParams.append('agencyId', agencyId);
-        
+
         return {
           url: `/clients/${clientId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
           method: "GET",
@@ -838,7 +845,7 @@ export const clientsApi = createApi({
       query: (agencyId) => {
         const queryParams = new URLSearchParams();
         if (agencyId) queryParams.append('agencyId', agencyId);
-        
+
         return {
           url: `/clients/stats${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
           method: "GET",
@@ -866,7 +873,7 @@ export const clientsApi = createApi({
       query: ({ clientId, data, agencyId }) => {
         const queryParams = new URLSearchParams();
         if (agencyId) queryParams.append('agencyId', agencyId);
-        
+
         return {
           url: `/clients/${clientId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
           method: "PUT",
@@ -887,7 +894,7 @@ export const clientsApi = createApi({
       query: ({ clientId, agencyId }) => {
         const queryParams = new URLSearchParams();
         if (agencyId) queryParams.append('agencyId', agencyId);
-        
+
         return {
           url: `/clients/${clientId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
           method: "DELETE",

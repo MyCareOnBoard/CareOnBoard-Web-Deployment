@@ -57,14 +57,14 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             communicationMethod: client.communicationMethod,
         },
         stage2: {
-            guardianName: client.guardianInfo?.guardianName || "",
-            guardianRelationship: client.guardianInfo?.guardianRelationship,
-            guardianEmail: client.guardianInfo?.guardianEmail || "",
-            guardianPhone: client.guardianInfo?.guardianPhone || "",
-            guardianAddress: client.guardianInfo?.guardianAddress || "",
-            supportCoordinatorName: client.guardianInfo?.supportCoordinatorName || "",
-            supportCoordinatorAgency: client.guardianInfo?.supportCoordinatorAgency || "",
-            supportCoordinatorContact: client.guardianInfo?.supportCoordinatorContact || "",
+            guardianName: client.guardianName || "",
+            guardianRelationship: client.guardianRelationship,
+            guardianEmail: client.guardianEmail || "",
+            guardianPhone: client.guardianPhone || "",
+            guardianAddress: client.guardianAddress || "",
+            supportCoordinatorName: client.supportCoordinatorName || "",
+            supportCoordinatorAgency: client.supportCoordinatorAgency || "",
+            supportCoordinatorContact: client.supportCoordinatorContact || "",
             services: client.services && client.services.length > 0
                 ? client.services.map((svc) => ({
                     id: svc.id,
