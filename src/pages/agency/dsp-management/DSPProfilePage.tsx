@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router";
 import { getEmployeeById } from "@/lib/api/employees";
 import { DSPProfile } from "./DSPProfile";
 import { DSP } from "./types";
