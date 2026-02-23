@@ -18,6 +18,15 @@ import { AddClientFormData, DocKey, DocState, createInitialDocs } from "@/pages/
 
 const OTHER_VALUE = "Other (specify)";
 
+/** Parse comma-separated text into array; only splits on commas, preserves spaces within values */
+function parseCommaSeparated(text: string): string[] {
+  return text.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+function getCustomText(values: string[], options: string[]): string {
+  return values.filter((v) => !options.includes(v)).join(", ");
+}
+
 const MEDICAL_CONDITIONS_OPTIONS = [
   "None",
   "Diabetes",
@@ -166,6 +175,12 @@ export function Stage3HealthcareAndDocuments({
   pageTitle?: string;
 }) {
   const stage3 = formData.stage3;
+  const [medicalConditionsOtherText, setMedicalConditionsOtherText] = useState<string | null>(null);
+  const [allergiesOtherText, setAllergiesOtherText] = useState<string | null>(null);
+  const [dietaryRestrictionsOtherText, setDietaryRestrictionsOtherText] = useState<string | null>(null);
+  const [mobilitySupportNeedsOtherText, setMobilitySupportNeedsOtherText] = useState<string | null>(null);
+  const [communicationNeedsOtherText, setCommunicationNeedsOtherText] = useState<string | null>(null);
+
   const updateStage3 = (patch: Partial<AddClientFormData["stage3"]>) =>
     setFormData((prev) => ({ ...prev, stage3: { ...prev.stage3, ...patch } }));
 
@@ -198,7 +213,10 @@ export function Stage3HealthcareAndDocuments({
             <label className="text-[12px] font-normal text-[#10141a]">Medical Conditions</label>
             <MultiSelect
               value={stage3.medicalConditions}
-              onValueChange={(v) => updateStage3({ medicalConditions: v })}
+              onValueChange={(v) => {
+                setMedicalConditionsOtherText(null);
+                updateStage3({ medicalConditions: v });
+              }}
               placeholder="Select Medical Conditions"
               buttonClassName="h-[44px] rounded-[12px] border-[#cccccd] bg-white w-full min-w-0"
             >
@@ -209,18 +227,24 @@ export function Stage3HealthcareAndDocuments({
             {(stage3.medicalConditions.includes(OTHER_VALUE) ||
               stage3.medicalConditions.some((v) => !MEDICAL_CONDITIONS_OPTIONS.includes(v))) && (
               <Input
-                value={stage3.medicalConditions
-                  .filter((v) => !MEDICAL_CONDITIONS_OPTIONS.includes(v))
-                  .join(", ")}
-                placeholder="Comma-separated values"
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                value={medicalConditionsOtherText ?? getCustomText(stage3.medicalConditions, MEDICAL_CONDITIONS_OPTIONS)}
+                placeholder="Comma-separated values (spaces allowed)"
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
                 onChange={(e) => {
                   const text = e.target.value;
-                  const customArr = text.split(",").map((s) => s.trim()).filter(Boolean);
+                  setMedicalConditionsOtherText(text);
+                  const customArr = parseCommaSeparated(text);
                   const predefined = stage3.medicalConditions.filter(
                     (v) => MEDICAL_CONDITIONS_OPTIONS.includes(v) && v !== OTHER_VALUE
                   );
-                  updateStage3({ medicalConditions: [...predefined, ...customArr] });
+                  const hadOther = stage3.medicalConditions.includes(OTHER_VALUE);
+                  const next = customArr.length > 0
+                    ? [...predefined, ...customArr]
+                    : hadOther ? [...predefined, OTHER_VALUE] : [...predefined];
+                  updateStage3({ medicalConditions: next });
                 }}
               />
             )}
@@ -230,7 +254,10 @@ export function Stage3HealthcareAndDocuments({
             <label className="text-[12px] font-normal text-[#10141a]">Allergies</label>
             <MultiSelect
               value={stage3.allergies}
-              onValueChange={(v) => updateStage3({ allergies: v })}
+              onValueChange={(v) => {
+                setAllergiesOtherText(null);
+                updateStage3({ allergies: v });
+              }}
               placeholder="Select Allergies"
               buttonClassName="h-[44px] rounded-[12px] border-[#cccccd] bg-white w-full min-w-0"
             >
@@ -241,18 +268,24 @@ export function Stage3HealthcareAndDocuments({
             {(stage3.allergies.includes(OTHER_VALUE) ||
               stage3.allergies.some((v) => !ALLERGIES_OPTIONS.includes(v))) && (
               <Input
-                value={stage3.allergies
-                  .filter((v) => !ALLERGIES_OPTIONS.includes(v))
-                  .join(", ")}
-                placeholder="Comma-separated values"
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                value={allergiesOtherText ?? getCustomText(stage3.allergies, ALLERGIES_OPTIONS)}
+                placeholder="Comma-separated values (spaces allowed)"
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
                 onChange={(e) => {
                   const text = e.target.value;
-                  const customArr = text.split(",").map((s) => s.trim()).filter(Boolean);
+                  setAllergiesOtherText(text);
+                  const customArr = parseCommaSeparated(text);
                   const predefined = stage3.allergies.filter(
                     (v) => ALLERGIES_OPTIONS.includes(v) && v !== OTHER_VALUE
                   );
-                  updateStage3({ allergies: [...predefined, ...customArr] });
+                  const hadOther = stage3.allergies.includes(OTHER_VALUE);
+                  const next = customArr.length > 0
+                    ? [...predefined, ...customArr]
+                    : hadOther ? [...predefined, OTHER_VALUE] : [...predefined];
+                  updateStage3({ allergies: next });
                 }}
               />
             )}
@@ -283,13 +316,14 @@ export function Stage3HealthcareAndDocuments({
               (stage3.behaviorSupportPlan &&
                 !BEHAVIOR_SUPPORT_PLAN_OPTIONS.includes(stage3.behaviorSupportPlan))) && (
               <Input
+                type="text"
                 value={
                   stage3.behaviorSupportPlan &&
                   !BEHAVIOR_SUPPORT_PLAN_OPTIONS.includes(stage3.behaviorSupportPlan)
                     ? stage3.behaviorSupportPlan
                     : ""
                 }
-                placeholder="Specify"
+                placeholder="Specify (spaces and commas allowed)"
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
                 onChange={(e) => updateStage3({ behaviorSupportPlan: e.target.value })}
               />
@@ -300,7 +334,10 @@ export function Stage3HealthcareAndDocuments({
             <label className="text-[12px] font-normal text-[#10141a]">Dietary Restrictions</label>
             <MultiSelect
               value={stage3.dietaryRestrictions}
-              onValueChange={(v) => updateStage3({ dietaryRestrictions: v })}
+              onValueChange={(v) => {
+                setDietaryRestrictionsOtherText(null);
+                updateStage3({ dietaryRestrictions: v });
+              }}
               placeholder="Select Dietary Restrictions"
               buttonClassName="h-[44px] rounded-[12px] border-[#cccccd] bg-white w-full min-w-0"
             >
@@ -311,18 +348,24 @@ export function Stage3HealthcareAndDocuments({
             {(stage3.dietaryRestrictions.includes(OTHER_VALUE) ||
               stage3.dietaryRestrictions.some((v) => !DIETARY_RESTRICTIONS_OPTIONS.includes(v))) && (
               <Input
-                value={stage3.dietaryRestrictions
-                  .filter((v) => !DIETARY_RESTRICTIONS_OPTIONS.includes(v))
-                  .join(", ")}
-                placeholder="Comma-separated values"
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                value={dietaryRestrictionsOtherText ?? getCustomText(stage3.dietaryRestrictions, DIETARY_RESTRICTIONS_OPTIONS)}
+                placeholder="Comma-separated values (spaces allowed)"
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
                 onChange={(e) => {
                   const text = e.target.value;
-                  const customArr = text.split(",").map((s) => s.trim()).filter(Boolean);
+                  setDietaryRestrictionsOtherText(text);
+                  const customArr = parseCommaSeparated(text);
                   const predefined = stage3.dietaryRestrictions.filter(
                     (v) => DIETARY_RESTRICTIONS_OPTIONS.includes(v) && v !== OTHER_VALUE
                   );
-                  updateStage3({ dietaryRestrictions: [...predefined, ...customArr] });
+                  const hadOther = stage3.dietaryRestrictions.includes(OTHER_VALUE);
+                  const next = customArr.length > 0
+                    ? [...predefined, ...customArr]
+                    : hadOther ? [...predefined, OTHER_VALUE] : [...predefined];
+                  updateStage3({ dietaryRestrictions: next });
                 }}
               />
             )}
@@ -353,12 +396,13 @@ export function Stage3HealthcareAndDocuments({
               (stage3.seizurePlan &&
                 !SEIZURE_PLAN_OPTIONS.includes(stage3.seizurePlan))) && (
               <Input
+                type="text"
                 value={
                   stage3.seizurePlan && !SEIZURE_PLAN_OPTIONS.includes(stage3.seizurePlan)
                     ? stage3.seizurePlan
                     : ""
                 }
-                placeholder="Specify"
+                placeholder="Specify (spaces and commas allowed)"
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
                 onChange={(e) => updateStage3({ seizurePlan: e.target.value })}
               />
@@ -369,7 +413,10 @@ export function Stage3HealthcareAndDocuments({
             <label className="text-[12px] font-normal text-[#10141a]">Mobility Support Needs</label>
             <MultiSelect
               value={stage3.mobilitySupportNeeds}
-              onValueChange={(v) => updateStage3({ mobilitySupportNeeds: v })}
+              onValueChange={(v) => {
+                setMobilitySupportNeedsOtherText(null);
+                updateStage3({ mobilitySupportNeeds: v });
+              }}
               placeholder="Select Mobility Support Needs"
               buttonClassName="h-[44px] rounded-[12px] border-[#cccccd] bg-white w-full min-w-0"
             >
@@ -380,18 +427,24 @@ export function Stage3HealthcareAndDocuments({
             {(stage3.mobilitySupportNeeds.includes(OTHER_VALUE) ||
               stage3.mobilitySupportNeeds.some((v) => !MOBILITY_SUPPORT_NEEDS_OPTIONS.includes(v))) && (
               <Input
-                value={stage3.mobilitySupportNeeds
-                  .filter((v) => !MOBILITY_SUPPORT_NEEDS_OPTIONS.includes(v))
-                  .join(", ")}
-                placeholder="Comma-separated values"
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                value={mobilitySupportNeedsOtherText ?? getCustomText(stage3.mobilitySupportNeeds, MOBILITY_SUPPORT_NEEDS_OPTIONS)}
+                placeholder="Comma-separated values (spaces allowed)"
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
                 onChange={(e) => {
                   const text = e.target.value;
-                  const customArr = text.split(",").map((s) => s.trim()).filter(Boolean);
+                  setMobilitySupportNeedsOtherText(text);
+                  const customArr = parseCommaSeparated(text);
                   const predefined = stage3.mobilitySupportNeeds.filter(
                     (v) => MOBILITY_SUPPORT_NEEDS_OPTIONS.includes(v) && v !== OTHER_VALUE
                   );
-                  updateStage3({ mobilitySupportNeeds: [...predefined, ...customArr] });
+                  const hadOther = stage3.mobilitySupportNeeds.includes(OTHER_VALUE);
+                  const next = customArr.length > 0
+                    ? [...predefined, ...customArr]
+                    : hadOther ? [...predefined, OTHER_VALUE] : [...predefined];
+                  updateStage3({ mobilitySupportNeeds: next });
                 }}
               />
             )}
@@ -401,7 +454,10 @@ export function Stage3HealthcareAndDocuments({
             <label className="text-[12px] font-normal text-[#10141a]">Communication Needs</label>
             <MultiSelect
               value={stage3.communicationNeeds}
-              onValueChange={(v) => updateStage3({ communicationNeeds: v })}
+              onValueChange={(v) => {
+                setCommunicationNeedsOtherText(null);
+                updateStage3({ communicationNeeds: v });
+              }}
               placeholder="Select Communication Needs"
               buttonClassName="h-[44px] rounded-[12px] border-[#cccccd] bg-white w-full min-w-0"
             >
@@ -412,18 +468,24 @@ export function Stage3HealthcareAndDocuments({
             {(stage3.communicationNeeds.includes(OTHER_VALUE) ||
               stage3.communicationNeeds.some((v) => !COMMUNICATION_NEEDS_OPTIONS.includes(v))) && (
               <Input
-                value={stage3.communicationNeeds
-                  .filter((v) => !COMMUNICATION_NEEDS_OPTIONS.includes(v))
-                  .join(", ")}
-                placeholder="Comma-separated values"
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                value={communicationNeedsOtherText ?? getCustomText(stage3.communicationNeeds, COMMUNICATION_NEEDS_OPTIONS)}
+                placeholder="Comma-separated values (spaces allowed)"
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
                 onChange={(e) => {
                   const text = e.target.value;
-                  const customArr = text.split(",").map((s) => s.trim()).filter(Boolean);
+                  setCommunicationNeedsOtherText(text);
+                  const customArr = parseCommaSeparated(text);
                   const predefined = stage3.communicationNeeds.filter(
                     (v) => COMMUNICATION_NEEDS_OPTIONS.includes(v) && v !== OTHER_VALUE
                   );
-                  updateStage3({ communicationNeeds: [...predefined, ...customArr] });
+                  const hadOther = stage3.communicationNeeds.includes(OTHER_VALUE);
+                  const next = customArr.length > 0
+                    ? [...predefined, ...customArr]
+                    : hadOther ? [...predefined, OTHER_VALUE] : [...predefined];
+                  updateStage3({ communicationNeeds: next });
                 }}
               />
             )}
@@ -454,13 +516,14 @@ export function Stage3HealthcareAndDocuments({
               (stage3.emergencyProtocols &&
                 !EMERGENCY_PROTOCOLS_OPTIONS.includes(stage3.emergencyProtocols))) && (
               <Input
+                type="text"
                 value={
                   stage3.emergencyProtocols &&
                   !EMERGENCY_PROTOCOLS_OPTIONS.includes(stage3.emergencyProtocols)
                     ? stage3.emergencyProtocols
                     : ""
                 }
-                placeholder="Specify"
+                placeholder="Specify (spaces and commas allowed)"
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
                 onChange={(e) => updateStage3({ emergencyProtocols: e.target.value })}
               />
