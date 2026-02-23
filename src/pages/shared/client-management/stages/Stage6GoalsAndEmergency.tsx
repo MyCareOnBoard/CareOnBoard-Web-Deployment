@@ -62,7 +62,7 @@ export function Stage6GoalsAndEmergency({
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">
-              Community goals
+              Community inclusion goals
             </label>
             <Input
               value={stage6.communityGoals}

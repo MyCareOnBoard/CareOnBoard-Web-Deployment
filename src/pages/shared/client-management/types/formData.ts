@@ -75,13 +75,13 @@ export type DocState = {
 };
 
 export type Stage3HealthcareAndDocumentsData = {
-    medicalConditions: string;
-    allergies: string;
-    dietaryRestrictions: string;
+    medicalConditions: string[];
+    allergies: string[];
+    dietaryRestrictions: string[];
     seizurePlan: string;
-    mobilitySupportNeeds: string;
+    mobilitySupportNeeds: string[];
     behaviorSupportPlan: string;
-    communicationNeeds: string;
+    communicationNeeds: string[];
     emergencyProtocols: string;
     docs: DocState[];
 };
@@ -267,13 +267,13 @@ export function createInitialAddClientFormData(): AddClientFormData {
             services: [createEmptyServiceAuthorization()],
         },
         stage3: {
-            medicalConditions: "",
-            allergies: "",
-            dietaryRestrictions: "",
+            medicalConditions: [],
+            allergies: [],
+            dietaryRestrictions: [],
             seizurePlan: "",
-            mobilitySupportNeeds: "",
+            mobilitySupportNeeds: [],
             behaviorSupportPlan: "",
-            communicationNeeds: "",
+            communicationNeeds: [],
             emergencyProtocols: "",
             docs: createInitialDocs(),
         },
