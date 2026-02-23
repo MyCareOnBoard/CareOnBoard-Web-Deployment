@@ -190,7 +190,7 @@ function ServiceAuthorizationFields({
 
       <div className="flex flex-col gap-1">
         <label className="text-[12px] font-normal text-[#10141a]">
-          Rate / Pay type
+          Staff Rate / Pay Type
         </label>
         <div className="flex gap-2">
           <Input

@@ -84,14 +84,29 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                 : initial.stage2.services,
         },
         stage3: {
-            medicalConditions: client.healthcareSafety?.medicalConditions || "",
-            allergies: client.healthcareSafety?.allergies || "",
-            dietaryRestrictions: client.healthcareSafety?.dietaryRestrictions || "",
-            seizurePlan: client.healthcareSafety?.seizurePlan || "",
-            mobilitySupportNeeds: client.healthcareSafety?.mobilitySupportNeeds || "",
-            behaviorSupportPlan: client.healthcareSafety?.behaviorSupportPlan || "",
-            communicationNeeds: client.healthcareSafety?.communicationNeeds || "",
-            emergencyProtocols: client.healthcareSafety?.emergencyProtocols || "",
+            medicalConditions: (() => {
+                const v = client.healthcareSafety?.medicalConditions ?? client.medicalConditions;
+                return Array.isArray(v) ? v : [];
+            })(),
+            allergies: (() => {
+                const v = client.healthcareSafety?.allergies ?? client.allergies;
+                return Array.isArray(v) ? v : [];
+            })(),
+            dietaryRestrictions: (() => {
+                const v = client.healthcareSafety?.dietaryRestrictions ?? client.dietaryRestrictions;
+                return Array.isArray(v) ? v : [];
+            })(),
+            seizurePlan: client.healthcareSafety?.seizurePlan ?? client.seizurePlan ?? "",
+            mobilitySupportNeeds: (() => {
+                const v = client.healthcareSafety?.mobilitySupportNeeds ?? client.mobilitySupportNeeds;
+                return Array.isArray(v) ? v : [];
+            })(),
+            behaviorSupportPlan: client.healthcareSafety?.behaviorSupportPlan ?? client.behaviorSupportPlan ?? "",
+            communicationNeeds: (() => {
+                const v = client.healthcareSafety?.communicationNeeds ?? client.communicationNeeds;
+                return Array.isArray(v) ? v : [];
+            })(),
+            emergencyProtocols: client.healthcareSafety?.emergencyProtocols ?? client.emergencyProtocols ?? "",
             docs: (() => {
                 const allDocs = createInitialDocs();
                 const existingDocs = client.documents || [];

@@ -80,13 +80,13 @@ export function formDataToApiPayload(
     supportCoordinatorAgency: s2.supportCoordinatorAgency || undefined,
     supportCoordinatorContact: s2.supportCoordinatorContact || undefined,
     services,
-    medicalConditions: s3.medicalConditions || undefined,
-    allergies: s3.allergies || undefined,
-    dietaryRestrictions: s3.dietaryRestrictions || undefined,
+    medicalConditions: s3.medicalConditions?.length ? s3.medicalConditions : undefined,
+    allergies: s3.allergies?.length ? s3.allergies : undefined,
+    dietaryRestrictions: s3.dietaryRestrictions?.length ? s3.dietaryRestrictions : undefined,
     seizurePlan: s3.seizurePlan || undefined,
-    mobilitySupportNeeds: s3.mobilitySupportNeeds || undefined,
+    mobilitySupportNeeds: s3.mobilitySupportNeeds?.length ? s3.mobilitySupportNeeds : undefined,
     behaviorSupportPlan: s3.behaviorSupportPlan || undefined,
-    communicationNeeds: s3.communicationNeeds || undefined,
+    communicationNeeds: s3.communicationNeeds?.length ? s3.communicationNeeds : undefined,
     emergencyProtocols: s3.emergencyProtocols || undefined,
     documents:
       s3.docs?.map((d) => ({

@@ -1,7 +1,35 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useAuth } from "@/utils/auth";
+import { UserType } from "@/utils/auth/types/user.types";
 import { AddClientFormData, YesNo } from "@/pages/shared/client-management/types/formData";
+
+const CUSTOM_OPTION = "Custom (Admin Only)";
+
+const MIN_SHIFT_LENGTH_OPTIONS_ALL = [
+  "1 Hour",
+  "2 Hours",
+  "3 Hours",
+  "4 Hours",
+  CUSTOM_OPTION,
+];
+
+const MAX_SHIFT_LENGTH_OPTIONS_ALL = [
+  "8 Hours",
+  "10 Hours",
+  "12 Hours",
+  "16 Hours",
+  "24 Hours (Live-in Only)",
+  CUSTOM_OPTION,
+];
 
 function YesNoRadio({
   label,
@@ -44,6 +72,16 @@ export function Stage4EvvAndVisitConfig({
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
   pageTitle?: string;
 }) {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
+
+  const minShiftLengthOptions = isSuperAdmin
+    ? MIN_SHIFT_LENGTH_OPTIONS_ALL
+    : MIN_SHIFT_LENGTH_OPTIONS_ALL.filter((o) => o !== CUSTOM_OPTION);
+  const maxShiftLengthOptions = isSuperAdmin
+    ? MAX_SHIFT_LENGTH_OPTIONS_ALL
+    : MAX_SHIFT_LENGTH_OPTIONS_ALL.filter((o) => o !== CUSTOM_OPTION);
+
   const stage4 = formData.stage4;
   const updateStage4 = (patch: Partial<AddClientFormData["stage4"]>) =>
     setFormData((prev) => ({ ...prev, stage4: { ...prev.stage4, ...patch } }));
@@ -98,24 +136,94 @@ export function Stage4EvvAndVisitConfig({
               <label className="text-[12px] font-normal text-[#10141a]">
                 Minimum shift length
               </label>
-              <Input
-                value={stage4.minShiftLength}
-                onChange={(e) => updateStage4({ minShiftLength: e.target.value })}
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                placeholder=""
-              />
+              <Select
+                value={
+                  minShiftLengthOptions.includes(stage4.minShiftLength)
+                    ? stage4.minShiftLength
+                    : stage4.minShiftLength && isSuperAdmin
+                      ? CUSTOM_OPTION
+                      : ""
+                }
+                onValueChange={(v) => updateStage4({ minShiftLength: v })}
+              >
+                <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                  <SelectValue placeholder="Select minimum shift length" />
+                </SelectTrigger>
+                <SelectContent>
+                  {minShiftLengthOptions.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isSuperAdmin &&
+                (stage4.minShiftLength === CUSTOM_OPTION ||
+                  (stage4.minShiftLength &&
+                    !MIN_SHIFT_LENGTH_OPTIONS_ALL.includes(stage4.minShiftLength))) && (
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={0.5}
+                  value={
+                    stage4.minShiftLength &&
+                    !MIN_SHIFT_LENGTH_OPTIONS_ALL.includes(stage4.minShiftLength)
+                      ? stage4.minShiftLength
+                      : ""
+                  }
+                  placeholder="Enter hours"
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
+                  onChange={(e) =>
+                    updateStage4({ minShiftLength: e.target.value })
+                  }
+                />
+              )}
             </div>
 
             <div className="flex flex-col gap-1">
               <label className="text-[12px] font-normal text-[#10141a]">
                 Maximum shift length
               </label>
-              <Input
-                value={stage4.maxShiftLength}
-                onChange={(e) => updateStage4({ maxShiftLength: e.target.value })}
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                placeholder=""
-              />
+              <Select
+                value={
+                  maxShiftLengthOptions.includes(stage4.maxShiftLength)
+                    ? stage4.maxShiftLength
+                    : stage4.maxShiftLength && isSuperAdmin
+                      ? CUSTOM_OPTION
+                      : ""
+                }
+                onValueChange={(v) => updateStage4({ maxShiftLength: v })}
+              >
+                <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                  <SelectValue placeholder="Select maximum shift length" />
+                </SelectTrigger>
+                <SelectContent>
+                  {maxShiftLengthOptions.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isSuperAdmin &&
+                (stage4.maxShiftLength === CUSTOM_OPTION ||
+                  (stage4.maxShiftLength &&
+                    !MAX_SHIFT_LENGTH_OPTIONS_ALL.includes(stage4.maxShiftLength))) && (
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={0.5}
+                  value={
+                    stage4.maxShiftLength &&
+                    !MAX_SHIFT_LENGTH_OPTIONS_ALL.includes(stage4.maxShiftLength)
+                      ? stage4.maxShiftLength
+                      : ""
+                  }
+                  placeholder="Enter hours"
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
+                  onChange={(e) =>
+                    updateStage4({ maxShiftLength: e.target.value })
+                  }
+                />
+              )}
             </div>
           </div>
 

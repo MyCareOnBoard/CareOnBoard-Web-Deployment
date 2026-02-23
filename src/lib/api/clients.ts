@@ -51,6 +51,15 @@ export interface Client {
   guardianInfo?: ClientGuardianInfo;
   healthcareSafety?: ClientHealthcareSafety;
   documents?: ClientDocument[];
+  // Flattened healthcare fields (when stored at top level)
+  medicalConditions?: string[];
+  allergies?: string[];
+  dietaryRestrictions?: string[];
+  seizurePlan?: string;
+  mobilitySupportNeeds?: string[];
+  behaviorSupportPlan?: string;
+  communicationNeeds?: string[];
+  emergencyProtocols?: string;
   evvVisitConfig?: ClientEvvVisitConfig;
   goalsAndEmergency?: ClientGoalsAndEmergency;
   systemAiAndAudit?: ClientSystemAiAndAudit;
@@ -98,13 +107,13 @@ export interface ClientGuardianInfo {
 }
 
 export interface ClientHealthcareSafety {
-  medicalConditions?: string;
-  allergies?: string;
-  dietaryRestrictions?: string;
+  medicalConditions?: string[];
+  allergies?: string[];
+  dietaryRestrictions?: string[];
   seizurePlan?: string;
-  mobilitySupportNeeds?: string;
+  mobilitySupportNeeds?: string[];
   behaviorSupportPlan?: string;
-  communicationNeeds?: string;
+  communicationNeeds?: string[];
   emergencyProtocols?: string;
 }
 
@@ -319,13 +328,13 @@ export interface CreateClientRequest {
   supportCoordinatorAgency?: string;
   supportCoordinatorContact?: string;
 
-  medicalConditions?: string;
-  allergies?: string;
-  dietaryRestrictions?: string;
+  medicalConditions?: string[];
+  allergies?: string[];
+  dietaryRestrictions?: string[];
   seizurePlan?: string;
-  mobilitySupportNeeds?: string;
+  mobilitySupportNeeds?: string[];
   behaviorSupportPlan?: string;
-  communicationNeeds?: string;
+  communicationNeeds?: string[];
   emergencyProtocols?: string;
 
   evvRequirement?: ClientYesNo;
@@ -418,13 +427,13 @@ export interface UpdateClientRequest {
   supportCoordinatorName?: string | null;
   supportCoordinatorAgency?: string | null;
   supportCoordinatorContact?: string | null;
-  medicalConditions?: string | null;
-  allergies?: string | null;
-  dietaryRestrictions?: string | null;
+  medicalConditions?: string[] | null;
+  allergies?: string[] | null;
+  dietaryRestrictions?: string[] | null;
   seizurePlan?: string | null;
-  mobilitySupportNeeds?: string | null;
+  mobilitySupportNeeds?: string[] | null;
   behaviorSupportPlan?: string | null;
-  communicationNeeds?: string | null;
+  communicationNeeds?: string[] | null;
   emergencyProtocols?: string | null;
   evvRequirement?: ClientYesNo | null;
   primaryVisitLocationGps?: ClientYesNo | null;

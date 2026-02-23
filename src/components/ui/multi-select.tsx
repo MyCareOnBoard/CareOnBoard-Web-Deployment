@@ -79,22 +79,22 @@ function MultiSelect({
                 onClick={() => !disabled && setOpen(!open)}
                 disabled={disabled}
                 className={cn(
-                    "flex w-full min-w-[254px] items-center justify-between gap-2 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-0 text-sm font-normal leading-[1.4] text-[var(--input-text)] outline-none transition-colors duration-200",
-                    "h-11 data-[size=sm]:h-9",
+                    "flex w-full min-w-[254px] min-h-0 items-center justify-between gap-2 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-0 text-sm font-normal leading-[1.4] text-[var(--input-text)] outline-none transition-colors duration-200",
+                    "h-11 data-[size=sm]:h-9 overflow-hidden",
                     "focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20",
                     "disabled:cursor-not-allowed disabled:opacity-60",
                     open && "border-primary ring-2 ring-ring/20",
                     buttonClassName
                 )}
             >
-                <div className="flex flex-1 flex-wrap items-center gap-1.5 overflow-hidden">
+                <div className="flex flex-1 min-w-0 min-h-0 flex-nowrap items-center gap-1.5 overflow-hidden">
                     {selectedValues.length === 0 ? (
                         <span className="text-[var(--input-placeholder)]">{placeholder}</span>
                     ) : (
                         selectedValues.map((val) => (
                             <span
                                 key={val}
-                                className="inline-flex items-center gap-1 rounded-md bg-[color-mix(in_oklab,var(--main-color)_12%,transparent)] px-2 py-0.5 text-xs font-medium text-[var(--input-text)]"
+                                className="inline-flex items-center gap-1 rounded-md bg-[color-mix(in_oklab,var(--main-color)_12%,transparent)] px-2 py-0.5 text-xs font-medium text-[var(--input-text)] whitespace-nowrap"
                             >
                 {getItemLabel(val)}
                                 <button

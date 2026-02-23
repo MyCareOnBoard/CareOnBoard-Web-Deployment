@@ -157,7 +157,7 @@ export function Stage7SystemAiAndAudit({
             />
           </div>
 
-          <div className="flex flex-col gap-1">
+          {/* <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">
               Notes Review Rules
             </label>
@@ -179,7 +179,7 @@ export function Stage7SystemAiAndAudit({
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder=""
             />
-          </div>
+          </div> */}
         </div>
       </div>
 
