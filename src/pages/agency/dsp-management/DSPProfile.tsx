@@ -8,6 +8,7 @@ import { Routes } from "@/routes/constants";
 import { listEmployeeDocuments, EmployeeDocument, sendDocumentAlert } from "@/lib/api/employee-documents";
 import { getEmployeeTrainings } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/utils/auth";
 import { ActivityTab } from "./components/ActivityTab";
 import { ShiftsTab } from "./components/ShiftsTab";
 import { ProfileTab } from "./components/ProfileTab";
@@ -25,6 +26,7 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
   const [showRequestDocument, setShowRequestDocument] = useState(false);
   const [currentDsp, setCurrentDsp] = useState<DSP>(dsp);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const navigate = useNavigate();
   const { shifts, isLoading: detailsLoading } = useDSPDetails(dsp.id);
@@ -48,7 +50,7 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
   const fetchTrainings = async () => {
     try {
       setTrainingsLoading(true);
-      const trainings = await getEmployeeTrainings(dsp.id);
+      const trainings = await getEmployeeTrainings(dsp.id, user?.agencyId);
       setTotalCount(trainings.length);
       setCompletedCount(trainings.filter((t) => t.status === 'completed').length);
     } catch (error) {
