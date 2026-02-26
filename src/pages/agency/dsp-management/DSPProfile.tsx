@@ -5,7 +5,7 @@ import { ChevronLeft, MessageSquare } from "lucide-react";
 import { DSP } from "./types";
 import { useDSPDetails,  useUpdateDSPStatus } from "./useDSPManagement";
 import { Routes } from "@/routes/constants";
-import { listEmployeeDocuments, EmployeeDocument, requestEmployeeDocument } from "@/lib/api/employee-documents";
+import { listEmployeeDocuments, EmployeeDocument, sendDocumentAlert } from "@/lib/api/employee-documents";
 import { getEmployeeTrainings } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import { ActivityTab } from "./components/ActivityTab";
@@ -36,6 +36,7 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
   
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [alertingDocId, setAlertingDocId] = useState<string | null>(null);
 
   useEffect(() => {
     if (dsp.id) {
@@ -97,11 +98,8 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
 
   const handleSendDocumentAlert = async (doc: EmployeeDocument) => {
     try {
-      await requestEmployeeDocument(
-        currentDsp.id,
-        doc.documentType,
-        `Your document "${doc.documentName}" is ${doc.status === 'expired' ? 'expired' : 'expiring soon'}. Please upload an updated version.`
-      );
+      setAlertingDocId(doc.id);
+      await sendDocumentAlert(currentDsp.id, doc.id);
       toast({
         title: "Alert Sent",
         description: `An alert has been sent to ${currentDsp.fullName} about their ${doc.status} document.`,
@@ -113,17 +111,21 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
         description: "Failed to send alert. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setAlertingDocId(null);
     }
   };
 
   const getDocumentActionButton = (status: string, doc?: EmployeeDocument) => {
     if ((status === 'expired' || status === 'expiring-soon') && doc) {
+      const isLoading = alertingDocId === doc.id;
       return (
         <button
           onClick={() => handleSendDocumentAlert(doc)}
-          className="px-4 py-1 bg-red-500 text-white text-xs rounded-full hover:bg-red-600 transition-colors cursor-pointer"
+          disabled={isLoading}
+          className="px-4 py-1 bg-red-500 text-white text-xs rounded-full hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Send Alert
+          {isLoading ? 'Sending...' : 'Send Alert'}
         </button>
       );
     }

@@ -327,7 +327,7 @@ export default function ComplianceMonitor() {
                   <Button
                     onClick={() => handleSendAlert(item)}
                     disabled={sendingAlert || item.status === "alerted"}
-                    className="bg-[rgba(178,178,179,0.1)] border border-[#b2b2b3] text-[#565656] hover:bg-[rgba(178,178,179,0.2)] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px] disabled:opacity-50">
+                    className="bg-red-500 border border-red-500 text-white hover:bg-red-600 rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px] disabled:opacity-50">
                     {sendingAlert ? (
                       <Loader2 className="w-4 h-4 animate-spin"/>
                     ) : (

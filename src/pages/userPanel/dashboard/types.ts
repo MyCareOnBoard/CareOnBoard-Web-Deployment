@@ -7,12 +7,14 @@ export interface GetEmployeeDocumentsResponse {
   status: string;
   uploadDate: string;
   expiryDate: string | null;
+  agencyId?: string;
 }
 
 export interface SaveEmployeeDocumentPayload {
   fileUrl: string;
   documentType: string;
   expiryDate: string | null;
+  agencyId?: string;
 }
 
 export interface GetEmployeeInfoResponse {

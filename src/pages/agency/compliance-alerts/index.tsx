@@ -4,16 +4,21 @@ import {useNavigate} from "react-router";
 import {Button} from "@/components/ui/button";
 import {Routes} from "@/routes/constants";
 import {useGetExpiredDocumentsQuery} from "./api";
+import {ExpiredDocument} from "./apiTypes";
 import {useAuth} from "@/utils/auth";
+import {sendDocumentAlert} from "@/lib/api/employee-documents";
+import {useToast} from "@/hooks/use-toast";
 
 export default function ComplianceAlertsPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("active");
+  const [alertingDocId, setAlertingDocId] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   const {user} = useAuth();
+  const {toast} = useToast();
 
   // Fetch expired documents
   const {data, isLoading, isError} = useGetExpiredDocumentsQuery(user?.agencyId ?? '', {
@@ -52,6 +57,26 @@ export default function ComplianceAlertsPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentAlerts = filteredAlerts.slice(startIndex, endIndex);
+
+  const handleSendAlert = async (doc: ExpiredDocument) => {
+    try {
+      setAlertingDocId(doc.id);
+      await sendDocumentAlert(doc.employeeId, doc.id);
+      toast({
+        title: "Alert Sent",
+        description: `An alert has been sent to ${doc.employee.fullName} about their expired document.`,
+      });
+    } catch (error) {
+      console.error('Failed to send document alert:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send alert. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAlertingDocId(null);
+    }
+  };
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -161,7 +186,9 @@ export default function ComplianceAlertsPage() {
               </tr>
               </thead>
               <tbody>
-              {currentAlerts.map((alert) => (
+              {currentAlerts.map((alert) => {
+                const isLoading = alertingDocId === alert.id;
+                return (
                 <tr
                   key={alert.id}
                   className="border-b border-[#e5e5e6] hover:bg-white/50 transition-colors"
@@ -199,12 +226,17 @@ export default function ComplianceAlertsPage() {
                   </td>
                   <td className="py-4 px-4">
                     <button
-                      className="px-4 py-2 text-[13px] rounded-full bg-[#B2B2B31A] border border-[#B2B2B3] font-semibold text-[#565656] hover:bg-[#B2B2B3] hover:text-white transition-colors">
-                      Send Alert
+                      onClick={() => {
+                        const doc = expiredDocuments.find(d => d.id === alert.id);
+                        if (doc) handleSendAlert(doc);
+                      }}
+                      disabled={isLoading}
+                      className="px-4 py-2 text-[13px] rounded-full bg-red-500 border border-red-500 font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                      {isLoading ? 'Sending...' : 'Send Alert'}
                     </button>
                   </td>
                 </tr>
-              ))}
+              )})}
               </tbody>
             </table>
           )}

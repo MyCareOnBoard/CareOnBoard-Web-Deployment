@@ -18,6 +18,7 @@ export interface ExpiredDocument {
   status: string;
   daysExpired: number;
   employee: Employee;
+  agencyId?: string;
 }
 
 export interface ExpiredDocumentsResponse {
