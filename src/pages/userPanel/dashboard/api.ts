@@ -64,6 +64,8 @@ export const userPanelDashboardApi = createApi({
                 method: "GET",
                 requiresAuth: true,
             }),
+            transformResponse: (response: { success: boolean; trainings: TrainingData[] }) =>
+                response.trainings ?? [],
         }),
         completeTraining: builder.mutation<
             void,

@@ -18,6 +18,7 @@ export interface EmployeeDocument {
   verifiedAt?: string;
   verifiedBy?: string;
   notes?: string;
+  agencyId?: string;
 }
 
 export interface ListEmployeeDocumentsResponse {
@@ -32,6 +33,7 @@ export interface UploadEmployeeDocumentRequest {
   file: File;
   expiryDate?: string;
   notes?: string;
+  agencyId?: string;
 }
 
 export interface UploadEmployeeDocumentResponse {
@@ -197,5 +199,27 @@ export async function requestEmployeeDocument(
   } catch (err: any) {
     console.error('requestEmployeeDocument error:', err);
     throw new Error(err.response?.data?.message || err.message || 'Failed to request employee document');
+  }
+}
+
+/**
+ * Send document alert (expired or expiring) to employee
+ * Endpoint: POST /employees/:employeeId/documents/:documentId/alerts
+ * Creates an in-app notification for the employee about the specific document.
+ */
+export async function sendDocumentAlert(
+  employeeId: string,
+  documentId: string,
+): Promise<void> {
+  try {
+    const response = await axiosClient.post<{ success: boolean; message: string }>(
+      `/employees/${employeeId}/documents/${documentId}/alerts`,
+    );
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Failed to send document alert');
+    }
+  } catch (err: any) {
+    console.error('sendDocumentAlert error:', err);
+    throw new Error(err.response?.data?.message || err.message || 'Failed to send document alert');
   }
 }

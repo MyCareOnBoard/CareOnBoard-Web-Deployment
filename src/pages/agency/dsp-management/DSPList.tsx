@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DSP } from "./types";
@@ -236,20 +237,22 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
                       <p className="text-lg font-semibold text-gray-900">{dsp.completedTrainings || 0}/{dsp.totalTrainings || 0}</p>
                     </div>
                   </div>
-                    {dsp.status === "active" ? (
-                      <button
-                        onClick={() => navigateToProfile(dsp)}
-                        className="px-6 py-2 bg-teal-500 text-white text-sm rounded-full hover:bg-teal-600 transition-colors cursor-pointer"
-                      >
-                        Details
-                      </button>
-                    ) : (
-                      <button
-                        className="px-6 py-2 bg-gray-200 text-gray-600 text-sm rounded-full hover:bg-teal-50 hover:text-teal-700 transition-colors cursor-pointer"
+                    {/* {dsp.status !== "active" && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="rounded-full"
                       >
                         Send Alert
-                      </button>
-                    )}
+                      </Button>
+                    )} */}
+                    <Button
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => navigateToProfile(dsp)}
+                    >
+                      Details
+                    </Button>
                 </div>
               );
             })}

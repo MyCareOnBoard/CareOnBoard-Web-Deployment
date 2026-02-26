@@ -283,11 +283,19 @@ export async function deleteEmployee(employeeId: string): Promise<{ success: boo
 /**
  * ✅ Get employee trainings
  * Endpoint: GET /employees/trainings
+ * Query params: employeeId (optional - for agency viewing a DSP), agencyId (required when employeeId is provided)
  */
-export async function getEmployeeTrainings(employeeId?: string): Promise<EmployeeTraining[]> {
+export async function getEmployeeTrainings(
+  employeeId?: string,
+  agencyId?: string,
+): Promise<EmployeeTraining[]> {
   try {
+    const params: Record<string, string> = {};
+    if (employeeId) params.employeeId = employeeId;
+    if (agencyId) params.agencyId = agencyId;
+
     const response = await axiosClient.get<EmployeeTrainingsResponse>('/employees/trainings', {
-      params: employeeId ? { employeeId } : undefined,
+      params: Object.keys(params).length > 0 ? params : undefined,
     });
 
     if (!response.data.success) {

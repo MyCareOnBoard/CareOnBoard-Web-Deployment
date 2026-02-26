@@ -4,8 +4,17 @@ import {
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
-	DialogDescription,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import CustomDatePicker from "@/components/ui/datePicker";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { requestEmployeeDocument, type EmployeeDocument, isExpiringSoon } from "@/lib/api/employee-documents";
 import { useToast } from "@/hooks/use-toast";
 
@@ -42,7 +51,7 @@ export function RequestDocumentModal({
 	const { toast } = useToast();
 	const [sending, setSending] = useState(false);
 	const [documentType, setDocumentType] = useState("");
-	const [expiryDate, setExpiryDate] = useState("");
+	const [expiryDate, setExpiryDate] = useState<Date | null>(null);
 
 	/** Find existing document for selected type to surface expiry info */
 	const existingDoc = documentType
@@ -67,7 +76,7 @@ export function RequestDocumentModal({
 			await requestEmployeeDocument(
 				employeeId,
 				documentType,
-				expiryDate || undefined,
+				expiryDate ? expiryDate.toISOString().slice(0, 10) : undefined,
 			);
 
 			toast({
@@ -91,46 +100,58 @@ export function RequestDocumentModal({
 
 	const resetAndClose = () => {
 		setDocumentType("");
-		setExpiryDate("");
+		setExpiryDate(null);
 		onClose();
 	};
 
 	return (
 		<Dialog open={open} onOpenChange={(next) => !next && resetAndClose()}>
-			<DialogContent className="w-[480px] max-w-[calc(100vw-32px)] p-0 gap-0">
-				<DialogHeader className="px-6 pt-6 pb-4 border-b">
-					<DialogTitle className="text-lg font-semibold">
-						Request New Document
+			<DialogContent className="w-[480px] max-w-[calc(100vw-32px)] p-0 gap-0 overflow-hidden rounded-2xl shadow-xl">
+				<DialogHeader className="px-6 pt-6 pb-4 text-left items-start">
+					<DialogTitle className="text-lg font-semibold text-[#10141a]">
+						Request Document
 					</DialogTitle>
-					<DialogDescription className="text-sm text-muted-foreground mt-0.5">
-						Send a document request to {employeeName}
-					</DialogDescription>
 				</DialogHeader>
 
-				<div className="px-6 py-5 space-y-4">
+				<div className="px-6 pb-6 space-y-4">
 					{/* Document Type */}
 					<div className="space-y-1.5">
-						<label className="text-sm font-medium text-gray-700">
+						<Label className="text-sm font-medium text-[#10141a]">
 							Document Type <span className="text-red-500">*</span>
-						</label>
-						<select
-							value={documentType}
-							onChange={(e) => setDocumentType(e.target.value)}
-							className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-						>
-							<option value="">Select document type</option>
-							{DOCUMENT_TYPES.map((dt) => (
-								<option key={dt.value} value={dt.value}>
-									{dt.label}
-								</option>
-							))}
-						</select>
+						</Label>
+						<Select value={documentType || undefined} onValueChange={setDocumentType}>
+							<SelectTrigger className="w-full h-10 rounded-lg border-[var(--input-border)] bg-[var(--input-bg)]">
+								<SelectValue placeholder="Select document type" />
+							</SelectTrigger>
+							<SelectContent>
+								{DOCUMENT_TYPES.map((dt) => (
+									<SelectItem key={dt.value} value={dt.value}>
+										{dt.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+
+					{/* Expiry Date (kept per user request) */}
+					<div className="space-y-1.5">
+						<Label className="text-sm font-medium text-[#10141a]">
+							Requested Expiry Date{" "}
+							<span className="text-[var(--grey-200)] font-normal">(optional)</span>
+						</Label>
+						<CustomDatePicker
+							date={expiryDate}
+							setDate={setExpiryDate}
+							placeholder="Select expiry date"
+							startMonth={new Date()}
+							endMonth={new Date(new Date().getFullYear() + 10, 11)}
+						/>
 					</div>
 
 					{/* Expiry status banner */}
 					{existingDoc && (isExpired || expiringSoon) && (
 						<div
-							className={`rounded-md px-4 py-2 text-sm font-medium ${
+							className={`rounded-lg px-4 py-2 text-sm font-medium ${
 								isExpired
 									? "bg-red-50 text-red-700 border border-red-200"
 									: "bg-amber-50 text-amber-700 border border-amber-200"
@@ -142,38 +163,20 @@ export function RequestDocumentModal({
 						</div>
 					)}
 
-					{/* Expiry Date */}
-					<div className="space-y-1.5">
-						<label className="text-sm font-medium text-gray-700">
-							Requested Expiry Date{" "}
-							<span className="text-muted-foreground font-normal">(optional)</span>
-						</label>
-						<input
-							type="date"
-							value={expiryDate}
-							onChange={(e) => setExpiryDate(e.target.value)}
-							min={new Date().toISOString().slice(0, 10)}
-							className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-						/>
-					</div>
-				</div>
+					<p className="text-sm text-[var(--grey-200)]">
+						This will send a notification to the user.
+					</p>
 
-				{/* Actions */}
-				<div className="flex items-center justify-end gap-3 px-6 py-4 border-t">
-					<button
-						onClick={resetAndClose}
-						disabled={sending}
-						className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-full hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors"
-					>
-						Cancel
-					</button>
-					<button
-						onClick={handleSend}
-						disabled={sending || !documentType}
-						className="px-5 py-2 text-sm font-medium text-white bg-teal-500 rounded-full hover:bg-teal-600 transition-colors disabled:opacity-50"
-					>
-						{sending ? "Sending..." : "Send Request"}
-					</button>
+					{/* Primary action - Figma: single teal pill button */}
+					<div className="pt-2">
+						<Button
+							onClick={handleSend}
+							disabled={sending || !documentType}
+							className="w-full px-6 py-2.5 rounded-full bg-teal-500 hover:bg-teal-600 text-white font-medium"
+						>
+							{sending ? "Sending..." : "Send Request"}
+						</Button>
+					</div>
 				</div>
 			</DialogContent>
 		</Dialog>

@@ -291,15 +291,14 @@ export function useUpdateDSPStatus() {
     dspId: string,
     status: 'active' | 'inactive' | 'suspended'
   ) => {
+    setIsUpdating(true);
+    setError(null);
     try {
-      setIsUpdating(true);
-      setError(null);
       await updateEmployee(dspId, { status }, agencyId);
-      return true;
     } catch (err: any) {
       console.error("Failed to update DSP status:", err);
       setError(err.message || "Failed to update status");
-      return false;
+      throw err;
     } finally {
       setIsUpdating(false);
     }

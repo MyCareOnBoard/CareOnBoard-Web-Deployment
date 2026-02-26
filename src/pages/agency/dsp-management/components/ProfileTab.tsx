@@ -1,12 +1,68 @@
+import { useState } from "react";
 import { DSP } from "../types";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProfileTabProps {
   dsp: DSP;
-  onDeactivate: () => void;
-  onActivate: () => void;
+  onDeactivate: () => void | Promise<void>;
+  onActivate: () => void | Promise<void>;
 }
 
 export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
+  const { toast } = useToast();
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"deactivate" | "activate" | null>(null);
+  const [isStatusLoading, setIsStatusLoading] = useState(false);
+
+  const handleDeactivateClick = () => {
+    setPendingAction("deactivate");
+    setShowStatusDialog(true);
+  };
+
+  const handleActivateClick = () => {
+    setPendingAction("activate");
+    setShowStatusDialog(true);
+  };
+
+  const handleConfirmStatusChange = async () => {
+    setIsStatusLoading(true);
+    try {
+      if (pendingAction === "deactivate") {
+        await Promise.resolve(onDeactivate());
+        toast({
+          title: "User Deactivated",
+          description: `${dsp.fullName} has been deactivated.`,
+        });
+      } else if (pendingAction === "activate") {
+        await Promise.resolve(onActivate());
+        toast({
+          title: "User Activated",
+          description: `${dsp.fullName} has been activated.`,
+        });
+      }
+      setShowStatusDialog(false);
+      setPendingAction(null);
+    } catch {
+      toast({
+        title: "Error",
+        description: `Failed to ${pendingAction === "deactivate" ? "deactivate" : "activate"} user. Please try again.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsStatusLoading(false);
+    }
+  };
+
+  const handleCancelStatusChange = () => {
+    if (isStatusLoading) return;
+    setShowStatusDialog(false);
+    setPendingAction(null);
+  };
+
+  const isDeactivating = pendingAction === "deactivate";
+
   return (<>
     <div className="bg-[#edf1f2] p-6 rounded-lg space-y-6">
       <div className="space-y-4">
@@ -106,25 +162,41 @@ export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
 
     </div>
       <div className="flex items-center gap-4 ">
-        <button className="px-6 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors cursor-pointer">
+        <Button variant="outline" size="sm">
           Report
-        </button>
+        </Button>
         {dsp.status === "active" ? (
-          <button
-            onClick={onDeactivate}
-            className="px-6 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors cursor-pointer"
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleDeactivateClick}
           >
             Deactivate User
-          </button>
+          </Button>
         ) : (
-          <button
-            onClick={onActivate}
-            className="px-6 py-2 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 transition-colors cursor-pointer"
+          <Button
+            size="sm"
+            onClick={handleActivateClick}
           >
             Activate User
-          </button>
+          </Button>
         )}
       </div>
+
+      <ConfirmDialog open={showStatusDialog} onOpenChange={(open) => !open && !isStatusLoading && handleCancelStatusChange()}>
+        <ConfirmDialogContent
+          title={isDeactivating ? "Deactivate User?" : "Activate User?"}
+          description={isDeactivating
+            ? `Are you sure you want to deactivate ${dsp.fullName}? They will no longer be able to access their user dashboard.`
+            : `Are you sure you want to activate ${dsp.fullName}? They will be able to access their user dashboard again.`}
+          confirmText={isDeactivating ? "Yes, Deactivate" : "Yes, Activate"}
+          cancelText="Cancel"
+          onConfirm={handleConfirmStatusChange}
+          onCancel={handleCancelStatusChange}
+          isLoading={isStatusLoading}
+          loadingText={isDeactivating ? "Deactivating..." : "Activating..."}
+        />
+      </ConfirmDialog>
   </>
   );
 }
