@@ -144,19 +144,11 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
   };
 
   const handleDeactivateUser = async () => {
-    try {
-      await updateStatus(dsp.id, "inactive");
-    } catch (error) {
-      console.error("Failed to deactivate user:", error);
-    }
+    await updateStatus(dsp.id, "inactive");
   };
 
   const handleActivateUser = async () => {
-    try {
-      await updateStatus(dsp.id, "active");
-    } catch (error) {
-      console.error("Failed to activate user:", error);
-    }
+    await updateStatus(dsp.id, "active");
   };
 
   return (

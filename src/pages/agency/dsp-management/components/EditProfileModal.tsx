@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
-	DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { updateEmployee, type UpdateEmployeeRequest } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import type { DSP } from "../types";
@@ -98,24 +98,22 @@ export function EditProfileModal({
 
 	return (
 		<Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-			<DialogContent className="w-[520px] max-w-[calc(100vw-32px)] p-0 gap-0">
-				<DialogHeader className="px-6 pt-6 pb-4 border-b">
-					<div className="flex items-center justify-between">
-						<DialogTitle className="text-lg font-semibold">
-							Edit Profile
-						</DialogTitle>
-					</div>
-					<DialogDescription className="text-sm text-muted-foreground mt-0.5">
+			<DialogContent className="w-[520px] max-w-[calc(100vw-32px)] p-0 gap-0 overflow-hidden rounded-2xl shadow-xl">
+				<DialogHeader className="px-6 pt-6 pb-4 text-left items-start">
+					<DialogTitle className="text-lg font-semibold text-[#10141a]">
+						Edit Profile
+					</DialogTitle>
+					<p className="text-sm text-[var(--grey-200)] mt-0.5">
 						Update {dsp.fullName}&apos;s information
-					</DialogDescription>
+					</p>
 				</DialogHeader>
 
 				<div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
 					{/* Full Name */}
 					<div className="space-y-1.5">
-						<label className="text-sm font-medium text-gray-700">
+						<Label className="text-sm font-medium text-[#10141a]">
 							Full Name
-						</label>
+						</Label>
 						<Input
 							value={form.fullName}
 							onChange={(e) => handleChange("fullName", e.target.value)}
@@ -125,9 +123,9 @@ export function EditProfileModal({
 
 					{/* Phone */}
 					<div className="space-y-1.5">
-						<label className="text-sm font-medium text-gray-700">
+						<Label className="text-sm font-medium text-[#10141a]">
 							Phone Number
-						</label>
+						</Label>
 						<Input
 							type="tel"
 							value={form.phone}
@@ -138,9 +136,9 @@ export function EditProfileModal({
 
 					{/* Address */}
 					<div className="space-y-1.5">
-						<label className="text-sm font-medium text-gray-700">
+						<Label className="text-sm font-medium text-[#10141a]">
 							Address
-						</label>
+						</Label>
 						<Input
 							value={form.address}
 							onChange={(e) => handleChange("address", e.target.value)}
@@ -150,35 +148,34 @@ export function EditProfileModal({
 
 					{/* Date of Birth */}
 					<div className="space-y-1.5">
-						<label className="text-sm font-medium text-gray-700">
+						<Label className="text-sm font-medium text-[#10141a]">
 							Date of Birth
-						</label>
+						</Label>
 						<Input
 							type="date"
 							value={form.dateOfBirth}
 							onChange={(e) => handleChange("dateOfBirth", e.target.value)}
 						/>
 					</div>
-
-		
 				</div>
 
 				{/* Actions */}
-				<div className="flex items-center justify-end gap-3 px-6 py-4 border-t">
-					<button
+				<div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+					<Button
+						variant="outline"
 						onClick={onClose}
 						disabled={saving}
-						className="px-5 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-full hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors"
+						className="px-5 py-2 rounded-full border-gray-300 text-gray-700 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors"
 					>
 						Cancel
-					</button>
-					<button
+					</Button>
+					<Button
 						onClick={handleSave}
 						disabled={saving}
-						className="px-5 py-2 text-sm font-medium text-white bg-teal-500 rounded-full hover:bg-teal-600 transition-colors disabled:opacity-50"
+						className="px-5 py-2 rounded-full bg-teal-500 hover:bg-teal-600 text-white font-medium disabled:opacity-50"
 					>
 						{saving ? "Saving..." : "Save Changes"}
-					</button>
+					</Button>
 				</div>
 			</DialogContent>
 		</Dialog>
