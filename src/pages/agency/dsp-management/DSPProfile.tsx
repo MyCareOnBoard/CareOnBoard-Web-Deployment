@@ -9,6 +9,7 @@ import { listEmployeeDocuments, EmployeeDocument, sendDocumentAlert } from "@/li
 import { getEmployeeTrainings } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
+import { useMessaging } from "@/contexts/MessagingContext";
 import { ActivityTab } from "./components/ActivityTab";
 import { ShiftsTab } from "./components/ShiftsTab";
 import { ProfileTab } from "./components/ProfileTab";
@@ -24,9 +25,11 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
   const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile">("Activity");
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showRequestDocument, setShowRequestDocument] = useState(false);
+  const [isOpeningChat, setIsOpeningChat] = useState(false);
   const [currentDsp, setCurrentDsp] = useState<DSP>(dsp);
   const { toast } = useToast();
   const { user } = useAuth();
+  const messaging = useMessaging();
 
   const navigate = useNavigate();
   const { shifts, isLoading: detailsLoading } = useDSPDetails(dsp.id);
@@ -151,6 +154,54 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
     await updateStatus(dsp.id, "active");
   };
 
+  const handleOpenChat = async () => {
+    if (isOpeningChat) return;
+
+    const dspParticipantId = currentDsp.uid || currentDsp.userId || currentDsp.id;
+    const currentUserId = user?.uid;
+
+    if (!currentUserId || !dspParticipantId) {
+      toast({
+        title: "Error",
+        description: "Unable to open chat right now.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsOpeningChat(true);
+
+      const existingConversation = messaging.conversations.find((conversation) => {
+        const participantIds = conversation.participantIds || [];
+        const isDirectConversation =
+          conversation.type === "direct" || participantIds.length === 2;
+
+        return (
+          isDirectConversation &&
+          participantIds.includes(currentUserId) &&
+          participantIds.includes(dspParticipantId)
+        );
+      });
+
+      const conversationId =
+        existingConversation?.id ??
+        (await messaging.createConversation([dspParticipantId]))?.id;
+
+      if (!conversationId) {
+        return;
+      }
+
+      navigate(
+        Routes.agency.supportConversation.replace(":conversationId", conversationId)
+      );
+    } catch (error) {
+      // Error toast is already handled in the messaging context
+    } finally {
+      setIsOpeningChat(false);
+    }
+  };
+
   return (
     <div className="  p-6 space-y-6">
       {/* Back Button */}
@@ -185,11 +236,12 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
             <p className="text-sm text-gray-600">{currentDsp.role} · {currentDsp.age} yrs old</p>
             <div className="flex items-center gap-2 mt-3">
               <button
-                onClick={() => navigate(Routes.agency.support)}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-500 text-white text-sm rounded-full hover:bg-teal-600 transition-colors"
+                onClick={handleOpenChat}
+                disabled={isOpeningChat}
+                className="flex items-center gap-2 px-4 py-2 bg-teal-500 text-white text-sm rounded-full hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <MessageSquare className="w-4 h-4" />
-                Chat
+                {isOpeningChat ? "Opening..." : "Chat"}
               </button>
               <button
                 onClick={() => setShowEditProfile(true)}

@@ -53,6 +53,7 @@ export function MessagingPage({
     const [contacts, setContacts] = useState<AgencyContact[]>([]);
     const [loadingContacts, setLoadingContacts] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [showChatView, setShowChatView] = useState(false);
 
     // Track which messages have been marked as read to avoid duplicate calls
@@ -122,29 +123,42 @@ export function MessagingPage({
         }
     }, [messaging.currentConversation?.id, messaging.currentMessages.length, user?.uid]);
 
+    const handleSelectConversation = useCallback((id: string) => {
+        messaging.selectConversation(id);
+        setShowChatView(true);
+        router.navigate(`${basePath}/${id}`);
+    }, [messaging, basePath]);
+
     const handleCreateConversation = useCallback(async (selectedUserIds: string[]) => {
         if (selectedUserIds.length === 0) return;
 
         try {
             const newConversation = await messaging.createConversation(selectedUserIds);
             if (newConversation) {
-                setIsNewMessageModalOpen(false);
+                handleSelectConversation(newConversation.id);
             }
         } catch (error: any) {
             // Error already handled in context
+        } finally {
+            setIsNewMessageModalOpen(false);
         }
-    }, [messaging]);
+    }, [messaging, handleSelectConversation]);
 
     const handleDeleteConversation = useCallback(async () => {
         if (!messaging.currentConversation) return;
 
         try {
+            setIsDeleting(true);
             await messaging.deleteConversation(messaging.currentConversation.id);
             messaging.selectConversation(null);
+            router.navigate(basePath);
         } catch (error: any) {
             // Error already handled in context
+        } finally {
+            setIsDeleting(false);
+            setIsDeleteDialogOpen(false);
         }
-    }, [messaging]);
+    }, [messaging, basePath, router]);
 
     const handleSendMessage = useCallback(async (content: string) => {
         if (!messaging.currentConversation?.id) {
@@ -157,12 +171,6 @@ export function MessagingPage({
         }
         await messaging.sendMessage(messaging.currentConversation.id, content);
     }, [messaging, toast]);
-
-    const handleSelectConversation = useCallback((id: string) => {
-        messaging.selectConversation(id);
-        setShowChatView(true);
-        router.navigate(`${basePath}/${id}`);
-    }, [messaging, basePath]);
 
     const handleBackToList = useCallback(() => {
         setShowChatView(false);
@@ -275,6 +283,8 @@ export function MessagingPage({
                     cancelText="Cancel"
                     onConfirm={handleDeleteConversation}
                     onCancel={handleCloseDeleteDialog}
+                    isLoading={isDeleting}
+                    loadingText="Deleting..."
                 />
             </ConfirmDialog>
         </>
