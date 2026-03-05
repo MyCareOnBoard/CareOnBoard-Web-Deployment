@@ -45,6 +45,7 @@ function transformEmployeeToDSP(employee: Employee): DSP {
 
   return {
     id: employee.id,
+    uid: employee.uid,
     userId: employee.userId,
     fullName: employee.fullName,
     email: employee.email,

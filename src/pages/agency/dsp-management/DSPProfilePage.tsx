@@ -53,6 +53,7 @@ export default function DSPProfilePage() {
 
         setDsp({
           id: employee.id,
+          uid: employee.uid || "",
           userId: employee.userId,
           fullName: employee.fullName,
           email: employee.email,

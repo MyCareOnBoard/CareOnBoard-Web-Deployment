@@ -3,6 +3,7 @@ import { ShiftLocation } from "@/lib/api/shifts";
 // Types
 export interface DSP {
   id: string;
+  uid?: string;
   userId: string;
   fullName: string;
   email: string;
