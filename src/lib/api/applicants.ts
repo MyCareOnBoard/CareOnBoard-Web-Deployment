@@ -12,6 +12,7 @@ export interface Applicant {
   documents: boolean;
   conditionalHire: boolean;
   finalAgencyReview: boolean;
+  officialHire: boolean;
   profilePictureUrl: string;
 }
 
@@ -305,6 +306,7 @@ const mapBackendToApplicant = (item: BackendApplicant): Applicant => {
     documents: Boolean(stages.documents?.completed),
     conditionalHire: Boolean(stages.conditionalHire?.completed),
     finalAgencyReview: Boolean(stages.finalAgencyReview?.completed),
+    officialHire: Boolean(stages.officialHire?.completed),
     profilePictureUrl: item?.profilePictureUrl || '',
   };
 };

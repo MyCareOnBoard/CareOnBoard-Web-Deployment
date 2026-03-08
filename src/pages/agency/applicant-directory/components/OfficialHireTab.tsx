@@ -48,7 +48,7 @@ export function OfficialHireTab({
                     <h3 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
                         Official Hire
                     </h3>
-                    <div className="rounded-[20px] bg-[rgba(255,255,255,0.8)] px-4 py-4 space-y-3">
+                    {/* <div className="rounded-[20px] bg-[rgba(255,255,255,0.8)] px-4 py-4 space-y-3">
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p className="text-[15px] font-semibold text-[#10141a]">
@@ -84,7 +84,7 @@ export function OfficialHireTab({
                                 </Button>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
                     {isLoading ? (
                         <div className="py-8 text-center text-sm text-[#808081]">
                             Loading status...
