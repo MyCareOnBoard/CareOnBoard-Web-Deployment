@@ -187,6 +187,9 @@ export interface ConditionalHireData {
 export interface ReviewStepData {
   stepKey: string;
   confirmed?: boolean;
+  rejected?: boolean;
+  rejectedBy?: string;
+  reason?: string | null;
   timestamp?: FirebaseTimestamp;
   confirmedBy?: string;
   updatedAt?: FirebaseTimestamp;
@@ -494,16 +497,17 @@ export const applicantsApi = {
   },
 
   /**
-   * Confirm a review step for an applicant
+   * Confirm or reject a review step for an applicant
    */
   confirmReviewStep: async (
     id: string,
     stepKey: string,
-    confirmed: boolean
+    confirmed: boolean,
+    reason?: string
   ): Promise<{ success: boolean; message: string; reviewStep: any }> => {
     const response = await axiosClient.post(
       `/agencyApplicants/${id}/review`,
-      { stepKey, confirmed }
+      { stepKey, confirmed, ...(reason != null && reason !== "" && { reason }) }
     );
     return response.data;
   },

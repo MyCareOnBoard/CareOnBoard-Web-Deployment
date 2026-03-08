@@ -101,6 +101,9 @@ export default function ApplicantProfilePage() {
   const [showRejectDocumentDialog, setShowRejectDocumentDialog] = useState(false);
   const [pendingRejectDocumentId, setPendingRejectDocumentId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [showRejectReviewStepDialog, setShowRejectReviewStepDialog] = useState(false);
+  const [pendingRejectStepKey, setPendingRejectStepKey] = useState<keyof ReviewStepsState | null>(null);
+  const [rejectReviewStepReason, setRejectReviewStepReason] = useState("");
   const [hasMovedBeyondDocumentsStage, setHasMovedBeyondDocumentsStage] =
     useState(false);
 
@@ -190,6 +193,7 @@ export default function ApplicantProfilePage() {
         ...prev,
         [stepKey]: {
           confirmed: true,
+          rejected: false,
           timestamp: new Date().toISOString()
         }
       }));
@@ -201,6 +205,45 @@ export default function ApplicantProfilePage() {
       toast({
         title: "Error",
         description: "Failed to confirm step",
+        variant: "destructive"
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleOpenRejectReviewStepDialog = (stepKey: keyof ReviewStepsState) => {
+    setPendingRejectStepKey(stepKey);
+    setRejectReviewStepReason("");
+    setShowRejectReviewStepDialog(true);
+  };
+
+  const handleRejectReviewStep = async () => {
+    const stepKey = pendingRejectStepKey;
+    if (!id || !stepKey) return;
+    setActionLoading(stepKey);
+    try {
+      await applicantsApi.confirmReviewStep(id, stepKey, false, rejectReviewStepReason);
+
+      setReviewSteps(prev => ({
+        ...prev,
+        [stepKey]: {
+          confirmed: false,
+          rejected: true,
+        }
+      }));
+      setShowRejectReviewStepDialog(false);
+      setPendingRejectStepKey(null);
+      setRejectReviewStepReason("");
+      toast({
+        title: "Rejected",
+        description: "Review step rejected. Applicant has been notified."
+      });
+      fetchApplicantData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to reject step",
         variant: "destructive"
       });
     } finally {
@@ -365,6 +408,11 @@ export default function ApplicantProfilePage() {
 
             mappedReviews[stepKey as keyof ReviewStepsState] = {
               confirmed: Boolean(reviewData.confirmed),
+              rejected: Boolean(
+                reviewData.rejected ||
+                (reviewData.confirmed === false &&
+                  (reviewData.rejectedBy || reviewData.reason))
+              ),
               timestamp,
             };
           }
@@ -828,6 +876,7 @@ export default function ApplicantProfilePage() {
             <FinalReviewTab
               reviewSteps={reviewSteps}
               onConfirm={handleConfirmReviewStep}
+              onReject={handleOpenRejectReviewStepDialog}
               actionLoading={actionLoading}
             />
           )}
@@ -887,6 +936,35 @@ export default function ApplicantProfilePage() {
                 value={rejectReason}
                 onChange={(event) => setRejectReason(event.target.value)}
                 placeholder="Enter rejection reason"
+                className="mt-3 min-h-[96px]"
+              />
+            </ConfirmDialogContent>
+          </ConfirmDialog>
+
+          <ConfirmDialog
+            open={showRejectReviewStepDialog}
+            onOpenChange={setShowRejectReviewStepDialog}
+          >
+            <ConfirmDialogContent
+              title="Reject Review Step?"
+              description="Optionally provide a reason. The applicant will be notified."
+              confirmText="Reject"
+              cancelText="Cancel"
+              onConfirm={handleRejectReviewStep}
+              onCancel={() => {
+                setShowRejectReviewStepDialog(false);
+                setPendingRejectStepKey(null);
+                setRejectReviewStepReason("");
+              }}
+              isLoading={Boolean(
+                pendingRejectStepKey && actionLoading === pendingRejectStepKey,
+              )}
+              loadingText="Rejecting..."
+            >
+              <Textarea
+                value={rejectReviewStepReason}
+                onChange={(event) => setRejectReviewStepReason(event.target.value)}
+                placeholder="Enter rejection reason (optional)"
                 className="mt-3 min-h-[96px]"
               />
             </ConfirmDialogContent>
