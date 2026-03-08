@@ -23,6 +23,7 @@ interface DocumentsTabProps {
   onRejectDocument: (docId: string) => void;
   onRequestDocument: (docType: string) => void;
   canAdvanceDocumentsStage: boolean;
+  showAdvanceDocumentsAction?: boolean;
   onAdvanceDocumentsStage: () => void;
 }
 
@@ -36,6 +37,7 @@ export function DocumentsTab({
   onRejectDocument,
   onRequestDocument,
   canAdvanceDocumentsStage,
+  showAdvanceDocumentsAction = true,
   onAdvanceDocumentsStage,
 }: DocumentsTabProps) {
   const documentByType = new Map(documents.map((document) => [document.type, document]));
@@ -223,15 +225,17 @@ export function DocumentsTab({
         )}
       </div>
 
-      <div className="flex justify-end">
-        <Button
-          onClick={onAdvanceDocumentsStage}
-          disabled={!canAdvanceDocumentsStage || isAdvancingStage}
-          className="rounded-[60px] bg-[#00B4B8] text-white hover:bg-[#009ca0] disabled:opacity-60"
-        >
-          {isAdvancingStage ? "Sending..." : "Send Conditional Hire Letter"}
-        </Button>
-      </div>
+      {showAdvanceDocumentsAction && (
+        <div className="flex justify-end">
+          <Button
+            onClick={onAdvanceDocumentsStage}
+            disabled={!canAdvanceDocumentsStage || isAdvancingStage}
+            className="rounded-[60px] bg-[#00B4B8] text-white hover:bg-[#009ca0] disabled:opacity-60"
+          >
+            {isAdvancingStage ? "Sending..." : "Send Conditional Hire Letter"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

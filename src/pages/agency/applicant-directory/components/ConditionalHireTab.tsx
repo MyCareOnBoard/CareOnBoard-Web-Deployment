@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Eye, CheckCircle, ExternalLink } from "lucide-react";
 import type { OfficialHireStatusResponse } from "@/lib/api/officialHire";
 import type { ComplianceData } from "@/lib/api/applicants";
@@ -10,14 +9,13 @@ import DigitalSignatureModal from "@/pages/applicant/application/components/Digi
 interface SignatureData {
   signatureType: string;
   signatureData: string;
+  createdAt?: { _seconds: number; _nanoseconds: number };
 }
 
 interface ConditionalHireTabProps {
   isLoading: boolean;
   hireStatus: OfficialHireStatusResponse["status"] | null;
   complianceData?: ComplianceData;
-  toggledAuthorizations: Set<string>;
-  onToggleAuthorization: (authKey: string, checked: boolean) => void;
   onSendAuthorizationAlert: (authKey: string) => void;
   actionLoading: string | null;
   signatureData?: SignatureData | null;
@@ -35,12 +33,13 @@ const authorizationLabels: Record<string, string> = {
   referenceChecks: "Reference Checks",
 };
 
+// All authorization keys (canonical order) - show all even if applicant has not approved
+const ALL_AUTHORIZATION_KEYS = Object.keys(authorizationLabels);
+
 export function ConditionalHireTab({
   isLoading,
   hireStatus,
   complianceData,
-  toggledAuthorizations,
-  onToggleAuthorization,
   onSendAuthorizationAlert,
   actionLoading,
   signatureData,
@@ -65,7 +64,7 @@ export function ConditionalHireTab({
             <div className="py-8 text-center text-sm text-[#808081]">
               Loading status...
             </div>
-          ) : hireStatus?.letterSigning?.hasSigned ? (
+          ) : (hireStatus?.letterSigning?.hasSigned || signatureData) ? (
             <div className="flex items-center justify-between gap-4 rounded-[8px] bg-[rgba(14,175,82,0.1)] px-4 py-3">
               <div className="flex items-start gap-3">
                 <div className="mt-[2px] flex h-5 w-5 items-center justify-center rounded-full bg-[#0eaf52]">
@@ -76,15 +75,20 @@ export function ConditionalHireTab({
                     Conditional Hire Letter Signed
                   </p>
                   <p className="mt-0.5 text-[13px] font-medium text-[#808081]">
-                    {hireStatus.letterSigning.signedAt
-                      ? `Signed on ${new Date(
-                        hireStatus.letterSigning.signedAt
-                      ).toLocaleDateString("en-US", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}`
-                      : "Signature received"}
+                    {(() => {
+                      const signedAt = hireStatus?.letterSigning?.signedAt
+                        ? new Date(hireStatus.letterSigning.signedAt)
+                        : signatureData?.createdAt?._seconds
+                          ? new Date(signatureData.createdAt._seconds * 1000)
+                          : null;
+                      return signedAt
+                        ? `Signed on ${signedAt.toLocaleDateString("en-US", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}`
+                        : "Signature received";
+                    })()}
                   </p>
                 </div>
               </div>
@@ -107,14 +111,15 @@ export function ConditionalHireTab({
           )}
         </div>
 
-        {/* Compliance Section */}
-        {complianceData?.authorizations && (
-          <div className="backdrop-blur-[8px] bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] px-4 py-4 md:px-6 md:py-5 space-y-4">
-            <h3 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-              Compliance
-            </h3>
-            <div className="space-y-3">
-              {Object.entries(complianceData.authorizations).map(([authKey, isEnabled]) => (
+        {/* Compliance Section - always show all authorizations */}
+        <div className="backdrop-blur-[8px] bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] px-4 py-4 md:px-6 md:py-5 space-y-4">
+          <h3 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
+            Compliance
+          </h3>
+          <div className="space-y-3">
+            {ALL_AUTHORIZATION_KEYS.map((authKey) => {
+              const isEnabled = complianceData?.authorizations?.[authKey] ?? false;
+              return (
                 <div
                   key={authKey}
                   className="flex flex-col gap-3 rounded-[16px] bg-[rgba(255,255,255,0.85)] px-4 py-3 md:flex-row md:items-center md:justify-between"
@@ -127,23 +132,11 @@ export function ConditionalHireTab({
                       className={
                         isEnabled
                           ? "rounded-[999px] bg-[rgba(14,175,82,0.1)] px-4 py-[4px] text-[12px] font-semibold text-[#0eaf52] border-0"
-                          : "rounded-[999px] bg-[rgba(213,52,17,0.08)] px-4 py-[4px] text-[12px] font-semibold text-[#d53411] border-0"
+                          : "rounded-[999px] bg-[rgba(128,128,129,0.12)] px-4 py-[4px] text-[12px] font-semibold text-[#525253] border-0"
                       }
                     >
-                      {isEnabled ? "Enabled" : "Disabled"}
+                      {isEnabled ? "Approved" : "Pending"}
                     </Badge>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[12px] font-medium text-[#808081]">
-                        {isEnabled ? "Approved" : "Pending"}
-                      </span>
-                      <Switch
-                        checked={Boolean(isEnabled)}
-                        disabled={actionLoading === authKey || toggledAuthorizations.has(authKey)}
-                        onCheckedChange={(checked) =>
-                          onToggleAuthorization(authKey, checked)
-                        }
-                      />
-                    </div>
                     {!isEnabled && (
                       <Button
                         variant="outline"
@@ -158,10 +151,10 @@ export function ConditionalHireTab({
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        )}
+        </div>
       </div>
     </>
   );

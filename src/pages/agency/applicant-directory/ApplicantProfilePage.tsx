@@ -53,10 +53,9 @@ export default function ApplicantProfilePage() {
   const [authApprovals, setAuthApprovals] = useState<Record<number, boolean>>({});
   const [complianceData, setComplianceData] = useState<ComplianceData | undefined>(undefined);
   const [signatures, setSignatures] = useState<{
-    conditionalHire?: { signatureType: string; signatureData: string; createdAt?: { _seconds: number; _nanoseconds: number } } | null;
-    officialHire?: { signatureType: string; signatureData: string; createdAt?: { _seconds: number; _nanoseconds: number } } | null;
+    conditionalHire?: { signatureType: string; signatureData: string; status?: string; createdAt?: { _seconds: number; _nanoseconds: number } } | null;
+    officialHire?: { signatureType: string; signatureData: string; status?: string; createdAt?: { _seconds: number; _nanoseconds: number } } | null;
   } | null>(null);
-  const [toggledAuthorizations, setToggledAuthorizations] = useState<Set<string>>(new Set());
   const [reviewSteps, setReviewSteps] = useState<ReviewStepsState>({
     documentsValid: { confirmed: false },
     backgroundCheck: { confirmed: false },
@@ -102,6 +101,8 @@ export default function ApplicantProfilePage() {
   const [showRejectDocumentDialog, setShowRejectDocumentDialog] = useState(false);
   const [pendingRejectDocumentId, setPendingRejectDocumentId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [hasMovedBeyondDocumentsStage, setHasMovedBeyondDocumentsStage] =
+    useState(false);
 
   const [applicant, setApplicant] = useState<{
     id: string;
@@ -176,27 +177,6 @@ export default function ApplicantProfilePage() {
   const getDocumentUrlByType = (type: string) => {
     const item = documentsData.find((doc) => doc.type === type);
     return item?.url;
-  };
-
-  const handleToggleCompliance = async (authKey: string, checked: boolean) => {
-    if (!id) return;
-    try {
-      await authorizationsApi.update(id, { [authKey]: checked });
-      // Add to toggled set to disable the toggle
-      setToggledAuthorizations(prev => new Set(prev).add(authKey));
-      toast({
-        title: "Success",
-        description: `Authorization ${checked ? 'approved' : 'disapproved'}`,
-      });
-      // Refresh applicant data
-      fetchApplicantData();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error?.response?.data?.message || "Failed to update authorization",
-        variant: "destructive",
-      });
-    }
   };
 
   const handleConfirmReviewStep = async (stepKey: keyof ReviewStepsState) => {
@@ -407,6 +387,16 @@ export default function ApplicantProfilePage() {
         official: data.officialHireStatus || null,
       });
 
+      const currentStep = String(data.currentApplicationStep || "").toLowerCase();
+      const movedBeyondDocuments =
+        currentStep === "conditional-hire" ||
+        currentStep === "compliance" ||
+        currentStep === "review" ||
+        currentStep === "final-agency-review" ||
+        currentStep === "official-hire" ||
+        currentStep === "orientation";
+      setHasMovedBeyondDocumentsStage(movedBeyondDocuments);
+
     } catch (error) {
       console.error('Error fetching applicant data:', error);
     } finally {
@@ -496,6 +486,11 @@ export default function ApplicantProfilePage() {
   );
   const hasReferences = references.length > 0;
   const documentsPillCompleted = allRequiredDocumentsExist && hasReferences;
+
+  // Conditional Hire pill: complete only when BOTH letter signed AND compliance finalized
+  const conditionalPillCompleted =
+    signatures?.conditionalHire?.status === "signed" && !!complianceData?.finalizedAt;
+
   const canAdvanceDocumentsStage =
     allRequiredDocumentsExist && allUploadedDocumentsAccepted && hasReferences;
 
@@ -744,12 +739,12 @@ export default function ApplicantProfilePage() {
                     onClick={() => handleNavigateToSection("conditional")}
                     className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "conditional"
                       ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                      : isStepComplete(stepStatuses.conditional)
+                      : conditionalPillCompleted
                         ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
                         : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                       }`}
                   >
-                    {isStepComplete(stepStatuses.conditional) ? (
+                    {conditionalPillCompleted ? (
                       <CheckCircle2 className="h-4 w-4" />
                     ) : (
                       <CircleAlert className="h-4 w-4" />
@@ -813,6 +808,7 @@ export default function ApplicantProfilePage() {
               onRejectDocument={handleOpenRejectDocumentDialog}
               onRequestDocument={handleRequestDocument}
               canAdvanceDocumentsStage={canAdvanceDocumentsStage}
+              showAdvanceDocumentsAction={!hasMovedBeyondDocumentsStage}
               onAdvanceDocumentsStage={() => setShowAdvanceDocumentsDialog(true)}
             />
           )}
@@ -822,8 +818,6 @@ export default function ApplicantProfilePage() {
               isLoading={isLoading}
               hireStatus={hireStatus}
               complianceData={complianceData}
-              toggledAuthorizations={toggledAuthorizations}
-              onToggleAuthorization={handleToggleCompliance}
               onSendAuthorizationAlert={handleSendAuthorizationAlert}
               actionLoading={actionLoading}
               signatureData={signatures?.conditionalHire}
