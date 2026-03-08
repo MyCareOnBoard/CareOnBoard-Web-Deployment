@@ -5,23 +5,17 @@ import {
   Phone,
   MessageSquare,
   ArrowLeft,
-  ExternalLink,
-  Eye,
-  CheckCircle,
   CheckCircle2,
   CircleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Routes } from "@/routes/constants";
-import { applicantsApi, type Applicant, type ApplicantDetailResponse, type ComplianceData } from "@/lib/api/applicants";
+import { applicantsApi, type ComplianceData } from "@/lib/api/applicants";
 import type { EligibilityData } from "@/lib/api/applicants";
 import { useToast } from "@/hooks/use-toast";
 import { agencyApplicantsExtraApi, ApplicantDocumentItem } from "@/lib/api/agencyApplicantsExtra";
 import { officialHireApi, OfficialHireStatusResponse } from "@/lib/api/officialHire";
-import { storageApi } from "@/lib/api/storage";
 import { authorizationsApi } from "@/lib/api/authorizations";
 import { ProfileTab } from "./components/ProfileTab";
 import { DocumentsTab } from "./components/DocumentsTab";
@@ -304,7 +298,22 @@ export default function ApplicantProfilePage() {
           }
         });
 
-        setDocumentsData(normalizedDocs);
+        setDocumentsData((prevDocs) => {
+          const prevDocsByType = new Map(prevDocs.map((doc) => [doc.type, doc]));
+
+          return normalizedDocs.map((doc) => {
+            const previousDoc = prevDocsByType.get(doc.type);
+
+            return previousDoc
+              ? {
+                ...doc,
+                status: previousDoc.status,
+                verifiedAt: previousDoc.verifiedAt,
+                note: previousDoc.note,
+              }
+              : doc;
+          });
+        });
 
         // Calculate progress
         const total = normalizedDocs.length;
@@ -432,6 +441,28 @@ export default function ApplicantProfilePage() {
     }
   };
 
+  const handleSendAuthorizationAlert = async (authKey: string) => {
+    if (!id) return;
+    setActionLoading(`alert-${authKey}`);
+    try {
+      await authorizationsApi.sendAlert(id, authKey, {
+        message: `Please complete the pending ${authKey} requirement to continue your onboarding.`,
+      });
+      toast({
+        title: "Alert Sent",
+        description: "The applicant has been notified about this pending requirement.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to send alert.",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleSendOfferLetter = async () => {
     if (!id) return;
     setActionLoading('offer-letter');
@@ -450,7 +481,7 @@ export default function ApplicantProfilePage() {
     if (!id) return;
     setActionLoading('signature');
     try {
-      await officialHireApi.requestSignature({ applicantId: id, docId: 'conditional-hire-letter' });
+      await officialHireApi.requestSignature({ applicantId: id, docId: 'official-hire' });
       toast({ title: 'Signature Requested', description: 'E-signature request has been sent.' });
       fetchApplicantData();
     } catch (error) {
@@ -694,8 +725,12 @@ export default function ApplicantProfilePage() {
           {activeSection === "documents" && (
             <DocumentsTab
               documentDefinitions={documentDefinitions}
+              documents={documentsData}
               getDocumentUrlByType={getDocumentUrlByType}
               references={references}
+              actionLoading={actionLoading}
+              onVerifyDocument={handleVerifyDocument}
+              onRejectDocument={handleRejectDocument}
             />
           )}
 
@@ -706,6 +741,8 @@ export default function ApplicantProfilePage() {
               complianceData={complianceData}
               toggledAuthorizations={toggledAuthorizations}
               onToggleAuthorization={handleToggleCompliance}
+              onSendAuthorizationAlert={handleSendAuthorizationAlert}
+              actionLoading={actionLoading}
               signatureData={signatures?.conditionalHire}
             />
           )}
@@ -726,6 +763,10 @@ export default function ApplicantProfilePage() {
                 ? new Date(signatures.officialHire.createdAt._seconds * 1000).toISOString()
                 : undefined}
               signatureData={signatures?.officialHire}
+              actionLoading={actionLoading}
+              onSendOfferLetter={handleSendOfferLetter}
+              onRequestSignature={handleRequestSignature}
+              onConfirmHire={handleConfirmHire}
             />
           )}
         </div>

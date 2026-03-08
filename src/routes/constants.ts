@@ -33,6 +33,7 @@ export const Routes = {
         supportConversation: "/agency/support/:conversationId",
         analytics: "/agency/analytics",
         applicantDirectory: "/agency/applicant-directory",
+        applicantAllApplicants: "/agency/applicant-directory/all-applicants",
         applicantClearanceHiring: "/agency/applicant-directory/clearance-hiring",
         applicantPendingApplicants: "/agency/applicant-directory/pending-applicants",
         applicantProfile: "/agency/applicant-directory/:id/profile",

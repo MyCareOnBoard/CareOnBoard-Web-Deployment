@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Check, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
@@ -7,6 +7,7 @@ import { Routes } from "@/routes/constants";
 import { agencyApplicantsExtraApi } from "@/lib/api/agencyApplicantsExtra";
 import { applicantsApi } from "@/lib/api/applicants";
 import { useToast } from "@/hooks/use-toast";
+import { DirectoryViewNav } from "./components/DirectoryViewNav";
 
 interface ClearanceItem {
   id: string;
@@ -16,6 +17,7 @@ interface ClearanceItem {
 
 export function ClearanceHiring() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState<"today" | "week" | "month">("today");
   const [searchQuery, setSearchQuery] = useState("");
@@ -168,6 +170,8 @@ export function ClearanceHiring() {
           <h1 className="text-[28px] font-bold text-[#10141a]">Applicant's directory</h1>
         </div>
       </div>
+
+      <DirectoryViewNav currentPath={location.pathname} />
 
       {/* Subheader and Filters */}
       <div className="relative p-4 overflow-hidden rounded-[24px] backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)] shadow-sm"

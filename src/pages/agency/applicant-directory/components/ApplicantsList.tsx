@@ -15,6 +15,8 @@ interface ApplicantsListProps {
   onPageChange: (page: number) => void;
   onApplicantSelect: (applicant: Applicant) => void;
   isLoading?: boolean;
+  title?: string;
+  description?: string;
 }
 
 function getInitials(name: string) {
@@ -129,18 +131,19 @@ export function ApplicantsList({
   onPageChange,
   onApplicantSelect,
   isLoading,
+  title = "All Applicants",
+  description = "Browse and review applicants assigned to your agency.",
 }: ApplicantsListProps) {
-  console.log(applicants)
   return (
     <div className="bg-white rounded-[30px] border border-[#e5e5e6] p-4 md:p-6 w-full">
       {/* Filters Section */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
         <div className="flex-1 min-w-[180px]">
           <h2 className="text-base font-semibold text-[#10141a] mb-1">
-            Pending Applicants
+            {title}
           </h2>
           <p className="text-sm text-[#808081]">
-            These are your Pending Applicants
+            {description}
           </p>
         </div>
 

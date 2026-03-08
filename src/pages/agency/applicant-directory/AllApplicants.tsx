@@ -1,12 +1,10 @@
 import { useLocation, useNavigate } from "react-router";
-import { ArrowLeft } from "lucide-react";
 import { Routes } from "@/routes/constants";
-import { Button } from "@/components/ui/button";
 import { ApplicantsList } from "./components/ApplicantsList";
 import { DirectoryViewNav } from "./components/DirectoryViewNav";
 import { useApplicantDirectoryData } from "./useApplicantDirectoryData";
 
-export default function PendingApplicants() {
+export default function AllApplicants() {
   const navigate = useNavigate();
   const location = useLocation();
   const {
@@ -19,7 +17,7 @@ export default function PendingApplicants() {
     setSearchQuery,
     setActiveTab,
     goToPage,
-  } = useApplicantDirectoryData({ tab: "pending" });
+  } = useApplicantDirectoryData({ tab: "all" });
 
   const handleViewDetails = (id: string) => {
     navigate(Routes.agency.applicantProfile.replace(":id", id));
@@ -27,26 +25,19 @@ export default function PendingApplicants() {
 
   return (
     <div className="min-h-screen">
-      <div className="p-2">
-        <div className="mx-auto max-w-7xl">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(Routes.agency.applicantDirectory)}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Applicant&apos;s directory
-            </h1>
-          </div>
+      {/* Main Content */}
+      <div className="mx-auto max-w-7xl">
+        {/* Header */}
+        <div className="flex mb-4">
+          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
+            Applicants directory
+          </h1>
+        </div>
 
-          <DirectoryViewNav currentPath={location.pathname} />
+        <DirectoryViewNav currentPath={location.pathname} />
 
-          {/* Pending Applicants Full Page List */}
+        {/* Applicant Directory List Section */}
+        <div className="backdrop-blur-[8px] bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] border-solid overflow-hidden relative rounded-[30px]">
           <ApplicantsList
             applicants={applicants}
             searchQuery={searchQuery}
@@ -58,8 +49,8 @@ export default function PendingApplicants() {
             onPageChange={goToPage}
             onApplicantSelect={(applicant) => handleViewDetails(applicant.id)}
             isLoading={isLoading}
-            title="Pending Applicants"
-            description="All pending applications."
+            title="All Applicants"
+            description="All applicants in your agency"
           />
         </div>
       </div>

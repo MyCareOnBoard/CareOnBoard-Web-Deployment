@@ -18,6 +18,8 @@ interface ConditionalHireTabProps {
   complianceData?: ComplianceData;
   toggledAuthorizations: Set<string>;
   onToggleAuthorization: (authKey: string, checked: boolean) => void;
+  onSendAuthorizationAlert: (authKey: string) => void;
+  actionLoading: string | null;
   signatureData?: SignatureData | null;
 }
 
@@ -39,6 +41,8 @@ export function ConditionalHireTab({
   complianceData,
   toggledAuthorizations,
   onToggleAuthorization,
+  onSendAuthorizationAlert,
+  actionLoading,
   signatureData,
 }: ConditionalHireTabProps) {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
@@ -113,12 +117,12 @@ export function ConditionalHireTab({
               {Object.entries(complianceData.authorizations).map(([authKey, isEnabled]) => (
                 <div
                   key={authKey}
-                  className="flex items-center justify-between rounded-[16px] bg-[rgba(255,255,255,0.85)] px-4 py-3"
+                  className="flex flex-col gap-3 rounded-[16px] bg-[rgba(255,255,255,0.85)] px-4 py-3 md:flex-row md:items-center md:justify-between"
                 >
                   <span className="flex-1 text-[14px] font-medium text-[#10141a]">
                     {authorizationLabels[authKey] || authKey}
                   </span>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-4">
                     <Badge
                       className={
                         isEnabled
@@ -128,27 +132,29 @@ export function ConditionalHireTab({
                     >
                       {isEnabled ? "Enabled" : "Disabled"}
                     </Badge>
-                    {!isEnabled ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2 rounded-[60px] border-[#d53411] px-4 py-[6px] text-[12px] font-semibold text-[#d53411] hover:bg-[rgba(213,52,17,0.06)]"
-                        onClick={() => {
-                          // Send alert functionality can be added here if needed
-                          console.log('Send alert for:', authKey);
-                        }}
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Send Alert
-                      </Button>
-                    ) : (
+                    <div className="flex items-center gap-3">
+                      <span className="text-[12px] font-medium text-[#808081]">
+                        {isEnabled ? "Approved" : "Pending"}
+                      </span>
                       <Switch
-                        checked={isEnabled}
-                        disabled={true}
+                        checked={Boolean(isEnabled)}
+                        disabled={actionLoading === authKey || toggledAuthorizations.has(authKey)}
                         onCheckedChange={(checked) =>
                           onToggleAuthorization(authKey, checked)
                         }
                       />
+                    </div>
+                    {!isEnabled && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2 rounded-[60px] border-[#d53411] px-4 py-[6px] text-[12px] font-semibold text-[#d53411] hover:bg-[rgba(213,52,17,0.06)]"
+                        disabled={actionLoading === `alert-${authKey}`}
+                        onClick={() => onSendAuthorizationAlert(authKey)}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {actionLoading === `alert-${authKey}` ? "Sending..." : "Send Alert"}
+                      </Button>
                     )}
                   </div>
                 </div>
