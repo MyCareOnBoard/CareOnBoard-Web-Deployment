@@ -220,6 +220,15 @@ export interface ApplicantDetailResponse {
   profilePictureUrl?: string;
   preScreening?: PreScreeningData;
   eligibility?: EligibilityData;
+  eligibilityDocumentStatuses?: Record<
+    string,
+    {
+      status?: "pending" | "uploaded" | "verified" | "rejected";
+      note?: string | null;
+      updatedAt?: FirebaseTimestamp;
+      updatedBy?: string;
+    }
+  >;
   compliance?: ComplianceData;
   conditionalHire?: ConditionalHireData;
   reviews?: Record<string, ReviewStepData>;

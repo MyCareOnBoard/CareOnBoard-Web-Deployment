@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Routes } from "@/routes/constants";
 import { applicantsApi, type ComplianceData } from "@/lib/api/applicants";
 import type { EligibilityData } from "@/lib/api/applicants";
@@ -96,6 +98,10 @@ export default function ApplicantProfilePage() {
   };
 
   const [references, setReferences] = useState<ReferenceItem[]>([]);
+  const [showAdvanceDocumentsDialog, setShowAdvanceDocumentsDialog] = useState(false);
+  const [showRejectDocumentDialog, setShowRejectDocumentDialog] = useState(false);
+  const [pendingRejectDocumentId, setPendingRejectDocumentId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const [applicant, setApplicant] = useState<{
     id: string;
@@ -266,8 +272,15 @@ export default function ApplicantProfilePage() {
 
       // Extract documents from eligibility data
       const eligibility = data.eligibility;
+      const eligibilityDocumentStatuses = data.eligibilityDocumentStatuses || {};
       if (eligibility) {
         const normalizedDocs: ApplicantDocumentItem[] = [];
+        const toIsoFromTimestamp = (
+          ts?: { _seconds?: number; _nanoseconds?: number } | null,
+        ) => {
+          if (!ts || typeof ts._seconds !== "number") return undefined;
+          return new Date(ts._seconds * 1000).toISOString();
+        };
 
         // Map each document type
         const docMap: Record<string, { url?: DocumentFile; label: string }> = {
@@ -284,36 +297,30 @@ export default function ApplicantProfilePage() {
 
         Object.entries(docMap).forEach(([type, { url, label }]) => {
           if (url?.fileUrl) {
+            const savedStatus = eligibilityDocumentStatuses?.[type];
+            const status =
+              savedStatus?.status && ["pending", "uploaded", "verified", "rejected"].includes(savedStatus.status)
+                ? (savedStatus.status as ApplicantDocumentItem["status"])
+                : ("uploaded" as const);
             normalizedDocs.push({
               id: type,
               type,
               label,
               required: false,
-              status: 'uploaded' as const,
+              status,
               url: url.fileUrl,
+              expiryDate: typeof url.expiryDate === "string" ? url.expiryDate : undefined,
               uploadedAt: undefined,
-              verifiedAt: undefined,
-              note: undefined,
+              verifiedAt:
+                status === "verified"
+                  ? toIsoFromTimestamp(savedStatus?.updatedAt)
+                  : undefined,
+              note: savedStatus?.note || undefined,
             });
           }
         });
 
-        setDocumentsData((prevDocs) => {
-          const prevDocsByType = new Map(prevDocs.map((doc) => [doc.type, doc]));
-
-          return normalizedDocs.map((doc) => {
-            const previousDoc = prevDocsByType.get(doc.type);
-
-            return previousDoc
-              ? {
-                ...doc,
-                status: previousDoc.status,
-                verifiedAt: previousDoc.verifiedAt,
-                note: previousDoc.note,
-              }
-              : doc;
-          });
-        });
+        setDocumentsData(normalizedDocs);
 
         // Calculate progress
         const total = normalizedDocs.length;
@@ -415,27 +422,100 @@ export default function ApplicantProfilePage() {
     if (!id) return;
     setActionLoading(docId);
     try {
-      await agencyApplicantsExtraApi.verifyDocument(id, docId, 'Verified by agency');
+      await agencyApplicantsExtraApi.verifyDocument(id, docId, 'Accepted by agency');
       setDocumentsData(prev => prev.map(d => d.id === docId ? { ...d, status: 'verified' as const, verifiedAt: new Date().toISOString() } : d));
-      toast({ title: 'Document Verified', description: 'Document has been verified successfully.' });
-      fetchApplicantData(); // Refresh to update progress
+      toast({ title: 'Document Accepted', description: 'Document has been accepted successfully.' });
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to verify document.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to accept document.', variant: 'destructive' });
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleRejectDocument = async (docId: string) => {
+  const handleOpenRejectDocumentDialog = (docId: string) => {
+    setPendingRejectDocumentId(docId);
+    setRejectReason("");
+    setShowRejectDocumentDialog(true);
+  };
+
+  const handleRejectDocument = async () => {
+    const docId = pendingRejectDocumentId;
     if (!id) return;
+    if (!docId) return;
+    if (!rejectReason.trim()) {
+      toast({
+        title: "Reason Required",
+        description: "Please provide a rejection reason before continuing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setActionLoading(docId);
     try {
-      await agencyApplicantsExtraApi.rejectDocument(id, docId, 'Document requires corrections');
-      setDocumentsData(prev => prev.map(d => d.id === docId ? { ...d, status: 'rejected' as const, note: 'Document requires corrections' } : d));
+      await agencyApplicantsExtraApi.rejectDocument(id, docId, rejectReason.trim());
+      setDocumentsData(prev => prev.map(d => d.id === docId ? { ...d, status: 'rejected' as const, note: rejectReason.trim() } : d));
       toast({ title: 'Document Rejected', description: 'Document has been rejected.' });
-      fetchApplicantData();
+      setShowRejectDocumentDialog(false);
+      setPendingRejectDocumentId(null);
+      setRejectReason("");
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to reject document.', variant: 'destructive' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRequestDocument = async (docType: string) => {
+    if (!id) return;
+    setActionLoading(`request-${docType}`);
+    try {
+      await agencyApplicantsExtraApi.requestDocument(id, docType);
+      toast({
+        title: "Document Request Sent",
+        description: "The applicant has been notified to upload the requested document.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to send document request.",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const statusByType = new Map(documentsData.map((document) => [document.type, document.status]));
+  const requiredDocumentTypes = documentDefinitions.map((definition) => definition.type);
+  const allRequiredDocumentsExist = requiredDocumentTypes.every((type) =>
+    Boolean(getDocumentUrlByType(type)),
+  );
+  const allUploadedDocumentsAccepted = requiredDocumentTypes.every(
+    (type) => statusByType.get(type) === "verified",
+  );
+  const hasReferences = references.length > 0;
+  const documentsPillCompleted = allRequiredDocumentsExist && hasReferences;
+  const canAdvanceDocumentsStage =
+    allRequiredDocumentsExist && allUploadedDocumentsAccepted && hasReferences;
+
+  const handleConfirmAdvanceDocumentsStage = async () => {
+    if (!id) return;
+    setActionLoading("advance-documents-stage");
+    try {
+      await agencyApplicantsExtraApi.advanceFromDocuments(id);
+      toast({
+        title: "Application Moved",
+        description: "The applicant has been moved to Conditional Hire & Compliance.",
+      });
+      setShowAdvanceDocumentsDialog(false);
+      fetchApplicantData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to move applicant to next stage.",
+        variant: "destructive",
+      });
     } finally {
       setActionLoading(null);
     }
@@ -619,12 +699,12 @@ export default function ApplicantProfilePage() {
                 </div>
 
                 {/* Stage Pills */}
-                <div className="mt-6 flex flex-wrap gap-3">
+                <div className="relative z-10 mt-6 flex flex-wrap gap-3">
                   {/* Profile */}
                   <button
                     type="button"
                     onClick={() => handleNavigateToSection("profile")}
-                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "profile"
+                    className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "profile"
                       ? "bg-[#00b4b8] text-white border-[#00b4b8]"
                       : !!(stepStatuses.profile)
                         ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
@@ -643,14 +723,14 @@ export default function ApplicantProfilePage() {
                   <button
                     type="button"
                     onClick={() => handleNavigateToSection("documents")}
-                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "documents"
+                    className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "documents"
                       ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                      : isStepComplete(stepStatuses.documents)
+                      : documentsPillCompleted
                         ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
                         : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
                       }`}
                   >
-                    {isStepComplete(stepStatuses.documents) ? (
+                    {documentsPillCompleted ? (
                       <CheckCircle2 className="h-4 w-4" />
                     ) : (
                       <CircleAlert className="h-4 w-4" />
@@ -662,7 +742,7 @@ export default function ApplicantProfilePage() {
                   <button
                     type="button"
                     onClick={() => handleNavigateToSection("conditional")}
-                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "conditional"
+                    className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "conditional"
                       ? "bg-[#00b4b8] text-white border-[#00b4b8]"
                       : isStepComplete(stepStatuses.conditional)
                         ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
@@ -681,7 +761,7 @@ export default function ApplicantProfilePage() {
                   <button
                     type="button"
                     onClick={() => handleNavigateToSection("final")}
-                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "final"
+                    className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "final"
                       ? "bg-[#00b4b8] text-white border-[#00b4b8]"
                       : isStepComplete(stepStatuses.final)
                         ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
@@ -700,7 +780,7 @@ export default function ApplicantProfilePage() {
                   <button
                     type="button"
                     onClick={() => handleNavigateToSection("official")}
-                    className={`flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
+                    className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
                       ? "bg-[#00b4b8] text-white border-[#00b4b8]"
                       : isStepComplete(stepStatuses.official)
                         ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
@@ -730,7 +810,10 @@ export default function ApplicantProfilePage() {
               references={references}
               actionLoading={actionLoading}
               onVerifyDocument={handleVerifyDocument}
-              onRejectDocument={handleRejectDocument}
+              onRejectDocument={handleOpenRejectDocumentDialog}
+              onRequestDocument={handleRequestDocument}
+              canAdvanceDocumentsStage={canAdvanceDocumentsStage}
+              onAdvanceDocumentsStage={() => setShowAdvanceDocumentsDialog(true)}
             />
           )}
 
@@ -769,6 +852,51 @@ export default function ApplicantProfilePage() {
               onConfirmHire={handleConfirmHire}
             />
           )}
+
+          <ConfirmDialog
+            open={showAdvanceDocumentsDialog}
+            onOpenChange={setShowAdvanceDocumentsDialog}
+          >
+            <ConfirmDialogContent
+              title="Move to Next Stage?"
+              description="This will move the applicant to Conditional Hire & Compliance Stage."
+              confirmText="Yes, Move"
+              cancelText="Cancel"
+              onConfirm={handleConfirmAdvanceDocumentsStage}
+              onCancel={() => setShowAdvanceDocumentsDialog(false)}
+              isLoading={actionLoading === "advance-documents-stage"}
+              loadingText="Moving..."
+            />
+          </ConfirmDialog>
+
+          <ConfirmDialog
+            open={showRejectDocumentDialog}
+            onOpenChange={setShowRejectDocumentDialog}
+          >
+            <ConfirmDialogContent
+              title="Reject Document?"
+              description="Please provide a reason. This reason will be sent to the applicant."
+              confirmText="Reject Document"
+              cancelText="Cancel"
+              onConfirm={handleRejectDocument}
+              onCancel={() => {
+                setShowRejectDocumentDialog(false);
+                setPendingRejectDocumentId(null);
+                setRejectReason("");
+              }}
+              isLoading={Boolean(
+                pendingRejectDocumentId && actionLoading === pendingRejectDocumentId,
+              )}
+              loadingText="Rejecting..."
+            >
+              <Textarea
+                value={rejectReason}
+                onChange={(event) => setRejectReason(event.target.value)}
+                placeholder="Enter rejection reason"
+                className="mt-3 min-h-[96px]"
+              />
+            </ConfirmDialogContent>
+          </ConfirmDialog>
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ export type ApplicantDocumentItem = {
   required: boolean;
   status: 'pending' | 'uploaded' | 'verified' | 'rejected';
   url?: string;
+  expiryDate?: string;
   uploadedAt?: string;
   verifiedAt?: string;
   note?: string;
@@ -49,6 +50,20 @@ export const agencyApplicantsExtraApi = {
   },
   async rejectDocument(uid: string, docId: string, reason: string) {
     const res = await axiosClient.post(`/agencyApplicants/${encodeURIComponent(uid)}/documents/${encodeURIComponent(docId)}/reject`, { reason });
+    return res.data;
+  },
+  async requestDocument(uid: string, documentType: string, expiryDate?: string) {
+    const res = await axiosClient.post(
+      `/agencyApplicants/${encodeURIComponent(uid)}/documents/request`,
+      { documentType, expiryDate },
+    );
+    return res.data;
+  },
+  async advanceFromDocuments(uid: string) {
+    const res = await axiosClient.post(
+      `/agencyApplicants/${encodeURIComponent(uid)}/documents/advance`,
+      {},
+    );
     return res.data;
   },
   async updateDocument(uid: string, docId: string, payload: Partial<ApplicantDocumentItem>) {

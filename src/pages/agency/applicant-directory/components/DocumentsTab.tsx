@@ -21,6 +21,9 @@ interface DocumentsTabProps {
   actionLoading: string | null;
   onVerifyDocument: (docId: string) => void;
   onRejectDocument: (docId: string) => void;
+  onRequestDocument: (docType: string) => void;
+  canAdvanceDocumentsStage: boolean;
+  onAdvanceDocumentsStage: () => void;
 }
 
 export function DocumentsTab({
@@ -31,8 +34,12 @@ export function DocumentsTab({
   actionLoading,
   onVerifyDocument,
   onRejectDocument,
+  onRequestDocument,
+  canAdvanceDocumentsStage,
+  onAdvanceDocumentsStage,
 }: DocumentsTabProps) {
   const documentByType = new Map(documents.map((document) => [document.type, document]));
+  const isAdvancingStage = actionLoading === "advance-documents-stage";
 
   const getStatusClasses = (status: ApplicantDocumentItem["status"]) => {
     switch (status) {
@@ -47,6 +54,30 @@ export function DocumentsTab({
     }
   };
 
+  const getStatusLabel = (status: ApplicantDocumentItem["status"]) => {
+    switch (status) {
+      case "verified":
+        return "Accepted";
+      case "rejected":
+        return "Rejected";
+      case "uploaded":
+        return "Uploaded";
+      default:
+        return "Pending";
+    }
+  };
+
+  const formatExpiryDate = (expiryDate?: string) => {
+    if (!expiryDate) return null;
+    const parsed = new Date(expiryDate);
+    if (Number.isNaN(parsed.getTime())) return expiryDate;
+    return parsed.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Documents list */}
@@ -57,6 +88,7 @@ export function DocumentsTab({
           const hasDocument = Boolean(url);
           const status = document?.status ?? (hasDocument ? "uploaded" : "pending");
           const isBusy = actionLoading === definition.type;
+          const isRequesting = actionLoading === `request-${definition.type}`;
 
           return (
             <div
@@ -88,16 +120,21 @@ export function DocumentsTab({
                       <span
                         className={`rounded-full px-3 py-1 text-[11px] font-semibold capitalize ${getStatusClasses(status)}`}
                       >
-                        {status}
+                        {getStatusLabel(status)}
                       </span>
                       {!hasDocument && (
                         <span className="text-[12px] text-[#808081]">
                           Awaiting upload from applicant
                         </span>
                       )}
-                      {document?.note && (
+                      {document?.note && status === "rejected" && (
                         <span className="text-[12px] text-[#d53411]">
                           {document.note}
+                        </span>
+                      )}
+                      {hasDocument && document?.expiryDate && (
+                        <span className="text-[12px] text-[#808081]">
+                          Expiry: {formatExpiryDate(document.expiryDate)}
                         </span>
                       )}
                     </div>
@@ -122,12 +159,12 @@ export function DocumentsTab({
                         disabled={isBusy || status === "verified"}
                         className="rounded-[60px] border-[#0eaf52] px-4 py-[6px] text-[11px] font-semibold text-[#0eaf52] hover:bg-[rgba(14,175,82,0.08)] disabled:opacity-60"
                       >
-                        {isBusy && actionLoading === definition.type ? "Working..." : status === "verified" ? "Verified" : "Verify"}
+                        {isBusy && actionLoading === definition.type ? "Working..." : status === "verified" ? "Accepted" : "Accept"}
                       </Button>
                       <Button
                         variant="outline"
                         onClick={() => onRejectDocument(definition.type)}
-                        disabled={isBusy || status === "rejected"}
+                        disabled={isBusy || status === "rejected" || status === "verified"}
                         className="rounded-[60px] border-[#d53411] px-4 py-[6px] text-[11px] font-semibold text-[#d53411] hover:bg-[rgba(213,52,17,0.06)] disabled:opacity-60"
                       >
                         {isBusy && actionLoading === definition.type ? "Working..." : status === "rejected" ? "Rejected" : "Reject"}
@@ -136,10 +173,11 @@ export function DocumentsTab({
                   ) : (
                     <Button
                       variant="outline"
-                      disabled
-                      className="rounded-[60px] border-[#b2b2b3] bg-[rgba(178,178,179,0.08)] px-4 py-[6px] text-[11px] font-semibold text-[#b2b2b3] cursor-not-allowed"
+                      onClick={() => onRequestDocument(definition.type)}
+                      disabled={isRequesting}
+                      className="rounded-[60px] border-[#2563eb] bg-[rgba(37,99,235,0.08)] px-4 py-[6px] text-[11px] font-semibold text-[#2563eb] hover:bg-[rgba(37,99,235,0.14)] disabled:opacity-60"
                     >
-                      View Document
+                      {isRequesting ? "Requesting..." : "Request Document"}
                     </Button>
                   )}
                 </div>
@@ -183,6 +221,16 @@ export function DocumentsTab({
             No references have been submitted yet.
           </div>
         )}
+      </div>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={onAdvanceDocumentsStage}
+          disabled={!canAdvanceDocumentsStage || isAdvancingStage}
+          className="rounded-[60px] bg-[#00B4B8] text-white hover:bg-[#009ca0] disabled:opacity-60"
+        >
+          {isAdvancingStage ? "Sending..." : "Send Conditional Hire Letter"}
+        </Button>
       </div>
     </div>
   );

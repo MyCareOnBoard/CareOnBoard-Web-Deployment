@@ -14,6 +14,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarDays } from "lucide-react";
 import { toast } from "sonner";
+import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
+import { getApplicationStatus } from "@/lib/api/job-application";
 
 interface DocumentUploadStepProps {
   onBack?: () => void;
@@ -59,12 +61,12 @@ const files = [
     placeholder: "Upload Hepatitis B vaccination series documents or chest x ray.",
     requiresExpiry: false
   },
-  // {
-  //   id: "hepatitis-b-immunity",
-  //   label: "Upload Hepatitis B immunity (titer result)",
-  //   placeholder: "Upload Hepatitis B immunity (titer result)",
-  //   requiresExpiry: false
-  // },
+  {
+    id: "hepatitis-b-immunity",
+    label: "Upload Hepatitis B immunity (titer result)",
+    placeholder: "Upload Hepatitis B immunity (titer result)",
+    requiresExpiry: false
+  },
   {
     id: "tb-test",
     label: "Upload tb test result.",
@@ -76,11 +78,13 @@ const files = [
 const tenYearsFromNow = new Date()
 tenYearsFromNow.setFullYear(new Date().getFullYear() + 10)
 
-export default function DocumentUploadStep({ onSuccess }: DocumentUploadStepProps) {
+export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUploadStepProps) {
   const [documentTypeUploading, setDocumentTypeUploading] = useState<DocumentTypes | null>(null);
   const ref = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(false);
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [canGoToNextStage, setCanGoToNextStage] = useState(false);
   const [fileUploads, setFileUploads] = useState<ApplicantDocumentFileUploadedInfo[]>(files.map((file) => ({
     fileName: "",
     fileUrl: "",
@@ -198,7 +202,7 @@ export default function DocumentUploadStep({ onSuccess }: DocumentUploadStepProp
         method: eligibilityVerificationData ? "PUT" : "POST"
       }).unwrap();
 
-      onSuccess?.();
+      setShowSuccessDialog(true);
     } catch (error) {
       console.error("Error submitting document upload and eligibility verification:", error);
     }
@@ -206,43 +210,71 @@ export default function DocumentUploadStep({ onSuccess }: DocumentUploadStepProp
 
   useEffect(() => {
     if (eligibilityVerificationData) {
-      setReferences(eligibilityVerificationData.data.references);
-      setValue(eligibilityVerificationData.data.declarationAgreed);
-      const fileKeys = [
-        "photoIdUrl",
-        "socialSecurityCardUrl",
-        "diplomaUrl",
-        "certificationsUrl",
-        "hepatitisBVaccinationUrl",
-        "hepatitisBImmunityUrl",
-        "tbTestResultUrl",
-        "i9FormUrl",
-        "w4FormUrl"
-      ]
-      const fileKeysIds = {
-        "photoIdUrl": "photo-id",
-        "socialSecurityCardUrl": "social-security-card",
-        "diplomaUrl": "diploma",
-        "certificationsUrl": "certifications",
-        "hepatitisBVaccinationUrl": "hepatitis-b-vaccination",
-        "hepatitisBImmunityUrl": "hepatitis-b-immunity",
-        "tbTestResultUrl": "tb-test",
-        "i9FormUrl": "i9-form",
-        "w4FormUrl": "w4-form"
-      }
-      setFileUploads(Object.entries(eligibilityVerificationData.data).filter(([key, value]) => fileKeys.includes(key) && value).map(([key, value]) => {
-        const splittedFileUrl = value?.fileUrl ? value.fileUrl?.split("/") : []
-        return {
-          fileName: splittedFileUrl[splittedFileUrl.length - 1],
-          fileUrl: value.fileUrl,
-          fileType: fileKeysIds[key as keyof typeof fileKeysIds] as DocumentTypes,
-          expiryDate: value.expiryDate
-        }
-      }))
+      const payload = eligibilityVerificationData.data || {};
+      setReferences((prev) =>
+        Array.isArray(payload.references) ? payload.references : prev
+      );
+      setValue(Boolean(payload.declarationAgreed));
+
+      const fileFieldToType: Record<string, string> = {
+        photoIdUrl: "photo-id",
+        socialSecurityCardUrl: "social-security-card",
+        diplomaUrl: "diploma",
+        certificationsUrl: "certifications",
+        hepatitisBVaccinationUrl: "hepatitis-b-vaccination",
+        hepatitisBImmunityUrl: "hepatitis-b-immunity",
+        tbTestResultUrl: "tb-test",
+        i9FormUrl: "i9-form",
+        w4FormUrl: "w4-form",
+      };
+
+      const normalizeExpiryDate = (value?: string) => {
+        if (!value) return undefined;
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? value : formatDate(date);
+      };
+
+      const preloaded: ApplicantDocumentFileUploadedInfo[] = Object.entries(fileFieldToType).reduce(
+        (acc, [field, fileType]) => {
+          const rawValue = payload[field as keyof typeof payload] as any;
+          const fileEntry = Array.isArray(rawValue) ? rawValue[0] : rawValue;
+          if (!fileEntry?.fileUrl) return acc;
+          const split = String(fileEntry.fileUrl).split("/");
+          acc.push({
+            fileName: split[split.length - 1] || "",
+            fileUrl: fileEntry.fileUrl,
+            fileType: fileType as DocumentTypes,
+            expiryDate: normalizeExpiryDate(fileEntry.expiryDate),
+          });
+          return acc;
+        },
+        [] as ApplicantDocumentFileUploadedInfo[],
+      );
+
+      setFileUploads(preloaded);
     }
   }, [eligibilityVerificationData]);
 
+  useEffect(() => {
+    const checkStage = async () => {
+      try {
+        const response = await getApplicationStatus();
+        const currentStep = response?.status?.currentStep;
+        const movedPastEligibility =
+          currentStep === "compliance" ||
+          currentStep === "review" ||
+          currentStep === "orientation";
+        setCanGoToNextStage(Boolean(movedPastEligibility));
+      } catch (error) {
+        setCanGoToNextStage(false);
+      }
+    };
+
+    checkStage();
+  }, []);
+
   return (
+    <>
     <form className={"w-full"} onSubmit={handleSubmit}>
       {files.map((file, index) => {
         const fileUpload = fileUploads.find((item) => item.fileType === file.id);
@@ -481,27 +513,55 @@ export default function DocumentUploadStep({ onSuccess }: DocumentUploadStepProp
         />
       </div>
       <div className="mt-6 pb-6">
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className={'bg-[#00B4B8] backdrop-blur-[22px] hover:bg-[#00B4B8] active:bg-[#b2b2b3]'}
-        >
-          <span>
-            {isSubmitting ? 'Submitting' : 'Next'}
-          </span>
-          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M4 10H16M16 10L10 4M16 10L10 16"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </Button>
+        {canGoToNextStage ? (
+          <Button
+            type="button"
+            onClick={() => onNext?.()}
+            className={'bg-[#00B4B8] backdrop-blur-[22px] hover:bg-[#00B4B8] active:bg-[#b2b2b3]'}
+          >
+            <span>Next</span>
+            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M4 10H16M16 10L10 4M16 10L10 16"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className={'bg-[#00B4B8] backdrop-blur-[22px] hover:bg-[#00B4B8] active:bg-[#b2b2b3]'}
+          >
+            <span>
+              {isSubmitting ? 'Saving...' : 'Save Documents & References'}
+            </span>
+            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M4 10H16M16 10L10 4M16 10L10 16"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Button>
+        )}
       </div>
 
     </form>
+    <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+      <SuccessDialogContent
+        title="Documents Saved"
+        description="Your documents and references were submitted successfully. Each document will be reviewed and accepted individually by your agency before you are moved to the next stage."
+        buttonText="Okay"
+        onButtonClick={() => setShowSuccessDialog(false)}
+      />
+    </SuccessDialog>
+    </>
   );
 }
 
