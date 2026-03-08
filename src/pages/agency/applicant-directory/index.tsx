@@ -1,13 +1,12 @@
-import { useNavigate } from "react-router";
-import { ArrowUpRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useLocation, useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { ApplicantsList } from "./components/ApplicantsList";
+import { DirectoryViewNav } from "./components/DirectoryViewNav";
 import { useApplicantDirectoryData } from "./useApplicantDirectoryData";
 
 export default function ApplicantDirectory() {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     applicants,
     isLoading,
@@ -18,7 +17,7 @@ export default function ApplicantDirectory() {
     setSearchQuery,
     setActiveTab,
     goToPage,
-  } = useApplicantDirectoryData();
+  } = useApplicantDirectoryData({ tab: "pending" });
 
   const handleViewDetails = (id: string) => {
     navigate(Routes.agency.applicantProfile.replace(":id", id));
@@ -31,9 +30,11 @@ export default function ApplicantDirectory() {
         {/* Header */}
         <div className="flex mb-4">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-            Applicant's directory
+            Applicants directory
           </h1>
         </div>
+
+        <DirectoryViewNav currentPath={location.pathname} />
 
         {/* Applicant Directory List Section */}
         <div className="backdrop-blur-[8px] bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] border-solid overflow-hidden relative rounded-[30px]">
@@ -48,6 +49,8 @@ export default function ApplicantDirectory() {
             onPageChange={goToPage}
             onApplicantSelect={(applicant) => handleViewDetails(applicant.id)}
             isLoading={isLoading}
+            title="Pending Applicants"
+            description="All pending applications."
           />
         </div>
       </div>

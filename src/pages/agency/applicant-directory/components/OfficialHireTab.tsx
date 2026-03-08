@@ -13,6 +13,10 @@ interface OfficialHireTabProps {
     hasSigned: boolean;
     signedAt?: string;
     signatureData?: SignatureData | null;
+    actionLoading: string | null;
+    onSendOfferLetter: () => void;
+    onRequestSignature: () => void;
+    onConfirmHire: () => void;
 }
 
 export function OfficialHireTab({
@@ -20,8 +24,15 @@ export function OfficialHireTab({
     hasSigned,
     signedAt,
     signatureData,
+    actionLoading,
+    onSendOfferLetter,
+    onRequestSignature,
+    onConfirmHire,
 }: OfficialHireTabProps) {
     const [showSignatureModal, setShowSignatureModal] = useState(false);
+    const isSendingOffer = actionLoading === "offer-letter";
+    const isRequestingSignature = actionLoading === "signature";
+    const isConfirmingHire = actionLoading === "confirm-hire";
 
     return (
         <>
@@ -37,6 +48,43 @@ export function OfficialHireTab({
                     <h3 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
                         Official Hire
                     </h3>
+                    {/* <div className="rounded-[20px] bg-[rgba(255,255,255,0.8)] px-4 py-4 space-y-3">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p className="text-[15px] font-semibold text-[#10141a]">
+                                    Agency actions
+                                </p>
+                                <p className="mt-1 text-[13px] text-[#808081]">
+                                    Send the offer packet, request the signature, then confirm the hire once the letter is signed.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    onClick={onSendOfferLetter}
+                                    disabled={isLoading || isSendingOffer}
+                                    className="rounded-[60px] bg-[#10141a] px-4 py-[6px] text-[12px] font-semibold text-white hover:bg-[#1d2430]"
+                                >
+                                    {isSendingOffer ? "Sending..." : "Send Offer Letter"}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={onRequestSignature}
+                                    disabled={isLoading || isRequestingSignature}
+                                    className="rounded-[60px] border-[#2563eb] px-4 py-[6px] text-[12px] font-semibold text-[#2563eb] hover:bg-[rgba(37,99,235,0.08)]"
+                                >
+                                    {isRequestingSignature ? "Requesting..." : "Request Signature"}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={onConfirmHire}
+                                    disabled={isLoading || !hasSigned || isConfirmingHire}
+                                    className="rounded-[60px] border-[#0eaf52] px-4 py-[6px] text-[12px] font-semibold text-[#0eaf52] hover:bg-[rgba(14,175,82,0.08)] disabled:opacity-60"
+                                >
+                                    {isConfirmingHire ? "Confirming..." : "Confirm Hire"}
+                                </Button>
+                            </div>
+                        </div>
+                    </div> */}
                     {isLoading ? (
                         <div className="py-8 text-center text-sm text-[#808081]">
                             Loading status...

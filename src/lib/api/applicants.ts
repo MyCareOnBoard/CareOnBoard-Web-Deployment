@@ -12,6 +12,7 @@ export interface Applicant {
   documents: boolean;
   conditionalHire: boolean;
   finalAgencyReview: boolean;
+  officialHire: boolean;
   profilePictureUrl: string;
 }
 
@@ -186,6 +187,9 @@ export interface ConditionalHireData {
 export interface ReviewStepData {
   stepKey: string;
   confirmed?: boolean;
+  rejected?: boolean;
+  rejectedBy?: string;
+  reason?: string | null;
   timestamp?: FirebaseTimestamp;
   confirmedBy?: string;
   updatedAt?: FirebaseTimestamp;
@@ -219,6 +223,15 @@ export interface ApplicantDetailResponse {
   profilePictureUrl?: string;
   preScreening?: PreScreeningData;
   eligibility?: EligibilityData;
+  eligibilityDocumentStatuses?: Record<
+    string,
+    {
+      status?: "pending" | "uploaded" | "verified" | "rejected";
+      note?: string | null;
+      updatedAt?: FirebaseTimestamp;
+      updatedBy?: string;
+    }
+  >;
   compliance?: ComplianceData;
   conditionalHire?: ConditionalHireData;
   reviews?: Record<string, ReviewStepData>;
@@ -305,6 +318,7 @@ const mapBackendToApplicant = (item: BackendApplicant): Applicant => {
     documents: Boolean(stages.documents?.completed),
     conditionalHire: Boolean(stages.conditionalHire?.completed),
     finalAgencyReview: Boolean(stages.finalAgencyReview?.completed),
+    officialHire: Boolean(stages.officialHire?.completed),
     profilePictureUrl: item?.profilePictureUrl || '',
   };
 };
@@ -483,16 +497,17 @@ export const applicantsApi = {
   },
 
   /**
-   * Confirm a review step for an applicant
+   * Confirm or reject a review step for an applicant
    */
   confirmReviewStep: async (
     id: string,
     stepKey: string,
-    confirmed: boolean
+    confirmed: boolean,
+    reason?: string
   ): Promise<{ success: boolean; message: string; reviewStep: any }> => {
     const response = await axiosClient.post(
       `/agencyApplicants/${id}/review`,
-      { stepKey, confirmed }
+      { stepKey, confirmed, ...(reason != null && reason !== "" && { reason }) }
     );
     return response.data;
   },

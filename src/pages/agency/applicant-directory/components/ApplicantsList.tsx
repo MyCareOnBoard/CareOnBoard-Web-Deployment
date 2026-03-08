@@ -15,6 +15,8 @@ interface ApplicantsListProps {
   onPageChange: (page: number) => void;
   onApplicantSelect: (applicant: Applicant) => void;
   isLoading?: boolean;
+  title?: string;
+  description?: string;
 }
 
 function getInitials(name: string) {
@@ -102,6 +104,16 @@ function ApplicantRow({ applicant, onClick }: ApplicantRowProps) {
             <CheckCircle2 className="w-5 h-5" strokeWidth={2.2} />
             Final Agency Review
           </div>
+
+          <div
+            className={`flex items-center gap-[4px] px-[10px] py-2 rounded-[60px] text-[14px] font-semibold whitespace-nowrap border-[0.5px] ${applicant.officialHire
+              ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
+              : "bg-[rgba(128,128,129,0.05)] text-[#525253] border-[#525253]"
+              }`}
+          >
+            <CheckCircle2 className="w-5 h-5" strokeWidth={2.2} />
+            Official Hire
+          </div>
         </div>
 
         {/* Actions */}
@@ -129,18 +141,19 @@ export function ApplicantsList({
   onPageChange,
   onApplicantSelect,
   isLoading,
+  title = "All Applicants",
+  description = "Browse and review applicants assigned to your agency.",
 }: ApplicantsListProps) {
-  console.log(applicants)
   return (
     <div className="bg-white rounded-[30px] border border-[#e5e5e6] p-4 md:p-6 w-full">
       {/* Filters Section */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
         <div className="flex-1 min-w-[180px]">
           <h2 className="text-base font-semibold text-[#10141a] mb-1">
-            Pending Applicants
+            {title}
           </h2>
           <p className="text-sm text-[#808081]">
-            These are your Pending Applicants
+            {description}
           </p>
         </div>
 
@@ -191,7 +204,7 @@ export function ApplicantsList({
                     <div className="h-3 w-24 bg-[#e5e7eb] rounded-full animate-pulse" />
                   </div>
                   <div className="flex-1 flex gap-2">
-                    {[1, 2, 3, 4].map((pill) => (
+                    {[1, 2, 3, 4, 5].map((pill) => (
                       <div
                         key={pill}
                         className="h-8 flex-1 bg-[#f3f4f6] rounded-full animate-pulse"

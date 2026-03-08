@@ -76,7 +76,8 @@ function ApplicationContent() {
         if (!response.status.hasStarted) {
           setActiveStep(0);
         } else if (response.status.currentStep !== null) {
-          setActiveStep(APPLICATION_STEP_NAMES.indexOf(response.status.currentStep));
+          const stepIndex = APPLICATION_STEP_NAMES.indexOf(response.status.currentStep);
+          setActiveStep(stepIndex >= 0 ? stepIndex : 0);
         } else {
           setActiveStep(0);
         }
@@ -120,7 +121,11 @@ function ApplicationContent() {
 
   const stepComponents = [
     <ProfilePreScreeningStep key="profile" onSuccess={handleStepSuccess} />,
-    <DocumentUploadStep key="documents" onBack={() => setActiveStep(activeStep - 1)} onSuccess={handleStepSuccess} />,
+    <DocumentUploadStep
+      key="documents"
+      onBack={() => setActiveStep(activeStep - 1)}
+      onNext={() => setActiveStep((prev) => Math.min(prev + 1, STEP_COUNT - 1))}
+    />,
     <ConditionalHireStep key="conditional" onBack={() => setActiveStep(activeStep - 1)} onSuccess={handleStepSuccess} />,
     <FinalReviewStep key="review" onSuccess={handleStepSuccess} />,
     <OrientationStep key="orientation" />,
@@ -205,13 +210,13 @@ function ApplicationContent() {
               className={"min-w-[100vw]"}
             />
           </div>
-          {stepComponents[activeStep]}
+          {stepComponents[activeStep] ?? stepComponents[0]}
         </div>
       </div>
       <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <SuccessDialogContent
           title={`Stage ${activeStep + 1} Submitted`}
-          description={`You have successfully completed ${APPLICATION_STEP_TITLES[activeStep]}. Click 'next' to go to the next phase.`}
+          description={`You have successfully completed ${APPLICATION_STEP_TITLES[activeStep] ?? APPLICATION_STEP_TITLES[0]}. Click 'next' to go to the next phase.`}
           buttonText="Next"
           onButtonClick={handleNext}
         />

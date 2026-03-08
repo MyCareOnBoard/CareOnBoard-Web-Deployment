@@ -3,6 +3,7 @@ import { CheckCircle2, Circle } from "lucide-react";
 
 export interface ReviewConfirmation {
   confirmed: boolean;
+  rejected?: boolean;
   timestamp?: string;
 }
 
@@ -19,6 +20,7 @@ export interface ReviewStepsState {
 interface FinalReviewTabProps {
   reviewSteps: ReviewStepsState;
   onConfirm: (stepKey: keyof ReviewStepsState) => void;
+  onReject: (stepKey: keyof ReviewStepsState) => void;
   actionLoading: string | null;
 }
 
@@ -35,6 +37,7 @@ const reviewStepDefinitions: { key: keyof ReviewStepsState; title: string }[] = 
 export function FinalReviewTab({
   reviewSteps,
   onConfirm,
+  onReject,
   actionLoading,
 }: FinalReviewTabProps) {
   return (
@@ -52,6 +55,7 @@ export function FinalReviewTab({
         {reviewStepDefinitions.map((step) => {
           const confirmation = reviewSteps[step.key];
           const isConfirmed = confirmation.confirmed;
+          const isRejected = Boolean(confirmation.rejected);
           const isLoading = actionLoading === step.key;
 
           return (
@@ -91,13 +95,23 @@ export function FinalReviewTab({
                   Confirmed
                 </span>
               ) : (
-                <Button
-                  onClick={() => onConfirm(step.key)}
-                  disabled={isLoading}
-                  className="rounded-[60px] bg-[#00b4b8] px-5 py-[8px] text-[13px] font-semibold text-white hover:bg-[#0090a8]"
-                >
-                  {isLoading ? "Confirming..." : "Confirm"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => onConfirm(step.key)}
+                    disabled={isLoading}
+                    className="rounded-[60px] bg-[#00b4b8] px-5 py-[8px] text-[13px] font-semibold text-white hover:bg-[#0090a8]"
+                  >
+                    {isLoading ? "Confirming..." : "Confirm"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => onReject(step.key)}
+                    disabled={isLoading || isRejected}
+                    className="rounded-[60px] border-[#d53411] px-5 py-[8px] text-[13px] font-semibold text-[#d53411] hover:bg-[rgba(213,52,17,0.06)]"
+                  >
+                    {isRejected ? "Rejected" : isLoading ? "Processing..." : "Reject"}
+                  </Button>
+                </div>
               )}
             </div>
           );
