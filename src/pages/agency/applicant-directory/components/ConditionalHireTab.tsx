@@ -22,7 +22,7 @@ interface ConditionalHireTabProps {
 }
 
 // Authorization mapping from API keys to display labels
-const authorizationLabels: Record<string, string> = {
+const authorizationLabels = {
   drugTest: "Drug Test Appointment",
   fingerprint: "Fingerprint Appointment",
   centralRegistry: "Central Registry Check",
@@ -31,10 +31,14 @@ const authorizationLabels: Record<string, string> = {
   oigExclusion: "OIG Exclusion List Check",
   healthTbScreening: "Health & TB Screening",
   referenceChecks: "Reference Checks",
-};
+} as const;
+
+type AuthorizationKey = keyof typeof authorizationLabels;
 
 // All authorization keys (canonical order) - show all even if applicant has not approved
-const ALL_AUTHORIZATION_KEYS = Object.keys(authorizationLabels);
+const ALL_AUTHORIZATION_KEYS = Object.keys(
+  authorizationLabels,
+) as AuthorizationKey[];
 
 export function ConditionalHireTab({
   isLoading,

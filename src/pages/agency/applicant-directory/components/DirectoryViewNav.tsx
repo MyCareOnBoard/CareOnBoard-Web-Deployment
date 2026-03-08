@@ -1,7 +1,14 @@
 import { NavLink } from "react-router";
 import { Routes } from "@/routes/constants";
 
-const viewLinks = [
+interface DirectoryViewLink {
+  label: string;
+  to: string;
+  exact?: boolean;
+  activePaths?: string[];
+}
+
+const viewLinks: DirectoryViewLink[] = [
   {
     label: "Pending Applicants",
     to: Routes.agency.applicantDirectory,
@@ -25,7 +32,7 @@ export function DirectoryViewNav({ currentPath }: DirectoryViewNavProps) {
   return (
     <div className="mb-6 flex flex-wrap gap-3">
       {viewLinks.map((link) => {
-        const isActive = "activePaths" in link && link.activePaths
+        const isActive = link.activePaths
           ? link.activePaths.includes(currentPath)
           : link.exact
             ? currentPath === link.to
