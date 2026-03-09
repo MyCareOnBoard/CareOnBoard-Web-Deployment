@@ -11,21 +11,41 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/utils/auth";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 
-// Helper function to format time for display
-const formatTime = (time?: string): string => {
-  if (!time) return "-";
-  try {
-    // If it's already in a readable format, return as-is
-    if (time.includes("AM") || time.includes("PM")) return time;
+/** Normalize timestamp-like values to a display-safe string. Never returns an object. */
+function normalizeTimestampToDisplayString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "" : value.toISOString();
+  }
+  if (typeof value === "object" && value !== null) {
+    const obj = value as Record<string, unknown>;
+    const seconds = obj._seconds ?? obj.seconds;
+    if (typeof seconds === "number") {
+      const ns = (obj._nanoseconds ?? obj.nanoseconds ?? 0) as number;
+      const ms = seconds * 1000 + (typeof ns === "number" ? ns / 1_000_000 : 0);
+      const d = new Date(ms);
+      return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+    }
+  }
+  return "";
+}
 
-    // Try to parse and format
-    const [hours, minutes] = time.split('T')[1].split(":");
+/** Format time for display. Accepts string, Date, or Firestore timestamp. Always returns a string. */
+const formatTime = (time?: unknown): string => {
+  const str = normalizeTimestampToDisplayString(time);
+  if (!str) return "-";
+  try {
+    if (str.includes("AM") || str.includes("PM")) return str;
+    const timePart = str.split("T")[1];
+    if (!timePart) return "-";
+    const [hours, minutes] = timePart.split(":");
     const hour = parseInt(hours, 10);
     const ampm = hour >= 12 ? "PM" : "AM";
     const formattedHour = hour % 12 || 12;
-    return `${formattedHour}:${minutes || "00"} ${ampm}`;
+    return `${formattedHour}:${(minutes || "00").split(".")[0]} ${ampm}`;
   } catch {
-    return time;
+    return "-";
   }
 };
 
