@@ -38,6 +38,34 @@ const getShiftDateLabel = (shift: Shift) => {
   }
 };
 
+/** Safely format clock time for display. Handles string, Date, or Firestore timestamp. Never returns an object. */
+const formatClockTime = (value: unknown): string => {
+  if (value == null) return "--------";
+  if (typeof value === "string") {
+    if (value.includes("AM") || value.includes("PM")) return value;
+    try {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? "--------" : format(d, "h:mm a");
+    } catch {
+      return "--------";
+    }
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "--------" : format(value, "h:mm a");
+  }
+  if (typeof value === "object" && value !== null) {
+    const obj = value as Record<string, unknown>;
+    const seconds = obj._seconds ?? obj.seconds;
+    if (typeof seconds === "number") {
+      const ns = (obj._nanoseconds ?? obj.nanoseconds ?? 0) as number;
+      const ms = seconds * 1000 + (typeof ns === "number" ? ns / 1_000_000 : 0);
+      const d = new Date(ms);
+      return Number.isNaN(d.getTime()) ? "--------" : format(d, "h:mm a");
+    }
+  }
+  return "--------";
+};
+
 const parseTimeToParts = (time: string): { hours: number; minutes: number } | null => {
   const match = time.match(/(\d{1,2})[.:](\d{2})[:]?([AaPp][Mm])/);
   if (!match) return null;
@@ -368,7 +396,7 @@ export default function ShiftDetailsModal({
           <div className="flex gap-2 mt-2">
             <span className="w-[90px] text-[#808081]">Clock In</span>
             {currentShift.clockedInAt ? (
-              <span className="text-[#10141a] font-semibold">{currentShift.clockedInAt}</span>
+              <span className="text-[#10141a] font-semibold">{formatClockTime(currentShift.clockedInAt)}</span>
             ) : (
               <TimePicker value="" onChange={(val) => handleTimeUpdate("clockedInAt", val)}>
                 <span className="text-[#10141a] font-semibold cursor-pointer hover:text-[#00b4b8] transition-colors">
@@ -380,7 +408,7 @@ export default function ShiftDetailsModal({
           <div className="flex gap-2 mt-2">
             <span className="w-[90px] text-[#808081]">Clock Out</span>
             {currentShift.clockedOutAt ? (
-              <span className="text-[#10141a] font-semibold">{currentShift.clockedOutAt}</span>
+              <span className="text-[#10141a] font-semibold">{formatClockTime(currentShift.clockedOutAt)}</span>
             ) : (
               <TimePicker value="" onChange={(val) => handleTimeUpdate("clockedOutAt", val)}>
                 <span className="text-[#10141a] font-semibold cursor-pointer hover:text-[#00b4b8] transition-colors">
