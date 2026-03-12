@@ -171,7 +171,7 @@ export default function ClientClaimsPage() {
                   <div className="flex items-start gap-8">
                     <span className="text-[14px] text-[#808081] min-w-20">DOB</span>
                     <span className="text-[14px] text-[#10141a]">
-                      {client.dateOfBirth || "N/A"}
+                      {client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString() : "N/A"}
                     </span>
                   </div>
                   <div className="flex items-start gap-8">
@@ -180,12 +180,12 @@ export default function ClientClaimsPage() {
                       {client.address || "N/A"}
                     </span>
                   </div>
-                  <div className="flex items-start gap-8">
-                    <span className="text-[14px] text-[#808081] min-w-20">Service Type</span>
-                    <span className="text-[14px] text-[#10141a]">
-                      {client.service || "N/A"}
-                    </span>
-                  </div>
+                  {/*<div className="flex items-start gap-8">*/}
+                  {/*  <span className="text-[14px] text-[#808081] min-w-20">Service Type</span>*/}
+                  {/*  <span className="text-[14px] text-[#10141a]">*/}
+                  {/*    {client.service || "N/A"}*/}
+                  {/*  </span>*/}
+                  {/*</div>*/}
                 </div>
               </div>
               <div className="text-right space-y-1">
@@ -196,7 +196,6 @@ export default function ClientClaimsPage() {
                 <p className="text-[14px] text-[#10141a]">Provider NPI: 23764234232756</p>
                 <p className="text-[14px] text-[#10141a]">Provider Taxonomy: 21/B Baker Street</p>
                 <p className="text-[14px] text-[#10141a]">Medicaid Provider Number: 21/B Baker Street</p>
-                <p className="text-[14px] text-[#10141a]">Provider Taxonomy: 21/B Baker Street</p>
               </div>
             </div>
 
@@ -224,10 +223,18 @@ export default function ClientClaimsPage() {
                   {serviceLogsGrouped.map((group, groupIndex) => (
                     <React.Fragment key={`${group.serviceCode}-${groupIndex}`}>
                       {group.logs.map((log) => {
-                        const dailyPayCut = log.billingRate
-                          ? Number(String(log.billingRate).replace("$", "").replace("/hour", ""))
-                          : 0;
-                        const totalAmount = log.hours * dailyPayCut;
+                        const matchedService = (client.services || []).find(s => s.code === String(log.serviceCode));
+                        const rate = matchedService ? parseFloat(matchedService.rate) || 0 : 0;
+                        const payType = matchedService?.payType || "hourly";
+                        let rowAmount = 0;
+                        if (payType === "15-min") rowAmount = (log.hours * 60 / 15) * rate;
+                        else if (payType === "daily") rowAmount = log.units * rate;
+                        else rowAmount = log.hours * rate;
+                        const rateLabel = payType === "15-min"
+                          ? `${formatCurrency(rate)}/15-min`
+                          : payType === "daily"
+                          ? `${formatCurrency(rate)}/day`
+                          : `${formatCurrency(rate)}/hr`;
 
                         return (
                           <div
@@ -244,29 +251,19 @@ export default function ClientClaimsPage() {
                               {log.service || "N/A"}
                             </div>
 
-                            {/* Service Code */}
-                            {/*<div className="text-[14px] text-[#10141a]">*/}
-                            {/*  {log.serviceCode || "N/A"}*/}
-                            {/*</div>*/}
-
                             {/* Total Hours */}
                             <div className="text-[14px] text-[#10141a]">
                               {log.hours.toFixed(2)}
                             </div>
 
-                            {/* Units */}
-                            {/*<div className="text-[14px] text-[#10141a]">*/}
-                            {/*  {log.units}*/}
-                            {/*</div>*/}
-
                             {/* Rate per unit */}
                             <div className="text-[14px] text-[#10141a]">
-                              {log.billingRate || `${formatCurrency(dailyPayCut)}/hour`}
+                              {rateLabel}
                             </div>
 
                             {/* Total Amount */}
                             <div className="text-[14px] text-[#10141a]">
-                              {formatCurrency(totalAmount)}
+                              {formatCurrency(rowAmount)}
                             </div>
                           </div>
                         );
@@ -294,12 +291,18 @@ export default function ClientClaimsPage() {
                     {billingSummary.totalHoursWorked}
                   </p>
                 </div>
-                <div className="flex justify-between items-center py-2">
-                  <p className="text-[14px] text-[#808081]">Rate Per Unit</p>
-                  <p className="text-[14px] font-medium text-[#10141a]">
-                    {formatCurrency(Number(String(billingSummary.ratePerUnit).replace("$", "").replace("/hour", "")))}
-                  </p>
-                </div>
+                {billingSummary.ratePerUnit != null && (
+                  <div className="flex justify-between items-center py-2">
+                    <p className="text-[14px] text-[#808081]">Rate Per Unit</p>
+                    <p className="text-[14px] font-medium text-[#10141a]">
+                      {billingSummary.payType === "15-min"
+                        ? `${formatCurrency(billingSummary.ratePerUnit)}/15-min`
+                        : billingSummary.payType === "daily"
+                        ? `${formatCurrency(billingSummary.ratePerUnit)}/day`
+                        : `${formatCurrency(billingSummary.ratePerUnit)}/hr`}
+                    </p>
+                  </div>
+                )}
                 <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
                   <p className="text-[14px] text-[#808081]">Total Amount</p>
                   <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary.totalAmount)}</p>

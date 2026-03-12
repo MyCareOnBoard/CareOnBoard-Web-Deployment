@@ -22,6 +22,7 @@ export interface BillingRecord {
   client: Client;
   employee: Employee;
   servicesOffered: string;
+  serviceCode?: string;
   totalHours: number;
   payRate: number;
   billingStatus?: 'pending' | 'approved' | 'rejected';
@@ -71,6 +72,16 @@ export interface GenerateReportResponse {
   message: string;
 }
 
+export interface ClientServiceDefinition {
+  id: string;
+  code: string;
+  name: string;
+  rate: string;
+  payType: "hourly" | "15-min" | "daily";
+  hours?: string;
+  totalApprovedHours?: string;
+}
+
 export interface ServiceLog {
   id: string;
   employee: Employee | null;
@@ -109,6 +120,7 @@ export interface ClientService {
     profileImage?: string;
     billingRate?: string;
     serviceCode?: string;
+    services?: ClientServiceDefinition[];
   } | null;
   date: string;
   clockedIn: string;
@@ -147,13 +159,15 @@ export interface ClientClaimsData {
     service?: string;
     serviceCode?: string;
     billingRate?: number;
+    services?: ClientServiceDefinition[];
     status?: string;
   };
   serviceLogsGrouped: ServiceLogGroup[];
   billingSummary: {
     totalHoursWorked: number;
     totalUnits: number;
-    ratePerUnit: number;
+    ratePerUnit: number | null;
+    payType: string | null;
     totalAmount: number;
   };
   dspNotes: DspNote[];
@@ -207,8 +221,12 @@ export interface DspClaimsData {
   billingSummary: {
     totalHoursWorked: number;
     totalUnits: number;
-    ratePerHour: number;
     totalPayRate: number;
+    payTypeBreakdown: {
+      hourly: { totalHours: number; totalAmount: number };
+      "15-min": { totalUnits: number; totalAmount: number };
+      daily: { totalShifts: number; totalAmount: number };
+    };
     totalMileage: number;
     totalExpenses: number;
     totalAmount: number;
