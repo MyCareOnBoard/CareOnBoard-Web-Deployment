@@ -18,7 +18,7 @@ import { AgencyContact } from "@/lib/api/userMessaging";
 import { NewMessageModal } from "@/components/chat/NewMessageModal";
 import { getInitials } from "@/lib/utils/string-utils";
 
-export type FilterTab = "all" | "dsp" | "administration" | "agency";
+export type FilterTab = "all" | "dsp" | "staff" | "administration" | "agency";
 
 export interface MessagingPageProps {
     /** Page title displayed in the header */

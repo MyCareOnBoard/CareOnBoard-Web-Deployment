@@ -279,7 +279,7 @@ export function NewMessageModal({
                             <Button
                                 onClick={handleStartChat}
                                 disabled={selectedUsers.length === 0 || isStartingChat}
-                                className="flex-1 h-12 bg-[#7c9ff5] hover:bg-[#6b8fe5] text-white rounded-full text-[15px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex-1 h-12 bg-[#2563eb] hover:bg-[#114fd7] active:bg-[#0f45be] text-white rounded-lg text-[15px] font-medium transition-all shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isStartingChat ? "Starting..." : "Start Chat"}
                             </Button>
