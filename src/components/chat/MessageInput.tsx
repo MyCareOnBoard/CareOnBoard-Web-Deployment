@@ -4,7 +4,7 @@
  */
 
 import React, { useState, KeyboardEvent } from "react";
-import { Send, Image as ImageIcon, Paperclip } from "lucide-react";
+import { Send, Paperclip } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -78,14 +78,6 @@ export const MessageInput = React.memo(function MessageInput({
           disabled={disabled || sending}
           maxLength={MAX_MESSAGE_LENGTH}
         />
-        <button
-          type="button"
-          className="p-2.5 text-[#808081] hover:text-[#2563eb] transition-colors"
-          title="Attach image"
-          disabled={disabled}
-        >
-          <ImageIcon className="w-5 h-5" />
-        </button>
         <button
           type="button"
           className="p-2.5 text-[#808081] hover:text-[#2563eb] transition-colors"
