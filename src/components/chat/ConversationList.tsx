@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Conversation, ConversationParticipant } from "@/lib/hooks/useMessaging";
 import { format } from "date-fns";
-import { getInitials, sanitizeSearchQuery, validateImageUrl } from "@/lib/utils/string-utils";
+import { formatRoleLabel, getInitials, sanitizeSearchQuery, validateImageUrl } from "@/lib/utils/string-utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMultiplePresence } from "@/lib/hooks/usePresence";
 
@@ -22,8 +22,8 @@ export interface ConversationListProps {
   onSearchChange?: (query: string) => void;
   loading?: boolean;
   currentUserId?: string;
-  filterTab?: "all" | "dsp" | "administration" | "agency";
-  onFilterChange?: (tab: "all" | "dsp" | "administration" | "agency") => void;
+  filterTab?: "all" | "dsp" | "staff" | "administration" | "agency";
+  onFilterChange?: (tab: "all" | "dsp" | "staff" | "administration" | "agency") => void;
   /** Show agency name alongside role (for super admin) */
   showAgencyName?: boolean;
 }
@@ -31,6 +31,24 @@ export interface ConversationListProps {
 /** Helper to check if conversation is a group chat */
 const isGroupConversation = (conversation: Conversation): boolean => {
   return conversation.type === "group" || (conversation.participantIds?.length || 0) > 2;
+};
+
+/** Classify role as DSP/employee-like (matches backend: DSP, employee) */
+const isDspRole = (role: string): boolean => {
+  const r = (role || "").toLowerCase();
+  return r.includes("dsp") || r === "employee";
+};
+
+/** Classify role as staff-like (matches backend: Agency Admin, Agency Staff) */
+const isStaffRole = (role: string): boolean => {
+  const r = (role || "").toLowerCase();
+  return (r.includes("agency") || r.includes("staff")) && !r.includes("super");
+};
+
+/** Classify role as administration-like (matches backend: Super Admin only) */
+const isAdministrationRole = (role: string): boolean => {
+  const r = (role || "").toLowerCase();
+  return r.includes("super");
 };
 
 /** Helper to get display name for group conversations */
@@ -201,12 +219,16 @@ export const ConversationList = React.memo(function ConversationList({
         const primaryParticipant = otherParticipants[0];
         if (!primaryParticipant) return false;
 
-        const roleLower = primaryParticipant.role.toLowerCase();
+        const role = primaryParticipant.role || "";
 
-        if (filterTab === "dsp" || filterTab === "administration") {
-          return !roleLower.includes("agency") && !roleLower.includes("admin");
-        } else if (filterTab === "agency") {
-          return roleLower.includes("agency") || roleLower.includes("admin");
+        if (filterTab === "dsp") {
+          return isDspRole(role);
+        }
+        if (filterTab === "staff" || filterTab === "agency") {
+          return isStaffRole(role);
+        }
+        if (filterTab === "administration") {
+          return isAdministrationRole(role);
         }
       }
 
@@ -269,6 +291,15 @@ export const ConversationList = React.memo(function ConversationList({
               DSP
             </button>
             <button
+              onClick={() => onFilterChange("staff")}
+              className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors ${filterTab === "staff"
+                ? "bg-[#2563eb] text-white"
+                : "bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]"
+                }`}
+            >
+              Staff
+            </button>
+            <button
               onClick={() => onFilterChange("administration")}
               className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors ${filterTab === "administration"
                 ? "bg-[#2563eb] text-white"
@@ -315,7 +346,7 @@ export const ConversationList = React.memo(function ConversationList({
             // Subtitle: member count for groups, role for direct
             const subtitle = isGroup
               ? `${otherParticipants.length + 1} members`
-              : primaryParticipant?.role || "";
+              : formatRoleLabel(primaryParticipant?.role || "");
 
             return (
               <div

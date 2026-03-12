@@ -7,23 +7,21 @@ import { ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import ExpandIcon from "@/assets/icons/arrow-expand-01.svg?react";
 import ServicesAvatar from "@/assets/icons/services-avatar.png";
+import { useAuth } from "@/utils/auth";
 
 export default function ClientsAndServicesPage() {
+  const { user } = useAuth();
   const [pendingClients, setPendingClients] = useState<Client[]>([]);
   const [pastClients, setPastClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [workAvailability, setWorkAvailability] = useState(false);
+  const [workAvailability, setWorkAvailability] = useState(user?.profile?.workAvailability || false);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [acceptedClientName, setAcceptedClientName] = useState("");
   const [pendingExpanded, setPendingExpanded] = useState(true);
   const [pastExpanded, setPastExpanded] = useState(true);
   const pageSize = 10;
-
-  useEffect(() => {
-    loadClients();
-  }, [page]);
 
   const loadClients = async () => {
     try {
@@ -50,6 +48,11 @@ export default function ClientsAndServicesPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadClients();
+  }, [page]);
+
 
   const getClientName = (client: Client) => {
     if (client.firstName && client.lastName) {
@@ -139,18 +142,6 @@ export default function ClientsAndServicesPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Client & Services</h1>
-          </div>
-
-          {/* Work Availability Toggle */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-700">
-              Work Availability
-            </span>
-            <Toggle
-              className="h-8 w-14"
-              pressed={workAvailability}
-              onPressedChange={setWorkAvailability}
-            />
           </div>
         </div>
 

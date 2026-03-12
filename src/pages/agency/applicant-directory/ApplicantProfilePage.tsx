@@ -16,6 +16,8 @@ import { Routes } from "@/routes/constants";
 import { applicantsApi, type ComplianceData } from "@/lib/api/applicants";
 import type { EligibilityData } from "@/lib/api/applicants";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/utils/auth";
+import { useMessaging } from "@/contexts/MessagingContext";
 import { agencyApplicantsExtraApi, ApplicantDocumentItem } from "@/lib/api/agencyApplicantsExtra";
 import { officialHireApi, OfficialHireStatusResponse } from "@/lib/api/officialHire";
 import { authorizationsApi } from "@/lib/api/authorizations";
@@ -41,6 +43,9 @@ export default function ApplicantProfilePage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const messaging = useMessaging();
+  const [isOpeningChat, setIsOpeningChat] = useState(false);
 
   const [activeSection, setActiveSection] = useState<TabSection>(
     getValidTab(searchParams.get("tab"))
@@ -109,8 +114,9 @@ export default function ApplicantProfilePage() {
 
   const [applicant, setApplicant] = useState<{
     id: string;
+    uid?: string;
     name: string;
-    role: string;
+    userType: string;
     address?: string;
     dob?: string;
     gender?: string;
@@ -131,7 +137,7 @@ export default function ApplicantProfilePage() {
   }>({
     id: id || "",
     name: "",
-    role: "",
+    userType: "",
     avatar: "",
     resumeUrl: "",
     profileScreening: false,
@@ -270,8 +276,9 @@ export default function ApplicantProfilePage() {
       setApplicant(prev => ({
         ...prev,
         id,
+        uid: data.uid || prev.uid,
         name: data.fullName || prev.name,
-        role: data.userType === 'applicant' ? 'Applicant' : (prev.role || 'Applicant'),
+        userType: data.userType || '',
         avatar: data.profilePictureUrl || prev.avatar,
         address: data.address?.address || prev.address,
         dob: data.dateOfBirth || prev.dob,
@@ -635,6 +642,54 @@ export default function ApplicantProfilePage() {
     }
   };
 
+  const handleOpenChat = async () => {
+    if (isOpeningChat) return;
+
+    const applicantParticipantId = applicant.uid;
+    const currentUserId = user?.uid;
+
+    if (!currentUserId || !applicantParticipantId) {
+      toast({
+        title: "Error",
+        description: "Unable to open chat right now.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsOpeningChat(true);
+
+      const existingConversation = messaging.conversations.find((conversation) => {
+        const participantIds = conversation.participantIds || [];
+        const isDirectConversation =
+          conversation.type === "direct" || participantIds.length === 2;
+
+        return (
+          isDirectConversation &&
+          participantIds.includes(currentUserId) &&
+          participantIds.includes(applicantParticipantId)
+        );
+      });
+
+      const conversationId =
+        existingConversation?.id ??
+        (await messaging.createConversation([applicantParticipantId]))?.id;
+
+      if (!conversationId) {
+        return;
+      }
+
+      navigate(
+        Routes.agency.supportConversation.replace(":conversationId", conversationId)
+      );
+    } catch (error) {
+      // Error toast is already handled in the messaging context
+    } finally {
+      setIsOpeningChat(false);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <div className="p-2">
@@ -705,7 +760,7 @@ export default function ApplicantProfilePage() {
                   <div className="flex-1 space-y-3">
                     <div className="inline-flex rounded-[60px] border border-[#0eaf52] bg-[#f0faf4] px-4 py-[6px]">
                       <span className="text-[10px] font-semibold leading-[1.4] text-[#0eaf52]">
-                        {applicant.role || "Applicant"}
+                        {applicant.userType === 'applicant' ? 'Applicant' : 'DSP'}
                       </span>
                     </div>
                     <div>
@@ -729,14 +784,17 @@ export default function ApplicantProfilePage() {
                         <Phone className="h-4 w-4" />
                         Call
                       </Button>
-                      <Button
-                        variant="outline"
-                        className="flex items-center gap-2 rounded-[60px] border-[rgba(255,255,255,0.3)] bg-white/70 px-5 py-[10px] text-[14px] font-semibold text-[#10141a] shadow-none hover:bg-white"
-                        onClick={() => navigate(Routes.agency.support)}
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        Chat
-                      </Button>
+                      {applicant.userType === 'employee' && (
+                        <Button
+                          variant="outline"
+                          disabled={isOpeningChat}
+                          className="flex items-center gap-2 rounded-[60px] border-[rgba(255,255,255,0.3)] bg-white/70 px-5 py-[10px] text-[14px] font-semibold text-[#10141a] shadow-none hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={handleOpenChat}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          {isOpeningChat ? "Opening..." : "Chat"}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

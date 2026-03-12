@@ -8,7 +8,7 @@ import { Trash2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Conversation } from "@/lib/hooks/useMessaging";
 import { OnlineStatusIndicator } from "./OnlineStatusIndicator";
-import { getInitials, validateImageUrl } from "@/lib/utils/string-utils";
+import { formatRoleLabel, getInitials, validateImageUrl } from "@/lib/utils/string-utils";
 
 interface ConversationHeaderProps {
   conversation: Conversation | null;
@@ -56,7 +56,7 @@ export const ConversationHeader = React.memo(function ConversationHeader({
         </div>
         <div>
           <h3 className="font-semibold text-[15px] text-[#10141a]">{participant.name}</h3>
-          <p className="text-[13px] text-[#808081]">{participant.role}</p>
+          <p className="text-[13px] text-[#808081]">{formatRoleLabel(participant.role)}</p>
         </div>
       </div>
       {onDelete && (

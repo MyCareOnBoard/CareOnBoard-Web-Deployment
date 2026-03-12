@@ -42,6 +42,15 @@ export function sanitizeSearchQuery(query: string): string {
 }
 
 /**
+ * Format role labels for display
+ * Example: "agency_staff" -> "agency staff"
+ */
+export function formatRoleLabel(role: string): string {
+  if (!role || typeof role !== "string") return "";
+  return role.replaceAll("_", " ");
+}
+
+/**
  * Validate image URL for security
  * Only allows HTTPS URLs from trusted domains
  */
