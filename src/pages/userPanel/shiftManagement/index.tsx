@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation, listShifts, categorizeShifts, clockIn as apiClockIn, shiftStarted as apiShiftStarted, clockOut as apiClockOut } from "@/lib/api/shifts";
 import { format } from "date-fns";
 import { ClockOutModal } from "./ClockOutModal";
+import { ClockInModal } from "./ClockInModal";
 import { LocationErrorModal } from "./LocationErrorModal";
 import ExpandIcon from "@/assets/icons/arrow-expand-01.svg?react";
 import { Routes } from "@/routes/constants";
@@ -685,6 +686,8 @@ export default function ShiftManagementPage() {
   const [todayShift, setTodayShift] = useState<Shift | null>(null);
   const [upcomingShifts, setUpcomingShifts] = useState<Shift[]>([]);
   const [previousShifts, setPreviousShifts] = useState<Shift[]>([]);
+  const [showClockInModal, setShowClockInModal] = useState(false);
+  const [clockInShiftId, setClockInShiftId] = useState<string | null>(null);
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [clockOutShiftId, setClockOutShiftId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<string>("Getting location...");
@@ -817,28 +820,38 @@ export default function ShiftManagementPage() {
         setShowLocationErrorModal(true);
         return;
       }
+      setClockInShiftId(shiftId);
+      setShowClockInModal(true);
+      return;
     }
+
+    if (shift.actionStatus === ShiftActionStatus.CLOCK_OUT) {
+      setClockOutShiftId(shiftId);
+      setShowClockOutModal(true);
+      return;
+    }
+  };
+
+  const handleClockInConfirm = async () => {
+    if (!clockInShiftId) return;
+
+    const shiftToClockIn = todayShift?.id === clockInShiftId ? todayShift : null;
+    if (!shiftToClockIn) return;
 
     try {
       setShiftsLoading(true);
-      let response;
-
-      if (shift.actionStatus === ShiftActionStatus.CLOCK_IN) {
-        response = await apiClockIn(shiftId);
-      } else if (shift.actionStatus === ShiftActionStatus.CLOCK_OUT) {
-        setClockOutShiftId(shiftId);
-        setShowClockOutModal(true);
-        return;
-      }
+      const response = await apiClockIn(clockInShiftId);
 
       if (response?.success) {
         setTodayShift(response.shift);
         await loadShifts();
-        toast.success('Action completed successfully');
+        toast.success('Clocked in successfully');
+        setShowClockInModal(false);
+        setClockInShiftId(null);
       }
     } catch (error: any) {
-      console.error('Failed to perform shift action:', error);
-      toast.error('Action failed', {
+      console.error('Failed to clock in:', error);
+      toast.error('Clock in failed', {
         description: error?.response?.data?.error || 'Please try again'
       });
     } finally {
@@ -1016,6 +1029,16 @@ export default function ShiftManagementPage() {
         isOpen={showClockOutModal}
         onConfirm={handleClockOutConfirm}
         onCancel={() => setShowClockOutModal(false)}
+        isLoading={shiftsLoading}
+      />
+
+      <ClockInModal
+        isOpen={showClockInModal}
+        onConfirm={handleClockInConfirm}
+        onCancel={() => {
+          setShowClockInModal(false);
+          setClockInShiftId(null);
+        }}
         isLoading={shiftsLoading}
       />
 
