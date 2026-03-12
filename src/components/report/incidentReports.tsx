@@ -13,6 +13,7 @@ import {
     IncidentReport as IncidentReportType,
     IncidentDetail
 } from "@/lib/api/reports";
+import {cn} from "@/lib/utils";
 
 export default function IncidentReport() {
     const {user} = useAuth();
@@ -32,7 +33,7 @@ export default function IncidentReport() {
     const [searchQuery, setSearchQuery] = useState<string>("");
     const [selectedDSP, setSelectedDSP] = useState<IncidentReportType | null>(null);
     const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
-    const [status, setStatus] = useState<"all" | "pending" | "under_review" | "resolved">("all");
+    const [status, setStatus] = useState<"all" | "submitted" | "resolved" | "not_resolved">("all");
     const [triggerRefetch, setTriggerRefetch] = useState<number>(0);
     const [incidentDetails, setIncidentDetails] = useState<IncidentDetail[]>([]);
 
@@ -97,6 +98,7 @@ export default function IncidentReport() {
                     startDate: locationState.startDate ? new Date(locationState.startDate) : null,
                     endDate: locationState.endDate ? new Date(locationState.endDate) : null,
                 })
+                setStatus(locationState.status ?? "all")
             }
         }
     }, [locationState]);
@@ -153,7 +155,49 @@ export default function IncidentReport() {
                                 className="w-full pl-10 pr-10 h-10 border-0 rounded-full bg-[#f8f9fa] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
                             />
                         </div>
-
+                        <Button
+                            className={cn("h-[44px] rounded-3xl w-[80px]",
+                                status === "all"
+                                    ? "bg-[#00b4b8] text-white"
+                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
+                            )}
+                            onClick={() => setStatus("all")}
+                        >
+                            All
+                        </Button>
+                        <Button
+                            className={cn(
+                                "h-[44px] rounded-3xl w-[100px]",
+                                status === "submitted"
+                                    ? "bg-[#00b4b8] text-white"
+                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
+                            )}
+                            onClick={() => setStatus("submitted")}
+                        >
+                            Under Review
+                        </Button>
+                        <Button
+                            className={cn(
+                                "h-[44px] rounded-3xl w-[100px]",
+                                status === "resolved"
+                                    ? "bg-[#00b4b8] text-white"
+                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
+                            )}
+                            onClick={() => setStatus("resolved")}
+                        >
+                            Resolved
+                        </Button>
+                        <Button
+                            className={cn(
+                                "h-[44px] rounded-3xl w-[100px]",
+                                status === "not_resolved"
+                                    ? "bg-[#00b4b8] text-white"
+                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
+                            )}
+                            onClick={() => setStatus("not_resolved")}
+                        >
+                            Not Resolved
+                        </Button>
                     </div>
                 </div>
 
