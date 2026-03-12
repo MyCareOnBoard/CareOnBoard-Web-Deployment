@@ -46,7 +46,11 @@ export interface DSPReport {
 export interface DSPDocument {
   id: string;
   documentType: string;
-  fileUrl: string;
+  fileUrl: {
+      fileName: string;
+      fileUrl: string;
+      fileType: string;
+  };
   status: string;
   uploadDate: string;
   expiryDate: string | null;

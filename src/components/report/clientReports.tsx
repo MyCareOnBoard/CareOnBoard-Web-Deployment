@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from "react";
+import React, {useState, useMemo, useEffect} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {Search, X, FileText, ExternalLink, Loader2, ArrowLeft} from "lucide-react";
@@ -6,7 +6,7 @@ import CustomDatePicker from "@/components/ui/datePicker";
 import {cn} from "@/lib/utils";
 import {useAuth} from "@/utils/auth";
 import {UserType} from "@/utils/auth/types";
-import {useNavigate} from "react-router";
+import {useLocation, useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {
     useGetClientsReportQuery,
@@ -20,6 +20,8 @@ export default function ClientReport() {
     const {user} = useAuth();
     const navigate = useNavigate();
     const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
+
+    const { state: locationState } = useLocation();
 
     const [dates, setDates] = useState<{
         startDate: Date | null;
@@ -86,6 +88,17 @@ export default function ClientReport() {
     const handleDocumentClick = (fileUrl: string) => {
         window.open(fileUrl, "_blank");
     };
+
+    useEffect(() => {
+        if (locationState) {
+            if (!locationState.isLifetime) {
+                setDates({
+                    startDate: locationState.startDate ? new Date(locationState.startDate) : null,
+                    endDate: locationState.endDate ? new Date(locationState.endDate) : null,
+                })
+            }
+        }
+    }, [locationState]);
 
 
     return (
