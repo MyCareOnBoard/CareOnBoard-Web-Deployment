@@ -160,7 +160,7 @@ export function MessagingPage({
         }
     }, [messaging, basePath, router]);
 
-    const handleSendMessage = useCallback(async (content: string) => {
+    const handleSendMessage = useCallback(async (content: string, attachments?: Array<{ type: "image" | "file"; url: string; name?: string }>) => {
         if (!messaging.currentConversation?.id) {
             toast({
                 title: "Error",
@@ -169,7 +169,7 @@ export function MessagingPage({
             });
             return;
         }
-        await messaging.sendMessage(messaging.currentConversation.id, content);
+        await messaging.sendMessage(messaging.currentConversation.id, content, attachments);
     }, [messaging, toast]);
 
     const handleBackToList = useCallback(() => {

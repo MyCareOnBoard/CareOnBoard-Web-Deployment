@@ -41,7 +41,11 @@ interface MessagingContextType {
 
   // Actions
   selectConversation: (conversationId: string | null) => void;
-  sendMessage: (conversationId: string, content: string) => Promise<void>;
+  sendMessage: (
+    conversationId: string,
+    content: string,
+    attachments?: Array<{ type: "image" | "file"; url: string; name?: string }>
+  ) => Promise<void>;
   createConversation: (participantIds: string[]) => Promise<Conversation | null>;
   markAsRead: (conversationId: string, messageIds: string[]) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
@@ -113,8 +117,17 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
 
   // Send message
   const sendMessage = useCallback(
-    async (conversationId: string, content: string) => {
-      if (!content.trim()) return;
+    async (
+      conversationId: string,
+      content: string,
+      attachments?: Array<{ type: "image" | "file"; url: string; name?: string }>
+    ) => {
+      const trimmedContent = content.trim();
+      const hasText = trimmedContent.length > 0;
+      const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+
+      // Require at least text or one attachment
+      if (!hasText && !hasAttachments) return;
 
       if (!conversationId || typeof conversationId !== 'string' || conversationId.trim() === '') {
         console.error("Invalid conversation ID:", conversationId);
@@ -129,7 +142,10 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       try {
         await sendMessageMutation({
           conversationId,
-          payload: { content: content.trim() }
+          payload: {
+            content: trimmedContent,
+            attachments: hasAttachments ? attachments : undefined,
+          }
         }).unwrap();
         // Real-time update will come via Firestore subscription
       } catch (error: any) {

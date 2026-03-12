@@ -12,7 +12,7 @@ export interface ChatPanelProps {
     loading: boolean;
     showChatView: boolean;
     onBackToList: () => void;
-    onSendMessage: (content: string) => void;
+    onSendMessage: (content: string, attachments?: Array<{ type: "image" | "file"; url: string; name?: string }>) => void;
     onDelete: () => void;
     emptyStateMessage?: string;
 }

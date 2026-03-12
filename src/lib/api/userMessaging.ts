@@ -103,7 +103,11 @@ export interface CreateConversationPayload {
  */
 export interface SendMessagePayload {
   content: string;
-  attachments?: string[];
+  attachments?: {
+    type: "image" | "file";
+    url: string;
+    name?: string;
+  }[];
 }
 
 /**
@@ -175,6 +179,25 @@ export interface SendMessageParams {
 export interface MarkMessagesReadParams {
   conversationId: string;
   payload: MarkAsReadPayload;
+}
+
+/**
+ * Upload Attachment Response
+ */
+export interface UploadAttachmentResponse {
+  success: boolean;
+  data: {
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    url: string;
+    storagePath: string;
+    uploadedAt: string;
+  };
+}
+
+export interface UploadAttachmentParams {
+  file: File;
 }
 
 // ==================== RTK Query API ====================
@@ -286,6 +309,26 @@ export const userMessagingApi = createApi({
       }),
       invalidatesTags: ['Conversations'],
     }),
+
+    // Upload attachment for user messaging
+    uploadAttachment: builder.mutation<UploadAttachmentResponse, UploadAttachmentParams>({
+      query: ({ file }) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        return {
+          url: `${USER_MESSAGING_BASE}/upload`,
+          method: "POST",
+          data: formData,
+          requiresAuth: true,
+          headers: {
+            // Let the browser set the correct multipart boundary
+            // but some backends rely on this explicit header
+            'Content-Type': 'multipart/form-data',
+          },
+        };
+      },
+    }),
   }),
 });
 
@@ -299,5 +342,6 @@ export const {
   useSendMessageMutation,
   useMarkMessagesAsReadMutation,
   useLeaveConversationMutation,
+  useUploadAttachmentMutation,
 } = userMessagingApi;
 

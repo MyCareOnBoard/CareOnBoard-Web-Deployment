@@ -122,11 +122,49 @@ export const MessageList = React.memo(function MessageList({
                   {/* Message bubble and sender info */}
                   <div className="flex flex-col max-w-[70%]">
                     {/* Message bubble - light gray with rounded corners (except bottom-left) */}
-                    <div className="px-4 py-2.5 bg-[#F2F2F2] rounded-tl-[12px] rounded-tr-[8px] rounded-br-[8px] rounded-bl-[4px] mb-1">
-                      <p
-                        className="text-[14px] leading-relaxed whitespace-pre-wrap break-words text-[#333333]"
-                        dangerouslySetInnerHTML={{ __html: msg.sanitizedContent }}
-                      />
+                    <div className="px-4 py-2.5 bg-[#F2F2F2] rounded-tl-[12px] rounded-tr-[8px] rounded-br-[8px] rounded-bl-[4px] mb-1 space-y-2">
+                      {msg.sanitizedContent && (
+                        <p
+                          className="text-[14px] leading-relaxed whitespace-pre-wrap break-words text-[#333333]"
+                          dangerouslySetInnerHTML={{ __html: msg.sanitizedContent }}
+                        />
+                      )}
+                      {msg.attachments && msg.attachments.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                          {msg.attachments.map((att, index) => {
+                            const isImage = att.type === "image";
+                            return (
+                              <div key={`${att.url}-${index}`} className="max-w-full">
+                                {isImage ? (
+                                  <a
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block"
+                                  >
+                                    <img
+                                      src={att.url}
+                                      alt={att.name || "Image attachment"}
+                                      className="max-h-40 rounded-md object-cover border border-[#e5e7eb]"
+                                    />
+                                  </a>
+                                ) : (
+                                  <a
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-white border border-[#e5e7eb] text-xs text-[#111827] hover:bg-[#f3f4f6]"
+                                  >
+                                    <span className="truncate max-w-[180px]">
+                                      {att.name || "File attachment"}
+                                    </span>
+                                  </a>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     {/* Sender name and timestamp below bubble */}
@@ -149,11 +187,49 @@ export const MessageList = React.memo(function MessageList({
                   {/* Message bubble and sender info */}
                   <div className="flex flex-col max-w-[70%] items-end">
                     {/* Message bubble - light blue with rounded corners (except top-right) */}
-                    <div className="px-4 py-2.5 bg-[#E0EDFE] rounded-tl-[8px] rounded-tr-[12px] rounded-br-[4px] rounded-bl-[8px] mb-1">
-                      <p
-                        className="text-[14px] leading-relaxed whitespace-pre-wrap break-words text-[#10141a]"
-                        dangerouslySetInnerHTML={{ __html: msg.sanitizedContent }}
-                      />
+                    <div className="px-4 py-2.5 bg-[#E0EDFE] rounded-tl-[8px] rounded-tr-[12px] rounded-br-[4px] rounded-bl-[8px] mb-1 space-y-2">
+                      {msg.sanitizedContent && (
+                        <p
+                          className="text-[14px] leading-relaxed whitespace-pre-wrap break-words text-[#10141a]"
+                          dangerouslySetInnerHTML={{ __html: msg.sanitizedContent }}
+                        />
+                      )}
+                      {msg.attachments && msg.attachments.length > 0 && (
+                        <div className="flex flex-col gap-2 items-end">
+                          {msg.attachments.map((att, index) => {
+                            const isImage = att.type === "image";
+                            return (
+                              <div key={`${att.url}-${index}`} className="max-w-full">
+                                {isImage ? (
+                                  <a
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block"
+                                  >
+                                    <img
+                                      src={att.url}
+                                      alt={att.name || "Image attachment"}
+                                      className="max-h-40 rounded-md object-cover border border-[#bfdbfe]"
+                                    />
+                                  </a>
+                                ) : (
+                                  <a
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-white border border-[#bfdbfe] text-xs text-[#111827] hover:bg-[#dbeafe]"
+                                  >
+                                    <span className="truncate max-w-[180px]">
+                                      {att.name || "File attachment"}
+                                    </span>
+                                  </a>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     {/* "You", timestamp, and read receipt below bubble */}
