@@ -2,7 +2,7 @@ import React, {useRef, useState} from "react";
 import {useParams, useNavigate} from "react-router";
 import {ArrowLeft, Banknote, CornerDownLeft, Loader2, Download, Eye} from "lucide-react";
 import {useAuth} from "@/utils/auth";
-import {useGetDspClaimsQuery, useApproveExpenseMutation, useRejectExpenseMutation} from "./api";
+import {useGetDspClaimsQuery, useApproveExpenseMutation, useRejectExpenseMutation, ClientServiceDefinition} from "./api";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import {useToast} from "@/hooks/use-toast";
@@ -77,51 +77,52 @@ export default function DSPClaimsPage() {
     }
   };
 
-  // Aggregate unique clients across all services: sum hours and units, keep a billing rate reference
+  // Aggregate unique clients across all services, using per-service rate and payType
   const uniqueClients = React.useMemo(() => {
     type Agg = {
-      client: { id: string; fullName: string; billingRate?: string } | null;
+      client: { id: string; fullName: string; services?: ClientServiceDefinition[] } | null;
       totalHours: number;
       totalUnits: number;
-      billingRate: number | undefined; // using service.payRate as the available rate source
       amount: number;
       serviceCode: string;
+      rate: number;
+      payType: string;
     };
 
     const map = new Map<string, Agg>();
 
     clientServicesGrouped?.forEach((group) => {
       group.services.forEach((svc) => {
-        const id = svc.client?.id || 'unknown';
-        const existing = map.get(id);
-        const billingRate = typeof svc.payRate === 'number' ? svc.payRate : 0;
+        const clientId = svc.client?.id || 'unknown';
+        const key = `${clientId}-${svc.serviceCode}`;
+
+        const matchedService = (svc.client?.services || []).find(
+          (s: ClientServiceDefinition) => s.code === String(svc.serviceCode)
+        );
+        const rate = matchedService ? parseFloat(matchedService.rate) || 0 : 0;
+        const payType = matchedService?.payType || "hourly";
+        const hours = svc.hours || 0;
+        const units = svc.units || 0;
+
+        let svcAmount = 0;
+        if (payType === "15-min") svcAmount = (hours * 60 / 15) * rate;
+        else if (payType === "daily") svcAmount = units * rate;
+        else svcAmount = hours * rate;
+
+        const existing = map.get(key);
         if (existing) {
-          const totalHours = existing.totalHours + (svc.hours || 0);
-          const totalUnits = existing.totalUnits + (svc.units || 0);
-          // Prefer the last non-zero billing rate encountered
-          const rate = billingRate || existing.billingRate;
-          const client = svc.client || existing.client;
-          const clientBillingRate = String(client?.billingRate)?.replace(
-            "$", ""
-          ).replace("/hour", "");
-          map.set(`${id}-${svc?.serviceCode}`, {
-            client: client,
-            serviceCode: svc.serviceCode || "",
-            totalHours,
-            totalUnits,
-            billingRate: rate,
-            amount: Math.round((totalUnits * Number(clientBillingRate || "0") * totalHours) * 100) / 100,
-          });
+          existing.totalHours += hours;
+          existing.totalUnits += units;
+          existing.amount += svcAmount;
         } else {
-          const totalHours = svc.hours || 0;
-          const totalUnits = svc.units || 0;
-          map.set(`${id}-${svc?.serviceCode}`, {
+          map.set(key, {
             client: svc.client || null,
             serviceCode: svc.serviceCode || "",
-            totalHours,
-            totalUnits,
-            billingRate,
-            amount: Math.round((totalUnits * billingRate * totalHours) * 100) / 100,
+            totalHours: hours,
+            totalUnits: units,
+            amount: svcAmount,
+            rate,
+            payType,
           });
         }
       });
@@ -236,6 +237,10 @@ export default function DSPClaimsPage() {
       setIsGeneratingPDF(false);
     }
   };
+
+  const totalAmount = (billingSummary?.totalAmount ?? 0)
+    + (billingSummary?.totalMileage ?? 0)
+    + (billingSummary?.totalExpenses ?? 0)
 
   if (isLoading) {
     return (
@@ -368,12 +373,12 @@ export default function DSPClaimsPage() {
               <p className="text-lg font-semibold text-[#10141a] mb-1">
                 {dspInfo?.fullName}
               </p>
-              <p className="flex justify-between items-center">
-                <span className="text-[14px] text-[#808081] mb-1">Payrate</span>
-                <span className="text-[14px] font-medium text-[#808081]">
-                  {dspInfo?.payrate || "N/A"}
-                </span>
-              </p>
+              {/*<p className="flex justify-between items-center">*/}
+              {/*  <span className="text-[14px] text-[#808081] mb-1">Payrate</span>*/}
+              {/*  <span className="text-[14px] font-medium text-[#808081]">*/}
+              {/*    {dspInfo?.payrate || "N/A"}*/}
+              {/*  </span>*/}
+              {/*</p>*/}
               <p className="flex justify-between items-center">
                 <span className="text-[14px] text-[#808081] mb-1">Phone No</span>
                 <span className="text-[14px] font-medium text-[#808081]">
@@ -413,9 +418,11 @@ export default function DSPClaimsPage() {
                     <p className="text-[12px] text-[#808081]">{uc.serviceCode}</p>
                     <p className="text-[12px] text-[#808081]">{uc.totalHours}</p>
                     <p className="text-[12px] text-[#808081]">
-                      {formatCurrency(Number((uc.client?.billingRate || "0")?.replace(
-                        "$", "").replace("/hour", ""))
-                      )}
+                      {uc.payType === "15-min"
+                        ? `${formatCurrency(uc.rate)}/15-min`
+                        : uc.payType === "daily"
+                        ? `${formatCurrency(uc.rate)}/day`
+                        : `${formatCurrency(uc.rate)}/hr`}
                     </p>
                     <p className="text-[12px] text-[#10141a]">{formatCurrency(uc.amount || 0)}</p>
                   </div>
@@ -454,9 +461,9 @@ export default function DSPClaimsPage() {
                   {/*  </p>*/}
                   {/*</div>*/}
                   <div className="flex justify-between items-center py-2">
-                    <p className="text-[14px] text-[#808081]">Pay Rate</p>
+                    <p className="text-[14px] text-[#808081]">Total Pay</p>
                     <p className="text-[14px] font-medium text-[#10141a]">
-                      {formatCurrency(Number(String("$10/hour").replace("$", "").replace("/hour", "")))}
+                      {formatCurrency(billingSummary?.totalPayRate || 0)}
                     </p>
                   </div>
                   <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
@@ -468,31 +475,32 @@ export default function DSPClaimsPage() {
                   <div className="flex justify-between items-center py-2">
                     <p className="text-[14px] text-[#808081]">Total Mileage</p>
                     <p className="text-[14px] font-medium text-[#10141a]">
-                      {billingSummary?.totalHoursWorked}
+                      {billingSummary?.totalMileage}
                     </p>
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <p className="text-[14px] text-[#808081]">Rate Per KM</p>
                     <p className="text-[14px] font-medium text-[#10141a]">
-                      {billingSummary?.totalUnits}
+                      {"N/A"}
                     </p>
                   </div>
                   <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
                     <p className="text-[14px] text-[#808081]">Total Amount</p>
-                    <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalAmount || 0)}</p>
+                    {/*<p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalAmount || 0)}</p>*/}
+                    <p className="text-[14px] text-[#808081]">N/A</p>
                   </div>
                 </div>
                 <div className="space-y-3 bg-white rounded p-4 w-full">
                   <div className="flex justify-between items-center py-2 pt-3">
                     <p className="text-[14px] text-[#808081]">Total Expenses</p>
-                    <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalAmount || 0)}</p>
+                    <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalExpenses || 0)}</p>
                   </div>
                 </div>
               </div>
               <div className={"w-full"}>
                 <p className="font-semibold flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2">
                   <span className={"text-white"}>Total Amount</span>
-                  <span className="text-white">{formatCurrency(billingSummary?.totalAmount || 0)}</span>
+                  <span className="text-white">{formatCurrency(totalAmount || 0)}</span>
                 </p>
               </div>
             </div>

@@ -208,6 +208,8 @@ export default function BillingReport() {
 
                             const dspName = record.employee?.fullName || 'Unknown DSP';
 
+                            const clientShifts = record.shifts;
+
                             return (
                                 <div
                                     key={record.id}
@@ -319,14 +321,16 @@ export default function BillingReport() {
 
                                     {/* Pay Rate - Multiple rows */}
                                     <div className="flex flex-col gap-4">
-                                        {(activeTab === "client" ? record.employees : record.clients)?.map((item) => (
-                                            <div key={item.id} className="flex flex-col justify-center h-[60px]">
-                                                <p className="text-[14px] text-[#808081] mb-1">Pay Rate</p>
-                                                <p className="text-[16px] font-medium text-[#10141a]">
-                                                    {formatCurrency(record.payRate)}
-                                                </p>
-                                            </div>
-                                        ))}
+                                        {record.shifts?.map((item) => {
+                                            return (
+                                                <div key={item.id} className="flex flex-col justify-center h-[60px]">
+                                                    <p className="text-[14px] text-[#808081] mb-1">Pay Rate</p>
+                                                    <p className="text-[16px] font-medium text-[#10141a]">
+                                                        {formatCurrency(item.payRate)}
+                                                    </p>
+                                                </div>
+                                            )
+                                        })}
                                     </div>
 
                                     {/* Generate Report Button */}
