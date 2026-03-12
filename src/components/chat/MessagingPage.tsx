@@ -243,7 +243,7 @@ export function MessagingPage({
                             onSelectConversation={handleSelectConversation}
                             searchQuery={searchQuery}
                             onSearchChange={setSearchQuery}
-                            loading={messaging.loading}
+                            loading={messaging.conversationsLoading}
                             currentUserId={user?.uid}
                             filterTab={showFilterTabs ? activeTab : undefined}
                             onFilterChange={showFilterTabs ? handleFilterChange : undefined}
@@ -256,7 +256,7 @@ export function MessagingPage({
                         conversation={messaging.currentConversation}
                         messages={messaging.currentMessages}
                         currentUserId={user?.uid}
-                        loading={messaging.loading}
+                        loading={messaging.conversationLoading || messaging.messagesLoading}
                         showChatView={showChatView}
                         onBackToList={handleBackToList}
                         onSendMessage={handleSendMessage}

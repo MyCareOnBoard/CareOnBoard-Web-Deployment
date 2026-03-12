@@ -31,6 +31,12 @@ interface MessagingContextType {
   currentMessages: Message[];
   presenceMap: Record<string, UserPresence>;
   loading: boolean;
+  /** Loading state for conversations list only */
+  conversationsLoading: boolean;
+  /** Loading state for selected conversation metadata */
+  conversationLoading: boolean;
+  /** Loading state for messages in selected conversation */
+  messagesLoading: boolean;
   error: Error | null;
 
   // Actions
@@ -275,6 +281,9 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       currentMessages,
       presenceMap,
       loading,
+      conversationsLoading,
+      conversationLoading,
+      messagesLoading,
       error,
       selectConversation,
       sendMessage,
@@ -291,6 +300,9 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       currentMessages,
       presenceMap,
       loading,
+      conversationsLoading,
+      conversationLoading,
+      messagesLoading,
       error,
       selectConversation,
       sendMessage,
