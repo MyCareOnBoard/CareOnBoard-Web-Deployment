@@ -88,18 +88,21 @@ export default function DashboardHeader(
   // Track previous notification IDs to detect new ones
   const previousNotificationIdsRef = useRef<Set<string>>(new Set());
 
-  // Show toast when a new notification is received
+  // Show toast when a new notification is received (real-time only, not on initial load)
   useEffect(() => {
     if (loading || notifications.length === 0) {
-      // Initialize the ref with current notification IDs on first load
-      if (!loading && notifications.length > 0) {
-        previousNotificationIdsRef.current = new Set(notifications.map(n => n.id));
-      }
+      return;
+    }
+
+    const previousIds = previousNotificationIdsRef.current;
+
+    // Initial load: seed the ref and skip toasts (no toast on refresh/login)
+    if (previousIds.size === 0) {
+      previousNotificationIdsRef.current = new Set(notifications.map(n => n.id));
       return;
     }
 
     const currentIds = new Set(notifications.map(n => n.id));
-    const previousIds = previousNotificationIdsRef.current;
 
     // Find new notifications (present in current but not in previous)
     const newNotifications = notifications.filter(n => !previousIds.has(n.id));
