@@ -235,8 +235,8 @@ export function MessagingPage({
                 </div>
 
                 <div className={`flex flex-1 overflow-hidden min-h-0 ${containerClassName}`}>
-                    {/* Left Panel - Conversations List */}
-                    <div className={`${showChatView ? 'hidden' : 'flex'} lg:flex flex-col w-full lg:w-[380px] xl:w-[420px] border-r border-[#e5e7eb] flex-shrink-0`}>
+                    {/* Left Panel - Conversations List (independent scroll) */}
+                    <div className={`${showChatView ? 'hidden' : 'flex'} lg:flex flex-col w-full lg:w-[380px] xl:w-[420px] border-r border-[#e5e7eb] flex-shrink-0 min-h-0 overflow-hidden`}>
                         <ConversationList
                             conversations={messaging.conversations}
                             selectedConversationId={messaging.currentConversation?.id || null}

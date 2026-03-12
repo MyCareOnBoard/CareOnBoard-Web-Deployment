@@ -248,7 +248,7 @@ export const ConversationList = React.memo(function ConversationList({
   };
 
   return (
-    <div className="w-full md:w-[380px] border-r border-[#e5e7eb] flex flex-col bg-white">
+    <div className="w-full md:w-[380px] border-r border-[#e5e7eb] flex flex-col min-h-0 bg-white overflow-hidden">
       {/* Header with Search */}
       <div className="p-6 border-b border-[#e5e7eb]">
         <div className="flex items-center justify-between mb-4">

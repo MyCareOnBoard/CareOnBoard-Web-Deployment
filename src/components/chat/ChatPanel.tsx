@@ -54,8 +54,8 @@ function ChatPanelComponent({
                         />
                     </div>
 
-                    {/* Messages Area */}
-                    <div className="flex-1 min-h-0 overflow-hidden">
+                    {/* Messages Area - independent scroll, does not affect conversation list */}
+                    <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                         <MessageList
                             messages={messages}
                             currentUserId={currentUserId}

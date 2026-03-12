@@ -21,7 +21,6 @@ export const MessageList = React.memo(function MessageList({
   currentUserId,
   loading
 }: MessageListProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
 
@@ -34,12 +33,15 @@ export const MessageList = React.memo(function MessageList({
   };
 
   // Auto-scroll to bottom when messages update (only if near bottom)
+  // Use scrollTop on container to avoid scrollIntoView scrolling ancestors (e.g. page under header)
   useEffect(() => {
     if (messages.length === 0) return;
 
-    // Only auto-scroll if user is near bottom
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
     if (shouldAutoScroll || checkIfNearBottom()) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
       setShouldAutoScroll(true);
     }
   }, [messages, shouldAutoScroll]);
@@ -93,7 +95,7 @@ export const MessageList = React.memo(function MessageList({
   return (
     <div
       ref={messagesContainerRef}
-      className="flex-1 overflow-y-auto px-6 py-4 bg-[#f7f7f7]"
+      className="flex-1 min-h-0 overflow-y-auto px-6 py-4 bg-[#f7f7f7]"
     >
       <div className="space-y-4">
         {formattedMessages.map((msg) => {
@@ -261,7 +263,6 @@ export const MessageList = React.memo(function MessageList({
           );
         })}
       </div>
-      <div ref={messagesEndRef} />
     </div>
   );
 });
