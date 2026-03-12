@@ -250,10 +250,6 @@ function ShiftCard({
         label: "Clock In",
         color: "bg-[#2B82FF] hover:bg-[#1e6ae6]",
       },
-      [ShiftActionStatus.SHIFT_STARTED]: {
-        label: "Shift Started",
-        color: "bg-[#0EAF52] hover:bg-[#0c9645]",
-      },
       [ShiftActionStatus.CLOCK_OUT]: {
         label: "Clock Out",
         color: "bg-[#D53411] hover:bg-[#b82d0f]",
@@ -829,8 +825,6 @@ export default function ShiftManagementPage() {
 
       if (shift.actionStatus === ShiftActionStatus.CLOCK_IN) {
         response = await apiClockIn(shiftId);
-      } else if (shift.actionStatus === ShiftActionStatus.SHIFT_STARTED) {
-        response = await apiShiftStarted(shiftId, user?.uid);
       } else if (shift.actionStatus === ShiftActionStatus.CLOCK_OUT) {
         setClockOutShiftId(shiftId);
         setShowClockOutModal(true);

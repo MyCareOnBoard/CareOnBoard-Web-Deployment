@@ -30,7 +30,6 @@ export enum ShiftStatus {
  */
 export enum ShiftActionStatus {
     CLOCK_IN = "clock_in",
-    SHIFT_STARTED = "shift_started",
     CLOCK_OUT = "clock_out",
 }
 
