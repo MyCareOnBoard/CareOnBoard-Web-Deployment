@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from "react";
+import React, {useState, useMemo, useEffect} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {Search, X, FileText, ExternalLink, Loader2, ArrowLeft} from "lucide-react";
@@ -6,7 +6,7 @@ import CustomDatePicker from "@/components/ui/datePicker";
 import {cn} from "@/lib/utils";
 import {useAuth} from "@/utils/auth";
 import {UserType} from "@/utils/auth/types";
-import {useNavigate} from "react-router";
+import {useLocation, useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {
     useGetDSPsReportQuery,
@@ -20,6 +20,8 @@ export default function DSPReport() {
     const {user} = useAuth();
     const navigate = useNavigate();
     const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
+
+    const { state: locationState } = useLocation();
 
     const [dates, setDates] = useState<{
         startDate: Date | null;
@@ -84,6 +86,29 @@ export default function DSPReport() {
     const handleDocumentClick = (fileUrl: string) => {
         window.open(fileUrl, "_blank");
     };
+
+    const APPLICANT_DOCUMENT_LABELS: Record<string, any> = {
+        "photo-id": "Photo ID (Driver's License, State ID, Passport)",
+        "social-security-card": "Social Security Card",
+        diploma: "School Diploma Certificate",
+        certifications: "Extra Certificates",
+        "hepatitis-b-vaccination": "Hepatitis B vaccination series documents",
+        "hepatitis-b-immunity": "Hepatitis B immunity (titer result)",
+        "tb-test": "TB test result",
+        "i9-form": "I-9 Form",
+        "w4-form": "W-4 Form",
+    };
+
+    useEffect(() => {
+        if (locationState) {
+            if (!locationState.isLifetime) {
+                setDates({
+                    startDate: locationState.startDate ? new Date(locationState.startDate) : null,
+                    endDate: locationState.endDate ? new Date(locationState.endDate) : null,
+                })
+            }
+        }
+    }, [locationState]);
 
     return (
         <div className="min-h-[calc(100vh-200px)] flex flex-col">
@@ -283,7 +308,7 @@ export default function DSPReport() {
                                         {selectedDSP.fullName}
                                     </h2>
                                     <p className="text-sm text-[#808081] mt-1">
-                                        Documents ({documentsData?.total || 0})
+                                        Documents ({documentsData?.data?.filter((f) => !!f.fileUrl.fileUrl)?.length || 0})
                                     </p>
                                 </div>
                                 <button
@@ -299,27 +324,27 @@ export default function DSPReport() {
                                     <div className="flex justify-center py-8">
                                         <Loader2 className="h-8 w-8 animate-spin text-[#00b4b8]" />
                                     </div>
-                                ) : documentsData?.data.length === 0 ? (
+                                ) : documentsData?.data.filter((f) => !!f.fileUrl.fileUrl).length === 0 ? (
                                     <div className="text-center py-8">
                                         <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                                         <p className="text-gray-500">No documents found</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {documentsData?.data.map((doc: DSPDocument) => (
+                                        {documentsData?.data.filter((f) => !!f.fileUrl.fileUrl).map((doc: DSPDocument) => (
                                             <div
                                                 key={doc.id}
-                                                onClick={() => handleDocumentClick(doc.fileUrl)}
+                                                onClick={() => handleDocumentClick(doc.fileUrl.fileUrl)}
                                                 className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
                                             >
                                                 <div className="flex items-center space-x-3">
                                                     <FileText className="h-8 w-8 text-[#00b4b8]" />
                                                     <div>
                                                         <p className="font-medium text-[#10141a] group-hover:text-[#00b4b8] transition-colors">
-                                                            {doc.documentType}
+                                                            {doc.fileUrl?.fileName}
                                                         </p>
                                                         <p className="text-sm text-[#808081]">
-                                                            {doc.status} • Uploaded {new Date(doc.uploadDate).toLocaleDateString()}
+                                                            {APPLICANT_DOCUMENT_LABELS?.[doc.fileUrl?.fileType] ?? ""} • Uploaded {new Date(doc.uploadDate).toLocaleDateString()}
                                                             {doc.expiryDate && ` • Expires ${new Date(doc.expiryDate).toLocaleDateString()}`}
                                                         </p>
                                                     </div>

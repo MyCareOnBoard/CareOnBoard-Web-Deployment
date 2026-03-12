@@ -1,12 +1,11 @@
-import React, {useState, useMemo} from "react";
+import React, {useState, useMemo, useEffect} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {Search, X, AlertTriangle, Loader2, ArrowLeft} from "lucide-react";
 import CustomDatePicker from "@/components/ui/datePicker";
-import {cn} from "@/lib/utils";
 import {useAuth} from "@/utils/auth";
 import {UserType} from "@/utils/auth/types";
-import {useNavigate} from "react-router";
+import {useLocation, useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {
     useGetIncidentReportQuery,
@@ -14,11 +13,14 @@ import {
     IncidentReport as IncidentReportType,
     IncidentDetail
 } from "@/lib/api/reports";
+import {cn} from "@/lib/utils";
 
 export default function IncidentReport() {
     const {user} = useAuth();
     const navigate = useNavigate();
     const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
+
+    const { state: locationState } = useLocation();
 
     const [dates, setDates] = useState<{
         startDate: Date | null;
@@ -31,7 +33,7 @@ export default function IncidentReport() {
     const [searchQuery, setSearchQuery] = useState<string>("");
     const [selectedDSP, setSelectedDSP] = useState<IncidentReportType | null>(null);
     const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
-    const [status, setStatus] = useState<"all" | "pending" | "under_review" | "resolved">("all");
+    const [status, setStatus] = useState<"all" | "submitted" | "resolved" | "not_resolved">("all");
     const [triggerRefetch, setTriggerRefetch] = useState<number>(0);
     const [incidentDetails, setIncidentDetails] = useState<IncidentDetail[]>([]);
 
@@ -89,6 +91,18 @@ export default function IncidentReport() {
         }
     };
 
+    useEffect(() => {
+        if (locationState) {
+            if (!locationState.isLifetime) {
+                setDates({
+                    startDate: locationState.startDate ? new Date(locationState.startDate) : null,
+                    endDate: locationState.endDate ? new Date(locationState.endDate) : null,
+                })
+                setStatus(locationState.status ?? "all")
+            }
+        }
+    }, [locationState]);
+
     return (
         <div className="min-h-[calc(100vh-200px)] flex flex-col">
             <div className={"mb-8 flex items-center justify-between"}>
@@ -141,7 +155,49 @@ export default function IncidentReport() {
                                 className="w-full pl-10 pr-10 h-10 border-0 rounded-full bg-[#f8f9fa] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
                             />
                         </div>
-
+                        <Button
+                            className={cn("h-[44px] rounded-3xl w-[80px]",
+                                status === "all"
+                                    ? "bg-[#00b4b8] text-white"
+                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
+                            )}
+                            onClick={() => setStatus("all")}
+                        >
+                            All
+                        </Button>
+                        <Button
+                            className={cn(
+                                "h-[44px] rounded-3xl w-[100px]",
+                                status === "submitted"
+                                    ? "bg-[#00b4b8] text-white"
+                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
+                            )}
+                            onClick={() => setStatus("submitted")}
+                        >
+                            Under Review
+                        </Button>
+                        <Button
+                            className={cn(
+                                "h-[44px] rounded-3xl w-[100px]",
+                                status === "resolved"
+                                    ? "bg-[#00b4b8] text-white"
+                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
+                            )}
+                            onClick={() => setStatus("resolved")}
+                        >
+                            Resolved
+                        </Button>
+                        <Button
+                            className={cn(
+                                "h-[44px] rounded-3xl w-[100px]",
+                                status === "not_resolved"
+                                    ? "bg-[#00b4b8] text-white"
+                                    : "bg-transparent border border-[#808081] text-[#808081] hover:bg-[#d0d0d0]"
+                            )}
+                            onClick={() => setStatus("not_resolved")}
+                        >
+                            Not Resolved
+                        </Button>
                     </div>
                 </div>
 

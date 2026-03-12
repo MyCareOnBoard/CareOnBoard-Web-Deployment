@@ -83,9 +83,9 @@ export default function GenerateReport() {
 
   const incidentFilters = [
     {id: "all", label: "All"},
-    {id: "pending", label: "Pending"},
-    {id: "under_review", label: "Under Review"},
+    {id: "submitted", label: "Under Review"},
     {id: "resolved", label: "Resolved"},
+    {id: "not_resolved", label: "Not Resolved"},
   ];
 
   const communityInclusionFilters = [
