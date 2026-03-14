@@ -248,7 +248,7 @@ export default function ClientClaimsPage() {
 
                             {/* Service */}
                             <div className="text-[14px] text-[#10141a]">
-                              {log.service || "N/A"}
+                              {log.serviceCode || "N/A"}
                             </div>
 
                             {/* Total Hours */}
