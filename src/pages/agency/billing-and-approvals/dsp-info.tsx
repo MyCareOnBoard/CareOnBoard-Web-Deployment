@@ -239,8 +239,8 @@ export default function DSPClaimsPage() {
   };
 
   const totalAmount = (billingSummary?.totalAmount ?? 0)
-    + (billingSummary?.totalMileage ?? 0)
     + (billingSummary?.totalExpenses ?? 0)
+    + ((billingSummary?.mileageRate || 0) * (billingSummary?.totalMileage || 0) || 0);
 
   if (isLoading) {
     return (
@@ -481,13 +481,14 @@ export default function DSPClaimsPage() {
                   <div className="flex justify-between items-center py-2">
                     <p className="text-[14px] text-[#808081]">Rate Per KM</p>
                     <p className="text-[14px] font-medium text-[#10141a]">
-                      {"N/A"}
+                        {billingSummary?.mileageRate ? formatCurrency(billingSummary?.mileageRate) : 0}
                     </p>
                   </div>
                   <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
                     <p className="text-[14px] text-[#808081]">Total Amount</p>
-                    {/*<p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalAmount || 0)}</p>*/}
-                    <p className="text-[14px] text-[#808081]">N/A</p>
+                    <p className="text-[14px] text-[#808081]">
+                        {formatCurrency((billingSummary?.totalMileage || 0) * (billingSummary?.mileageRate || 0) || 0)}
+                    </p>
                   </div>
                 </div>
                 <div className="space-y-3 bg-white rounded p-4 w-full">
