@@ -15,6 +15,7 @@ interface DisplayClient {
   id: string;
   name: string;
   status: "Active" | "Inactive" | "Pending" | "Archived";
+  statusLabel: string;
   roleLabel: string;
   roleValue: string | number;
   accountCreated: string;
@@ -111,15 +112,17 @@ export default function ClientsDirectory() {
     return clients.map((client) => {
       const status = client.status || "active";
       const statusCapitalized = status.charAt(0).toUpperCase() + status.slice(1) as DisplayClient["status"];
-      
+      const statusLabel = status === "pending" ? "Pending Setup" : statusCapitalized;
+
       const primaryDspCount = client?.primaryDsp ? 1 : 0;
       const secondaryDspsCount = client?.secondaryDsps?.length || 0;
       const dspCount = primaryDspCount + secondaryDspsCount;
-      
+
       return {
         id: client.id,
         name: formatClientName(client),
         status: statusCapitalized,
+        statusLabel,
         roleLabel: "DSP",
         roleValue: dspCount,
         accountCreated: formatDate(client.createdAt),
@@ -340,10 +343,12 @@ export default function ClientsDirectory() {
                       className={
                         client.status === "Active"
                           ? "bg-[rgba(14,175,82,0.05)] border-[0.5px] border-[#0eaf52] text-[#0eaf52] px-[10px] py-[10px]"
-                          : "px-[10px] py-[10px]"
+                          : client.status === "Pending"
+                            ? "bg-amber-50 border-[0.5px] border-amber-500 text-amber-700 px-[10px] py-[10px]"
+                            : "px-[10px] py-[10px]"
                       }
                     >
-                      {client.status}
+                      {client.statusLabel}
                     </Badge>
 
                     <div className="w-[75px] text-[14px] font-medium leading-[1.4]">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { AddClientFormData } from "../types/formData";
 import { createClient, updateClient } from "@/lib/api/clients";
 import { formDataToApiPayload } from "../utils/formDataToApiPayload";
@@ -10,11 +10,13 @@ export function useClientSave() {
   const [showSavingModal, setShowSavingModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
 
-  const saveClient = async (
+  const saveClient = useCallback(async (
     formData: AddClientFormData,
     isEditMode: boolean,
     clientId?: string,
-    includeAgencyId: boolean = false
+    includeAgencyId: boolean = false,
+    progressive: boolean = false,
+    markComplete: boolean = false
   ): Promise<{ success: boolean; clientId?: string; clientName?: string; error?: string }> => {
     if (isSaving) {
       return { success: false, error: "Save already in progress" };
@@ -26,9 +28,11 @@ export function useClientSave() {
     setErrorMessage(undefined);
 
     try {
-      const payload = formDataToApiPayload(formData, includeAgencyId);
+      const payload = formDataToApiPayload(formData, includeAgencyId, progressive, markComplete);
 
-      if (isEditMode && clientId) {
+      const useUpdatePath = isEditMode || (progressive && clientId);
+
+      if (useUpdatePath && clientId) {
         const { documents, ...payloadWithoutDocs } = payload;
         await updateClient(clientId, payloadWithoutDocs);
 
@@ -37,7 +41,6 @@ export function useClientSave() {
         const clientName = fullName || "Client";
 
         setSaveStage(2);
-
         const finalDocuments = await handleDocumentUploads(clientId, formData);
         await updateClient(clientId, { documents: finalDocuments });
 
@@ -50,12 +53,10 @@ export function useClientSave() {
 
         const fullName =
           `${created.firstName || ""} ${created.lastName || ""}`.trim() ||
-          `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();
-        const clientName =
-          fullName || `${formData.stage1.firstName} ${formData.stage1.lastName}`.trim();
+          `${formData.stage1.firstName || ""} ${formData.stage1.lastName || ""}`.trim();
+        const clientName = fullName || "Client";
 
         setSaveStage(2);
-
         const finalDocuments = await handleDocumentUploads(created.id, formData);
         await updateClient(created.id, { documents: finalDocuments });
 
@@ -71,7 +72,7 @@ export function useClientSave() {
       setShowSavingModal(false);
       return { success: false, error };
     }
-  };
+  }, []);
 
   return {
     saveClient,

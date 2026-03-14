@@ -96,18 +96,21 @@ export function SuperAdminClientFormWrapper({ isEditMode = false }: SuperAdminCl
     agencies,
     loadingAgencies,
     onSuccessNavigate: (id) => (id ? Routes.superAdmin.clientDetails.replace(":clientId", id) : Routes.superAdmin.clientDirectory),
-    successMessage: isEditMode ? "Update Client" : "Save Client",
+    successMessage: isEditMode ? "Update Client" : "Save Progress",
     pageTitle: isEditMode ? "Edit client" : "Add client",
     backNavigate: isEditMode && clientId ? Routes.superAdmin.clientDetails.replace(":clientId", clientId) : Routes.superAdmin.clientDirectory,
     clientId,
     isEditMode,
   };
 
-  const handleSuccess = (id?: string) => {
-    const path = id
-      ? Routes.superAdmin.clientDetails.replace(":clientId", id)
-      : Routes.superAdmin.clientDirectory;
-    navigate(path);
+  const handleSuccess = (id?: string, isProgressive?: boolean) => {
+    if (id && isProgressive) {
+      navigate(Routes.superAdmin.editClient.replace(":clientId", id), { replace: true });
+    } else if (id) {
+      navigate(Routes.superAdmin.clientDetails.replace(":clientId", id));
+    } else {
+      navigate(Routes.superAdmin.clientDirectory);
+    }
   };
 
   return (

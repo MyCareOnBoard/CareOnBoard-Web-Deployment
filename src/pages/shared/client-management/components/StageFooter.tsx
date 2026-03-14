@@ -1,9 +1,9 @@
-import React from "react";
+import React, { memo } from "react";
 import { ArrowLeft, ArrowRight, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
-export function StageFooter({
+export const StageFooter = memo(function StageFooter({
   declared,
   setDeclared,
   isFirst,
@@ -13,7 +13,7 @@ export function StageFooter({
   onSave,
   primaryLoading = false,
   requireDeclaration = true,
-  saveButtonText = "Save Client",
+  saveButtonText = "Save Progress",
 }: {
   declared: boolean;
   setDeclared: (next: boolean) => void;
@@ -26,7 +26,7 @@ export function StageFooter({
   requireDeclaration?: boolean;
   saveButtonText?: string;
 }) {
-  const primaryDisabled = requireDeclaration ? !declared : false;
+  const nextDisabled = requireDeclaration ? !declared : false;
 
   return (
     <div className="mt-6 flex flex-col gap-4">
@@ -56,22 +56,31 @@ export function StageFooter({
 
         <Button
           type="button"
-          className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold"
-          onClick={isLast ? onSave : onNext}
-          disabled={primaryDisabled || primaryLoading}
+          variant="outline"
+          className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold border-[#00b4b8] text-[#00b4b8] hover:bg-[#00b4b8]/10"
+          onClick={onSave}
+          disabled={nextDisabled || primaryLoading}
         >
-          {isLast ? saveButtonText : "Next"}
-          {isLast ? (
-            primaryLoading ? (
-              <Loader2 className="w-5 h-5 text-white animate-spin" />
-            ) : (
-              <Save className="w-5 h-5 text-white" />
-            )
+          {primaryLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
-            <ArrowRight className="w-5 h-5 text-white" />
+            <Save className="w-5 h-5" />
           )}
+          {saveButtonText}
         </Button>
+
+        {!isLast && (
+          <Button
+            type="button"
+            className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold"
+            onClick={onNext}
+            disabled={nextDisabled || primaryLoading}
+          >
+            Next
+            <ArrowRight className="w-5 h-5 text-white" />
+          </Button>
+        )}
       </div>
     </div>
   );
-}
+});

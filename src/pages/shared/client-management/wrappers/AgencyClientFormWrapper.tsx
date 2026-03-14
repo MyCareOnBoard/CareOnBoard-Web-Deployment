@@ -86,18 +86,21 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
     showAgencySelection: false,
     userAgencyId: user?.agencyId || user?.uid,
     onSuccessNavigate: (id) => (id ? Routes.agency.clientDetails.replace(":clientId", id) : Routes.agency.clients),
-    successMessage: isEditMode ? "Update Client" : "Save Client",
+    successMessage: isEditMode ? "Update Client" : "Save Progress",
     pageTitle: isEditMode ? "Edit client" : "Add client",
     backNavigate: isEditMode && clientId ? Routes.agency.clientDetails.replace(":clientId", clientId) : Routes.agency.clients,
     clientId,
     isEditMode,
   };
 
-  const handleSuccess = (id?: string) => {
-    const path = id
-      ? Routes.agency.clientDetails.replace(":clientId", id)
-      : Routes.agency.clients;
-    navigate(path);
+  const handleSuccess = (id?: string, isProgressive?: boolean) => {
+    if (id && isProgressive) {
+      navigate(Routes.agency.editClient.replace(":clientId", id), { replace: true });
+    } else if (id) {
+      navigate(Routes.agency.clientDetails.replace(":clientId", id));
+    } else {
+      navigate(Routes.agency.clients);
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { AddClientFormData } from "./types/formData";
 import { ClientFormConfig } from "./types/config";
 import { useClientForm } from "./hooks/useClientForm";
@@ -21,7 +21,7 @@ type ClientFormWizardProps = {
   clientId?: string;
   isEditMode?: boolean;
   config: ClientFormConfig;
-  onSuccess?: (clientId?: string) => void;
+  onSuccess?: (clientId?: string, isProgressive?: boolean) => void;
 };
 
 export function ClientFormWizard({
@@ -55,29 +55,48 @@ export function ClientFormWizard({
   const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
   const [savedClientName, setSavedClientName] = React.useState<string | undefined>(undefined);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     const result = await saveClient(
       formData,
       isEditMode,
       clientId,
-      config.showAgencySelection
+      config.showAgencySelection,
+      !isLast,
+      isLast
     );
 
     if (result.success) {
-      setSavedClientName(result.clientName);
-      setShowSaveSuccess(true);
-      if (onSuccess) {
-        onSuccess(result.clientId);
+      const isProgressive = !isLast;
+      if (isProgressive && onSuccess && result.clientId) {
+        onSuccess(result.clientId, true);
+      } else {
+        setSavedClientName(result.clientName);
+        setShowSaveSuccess(true);
+        if (onSuccess) {
+          onSuccess(result.clientId);
+        }
       }
     }
-  };
+  }, [
+    formData,
+    isEditMode,
+    clientId,
+    config.showAgencySelection,
+    isLast,
+    onSuccess,
+    saveClient,
+  ]);
 
-  const handleSuccessClose = () => {
+  const handleSuccessClose = useCallback(() => {
     setShowSaveSuccess(false);
     if (onSuccess) {
       onSuccess();
     }
-  };
+  }, [onSuccess]);
+
+  const handleErrorClose = useCallback((open: boolean) => {
+    if (!open) setErrorMessage(undefined);
+  }, []);
 
   const footer = useMemo(
     () => (
@@ -91,15 +110,15 @@ export function ClientFormWizard({
         onSave={handleSave}
         primaryLoading={isSaving}
         requireDeclaration={true}
-        saveButtonText={isEditMode ? (config.successMessage || "Update Client") : (config.successMessage || "Save Client")}
+        saveButtonText={config.successMessage || "Save Progress"}
       />
     ),
-    [declared, isFirst, isLast, isSaving, formData, isEditMode, config.successMessage, goToNext, goToPrev]
+    [declared, isFirst, isLast, isSaving, config.successMessage, goToNext, goToPrev, handleSave]
   );
 
   const pageTitle = config.pageTitle || (isEditMode ? "Edit client" : "Add client");
 
-  const stageContent = (() => {
+  const stageContent = useMemo(() => {
     if (stage === 1)
       return (
         <Stage1ClientIdentityAndContact
@@ -171,7 +190,14 @@ export function ClientFormWizard({
         />
       );
     return null;
-  })();
+  }, [
+    stage,
+    config,
+    formData,
+    setFormData,
+    pageTitle,
+    footer,
+  ]);
 
   return (
     <>
@@ -199,9 +225,7 @@ export function ClientFormWizard({
 
       <SaveClientErrorModal
         open={!!errorMessage}
-        onOpenChange={(open) => {
-          if (!open) setErrorMessage(undefined);
-        }}
+        onOpenChange={handleErrorClose}
         errorMessage={errorMessage}
       />
     </>

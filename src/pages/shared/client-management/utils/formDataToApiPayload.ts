@@ -1,9 +1,13 @@
 import { AddClientFormData } from "../types/formData";
-import { CreateClientRequest, UpdateClientRequest } from "@/lib/api/clients";
+import { CreateClientRequest } from "@/lib/api/clients";
+
+const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
 
 export function formDataToApiPayload(
   formData: AddClientFormData,
-  includeAgencyId: boolean = false
+  includeAgencyId: boolean = false,
+  progressive: boolean = false,
+  markComplete: boolean = false
 ): CreateClientRequest {
   const s1 = formData.stage1;
   const s2 = formData.stage2;
@@ -13,10 +17,8 @@ export function formDataToApiPayload(
   const s6 = formData.stage6;
   const s7 = formData.stage7;
 
-  const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
-
   const primaryLocation = s1.location;
-  if (!primaryLocation || !primaryLocation.lat || !primaryLocation.lon) {
+  if (!progressive && (!primaryLocation || !primaryLocation.lat || !primaryLocation.lon)) {
     throw new Error("Please select an address from the suggestions so we can capture coordinates.");
   }
 
@@ -37,9 +39,11 @@ export function formDataToApiPayload(
       sdrEndDate: toIso(svc.sdrEndDate),
     })) ?? [];
 
-  const hasInvalidService = services.some((svc) => !svc.name || !svc.code);
-  if (hasInvalidService) {
-    throw new Error("Please select an Authorized Service for each service block (service code will auto-populate).");
+  if (!progressive) {
+    const hasInvalidService = services.some((svc) => !svc.name || !svc.code);
+    if (hasInvalidService) {
+      throw new Error("Please select an Authorized Service for each service block (service code will auto-populate).");
+    }
   }
 
   const payload: CreateClientRequest = {
@@ -51,12 +55,22 @@ export function formDataToApiPayload(
     email: s1.email || undefined,
     phone: s1.phone || undefined,
     dateOfBirth: toIso(s1.dob),
-    primaryAddress: {
-      address: s1.address || undefined,
-      location: primaryLocation,
-      countyState: s1.countyState || undefined,
-      zipCode: s1.zipCode || undefined,
-    },
+    primaryAddress:
+      primaryLocation?.lat && primaryLocation?.lon
+        ? {
+            address: s1.address || undefined,
+            location: primaryLocation,
+            countyState: s1.countyState || undefined,
+            zipCode: s1.zipCode || undefined,
+          }
+        : s1.address || s1.countyState || s1.zipCode
+          ? {
+              address: s1.address || undefined,
+              location: undefined,
+              countyState: s1.countyState || undefined,
+              zipCode: s1.zipCode || undefined,
+            }
+          : undefined,
     secondaryAddress: s1.secondaryAddress || s1.secondaryLocation || s1.secondaryCountyState || s1.secondaryZipCode
       ? {
           address: s1.secondaryAddress || undefined,
@@ -138,6 +152,7 @@ export function formDataToApiPayload(
     requiredVisitDocumentation: s7.requiredVisitDocumentation || undefined,
     notesReviewRules: s7.notesReviewRules || undefined,
     billingValidationRules: s7.billingValidationRules || undefined,
+    ...(markComplete ? { status: "active" as const } : {}),
   };
 
   return payload;
