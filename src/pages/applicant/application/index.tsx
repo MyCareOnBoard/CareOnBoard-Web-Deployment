@@ -18,10 +18,9 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApplicationStatusNames, getApplicationStatus, updateApplicationStatus, cancelApplication, type ApplicationStatus } from "@/lib/api/job-application";
 import { useAuth } from "@/utils/auth";
-import { APPLICATION_STEP_NAMES, APPLICATION_STEP_TITLES } from "@/lib/api/job-application";
+import { APPLICATION_STEP_NAMES, APPLICATION_STEP_TITLES, getApplicationStepIndex } from "@/lib/api/job-application";
 import { useToast } from "@/hooks/use-toast";
 import { Routes } from "@/routes/constants";
-
 
 const STEP_COUNT = 5;
 const getProgressPercentage = (step: number) => {
@@ -48,8 +47,6 @@ function ApplicationContent() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
-
-  console.log("activeStep", activeStep);
   const [isLoading, setIsLoading] = useState(true);
   const progressValue = useMemo(() => getProgressPercentage(activeStep), [activeStep]);
 
@@ -76,8 +73,7 @@ function ApplicationContent() {
         if (!response.status.hasStarted) {
           setActiveStep(0);
         } else if (response.status.currentStep !== null) {
-          const stepIndex = APPLICATION_STEP_NAMES.indexOf(response.status.currentStep);
-          setActiveStep(stepIndex >= 0 ? stepIndex : 0);
+          setActiveStep(getApplicationStepIndex(response.status.currentStep));
         } else {
           setActiveStep(0);
         }

@@ -3,7 +3,7 @@ import { Plus, FileText, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Routes } from "@/routes/constants";
 import { useEffect, useState } from "react";
-import { APPLICATION_STEP_NAMES, getApplicationStatus } from "@/lib/api/job-application";
+import { getApplicationStatus, getApplicationStepIndex } from "@/lib/api/job-application";
 import { ApplicationStatusType } from "@/lib/api/job-application";
 
 
@@ -51,12 +51,12 @@ export default function ApplicantDashboardPage() {
         const { hasStarted, currentStep, status } = response.status;
 
         setApplicationStatus(status);
-        setApplicationStep(APPLICATION_STEP_NAMES.indexOf(currentStep || "profile"));
+        const stepIndex = getApplicationStepIndex(currentStep);
+        setApplicationStep(stepIndex);
         setApplicationStarted(hasStarted);
 
         if (hasStarted && currentStep !== null) {
-          console.log("🔍 Setting application stage to:", APPLICATION_STEP_NAMES.indexOf(currentStep));
-          setApplicationStage(applicationStages[APPLICATION_STEP_NAMES.indexOf(currentStep)]);
+          setApplicationStage(applicationStages[stepIndex]);
         }
       }
 
@@ -84,6 +84,8 @@ export default function ApplicantDashboardPage() {
       );
     }
 
+    const stage = applicationStage ?? applicationStages[0];
+
     if (!applicationStarted) {
       return (
         <div className="flex flex-col items-center max-w-md text-center">
@@ -91,10 +93,10 @@ export default function ApplicantDashboardPage() {
             <FileText className="w-10 h-10 text-[#00b4b8]" />
           </div>
           <h2 className="mb-3 text-2xl font-bold text-[#10141a]">
-            {applicationStage.title}
+            {stage.title}
           </h2>
           <p className="mb-8 text-base text-[#808081] leading-relaxed">
-            {applicationStage.subtitle}
+            {stage.subtitle}
           </p>
           <Button
             onClick={() => navigate(Routes.applicant.application)}
@@ -136,10 +138,10 @@ export default function ApplicantDashboardPage() {
           <FileText className="w-10 h-10 text-[#00b4b8]" />
         </div>
         <h2 className="mb-3 text-2xl font-bold text-[#10141a]">
-          {applicationStage.title}
+          {stage.title}
         </h2>
         <p className="mb-8 text-base text-[#808081] leading-relaxed">
-          {applicationStage.subtitle}
+          {stage.subtitle}
         </p>
         <Button
           onClick={() => navigate(Routes.applicant.application)}

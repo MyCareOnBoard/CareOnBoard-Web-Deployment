@@ -153,6 +153,22 @@ export const APPLICATION_STEP_TITLES = [
 
 export const APPLICATION_STEP_NAMES = ["pre-screening", "eligibility", "compliance", "review", "orientation"];
 
+/** Maps API step values to APPLICATION_STEP_NAMES for backend/frontend alignment */
+export const APPLICATION_STEP_ALIASES: Record<string, string> = {
+  "eligibility-verification": "eligibility",
+  "profile": "pre-screening",
+};
+
+/**
+ * Returns the clamped step index (0 to APPLICATION_STEP_NAMES.length - 1) for a given currentStep.
+ * Normalizes backend step names (e.g. "eligibility-verification") before lookup.
+ */
+export const getApplicationStepIndex = (currentStep: string | null | undefined): number => {
+  const normalized = APPLICATION_STEP_ALIASES[currentStep ?? ""] ?? currentStep ?? "pre-screening";
+  const index = APPLICATION_STEP_NAMES.indexOf(normalized);
+  return Math.max(0, Math.min(index, APPLICATION_STEP_NAMES.length - 1));
+};
+
 export type ApplicationStepName = typeof APPLICATION_STEP_NAMES[number] | null;
 
 export const ApplicationStatusNames = ["incomplete", "pre-screening_complete", "eligibility_pending", "eligibility_complete", "submitted", "under_review", "approved", "rejected"];
