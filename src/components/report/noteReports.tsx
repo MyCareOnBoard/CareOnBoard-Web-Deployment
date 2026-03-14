@@ -98,6 +98,9 @@ export default function NoteReport() {
                     startDate: locationState.startDate ? new Date(locationState.startDate) : null,
                     endDate: locationState.endDate ? new Date(locationState.endDate) : null,
                 })
+                if (locationState.noteType) {
+                    setNoteType(locationState.noteType);
+                }
             }
         }
     }, [locationState]);
