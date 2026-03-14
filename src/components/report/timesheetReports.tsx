@@ -238,7 +238,7 @@ export default function TimesheetReport() {
                                                 Approved Notes
                                             </p>
                                             <p className="text-[14px] font-medium text-black">
-                                                {client.approvedNotesCount}
+                                                {client.totalApprovedNotes}
                                             </p>
                                         </div>
 

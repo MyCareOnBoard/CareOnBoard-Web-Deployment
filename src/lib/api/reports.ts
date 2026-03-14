@@ -61,6 +61,7 @@ export interface ShiftReport {
   fullName: string;
   totalDSPs: number;
   approvedNotesCount: number;
+    totalApprovedNotes: number;
 }
 
 export interface ApprovedNote {
