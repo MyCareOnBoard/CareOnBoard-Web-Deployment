@@ -32,6 +32,8 @@ export type Service = {
     totalApprovedHours?: string;
     rate?: string;
     payType?: ServicePayType;
+    clientRate?: string;
+    clientPayType?: ServicePayType;
     ispEffectiveDate?: Date;
     startAuthDate?: Date;
     endAuthDate?: Date;
@@ -173,6 +175,8 @@ function createEmptyServiceAuthorization(): Service {
         totalApprovedHours: "",
         rate: "",
         payType: undefined,
+        clientRate: "",
+        clientPayType: undefined,
         ispEffectiveDate: undefined,
         startAuthDate: undefined,
         endAuthDate: undefined,

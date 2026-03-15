@@ -74,6 +74,8 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                     totalApprovedHours: svc.totalApprovedHours || "",
                     rate: svc.rate || "",
                     payType: svc.payType,
+                    clientRate: svc.clientRate || "",
+                    clientPayType: svc.clientPayType,
                     ispEffectiveDate: svc.ispEffectiveDate ? parseDate(svc.ispEffectiveDate) : undefined,
                     startAuthDate: svc.startAuthDate ? parseDate(svc.startAuthDate) : undefined,
                     endAuthDate: svc.endAuthDate ? parseDate(svc.endAuthDate) : undefined,

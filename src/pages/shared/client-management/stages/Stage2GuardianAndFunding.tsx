@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -13,17 +13,68 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AddClientFormData, Service } from "@/pages/shared/client-management/types/formData";
-import { listServices, useListServicesQuery, type Service as ApiService } from "@/lib/api/services";
+import { AddClientFormData, Service, type ServicePayType } from "@/pages/shared/client-management/types/formData";
+import { useListServicesQuery, type Service as ApiService } from "@/lib/api/services";
 import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 
-function ServiceAuthorizationFields({
+const RATE_INPUT_CLASS = "h-[44px] rounded-[12px] border-[#cccccd] bg-white";
+const SELECT_TRIGGER_CLASS = "w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white";
+
+function RatePayTypeField({
+  label,
+  rate,
+  payType,
+  onRateChange,
+  onPayTypeChange,
+}: {
+  label: string;
+  rate: string;
+  payType?: ServicePayType;
+  onRateChange: (value: string) => void;
+  onPayTypeChange: (value: ServicePayType) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-[12px] font-normal text-[#10141a]">{label}</label>
+      <div className="flex gap-2">
+        <Input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step={0.01}
+          value={rate}
+          onChange={(e) => onRateChange(e.target.value)}
+          className={RATE_INPUT_CLASS}
+          placeholder="Enter rate"
+        />
+        <Select value={payType} onValueChange={(v) => onPayTypeChange(v as ServicePayType)}>
+          <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+            <SelectValue placeholder="Pay type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="hourly">Hourly</SelectItem>
+            <SelectItem value="15-min">15 minutes</SelectItem>
+            <SelectItem value="daily">Daily</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
+const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationFields({
   service,
+  serviceId,
   onChange,
 }: {
   service: Service;
-  onChange: (next: Service) => void;
+  serviceId: string;
+  onChange: (serviceId: string, next: Service) => void;
 }) {
+  const update = React.useCallback(
+    (patch: Partial<Service>) => onChange(serviceId, { ...service, ...patch }),
+    [service, serviceId, onChange]
+  );
   const [isIspOpen, setIsIspOpen] = useState(false);
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [isEndOpen, setIsEndOpen] = useState(false);
@@ -77,9 +128,9 @@ function ServiceAuthorizationFields({
       (svc) => svc.name === service.name && svc.code === service.code,
     );
     if (!stillValid && (service.name || service.code)) {
-      onChange({ ...service, name: "", code: "" });
+      update({ name: "", code: "" });
     }
-  }, [selectedType, filteredServices, service.name, service.code, onChange, loadingServices, offeredServices.length]);
+  }, [selectedType, filteredServices, service.name, service.code, update, loadingServices, offeredServices.length]);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
@@ -121,7 +172,7 @@ function ServiceAuthorizationFields({
           value={service.name}
           onValueChange={(v) => {
             const selectedService = filteredServices.find((s) => s.name === v);
-            onChange({ ...service, name: v, code: selectedService?.code || "" });
+            update({ name: v, code: selectedService?.code || "" });
           }}
           disabled={
             loadingServices ||
@@ -162,9 +213,7 @@ function ServiceAuthorizationFields({
           min={0}
           step={1}
           value={service.hours}
-          onChange={(e) =>
-            onChange({ ...service, hours: e.target.value })
-          }
+          onChange={(e) => update({ hours: e.target.value })}
           className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
           placeholder="Enter hours"
         />
@@ -180,44 +229,29 @@ function ServiceAuthorizationFields({
           min={0}
           step={1}
           value={service.totalApprovedHours}
-          onChange={(e) =>
-            onChange({ ...service, totalApprovedHours: e.target.value })
-          }
+          onChange={(e) => update({ totalApprovedHours: e.target.value })}
           className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
           placeholder="Enter total approved hours"
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">
-          Staff Rate / Pay Type
-        </label>
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={0.01}
-            value={service.rate}
-            onChange={(e) => onChange({ ...service, rate: e.target.value })}
-            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-            placeholder="Enter rate"
-          />
-          <Select
-            value={service.payType}
-            onValueChange={(v) => onChange({ ...service, payType: v as any })}
-          >
-            <SelectTrigger className="w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-              <SelectValue placeholder="Pay type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hourly">Hourly</SelectItem>
-              <SelectItem value="15-min">15 minutes</SelectItem>
-              <SelectItem value="daily">Daily</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <RatePayTypeField
+        label="Client Rate / Pay Type"
+        rate={service.clientRate ?? ""}
+        payType={service.clientPayType}
+        onRateChange={(v) => update({ clientRate: v })}
+        onPayTypeChange={(v) => update({ clientPayType: v })}
+      />
+      
+      <RatePayTypeField
+        label="Staff Rate / Pay Type"
+        rate={service.rate ?? ""}
+        payType={service.payType}
+        onRateChange={(v) => update({ rate: v })}
+        onPayTypeChange={(v) => update({ payType: v })}
+      />
+
+      
 
       <div className="flex flex-col gap-1">
         <label className="text-[12px] font-normal text-[#10141a]">
@@ -260,7 +294,7 @@ function ServiceAuthorizationFields({
               }}
               onSelect={(d) => {
                 if (d) {
-                  onChange({ ...service, ispEffectiveDate: d });
+                  update({ ispEffectiveDate: d });
                   setIsIspOpen(false);
                 }
               }}
@@ -306,7 +340,7 @@ function ServiceAuthorizationFields({
               }}
               onSelect={(d) => {
                 if (d) {
-                  onChange({ ...service, startAuthDate: d });
+                  update({ startAuthDate: d });
                   setIsStartOpen(false);
                 }
               }}
@@ -352,7 +386,7 @@ function ServiceAuthorizationFields({
               }}
               onSelect={(d) => {
                 if (d) {
-                  onChange({ ...service, endAuthDate: d });
+                  update({ endAuthDate: d });
                   setIsEndOpen(false);
                 }
               }}
@@ -396,7 +430,7 @@ function ServiceAuthorizationFields({
               }}
               onSelect={(d) => {
                 if (d) {
-                  onChange({ ...service, pcptDate: d });
+                  update({ pcptDate: d });
                   setIsPcptOpen(false);
                 }
               }}
@@ -446,7 +480,7 @@ function ServiceAuthorizationFields({
               }}
               onSelect={(d) => {
                 if (d) {
-                  onChange({ ...service, sdrStartDate: d });
+                  update({ sdrStartDate: d });
                   setIsSdrStartOpen(false);
                 }
               }}
@@ -496,7 +530,7 @@ function ServiceAuthorizationFields({
               }}
               onSelect={(d) => {
                 if (d) {
-                  onChange({ ...service, sdrEndDate: d });
+                  update({ sdrEndDate: d });
                   setIsSdrEndOpen(false);
                 }
               }}
@@ -506,7 +540,7 @@ function ServiceAuthorizationFields({
       </div>
     </div>
   );
-}
+});
 
 export function Stage2GuardianAndFunding({
   footer,
@@ -520,8 +554,21 @@ export function Stage2GuardianAndFunding({
   pageTitle?: string;
 }) {
   const stage2 = formData.stage2;
-  const updateStage2 = (patch: Partial<AddClientFormData["stage2"]>) =>
-    setFormData((prev) => ({ ...prev, stage2: { ...prev.stage2, ...patch } }));
+  const updateStage2 = useCallback(
+    (patch: Partial<AddClientFormData["stage2"]>) =>
+      setFormData((prev) => ({ ...prev, stage2: { ...prev.stage2, ...patch } })),
+    []
+  );
+
+  const handleServiceChange = useCallback((serviceId: string, next: Service) => {
+    setFormData((prev) => ({
+      ...prev,
+      stage2: {
+        ...prev.stage2,
+        services: prev.stage2.services.map((s) => (s.id === serviceId ? next : s)),
+      },
+    }));
+  }, []);
 
   const addressInputRef = useRef<HTMLDivElement>(null);
   const guardianAddressAutocomplete = useGooglePlacesAutocomplete();
@@ -554,6 +601,9 @@ export function Stage2GuardianAndFunding({
       code: undefined,
       hours: "",
       rate: "",
+      payType: undefined,
+      clientRate: "",
+      clientPayType: undefined,
       ispEffectiveDate: undefined,
       startAuthDate: undefined,
       endAuthDate: undefined,
@@ -770,11 +820,8 @@ export function Stage2GuardianAndFunding({
 
               <ServiceAuthorizationFields
                 service={service}
-                onChange={(next) =>
-                  updateStage2({
-                    services: services.map((s) => (s.id === service.id ? next : s)),
-                  })
-                }
+                serviceId={service.id}
+                onChange={handleServiceChange}
               />
             </div>
           ))}

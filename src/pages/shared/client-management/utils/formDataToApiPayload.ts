@@ -31,6 +31,8 @@ export function formDataToApiPayload(
       totalApprovedHours: svc.totalApprovedHours || "",
       rate: svc.rate || "",
       payType: svc.payType,
+      clientRate: svc.clientRate || "",
+      clientPayType: svc.clientPayType,
       ispEffectiveDate: toIso(svc.ispEffectiveDate),
       startAuthDate: toIso(svc.startAuthDate),
       endAuthDate: toIso(svc.endAuthDate),
