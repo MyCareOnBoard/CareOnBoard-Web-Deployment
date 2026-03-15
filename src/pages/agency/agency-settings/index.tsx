@@ -5,8 +5,11 @@ import { useLocation } from "react-router";
 import AccountTab from "./components/AccountTab";
 import NotificationsTab from "./components/NotificationTab";
 import UserLevelsTab from "./components/UserLevelsTab";
+import { useAuth } from "@/utils/auth";
+import { UserType } from "@/utils/auth/types";
 
 export default function AgencySettingsPage() {
+  const { user } = useAuth();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<"account" | "notification" | "userLevels">("account");
   const [showSuccess, setShowSuccess] = useState(false);
@@ -48,6 +51,7 @@ export default function AgencySettingsPage() {
         >
           Notification
         </button>
+        {(user?.userType === UserType.AGENCY_STAFF && user?.profile?.accessList?.includes("User Levels")) && (
         <button
           onClick={() => setActiveTab("userLevels")}
           className={`px-4 py-2 rounded-full cursor-pointer font-medium ${activeTab === "userLevels"
@@ -55,8 +59,9 @@ export default function AgencySettingsPage() {
               : "outline-2 outline-offset-2 outline-solid outline-gray-300 bg-gray-200 text-gray-500"
             }`}
         >
-          Team
-        </button>
+            Team
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
