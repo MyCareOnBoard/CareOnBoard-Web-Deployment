@@ -36,40 +36,13 @@ export default function ClientClaimsPage() {
 
   const handleGoBack = useCallback(() => navigate(-1), [navigate]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#eef4f5] px-8 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#00b4b8]"/>
-      </div>
-    );
-  }
-
-  if (error || !data?.data) {
-    return (
-      <div className="min-h-screen bg-[#eef4f5] px-8 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-[18px] font-semibold text-[#10141a] mb-2">
-            We couldn't load this client's claims
-          </p>
-          <p className="text-[14px] text-[#808081] mb-4">
-            Please try again later or go back to billing
-          </p>
-          <button
-            onClick={handleGoBack}
-            className="text-[#00b4b8] hover:underline"
-          >
-            Back to billing
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const { client, serviceLogsGrouped, billingSummary } = data.data;
+  const client = data?.data?.client;
+  const serviceLogsGrouped = data?.data?.serviceLogsGrouped ?? [];
+  const billingSummary = data?.data?.billingSummary;
 
   const handlePrint = useCallback(async () => {
     const el = printContentRef.current;
-    if (!el) return;
+    if (!el || !client) return;
 
     setIsGeneratingPDF(true);
     try {
@@ -112,7 +85,7 @@ export default function ClientClaimsPage() {
     } finally {
       setIsGeneratingPDF(false);
     }
-  }, [client.fullName]);
+  }, [client?.fullName]);
 
   const serviceLogRows = useMemo(() => {
     const rows: { log: (typeof serviceLogsGrouped)[0]["logs"][0]; rateLabel: string; rowAmount: number }[] = [];
@@ -131,14 +104,43 @@ export default function ClientClaimsPage() {
   }, [serviceLogsGrouped, serviceByCode]);
 
   const formattedDob = useMemo(
-    () => (client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString() : "—"),
-    [client.dateOfBirth]
+    () => (client?.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString() : "—"),
+    [client?.dateOfBirth]
   );
 
   const providerAddress = useMemo(() => {
     const addr = user?.profile?.address;
     return typeof addr === "object" ? addr?.address : addr;
   }, [user?.profile?.address]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#eef4f5] px-8 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#00b4b8]"/>
+      </div>
+    );
+  }
+
+  if (error || !data?.data) {
+    return (
+      <div className="min-h-screen bg-[#eef4f5] px-8 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-[18px] font-semibold text-[#10141a] mb-2">
+            We couldn't load this client's claims
+          </p>
+          <p className="text-[14px] text-[#808081] mb-4">
+            Please try again later or go back to billing
+          </p>
+          <button
+            onClick={handleGoBack}
+            className="text-[#00b4b8] hover:underline"
+          >
+            Back to billing
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#eef4f5] px-8">
@@ -188,12 +190,12 @@ export default function ClientClaimsPage() {
             <div className="rounded-xl p-4 mb-6 flex justify-between items-start">
               <div className="flex items-start gap-6">
                 <div className="w-24 h-24 rounded border-2 bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-gray-400 text-[32px] font-light shrink-0">
-                  {client.fullName.charAt(0)}
+                  {client?.fullName?.charAt(0)}
                 </div>
                 <div className="flex flex-col space-y-2">
                   <div>
                     <p className="text-[16px] font-semibold text-[#10141a]">
-                      {client.fullName}
+                      {client?.fullName}
                     </p>
                   </div>
                   <div className="flex items-start gap-8">
@@ -203,7 +205,7 @@ export default function ClientClaimsPage() {
                   <div className="flex items-start gap-8">
                     <span className="text-[14px] text-[#808081] min-w-20">Address</span>
                     <span className="text-[14px] text-[#10141a]">
-                      {client.address || "—"}
+                      {client?.address || "—"}
                     </span>
                   </div>
                   {/*<div className="flex items-start gap-8">*/}
@@ -282,10 +284,10 @@ export default function ClientClaimsPage() {
                 <div className="flex justify-between items-center py-2">
                   <p className="text-[14px] text-[#808081]">Hours worked</p>
                   <p className="text-[14px] font-medium text-[#10141a]">
-                    {billingSummary.totalHoursWorked}
+                    {billingSummary?.totalHoursWorked}
                   </p>
                 </div>
-                {billingSummary.ratePerUnit != null && (
+                {billingSummary?.ratePerUnit != null && (
                   <div className="flex justify-between items-center py-2">
                     <p className="text-[14px] text-[#808081]">Rate</p>
                     <p className="text-[14px] font-medium text-[#10141a]">
@@ -298,13 +300,13 @@ export default function ClientClaimsPage() {
                 )}
                 <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
                   <p className="text-[14px] text-[#808081]">Total amount</p>
-                  <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary.totalAmount)}</p>
+                  <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalAmount ?? 0)}</p>
                 </div>
               </div>
               <div className={"w-full"}>
                 <p className="flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2 font-semibold">
                   <span className={"text-white"}>Total amount</span>
-                  <span className="text-white">{formatCurrency(billingSummary.totalAmount)}</span>
+                  <span className="text-white">{formatCurrency(billingSummary?.totalAmount ?? 0)}</span>
                 </p>
               </div>
             </div>
