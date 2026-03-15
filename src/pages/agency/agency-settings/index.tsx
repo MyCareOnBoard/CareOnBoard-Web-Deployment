@@ -55,12 +55,12 @@ export default function AgencySettingsPage() {
               : "outline-2 outline-offset-2 outline-solid outline-gray-300 bg-gray-200 text-gray-500"
             }`}
         >
-          User Levels
+          Team
         </button>
       </div>
 
       {/* Tab Content */}
-      <div className="p-4 bg-[#f7f7f7] rounded-2xl">
+      <div className="min-w-0 overflow-x-hidden rounded-2xl bg-[#f7f7f7] p-4">
         {activeTab === "account" ? (
           <AccountTab onSaved={handleSave} />
         ) : activeTab === "notification" ? (

@@ -162,7 +162,7 @@ export default function AddNewUserModal({
         {/* Header */}
         <div className="flex items-center justify-between w-full h-[44px] shrink-0">
           <DialogTitle className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-            {mode === "create" ? "Add new user" : "Edit user"}
+            {mode === "create" ? "Add team member" : "Edit team member"}
           </DialogTitle>
           <button
             onClick={handleClose}
@@ -298,7 +298,7 @@ export default function AddNewUserModal({
                   {/* Header */}
                   <div className="px-[20px] pt-[12px] pb-0 shrink-0">
                     <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
-                      Select access
+                      Choose which areas of the dashboard this person can access
                     </p>
                   </div>
 
@@ -379,11 +379,11 @@ export default function AddNewUserModal({
             <span className="text-[14px] font-semibold leading-[1.4] text-white">
               {isSaving
                 ? mode === "create"
-                  ? "Adding user..."
-                  : "Updating user..."
+                  ? "Adding..."
+                  : "Saving..."
                 : mode === "create"
-                  ? "Add User"
-                  : "Update User"}
+                  ? "Add team member"
+                  : "Save changes"}
             </span>
           </button>
         </DialogFooter>
