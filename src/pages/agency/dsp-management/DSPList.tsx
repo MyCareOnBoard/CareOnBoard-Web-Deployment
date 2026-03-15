@@ -125,7 +125,7 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-gray-900">DSP Directory</h3>
-            <p className="text-sm text-gray-600">Number Of Expiring Or Missing Documents/Training</p>
+            <p className="text-sm text-gray-600">Browse, search, and manage your direct support professionals</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="relative" ref={searchRef}>

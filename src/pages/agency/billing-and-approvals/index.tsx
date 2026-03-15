@@ -1,10 +1,12 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useCallback} from "react";
 import {ChevronLeft, ChevronRight} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {useAuth} from "@/utils/auth";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {useGetBillingRecordsQuery} from "./api";
+import {formatCurrency, buildServiceByCodeMap, getClientRate} from "./billingUtils";
+import type {ClientServiceDefinition} from "./api";
 
 interface BillingStatusFilter {
   value: string;
@@ -79,23 +81,15 @@ export default function BillingAndApprovalsPage() {
   const totalPages = Math.ceil(totalRecords / itemsPerPage);
   const loading = isLoading || isFetching;
 
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
+  const handlePreviousPage = useCallback(() => {
+    setCurrentPage((p) => (p > 1 ? p - 1 : p));
+  }, []);
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
+  const handleNextPage = useCallback(() => {
+    setCurrentPage((p) => (p < totalPages ? p + 1 : p));
+  }, [totalPages]);
 
-  const formatCurrency = (amount: number) => {
-    return `$${amount.toFixed(0)}`;
-  };
-
-  const servicesGroupedByRole = billingData?.records || []
+  const servicesGroupedByRole = billingData?.records || [];
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -200,6 +194,10 @@ export default function BillingAndApprovalsPage() {
                 : 'Unknown Client';
 
               const dspName = record.employee?.fullName || 'Unknown DSP';
+
+              const serviceByCode = buildServiceByCodeMap(
+                record.client?.services as unknown as ClientServiceDefinition[] | undefined
+              );
 
               return (
                 <div
@@ -310,16 +308,26 @@ export default function BillingAndApprovalsPage() {
                     ))}
                   </div>
 
-                  {/* Pay Rate - Multiple rows */}
+                  {/* Pay Rate - Multiple rows (client rate on clients tab, staff rate on DSP tab) */}
                   <div className="flex flex-col gap-4">
-                    {(activeTab === "client" ? record.employees : record.clients)?.map((item) => (
-                      <div key={item.id} className="flex flex-col justify-center h-[60px]">
-                        <p className="text-[14px] text-[#808081] mb-1">Pay Rate</p>
-                        <p className="text-[16px] font-medium text-[#10141a]">
-                          {formatCurrency(record.payRate)}
-                        </p>
-                      </div>
-                    ))}
+                    {(activeTab === "client" ? record.employees : record.clients)?.map((item) => {
+                      const serviceCode = (item as { serviceCode?: string }).serviceCode;
+                      let rateToShow = record.payRate ?? 0;
+                      if (activeTab === "client" && serviceCode) {
+                        const service = serviceByCode.get(String(serviceCode));
+                        rateToShow = service
+                          ? (getClientRate(service).rate || record.payRate) ?? 0
+                          : (record.payRate ?? 0);
+                      }
+                      return (
+                        <div key={item.id} className="flex flex-col justify-center h-[60px]">
+                          <p className="text-[14px] text-[#808081] mb-1">Pay Rate</p>
+                          <p className="text-[16px] font-medium text-[#10141a]">
+                            {formatCurrency(rateToShow)}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Generate Report Button */}

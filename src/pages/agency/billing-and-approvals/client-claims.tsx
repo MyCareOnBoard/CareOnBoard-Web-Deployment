@@ -1,10 +1,15 @@
-import React, {useState, useRef} from "react";
-import {useParams, useNavigate} from "react-router";
-import {ArrowLeft, Loader2, Download} from "lucide-react";
-import {useAuth} from "@/utils/auth";
-import {useGetClientClaimsQuery} from "./api";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+import React, { useMemo, useState, useRef, useCallback } from "react";
+import { useParams, useNavigate } from "react-router";
+import { ArrowLeft, Loader2, Download } from "lucide-react";
+import { useAuth } from "@/utils/auth";
+import { useGetClientClaimsQuery } from "./api";
+import {
+  formatCurrency,
+  getClientRate,
+  computeBillingAmount,
+  formatRateLabel,
+  buildServiceByCodeMap,
+} from "./billingUtils";
 
 export default function ClientClaimsPage() {
   const {clientId} = useParams();
@@ -13,7 +18,7 @@ export default function ClientClaimsPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const printContentRef = useRef<HTMLDivElement>(null);
 
-  const {data, isLoading, error} = useGetClientClaimsQuery(
+  const { data, isLoading, error } = useGetClientClaimsQuery(
     {
       clientId: clientId || "",
       agencyId: user?.agencyId || "",
@@ -24,12 +29,12 @@ export default function ClientClaimsPage() {
     }
   );
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
-  };
+  const serviceByCode = useMemo(
+    () => buildServiceByCodeMap(data?.data?.client?.services),
+    [data?.data?.client?.services]
+  );
+
+  const handleGoBack = useCallback(() => navigate(-1), [navigate]);
 
   if (isLoading) {
     return (
@@ -44,80 +49,103 @@ export default function ClientClaimsPage() {
       <div className="min-h-screen bg-[#eef4f5] px-8 flex items-center justify-center">
         <div className="text-center">
           <p className="text-[18px] font-semibold text-[#10141a] mb-2">
-            Failed to load client claims
+            We couldn't load this client's claims
           </p>
           <p className="text-[14px] text-[#808081] mb-4">
-            Please try again later
+            Please try again later or go back to billing
           </p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleGoBack}
             className="text-[#00b4b8] hover:underline"
           >
-            Go back
+            Back to billing
           </button>
         </div>
       </div>
     );
   }
 
-  const {client, serviceLogsGrouped, billingSummary} = data.data;
+  const { client, serviceLogsGrouped, billingSummary } = data.data;
 
-  const handlePrint = async () => {
-    if (!printContentRef.current) return;
+  const handlePrint = useCallback(async () => {
+    const el = printContentRef.current;
+    if (!el) return;
 
     setIsGeneratingPDF(true);
-    
     try {
-      // Convert HTML to canvas (handles oklch colors natively)
-      const canvas = await html2canvas(printContentRef.current, {
+      const [html2canvas, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const canvas = await html2canvas.default(el, {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff',
-        windowHeight: printContentRef.current.scrollHeight,
+        backgroundColor: "#ffffff",
+        windowHeight: el.scrollHeight,
       });
 
-      // Create PDF from canvas
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'in',
-        format: 'letter',
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const pdf = new jsPDF({ orientation: "portrait", unit: "in", format: "letter" });
+      const imgData = canvas.toDataURL("image/jpeg", 0.98);
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth - 1; // 0.5 inch margins
+      const imgWidth = pageWidth - 1;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
       let heightLeft = imgHeight;
-      let position = 0.5; // Top margin
-
-      pdf.addImage(imgData, 'JPEG', 0.5, position, imgWidth, imgHeight);
+      let position = 0.5;
+      pdf.addImage(imgData, "JPEG", 0.5, position, imgWidth, imgHeight);
       heightLeft -= pageHeight - 1;
 
       while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0.5, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, "JPEG", 0.5, position, imgWidth, imgHeight);
         heightLeft -= pageHeight - 1;
       }
 
-      const filename = `Client_Claims_${client.fullName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `Client_Claims_${client.fullName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`;
       pdf.save(filename);
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error("Error generating PDF:", error);
     } finally {
       setIsGeneratingPDF(false);
     }
-  };
+  }, [client.fullName]);
+
+  const serviceLogRows = useMemo(() => {
+    const rows: { log: (typeof serviceLogsGrouped)[0]["logs"][0]; rateLabel: string; rowAmount: number }[] = [];
+    serviceLogsGrouped.forEach((group) => {
+      group.logs.forEach((log) => {
+        const service = serviceByCode.get(String(log.serviceCode));
+        const { rate, payType } = getClientRate(service);
+        rows.push({
+          log,
+          rateLabel: formatRateLabel(rate, payType),
+          rowAmount: computeBillingAmount(rate, payType, log.hours, log.units),
+        });
+      });
+    });
+    return rows;
+  }, [serviceLogsGrouped, serviceByCode]);
+
+  const formattedDob = useMemo(
+    () => (client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString() : "—"),
+    [client.dateOfBirth]
+  );
+
+  const providerAddress = useMemo(() => {
+    const addr = user?.profile?.address;
+    return typeof addr === "object" ? addr?.address : addr;
+  }, [user?.profile?.address]);
 
   return (
     <div className="min-h-screen bg-[#eef4f5] px-8">
       <div className="mx-auto">
         <div className="flex items-center gap-4 mb-6 no-print">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleGoBack}
             className="w-10 h-10 rounded-full bg-white border border-[#e5e5e6] flex items-center justify-center hover:bg-gray-50 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-[#10141a]"/>
@@ -140,7 +168,7 @@ export default function ClientClaimsPage() {
               {isGeneratingPDF ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-[14px]">Generating PDF...</span>
+                  <span className="text-[14px]">Creating PDF…</span>
                 </>
               ) : (
                 <>
@@ -169,15 +197,13 @@ export default function ClientClaimsPage() {
                     </p>
                   </div>
                   <div className="flex items-start gap-8">
-                    <span className="text-[14px] text-[#808081] min-w-20">DOB</span>
-                    <span className="text-[14px] text-[#10141a]">
-                      {client.dateOfBirth ? new Date(client.dateOfBirth).toLocaleDateString() : "N/A"}
-                    </span>
+                    <span className="text-[14px] text-[#808081] min-w-20">Date of birth</span>
+                    <span className="text-[14px] text-[#10141a]">{formattedDob}</span>
                   </div>
                   <div className="flex items-start gap-8">
                     <span className="text-[14px] text-[#808081] min-w-20">Address</span>
                     <span className="text-[14px] text-[#10141a]">
-                      {client.address || "N/A"}
+                      {client.address || "—"}
                     </span>
                   </div>
                   {/*<div className="flex items-start gap-8">*/}
@@ -192,88 +218,56 @@ export default function ClientClaimsPage() {
                 <p className="text-[16px] font-semibold text-[#10141a] mb-2">
                   {user?.profile?.name}
                 </p>
-                <p className="text-[14px] text-[#10141a]">{typeof user?.profile?.address === 'object' ? user.profile.address.address : user?.profile?.address}</p>
-                <p className="text-[14px] text-[#10141a]">Provider NPI: 23764234232756</p>
-                <p className="text-[14px] text-[#10141a]">Provider Taxonomy: 21/B Baker Street</p>
-                <p className="text-[14px] text-[#10141a]">Medicaid Provider Number: 21/B Baker Street</p>
+                <p className="text-[14px] text-[#10141a]">{providerAddress}</p>
+                <p className="text-[14px] text-[#10141a]">NPI: 23764234232756</p>
+                <p className="text-[14px] text-[#10141a]">Taxonomy: 21/B Baker Street</p>
+                <p className="text-[14px] text-[#10141a]">Medicaid ID: 21/B Baker Street</p>
               </div>
             </div>
 
-            {/* Approved Service Logs */}
+            {/* Service Hours */}
             <div className="mb-6">
               <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-                Approved Service Logs
+                Service hours
               </h2>
 
-            {serviceLogsGrouped.length > 0 ? (
+            {serviceLogRows.length > 0 ? (
               <div className="overflow-hidden">
                 {/* Table Header */}
-                <div className="grid grid-cols-7 gap-4 px-4 py-3">
-                  <div className="font-semibold text-[14px] text-[#808081]">DSP</div>
-                  <div className="font-semibold text-[14px] text-[#808081]">Service</div>
-                  {/*<div className="font-semibold text-[14px] text-[#808081]">Service Code</div>*/}
-                  <div className="font-semibold text-[14px] text-[#808081]">Total Hours</div>
-                  {/*<div className="font-semibold text-[14px] text-[#808081]">Units</div>*/}
-                  <div className="font-semibold text-[14px] text-[#808081]">Rate/Unit</div>
-                  <div className="font-semibold text-[14px] text-[#808081]">Total Amount</div>
+                <div className="grid grid-cols-5 gap-4 px-4 py-3">
+                  <div className="font-semibold text-[14px] text-[#808081]">Staff</div>
+                  <div className="font-semibold text-[14px] text-[#808081]">Service Code</div>
+                  <div className="font-semibold text-[14px] text-[#808081]">Hours</div>
+                  <div className="font-semibold text-[14px] text-[#808081]">Rate</div>
+                  <div className="font-semibold text-[14px] text-[#808081]">Amount</div>
                 </div>
 
                 {/* Table Body */}
                 <div>
-                  {serviceLogsGrouped.map((group, groupIndex) => (
-                    <React.Fragment key={`${group.serviceCode}-${groupIndex}`}>
-                      {group.logs.map((log) => {
-                        const matchedService = (client.services || []).find(s => s.code === String(log.serviceCode));
-                        const rate = matchedService ? parseFloat(matchedService.rate) || 0 : 0;
-                        const payType = matchedService?.payType || "hourly";
-                        let rowAmount = 0;
-                        if (payType === "15-min") rowAmount = (log.hours * 60 / 15) * rate;
-                        else if (payType === "daily") rowAmount = log.units * rate;
-                        else rowAmount = log.hours * rate;
-                        const rateLabel = payType === "15-min"
-                          ? `${formatCurrency(rate)}/15-min`
-                          : payType === "daily"
-                          ? `${formatCurrency(rate)}/day`
-                          : `${formatCurrency(rate)}/hr`;
-
-                        return (
-                          <div
-                            key={log.id}
-                            className="grid grid-cols-7 gap-4 px-4 py-3 hover:bg-[#f9fafb] transition-colors"
-                          >
-                            {/* DSP */}
-                            <div className="text-[14px] text-[#10141a]">
-                              {log.employee?.fullName || "N/A"}
-                            </div>
-
-                            {/* Service */}
-                            <div className="text-[14px] text-[#10141a]">
-                              {log.serviceCode || "N/A"}
-                            </div>
-
-                            {/* Total Hours */}
-                            <div className="text-[14px] text-[#10141a]">
-                              {log.hours.toFixed(2)}
-                            </div>
-
-                            {/* Rate per unit */}
-                            <div className="text-[14px] text-[#10141a]">
-                              {rateLabel}
-                            </div>
-
-                            {/* Total Amount */}
-                            <div className="text-[14px] text-[#10141a]">
-                              {formatCurrency(rowAmount)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </React.Fragment>
+                  {serviceLogRows.map(({ log, rateLabel, rowAmount }) => (
+                    <div
+                      key={log.id}
+                      className="grid grid-cols-5 gap-4 px-4 py-3 hover:bg-[#f9fafb] transition-colors"
+                    >
+                      <div className="text-[14px] text-[#10141a]">
+                        {log.employee?.fullName || "—"}
+                      </div>
+                      <div className="text-[14px] text-[#10141a]">
+                        {log.serviceCode || "—"}
+                      </div>
+                      <div className="text-[14px] text-[#10141a]">
+                        {log.hours.toFixed(2)}
+                      </div>
+                      <div className="text-[14px] text-[#10141a]">{rateLabel}</div>
+                      <div className="text-[14px] text-[#10141a]">
+                        {formatCurrency(rowAmount)}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <p className="text-[14px] text-[#808081]">No service logs available</p>
+              <p className="text-[14px] text-[#808081]">No service hours recorded for this period</p>
             )}
             </div>
 
@@ -286,31 +280,30 @@ export default function ClientClaimsPage() {
             <div className={"flex flex-col mb-4"}>
               <div className="space-y-3 w-sm bg-white rounded p-4">
                 <div className="flex justify-between items-center py-2">
-                  <p className="text-[14px] text-[#808081]">Total hours worked</p>
+                  <p className="text-[14px] text-[#808081]">Hours worked</p>
                   <p className="text-[14px] font-medium text-[#10141a]">
                     {billingSummary.totalHoursWorked}
                   </p>
                 </div>
                 {billingSummary.ratePerUnit != null && (
                   <div className="flex justify-between items-center py-2">
-                    <p className="text-[14px] text-[#808081]">Rate Per Unit</p>
+                    <p className="text-[14px] text-[#808081]">Rate</p>
                     <p className="text-[14px] font-medium text-[#10141a]">
-                      {billingSummary.payType === "15-min"
-                        ? `${formatCurrency(billingSummary.ratePerUnit)}/15-min`
-                        : billingSummary.payType === "daily"
-                        ? `${formatCurrency(billingSummary.ratePerUnit)}/day`
-                        : `${formatCurrency(billingSummary.ratePerUnit)}/hr`}
+                      {formatRateLabel(
+                        billingSummary.ratePerUnit,
+                        billingSummary.payType ?? "hourly"
+                      )}
                     </p>
                   </div>
                 )}
                 <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
-                  <p className="text-[14px] text-[#808081]">Total Amount</p>
+                  <p className="text-[14px] text-[#808081]">Total amount</p>
                   <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary.totalAmount)}</p>
                 </div>
               </div>
               <div className={"w-full"}>
                 <p className="flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2 font-semibold">
-                  <span className={"text-white"}>Total Amount</span>
+                  <span className={"text-white"}>Total amount</span>
                   <span className="text-white">{formatCurrency(billingSummary.totalAmount)}</span>
                 </p>
               </div>

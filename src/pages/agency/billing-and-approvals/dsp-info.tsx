@@ -1,11 +1,22 @@
-import React, {useRef, useState} from "react";
-import {useParams, useNavigate} from "react-router";
-import {ArrowLeft, Banknote, CornerDownLeft, Loader2, Download, Eye} from "lucide-react";
-import {useAuth} from "@/utils/auth";
-import {useGetDspClaimsQuery, useApproveExpenseMutation, useRejectExpenseMutation, ClientServiceDefinition} from "./api";
+import React, { useRef, useState } from "react";
+import { useParams, useNavigate } from "react-router";
+import { ArrowLeft, Banknote, CornerDownLeft, Loader2, Download, Eye } from "lucide-react";
+import { useAuth } from "@/utils/auth";
+import {
+  useGetDspClaimsQuery,
+  useApproveExpenseMutation,
+  useRejectExpenseMutation,
+  ClientServiceDefinition,
+} from "./api";
+import {
+  formatCurrency,
+  getStaffRate,
+  computeBillingAmount,
+  formatRateLabel,
+} from "./billingUtils";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import {useToast} from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DSPClaimsPage() {
   const {dsp} = useParams();
@@ -28,14 +39,13 @@ export default function DSPClaimsPage() {
   const [approveExpense, {isLoading: isApproving}] = useApproveExpenseMutation();
   const [rejectExpense, {isLoading: isRejecting}] = useRejectExpenseMutation();
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
-  };
+  const { dsp: dspInfo, clientServicesGrouped, billingSummary, expenseRecords, pendingExpenses } =
+    data?.data || {};
 
-  const {dsp: dspInfo, clientServicesGrouped, billingSummary, pendingExpenses} = data?.data || {};
+  const approvedExpenses = React.useMemo(
+    () => expenseRecords?.filter((e) => e.status === "approved") ?? [],
+    [expenseRecords]
+  );
 
   const handleApproveExpense = async (expenseId: string) => {
     try {
@@ -99,15 +109,10 @@ export default function DSPClaimsPage() {
         const matchedService = (svc.client?.services || []).find(
           (s: ClientServiceDefinition) => s.code === String(svc.serviceCode)
         );
-        const rate = matchedService ? parseFloat(matchedService.rate) || 0 : 0;
-        const payType = matchedService?.payType || "hourly";
+        const { rate, payType } = getStaffRate(matchedService);
         const hours = svc.hours || 0;
         const units = svc.units || 0;
-
-        let svcAmount = 0;
-        if (payType === "15-min") svcAmount = (hours * 60 / 15) * rate;
-        else if (payType === "daily") svcAmount = units * rate;
-        else svcAmount = hours * rate;
+        const svcAmount = computeBillingAmount(rate, payType, hours, units);
 
         const existing = map.get(key);
         if (existing) {
@@ -238,9 +243,8 @@ export default function DSPClaimsPage() {
     }
   };
 
-  const totalAmount = (billingSummary?.totalAmount ?? 0)
-    + (billingSummary?.totalMileage ?? 0)
-    + (billingSummary?.totalExpenses ?? 0)
+  const totalAmount =
+    (billingSummary?.totalAmount ?? 0) + (billingSummary?.totalMileage ?? 0);
 
   if (isLoading) {
     return (
@@ -310,7 +314,7 @@ export default function DSPClaimsPage() {
         {pendingExpenses && pendingExpenses.length > 0 && (
           <div className="bg-white rounded-[20px] p-6 mb-6 no-print">
             <h2 className="text-[14px] font-semibold text-[#808081] mb-4">
-              Pending DSP Expenses ({pendingExpenses.length})
+              Expenses awaiting approval ({pendingExpenses.length})
             </h2>
             <div className="space-y-3">
               {pendingExpenses.map((expense) => (
@@ -359,11 +363,10 @@ export default function DSPClaimsPage() {
         )}
         <div ref={printContentRef} className="bg-white p-8 rounded-lg forced-colors:none no-oklch">
           <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-            DSP Information
+            Staff Member
           </h2>
 
-
-          {/* DSP Info Card */}
+          {/* Staff Profile */}
           <div className="rounded-xl p-4 flex items-start gap-4 mb-6">
             <div
               className="w-24 h-24 rounded border-2 border-gray-300 flex items-center justify-center text-gray-400 text-[32px] font-light flex-shrink-0">
@@ -373,28 +376,16 @@ export default function DSPClaimsPage() {
               <p className="text-lg font-semibold text-[#10141a] mb-1">
                 {dspInfo?.fullName}
               </p>
-              {/*<p className="flex justify-between items-center">*/}
-              {/*  <span className="text-[14px] text-[#808081] mb-1">Payrate</span>*/}
-              {/*  <span className="text-[14px] font-medium text-[#808081]">*/}
-              {/*    {dspInfo?.payrate || "N/A"}*/}
-              {/*  </span>*/}
-              {/*</p>*/}
               <p className="flex justify-between items-center">
-                <span className="text-[14px] text-[#808081] mb-1">Phone No</span>
+                <span className="text-[14px] text-[#808081] mb-1">Phone</span>
                 <span className="text-[14px] font-medium text-[#808081]">
                   {dspInfo?.phone || "N/A"}
-                </span>
-              </p>
-              <p className="flex justify-between items-center">
-                <span className="text-[14px] text-[#808081] mb-1">Staff Category</span>
-                <span className="text-[14px] font-medium text-[#808081]">
-                  {"Permanent"}
                 </span>
               </p>
             </div>
           </div>
 
-          {/* Unique Clients Summary */}
+          {/* Client Services */}
           <div className="rounded-[20px] px-6 mb-6">
             <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
               Client Services
@@ -403,9 +394,9 @@ export default function DSPClaimsPage() {
               <div className="space-y-3">
                 <div className="grid grid-cols-5 gap-4 text-[12px] text-[#808081] px-4">
                   <span>Client</span>
-                  <span>Service Offered</span>
-                  <span>Total Hours</span>
-                  <span>Billing Rate</span>
+                  <span>Service Code</span>
+                  <span>Hours</span>
+                  <span>Rate</span>
                   <span>Amount</span>
                 </div>
                 {uniqueClients.map((uc, idx) => (
@@ -418,18 +409,58 @@ export default function DSPClaimsPage() {
                     <p className="text-[12px] text-[#808081]">{uc.serviceCode}</p>
                     <p className="text-[12px] text-[#808081]">{uc.totalHours}</p>
                     <p className="text-[12px] text-[#808081]">
-                      {uc.payType === "15-min"
-                        ? `${formatCurrency(uc.rate)}/15-min`
-                        : uc.payType === "daily"
-                        ? `${formatCurrency(uc.rate)}/day`
-                        : `${formatCurrency(uc.rate)}/hr`}
+                      {formatRateLabel(uc.rate, uc.payType)}
                     </p>
                     <p className="text-[12px] text-[#10141a]">{formatCurrency(uc.amount || 0)}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[14px] text-[#808081]">No client summary available</p>
+              <p className="text-[14px] text-[#808081]">No service hours recorded for this period</p>
+            )}
+          </div>
+
+          {/* Approved Expenses */}
+          <div className="rounded-[20px] px-6 mb-6">
+            <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
+              Approved Expenses
+            </h2>
+            {approvedExpenses.length > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-4 gap-4 text-[12px] text-[#808081] px-4">
+                  <span>Date</span>
+                  <span>Description</span>
+                  <span>Amount</span>
+                  <span>Receipt</span>
+                </div>
+                {approvedExpenses.map((expense) => (
+                  <div
+                    key={expense.id}
+                    className="grid grid-cols-4 gap-4 items-center py-3 border-b border-[#e5e5e6] last:border-b-0 px-4"
+                  >
+                    <p className="text-[12px] text-[#808081]">
+                      {expense.date ? new Date(expense.date).toLocaleDateString("en-US") : "—"}
+                    </p>
+                    <p className="text-[14px] text-[#10141a]">{expense.message || "—"}</p>
+                    <p className="text-[12px] text-[#10141a]">{formatCurrency(expense.amount || 0)}</p>
+                    <div>
+                      {expense.receiptUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => window.open(expense.receiptUrl, "_blank")}
+                          className="text-[12px] text-[#00b4b8] hover:underline font-medium"
+                        >
+                          View receipt
+                        </button>
+                      ) : (
+                        <span className="text-[12px] text-[#808081]">—</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[14px] text-[#808081]">No approved expenses for this period</p>
             )}
           </div>
 
@@ -439,70 +470,47 @@ export default function DSPClaimsPage() {
               Billing Summary
             </h2>
 
-            <div className={"mb-4"}>
-              <div className={"mb-6 flex justify-between items-end gap-4"}>
-                <div className="space-y-3 bg-white rounded p-4 w-full">
-                  <div className="flex justify-between items-center py-2">
-                    <p className="text-[14px] text-[#808081]">Total hours worked</p>
-                    <p className="text-[14px] font-medium text-[#10141a]">
-                      {billingSummary?.totalHoursWorked}
-                    </p>
-                  </div>
-                  {/*<div className="flex justify-between items-center py-2">*/}
-                  {/*  <p className="text-[14px] text-[#808081]">Total Units</p>*/}
-                  {/*  <p className="text-[14px] font-medium text-[#10141a]">*/}
-                  {/*    {billingSummary?.totalUnits}*/}
-                  {/*  </p>*/}
-                  {/*</div>*/}
-                  {/*<div className="flex justify-between items-center py-2">*/}
-                  {/*  <p className="text-[14px] text-[#808081]">Rate Per Unit</p>*/}
-                  {/*  <p className="text-[14px] font-medium text-[#10141a]">*/}
-                  {/*    {formatCurrency(Number(String("$0/hour").replace("$", "").replace("/hour", "")))}*/}
-                  {/*  </p>*/}
-                  {/*</div>*/}
-                  <div className="flex justify-between items-center py-2">
-                    <p className="text-[14px] text-[#808081]">Total Pay</p>
-                    <p className="text-[14px] font-medium text-[#10141a]">
-                      {formatCurrency(billingSummary?.totalPayRate || 0)}
-                    </p>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
-                    <p className="text-[14px] text-[#808081]">Total Amount</p>
-                    <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalAmount || 0)}</p>
-                  </div>
-                </div>
-                <div className="space-y-3 bg-white rounded p-4 w-full">
-                  <div className="flex justify-between items-center py-2">
-                    <p className="text-[14px] text-[#808081]">Total Mileage</p>
-                    <p className="text-[14px] font-medium text-[#10141a]">
-                      {billingSummary?.totalMileage}
-                    </p>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <p className="text-[14px] text-[#808081]">Rate Per KM</p>
-                    <p className="text-[14px] font-medium text-[#10141a]">
-                      {"N/A"}
-                    </p>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-t border-[#e5e5e6] pt-3">
-                    <p className="text-[14px] text-[#808081]">Total Amount</p>
-                    {/*<p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalAmount || 0)}</p>*/}
-                    <p className="text-[14px] text-[#808081]">N/A</p>
-                  </div>
-                </div>
-                <div className="space-y-3 bg-white rounded p-4 w-full">
-                  <div className="flex justify-between items-center py-2 pt-3">
-                    <p className="text-[14px] text-[#808081]">Total Expenses</p>
-                    <p className="text-[14px] text-[#808081]">{formatCurrency(billingSummary?.totalExpenses || 0)}</p>
-                  </div>
-                </div>
-              </div>
-              <div className={"w-full"}>
-                <p className="font-semibold flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2">
-                  <span className={"text-white"}>Total Amount</span>
-                  <span className="text-white">{formatCurrency(totalAmount || 0)}</span>
+            <div className="space-y-3 bg-white rounded p-4 max-w-md">
+              <div className="flex justify-between items-center py-2">
+                <p className="text-[14px] text-[#808081]">Hours worked</p>
+                <p className="text-[14px] font-medium text-[#10141a]">
+                  {billingSummary?.totalHoursWorked ?? 0}
                 </p>
               </div>
+              <div className="flex justify-between items-center py-2">
+                <p className="text-[14px] text-[#808081]">Service pay</p>
+                <p className="text-[14px] font-medium text-[#10141a]">
+                  {formatCurrency(billingSummary?.totalPayRate ?? 0)}
+                </p>
+              </div>
+              {(billingSummary?.totalMileage ?? 0) > 0 && (
+                <div className="flex justify-between items-center py-2">
+                  <p className="text-[14px] text-[#808081]">Mileage reimbursement</p>
+                  <p className="text-[14px] font-medium text-[#10141a]">
+                    {formatCurrency(billingSummary?.totalMileage ?? 0)}
+                  </p>
+                </div>
+              )}
+              {(billingSummary?.totalExpenses ?? 0) > 0 && (
+                <div className="flex justify-between items-center py-2">
+                  <p className="text-[14px] text-[#808081]">Approved expenses</p>
+                  <p className="text-[14px] font-medium text-[#10141a]">
+                    {formatCurrency(billingSummary?.totalExpenses ?? 0)}
+                  </p>
+                </div>
+              )}
+              <div className="flex justify-between items-center py-3 border-t border-[#e5e5e6] mt-2">
+                <p className="text-[14px] font-semibold text-[#10141a]">Total amount</p>
+                <p className="text-[14px] font-semibold text-[#10141a]">
+                  {formatCurrency(totalAmount ?? 0)}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <p className="font-semibold flex justify-between items-center py-2 bg-[#00b4b8] rounded p-2 text-white max-w-md">
+                <span>Total amount</span>
+                <span>{formatCurrency(totalAmount ?? 0)}</span>
+              </p>
             </div>
           </div>
         </div>

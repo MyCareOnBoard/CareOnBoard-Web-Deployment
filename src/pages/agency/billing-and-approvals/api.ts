@@ -78,6 +78,8 @@ export interface ClientServiceDefinition {
   name: string;
   rate: string;
   payType: "hourly" | "15-min" | "daily";
+  clientRate?: string;
+  clientPayType?: "hourly" | "15-min" | "daily";
   hours?: string;
   totalApprovedHours?: string;
 }

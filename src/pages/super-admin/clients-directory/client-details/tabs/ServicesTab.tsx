@@ -40,6 +40,8 @@ type EditableService = {
   totalApprovedHours?: string;
   rate?: string;
   payType?: ClientService["payType"];
+  clientRate?: string;
+  clientPayType?: ClientService["payType"];
   ispEffectiveDate?: Date | null;
   startAuthDate?: Date | null;
   endAuthDate?: Date | null;
@@ -77,6 +79,8 @@ function mapClientServicesToEditable(services?: ClientService[]): EditableServic
     totalApprovedHours: svc.totalApprovedHours,
     rate: svc.rate,
     payType: svc.payType,
+    clientRate: svc.clientRate,
+    clientPayType: svc.clientPayType,
     ispEffectiveDate: parseDate(svc.ispEffectiveDate),
     startAuthDate: parseDate(svc.startAuthDate),
     endAuthDate: parseDate(svc.endAuthDate),
@@ -95,6 +99,8 @@ function mapEditableToClientServices(services: EditableService[]): ClientService
     totalApprovedHours: svc.totalApprovedHours,
     rate: svc.rate,
     payType: svc.payType,
+    clientRate: svc.clientRate,
+    clientPayType: svc.clientPayType,
     ispEffectiveDate: svc.ispEffectiveDate
       ? svc.ispEffectiveDate.toISOString()
       : undefined,
@@ -334,7 +340,7 @@ function ServiceRow({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
           <p className="text-[12px] font-normal text-[#10141a]">
-            Rate / Pay type
+            Staff Rate / Pay type
           </p>
           <div className="flex gap-2">
             {isEditing ? (
@@ -370,6 +376,52 @@ function ServiceRow({
                       service.payType === "15-min"
                         ? "/ 15 mins"
                         : service.payType === "daily"
+                        ? "/ day"
+                        : "/ hour"
+                    }`
+                  : "-"}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <p className="text-[12px] font-normal text-[#10141a]">
+            Client Rate / Pay type
+          </p>
+          <div className="flex gap-2">
+            {isEditing ? (
+              <>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step={0.01}
+                  value={service.clientRate || ""}
+                  onChange={(e) => handleFieldChange("clientRate", e.target.value)}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Enter rate"
+                />
+                <Select
+                  value={service.clientPayType}
+                  onValueChange={(v) => handleFieldChange("clientPayType", v)}
+                >
+                  <SelectTrigger className="w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                    <SelectValue placeholder="Pay type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hourly">Hourly</SelectItem>
+                    <SelectItem value="15-min">15 minutes</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">
+                {service.clientRate
+                  ? `$${service.clientRate} ${
+                      service.clientPayType === "15-min"
+                        ? "/ 15 mins"
+                        : service.clientPayType === "daily"
                         ? "/ day"
                         : "/ hour"
                     }`
@@ -757,6 +809,8 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
       totalApprovedHours: "",
       rate: "",
       payType: undefined,
+      clientRate: "",
+      clientPayType: undefined,
       ispEffectiveDate: null,
       startAuthDate: null,
       endAuthDate: null,
