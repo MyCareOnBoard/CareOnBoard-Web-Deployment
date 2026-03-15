@@ -243,8 +243,9 @@ export default function DSPClaimsPage() {
     }
   };
 
-  const totalAmount =
-    (billingSummary?.totalAmount ?? 0) + (billingSummary?.totalMileage ?? 0);
+  const totalAmount = (billingSummary?.totalAmount ?? 0)
+    + (billingSummary?.totalExpenses ?? 0)
+    + ((billingSummary?.mileageRate || 0) * (billingSummary?.totalMileage || 0) || 0);
 
   if (isLoading) {
     return (

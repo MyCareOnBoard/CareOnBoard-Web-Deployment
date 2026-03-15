@@ -232,6 +232,7 @@ export interface DspClaimsData {
     totalMileage: number;
     totalExpenses: number;
     totalAmount: number;
+    mileageRate: number;
   };
   mileageRecords: MileageRecord[];
   expenseRecords: ExpenseRecord[];
