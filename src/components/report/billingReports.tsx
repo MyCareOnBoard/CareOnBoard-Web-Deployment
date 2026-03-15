@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useCallback} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {ChevronLeft, ChevronRight, ArrowLeft, Search} from "lucide-react";
@@ -7,6 +7,7 @@ import {useAuth} from "@/utils/auth";
 import {useLocation, useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {useGetBillingRecordsQuery} from "@/pages/agency/billing-and-approvals/api";
+import {formatCurrency, buildServiceByCodeMap, getClientRate} from "@/pages/agency/billing-and-approvals/billingUtils";
 
 export default function BillingReport() {
     const {user} = useAuth();
@@ -73,21 +74,13 @@ export default function BillingReport() {
     const totalPages = Math.ceil(totalRecords / itemsPerPage);
     const loading = isLoading || isFetching;
 
-    const handlePreviousPage = () => {
-        if (currentPage > 1) {
-            setCurrentPage(currentPage - 1);
-        }
-    };
+    const handlePreviousPage = useCallback(() => {
+        setCurrentPage((p) => (p > 1 ? p - 1 : p));
+    }, []);
 
-    const handleNextPage = () => {
-        if (currentPage < totalPages) {
-            setCurrentPage(currentPage + 1);
-        }
-    };
-
-    const formatCurrency = (amount: number) => {
-        return `$${amount.toFixed(0)}`;
-    };
+    const handleNextPage = useCallback(() => {
+        setCurrentPage((p) => (p < totalPages ? p + 1 : p));
+    }, [totalPages]);
 
     const servicesGroupedByRole = billingData?.records || [];
 
@@ -121,12 +114,12 @@ export default function BillingReport() {
                 </div>
                 <div className="flex gap-4 items-center">
                     <CustomDatePicker
-                        placeholder="Select Starting date"
+                        placeholder="Start date"
                         date={dates.startDate}
                         setDate={(e) => handleDateSelect("startDate", e)}
                     />
                     <CustomDatePicker
-                        placeholder="Select Ending date"
+                        placeholder="End date"
                         date={dates.endDate}
                         setDate={(e) => handleDateSelect("endDate", e)}
                     />
@@ -144,7 +137,7 @@ export default function BillingReport() {
                     <div>
                         <h2 className="text-[20px] font-medium text-[#10141a] mb-1">Billing Report</h2>
                         <p className="text-[14px] text-[#808081]">
-                            Report For Billings
+                            Billing overview by client or staff
                         </p>
                     </div>
 
@@ -155,7 +148,7 @@ export default function BillingReport() {
                                 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#808081] pointer-events-none z-10"/>
                             <Input
                                 type="text"
-                                placeholder="Search by staff ID or name"
+                                placeholder="Search by name or ID"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-10 pr-4 h-[36px] border-0 rounded-[60px] bg-[rgba(255,255,255,0.5)] backdrop-blur-[8px] border border-[rgba(255,255,255,0.3)] focus-visible:ring-1 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-0 text-[12px]"
@@ -190,13 +183,13 @@ export default function BillingReport() {
                         <div className="text-center">
                             <div
                                 className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
-                            <p className="text-sm text-[#808081]">Loading billing records...</p>
+                            <p className="text-sm text-[#808081]">Loading billing records…</p>
                         </div>
                     </div>
                 ) : servicesGroupedByRole.length === 0 ? (
                     <div className="text-center py-12">
                         <p className="text-[16px] font-medium text-[#808081]">
-                            No billing records found
+                            No billing records for this period
                         </p>
                     </div>
                 ) : (
@@ -208,7 +201,7 @@ export default function BillingReport() {
 
                             const dspName = record.employee?.fullName || 'Unknown DSP';
 
-                            const clientShifts = record.shifts;
+                            const serviceByCode = buildServiceByCodeMap(record.client?.services);
 
                             return (
                                 <div
@@ -220,7 +213,7 @@ export default function BillingReport() {
                                             {/* Client Info */}
                                             <div className="flex gap-4">
                                                 <div
-                                                    className="w-12 h-12 rounded-full bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-lg font-bold">
+                                                    className="w-12 h-12 rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-lg font-bold">
                                                     {clientName.charAt(0)}
                                                 </div>
                                                 <div>
@@ -236,14 +229,14 @@ export default function BillingReport() {
                                                 {record.employees?.map((employee) => (
                                                     <div className="flex items-center gap-4 h-[60px]" key={employee.id}>
                                                         <div
-                                                            className="w-12 h-12 rounded-full bg-linear-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-lg font-bold">
+                                                            className="w-12 h-12 rounded-[8px] bg-linear-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-lg font-bold">
                                                             {employee.fullName?.charAt(0) || 'D'}
                                                         </div>
                                                         <div>
                                                             <p className="text-[16px] font-semibold text-[#10141a]">
                                                                 {employee.fullName || 'Unknown DSP'}
                                                             </p>
-                                                            <p className="text-[14px] text-[#808081]">DSP</p>
+                                                            <p className="text-[14px] text-[#808081]">Staff</p>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -254,14 +247,14 @@ export default function BillingReport() {
                                             {/* DSP Info (First in DSP tab) */}
                                             <div className="flex gap-4">
                                                 <div
-                                                    className="w-12 h-12 rounded-full bg-linear-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-lg font-bold">
+                                                    className="w-12 h-12 rounded-[8px] bg-linear-to-br from-[#808081] to-[#6a6a6b] flex items-center justify-center text-white text-lg font-bold">
                                                     {dspName.charAt(0)}
                                                 </div>
                                                 <div>
                                                     <p className="text-[16px] font-semibold text-[#10141a]">
                                                         {dspName}
                                                     </p>
-                                                    <p className="text-[14px] text-[#808081]">DSP</p>
+                                                    <p className="text-[14px] text-[#808081]">Staff</p>
                                                 </div>
                                             </div>
 
@@ -276,7 +269,7 @@ export default function BillingReport() {
                                                         <div className="flex items-center gap-4 h-[60px]"
                                                              key={client.id}>
                                                             <div
-                                                                className="w-12 h-12 rounded-full bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-lg font-bold">
+                                                                className="w-12 h-12 rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-lg font-bold">
                                                                 {clientDisplayName.charAt(0)}
                                                             </div>
                                                             <div>
@@ -302,7 +295,7 @@ export default function BillingReport() {
                                                 <div key={item.id} className="flex flex-col justify-center h-[60px]">
                                                     <p className="text-[14px] text-[#808081] mb-1">Service Code</p>
                                                     <p className="text-[16px] font-medium text-[#10141a]">
-                                                        {serviceCode || 'N/A'}
+                                                        {serviceCode || '—'}
                                                     </p>
                                                 </div>
                                             );
@@ -313,20 +306,26 @@ export default function BillingReport() {
                                     <div className="flex flex-col gap-4">
                                         {(activeTab === "client" ? record.employees : record.clients)?.map((item) => (
                                             <div key={item.id} className="flex flex-col justify-center h-[60px]">
-                                                <p className="text-[14px] text-[#808081] mb-1">Total Hours</p>
+                                                <p className="text-[14px] text-[#808081] mb-1">Hours</p>
                                                 <p className="text-[16px] font-medium text-[#10141a]">{item.totalHours || 0}</p>
                                             </div>
                                         ))}
                                     </div>
 
-                                    {/* Pay Rate - Multiple rows */}
+                                    {/* Pay Rate - Multiple rows (client rate on clients tab, staff rate on DSP tab) */}
                                     <div className="flex flex-col gap-4">
                                         {record.shifts?.map((item) => {
+                                            const serviceCode = item.serviceCode;
+                                            let rateToShow = item.payRate;
+                                            if (activeTab === "client" && serviceCode) {
+                                                const service = serviceByCode.get(String(serviceCode));
+                                                rateToShow = service ? getClientRate(service).rate || item.payRate : item.payRate;
+                                            }
                                             return (
                                                 <div key={item.id} className="flex flex-col justify-center h-[60px]">
-                                                    <p className="text-[14px] text-[#808081] mb-1">Pay Rate</p>
+                                                    <p className="text-[14px] text-[#808081] mb-1">Rate</p>
                                                     <p className="text-[16px] font-medium text-[#10141a]">
-                                                        {formatCurrency(item.payRate)}
+                                                        {formatCurrency(rateToShow)}
                                                     </p>
                                                 </div>
                                             )
@@ -344,7 +343,7 @@ export default function BillingReport() {
                                                 )}
                                                 className="bg-[#B2B2B3] hover:bg-[#B2B2B3] text-white rounded-full px-6 py-2 h-auto font-medium transition-all duration-200"
                                             >
-                                                Generate Report
+                                                View claims
                                             </Button>
                                         </div>
                                     </div>
