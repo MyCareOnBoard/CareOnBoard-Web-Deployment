@@ -303,7 +303,7 @@ export default function BillingAndApprovalsPage() {
                     {(activeTab === "client" ? record.employees : record.clients)?.map((item) => (
                       <div key={item.id} className="flex flex-col justify-center h-[60px]">
                         <p className="text-[14px] text-[#808081] mb-1">Total Hours</p>
-                        <p className="text-[16px] font-medium text-[#10141a]">{item.totalHours || 0}</p>
+                        <p className="text-[16px] font-medium text-[#10141a]">{(item.totalHours ?? 0).toFixed(2)}</p>
                       </div>
                     ))}
                   </div>
@@ -319,9 +319,10 @@ export default function BillingAndApprovalsPage() {
                           ? (getClientRate(service).rate || record.payRate) ?? 0
                           : (record.payRate ?? 0);
                       }
+                      const rateLabel = serviceCode ? `Pay rate (${serviceCode})` : "Pay Rate";
                       return (
                         <div key={item.id} className="flex flex-col justify-center h-[60px]">
-                          <p className="text-[14px] text-[#808081] mb-1">Pay Rate</p>
+                          <p className="text-[14px] text-[#808081] mb-1">{rateLabel}</p>
                           <p className="text-[16px] font-medium text-[#10141a]">
                             {formatCurrency(rateToShow)}
                           </p>

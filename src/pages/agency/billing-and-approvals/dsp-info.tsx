@@ -408,7 +408,7 @@ export default function DSPClaimsPage() {
                       {uc.client?.fullName || 'Unknown Client'}
                     </p>
                     <p className="text-[12px] text-[#808081]">{uc.serviceCode}</p>
-                    <p className="text-[12px] text-[#808081]">{uc.totalHours}</p>
+                    <p className="text-[12px] text-[#808081]">{(uc.totalHours ?? 0).toFixed(2)}</p>
                     <p className="text-[12px] text-[#808081]">
                       {formatRateLabel(uc.rate, uc.payType)}
                     </p>
@@ -475,7 +475,7 @@ export default function DSPClaimsPage() {
               <div className="flex justify-between items-center py-2">
                 <p className="text-[14px] text-[#808081]">Hours worked</p>
                 <p className="text-[14px] font-medium text-[#10141a]">
-                  {billingSummary?.totalHoursWorked ?? 0}
+                  {(billingSummary?.totalHoursWorked ?? 0).toFixed(2)}
                 </p>
               </div>
               <div className="flex justify-between items-center py-2">
@@ -485,12 +485,26 @@ export default function DSPClaimsPage() {
                 </p>
               </div>
               {(billingSummary?.totalMileage ?? 0) > 0 && (
-                <div className="flex justify-between items-center py-2">
-                  <p className="text-[14px] text-[#808081]">Mileage reimbursement</p>
-                  <p className="text-[14px] font-medium text-[#10141a]">
-                    {formatCurrency(billingSummary?.totalMileage ?? 0)}
-                  </p>
-                </div>
+                <>
+                  <div className="flex justify-between items-center py-2">
+                    <p className="text-[14px] text-[#808081]">Mileage</p>
+                    <p className="text-[14px] font-medium text-[#10141a]">
+                      {(billingSummary?.totalMileage ?? 0).toFixed(2)} km
+                    </p>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <p className="text-[14px] text-[#808081]">Mileage rate</p>
+                    <p className="text-[14px] font-medium text-[#10141a]">
+                      {formatCurrency(billingSummary?.mileageRate ?? 0)}/km
+                    </p>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <p className="text-[14px] text-[#808081]">Mileage reimbursement</p>
+                    <p className="text-[14px] font-medium text-[#10141a]">
+                      {formatCurrency((billingSummary?.mileageRate ?? 0) * (billingSummary?.totalMileage ?? 0))}
+                    </p>
+                  </div>
+                </>
               )}
               {(billingSummary?.totalExpenses ?? 0) > 0 && (
                 <div className="flex justify-between items-center py-2">

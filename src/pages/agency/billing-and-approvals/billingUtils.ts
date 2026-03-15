@@ -48,11 +48,11 @@ export function formatRateLabel(rate: number, payType: string): string {
 }
 
 export function buildServiceByCodeMap(
-  services: ClientServiceDefinition[] | undefined
+  services: ClientServiceDefinition[] | Array<{ code?: string; rate?: string; clientRate?: string; payType?: string; clientPayType?: string }> | undefined
 ): Map<string, ClientServiceDefinition> {
   const map = new Map<string, ClientServiceDefinition>();
   (services || []).forEach((s) => {
-    if (s.code) map.set(String(s.code), s);
+    if (s.code) map.set(String(s.code), s as ClientServiceDefinition);
   });
   return map;
 }

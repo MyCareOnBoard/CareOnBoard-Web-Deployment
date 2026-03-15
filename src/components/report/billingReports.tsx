@@ -151,7 +151,7 @@ export default function BillingReport() {
                                 placeholder="Search by name or ID"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 h-[36px] border-0 rounded-[60px] bg-[rgba(255,255,255,0.5)] backdrop-blur-[8px] border border-[rgba(255,255,255,0.3)] focus-visible:ring-1 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-0 text-[12px]"
+                                className="w-full pl-10 pr-4 h-[36px] rounded-[60px] bg-[rgba(255,255,255,0.5)] backdrop-blur-[8px] border border-[rgba(255,255,255,0.3)] focus-visible:ring-1 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-0 text-[12px]"
                             />
                         </div>
                         <Button
@@ -285,51 +285,88 @@ export default function BillingReport() {
                                         </>
                                     )}
 
-                                    {/* Service Code - Multiple rows */}
-                                    <div className="flex flex-col gap-4">
-                                        {(activeTab === "client" ? record.employees : record.clients)?.map((item) => {
+                                    {(() => {
+                                        const items = activeTab === "client" ? record.employees : record.clients;
+                                        const groupMap = new Map<string, { serviceCode: string; hours: number; count: number }>();
+                                        (items ?? []).forEach((item) => {
                                             const serviceCode = activeTab === "client"
                                                 ? (item as any).serviceCode
                                                 : (item as any).serviceCode || (item as any).services?.[0]?.code;
-                                            return (
-                                                <div key={item.id} className="flex flex-col justify-center h-[60px]">
-                                                    <p className="text-[14px] text-[#808081] mb-1">Service Code</p>
-                                                    <p className="text-[16px] font-medium text-[#10141a]">
-                                                        {serviceCode || '—'}
-                                                    </p>
+                                            const code = serviceCode || "—";
+                                            const hours = item.totalHours ?? 0;
+                                            const key = `${code}|${hours}`;
+                                            const existing = groupMap.get(key);
+                                            if (existing) existing.count++;
+                                            else groupMap.set(key, { serviceCode: code, hours, count: 1 });
+                                        });
+                                        const groupedServiceRows = Array.from(groupMap.entries()).map(([, { serviceCode, hours, count }]) => ({
+                                            serviceCode,
+                                            hours,
+                                            count,
+                                        }));
+                                        return (
+                                            <>
+                                                {/* Service Code - Grouped by (serviceCode, hours) to avoid repetition */}
+                                                <div className="flex flex-col gap-4">
+                                                    {groupedServiceRows.map(({ serviceCode, count }, idx) => (
+                                                        <div key={`sc-${serviceCode}-${idx}`} className="flex flex-col justify-center h-[60px]">
+                                                            <p className="text-[14px] text-[#808081] mb-1">Service Code</p>
+                                                            <p className="text-[16px] font-medium text-[#10141a]">
+                                                                {count > 1 ? `${serviceCode} × ${count}` : serviceCode}
+                                                            </p>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Total Hours - Multiple rows */}
-                                    <div className="flex flex-col gap-4">
-                                        {(activeTab === "client" ? record.employees : record.clients)?.map((item) => (
-                                            <div key={item.id} className="flex flex-col justify-center h-[60px]">
-                                                <p className="text-[14px] text-[#808081] mb-1">Hours</p>
-                                                <p className="text-[16px] font-medium text-[#10141a]">{item.totalHours || 0}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Pay Rate - Multiple rows (client rate on clients tab, staff rate on DSP tab) */}
-                                    <div className="flex flex-col gap-4">
-                                        {record.shifts?.map((item) => {
-                                            const serviceCode = item.serviceCode;
-                                            let rateToShow = item.payRate;
-                                            if (activeTab === "client" && serviceCode) {
-                                                const service = serviceByCode.get(String(serviceCode));
-                                                rateToShow = service ? getClientRate(service).rate || item.payRate : item.payRate;
-                                            }
-                                            return (
-                                                <div key={item.id} className="flex flex-col justify-center h-[60px]">
-                                                    <p className="text-[14px] text-[#808081] mb-1">Rate</p>
-                                                    <p className="text-[16px] font-medium text-[#10141a]">
-                                                        {formatCurrency(rateToShow)}
-                                                    </p>
+                                                {/* Total Hours - Grouped by (serviceCode, hours) to match Service Code */}
+                                                <div className="flex flex-col gap-4">
+                                                    {groupedServiceRows.map(({ hours, count }, idx) => (
+                                                        <div key={`hr-${hours}-${idx}`} className="flex flex-col justify-center h-[60px]">
+                                                            <p className="text-[14px] text-[#808081] mb-1">Hours</p>
+                                                            <p className="text-[16px] font-medium text-[#10141a]">
+                                                                {count > 1 ? `${(hours).toFixed(2)} × ${count}` : (hours).toFixed(2)}
+                                                            </p>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            )
-                                        })}
+                                            </>
+                                        );
+                                    })()}
+
+                                    {/* Pay Rate - Grouped by (serviceCode, rate) to avoid repetition */}
+                                    <div className="flex flex-col gap-4">
+                                        {(() => {
+                                            const map = new Map<string, { rate: number; count: number }>();
+                                            (record.shifts ?? []).forEach((item) => {
+                                                const serviceCode = item.serviceCode ?? "";
+                                                let rateToShow = item.payRate;
+                                                if (activeTab === "client" && serviceCode) {
+                                                    const service = serviceByCode.get(String(serviceCode));
+                                                    rateToShow = service ? getClientRate(service).rate || item.payRate : item.payRate;
+                                                }
+                                                const rate = rateToShow ?? 0;
+                                                const key = `${serviceCode}|${rate}`;
+                                                const existing = map.get(key);
+                                                if (existing) existing.count++;
+                                                else map.set(key, { rate, count: 1 });
+                                            });
+                                            const groupedRates = Array.from(map.entries()).map(([key, { rate, count }]) => {
+                                                const [code] = key.split("|");
+                                                return { serviceCode: code || null, rate, count };
+                                            });
+                                            return groupedRates.map(({ serviceCode, rate, count }, idx) => {
+                                                const rateLabel = serviceCode
+                                                    ? (count > 1 ? `Rate (${serviceCode}) × ${count}` : `Rate (${serviceCode})`)
+                                                    : (count > 1 ? `Rate × ${count}` : "Rate");
+                                                return (
+                                                    <div key={`${serviceCode}-${rate}-${idx}`} className="flex flex-col justify-center h-[60px]">
+                                                        <p className="text-[14px] text-[#808081] mb-1">{rateLabel}</p>
+                                                        <p className="text-[16px] font-medium text-[#10141a]">
+                                                            {formatCurrency(rate)}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
                                     </div>
 
                                     {/* Generate Report Button */}
