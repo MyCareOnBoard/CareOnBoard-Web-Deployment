@@ -119,48 +119,73 @@ export async function deleteService(id: string): Promise<void> {
 }
 
 
+function buildListServicesQuery(params?: ListServicesParams): string {
+  if (!params || Object.keys(params).length === 0) return "";
+  const searchParams = new URLSearchParams();
+  if (params.type) searchParams.set("type", params.type);
+  if (params.search) searchParams.set("search", params.search);
+  if (params.limit != null) searchParams.set("limit", String(params.limit));
+  if (params.offset != null) searchParams.set("offset", String(params.offset));
+  const q = searchParams.toString();
+  return q ? `?${q}` : "";
+}
+
 export const servicesApi = createApi({
   reducerPath: "servicesApi",
   baseQuery: customBaseQuery,
-  tagTypes: ['Services'],
+  tagTypes: ["Services"],
+  keepUnusedDataFor: 300, // Keep services cached 5 min when navigating away
   endpoints: (builder) => ({
-    listServices: builder.query<ListServicesResponse, { limit?: number }>({
-      query: ({ limit }) => ({
-        url: `/services` + (limit ? `?limit=${limit}` : ""),
+    listServices: builder.query<ListServicesResponse, ListServicesParams | void>({
+      query: (params) => ({
+        url: `/services${buildListServicesQuery(params ?? undefined)}`,
         method: "GET",
-        requiresAuth: true
+        requiresAuth: true,
       }),
+      providesTags: (result) =>
+        result?.services
+          ? [
+              ...result.services.map(({ id }) => ({ type: "Services" as const, id })),
+              { type: "Services", id: "LIST" },
+            ]
+          : [{ type: "Services", id: "LIST" }],
     }),
     deleteService: builder.mutation<
-      { success: boolean, message: string },
+      { success: boolean; message: string },
       string
     >({
       query: (serviceId) => ({
         url: `/services/${serviceId}`,
         method: "DELETE",
-        requiresAuth: true
+        requiresAuth: true,
       }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: "Services", id },
+        { type: "Services", id: "LIST" },
+      ],
     }),
-    getService: builder.query<
-      Service,
-      string
-    >({
+    getService: builder.query<Service, string>({
       query: (serviceId) => ({
         url: `/services/${serviceId}`,
         method: "GET",
-        requiresAuth: true
+        requiresAuth: true,
       }),
+      providesTags: (_result, _error, id) => [{ type: "Services", id }],
     }),
     updateService: builder.mutation<
       void,
-      { serviceId: string, data: UpdateServiceRequest }
+      { serviceId: string; data: UpdateServiceRequest }
     >({
       query: ({ serviceId, data }) => ({
         url: `/services/${serviceId}`,
-        method: "PATCH",
+        method: "PUT",
         data,
-        requiresAuth: true
+        requiresAuth: true,
       }),
+      invalidatesTags: (_result, _error, { serviceId }) => [
+        { type: "Services", id: serviceId },
+        { type: "Services", id: "LIST" },
+      ],
     }),
     getServices: builder.query<
       { services: { code: string; name: string }[] },
@@ -172,16 +197,14 @@ export const servicesApi = createApi({
         requiresAuth: true
       })
     }),
-    createService: builder.mutation<
-      Service,
-      CreateServiceRequest
-    >({
+    createService: builder.mutation<Service, CreateServiceRequest>({
       query: (data) => ({
         url: `/services`,
         method: "POST",
         data,
-        requiresAuth: true
+        requiresAuth: true,
       }),
+      invalidatesTags: [{ type: "Services", id: "LIST" }],
     }),
   }),
 });

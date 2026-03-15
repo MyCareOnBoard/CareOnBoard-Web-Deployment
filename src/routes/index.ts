@@ -92,6 +92,7 @@ import SuperAdminBillingReports from "@/components/report/billingReports";
 import SuperAdminIncidentReports from "@/components/report/incidentReports";
 import SuperAdminCommunityInclusionReports from "@/components/report/communityInclusionReports";
 import SuperAdminSystemSettingsPage from "@/pages/super-admin/system-settings";
+import ServicesManagementPage from "@/pages/super-admin/services";
 import AgencyTrainings from "@/pages/agency/trainings";
 import GlobalNotesQualityPage from "@/pages/super-admin/global-notes-quality";
 import AgencyBillingMonitorPage from "@/pages/super-admin/agency-billing-monitor";
@@ -676,6 +677,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.systemSettings,
                 Component: SuperAdminSystemSettingsPage,
+            },
+            {
+                path: Routes.superAdmin.services,
+                Component: ServicesManagementPage,
             },
         ],
     },

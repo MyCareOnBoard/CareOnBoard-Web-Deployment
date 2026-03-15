@@ -19,6 +19,7 @@ import {
   ChartGantt,
   Settings,
   UserLock,
+  Briefcase,
 } from "lucide-react";
 
 const allNavItems: NavItem[] = [
@@ -32,6 +33,7 @@ const allNavItems: NavItem[] = [
   {label: "Oversight Center", path: Routes.superAdmin.oversightCenter, icon: BarChart3, accessKey: "Oversight Center"},
   {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock, accessKey: "Clients Directory"},
   {label: "Reports", path: Routes.superAdmin.reports.index, icon: ChartGantt, accessKey: "Reports"},
+  {label: "Services", path: Routes.superAdmin.services, icon: Briefcase, accessKey: "Services"},
   {label: "System Settings", path: Routes.superAdmin.systemSettings, icon: Settings, accessKey: "System Settings"},
 ];
 

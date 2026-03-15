@@ -145,6 +145,7 @@ export const Routes = {
         },
         clientReports: "/super-admin/reports/clients",
         systemSettings: "/super-admin/system-settings",
+        services: "/super-admin/services",
     },
     auth: {
         login: "/auth/login",
