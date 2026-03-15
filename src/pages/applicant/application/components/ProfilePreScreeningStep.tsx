@@ -20,6 +20,7 @@ import CalendarDaysIcon from "@/assets/icons/calendar-days.svg?react";
 import { Loader } from "lucide-react";
 import { format, differenceInYears, subYears } from "date-fns";
 import { uploadResume, submitPreScreening, getPreScreening, updatePreScreening, type PreScreeningData } from "@/lib/api/job-application";
+import { updateProfileInfo } from "@/lib/api/profile";
 import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 
 const DEFAULT_DOB = new Date();
@@ -266,7 +267,6 @@ export default function ProfilePreScreeningStep({ onSuccess }: ProfilePreScreeni
 
         // Update user profile with application data
         try {
-          const { updateProfileInfo } = await import('@/lib/api/profile');
           await updateProfileInfo({
             fullName: values.fullName,
             email: values.email,

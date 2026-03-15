@@ -14,8 +14,6 @@ import {
   computeBillingAmount,
   formatRateLabel,
 } from "./billingUtils";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import { useToast } from "@/hooks/use-toast";
 
 export default function DSPClaimsPage() {
@@ -187,6 +185,13 @@ export default function DSPClaimsPage() {
       };
 
       inlineResolvedColors(clonedContent);
+
+      // Dynamically load PDF libraries (avoids bundling in main chunk)
+      const [html2canvasMod, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+      const html2canvas = html2canvasMod.default;
 
       // Render to canvas
       const canvas = await html2canvas(clonedContent, {
