@@ -105,9 +105,9 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 const checkLocationMatch = (
   userCoords: { lat: number; lng: number } | null,
   shiftLocation?: Shift["location"] | null
-): boolean => {
-  if (!shiftLocation) return true;
-  if (!userCoords) return false;
+): [boolean, number] => {
+  if (!shiftLocation) return [false, 0];
+  if (!userCoords) return [false, 0];
 
   const shiftLatLon = shiftLocation.latlon;
   if (shiftLatLon?.lat && shiftLatLon?.lon) {
@@ -116,11 +116,11 @@ const checkLocationMatch = (
 
     if (!isNaN(shiftLat) && !isNaN(shiftLon)) {
       const distance = calculateDistance(userCoords.lat, userCoords.lng, shiftLat, shiftLon);
-      return distance <= GEOFENCE_RADIUS_METERS;
+      return [distance <= GEOFENCE_RADIUS_METERS, Math.round(distance)];
     }
   }
 
-  return true;
+  return [false, 0];
 };
 
 const isShiftExpiringSoon = (startTime: string, endTime: string, date: string): boolean => {
@@ -694,6 +694,7 @@ export default function ShiftManagementPage() {
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState(false);
   const [showLocationErrorModal, setShowLocationErrorModal] = useState(false);
+  const [locationDistance, setLocationDistance] = useState<number | null>(null);
   const [shiftsLoading, setShiftsLoading] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
@@ -816,8 +817,10 @@ export default function ShiftManagementPage() {
         return;
       }
 
-      if (!checkLocationMatch(userCoords, shift.location)) {
+      const [isLocationMatch, distance] = checkLocationMatch(userCoords, shift.location);
+      if (!isLocationMatch) {
         setShowLocationErrorModal(true);
+        setLocationDistance(distance);
         return;
       }
       setClockInShiftId(shiftId);
@@ -1046,6 +1049,7 @@ export default function ShiftManagementPage() {
         isOpen={showLocationErrorModal}
         onClose={() => setShowLocationErrorModal(false)}
         userLocation={userLocation}
+        locationDistance={locationDistance ?? 0}
         shiftLocation={formatShiftLocation(todayShift?.location) || ''}
       />
     </div>

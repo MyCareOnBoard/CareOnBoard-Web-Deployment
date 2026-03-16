@@ -5,9 +5,10 @@ interface LocationErrorModalProps {
   onClose: () => void;
   userLocation: string;
   shiftLocation: string;
+  locationDistance: number;
 }
 
-export function LocationErrorModal({ isOpen, onClose, userLocation, shiftLocation }: LocationErrorModalProps) {
+export function LocationErrorModal({ isOpen, onClose, userLocation, shiftLocation, locationDistance }: LocationErrorModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -39,6 +40,9 @@ export function LocationErrorModal({ isOpen, onClose, userLocation, shiftLocatio
                 <div className="bg-[rgba(14,175,82,0.05)] border border-[#0eaf52]/20 rounded-lg p-3">
                   <p className="text-[12px] font-semibold text-[#808081] mb-1">Shift Location:</p>
                   <p className="text-[14px] font-medium text-[#10141a]">{shiftLocation}</p>
+                </div>
+                <div className="p-3 text-center">
+                  <p className="text-[12px] font-semibold text-[#d53411] mb-1">You are {locationDistance} meters away from the shift location.</p>
                 </div>
               </div>
             </div>
