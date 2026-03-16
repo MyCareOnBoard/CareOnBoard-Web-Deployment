@@ -110,6 +110,7 @@ const checkLocationMatch = (
   if (!userCoords) return [false, 0];
 
   const shiftLatLon = shiftLocation.latlon;
+
   if (shiftLatLon?.lat && shiftLatLon?.lon) {
     const shiftLat = parseFloat(shiftLatLon.lat);
     const shiftLon = parseFloat(shiftLatLon.lon);
@@ -697,6 +698,7 @@ export default function ShiftManagementPage() {
   const [locationDistance, setLocationDistance] = useState<number | null>(null);
   const [shiftsLoading, setShiftsLoading] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const { reverseGeocode } = useReverseGeocode();
 
   const currentDate = new Date();
 
@@ -759,8 +761,6 @@ export default function ShiftManagementPage() {
     }
   };
 
-  const { reverseGeocode } = useReverseGeocode();
-
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -817,8 +817,13 @@ export default function ShiftManagementPage() {
         return;
       }
 
+      const shiftLocation = shift.location;
+      const shiftLat = parseFloat(shiftLocation?.latlon?.lat ?? '0');
+      const shiftLon = parseFloat(shiftLocation?.latlon?.lon ?? '0');
+      const result = await reverseGeocode(shiftLat, shiftLon);
+
       const [isLocationMatch, distance] = checkLocationMatch(userCoords, shift.location);
-      if (!isLocationMatch) {
+      if (!isLocationMatch && result?.formattedAddress !== userLocation) {
         setShowLocationErrorModal(true);
         setLocationDistance(distance);
         return;
