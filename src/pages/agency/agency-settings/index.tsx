@@ -51,7 +51,7 @@ export default function AgencySettingsPage() {
         >
           Notification
         </button>
-        {(user?.userType === UserType.AGENCY_STAFF && user?.profile?.accessList?.includes("User Levels")) && (
+        {(user?.userType === UserType.AGENCY_STAFF && user?.profile?.accessList?.includes("User Levels") || user?.userType === UserType.AGENCY) && (
         <button
           onClick={() => setActiveTab("userLevels")}
           className={`px-4 py-2 rounded-full cursor-pointer font-medium ${activeTab === "userLevels"
