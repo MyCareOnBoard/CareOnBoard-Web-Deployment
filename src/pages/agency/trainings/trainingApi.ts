@@ -52,8 +52,8 @@ export const employeeTrainingsApi = createApi({
             invalidatesTags: ["Trainings"]
         }),
         getTrainings: builder.query<TrainingDataResponse[], string>({
-            query: (agencyId) => ({
-                url: `/agencies/${agencyId}/trainings`,
+            query: () => ({
+                url: `/agencies/trainings`,
                 method: "GET",
                 requiresAuth: true
             }),
