@@ -5,10 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import UserIcon from "@/assets/icons/user.svg?react";
 
-<<<<<<<< HEAD:src/pages/applicant/application/index.tsx
 import ProfilePreScreeningStep from "./components/ProfilePreScreeningStep";
-========
->>>>>>>> facdc21197e3e204c2c08bbdb3cc5008196b761e:src/pages/application/index.tsx
 import DocumentUploadStep from "./components/DocumentUploadStep";
 import ConditionalHireStep from "./components/ConditionalHireStep";
 import FinalReviewStep from "./components/FinalReviewStep";
@@ -119,7 +116,6 @@ function ApplicationContent() {
   };
 
   const stepComponents = [
-<<<<<<<< HEAD:src/pages/applicant/application/index.tsx
     <ProfilePreScreeningStep key="profile" onSuccess={handleStepSuccess} />,
     <DocumentUploadStep
       key="documents"
@@ -129,13 +125,6 @@ function ApplicationContent() {
     <ConditionalHireStep key="conditional" onBack={() => setActiveStep(activeStep - 1)} onSuccess={handleStepSuccess} />,
     <FinalReviewStep key="review" onSuccess={handleStepSuccess} />,
     <OrientationStep key="orientation" />,
-========
-    // <ProfilePreScreeningStep key="profile" onNext={handleNext} />,
-    <DocumentUploadStep key="documents" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
-    <ConditionalHireStep key="conditional" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
-    <FinalReviewStep key="review" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
-    <OrientationStep key="orientation" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
->>>>>>>> facdc21197e3e204c2c08bbdb3cc5008196b761e:src/pages/application/index.tsx
   ];
 
   const handleCancelClick = () => {
