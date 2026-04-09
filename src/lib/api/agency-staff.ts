@@ -12,7 +12,7 @@ import { customBaseQuery } from "@/lib/baseQuery";
 export enum AgencyAccessScope {
     DSP_MANAGEMENT = "DSP Management",
     CLIENT_MANAGEMENT = "Client Management",
-    SCHEDULING = "Scheduling",
+    SCHEDULING = "Shift Management",
     NOTES = "Notes",
     BILLING_MANAGEMENT = "Billing & Management",
     AI_AUTOMATION = "AI Automation",

@@ -27,7 +27,7 @@ export default function InternalUsersPage() {
       name: "Nur Nabi Rahman",
       email: "nurnabi@iotaq.agency",
       avatar: "",
-      accessLevels: ["Scheduling", "Notes", "Analytics", "Reports"],
+      accessLevels: ["Shift Management", "Notes", "Analytics", "Reports"],
     },
      {
       id: "2",

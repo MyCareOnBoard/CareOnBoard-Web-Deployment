@@ -13,6 +13,8 @@ interface SearchSelectProps {
     options: Option[]
     value?: string
     onChange?: (value: string) => void
+    /** Fired when the dropdown search text changes (e.g. to load remote options). Cleared when the menu closes. */
+    onSearchChange?: (query: string) => void
     placeholder?: string
     emptyMessage?: string
     className?: string
@@ -24,6 +26,7 @@ export function SearchSelect({
                                  options,
                                  value,
                                  onChange,
+                                 onSearchChange,
                                  placeholder = "Select an option...",
                                  emptyMessage = "No results found",
                                  className,
@@ -80,8 +83,9 @@ export function SearchSelect({
         if (!isOpen) {
             setSearchQuery("")
             setHighlightedIndex(0)
+            onSearchChange?.("")
         }
-    }, [isOpen])
+    }, [isOpen, onSearchChange])
 
     // Keyboard navigation
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -230,8 +234,10 @@ export function SearchSelect({
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => {
-                                    setSearchQuery(e.target.value)
+                                    const q = e.target.value
+                                    setSearchQuery(q)
                                     setHighlightedIndex(0)
+                                    onSearchChange?.(q)
                                 }}
                                 onKeyDown={handleKeyDown}
                                 placeholder={searchPlaceholder}

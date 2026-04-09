@@ -66,6 +66,7 @@ const ShiftsPage = lazy(() => import("@/pages/agency/shifts"));
 const ShiftsListPage = lazy(() => import("@/pages/agency/scheduling/shifts"));
 const ApprovalsPage = lazy(() => import("@/pages/agency/scheduling/approvals"));
 const ActivityLogsPage = lazy(() => import("@/pages/agency/scheduling/activity-logs"));
+const AgencyShiftMaintenancePage = lazy(() => import("@/pages/agency/shift-maintenance"));
 const NotesPage = lazy(() => import("@/pages/userPanel/notes"));
 const AgencyNotesPage = lazy(() => import("@/pages/agency/notes"));
 const SuperAdminLayout = lazy(() => import("@/layouts/SuperAdminLayout"));
@@ -97,6 +98,7 @@ const SuperAdminSystemSettingsPage = lazy(() => import("@/pages/super-admin/syst
 const ServicesManagementPage = lazy(() => import("@/pages/super-admin/services"));
 const AgencyTrainings = lazy(() => import("@/pages/agency/trainings"));
 const GlobalNotesQualityPage = lazy(() => import("@/pages/super-admin/global-notes-quality"));
+const SuperAdminShiftMaintenancePage = lazy(() => import("@/pages/super-admin/shift-maintenance"));
 const AgencyBillingMonitorPage = lazy(() => import("@/pages/super-admin/agency-billing-monitor"));
 const AIAutomationPage = lazy(() => import("@/pages/agency/ai-automation"));
 const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));
@@ -296,6 +298,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.activityLogs,
                 Component: ActivityLogsPage,
+            },
+            {
+                path: Routes.agency.shiftMaintenance,
+                Component: AgencyShiftMaintenancePage,
             },
             {
                 path: Routes.agency.analytics,
@@ -606,6 +612,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.agencyBillingMonitor,
                 Component: AgencyBillingMonitorPage,
+            },
+            {
+                path: Routes.superAdmin.shiftMaintenance,
+                Component: SuperAdminShiftMaintenancePage,
             },
             {
                 path: Routes.superAdmin.reports.index,
