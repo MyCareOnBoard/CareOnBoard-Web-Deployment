@@ -363,7 +363,7 @@ export default function SchedulingPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-            Scheduling
+            Shift Management
           </h1>
           <div className="flex items-center gap-3">
             <Button
@@ -678,6 +678,24 @@ export default function SchedulingPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Shift Maintenance Link */}
+      <div
+        className="mt-5 rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white cursor-pointer hover:bg-white/50 transition-colors"
+        onClick={() => navigate(Routes.agency.shiftMaintenance)}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">Shift maintenance</h2>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              Find problem shifts, fix them with a note on file, and review activity history
+            </p>
+          </div>
+          <div className="bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full w-[40px] h-[40px] flex items-center justify-center">
+            <ArrowUpRight className="w-4 h-4 text-[#10141a]" />
           </div>
         </div>
       </div>

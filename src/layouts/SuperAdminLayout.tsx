@@ -20,6 +20,7 @@ import {
   Settings,
   UserLock,
   Briefcase,
+  Wrench,
 } from "lucide-react";
 
 const allNavItems: NavItem[] = [
@@ -32,6 +33,7 @@ const allNavItems: NavItem[] = [
   {label: "Corporate Support", path: Routes.superAdmin.corporateSupport, icon: HelpCircle, accessKey: "Corporate Support"},
   {label: "Oversight Center", path: Routes.superAdmin.oversightCenter, icon: BarChart3, accessKey: "Oversight Center"},
   {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock, accessKey: "Clients Directory"},
+  {label: "Shift Maintenance", path: Routes.superAdmin.shiftMaintenance, icon: Wrench, accessKey: "Shift Maintenance"},
   {label: "Reports", path: Routes.superAdmin.reports.index, icon: ChartGantt, accessKey: "Reports"},
   {label: "Services", path: Routes.superAdmin.services, icon: Briefcase, accessKey: "Services"},
   {label: "System Settings", path: Routes.superAdmin.systemSettings, icon: Settings, accessKey: "System Settings"},

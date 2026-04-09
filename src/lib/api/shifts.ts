@@ -172,6 +172,7 @@ export interface UpdateShiftRequest {
     employeeId?: string;
     clientId?: string;
     approved?: boolean;
+    maintenanceReason?: string;
 }
 
 /**
@@ -436,12 +437,17 @@ export const createShift = async (data: CreateShiftRequest): Promise<ShiftRespon
 /**
  * Get a shift by ID
  * @param shiftId - The ID of the shift to retrieve
+ * @param populate - Optionally populate related documents (client, employee, agency)
  * @returns Promise with shift response
  */
-export const getShiftById = async (shiftId: string): Promise<ShiftResponse> => {
+export const getShiftById = async (
+    shiftId: string,
+    options?: { agencyId?: string; client?: boolean; employee?: boolean; agency?: boolean },
+): Promise<ShiftResponse> => {
     try {
         const response = await axiosClient.get<ShiftResponse>(
-            `${SHIFT_BASE}/${shiftId}`
+            `${SHIFT_BASE}/${shiftId}`,
+            { params: options },
         );
 
         return response.data;
@@ -772,6 +778,94 @@ export const clearShifts = async (): Promise<ClearShiftsResponse> => {
  * @param data - Optional configuration for shift counts
  * @returns Promise with reset summary
  */
+// ==================== Maintenance API ====================
+
+export type AnomalyCode = "missed" | "incomplete_clock" | "unassigned" | "invalid_time";
+
+export interface ShiftAnomaly {
+    id: string;
+    date: string;
+    startTime: string | null;
+    endTime: string | null;
+    status: ShiftStatus;
+    employeeId: string | null;
+    clientId: string | null;
+    assignedDsp: string | null;
+    anomalyCodes: AnomalyCode[];
+}
+
+export interface FetchAnomaliesParams {
+    agencyId?: string;
+    from: string;
+    to: string;
+    limit?: number;
+    startAfter?: string;
+}
+
+export interface FetchAnomaliesResponse {
+    success: boolean;
+    anomalies: ShiftAnomaly[];
+    hasNextPage: boolean;
+    nextCursor: string | null;
+}
+
+export interface ShiftAuditRecord {
+    id: string;
+    shiftId: string;
+    agencyId: string;
+    actorUid: string;
+    actorUserType: string;
+    actorName: string | null;
+    action: "create" | "clock_in" | "shift_started" | "clock_out" | "status_change" | "update" | "delete";
+    changes: Record<string, { before: unknown; after: unknown }> | Record<string, unknown>;
+    reason: string | null;
+    ip: string | null;
+    environment: string;
+    timestamp: unknown;
+}
+
+export interface FetchAuditParams {
+    agencyId?: string;
+    shiftId?: string;
+    limit?: number;
+    startAfter?: string;
+}
+
+export interface FetchAuditResponse {
+    success: boolean;
+    audits: ShiftAuditRecord[];
+    hasNextPage: boolean;
+    nextCursor: string | null;
+}
+
+export const fetchShiftAnomalies = async (params: FetchAnomaliesParams): Promise<FetchAnomaliesResponse> => {
+    try {
+        const response = await axiosClient.get<FetchAnomaliesResponse>(
+            `${SHIFT_BASE}/maintenance/anomalies`,
+            { params }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch shift anomalies:', error);
+        throw error;
+    }
+};
+
+export const fetchShiftMaintenanceAudit = async (params: FetchAuditParams): Promise<FetchAuditResponse> => {
+    try {
+        const response = await axiosClient.get<FetchAuditResponse>(
+            `${SHIFT_BASE}/maintenance/audit`,
+            { params }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch shift maintenance audit:', error);
+        throw error;
+    }
+};
+
+// ==================== Dev / Seed Helpers ====================
+
 export const resetShifts = async (data: SeedShiftsRequest = {}): Promise<ResetShiftsResponse> => {
     try {
         const response = await axiosClient.post<ResetShiftsResponse>(

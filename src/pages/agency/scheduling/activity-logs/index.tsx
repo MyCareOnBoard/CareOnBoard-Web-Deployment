@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { parseISO } from "date-fns";
-import { ArrowUpRight, ChevronLeft, ChevronRight, Loader2, Plus } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Loader2, Plus, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listShifts, Shift, ShiftStatus } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
@@ -293,7 +293,7 @@ export default function ActivityLogsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-            Scheduling
+            Shift Management
           </h1>
           <Button
             onClick={() => {
@@ -339,6 +339,26 @@ export default function ActivityLogsPage() {
                 })}
               </div>
             </div>
+
+            {/* Cross-link to Shift Maintenance for relevant filters */}
+            {(activeFilter === "missed" || activeFilter === "incomplete") && filteredShifts.length > 0 && (
+              <div
+                className="flex items-center gap-3 mb-4 px-4 py-3 rounded-2xl border border-[#00b4b8]/20 bg-[#00b4b8]/5 cursor-pointer hover:bg-[#00b4b8]/10 transition-colors"
+                onClick={() => navigate(Routes.agency.shiftMaintenance)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") navigate(Routes.agency.shiftMaintenance); }}
+              >
+                <Wrench className="w-4 h-4 text-[#00b4b8] shrink-0" />
+                <span className="text-[13px] font-medium text-[#10141a]">
+                  Need a written note on file when you fix or remove shifts?{" "}
+                  <span className="text-[#00b4b8] font-semibold">
+                    Open shift maintenance
+                    <ArrowUpRight className="inline w-3.5 h-3.5 ml-0.5 -mt-0.5" />
+                  </span>
+                </span>
+              </div>
+            )}
 
             {/* Activity Items */}
             <div className="space-y-3">

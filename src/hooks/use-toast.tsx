@@ -4,6 +4,7 @@
  * Wrapper around Sonner toast notifications for consistent API
  */
 
+import { useCallback } from "react";
 import { toast as sonnerToast } from 'sonner'
 
 export interface Toast {
@@ -14,8 +15,7 @@ export interface Toast {
 }
 
 export function useToast() {
-  const toast = ({ title, description, variant = 'default' }: Omit<Toast, 'id'>) => {
-    // Handle different variants
+  const toast = useCallback(({ title, description, variant = 'default' }: Omit<Toast, 'id'>) => {
     switch (variant) {
       case 'destructive':
         return sonnerToast.error(<div className="font-medium">{title}</div>, {
@@ -43,7 +43,7 @@ export function useToast() {
           description: description,
         })
     }
-  }
+  }, []);
 
   return {
     toast,

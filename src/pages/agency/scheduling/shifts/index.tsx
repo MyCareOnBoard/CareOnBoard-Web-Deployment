@@ -312,7 +312,7 @@ export default function ShiftsListPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-            Scheduling
+            Shift Management
           </h1>
           <Button
             onClick={() => {
