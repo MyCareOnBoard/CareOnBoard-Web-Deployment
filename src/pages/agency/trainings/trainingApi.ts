@@ -1,5 +1,5 @@
-import {createApi} from "@reduxjs/toolkit/query/react";
-import {customBaseQuery} from "@/lib/baseQuery";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { customBaseQuery } from "@/lib/baseQuery";
 
 
 interface GetEmployeesNonPaginatedResponseItem {
@@ -43,7 +43,7 @@ export const employeeTrainingsApi = createApi({
             void,
             { agencyId: string; trainingData: TrainingData }
         >({
-            query: ({agencyId, trainingData}) => ({
+            query: ({ agencyId, trainingData }) => ({
                 url: `/agencies/${agencyId}/trainings`,
                 method: "POST",
                 data: trainingData,
@@ -52,8 +52,8 @@ export const employeeTrainingsApi = createApi({
             invalidatesTags: ["Trainings"]
         }),
         getTrainings: builder.query<TrainingDataResponse[], string>({
-            query: (agencyId) => ({
-                url: `/agencies/${agencyId}/trainings`,
+            query: () => ({
+                url: `/agencies/trainings`,
                 method: "GET",
                 requiresAuth: true
             }),
@@ -61,12 +61,12 @@ export const employeeTrainingsApi = createApi({
         }),
         approveTraining: builder.mutation<
             TrainingDataResponse[],
-            {agencyId: string, trainingId: string, approved: boolean}
+            { agencyId: string, trainingId: string, approved: boolean }
         >({
-            query: ({agencyId, trainingId, approved}) => ({
+            query: ({ agencyId, trainingId, approved }) => ({
                 url: `/agencies/${agencyId}/trainings/${trainingId}/approve`,
                 method: "PATCH",
-                data: {approved},
+                data: { approved },
                 requiresAuth: true
             }),
             invalidatesTags: ["Trainings"]
