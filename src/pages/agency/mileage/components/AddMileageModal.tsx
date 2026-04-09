@@ -7,7 +7,6 @@ import { searchClients, Client } from "@/lib/api/clients";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import { mileageApi, CreateMileageRideRequest, MileageRide, UpdateAgencyRideRequest } from "@/lib/api/mileage";
-import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 
 interface AddMileageModalProps {
   isOpen: boolean;
@@ -23,12 +22,7 @@ interface MileageFormData {
   clientId?: string;
   assignDsp: string;
   assignDspId?: string;
-  startIn: string;
-  dropOff: string;
-  pickupLatLon: { lat: number; lng: number } | null;
-  dropOffLatLon: { lat: number; lng: number } | null;
-  estimatedDistance: number;
-  estimatedDuration: number;
+  notes: string;
   selectDate: Date | null;
   selectTime: string;
   schedulingType: "one-time" | "recurring";
@@ -39,12 +33,7 @@ const initialFormData: MileageFormData = {
   clientId: "",
   assignDsp: "",
   assignDspId: "",
-  startIn: "",
-  dropOff: "",
-  pickupLatLon: null,
-  dropOffLatLon: null,
-  estimatedDistance: 0,
-  estimatedDuration: 0,
+  notes: "",
   selectDate: null,
   selectTime: "",
   schedulingType: "one-time",
@@ -58,7 +47,7 @@ export default function AddMileageModal({
   mode = "create",
   initialRide = null,
 }: AddMileageModalProps) {
-  const { toast } = useToast(); // <-- Use like in AddScheduleModal
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState<MileageFormData>(initialFormData);
 
@@ -69,14 +58,9 @@ export default function AddMileageModal({
   const [showDspDropdown, setShowDspDropdown] = useState(false);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
   const [isSearchingDsps, setIsSearchingDsps] = useState(false);
-  const [isEstimatingDistance, setIsEstimatingDistance] = useState(false);
 
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // --- Location autocomplete hooks ---
-  const startLocationAutocomplete = useGooglePlacesAutocomplete();
-  const dropOffLocationAutocomplete = useGooglePlacesAutocomplete();
 
   // --- Client search handler ---
   const handleClientSearch = (query: string) => {
@@ -138,40 +122,6 @@ export default function AddMileageModal({
     setDspSearchResults([]);
   };
 
-  // --- Location select handlers ---
-  const handleStartLocationSelect = async (placeId: string) => {
-    const details = await startLocationAutocomplete.selectSuggestion(placeId);
-    if (details) {
-      setFormData(prev => ({
-        ...prev,
-        startIn: details.formattedAddress,
-        pickupLatLon: { lat: details.lat, lng: details.lng },
-      }));
-    }
-  };
-
-  const handleDropOffLocationSelect = async (placeId: string) => {
-    const details = await dropOffLocationAutocomplete.selectSuggestion(placeId);
-    if (details) {
-      setFormData(prev => ({
-        ...prev,
-        dropOff: details.formattedAddress,
-        dropOffLatLon: { lat: details.lat, lng: details.lng },
-      }));
-    }
-  };
-
-  const handleInputChange = (field: keyof Omit<MileageFormData, 'selectDate' | 'schedulingType'>, value: string) => {
-    setFormData((prev) => {
-      if (field === "startIn") {
-        return { ...prev, startIn: value, pickupLatLon: null, estimatedDistance: 0, estimatedDuration: 0 };
-      }
-      if (field === "dropOff") {
-        return { ...prev, dropOff: value, dropOffLatLon: null, estimatedDistance: 0, estimatedDuration: 0 };
-      }
-      return { ...prev, [field]: value };
-    });
-  };
 
   const handleDateSelect = (date: Date) => {
     setFormData((prev) => ({ ...prev, selectDate: date }));
@@ -208,17 +158,6 @@ export default function AddMileageModal({
     return `${hours.toString().padStart(2, "0")}:${minutes}:${period}`;
   };
 
-  const formatDuration = (seconds: number): string => {
-    if (!seconds || seconds <= 0) return "0 min";
-    const totalMinutes = Math.round(seconds / 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    if (hours > 0) {
-      return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} min`;
-    }
-    return `${minutes} min`;
-  };
-
   const handleSchedulingTypeChange = (type: "one-time" | "recurring") => {
     setFormData((prev) => ({ ...prev, schedulingType: type }));
   };
@@ -246,12 +185,7 @@ export default function AddMileageModal({
       clientId: initialRide.clientId,
       assignDsp: initialRide.caregiverName || "",
       assignDspId: initialRide.caregiverId,
-      startIn: initialRide.pickupLocation || initialRide.location || "",
-      dropOff: initialRide.dropOffLocation || "",
-      pickupLatLon: initialRide.pickupLatLon ?? null,
-      dropOffLatLon: initialRide.dropOffLatLon ?? null,
-      estimatedDistance: initialRide.estimatedDistance ?? 0,
-      estimatedDuration: initialRide.estimatedDuration ?? 0,
+      notes: initialRide.notes || "",
       selectDate: scheduledDate,
       selectTime: time12,
       schedulingType: "one-time",
@@ -264,76 +198,6 @@ export default function AddMileageModal({
     }
   }, [isOpen, mode]);
 
-  const fetchEstimatedDistance = (
-    origin: { lat: number; lng: number },
-    destination: { lat: number; lng: number }
-  ): Promise<{ distanceKm: number; durationSeconds: number } | null> => {
-    if (!window.google?.maps?.DistanceMatrixService) {
-      return Promise.resolve(null);
-    }
-
-    return new Promise((resolve) => {
-      const service = new window.google.maps.DistanceMatrixService();
-      service.getDistanceMatrix(
-        {
-          origins: [origin],
-          destinations: [destination],
-          travelMode: window.google.maps.TravelMode.DRIVING,
-          unitSystem: window.google.maps.UnitSystem.METRIC,
-        },
-        (response, status) => {
-          if (status !== "OK" || !response?.rows?.[0]?.elements?.[0]) {
-            resolve(null);
-            return;
-          }
-
-          const element = response.rows[0].elements[0];
-          if (element.status !== "OK" || !element.distance?.value || !element.duration?.value) {
-            resolve(null);
-            return;
-          }
-
-          const distanceKm = Number((element.distance.value / 1000).toFixed(2));
-          resolve({ distanceKm, durationSeconds: element.duration.value });
-        }
-      );
-    });
-  };
-
-  const distanceEstimateRequestIdRef = useRef(0);
-
-  useEffect(() => {
-    const pickupLatLon = formData.pickupLatLon;
-    const dropOffLatLon = formData.dropOffLatLon;
-
-    if (!pickupLatLon || !dropOffLatLon) {
-      return;
-    }
-
-    const debounceMs = 500;
-    const timeoutId = setTimeout(() => {
-      const requestId = ++distanceEstimateRequestIdRef.current;
-      setIsEstimatingDistance(true);
-      fetchEstimatedDistance(pickupLatLon, dropOffLatLon)
-        .then((result) => {
-          if (requestId !== distanceEstimateRequestIdRef.current) return;
-          if (result !== null) {
-            setFormData((prev) => ({
-              ...prev,
-              estimatedDistance: result.distanceKm,
-              estimatedDuration: result.durationSeconds,
-            }));
-          }
-        })
-        .finally(() => {
-          if (requestId === distanceEstimateRequestIdRef.current) {
-            setIsEstimatingDistance(false);
-          }
-        });
-    }, debounceMs);
-
-    return () => clearTimeout(timeoutId);
-  }, [formData.pickupLatLon, formData.dropOffLatLon]);
 
   const handleSaveAndCancel = () => {
     setFormData(initialFormData);
@@ -344,8 +208,6 @@ export default function AddMileageModal({
     const missingFields: string[] = [];
     if (!formData.client || !formData.clientId) missingFields.push("Client");
     if (!formData.assignDsp || !formData.assignDspId) missingFields.push("Assign DSP");
-    if (!formData.startIn) missingFields.push("Start in");
-    if (!formData.dropOff) missingFields.push("Drop Off");
     if (!formData.selectDate) missingFields.push("Select Date");
     if (!formData.selectTime) missingFields.push("Select Time");
     if (!formData.schedulingType) missingFields.push("Scheduling Type");
@@ -385,25 +247,13 @@ export default function AddMileageModal({
       const basePayload = {
         clientId,
         caregiverId,
-        pickupLocation: formData.startIn,
-        dropOffLocation: formData.dropOff,
-        estimatedDistance: formData.estimatedDistance,
-        estimatedDuration: formData.estimatedDuration,
-        pickupLatLon: formData.pickupLatLon ?? undefined,
-        dropOffLatLon: formData.dropOffLatLon ?? undefined,
-        notes: "",
+        notes: formData.notes || "",
       };
 
       if (mode === "edit" && initialRide?.id) {
         const updatePayload: UpdateAgencyRideRequest = {
           caregiverId: basePayload.caregiverId,
-          pickupLocation: basePayload.pickupLocation,
-          dropOffLocation: basePayload.dropOffLocation,
           scheduledStartTime,
-          estimatedDistance: basePayload.estimatedDistance,
-          estimatedDuration: basePayload.estimatedDuration,
-          pickupLatLon: basePayload.pickupLatLon,
-          dropOffLatLon: basePayload.dropOffLatLon,
           notes: basePayload.notes,
         };
         await mileageApi.updateAgency(initialRide.id, updatePayload);
@@ -576,87 +426,17 @@ export default function AddMileageModal({
               )}
             </div>
 
-            {/* Start in */}
+            {/* Notes */}
             <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">Start in</label>
-              <div className="relative bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
-                <input
-                  type="text"
-                  placeholder="Search Location"
-                  value={formData.startIn}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, startIn: e.target.value }));
-                    startLocationAutocomplete.handleInputChange(e.target.value);
-                  }}
-                  onFocus={() => {
-                    if (startLocationAutocomplete.suggestions.length > 0) startLocationAutocomplete.setShowSuggestions(true);
-                  }}
-                  className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
-                  autoComplete="off"
+              <label className="text-[12px] font-normal text-[#10141a]">Notes (optional)</label>
+              <div className="bg-white border border-[#cccccd] rounded-xl px-4 py-2.5">
+                <textarea
+                  placeholder="Add any notes..."
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={2}
+                  className="w-full text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent resize-none"
                 />
-                {startLocationAutocomplete.isSearching && (
-                  <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
-                )}
-                {startLocationAutocomplete.showSuggestions && startLocationAutocomplete.suggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-[44px] mt-0 bg-white border border-[#cccccd] rounded-xl shadow-lg z-[100] max-h-[200px] overflow-y-auto">
-                    {startLocationAutocomplete.suggestions.map((suggestion) => (
-                      <button
-                        key={suggestion.placeId}
-                        type="button"
-                        onClick={() => handleStartLocationSelect(suggestion.placeId)}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
-                      >
-                        <p className="text-[14px] font-normal text-black">{suggestion.description}</p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Drop Off */}
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">Drop Off</label>
-              <div className="relative bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
-                <input
-                  type="text"
-                  placeholder="Search Location"
-                  value={formData.dropOff}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, dropOff: e.target.value }));
-                    dropOffLocationAutocomplete.handleInputChange(e.target.value);
-                  }}
-                  onFocus={() => {
-                    if (dropOffLocationAutocomplete.suggestions.length > 0) dropOffLocationAutocomplete.setShowSuggestions(true);
-                  }}
-                  className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
-                  autoComplete="off"
-                />
-                {dropOffLocationAutocomplete.isSearching && (
-                  <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
-                )}
-                {dropOffLocationAutocomplete.showSuggestions && dropOffLocationAutocomplete.suggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-[44px] mt-0 bg-white border border-[#cccccd] rounded-xl shadow-lg z-[100] max-h-[200px] overflow-y-auto">
-                    {dropOffLocationAutocomplete.suggestions.map((suggestion) => (
-                      <button
-                        key={suggestion.placeId}
-                        type="button"
-                        onClick={() => handleDropOffLocationSelect(suggestion.placeId)}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
-                      >
-                        <p className="text-[14px] font-normal text-black">{suggestion.description}</p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center justify-between text-[12px] font-normal text-[#808081]">
-                <span>Estimated Distance</span>
-                <span>{formData.estimatedDistance ? `${formData.estimatedDistance}KM` : "0KM"}</span>
-              </div>
-              <div className="flex items-center justify-between text-[12px] font-normal text-[#808081]">
-                <span>Estimated Duration</span>
-                <span>{formatDuration(formData.estimatedDuration)}</span>
               </div>
             </div>
 

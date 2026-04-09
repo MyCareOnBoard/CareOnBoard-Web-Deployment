@@ -1,21 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, ArrowUpRight, Loader2, Pencil, Trash2, XCircle } from "lucide-react";
+import { Plus, ArrowUpRight, Loader2, Pencil, Trash2, XCircle, Eye } from "lucide-react";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import AddMileageModal from "./components/AddMileageModal";
+import RideDetailModal from "./components/RideDetailModal";
 import { mileageApi, MileageRide } from "@/lib/api/mileage";
-
-function formatDuration(seconds?: number | null): string {
-  if (!seconds || seconds <= 0) return "—";
-  const totalMinutes = Math.round(seconds / 60);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours > 0) {
-    return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} min`;
-  }
-  return `${minutes} min`;
-}
 
 const getInitials = (name: string) =>
   name
@@ -28,6 +18,7 @@ const getInitials = (name: string) =>
 export default function MileagePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRide, setEditingRide] = useState<MileageRide | null>(null);
+  const [viewingRide, setViewingRide] = useState<MileageRide | null>(null);
   const [rideToDelete, setRideToDelete] = useState<MileageRide | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [rideToCancel, setRideToCancel] = useState<MileageRide | null>(null);
@@ -99,7 +90,7 @@ export default function MileagePage() {
     }
   };
 
-  const activeCount = rides.filter((r) => r.status === "scheduled" || r.status === "in_progress").length;
+  const activeCount = rides.filter((r) => r.status === "scheduled" || r.status === "in_progress" || r.status === "paused").length;
   const completedCount = rides.filter((r) => r.status === "completed").length;
   const cancelledCount = rides.filter((r) => r.status === "cancelled").length;
 
@@ -198,11 +189,25 @@ export default function MileagePage() {
           ) : rides.length > 0 ? (
             <div className="divide-y divide-[#e5e7eb]">
               {rides.map((entry) => {
-                const pickup = entry.pickupLocation ?? entry.location ?? "";
-                const dropOff = entry.dropOffLocation ?? "";
-                const distanceKm = entry.actualDistance ?? entry.estimatedDistance ?? null;
+                const distanceKm = entry.actualDistance ?? null;
                 const distanceStr = distanceKm != null ? `${distanceKm} km` : "—";
-                const durationStr = formatDuration(entry.estimatedDuration ?? null);
+                const scheduledDate = (() => {
+                  const v = entry.scheduledStartTime as unknown;
+                  if (!v) return "—";
+                  if (typeof v === "string") return new Date(v).toLocaleDateString();
+                  if (typeof v === "object" && v !== null) {
+                    const s = (v as { seconds?: number; _seconds?: number }).seconds ?? (v as { _seconds?: number })._seconds;
+                    if (typeof s === "number") return new Date(s * 1000).toLocaleDateString();
+                  }
+                  return "—";
+                })();
+                const statusColors: Record<string, string> = {
+                  scheduled: "bg-blue-100 text-blue-700",
+                  in_progress: "bg-green-100 text-green-700",
+                  paused: "bg-yellow-100 text-yellow-700",
+                  completed: "bg-gray-100 text-gray-600",
+                  cancelled: "bg-red-100 text-red-600",
+                };
                 return (
                   <div key={entry.id} className="p-6 hover:bg-[#f9fafb] transition-colors">
                     <div className="flex items-center gap-8">
@@ -213,7 +218,7 @@ export default function MileagePage() {
                             {entry.clientAvatarUrl && (
                               <AvatarImage
                                 src={entry.clientAvatarUrl}
-                                alt={entry.clientName}
+                                 alt={entry.clientName ?? undefined}
                                 className="w-full h-full object-cover aspect-auto rounded-[8px]"
                               />
                             )}
@@ -250,26 +255,37 @@ export default function MileagePage() {
                         </div>
                       </div>
 
-                      {/* Locations */}
+                      {/* Info columns */}
                       <div className="grid flex-1 grid-cols-4 gap-6">
                         <div>
-                          <div className="text-[13px] text-[#9ca3af] mb-1">Check In</div>
-                          <div className="text-[15px] text-[#10141a]">{pickup || "—"}</div>
+                          <div className="text-[13px] text-[#9ca3af] mb-1">Scheduled</div>
+                          <div className="text-[15px] text-[#10141a]">{scheduledDate}</div>
                         </div>
                         <div>
-                          <div className="text-[13px] text-[#9ca3af] mb-1">Drop Off</div>
-                          <div className="text-[15px] text-[#10141a]">{dropOff || "—"}</div>
+                          <div className="text-[13px] text-[#9ca3af] mb-1">Segments</div>
+                          <div className="text-[15px] text-[#10141a]">{entry.segmentCount ?? 0}</div>
                         </div>
                         <div>
                           <div className="text-[13px] text-[#9ca3af] mb-1">Distance</div>
                           <div className="text-[15px] text-[#10141a]">{distanceStr}</div>
                         </div>
                         <div>
-                          <div className="text-[13px] text-[#9ca3af] mb-1">Duration</div>
-                          <div className="text-[15px] text-[#10141a]">{durationStr}</div>
+                          <div className="text-[13px] text-[#9ca3af] mb-1">Status</div>
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[12px] font-medium capitalize ${statusColors[entry.status] ?? ""}`}>
+                            {entry.status.replace("_", " ")}
+                          </span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setViewingRide(entry)}
+                          className="p-2 rounded-lg hover:bg-[#f3f4f6] transition-colors cursor-pointer"
+                          aria-label="View details"
+                          title="View details"
+                        >
+                          <Eye className="w-4 h-4 text-[#6b7280]" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleEditRide(entry)}
@@ -336,6 +352,13 @@ export default function MileagePage() {
         message="Are you sure you want to delete this mileage record? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
+      />
+
+      {/* Ride detail modal */}
+      <RideDetailModal
+        ride={viewingRide}
+        isOpen={!!viewingRide}
+        onClose={() => setViewingRide(null)}
       />
 
       {/* Cancel ride confirmation */}
