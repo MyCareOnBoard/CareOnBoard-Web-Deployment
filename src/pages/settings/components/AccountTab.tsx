@@ -1,12 +1,24 @@
 import { useEffect, useState, useCallback, ChangeEvent } from "react"
-import { getAccountInfo, updateAccountInfo, AccountInfo, deleteAccount } from "@/lib/api/settings"
+import { getAccountInfo, updateAccountInfo, AccountInfo } from "@/lib/api/settings"
+import { deleteAccount } from "@/lib/api/profile" // Use profile delete endpoint
 import { useForm } from "react-hook-form"
 import { Form, FormField, FormItem, FormMessage, FormControl } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import SuccessModal from "./SuccessModal"
 import { getAuth } from "firebase/auth"
-import { Trash2, Loader2, User, AlertCircle } from "lucide-react"
+import { Trash2, Loader2, User, AlertCircle, MapPin } from "lucide-react"
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal"
+import { useNavigate } from "react-router"
+import { Routes } from "@/routes/constants"
+
+const LOCATION_STORAGE_KEY = "user_location_access"
+
+type LocationStatus = {
+  message: string
+  tone: "success" | "error" | "info"
+}
 
 interface AccountFormValues {
   fullName: string
@@ -18,6 +30,7 @@ interface AccountTabProps {
 }
 
 export default function AccountTab({ onSaved }: AccountTabProps) {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -29,9 +42,12 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  // Add modal title/message so we can reuse SuccessModal for delete
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [modalTitle, setModalTitle] = useState<string>("Account Updated")
   const [modalMessage, setModalMessage] = useState<string>("Your account information has been successfully saved.")
+  const [locationEnabled, setLocationEnabled] = useState(false)
+  const [locationPending, setLocationPending] = useState(false)
+  const [locationStatus, setLocationStatus] = useState<LocationStatus | null>(null)
 
   const form = useForm<AccountFormValues>({
     mode: "onChange",
@@ -40,13 +56,18 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
 
   const fullNameValue = form.watch("fullName")
 
+  useEffect(() => {
+    const stored = localStorage.getItem(LOCATION_STORAGE_KEY)
+    if (stored === "granted") {
+      setLocationEnabled(true)
+    }
+  }, [])
+
   const load = useCallback(async () => {
-    console.log("🔄 Loading account info...")
     setLoading(true)
     setError("")
     try {
       const data = await getAccountInfo()
-      console.log("✅ Loaded account info:", data)
 
       let fullName = data.fullName || ""
       let email = data.email || ""
@@ -55,11 +76,9 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       const current = auth.currentUser
       
       if (!fullName && current?.displayName) {
-        console.log("⚠️ Using Firebase displayName as fallback:", current.displayName)
         fullName = current.displayName
       }
       if (!email && current?.email) {
-        console.log("⚠️ Using Firebase email as fallback:", current.email)
         email = current.email
       }
 
@@ -68,8 +87,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
         fullName,
         profilePicture: data.profilePicture,
       }
-
-      console.log("✅ Merged account info:", merged)
       
       setInfo(merged)
       setInitialFullName(merged.fullName)
@@ -81,7 +98,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       )
       
       if (merged.profilePicture) {
-        console.log("🖼️ Setting profile picture:", merged.profilePicture)
         setSelectedImage(merged.profilePicture)
       }
     } catch (e: any) {
@@ -99,7 +115,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      console.log("🖼️ Image selected:", file.name, file.size, "bytes", file.type)
       if (file.size > 2 * 1024 * 1024) {
         setError("Image must be under 2MB")
         return
@@ -113,7 +128,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
       const reader = new FileReader()
       reader.onloadend = () => {
         const preview = reader.result as string
-        console.log("🖼️ Preview generated")
         setTempImage(preview)
       }
       reader.readAsDataURL(file)
@@ -123,21 +137,8 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
   const nameChanged = fullNameValue.trim() !== initialFullName.trim()
   const imageChanged = !!imageFile
   const hasChanges = nameChanged || imageChanged
-  const hasProfilePicture = !!(tempImage || selectedImage || initialImage)
 
   const handleSave = async (data: AccountFormValues) => {
-    console.log("💾 Save triggered")
-    console.log("💾 Has changes:", hasChanges)
-    console.log("💾 Name changed:", nameChanged)
-    console.log("💾 Image changed:", imageChanged)
-    console.log("💾 Has profile picture:", hasProfilePicture)
-    
-    // Validation: Profile picture is required
-    if (!hasProfilePicture && !imageFile) {
-      setError("Profile picture is required. Please upload an image.")
-      return
-    }
-    
     if (!hasChanges) {
       setError("No changes to save")
       return
@@ -152,84 +153,129 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
     setError("")
     
     try {
-      console.log("🚀 Calling updateAccountInfo...")
-      console.log("📤 Sending fullName:", nameChanged ? data.fullName.trim() : "unchanged")
-      console.log("📤 Sending image:", imageChanged ? imageFile!.name : "unchanged")
-      
       const result = await updateAccountInfo({
         fullName: nameChanged ? data.fullName.trim() : undefined,
         profilePictureFile: imageChanged ? imageFile! : undefined,
       })
 
-      console.log("✅ API Response:", result)
-      console.log("✅ Response fullName:", result.fullName)
-      console.log("✅ Response profilePicture:", result.profilePicture)
-
-      // Create updated info - preserve existing values if API doesn't return them
-      const updatedInfo: AccountInfo = {
-        email: result.email || info?.email || data.email,
-        fullName: result.fullName || data.fullName.trim(),
-        profilePicture: result.profilePicture || selectedImage,
-      }
-
-      console.log("📝 Updated info object:", updatedInfo)
-
-      // Update all state
-      setInfo(updatedInfo)
-      setInitialFullName(updatedInfo.fullName)
-      setInitialImage(updatedInfo.profilePicture || "")
+      // Update state with exact API response
+      setInfo(result)
+      setInitialFullName(result.fullName)
       
-      // Update form values
-      form.setValue("fullName", updatedInfo.fullName, { shouldValidate: false, shouldDirty: false })
-      form.setValue("email", updatedInfo.email, { shouldValidate: false, shouldDirty: false })
-      
-      // Update displayed image
+      // Update image states if new image was uploaded
       if (result.profilePicture) {
-        console.log("🖼️ Setting new profile picture from result:", result.profilePicture)
+        setInitialImage(result.profilePicture)
         setSelectedImage(result.profilePicture)
-      } else if (tempImage && !result.profilePicture) {
-        console.log("🖼️ Keeping temp preview as selected image")
-        setSelectedImage(tempImage)
       }
       
-      // Clear temp state
+      // Clear temporary states
       setTempImage(null)
       setImageFile(null)
 
-      console.log("✅ Save completed successfully")
-      onSaved?.(updatedInfo)
-      // Set modal content for save success
-      setModalTitle("Account Updated")
-      setModalMessage("Your account information has been successfully saved.")
+      // Reset form to prevent "unsaved changes"
+      form.reset(
+        { fullName: result.fullName, email: result.email },
+        { keepDefaultValues: false }
+      )
+
+      onSaved?.(result)
+      
+      // Set success message
+      if (imageChanged && result.profilePicture) {
+        setModalTitle("Account Updated")
+        setModalMessage("Your account information and profile picture have been successfully saved.")
+      } else {
+        setModalTitle("Account Updated")
+        setModalMessage("Your account information has been successfully saved.")
+      }
+      
       setIsModalVisible(true)
     } catch (e: any) {
       console.error("❌ Save failed:", e)
-      setError(e.message || "Failed to save changes")
+      
+      let errorMessage = e.message || "Failed to save changes"
+      
+      if (errorMessage.includes("Image upload requires server connection")) {
+        errorMessage = "Cannot upload image - server is unavailable. Please try again when connected."
+      } else if (errorMessage.includes("Failed to upload profile picture")) {
+        errorMessage = "Profile picture upload failed. Please check the file and try again."
+      }
+      
+      setError(errorMessage)
     } finally {
       setSaving(false)
     }
   }
 
-  // Replace simulated delete with real API call
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to permanently delete your account?")) return
-    setError("")
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true)
+  }
+
+  // Delete confirmation handler - Uses same endpoint as ProfilePage
+  const handleDeleteConfirm = async () => {
     setDeleting(true)
+    setError("")
+
     try {
+      // Use deleteAccount from @/lib/api/profile (same as ProfilePage)
       await deleteAccount()
-      // Show success modal (you may redirect/sign out here if needed)
-      setModalTitle("Account Deleted")
-      setModalMessage("Your account has been permanently deleted.")
-      setIsModalVisible(true)
-    } catch (e: any) {
-      setError(e?.message || "Failed to delete account")
-    } finally {
+      
+      // Clear auth and storage (matches ProfilePage)
+      localStorage.clear()
+      sessionStorage.clear()
+      
+      // Redirect to login (matches ProfilePage)
+      navigate(Routes.auth.login, { replace: true })
+    } catch (err: any) {
+      console.error("❌ [AccountTab] Delete failed:", err)
+      
+      // Show error message (matches ProfilePage)
+      setError(err?.message || "Failed to delete account. Please try again or contact support.")
       setDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
 
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false)
+  }
+
+  const requestLocation = () => {
+    setLocationStatus({ message: "Requesting location access...", tone: "info" })
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationEnabled(false)
+      setLocationStatus({ message: "Geolocation is not supported in this browser.", tone: "error" })
+      return
+    }
+
+    setLocationPending(true)
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setLocationPending(false)
+        setLocationEnabled(true)
+        localStorage.setItem(LOCATION_STORAGE_KEY, "granted")
+        setLocationStatus({ message: "Location access enabled.", tone: "success" })
+      },
+      (err) => {
+        setLocationPending(false)
+        setLocationEnabled(false)
+        localStorage.setItem(LOCATION_STORAGE_KEY, "off")
+        setLocationStatus({ message: err?.message || "Location permission denied.", tone: "error" })
+      }
+    )
+  }
+
+  const handleLocationToggle = (next: boolean) => {
+    if (next) {
+      requestLocation()
+      return
+    }
+    setLocationEnabled(false)
+    localStorage.setItem(LOCATION_STORAGE_KEY, "off")
+    setLocationStatus({ message: "Location access disabled.", tone: "info" })
+  }
+
   const handleCancel = () => {
-    console.log("❌ Cancel clicked - resetting to initial values")
     setTempImage(null)
     setImageFile(null)
     setError("")
@@ -265,7 +311,7 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
 
       {error && (
         <div className="flex items-start gap-2 p-3 text-sm text-red-600 rounded-lg bg-red-50">
-          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -276,7 +322,7 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
           <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
             <div>
               <h2 className="font-semibold text-lg text-[#10141a]">
-                Profile Picture <span className="text-red-500">*</span>
+                Profile Picture
               </h2>
               <p className="text-sm text-[#4f4f4f]">
                 Upload a photo so your team can recognize you.
@@ -291,8 +337,8 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
                   className="object-cover rounded-full w-14 h-14 ring-2 ring-offset-2 ring-gray-200"
                 />
               ) : (
-                <div className="flex items-center justify-center bg-gray-200 rounded-full w-14 h-14 ring-2 ring-offset-2 ring-red-300">
-                  <User className="w-6 h-6 text-gray-500" />
+                <div className="flex items-center justify-center bg-gray-100 border border-gray-200 rounded-full w-14 h-14 ring-2 ring-offset-2 ring-gray-300">
+                  <User className="w-6 h-6 text-gray-400" />
                 </div>
               )}
               <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
@@ -300,7 +346,9 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
                   {saving ? "Uploading..." : displayImage ? "Change Image" : "Upload Image"}
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,image/jpg"
+                    accept="image/*"
+                    aria-label="Upload Image"
+                    data-testid="profile-image-input"
                     onChange={handleImageChange}
                     className="hidden"
                     disabled={saving}
@@ -310,7 +358,6 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
                   <button
                     type="button"
                     onClick={() => {
-                      console.log("🗑️ Clearing temp image")
                       setTempImage(null)
                       setImageFile(null)
                     }}
@@ -321,7 +368,7 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
                   </button>
                 )}
                 <p className="text-sm text-[#4f4f4f]">
-                  JPG/PNG, max 2MB {!hasProfilePicture && <span className="text-red-500">(Required)</span>}
+                  JPG/PNG, max 2MB
                 </p>
               </div>
             </div>
@@ -387,16 +434,54 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
             />
           </div>
 
-          {/* Delete Account */}
-          <div className="grid gap-6 pt-6 pb-6 border-t border-gray-200 sm:grid-cols-2">
+          {/* Location Access */}
+          <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
             <div>
-              <h2 className="font-semibold text-lg text-[#10141a]">Delete My Account</h2>
-              <p className="text-sm text-[#4f4f4f]">Permanently delete the account.</p>
+              <div className="flex items-center gap-2 text-lg font-semibold text-[#10141a]">
+                <MapPin className="w-5 h-5 text-[#00b3ad]" />
+                <span>Location Access</span>
+              </div>
+              <p className="text-sm text-[#4f4f4f]">The device will use GPS in the background</p>
+              {locationStatus && (
+                <p className={`mt-2 text-sm ${
+                  locationStatus.tone === "success"
+                    ? "text-emerald-700"
+                    : locationStatus.tone === "error"
+                    ? "text-red-700"
+                    : "text-[#4f4f4f]"
+                }`}>
+                  {locationStatus.message}
+                </p>
+              )}
             </div>
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end">
+              <Switch
+                aria-label="Location access"
+                checked={locationEnabled}
+                disabled={locationPending}
+                onCheckedChange={handleLocationToggle}
+              />
+            </div>
+          </div>
+
+          {/* Danger Zone - Delete Account */}
+          <div className="grid gap-6 px-6 pt-6 pb-6 -mx-6 border-t-2 border-red-200 bg-red-50/30 sm:grid-cols-2">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-red-600">
+                <AlertCircle className="w-5 h-5" />
+                Danger Zone
+              </h2>
+              <p className="mt-1 text-sm font-medium text-red-700">
+                Delete My Account
+              </p>
+              <p className="text-sm text-[#4f4f4f] mt-2">
+                Once you delete your account, there is no going back. Please be certain.
+              </p>
+            </div>
+            <div className="flex items-start justify-end">
               <Button
                 type="button"
-                onClick={handleDelete}
+                onClick={handleDeleteClick}
                 variant="destructive"
                 disabled={deleting}
                 className="flex items-center gap-2 bg-[#d93c24] hover:bg-[#c52d16] rounded-full"
@@ -436,6 +521,18 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
           </div>
         </form>
       </Form>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={deleting}
+        title="Delete Account?"
+        message="Are you sure you want to permanently delete your account? This action cannot be undone and all your data will be lost."
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
 
       {/* Success Modal */}
       <SuccessModal

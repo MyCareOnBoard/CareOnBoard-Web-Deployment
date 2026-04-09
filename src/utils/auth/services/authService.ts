@@ -14,9 +14,11 @@ import {
   updateProfile,
   verifyPasswordResetCode,
   confirmPasswordReset,
+  deleteUser,
   type User as FirebaseUser,
 } from 'firebase/auth'
-import type { User } from '../types'
+import type { User } from '../types/user.types'
+import { getAuthErrorMessage } from '@/utils/auth'
 
 export interface AuthResponse {
   success: boolean
@@ -33,6 +35,7 @@ export function transformFirebaseUser(firebaseUser: FirebaseUser): User {
     email: firebaseUser.email || '',
     fullName: firebaseUser.displayName || '',
     emailVerified: firebaseUser.emailVerified,
+    userType: 'applicant' as any, // Default to applicant, will be updated from backend
     createdAt: firebaseUser.metadata.creationTime
       ? new Date(firebaseUser.metadata.creationTime)
       : new Date(),
@@ -57,30 +60,9 @@ export async function loginWithEmail(email: string, password: string): Promise<A
   } catch (error: any) {
     console.error('Login error:', error)
 
-    let errorMessage = 'Failed to login'
-
-    // Handle Firebase auth errors
-    switch (error.code) {
-      case 'auth/invalid-email':
-        errorMessage = 'Invalid email address'
-        break
-      case 'auth/user-disabled':
-        errorMessage = 'This account has been disabled'
-        break
-      case 'auth/user-not-found':
-      case 'auth/wrong-password':
-        errorMessage = 'Invalid email or password'
-        break
-      case 'auth/too-many-requests':
-        errorMessage = 'Too many failed attempts. Please try again later'
-        break
-      default:
-        errorMessage = error.message || 'Failed to login'
-    }
-
     return {
       success: false,
-      error: errorMessage,
+      error: getAuthErrorMessage(error),
     }
   }
 }
@@ -117,26 +99,9 @@ export async function registerWithEmail(fullName: string, email: string, passwor
   } catch (error: any) {
     console.error('Registration error:', error)
 
-    let errorMessage = 'Failed to create account'
-
-    // Handle Firebase auth errors
-    switch (error.code) {
-      case 'auth/email-already-in-use':
-        errorMessage = 'Email already registered'
-        break
-      case 'auth/invalid-email':
-        errorMessage = 'Invalid email address'
-        break
-      case 'auth/weak-password':
-        errorMessage = 'Password is too weak'
-        break
-      default:
-        errorMessage = error.message || 'Failed to create account'
-    }
-
     return {
       success: false,
-      error: errorMessage,
+      error: getAuthErrorMessage(error),
     }
   }
 }
@@ -154,23 +119,9 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
   } catch (error: any) {
     console.error('Password reset error:', error)
 
-    let errorMessage = 'Failed to send reset email'
-
-    // Handle Firebase auth errors
-    switch (error.code) {
-      case 'auth/invalid-email':
-        errorMessage = 'Invalid email address'
-        break
-      case 'auth/user-not-found':
-        errorMessage = 'No account found with this email'
-        break
-      default:
-        errorMessage = error.message || 'Failed to send reset email'
-    }
-
     return {
       success: false,
-      error: errorMessage,
+      error: getAuthErrorMessage(error),
     }
   }
 }
@@ -182,16 +133,16 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
 export async function verifyResetCode(code: string): Promise<{ success: boolean; email?: string; error?: string }> {
   try {
     const email = await verifyPasswordResetCode(auth, code)
-    
+
     return {
       success: true,
       email,
     }
   } catch (error: any) {
     console.error('Reset code verification error:', error)
-    
+
     let errorMessage = 'Invalid or expired reset code'
-    
+
     switch (error.code) {
       case 'auth/expired-action-code':
         errorMessage = 'This reset link has expired. Please request a new one.'
@@ -208,7 +159,7 @@ export async function verifyResetCode(code: string): Promise<{ success: boolean;
       default:
         errorMessage = error.message || 'Invalid or expired reset code'
     }
-    
+
     return {
       success: false,
       error: errorMessage,
@@ -223,15 +174,15 @@ export async function verifyResetCode(code: string): Promise<{ success: boolean;
 export async function confirmReset(code: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
   try {
     await confirmPasswordReset(auth, code, newPassword)
-    
+
     return {
       success: true,
     }
   } catch (error: any) {
     console.error('Password reset confirmation error:', error)
-    
+
     let errorMessage = 'Failed to reset password'
-    
+
     switch (error.code) {
       case 'auth/expired-action-code':
         errorMessage = 'This reset link has expired. Please request a new one.'
@@ -245,7 +196,7 @@ export async function confirmReset(code: string, newPassword: string): Promise<{
       default:
         errorMessage = error.message || 'Failed to reset password'
     }
-    
+
     return {
       success: false,
       error: errorMessage,
@@ -261,6 +212,20 @@ export async function logout(): Promise<void> {
     await signOut(auth)
   } catch (error) {
     console.error('Logout error:', error)
+    throw error
+  }
+}
+
+/**
+ * Delete the current Firebase Auth user (e.g. when backend user creation fails after signup)
+ */
+export async function deleteCurrentUser(): Promise<void> {
+  const user = auth.currentUser
+  if (!user) return
+  try {
+    await deleteUser(user)
+  } catch (error) {
+    console.error('Error deleting Firebase user:', error)
     throw error
   }
 }

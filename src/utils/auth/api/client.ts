@@ -6,7 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 
 export async function getAuthToken(): Promise<string | null> {
   const user = auth.currentUser;
-  
+
   if (!user) {
     console.warn('No authenticated user found');
     return null;
@@ -33,7 +33,7 @@ export async function apiRequest<T = any>(
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
@@ -123,7 +123,7 @@ export async function uploadFile(
 
   const formData = new FormData();
   formData.append('file', file);
-  
+
   // Add any additional fields
   if (additionalData) {
     Object.entries(additionalData).forEach(([key, value]) => {
@@ -150,7 +150,7 @@ export async function uploadFile(
   return await response.json();
 }
 
-export async function createUser(fullName: string): Promise<any> {
+export async function createUser(fullName: string, agencyId?: string): Promise<any> {
   const auth = getAuth();
   const token = await auth.currentUser?.getIdToken();
 
@@ -158,7 +158,7 @@ export async function createUser(fullName: string): Promise<any> {
     throw new Error("Not authenticated");
   }
 
-  const url = `${API_BASE_URL}/users/create`;
+  const url = `${API_BASE_URL}/users`;
 
   const response = await fetch(url, {
     method: "POST",
@@ -167,7 +167,7 @@ export async function createUser(fullName: string): Promise<any> {
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ fullName }),
+    body: JSON.stringify({ fullName, agencyId }),
   });
 
   if (!response.ok) {

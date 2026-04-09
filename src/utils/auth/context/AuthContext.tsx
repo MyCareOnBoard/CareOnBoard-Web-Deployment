@@ -1,28 +1,31 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
-import { loginUser, signupUser, logoutUser as logoutRedux, setUser } from "../store/authSlice"
+import { setUser } from "@/utils/auth"
 import type { AppDispatch, RootState } from "@/store/redux/store"
 import {
   loginWithEmail,
   registerWithEmail,
   sendPasswordResetEmail,
   logout as logoutUser,
-  getCurrentUser,
-  // saveUserSession,
-  // clearUserSession,
   getIdToken,
-  type AuthResponse,
+  deleteCurrentUser,
 } from "../services/authService"
-import type { User } from "../types"
 import { createUser as createBackendUser } from "../api/client"
 import { PageLoader } from "@/components/ui/loader"
+import { auth } from "@/lib/firebase";
+import type { User } from "../types/user.types"
 
 interface AuthContextType {
   user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  signup: (email: string, password: string, fullName: string) => Promise<void>
+  signup: (
+    email: string,
+    password: string,
+    fullName: string,
+    agencyId?: string
+  ) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   createUser: (fullName: string) => Promise<void>
@@ -49,31 +52,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
 
-  // Initialize auth state - check both Redux (persisted) and Firebase
   useEffect(() => {
     const initAuth = async () => {
-      console.log('[AuthContext] Initializing auth...')
-      console.log('[AuthContext] Redux user:', reduxUser)
-      
-      // First, check if we have a persisted user in Redux
+
       if (reduxUser) {
-        console.log('[AuthContext] Found persisted user in Redux:', reduxUser.email)
         setUserState(reduxUser)
         setIsInitialized(true)
         setLoading(false)
         return
       }
-      
-      // If no Redux user, check Firebase auth state
-      const currentUser = await getCurrentUser()
-      console.log('[AuthContext] Firebase current user:', currentUser?.email || 'null')
-      
+
+      // If no Redux user, check Firebase auth state synchronously
+      const currentUser = auth.currentUser;
       if (currentUser) {
-        console.log('[AuthContext] Syncing Firebase user to Redux')
-        setUserState(currentUser)
-        dispatch(setUser(currentUser))
+        const user = {
+          uid: currentUser.uid,
+          email: currentUser.email || '',
+          fullName: currentUser.displayName || '',
+          emailVerified: currentUser.emailVerified,
+          createdAt: currentUser.metadata.creationTime
+            ? new Date(currentUser.metadata.creationTime)
+            : new Date(),
+          updatedAt: new Date(),
+          photoURL: currentUser.photoURL || undefined,
+          phoneNumber: currentUser.phoneNumber || undefined,
+          userType: 'applicant' as any, // Default to applicant, will be updated from backend
+        }
+        setUserState(user)
+        dispatch(setUser(user))
       }
-      
+
       setIsInitialized(true)
       setLoading(false)
     }
@@ -84,7 +92,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sync local state when Redux state changes (after login/signup)
   useEffect(() => {
     if (isInitialized) {
-      console.log('[AuthContext] Redux user changed:', reduxUser?.email || 'null')
       setUserState(reduxUser ?? null)
     }
   }, [reduxUser, isInitialized])
@@ -93,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Login user with email and password
    */
   const login = async (email: string, password: string) => {
-    console.log('[AuthContext] Login attempt for:', email)
     const response = await loginWithEmail(email, password)
 
     if (!response.success || !response.user) {
@@ -101,21 +107,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(response.error || "Login failed")
     }
 
-    console.log('[AuthContext] Login successful, updating state and Redux')
-    console.log('[AuthContext] User object:', response.user)
-    
     // Update local state and Redux
     setUserState(response.user)
     dispatch(setUser(response.user))
-    
-    console.log('[AuthContext] User dispatched to Redux')
   }
 
   /**
    * Register new user
    */
-  const signup = async (email: string, password: string, fullName: string) => {
-    console.log('[AuthContext] Signup attempt for:', email)
+  const signup = async (
+    email: string,
+    password: string,
+    fullName: string,
+    agencyId?: string
+  ) => {
     const response = await registerWithEmail(fullName, email, password)
 
     if (!response.success || !response.user) {
@@ -123,23 +128,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(response.error || "Registration failed")
     }
 
-    console.log('[AuthContext] Signup successful, updating state and Redux')
-    console.log('[AuthContext] User object:', response.user)
-    
-    // Update local state and Redux
-    setUserState(response.user)
-    dispatch(setUser(response.user))
-    
-    console.log('[AuthContext] User dispatched to Redux')
-    
-    // Create user in backend
+    // Create user in backend FIRST (before updating state so presence/heartbeat don't run)
     try {
-      await createBackendUser(fullName)
-      console.log('[signup] User created in backend successfully')
+      await createBackendUser(fullName, agencyId)
     } catch (error: any) {
       console.error('[signup] Failed to create user in backend:', error)
-      // Don't throw - Firebase account is already created, just log the error
+      try {
+        await deleteCurrentUser()
+      } catch (deleteErr: any) {
+        console.error('[signup] Failed to remove Firebase user after backend error:', deleteErr)
+      }
+      throw error
     }
+
+    // Update local state and Redux AFTER backend user is created
+    setUserState(response.user)
+    dispatch(setUser(response.user))
   }
 
   /**
@@ -148,7 +152,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const createUser = async (fullName: string) => {
     try {
       await createBackendUser(fullName)
-      console.log('[createUser] User created in backend successfully')
     } catch (error: any) {
       console.error('[createUser] Failed to create user in backend:', error)
       throw error
@@ -159,11 +162,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Logout current user
    */
   const logout = async () => {
-    console.log('[AuthContext] Logging out user')
     await logoutUser()
     setUserState(null)
     dispatch(setUser(null))
-    console.log('[AuthContext] User logged out, Redux cleared')
   }
 
   /**

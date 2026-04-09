@@ -50,3 +50,6 @@ src/**/*.jsx
 # Firebase Emulator Data
 emulator-data/
 .firebase/
+
+tsconfig.tsbuildinfo
+package-lock.json

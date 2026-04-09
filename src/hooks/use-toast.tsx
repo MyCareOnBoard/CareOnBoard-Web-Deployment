@@ -18,28 +18,28 @@ export function useToast() {
     // Handle different variants
     switch (variant) {
       case 'destructive':
-        return sonnerToast.error(title, {
+        return sonnerToast.error(<div className="font-medium">{title}</div>, {
           description: description,
         })
       
       case 'success':
-        return sonnerToast.success(title, {
+        return sonnerToast.success(<div className="font-medium">{title}</div>, {
           description: description,
         })
       
       case 'info':
-        return sonnerToast.info(title, {
+        return sonnerToast.info(<div className="font-medium">{title}</div>, {
           description: description,
         })
       
       case 'warning':
-        return sonnerToast.warning(title, {
+        return sonnerToast.warning(<div className="font-medium">{title}</div>, {
           description: description,
         })
       
       case 'default':
       default:
-        return sonnerToast(title, {
+        return sonnerToast(<div className="font-medium">{title}</div>, {
           description: description,
         })
     }

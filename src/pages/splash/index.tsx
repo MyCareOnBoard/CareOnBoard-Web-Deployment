@@ -1,22 +1,25 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router"
+import {useNavigate, useParams} from "react-router"
 import { Routes } from "@/routes/constants"
 
 export default function SplashScreen() {
   const navigate = useNavigate()
   const [isAnimating, setIsAnimating] = useState(true)
 
+  const {id} = useParams<{id: string}>();
+  console.log("id", id)
+
   useEffect(() => {
     // Navigate to login after animation completes
     const timer = setTimeout(() => {
       setIsAnimating(false)
       setTimeout(() => {
-        navigate(Routes.login)
+        navigate( id ? Routes.auth.signup + `?agencyId=${id}` : Routes.auth.login)
       }, 600)
     }, 4000)
 
     return () => clearTimeout(timer)
-  }, [navigate])
+  }, [navigate, id])
 
   return (
     <div
@@ -37,7 +40,7 @@ export default function SplashScreen() {
           {/* Logo and text in horizontal layout */}
           <div className="flex items-center gap-4 sm:gap-6">
             {/* Logo with subtle animations */}
-            <div className="relative flex-shrink-0">
+            <div className="relative shrink-0">
               {/* Glow effect behind logo */}
               <div
                 className="absolute inset-0 blur-2xl bg-[#00B4B8]/20 rounded-full scale-150 animate-pulse-slow"
@@ -68,16 +71,16 @@ export default function SplashScreen() {
                 <span className="inline-block animate-letter-bounce" style={{ animationDelay: "0.25s" }}>
                   e
                 </span>
-                <span className="inline-block w-2 sm:w-3" />
+                {/* <span className="inline-block w-2 sm:w-3" /> */}
                 <span className="inline-block animate-letter-bounce" style={{ animationDelay: "0.3s" }}>
-                  o
+                  O
                 </span>
                 <span className="inline-block animate-letter-bounce" style={{ animationDelay: "0.35s" }}>
                   n
                 </span>
-                <span className="inline-block w-2 sm:w-3" />
+                {/* <span className="inline-block w-2 sm:w-3" /> */}
                 <span className="inline-block animate-letter-bounce" style={{ animationDelay: "0.4s" }}>
-                  B
+                  b
                 </span>
                 <span className="inline-block animate-letter-bounce" style={{ animationDelay: "0.45s" }}>
                   o

@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from "react"
-import { useLocation, useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { verifyOtp, resendOtp } from "@/lib/api/otp"
-import { apiFetch } from "@/lib/api/otp"
-import { getAuth } from "firebase/auth"
+import { completeOnboarding } from "@/lib/api/onboarding"
+import { getUser } from "@/lib/api/users"
+import { useAuth } from "@/utils/auth"
 import LogoHeader from "./components/LogoHeader"
 import { Routes } from "@/routes/constants"
 
 export default function VerifyOTP() {
+  const { user, loading: authLoading } = useAuth()
   const nav = useNavigate()
   const { state } = useLocation() as { state?: { email?: string } }
 
@@ -21,24 +23,29 @@ export default function VerifyOTP() {
 
   useEffect(() => {
     const loadEmail = async () => {
+      // Wait for auth to be initialized
+      if (authLoading) {
+        return
+      }
+
       try {
         if (email) {
           setLoading(false)
           return
         }
-        const auth = getAuth()
-        await auth.authStateReady()
-        const user = auth.currentUser
+
+        // Try to get email from auth context user
         if (user?.email) {
           setEmail(user.email)
+          setLoading(false)
           return
         }
         
-        // Fallback to profile endpoint
-        const profile = await apiFetch("/users/profile")
-        const profEmail = profile?.user?.email || profile?.email
-        if (!profEmail) throw new Error("User not found. Please create a profile first.")
-        setEmail(profEmail)
+        // Fallback to user data endpoint
+        const userData = await getUser()
+        const userEmail = userData?.email
+        if (!userEmail) throw new Error("User not found. Please create a user account first.")
+        setEmail(userEmail)
       } catch (e: any) {
         setError(e.message || "Unable to fetch your email.")
       } finally {
@@ -46,7 +53,7 @@ export default function VerifyOTP() {
       }
     }
     loadEmail()
-  }, [email])
+  }, [email, user, authLoading])
 
   const submit = async () => {
     const code = otp.trim()
@@ -59,20 +66,14 @@ export default function VerifyOTP() {
       
       // Step 2: Update user profile to mark onboarding as completed
       try {
-        await apiFetch("/users/profile", {
-          method: "PUT",
-          body: JSON.stringify({
-            onboardingCompleted: true
-          })
-        })
+        await completeOnboarding()
         console.log("✅ Onboarding marked as completed")
       } catch (updateErr: any) {
         console.warn("⚠️ Could not update onboarding status:", updateErr)
         // Don't block navigation if update fails
       }
-      
-      // Step 3: Redirect to dashboard
-      nav(Routes.dashboard, { replace: true })
+
+      nav(Routes.onboarding.success, { replace: true })
     } catch (e: any) {
       setError(e?.message || "Invalid or expired OTP")
     } finally {
@@ -108,7 +109,7 @@ export default function VerifyOTP() {
           <LogoHeader />
           <h3 className="mb-2 text-2xl font-semibold">Enter the OTP sent to your email</h3>
 
-          {loading ? (
+          {authLoading || loading ? (
             <p className="text-gray-500">Fetching your email...</p>
           ) : (
             <>
@@ -129,7 +130,7 @@ export default function VerifyOTP() {
             <Button
               variant="default_full"
               onClick={submit}
-              disabled={verifying || loading || !email || otp.length < 4}
+              disabled={verifying || authLoading || loading || !email || otp.length < 4}
               className="px-6 py-2 bg-[#00B4B8] text-white rounded-full"
             >
               {verifying ? "Verifying..." : "Verify OTP"}
@@ -137,7 +138,7 @@ export default function VerifyOTP() {
             <Button
               variant="outline"
               onClick={handleResend}
-              disabled={resending || loading || !email}
+              disabled={resending || authLoading || loading || !email}
               className="px-6 py-2 rounded-full"
             >
               {resending ? "Resending..." : "Resend OTP"}

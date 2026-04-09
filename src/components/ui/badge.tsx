@@ -9,9 +9,13 @@ const badgeVariants = cva(
 )
 
 const badgeStyles: Record<string, string> = {
-  confirmed: "border-[var(--color-green)] bg-[#f0faf4] text-[var(--color-green)]",
-  rejected: "border-[#ff4545] bg-[#f0faf4] text-[#ff4545]",
-  pending: "border-[var(--color-grey-200)] bg-[#f0faf4] text-[var(--color-grey-200)]",
+  confirmed: "bg-[rgba(14,175,82,0.1)] border-[#0eaf52] text-[#0eaf52]",
+  success: "bg-[rgba(14,175,82,0.1)] border-[#0eaf52] text-[#0eaf52]",
+  warning: "border-[#ff4545] bg-[#f0faf4] text-[#ff4545]",
+  pending: "border-[var(--grey-200)] bg-[#f0faf4] text-[var(--grey-200)]",
+  expired: "border-[#ff4545] bg-[#fef2f2] text-[#ff4545]",
+  error: "border-[#ff4545] bg-[#fef2f2] text-[#ff4545]",
+  info: "border-[#00b4b8] bg-[#f0faf4] text-[#00b4b8]",
 }
 
 type BadgeProps = React.ComponentProps<"span"> & {

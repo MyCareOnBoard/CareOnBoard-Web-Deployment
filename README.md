@@ -1,6 +1,6 @@
-# Care On Board
+# CareOnboard
 
-CareOnBoard is a HIPAA-compliant SaaS platform designed to simplify and modernize caregiver onboarding and compliance management for agencies serving individuals with developmental disabilities (DDD) and home care needs. A modern React application built with TypeScript, Vite, and React Router.
+CareOnboard is a HIPAA-compliant SaaS platform designed to simplify and modernize caregiver onboarding and compliance management for agencies serving individuals with developmental disabilities (DDD) and home care needs. A modern React application built with TypeScript, Vite, and React Router.
 
 The platform helps provider agencies manage end-to-end onboarding, including background checks, drug testing, certification tracking, Electronic Visit Verification (EVV), and payroll integration — reducing paperwork, improving compliance, and enabling faster staff deployment with a clean, responsive UI.
 
@@ -28,7 +28,7 @@ Tech stack: React + Vite (web), React Native (mobile), Firebase (backend).
 Tagline: “Powering Care, Less Paperwork.”
 
 Business Context
-CareOnBoard’s initial client is Morning Star Supportive Services, a New Jersey-based care agency.
+CareOnboard’s initial client is Morning Star Supportive Services, a New Jersey-based care agency.
 
 The project is being developed by iOta Digital Lab LLC, led by Nathan Kwadade, with a distributed engineering team.
 The build is structured around four milestones — onboarding, credential management, EVV, and payroll/reporting — with the first release scheduled for November 2025 and backend
@@ -322,7 +322,7 @@ src/pages/application/components/__tests__/
 └── README.md                                  # Test documentation
 ```
 
-For more details, see the [test documentation](src/pages/application/components/__tests__/README.md).
+For more details, see the [test documentation](src/pages/applicant/application/components/__tests__/README.md).
 
 ## 🔧 Editor Setup
 

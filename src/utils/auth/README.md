@@ -153,7 +153,7 @@ export default function LoginPage() {
   const handleLogin = async (email, password) => {
     try {
       await login(email, password)
-      navigate('/dashboard')
+      navigate('/applicant/dashboard')
     } catch (error) {
       toast.error(error.message)
     }
@@ -178,7 +178,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate('/login')
+      navigate('/auth/login')
     }
   }, [user, loading])
 

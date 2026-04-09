@@ -50,7 +50,15 @@ export interface PreScreeningData {
     fullName: string;
     email: string;
     dateOfBirth: string; // Format: YYYY-MM-DD
-    address: string;
+    address: {
+        address: string;
+        city: string;
+        zipCode: string;
+        latlon?: {
+            lat: string;
+            lon: string;
+        };
+    };
     gender: 'Male' | 'Female';
     isAtLeast18: boolean;
     hasHighSchoolDiploma: boolean;
@@ -81,12 +89,99 @@ export const submitPreScreening = async (data: PreScreeningData): Promise<ApiRes
 };
 
 /**
+ * Get pre-screening form data
+ * @returns Promise with submission response
+ */
+export const getPreScreening = async (): Promise<ApiResponse<any>> => {
+    try {
+        const response = await axiosClient.get<ApiResponse<any>>(
+            `${JOB_APPLICATION_BASE}/pre-screening`
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to get pre-screening:', error);
+        throw error;
+    }
+};
+
+/**
+ * Update pre-screening form data
+ * @param data - The pre-screening form data to update
+ * @returns Promise with update response
+ */
+export const updatePreScreening = async (data: PreScreeningData): Promise<ApiResponse<any>> => {
+    try {
+        const response = await axiosClient.put<ApiResponse<any>>(
+            `${JOB_APPLICATION_BASE}/pre-screening`,
+            data
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to update pre-screening:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get eligibility verification data
+ * @returns Promise with eligibility verification data
+ */
+export const getEligibilityVerification = async (): Promise<ApiResponse<any>> => {
+    try {
+        const response = await axiosClient.get<ApiResponse<any>>(
+            `${JOB_APPLICATION_BASE}/eligibility-verification`
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch eligibility verification:', error);
+        throw error;
+    }
+};
+
+
+
+export const APPLICATION_STEP_TITLES = [
+    "Profile & Pre-Screening",
+    "Document Upload & Eligibility Verification",
+    "Conditional Hire & Compliance",
+    "Final Agency Review",
+    "Official Hire & Orientation",
+];
+
+export const APPLICATION_STEP_NAMES = ["pre-screening", "eligibility", "compliance", "review", "orientation"];
+
+/** Maps API step values to APPLICATION_STEP_NAMES for backend/frontend alignment */
+export const APPLICATION_STEP_ALIASES: Record<string, string> = {
+  "eligibility-verification": "eligibility",
+  "profile": "pre-screening",
+};
+
+/**
+ * Returns the clamped step index (0 to APPLICATION_STEP_NAMES.length - 1) for a given currentStep.
+ * Normalizes backend step names (e.g. "eligibility-verification") before lookup.
+ */
+export const getApplicationStepIndex = (currentStep: string | null | undefined): number => {
+  const normalized = APPLICATION_STEP_ALIASES[currentStep ?? ""] ?? currentStep ?? "pre-screening";
+  const index = APPLICATION_STEP_NAMES.indexOf(normalized);
+  return Math.max(0, Math.min(index, APPLICATION_STEP_NAMES.length - 1));
+};
+
+export type ApplicationStepName = typeof APPLICATION_STEP_NAMES[number] | null;
+
+export const ApplicationStatusNames = ["incomplete", "pre-screening_complete", "eligibility_pending", "eligibility_complete", "submitted", "under_review", "approved", "rejected"];
+
+export type ApplicationStatusType = typeof ApplicationStatusNames[number];
+
+/**
  * Application status response structure
  */
 export interface ApplicationStatus {
     hasStarted: boolean;
-    currentStep: string | null;
-    status: 'not_started' | 'in_progress' | 'submitted' | 'under_review' | 'approved' | 'rejected' | null;
+    currentStep: ApplicationStepName;
+    status: ApplicationStatusType;
 }
 
 /**
@@ -117,13 +212,13 @@ export const getApplicationStatus = async (): Promise<ApplicationStatusResponse>
 };
 
 export interface UpdateApplicationStatusRequest {
-    status?: 'incomplete' | 'pre-screening_complete' | 'eligibility_pending' | 'eligibility_complete' | 'submitted' | 'under_review' | 'approved' | 'rejected';
-    currentStep?: string;
+    status?: ApplicationStatusType;
+    currentStep?: ApplicationStepName;
 }
 
 export interface UpdateApplicationStatusResponse {
-    status: string;
-    currentStep: string;
+    status: ApplicationStatusType;
+    currentStep: ApplicationStepName;
 }
 
 export const updateApplicationStatus = async (
@@ -199,12 +294,47 @@ export interface FinalReviewResponse {
 export const getFinalReviewChecklist = async (): Promise<FinalReviewResponse> => {
     try {
         const response = await axiosClient.get<FinalReviewResponse>(
-            'https://us-central1-care-on-board.cloudfunctions.net/finalReview/checklist'
+            '/finalReview/checklist'
         );
 
         return response.data;
     } catch (error) {
         console.error('Failed to fetch final review checklist:', error);
+        throw error;
+    }
+};
+
+/**
+ * Cancel Application Response
+ */
+export interface CancelApplicationResponse {
+    success: boolean;
+    message: string;
+    data: {
+        cancelledAt: string;
+        archiveId: string;
+        deletedSections: {
+            preScreening: boolean;
+            eligibilityVerification: boolean;
+            conditionalHire: boolean;
+            officialHire: boolean;
+        };
+    };
+}
+
+/**
+ * Cancel the current job application
+ * @returns Promise with cancellation response
+ */
+export const cancelApplication = async (): Promise<CancelApplicationResponse> => {
+    try {
+        const response = await axiosClient.post<CancelApplicationResponse>(
+            `${JOB_APPLICATION_BASE}/cancel`
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Failed to cancel application:', error);
         throw error;
     }
 };
