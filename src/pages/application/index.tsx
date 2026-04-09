@@ -4,7 +4,6 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import UserIcon from "@/assets/icons/user.svg?react";
 
-import ProfilePreScreeningStep, { type ProfilePreScreeningFormValues } from "./components/ProfilePreScreeningStep";
 import DocumentUploadStep from "./components/DocumentUploadStep";
 import ConditionalHireStep from "./components/ConditionalHireStep";
 import FinalReviewStep from "./components/FinalReviewStep";
@@ -89,7 +88,7 @@ function ApplicationContent() {
   };
 
   const stepComponents = [
-    <ProfilePreScreeningStep key="profile" onNext={handleNext} />,
+    // <ProfilePreScreeningStep key="profile" onNext={handleNext} />,
     <DocumentUploadStep key="documents" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
     <ConditionalHireStep key="conditional" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,
     <FinalReviewStep key="review" onBack={() => setActiveStep(activeStep - 1)} onNext={handleNext} />,

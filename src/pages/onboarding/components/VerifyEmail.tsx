@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router'
 import LogoHeader from './LogoHeader'
 import { Input } from '../../../components/ui/input'
 import { Button } from '../../../components/ui/button'
-import VerifyOTP from './VerifyOTP';
 
 export default function VerifyEmail(){
   const [email, setEmail] = useState('')
