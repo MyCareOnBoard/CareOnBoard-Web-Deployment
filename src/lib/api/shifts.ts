@@ -791,6 +791,10 @@ export interface ShiftAnomaly {
     employeeId: string | null;
     clientId: string | null;
     assignedDsp: string | null;
+    /** Resolved from clients collection (backend); optional on older APIs */
+    clientName?: string | null;
+    /** Resolved from employees / assignedDsp (backend); optional on older APIs */
+    dspName?: string | null;
     anomalyCodes: AnomalyCode[];
 }
 

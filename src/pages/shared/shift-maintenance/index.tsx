@@ -65,6 +65,16 @@ const ROLE_LABELS: Record<string, string> = {
   dsp: "DSP",
 };
 
+function anomalyDspLabel(a: ShiftAnomaly): string {
+  if (a.dspName) return a.dspName;
+  if (a.assignedDsp && a.assignedDsp !== a.employeeId) return a.assignedDsp;
+  return a.employeeId || "-";
+}
+
+function anomalyClientLabel(a: ShiftAnomaly): string {
+  return a.clientName || a.clientId || "-";
+}
+
 function summarizeChanges(action: ShiftAuditRecord["action"], changes: ShiftAuditRecord["changes"]): string {
   if (!changes || typeof changes !== "object") return "-";
   const c = changes as Record<string, unknown>;
@@ -410,8 +420,18 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
                         <tr key={a.id} className="border-b border-gray-100 hover:bg-white/40 transition-colors">
                           <td className="py-3">{a.date}</td>
                           <td className="py-3">{a.startTime || "-"} - {a.endTime || "-"}</td>
-                          <td className="py-3 truncate max-w-[120px]">{a.assignedDsp || a.employeeId || "-"}</td>
-                          <td className="py-3 truncate max-w-[120px]">{a.clientId || "-"}</td>
+                          <td
+                            className="py-3 truncate max-w-[120px]"
+                            title={a.employeeId || undefined}
+                          >
+                            {anomalyDspLabel(a)}
+                          </td>
+                          <td
+                            className="py-3 truncate max-w-[120px]"
+                            title={a.clientId || undefined}
+                          >
+                            {anomalyClientLabel(a)}
+                          </td>
                           <td className="py-3">
                             <Badge variant="outline" className="text-xs capitalize">{a.status}</Badge>
                           </td>
