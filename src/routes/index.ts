@@ -1,4 +1,4 @@
-import { lazy, createElement } from "react";
+import { lazy } from "react";
 import { createBrowserRouter, Navigate } from "react-router";
 import { Routes } from "@/routes/constants";
 
@@ -274,26 +274,6 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.aiAutomation,
                 Component: AIAutomationPage,
-            },
-            {
-                path: "/agency/scheduling",
-                Component: () => createElement(Navigate, { to: Routes.agency.scheduling, replace: true }),
-            },
-            {
-                path: "/agency/scheduling/shifts",
-                Component: () => createElement(Navigate, { to: Routes.agency.shiftsList, replace: true }),
-            },
-            {
-                path: "/agency/scheduling/approvals",
-                Component: () => createElement(Navigate, { to: Routes.agency.approvals, replace: true }),
-            },
-            {
-                path: "/agency/scheduling/activity-logs",
-                Component: () => createElement(Navigate, { to: Routes.agency.activityLogs, replace: true }),
-            },
-            {
-                path: "/agency/shift-maintenance",
-                Component: () => createElement(Navigate, { to: Routes.agency.shiftMaintenance, replace: true }),
             },
             {
                 path: Routes.agency.scheduling,
