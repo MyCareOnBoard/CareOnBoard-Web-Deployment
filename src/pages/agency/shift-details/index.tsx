@@ -24,7 +24,7 @@ import {
   ShiftStatus,
   type ShiftAuditRecord,
 } from "@/lib/api/shifts";
-import { shiftToAnomalyRecord } from "@/lib/shift-anomaly-detection";
+import { detectShiftAnomalyCodes, shiftToAnomalyRecord } from "@/lib/shift-anomaly-detection";
 import { shiftToScheduleFormData } from "@/pages/agency/scheduling/shift-to-schedule-form";
 import type { ScheduleFormData } from "@/pages/agency/scheduling/components/AddScheduleModal";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
@@ -83,11 +83,14 @@ function shiftDeleteConfirmMessage(shift: Shift): string {
   return `Removes ${clientLabel}'s shift on ${when} from the schedule. This can't be undone.`;
 }
 
-function shiftStatusBadgeProps(status: ShiftStatus): {
+function shiftStatusBadgeProps(shift: Shift): {
   label: string;
   variant: React.ComponentProps<typeof Badge>["variant"];
 } {
-  switch (status) {
+  if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
+    return { label: "Incomplete", variant: "incomplete" };
+  }
+  switch (shift.status) {
     case ShiftStatus.ONGOING:
       return { label: "Active", variant: "success" };
     case ShiftStatus.COMPLETED:
@@ -99,7 +102,7 @@ function shiftStatusBadgeProps(status: ShiftStatus): {
     case ShiftStatus.EXPIRED:
       return { label: "Expired", variant: "expired" };
     default:
-      return { label: String(status), variant: "pending" };
+      return { label: String(shift.status), variant: "pending" };
   }
 }
 
@@ -293,7 +296,7 @@ export default function AgencyShiftDetailsPage() {
 
   if (!shift) return null;
 
-  const scheduleStatusBadge = shiftStatusBadgeProps(shift.status);
+  const scheduleStatusBadge = shiftStatusBadgeProps(shift);
 
   return (
     <>

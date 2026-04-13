@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
 import { useAuth } from "@/utils/auth";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
+import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 
 type ActivityFilter = "all" | "active" | "completed" | "missed" | "incomplete";
 
@@ -66,7 +67,6 @@ const parseTimeToParts = (time: string): { hours: number; minutes: number } | nu
 };
 
 const isShiftMissed = (shift: Shift): boolean => {
-  console.log(shift);
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (shift.clockedInAt) return false;
   if (!shift.date) return false;
@@ -107,12 +107,16 @@ const isShiftMissed = (shift: Shift): boolean => {
     );
   }
 
-  console.log(endDateTime.getTime(), Date.now());
-
   return endDateTime.getTime() < Date.now();
 };
 
-const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
+const INCOMPLETE_PILL_STYLE = {
+  label: "Incomplete",
+  color: "#B45309",
+  bgColor: "rgba(254, 243, 199, 0.65)",
+};
+
+const getStatusInfoByStatus = (status: ShiftStatus, _approved?: boolean) => {
   switch (status) {
     case ShiftStatus.ONGOING:
       return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
@@ -129,11 +133,24 @@ const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
   }
 };
 
+const getActivityRowStatusInfo = (shift: Shift) => {
+  if (isShiftMissed(shift)) {
+    return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
+  }
+  if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
+    return INCOMPLETE_PILL_STYLE;
+  }
+  return getStatusInfoByStatus(shift.status, shift.approved);
+};
+
 const getStatusInfoForTab = (shift: Shift, tab: ActivityFilter) => {
   switch (tab) {
     case "all":
-      return getStatusInfo(shift.status, shift.approved);
+      return getActivityRowStatusInfo(shift);
     case "active":
+      if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
+        return INCOMPLETE_PILL_STYLE;
+      }
       if (shift.status === ShiftStatus.ONGOING) {
         return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
       }
@@ -143,9 +160,9 @@ const getStatusInfoForTab = (shift: Shift, tab: ActivityFilter) => {
     case "missed":
       return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
     case "incomplete":
-      return { label: "Incomplete", color: "#D53411", bgColor: "rgba(213,52,17,0.05)" };
+      return INCOMPLETE_PILL_STYLE;
     default:
-      return getStatusInfo(shift.status, shift.approved);
+      return getActivityRowStatusInfo(shift);
   }
 };
 

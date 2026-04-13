@@ -140,18 +140,19 @@ export default function UserPanelDashboardPage() {
         setTimeout(() => setError(false), 3000);
     }
 
-    const handleWorkAvailabilityChange = async () => {
-        setWorkAvailability((prev) => !prev);
+    const handleWorkAvailabilityChange = async (pressed: boolean) => {
+        setWorkAvailability(pressed);
         try {
-            updateEmployeeInfo({
-                workAvailability: !employeeInfo?.workAvailability
+            await updateEmployeeInfo({
+                workAvailability: pressed,
             }).unwrap();
             const user = await getUser();
-            dispatch(setUser(user))
+            dispatch(setUser(user));
         } catch (error) {
             console.error("Error updating work availability:", error);
+            setWorkAvailability(!pressed);
         }
-    }
+    };
 
     const goToProfile = () => {
         navigate(Routes.userPanel.profile);

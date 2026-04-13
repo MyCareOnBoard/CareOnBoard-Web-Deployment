@@ -30,6 +30,7 @@ import { shiftToScheduleFormData } from "./shift-to-schedule-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/utils/auth";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
+import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 
 /** Normalize timestamp-like values to a display-safe string. Never returns an object. */
@@ -132,6 +133,9 @@ const getStatusInfo = (shift: Shift, approved?: boolean) => {
   // Check if shift is missed first, regardless of status
   if (isShiftMissed(shift)) {
     return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
+  }
+  if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
+    return { label: "Incomplete", color: "#B45309", bgColor: "rgba(254, 243, 199, 0.65)" };
   }
 
   switch (shift.status) {
@@ -871,7 +875,7 @@ export default function SchedulingPage() {
                     </div>
 
                     {/* Status & Times */}
-                    <div className="flex items-center gap-16 flex-1 w-[256px]">
+                    <div className="flex items-center gap-16 flex-1 w-[100px]">
                       {/* Status Badge */}
                       <div
                         className="rounded-full min-w-[54px] min-h-7 flex items-center justify-center gap-1 px-2.5"
@@ -887,7 +891,9 @@ export default function SchedulingPage() {
                           {statusInfo.label}
                         </span>
                       </div>
+                    </div>
 
+                    <div className="flex items-center gap-16 flex-1 w-[100px]">
                       {/* Clocked In */}
                       <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
                         <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
@@ -895,7 +901,8 @@ export default function SchedulingPage() {
                           {shift.clockedInAt ? formatTime(shift.clockedInAt) : "--:-- --"}
                         </span>
                       </div>
-
+                    </div>
+                    <div className="flex items-center gap-16 flex-1 w-[100px]">
                       {/* Clocked Out */}
                       <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
                         <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
@@ -1017,6 +1024,9 @@ export default function SchedulingPage() {
       <ShiftDetailsModal
         isOpen={showShiftDetails}
         shift={selectedShift}
+        anomalyCodes={selectedShift ? detectShiftAnomalyCodes(selectedShift) : []}
+        hydrateFromServer
+        agencyId={user?.agencyId ?? ""}
         onClose={() => {
           setShowShiftDetails(false);
           setSelectedShift(null);
