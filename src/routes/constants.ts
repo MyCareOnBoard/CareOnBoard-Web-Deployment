@@ -47,6 +47,7 @@ export const Routes = {
         approvals: "/agency/shifts/approvals",
         activityLogs: "/agency/shifts/activity-logs",
         shiftMaintenance: "/agency/shifts/maintenance",
+        shiftDetails: "/agency/shifts/:shiftId",
         notes: "/agency/notes",
         mileage: "/agency/mileage",
         incident: "/agency/incident",

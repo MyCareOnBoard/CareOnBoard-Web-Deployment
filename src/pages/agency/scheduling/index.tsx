@@ -18,9 +18,10 @@ import { listShifts, deleteShift, Shift, ShiftStatus } from "@/lib/api/shifts";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router";
+import { useNavigate, generatePath } from "react-router";
 import { Routes } from "@/routes/constants";
 import AddScheduleModal, { ScheduleFormData } from "./components/AddScheduleModal";
+import { shiftToScheduleFormData } from "./shift-to-schedule-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/utils/auth";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
@@ -183,45 +184,20 @@ export default function SchedulingPage() {
   const [loading, setLoading] = useState(true);
   const itemsPerPage = 6;
 
-  // Handle edit shift
   const handleEdit = (shift: Shift) => {
-    const clientName = shift.client
-      ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
-      : "Unknown Client";
-    const employeeName = shift.employee?.fullName || "";
-    const anyShift = shift as any;
-
-    const formData: ScheduleFormData = {
-      client: clientName,
-      clientId: shift.client?.id || "",
-      clientLocation: shift.location || null,
-      assignedDsp: employeeName,
-      assignedDspId: (shift.employee as any)?.id || "",
-      billingRate: "",
-      serviceCode: shift.serviceCode || "183535",
-      notesType: anyShift.notesType || "",
-      comment: anyShift.comment || "",
-      schedulingType: (shift.schedulingType as "one-time" | "recurring" | "") || "one-time",
-      date: shift.date ? new Date(shift.date) : null,
-      startDate: null,
-      endDate: null,
-      clockInTime: shift.startTime,
-      clockOutTime: shift.endTime || "",
-      ispOutcome: shift.ispOutcome || "",
-      planOfCare: null,
-      submissionStatus: shift.submissionStatus,
-    } as ScheduleFormData;
-
-    (formData as any).shiftId = shift.id;
-
-    setEditFormData(formData);
+    setEditFormData(shiftToScheduleFormData(shift));
     setModalMode("edit");
     setShowAddScheduleModal(true);
   };
 
   const closeShiftRowMenu = () => setShiftMenuOpenForId(null);
 
-  const openShiftDetailsFromMenu = (shift: Shift) => {
+  const goToShiftDetailsPage = (shift: Shift) => {
+    closeShiftRowMenu();
+    navigate(generatePath(Routes.agency.shiftDetails, { shiftId: shift.id }));
+  };
+
+  const openShiftMaintenanceModal = (shift: Shift) => {
     closeShiftRowMenu();
     setSelectedShift(shift);
     setShowShiftDetails(true);
@@ -230,11 +206,6 @@ export default function SchedulingPage() {
   const openEditScheduleFromMenu = (shift: Shift) => {
     closeShiftRowMenu();
     handleEdit(shift);
-  };
-
-  const goToShiftMaintenanceFromMenu = () => {
-    closeShiftRowMenu();
-    navigate(Routes.agency.shiftMaintenance);
   };
 
   const requestDeleteShiftFromMenu = (shift: Shift) => {
@@ -702,8 +673,8 @@ export default function SchedulingPage() {
                             type="button"
                             role="menuitem"
                             className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#10141a] hover:bg-black/[0.06]"
-                            aria-label="View full shift details"
-                            onClick={() => openShiftDetailsFromMenu(shift)}
+                            aria-label="Open full shift details page"
+                            onClick={() => goToShiftDetailsPage(shift)}
                           >
                             <FileText className="size-4 shrink-0 text-[#808081]" aria-hidden />
                             Details
@@ -722,8 +693,8 @@ export default function SchedulingPage() {
                             type="button"
                             role="menuitem"
                             className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#10141a] hover:bg-black/[0.06]"
-                            aria-label="Open shift maintenance: review problems and history"
-                            onClick={goToShiftMaintenanceFromMenu}
+                            aria-label="Adjust clock times, notes, or mark shift completed"
+                            onClick={() => openShiftMaintenanceModal(shift)}
                           >
                             <Wrench className="size-4 shrink-0 text-[#808081]" aria-hidden />
                             Maintenance

@@ -21,10 +21,18 @@ import {
   fetchShiftMaintenanceAudit,
   type ShiftAnomaly,
   type ShiftAuditRecord,
-  type AnomalyCode,
 } from "@/lib/api/shifts";
 import { Routes } from "@/routes/constants";
 import { listAgencies } from "@/lib/api/agencies";
+import {
+  ACTION_LABELS,
+  ANOMALY_LABELS,
+  ROLE_LABELS,
+  anomalyClientLabel,
+  anomalyDspLabel,
+  formatShiftAuditTimestamp,
+  summarizeChanges,
+} from "@/pages/shared/shift-maintenance/audit-display";
 
 const ShiftCorrectionModal = lazy(() => import("./ShiftCorrectionModal"));
 
@@ -38,74 +46,6 @@ function useDebounce<T>(value: T, delayMs: number): T {
 }
 
 type TabKey = "anomalies" | "audit";
-
-const ANOMALY_LABELS: Record<AnomalyCode, { label: string; color: string }> = {
-  missed: { label: "Missed shift", color: "bg-red-100 text-red-700" },
-  incomplete_clock: { label: "No clock-out", color: "bg-amber-100 text-amber-700" },
-  unassigned: { label: "No DSP assigned", color: "bg-blue-100 text-blue-700" },
-  invalid_time: { label: "End before start", color: "bg-purple-100 text-purple-700" },
-};
-
-const ACTION_LABELS: Record<ShiftAuditRecord["action"], { label: string; color: string }> = {
-  create: { label: "Created", color: "bg-emerald-100 text-emerald-700" },
-  clock_in: { label: "Clocked In", color: "bg-green-100 text-green-700" },
-  shift_started: { label: "Shift Started", color: "bg-teal-100 text-teal-700" },
-  clock_out: { label: "Clocked Out", color: "bg-sky-100 text-sky-700" },
-  status_change: { label: "Status Change", color: "bg-indigo-100 text-indigo-700" },
-  update: { label: "Updated", color: "bg-amber-100 text-amber-700" },
-  delete: { label: "Deleted", color: "bg-red-100 text-red-700" },
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: "Super Admin",
-  superAdmin: "Super Admin",
-  agency: "Agency",
-  agency_admin: "Agency",
-  employee: "DSP",
-  dsp: "DSP",
-};
-
-function anomalyDspLabel(a: ShiftAnomaly): string {
-  if (a.dspName) return a.dspName;
-  if (a.assignedDsp && a.assignedDsp !== a.employeeId) return a.assignedDsp;
-  return a.employeeId || "-";
-}
-
-function anomalyClientLabel(a: ShiftAnomaly): string {
-  return a.clientName || a.clientId || "-";
-}
-
-function summarizeChanges(action: ShiftAuditRecord["action"], changes: ShiftAuditRecord["changes"]): string {
-  if (!changes || typeof changes !== "object") return "-";
-  const c = changes as Record<string, unknown>;
-  switch (action) {
-    case "create":
-      return c.date ? `Scheduled for ${c.date}` : "New shift (no date yet)";
-    case "clock_in":
-      return c.clockedInAt ? `Clock-in: ${c.clockedInAt}` : "Clocked in";
-    case "clock_out": {
-      const parts: string[] = [];
-      if (c.clockedOutAt) parts.push(`Clock-out: ${c.clockedOutAt}`);
-      if (c.sessionDuration) parts.push(`Length: ${c.sessionDuration}`);
-      return parts.length ? parts.join(" · ") : "Clocked out";
-    }
-    case "shift_started":
-      return "Shift marked as started";
-    case "status_change": {
-      const s = c.status as { before?: string; after?: string } | undefined;
-      return s?.before && s?.after ? `Status: ${s.before} → ${s.after}` : "Status changed";
-    }
-    case "update": {
-      const keys = Object.keys(c);
-      if (keys.length === 0) return "Shift updated";
-      return keys.length <= 3 ? `Updated: ${keys.join(", ")}` : `Updated ${keys.length} fields`;
-    }
-    case "delete":
-      return "Shift removed";
-    default:
-      return "-";
-  }
-}
 
 interface ShiftMaintenancePageProps {
   isSuperAdmin?: boolean;
@@ -276,19 +216,6 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
     loadAnomalies(null);
     setAnomaliesPage(0);
     setAuditsFetched(false);
-  };
-
-  const formatTimestamp = (ts: unknown): string => {
-    if (!ts) return "-";
-    if (typeof ts === "string") return format(new Date(ts), "MMM d, yyyy h:mm a");
-    if (typeof ts === "object" && ts !== null) {
-      const obj = ts as Record<string, unknown>;
-      const seconds = (obj._seconds ?? obj.seconds) as number | undefined;
-      if (typeof seconds === "number") {
-        return format(new Date(seconds * 1000), "MMM d, yyyy h:mm a");
-      }
-    }
-    return "-";
   };
 
   return (
@@ -519,10 +446,14 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
                     </thead>
                     <tbody>
                       {audits.map((a) => {
-                        const actionMeta = ACTION_LABELS[a.action] || { label: a.action, color: "bg-gray-100 text-gray-600" };
+                        const actionMeta =
+                          ACTION_LABELS[a.action as ShiftAuditRecord["action"]] || {
+                            label: String(a.action),
+                            color: "bg-gray-100 text-gray-600",
+                          };
                         return (
                           <tr key={a.id} className="border-b border-gray-100 hover:bg-white/40 transition-colors">
-                            <td className="py-3 whitespace-nowrap">{formatTimestamp(a.timestamp)}</td>
+                            <td className="py-3 whitespace-nowrap">{formatShiftAuditTimestamp(a.timestamp)}</td>
                             <td className="py-3">{a.actorName || a.actorUid}</td>
                             <td className="py-3 text-xs text-gray-500">{ROLE_LABELS[a.actorUserType] || a.actorUserType}</td>
                             <td className="py-3">
