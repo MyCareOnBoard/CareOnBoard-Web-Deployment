@@ -3,7 +3,7 @@ import type { ShiftAnomaly, ShiftAuditRecord, AnomalyCode } from "@/lib/api/shif
 
 export const ANOMALY_LABELS: Record<AnomalyCode, { label: string; color: string }> = {
   missed: { label: "Missed shift", color: "bg-red-100 text-red-700" },
-  incomplete_clock: { label: "No clock-out", color: "bg-amber-100 text-amber-700" },
+  incomplete_clock: { label: "Incomplete shift (no clock-out)", color: "bg-amber-100 text-amber-700" },
   unassigned: { label: "No DSP assigned", color: "bg-blue-100 text-blue-700" },
   invalid_time: { label: "End before start", color: "bg-purple-100 text-purple-700" },
 };

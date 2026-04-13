@@ -63,6 +63,21 @@ function scheduledEndDateTime(shift: Shift): Date | null {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
 }
 
+/** Parsed scheduled end only when `endTime` parses; otherwise null (matches maintenance API fallback). */
+function parsedScheduledEndOrNull(shift: Shift): Date | null {
+  if (!shift.date || !shift.endTime) return null;
+  const date = parseISO(shift.date);
+  const parsedTime = parseTimeToParts(shift.endTime);
+  if (!parsedTime) return null;
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    parsedTime.hours,
+    parsedTime.minutes,
+  );
+}
+
 function hasInvalidScheduledWindow(shift: Shift): boolean {
   if (!shift.startTime || !shift.endTime) return false;
   const s = parseTimeToParts(shift.startTime);
@@ -75,10 +90,13 @@ function hasInvalidScheduledWindow(shift: Shift): boolean {
 
 function hasIncompleteClockOut(shift: Shift): boolean {
   if (!shift.clockedInAt || shift.clockedOutAt) return false;
-  if (shift.status === ShiftStatus.COMPLETED) return true;
-  const end = scheduledEndDateTime(shift);
-  if (!end) return false;
-  return end.getTime() < Date.now();
+  if (shift.status === ShiftStatus.COMPLETED) return false;
+  if (!shift.date) return false;
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const isPast = shift.date < todayUtc;
+  const endDt = parsedScheduledEndOrNull(shift);
+  const endIsPast = endDt ? Date.now() > endDt.getTime() : isPast;
+  return endIsPast;
 }
 
 function hasNoDspAssigned(shift: Shift): boolean {

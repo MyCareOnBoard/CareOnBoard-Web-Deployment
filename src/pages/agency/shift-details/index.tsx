@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from
 import { useNavigate, useParams } from "react-router";
 import { format, parseISO } from "date-fns";
 import { ArrowLeft, Loader2, StickyNote } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -82,20 +83,23 @@ function shiftDeleteConfirmMessage(shift: Shift): string {
   return `Removes ${clientLabel}'s shift on ${when} from the schedule. This can't be undone.`;
 }
 
-function humanizeShiftStatus(status: ShiftStatus): string {
+function shiftStatusBadgeProps(status: ShiftStatus): {
+  label: string;
+  variant: React.ComponentProps<typeof Badge>["variant"];
+} {
   switch (status) {
     case ShiftStatus.ONGOING:
-      return "Active";
+      return { label: "Active", variant: "success" };
     case ShiftStatus.COMPLETED:
-      return "Completed";
+      return { label: "Completed", variant: "completed" };
     case ShiftStatus.PENDING:
-      return "Pending";
+      return { label: "Pending", variant: "pending" };
     case ShiftStatus.AVAILABLE:
-      return "Available";
+      return { label: "Available", variant: "info" };
     case ShiftStatus.EXPIRED:
-      return "Expired";
+      return { label: "Expired", variant: "expired" };
     default:
-      return status;
+      return { label: String(status), variant: "pending" };
   }
 }
 
@@ -289,6 +293,8 @@ export default function AgencyShiftDetailsPage() {
 
   if (!shift) return null;
 
+  const scheduleStatusBadge = shiftStatusBadgeProps(shift.status);
+
   return (
     <>
       <div className="space-y-5">
@@ -339,71 +345,44 @@ export default function AgencyShiftDetailsPage() {
         </div>
 
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
-          <div className="flex flex-col gap-6 sm:flex-row sm:gap-12">
-            <div className="flex items-center gap-4">
-              <Avatar className="size-[52px] rounded-[8px]">
-                {shift.client?.profileImage && (
-                  <AvatarImage src={shift.client.profileImage} alt={clientName} className="object-cover" />
-                )}
-                <AvatarFallback className="rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white">
-                  {getInitialsFromName(clientName)}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-[16px] font-semibold text-[#10141a]">{clientName}</p>
-                <p className="text-[14px] text-[#808081]">Client</p>
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+            <div className="flex flex-col gap-6 sm:flex-row sm:gap-12">
+              <div className="flex items-center gap-4">
+                <Avatar className="size-[52px] rounded-[8px]">
+                  {shift.client?.profileImage && (
+                    <AvatarImage src={shift.client.profileImage} alt={clientName} className="object-cover" />
+                  )}
+                  <AvatarFallback className="rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white">
+                    {getInitialsFromName(clientName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-[16px] font-semibold text-[#10141a]">{clientName}</p>
+                  <p className="text-[14px] text-[#808081]">Client</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <Avatar className="size-[52px] rounded-[8px]">
+                  {shift.employee?.profilePicture && (
+                    <AvatarImage src={shift.employee.profilePicture} alt={dspName} className="object-cover" />
+                  )}
+                  <AvatarFallback className="rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white">
+                    {getInitialsFromName(dspName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-[16px] font-semibold text-[#10141a]">{dspName}</p>
+                  <p className="text-[14px] text-[#808081]">DSP</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <Avatar className="size-[52px] rounded-[8px]">
-                {shift.employee?.profilePicture && (
-                  <AvatarImage src={shift.employee.profilePicture} alt={dspName} className="object-cover" />
-                )}
-                <AvatarFallback className="rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white">
-                  {getInitialsFromName(dspName)}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-[16px] font-semibold text-[#10141a]">{dspName}</p>
-                <p className="text-[14px] text-[#808081]">DSP</p>
-              </div>
+            <div className="hidden sm:flex sm:shrink-0 sm:items-center sm:justify-end">
+              <Badge variant={scheduleStatusBadge.variant} className="w-fit capitalize">
+                {scheduleStatusBadge.label}
+              </Badge>
             </div>
           </div>
         </div>
-
-        <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
-          <h2 className="mb-2 text-[18px] font-semibold text-[#10141a]">Schedule</h2>
-          <dl>
-            <DetailRow label="Date" value={shift.date ? format(parseISO(shift.date), "MMMM d, yyyy") : "—"} />
-            <DetailRow label="Scheduled start" value={shift.startTime || "—"} />
-            <DetailRow label="Scheduled end" value={shift.endTime || "—"} />
-            <DetailRow label="Location" value={formatShiftLocation(shift.location) || "—"} />
-            <DetailRow label="Status" value={humanizeShiftStatus(shift.status)} />
-            <DetailRow label="Service code" value={shift.serviceCode || "—"} />
-            <DetailRow label="Scheduling type" value={shift.schedulingType || "—"} />
-            <DetailRow label="ISP outcome" value={shift.ispOutcome || "—"} />
-            <DetailRow label="Session duration" value={shift.sessionDuration || "—"} />
-            <DetailRow label="Submission" value={shift.submissionStatus || "—"} />
-          </dl>
-        </div>
-
-        <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
-          <h2 className="mb-2 text-[18px] font-semibold text-[#10141a]">Clock activity</h2>
-          <dl>
-            <DetailRow label="Clock in" value={formatClockValue(shift.clockedInAt)} />
-            <DetailRow label="Clock out" value={formatClockValue(shift.clockedOutAt)} />
-          </dl>
-        </div>
-
-        {(shift.comment || shift.notesType) && (
-          <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
-            <h2 className="mb-2 text-[18px] font-semibold text-[#10141a]">Notes</h2>
-            <dl>
-              {shift.notesType ? <DetailRow label="Note type" value={shift.notesType} /> : null}
-              {shift.comment ? <DetailRow label="Comment" value={shift.comment} /> : null}
-            </dl>
-          </div>
-        )}
 
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -447,6 +426,47 @@ export default function AgencyShiftDetailsPage() {
             </p>
           )}
         </div>
+
+        <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
+          <h2 className="mb-2 text-[18px] font-semibold text-[#10141a]">Schedule</h2>
+          <dl>
+            <DetailRow label="Date" value={shift.date ? format(parseISO(shift.date), "MMMM d, yyyy") : "—"} />
+            <DetailRow label="Scheduled start" value={shift.startTime || "—"} />
+            <DetailRow label="Scheduled end" value={shift.endTime || "—"} />
+            <DetailRow label="Location" value={formatShiftLocation(shift.location) || "—"} />
+            <DetailRow
+              label="Status"
+              value={
+                <Badge variant={scheduleStatusBadge.variant} className="w-fit capitalize">
+                  {scheduleStatusBadge.label}
+                </Badge>
+              }
+            />
+            <DetailRow label="Service code" value={shift.serviceCode || "—"} />
+            <DetailRow label="Scheduling type" value={shift.schedulingType || "—"} />
+            <DetailRow label="ISP outcome" value={shift.ispOutcome || "—"} />
+            <DetailRow label="Session duration" value={shift.sessionDuration || "—"} />
+            <DetailRow label="Submission" value={shift.submissionStatus || "—"} />
+          </dl>
+        </div>
+
+        <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
+          <h2 className="mb-2 text-[18px] font-semibold text-[#10141a]">Clock activity</h2>
+          <dl>
+            <DetailRow label="Clock in" value={formatClockValue(shift.clockedInAt)} />
+            <DetailRow label="Clock out" value={formatClockValue(shift.clockedOutAt)} />
+          </dl>
+        </div>
+
+        {(shift.comment || shift.notesType) && (
+          <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
+            <h2 className="mb-2 text-[18px] font-semibold text-[#10141a]">Notes</h2>
+            <dl>
+              {shift.notesType ? <DetailRow label="Note type" value={shift.notesType} /> : null}
+              {shift.comment ? <DetailRow label="Comment" value={shift.comment} /> : null}
+            </dl>
+          </div>
+        )}
 
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
           <h2 className="mb-4 text-[18px] font-semibold text-[#10141a]">Activity on this shift</h2>

@@ -51,6 +51,92 @@ function shiftAnomalyToStub(a: ShiftAnomaly): Shift {
   } as Shift;
 }
 
+function AnomalyShiftTableSection({
+  title,
+  description,
+  rows,
+  emptyHint,
+  onEditRow,
+}: {
+  title: string;
+  description?: string;
+  rows: ShiftAnomaly[];
+  emptyHint: string;
+  onEditRow: (a: ShiftAnomaly) => void;
+}) {
+  return (
+    <section className="mb-10 last:mb-0">
+      <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+      {description ? (
+        <p className="mt-1 max-w-2xl text-sm text-gray-600">{description}</p>
+      ) : null}
+      {rows.length === 0 ? (
+        <p className="mt-3 text-sm text-gray-500">{emptyHint}</p>
+      ) : (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-gray-500">
+                <th className="pb-3 font-medium">Date</th>
+                <th className="pb-3 font-medium">Time</th>
+                <th className="pb-3 font-medium">DSP</th>
+                <th className="pb-3 font-medium">Client</th>
+                <th className="pb-3 font-medium">Status</th>
+                <th className="pb-3 font-medium">Anomaly</th>
+                <th className="pb-3 font-medium">Fix</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((a) => (
+                <tr key={a.id} className="border-b border-gray-100 transition-colors hover:bg-white/40">
+                  <td className="py-3">{a.date}</td>
+                  <td className="py-3">
+                    {a.startTime || "-"} - {a.endTime || "-"}
+                  </td>
+                  <td className="max-w-[120px] truncate py-3" title={a.employeeId || undefined}>
+                    {anomalyDspLabel(a)}
+                  </td>
+                  <td className="max-w-[120px] truncate py-3" title={a.clientId || undefined}>
+                    {anomalyClientLabel(a)}
+                  </td>
+                  <td className="py-3">
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {a.status}
+                    </Badge>
+                  </td>
+                  <td className="py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {a.anomalyCodes.map((code) => (
+                        <span
+                          key={code}
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${ANOMALY_LABELS[code]?.color || "bg-gray-100 text-gray-600"}`}
+                        >
+                          {ANOMALY_LABELS[code]?.label || code}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="py-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      title="Review and fix this shift"
+                      onClick={() => onEditRow(a)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function useDebounce<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -233,6 +319,16 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
     setAuditsFetched(false);
   };
 
+  const { problemAnomalies, incompleteAnomalies } = useMemo(() => {
+    const problem: ShiftAnomaly[] = [];
+    const incomplete: ShiftAnomaly[] = [];
+    for (const a of anomalies) {
+      if (a.anomalyCodes.includes("incomplete_clock")) incomplete.push(a);
+      else problem.push(a);
+    }
+    return { problemAnomalies: problem, incompleteAnomalies: incomplete };
+  }, [anomalies]);
+
   return (
     <div className="min-h-[calc(100vh-200px)]">
       {/* Page header — match agency client-details pattern */}
@@ -344,64 +440,19 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-left text-gray-500">
-                        <th className="pb-3 font-medium">Date</th>
-                        <th className="pb-3 font-medium">Time</th>
-                        <th className="pb-3 font-medium">DSP</th>
-                        <th className="pb-3 font-medium">Client</th>
-                        <th className="pb-3 font-medium">Status</th>
-                        <th className="pb-3 font-medium">Anomaly</th>
-                        <th className="pb-3 font-medium">Fix</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {anomalies.map((a) => (
-                        <tr key={a.id} className="border-b border-gray-100 hover:bg-white/40 transition-colors">
-                          <td className="py-3">{a.date}</td>
-                          <td className="py-3">{a.startTime || "-"} - {a.endTime || "-"}</td>
-                          <td
-                            className="py-3 truncate max-w-[120px]"
-                            title={a.employeeId || undefined}
-                          >
-                            {anomalyDspLabel(a)}
-                          </td>
-                          <td
-                            className="py-3 truncate max-w-[120px]"
-                            title={a.clientId || undefined}
-                          >
-                            {anomalyClientLabel(a)}
-                          </td>
-                          <td className="py-3">
-                            <Badge variant="outline" className="text-xs capitalize">{a.status}</Badge>
-                          </td>
-                          <td className="py-3">
-                            <div className="flex flex-wrap gap-1">
-                              {a.anomalyCodes.map((code) => (
-                                <span key={code} className={`text-xs px-2 py-0.5 rounded-full font-medium ${ANOMALY_LABELS[code]?.color || "bg-gray-100 text-gray-600"}`}>
-                                  {ANOMALY_LABELS[code]?.label || code}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="py-3">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              title="Review and fix this shift"
-                              onClick={() => setEditShift(a)}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <AnomalyShiftTableSection
+                  title="Flagged issues"
+                  rows={problemAnomalies}
+                  emptyHint="No other flagged issues on this page."
+                  onEditRow={setEditShift}
+                />
+                <AnomalyShiftTableSection
+                  title="Incomplete shifts"
+                  description="Past the scheduled end time, someone clocked in, and there is no clock-out yet."
+                  rows={incompleteAnomalies}
+                  emptyHint="No incomplete shifts on this page."
+                  onEditRow={setEditShift}
+                />
                 <div className="flex items-center justify-between mt-4">
                   <span className="text-xs text-gray-500">Page {anomaliesPage + 1}</span>
                   <div className="flex gap-2">

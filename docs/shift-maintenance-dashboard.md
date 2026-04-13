@@ -2,55 +2,54 @@
 
 ## Overview
 
-A new admin tool that helps Super Admins and Agency administrators identify shift problems, correct scheduling issues, and review a **full shift lifecycle audit** (creation through clock-in/out, status changes, corrections, and deletions).
+A tool for Super Admins and Agency administrators to spot shift problems, fix schedules, and read a full history of what happened on each shift—from creation through clock-in/out, updates, and removals.
 
 ## What's New
 
 ### Shift Maintenance Page
 
-Both Super Admins and Agency admins now have access to a dedicated Shift Maintenance page with two views.
+Both Super Admins and Agency admins get a **Shift Maintenance** area with two tabs.
 
-**Relationship to Activity Log** — For agencies, **Shift Management → Activity Log** already shows recent shift activity, includes filters such as missed or incomplete-style views, and lets you open shift details and edit from there. Shift Maintenance does **not** replace that daily workflow. It adds a focused place to work from **server-checked anomaly rules** over a **date range you choose**, requires a **written reason** when you change or delete a shift, and keeps those actions in a **separate audit history**. Super Admins also get a cross-agency view, which Activity Log does not offer.
+**How it fits with everyday work** — **Shift Management** is where agencies review recent activity and open shifts. **Recent Shifts** on that hub lets you **search by name** (client or caregiver), **filter by day**, and flip **pages** when the list is long. Shift Maintenance adds a **date-range** view driven by **automatic checks** for common problems, and it asks for a **short written reason** when you save a fix so the history stays clear. Super Admins can work across agencies; agencies see only their own shifts.
 
-**Problem shifts** (first tab in the app) — Scans shifts within a selected date range and flags issues such as:
+**Problem shifts** — Lists shifts in the range that match rules such as:
 
-- **Missed shift** — The scheduled window has passed but no one clocked in
-- **No clock-out** — Someone clocked in but never clocked out
-- **No DSP assigned** — A pending shift has no assigned caregiver
-- **End before start** — The scheduled end time is earlier than the start time
+- **Missed shift** — The scheduled time has passed and no one clocked in  
+- **Incomplete shift** — Past the scheduled end, someone clocked in, and there is still no clock-out (shown in its own **Incomplete shifts** block under **Flagged issues** on the same tab)  
+- **No DSP assigned** — Shift has no assigned caregiver  
+- **End before start** — End time is before start time  
 
-From this view, administrators can open a shift and either update it or remove it. Every change or removal done here requires a **short note** that is stored in the activity history.
+Open a row to adjust clock times or completion in one place. You write a **note for the history**, then tap **Update changes** to save. Nothing saves until you do that.
 
-**Activity history** (second tab) — A read-only record of **every action** recorded on a shift, not only admin corrections. The system logs:
+**Activity history** — Read-only list of actions on shifts: created, clocked in/out, status changes, updates, and deletes. Each row shows **when**, **who**, **role**, a **short summary**, and—when someone left one—a **note**. Click the **note icon** to read the full text. This log cannot be edited from the product.
 
-- **Created** — Who created the shift (agency or staff workflows)
-- **Clocked In / Shift Started / Clocked Out** — Who performed the action and relevant times or duration (DSP-facing flows)
-- **Status Change** — When shift status was updated and what it changed from and to
-- **Updated / Deleted** — Administrative corrections and removals; updates still require a written reason when done through maintenance
+### Shift Details Page
 
-Each row shows **when** the event happened, **who** did it, their **role** (for example DSP, Agency, or Super Admin), a short **summary** of what happened, the **shift ID**, and a **note** when one was saved (routine DSP clock-in/out usually has no note). This history cannot be edited or deleted through the product.
+From **Shift Management**, opening a shift’s **Details** gives you the **same kind of editor** for clocks and completion: draft your changes, add the **required note**, then **Update changes**.
+
+The **What needs attention** block lists issues spotted from that shift’s data. **Resolve and fix** opens the same editor. **Edit clock times** in the header does too.
+
+The **Activity on this shift** table matches the maintenance idea: full notes open in a small dialog when you use the note icon.
 
 ### Where to Find It
 
-- **Super Admins** — New "Shift Maintenance" item in the sidebar navigation. Requires the "Shift Maintenance" access permission to be enabled for the admin account.
-- **Agency Admins** — New "Shift maintenance" card on the **Shift Management** hub page, alongside the existing Shifts and Activity Log sections. Use **Back to Shift Management** on the maintenance screen to return to that hub.
+- **Super Admins** — **Shift Maintenance** in the sidebar (needs the Shift Maintenance permission).
+- **Agency Admins** — **Shift maintenance** card on the **Shift Management** hub, next to Shifts. Use **Back to Shift Management** to leave the maintenance screen.
 
 ### Access and Permissions
 
-- Super Admins can view and correct shifts across any agency by selecting an agency
-- Agency admins and staff can only see and correct shifts belonging to their own agency
-- Employees do not have access to this feature
-- All logged shift actions are attributed to the authenticated user who performed them (DSP, agency user, or Super Admin as applicable)
+- Super Admins can pick an agency and work on its shifts.  
+- Agency users only see their agency.  
+- Employees do not use this area.  
+- Actions are recorded under the signed-in user.
 
 ### Agency staff access scopes
 
-Internal users who should reach the Shift Management hub need the **Shift Management** scope on their access list (replacing the former **Scheduling** scope). Existing accounts that still show **Scheduling** in the database keep access until an admin saves their profile again; the app maps the old value to the new label where needed.
+Staff who should use Shift Management need the **Shift Management** scope (the old **Scheduling** label may still appear in some records until a profile is saved again; access is mapped so work keeps working).
 
 ## Security Improvements
 
-As part of this update, several security enhancements were applied to the existing shift system:
-
-- Agency users can no longer view or modify shifts belonging to other agencies
-- A shift's agency assignment can no longer be changed after it is created
-- The audit log is protected from any direct access or tampering outside of the system
-- All maintenance actions are subject to request rate limits to prevent misuse
+- Agency users cannot view or change other agencies’ shifts.  
+- A shift’s agency is fixed after creation.  
+- Audit history is read-only in the app and not exposed for direct editing.  
+- Maintenance-related requests are rate-limited to reduce abuse.
