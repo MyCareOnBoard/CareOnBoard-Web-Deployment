@@ -1,8 +1,15 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { format, parseISO } from "date-fns";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -123,6 +130,12 @@ export default function AgencyShiftDetailsPage() {
 
   const [shiftPendingDelete, setShiftPendingDelete] = useState(false);
   const [isDeletingShift, setIsDeletingShift] = useState(false);
+
+  const [auditNoteModal, setAuditNoteModal] = useState<{
+    reason: string;
+    when: string;
+    who: string;
+  } | null>(null);
 
   const agencyId = user?.agencyId;
 
@@ -326,14 +339,13 @@ export default function AgencyShiftDetailsPage() {
         </div>
 
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
-          <h2 className="mb-4 text-[18px] font-semibold text-[#10141a]">People</h2>
           <div className="flex flex-col gap-6 sm:flex-row sm:gap-12">
             <div className="flex items-center gap-4">
-              <Avatar className="size-[52px] rounded-lg">
+              <Avatar className="size-[52px] rounded-[8px]">
                 {shift.client?.profileImage && (
                   <AvatarImage src={shift.client.profileImage} alt={clientName} className="object-cover" />
                 )}
-                <AvatarFallback className="rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white">
+                <AvatarFallback className="rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white">
                   {getInitialsFromName(clientName)}
                 </AvatarFallback>
               </Avatar>
@@ -343,11 +355,11 @@ export default function AgencyShiftDetailsPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Avatar className="size-[52px] rounded-lg">
+              <Avatar className="size-[52px] rounded-[8px]">
                 {shift.employee?.profilePicture && (
                   <AvatarImage src={shift.employee.profilePicture} alt={dspName} className="object-cover" />
                 )}
-                <AvatarFallback className="rounded-lg bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white">
+                <AvatarFallback className="rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white">
                   {getInitialsFromName(dspName)}
                 </AvatarFallback>
               </Avatar>
@@ -476,7 +488,27 @@ export default function AgencyShiftDetailsPage() {
                           <td className="max-w-[220px] truncate py-3 text-gray-600">
                             {summarizeChanges(a.action, a.changes)}
                           </td>
-                          <td className="max-w-[180px] truncate py-3 text-gray-600">{a.reason || "—"}</td>
+                          <td className="py-3 text-gray-600">
+                            {a.reason ? (
+                              <button
+                                type="button"
+                                className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#10141a] transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 focus-visible:outline-none"
+                                aria-label="View activity note"
+                                title={a.reason}
+                                onClick={() =>
+                                  setAuditNoteModal({
+                                    reason: a.reason!,
+                                    when: formatShiftAuditTimestamp(a.timestamp),
+                                    who: a.actorName || a.actorUid,
+                                  })
+                                }
+                              >
+                                <StickyNote className="size-4 shrink-0" strokeWidth={2} aria-hidden />
+                              </button>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
@@ -539,6 +571,37 @@ export default function AgencyShiftDetailsPage() {
           />
         </Suspense>
       ) : null}
+
+      <Dialog open={auditNoteModal !== null} onOpenChange={(open) => !open && setAuditNoteModal(null)}>
+        <DialogContent className="w-[min(440px,92vw)] gap-0 rounded-[20px] border border-white/30 bg-white p-6 shadow-xl sm:max-w-[440px]">
+          <DialogHeader className="items-start space-y-1 text-left">
+            <DialogTitle className="text-[18px] font-semibold text-[#10141a]">Activity note</DialogTitle>
+            {auditNoteModal ? (
+              <p id="audit-note-context" className="text-[13px] leading-snug text-[#808081]">
+                {auditNoteModal.when} · {auditNoteModal.who}
+              </p>
+            ) : null}
+          </DialogHeader>
+          {auditNoteModal ? (
+            <p
+              className="mt-4 max-h-[min(320px,50vh)] overflow-y-auto text-[14px] leading-relaxed break-words whitespace-pre-wrap text-[#10141a]"
+              aria-describedby="audit-note-context"
+            >
+              {auditNoteModal.reason}
+            </p>
+          ) : null}
+          <DialogFooter className="mt-6 flex w-full flex-row justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full font-semibold"
+              onClick={() => setAuditNoteModal(null)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <DeleteConfirmationModal
         isOpen={shiftPendingDelete}
