@@ -5,7 +5,7 @@ import TimePicker from "@/components/TimePicker";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { searchClients, Client, ClientService, getAgencyClientById } from "@/lib/api/clients";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { searchEmployees, Employee } from "@/lib/api/employees";
+import { searchEmployees, getEmployeeById, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import { Routes } from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -220,6 +220,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   // Debounce refs
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  /** Discards stale async results when the user selects another client quickly. */
+  const latestClientSelectIdRef = useRef<string | null>(null);
 
   // Success / saved modals state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -440,7 +442,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     dspSearchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearchingDsps(true);
-        const results = await searchEmployees(query, agencyId);
+        const results = await searchEmployees(query, agencyId, {
+          workAvailability: true,
+        });
         setDspSearchResults(results);
         setShowDspDropdown(results.length > 0);
       } catch (error) {
@@ -476,17 +480,52 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     return null;
   };
 
-  const handleClientSelect = (client: Client) => {
-    setFormData(prev => ({
+  const handleClientSelect = async (client: Client) => {
+    const selectId = client.id;
+    latestClientSelectIdRef.current = selectId;
+
+    let assignedDsp = client.primaryDsp?.name || "";
+    let assignedDspId = client.primaryDsp?.id || "";
+
+    if (client.primaryDsp?.id) {
+      try {
+        const emp = await getEmployeeById(client.primaryDsp.id);
+        if (latestClientSelectIdRef.current !== selectId) return;
+        if (emp.workAvailability !== true) {
+          assignedDsp = "";
+          assignedDspId = "";
+          toast({
+            title: "Primary DSP unavailable",
+            description:
+              "Primary DSP is currently unavailable, please select another.",
+            variant: "destructive",
+          });
+        }
+      } catch {
+        if (latestClientSelectIdRef.current !== selectId) return;
+        assignedDsp = "";
+        assignedDspId = "";
+        toast({
+          title: "Could not verify primary DSP",
+          description: "Please select a DSP manually.",
+          variant: "destructive",
+        });
+      }
+    }
+
+    if (latestClientSelectIdRef.current !== selectId) return;
+
+    setFormData((prev) => ({
       ...prev,
-      client: client.firstName && client.lastName
-        ? `${client.firstName} ${client.lastName}`
-        : client.id,
+      client:
+        client.firstName && client.lastName
+          ? `${client.firstName} ${client.lastName}`
+          : client.id,
       clientId: client.id,
       clientLocation: getClientPrimaryAddress(client),
       serviceCode: client.services?.[0]?.code || "",
-      assignedDsp: client.primaryDsp?.name || "",
-      assignedDspId: client.primaryDsp?.id || "",
+      assignedDsp,
+      assignedDspId,
       billingRate: client.services?.[0]?.rate || "",
       ispOutcome: client.ispOutcomes || "",
     }));

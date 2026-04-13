@@ -176,10 +176,11 @@ export interface UpdateShiftRequest {
 }
 
 /**
- * Clock In/Out Request Data
+ * Clock In/Out Request Data (server enforces geofence; timestamps are server-generated)
  */
 export interface ClockInRequest {
-    clockedInAt?: string; // Optional, uses current time if not provided
+    latitude: number;
+    longitude: number;
 }
 
 export interface ShiftStartedRequest {
@@ -187,8 +188,8 @@ export interface ShiftStartedRequest {
 }
 
 export interface ClockOutRequest {
-    clockedOutAt?: string; // Optional, uses current time if not provided
-    sessionDuration?: string; // Optional, auto-calculated if not provided
+    latitude: number;
+    longitude: number;
 }
 
 /**
@@ -557,7 +558,7 @@ export const deleteShift = async (shiftId: string): Promise<DeleteShiftResponse>
  */
 export const clockIn = async (
     shiftId: string,
-    data: ClockInRequest = {}
+    data: ClockInRequest,
 ): Promise<ShiftResponse> => {
     try {
         const response = await axiosClient.post<ShiftResponse>(
@@ -609,7 +610,7 @@ export const shiftStarted = async (
  */
 export const clockOut = async (
     shiftId: string,
-    data: ClockOutRequest = {}
+    data: ClockOutRequest,
 ): Promise<ShiftResponse> => {
     try {
         const response = await axiosClient.post<ShiftResponse>(

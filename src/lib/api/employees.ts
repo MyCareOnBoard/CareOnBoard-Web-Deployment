@@ -313,12 +313,17 @@ export async function getEmployeeTrainings(
  * ✅ Search employees
  * Helper function that uses listEmployees with search parameter
  */
-export async function searchEmployees(query: string, agencyId?: string): Promise<Employee[]> {
+export async function searchEmployees(
+  query: string,
+  agencyId?: string,
+  options?: { workAvailability?: boolean },
+): Promise<Employee[]> {
   try {
     const response = await listEmployees({
       search: query,
       agencyId,
       limit: 50,
+      workAvailability: options?.workAvailability,
     });
 
     return response.employees;
