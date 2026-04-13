@@ -586,11 +586,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     clearError("endDate");
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setFormData(prev => ({ ...prev, planOfCare: file }));
-  };
-
   // Handle weekday toggle
   const handleWeekdayToggle = (day: string, dayIndex: number) => {
     const existing = selectedWeekdays.find(w => w.dayIndex === dayIndex);
@@ -834,7 +829,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         } catch (error: any) {
           console.error("Failed to save draft schedule:", error);
           toast({
-            title: "Save Failed",
+            title: error?.response?.data?.code || "Save Failed",
             description: error?.response?.data?.error || "Failed to save draft. Please try again.",
             variant: "destructive",
           });
@@ -872,8 +867,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           });
         } else {
           toast({
-            title: "Save Failed",
-            description: "Failed to save schedule drafts. Please try again.",
+            title: failures[0]?.reason?.response?.data?.code || "Save Failed",
+            description: failures[0]?.reason?.response?.data?.error || "Failed to save schedule drafts. Please try again.",
             variant: "destructive",
           });
           return;
@@ -899,7 +894,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     } catch (error: any) {
       console.error("Failed to save draft schedule:", error);
       toast({
-        title: "Save Failed",
+        title: error?.response?.data?.code || "Save Failed",
         description: error?.response?.data?.error || "Failed to save draft. Please try again.",
         variant: "destructive",
       });
@@ -1137,8 +1132,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           });
         } else {
           toast({
-            title: "Scheduling Failed",
-            description: "Failed to schedule shifts. Please try again.",
+            title: failures[0]?.reason?.response?.data?.code || "Scheduling Failed",
+            description: failures[0]?.reason?.response?.data?.error || "Failed to schedule shifts. Please try again.",
             variant: "destructive",
           });
           return;
@@ -1172,7 +1167,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     } catch (error: any) {
       console.error("Failed to create schedule:", error);
       toast({
-        title: "Scheduling Failed",
+        title: error?.response?.data?.code || "Scheduling Failed",
         description: error?.response?.data?.error || "Failed to create schedule. Please try again.",
         variant: "destructive",
       });
@@ -1235,6 +1230,12 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   {errors.client && (
                     <span className="text-[12px] font-normal text-[#D53411]">{errors.client}</span>
                   )}
+                  {formData.clientId ? (
+                    <span className="text-[12px] font-normal text-[#808081]">
+                      Location:{" "}
+                      {formatShiftLocation(formData.clientLocation) || "Not on file"}
+                    </span>
+                  ) : null}
                   {/* Client Dropdown */}
                   {showClientDropdown && clientSearchResults.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">

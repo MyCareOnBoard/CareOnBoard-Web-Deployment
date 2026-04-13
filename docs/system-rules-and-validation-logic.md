@@ -7,6 +7,18 @@ Plain-language summary of what the platform enforces and validates. No action re
 - Client selection and form state stay consistent when switching clients quickly (no mixed assignments).
 - DSP search is filtered to people marked available for work.
 
+### When saving a shift
+
+- A **client** and a **visit location** (address or map point) are required; the **start time** must be valid.
+- If the **end time** is earlier than the **start time** on the clock, the system treats the visit as ending the **next calendar day** (overnight visit).
+- The **assigned caregiver** must exist, be **available for work**, and—when the shift belongs to an agency—must be **on that same agency**.
+- The **client** must be **active**, the visit **date** must fall within **authorized service dates** for that client (when those are recorded), and the visit must not be **after the client’s contract end** (when one is set).
+- If the client’s record **requires map coordinates** for visits, the saved location must include **valid coordinates**.
+- You cannot save a **duplicate** visit: same caregiver, same day, same start and end, same client.
+- You cannot save a visit that **overlaps in time** with another visit for that caregiver that day that is **not completed or cancelled**.
+- You cannot save a visit that **overlaps** with another **not completed or cancelled** visit for the **same client** with a **different** caregiver that day.
+- You cannot save a visit that **overlaps** a **scheduled or active ride** for that caregiver that day (the system blocks a window around the ride’s start time).
+
 ## Shift management (staff)
 
 ### Geofencing

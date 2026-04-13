@@ -309,7 +309,7 @@ export default function ShiftDetailsModal({
       toast({
         title: "Nothing to update",
         description: "Change the clock times or completion status, or close the window.",
-        variant: "destructive",
+        variant: "warning",
       });
       return;
     }
@@ -327,17 +327,18 @@ export default function ShiftDetailsModal({
         description: "The shift was updated.",
       });
     } catch (e) {
-      console.error(e);
-      toast({
-        title: "Couldn't save changes",
-        description: "Check your connection and try again.",
-        variant: "destructive",
-      });
+      if (typeof e === "object" && e !== null && "response" in e && typeof e.response === "object" && e.response !== null && "data" in e.response) {
+        const errorData = e.response.data as { code?: string; error?: string };
+        toast({
+          title: errorData.code || "Error",
+          description: errorData.error || "An unexpected error occurred",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
-  };
-
+  }
   const showBody = !hydrateFromServer || !loadingFull;
   const canSubmit = Boolean(reason.trim()) && !isSubmitting && resolvedShift;
 
