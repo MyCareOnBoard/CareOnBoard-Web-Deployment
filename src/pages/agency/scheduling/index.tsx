@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Plus,
   ChevronLeft,
@@ -11,10 +11,15 @@ import {
   FileText,
   Pencil,
   Trash2,
+  Search,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { format, isSameDay, parseISO } from "date-fns";
-import { listShifts, deleteShift, Shift, ShiftStatus } from "@/lib/api/shifts";
+import { listShifts, deleteShift, Shift, ShiftStatus, ListShiftsParams } from "@/lib/api/shifts";
+import { listClients } from "@/lib/api/clients";
+import { listEmployees } from "@/lib/api/employees";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
@@ -162,6 +167,19 @@ function shiftDeleteConfirmMessage(shift: Shift): string {
   return `Removes ${clientLabel}'s shift on ${when} from the schedule. This can't be undone.`;
 }
 
+const PERSON_TYPEAHEAD_LIMIT = 10;
+const PERSON_RESULTS_MERGED_MAX = 15;
+const PERSON_SEARCH_DEBOUNCE_MS = 300;
+
+type PersonFilter = { kind: "client" | "dsp"; id: string; label: string };
+
+type PersonSearchRow = { kind: "client" | "dsp"; id: string; label: string };
+
+function clientDisplayName(c: { firstName?: string; lastName?: string }): string {
+  const n = `${c.firstName || ""} ${c.lastName || ""}`.trim();
+  return n || "Unknown client";
+}
+
 export default function SchedulingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -182,7 +200,50 @@ export default function SchedulingPage() {
   // API data states
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
+  const [personFilter, setPersonFilter] = useState<PersonFilter | null>(null);
+  const [personSearchInput, setPersonSearchInput] = useState("");
+  const [personSearchOpen, setPersonSearchOpen] = useState(false);
+  const [personSearchResults, setPersonSearchResults] = useState<PersonSearchRow[]>([]);
+  const [personSearchLoading, setPersonSearchLoading] = useState(false);
+  /** When this equals trimmed query, last fetch finished (for empty state). */
+  const [personSearchSettledKey, setPersonSearchSettledKey] = useState<string | null>(null);
+  const [personSearchTruncated, setPersonSearchTruncated] = useState(false);
+  const personSearchContainerRef = useRef<HTMLDivElement>(null);
   const itemsPerPage = 6;
+
+  const loadShifts = useCallback(async () => {
+    const agencyId = user?.agencyId;
+    if (!agencyId) return;
+
+    try {
+      setLoading(true);
+      const params: ListShiftsParams = {
+        limit: 100,
+        agencyId,
+        client: true,
+        employee: true,
+      };
+      if (personFilter?.kind === "client") params.clientId = personFilter.id;
+      if (personFilter?.kind === "dsp") params.employeeId = personFilter.id;
+
+      const response = await listShifts(params);
+      setShifts(response.shifts || []);
+    } catch (error) {
+      console.error("Failed to fetch shifts:", error);
+      toast({
+        title: "Couldn’t load shifts",
+        description: "Check your connection and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.agencyId, personFilter, toast]);
+
+  useEffect(() => {
+    if (!user?.agencyId) return;
+    void loadShifts();
+  }, [user?.agencyId, loadShifts]);
 
   const handleEdit = (shift: Shift) => {
     setEditFormData(shiftToScheduleFormData(shift));
@@ -236,36 +297,6 @@ export default function SchedulingPage() {
     }
   };
 
-  // Fetch all shifts for activity log
-  useEffect(() => {
-    const fetchShifts = async () => {
-      try {
-        setLoading(true);
-        const response = await listShifts({
-          limit: 100,
-          agencyId: user?.agencyId,
-          client: true,
-          employee: true,
-        });
-        setShifts(response.shifts || []);
-      } catch (error) {
-        console.error("Failed to fetch shifts:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load shifts. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user?.agencyId) {
-      fetchShifts();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.agencyId]);
-
   // Calculate shift statistics
   const shiftStats = useMemo(() => {
     const targetDate = selectedDate || new Date();
@@ -317,16 +348,156 @@ export default function SchedulingPage() {
 
   useEffect(() => {
     setActivityPage(1);
-  }, [selectedDate]);
+  }, [selectedDate, personFilter]);
 
   useEffect(() => {
     setActivityPage((p) => Math.min(Math.max(1, p), totalActivityPages));
   }, [totalActivityPages]);
 
+  useEffect(() => {
+    const agencyId = user?.agencyId;
+    if (!agencyId || personFilter) {
+      setPersonSearchResults([]);
+      setPersonSearchLoading(false);
+      setPersonSearchSettledKey(null);
+      setPersonSearchTruncated(false);
+      return;
+    }
+
+    const q = personSearchInput.trim();
+    if (q.length < 2) {
+      setPersonSearchResults([]);
+      setPersonSearchLoading(false);
+      setPersonSearchSettledKey(null);
+      setPersonSearchTruncated(false);
+      return;
+    }
+
+    const ac = new AbortController();
+    setPersonSearchLoading(true);
+    setPersonSearchSettledKey(null);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const [clientsOutcome, employeesOutcome] = await Promise.allSettled([
+          listClients({
+            search: q,
+            agencyId,
+            limit: PERSON_TYPEAHEAD_LIMIT,
+            signal: ac.signal,
+          }),
+          listEmployees({
+            search: q,
+            agencyId,
+            limit: PERSON_TYPEAHEAD_LIMIT,
+            signal: ac.signal,
+          }),
+        ]);
+
+        if (ac.signal.aborted) return;
+
+        const rows: PersonSearchRow[] = [];
+
+        if (clientsOutcome.status === "fulfilled") {
+          for (const c of clientsOutcome.value) {
+            rows.push({
+              kind: "client",
+              id: c.id,
+              label: clientDisplayName(c),
+            });
+          }
+        }
+
+        if (employeesOutcome.status === "fulfilled") {
+          for (const e of employeesOutcome.value.employees) {
+            rows.push({
+              kind: "dsp",
+              id: e.id,
+              label: e.fullName?.trim() || "Unknown DSP",
+            });
+          }
+        }
+
+        const merged = rows.slice(0, PERSON_RESULTS_MERGED_MAX);
+        setPersonSearchResults(merged);
+        setPersonSearchSettledKey(q);
+        setPersonSearchTruncated(rows.length > PERSON_RESULTS_MERGED_MAX);
+
+        if (
+          clientsOutcome.status === "rejected" &&
+          employeesOutcome.status === "rejected"
+        ) {
+          toast({
+            title: "Couldn’t search directory",
+            description: "Check your connection and try again.",
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        if (ac.signal.aborted) return;
+        console.error("Person search failed:", err);
+        setPersonSearchResults([]);
+        setPersonSearchSettledKey(q);
+        setPersonSearchTruncated(false);
+      } finally {
+        if (!ac.signal.aborted) {
+          setPersonSearchLoading(false);
+        }
+      }
+    }, PERSON_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+      ac.abort();
+    };
+  }, [personSearchInput, user?.agencyId, personFilter, toast]);
+
+  useEffect(() => {
+    if (!personSearchOpen) return;
+    const onDocMouseDown = (ev: MouseEvent) => {
+      const el = personSearchContainerRef.current;
+      if (el && !el.contains(ev.target as Node)) {
+        setPersonSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [personSearchOpen]);
+
   const paginatedShifts = filteredActivityShifts.slice(
     (activityPage - 1) * itemsPerPage,
     activityPage * itemsPerPage
   );
+
+  const clearPersonFilter = useCallback(() => {
+    setPersonFilter(null);
+    setPersonSearchInput("");
+    setPersonSearchResults([]);
+    setPersonSearchSettledKey(null);
+    setPersonSearchTruncated(false);
+    setPersonSearchOpen(false);
+  }, []);
+
+  const selectPersonRow = useCallback((row: PersonSearchRow) => {
+    setPersonFilter((prev) => {
+      if (prev?.id === row.id && prev.kind === row.kind) return prev;
+      return { kind: row.kind, id: row.id, label: row.label };
+    });
+    setPersonSearchInput(row.label);
+    setPersonSearchOpen(false);
+    setPersonSearchResults([]);
+    setPersonSearchSettledKey(null);
+    setPersonSearchTruncated(false);
+  }, []);
+
+  const personSearchTrimmed = personSearchInput.trim();
+  const showPersonDropdown =
+    personSearchOpen &&
+    !personFilter &&
+    personSearchTrimmed.length >= 2 &&
+    (personSearchLoading ||
+      personSearchResults.length > 0 ||
+      (personSearchSettledKey === personSearchTrimmed && !personSearchLoading));
 
   return (
     <>
@@ -372,7 +543,8 @@ export default function SchedulingPage() {
                   Shifts ({shiftStats.date})
                 </h2>
                 <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                  Shifts data of {shiftStats.date}
+                  Scheduled shifts on {shiftStats.date}
+                  {personFilter ? ` · ${personFilter.label}` : ""}
                 </p>
               </div>
 
@@ -446,16 +618,106 @@ export default function SchedulingPage() {
       {/* Recent shifts */}
       <div className="mt-5 rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
         <div>
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 flex-1">
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1 basis-full lg:basis-[min(100%,240px)]">
               <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
                 Recent Shifts
               </h2>
               <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                Recent clock-in and clock-out activity. Pick a day with the calendar filter, or open the full log to search older shifts.
+                Filter by date, search for a client or DSP to narrow the list.
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-2 self-start sm:mt-0.5">
+
+            <div
+              ref={personSearchContainerRef}
+              className="relative w-full max-w-md flex-1 lg:mx-2 lg:min-w-[220px]"
+            >
+              <div className="relative flex items-center gap-1">
+                <Search className="pointer-events-none absolute left-3 size-4 text-[#808081]" aria-hidden />
+                <Input
+                  type="search"
+                  autoComplete="off"
+                  placeholder="Search by client or DSP name"
+                  aria-label="Search by client or DSP name to filter shifts"
+                  aria-expanded={showPersonDropdown}
+                  aria-controls="recent-shifts-person-results"
+                  aria-autocomplete="list"
+                  role="combobox"
+                  value={personSearchInput}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (personFilter) {
+                      setPersonFilter(null);
+                      setPersonSearchInput(v);
+                      setPersonSearchOpen(true);
+                      return;
+                    }
+                    setPersonSearchInput(v);
+                  }}
+                  onFocus={(e) => {
+                    if (personFilter) {
+                      (e.target as HTMLInputElement).select();
+                      return;
+                    }
+                    setPersonSearchOpen(true);
+                  }}
+                  className="h-10 rounded-full border-[rgba(255,255,255,0.5)] bg-[rgba(255,255,255,0.5)] pl-9 pr-10 text-[14px] font-medium shadow-sm"
+                />
+                {personFilter ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 size-8 shrink-0 rounded-full text-[#10141a] hover:bg-black/[0.06]"
+                    aria-label="Clear person filter and show all shifts"
+                    onClick={clearPersonFilter}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                ) : null}
+              </div>
+              {showPersonDropdown ? (
+                <div
+                  id="recent-shifts-person-results"
+                  role="listbox"
+                  className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-[min(320px,70vh)] overflow-auto rounded-xl border border-white/40 bg-[#FFFFFFF2] py-1 shadow-lg backdrop-blur-md"
+                >
+                  {personSearchLoading && personSearchResults.length === 0 ? (
+                    <div className="flex items-center justify-center gap-2 py-6 text-[14px] text-[#808081]">
+                      <Loader2 className="size-4 animate-spin text-[#00b4b8]" aria-hidden />
+                      Searching…
+                    </div>
+                  ) : null}
+                  {personSearchResults.map((row) => (
+                    <button
+                      key={`${row.kind}-${row.id}`}
+                      type="button"
+                      role="option"
+                      className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-left text-[14px] hover:bg-black/[0.06]"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectPersonRow(row)}
+                    >
+                      <span className="min-w-0 truncate font-medium text-[#10141a]">{row.label}</span>
+                      <span className="shrink-0 rounded-full bg-black/[0.06] px-2 py-0.5 text-[12px] font-semibold text-[#808081]">
+                        {row.kind === "client" ? "Client" : "DSP"}
+                      </span>
+                    </button>
+                  ))}
+                  {!personSearchLoading &&
+                  personSearchSettledKey === personSearchTrimmed &&
+                  personSearchResults.length === 0 ? (
+                    <p className="px-3 py-4 text-center text-[14px] text-[#808081]">No matches</p>
+                  ) : null}
+                  {personSearchTruncated ? (
+                    <p className="border-t border-[#e5e5e6] px-3 py-2 text-[12px] text-[#808081]">
+                      Keep typing to narrow results.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex shrink-0 flex-wrap items-center gap-2 self-start">
               <Popover
                 open={calendarOpen}
                 onOpenChange={(open) => {
@@ -522,16 +784,6 @@ export default function SchedulingPage() {
                   ) : null}
                 </PopoverContent>
               </Popover>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => navigate(Routes.agency.activityLogs)}
-                className="size-10 shrink-0 rounded-full border-[rgba(255,255,255,0.5)] bg-[rgba(255,255,255,0.5)] shadow-sm hover:bg-white/80"
-                aria-label="Open full activity log: search and browse all shift history"
-              >
-                <ArrowUpRight className="size-4 text-[#10141a]" />
-              </Button>
             </div>
           </div>
 
@@ -545,10 +797,16 @@ export default function SchedulingPage() {
               <div className="flex items-center justify-center py-8 px-4 text-center">
                 <p className="text-[14px] text-[#808081] max-w-md">
                   {shifts.length === 0
-                    ? "No shifts yet. Add a schedule to get started."
+                    ? personFilter
+                      ? `No shifts for ${personFilter.label}. Clear the person filter or pick another name.`
+                      : "No shifts yet. Add a schedule to get started."
+                    : selectedDate && personFilter
+                      ? `No shifts for ${personFilter.label} on ${format(selectedDate, "MMMM d, yyyy")}. Try another date, clear the person filter, or open the calendar and choose Show all days.`
                     : selectedDate
                       ? `No shifts on ${format(selectedDate, "MMMM d, yyyy")}. Try another date, or open the calendar filter and choose Show all days.`
-                      : "No shifts to show."}
+                      : personFilter
+                        ? `No shifts for ${personFilter.label} in this list. Clear the filter or try another name.`
+                        : "No shifts to show."}
                 </p>
               </div>
             ) : (
@@ -752,7 +1010,7 @@ export default function SchedulingPage() {
           setEditFormData(null);
           setModalMode("create");
         }}
-        onShiftsUpdated={(updatedShifts) => setShifts(updatedShifts)}
+        onShiftsUpdated={() => void loadShifts()}
         editData={editFormData}
         mode={modalMode}
       />
@@ -763,12 +1021,7 @@ export default function SchedulingPage() {
           setShowShiftDetails(false);
           setSelectedShift(null);
         }}
-        onShiftUpdated={(updatedShift) =>
-          setShifts((prev) => prev.map((shift) => (shift.id === updatedShift.id ? updatedShift : shift)))
-        }
-        onShiftDeleted={(shiftId) =>
-          setShifts((prev) => prev.filter((shift) => shift.id !== shiftId))
-        }
+        onShiftUpdated={(_updated) => void loadShifts()}
       />
       <DeleteConfirmationModal
         isOpen={!!shiftPendingDelete}

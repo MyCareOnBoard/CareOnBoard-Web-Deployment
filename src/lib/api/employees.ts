@@ -84,6 +84,7 @@ export interface ListEmployeesParams {
   search?: string;
   limit?: number;
   page?: number;
+  signal?: AbortSignal;
 }
 
 /**
@@ -185,6 +186,7 @@ export async function listEmployees(params?: ListEmployeesParams): Promise<ListE
         limit: params?.limit || 50,
         page: params?.page,
       },
+      signal: params?.signal,
     });
 
     if (!response.data.success) {

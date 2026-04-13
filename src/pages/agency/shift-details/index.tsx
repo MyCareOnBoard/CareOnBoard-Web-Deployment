@@ -14,7 +14,6 @@ import {
   getShiftById,
   Shift,
   ShiftStatus,
-  ShiftType,
   type ShiftAuditRecord,
 } from "@/lib/api/shifts";
 import { shiftToAnomalyRecord } from "@/lib/shift-anomaly-detection";
@@ -30,7 +29,6 @@ import {
 } from "@/pages/shared/shift-maintenance/audit-display";
 
 const AddScheduleModal = lazy(() => import("@/pages/agency/scheduling/components/AddScheduleModal"));
-const ShiftCorrectionModal = lazy(() => import("@/pages/shared/shift-maintenance/ShiftCorrectionModal"));
 const ShiftDetailsModal = lazy(() => import("@/components/ShiftDetailsModal"));
 
 const AUDIT_PAGE_SIZE = 25;
@@ -120,8 +118,6 @@ export default function AgencyShiftDetailsPage() {
 
   const [showAddScheduleModal, setShowAddScheduleModal] = useState(false);
   const [editFormData, setEditFormData] = useState<ScheduleFormData | null>(null);
-
-  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
 
   const [showShiftDetailsModal, setShowShiftDetailsModal] = useState(false);
 
@@ -317,7 +313,7 @@ export default function AgencyShiftDetailsPage() {
               className="rounded-full border-[rgba(255,255,255,0.5)] bg-white px-4 font-semibold text-[#10141a] shadow-sm hover:bg-white/90"
               onClick={() => setShowShiftDetailsModal(true)}
             >
-              Clock times & notes
+              Edit clock times
             </Button>
             <Button
               type="button"
@@ -371,13 +367,6 @@ export default function AgencyShiftDetailsPage() {
             <DetailRow label="Scheduled end" value={shift.endTime || "—"} />
             <DetailRow label="Location" value={formatShiftLocation(shift.location) || "—"} />
             <DetailRow label="Status" value={humanizeShiftStatus(shift.status)} />
-            <DetailRow label="Type" value={shift.type === ShiftType.MANUAL ? "Manual" : "Automatic"} />
-            <DetailRow
-              label="Approval"
-              value={
-                shift.approved === true ? "Approved" : shift.approved === false ? "Not approved" : "—"
-              }
-            />
             <DetailRow label="Service code" value={shift.serviceCode || "—"} />
             <DetailRow label="Scheduling type" value={shift.schedulingType || "—"} />
             <DetailRow label="ISP outcome" value={shift.ispOutcome || "—"} />
@@ -413,9 +402,9 @@ export default function AgencyShiftDetailsPage() {
                 variant="outline"
                 size="sm"
                 className="w-fit rounded-full"
-                onClick={() => setShowCorrectionModal(true)}
+                onClick={() => setShowShiftDetailsModal(true)}
               >
-                Review and fix
+                Resolve and fix
               </Button>
             ) : null}
           </div>
@@ -432,7 +421,9 @@ export default function AgencyShiftDetailsPage() {
             </div>
           ) : (
             <p className="text-[14px] text-[#808081]">
-              Nothing stands out from this shift&apos;s schedule and clock times. For agency-wide flagged shifts, open{" "}
+              Nothing stands out from this shift&apos;s schedule and clock times. Use{" "}
+              <span className="font-semibold text-[#10141a]">Edit clock times</span> above to adjust clocks or
+              completion. For agency-wide flagged shifts, open{" "}
               <button
                 type="button"
                 className="font-semibold text-[#10141a] underline underline-offset-2"
@@ -533,33 +524,17 @@ export default function AgencyShiftDetailsPage() {
         </Suspense>
       )}
 
-      {showCorrectionModal && derivedAnomaly && agencyId ? (
-        <Suspense fallback={null}>
-          <ShiftCorrectionModal
-            shift={derivedAnomaly}
-            agencyId={agencyId}
-            onClose={() => setShowCorrectionModal(false)}
-            onComplete={() => {
-              setShowCorrectionModal(false);
-              refetchShiftAndRelated({ silent: true });
-            }}
-          />
-        </Suspense>
-      ) : null}
-
       {showShiftDetailsModal ? (
         <Suspense fallback={null}>
           <ShiftDetailsModal
             isOpen={showShiftDetailsModal}
             shift={shift}
+            anomalyCodes={derivedAnomaly?.anomalyCodes ?? []}
+            hydrateFromServer={false}
             onClose={() => setShowShiftDetailsModal(false)}
             onShiftUpdated={(updated) => {
               setShift(updated);
               void refetchShiftAndRelated({ silent: true });
-            }}
-            onShiftDeleted={() => {
-              setShowShiftDetailsModal(false);
-              navigate(Routes.agency.scheduling);
             }}
           />
         </Suspense>

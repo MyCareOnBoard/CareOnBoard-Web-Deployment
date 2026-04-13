@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   fetchShiftAnomalies,
   fetchShiftMaintenanceAudit,
+  type Shift,
   type ShiftAnomaly,
   type ShiftAuditRecord,
 } from "@/lib/api/shifts";
@@ -34,7 +35,21 @@ import {
   summarizeChanges,
 } from "@/pages/shared/shift-maintenance/audit-display";
 
-const ShiftCorrectionModal = lazy(() => import("./ShiftCorrectionModal"));
+const ShiftDetailsModal = lazy(() => import("@/components/ShiftDetailsModal"));
+
+function shiftAnomalyToStub(a: ShiftAnomaly): Shift {
+  return {
+    id: a.id,
+    date: a.date,
+    startTime: a.startTime ?? undefined,
+    endTime: a.endTime ?? undefined,
+    status: a.status,
+    employeeId: a.employeeId,
+    clientId: a.clientId,
+    assignedDsp: a.assignedDsp,
+    clientName: a.clientName,
+  } as Shift;
+}
 
 function useDebounce<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -499,17 +514,19 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
         )}
       </div>
 
-      {/* Lazy-loaded correction modal */}
-      {editShift && (
+      {editShift ? (
         <Suspense fallback={null}>
-          <ShiftCorrectionModal
-            shift={editShift}
+          <ShiftDetailsModal
+            isOpen
+            shift={shiftAnomalyToStub(editShift)}
+            anomalyCodes={editShift.anomalyCodes}
+            hydrateFromServer
             agencyId={resolvedAgencyId || ""}
             onClose={() => setEditShift(null)}
-            onComplete={handleCorrectionComplete}
+            onMaintenanceComplete={handleCorrectionComplete}
           />
         </Suspense>
-      )}
+      ) : null}
     </div>
   );
 }

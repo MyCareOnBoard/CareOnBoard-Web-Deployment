@@ -523,9 +523,6 @@ export default function ActivityLogsPage() {
         onShiftUpdated={(updatedShift) =>
           setShifts((prev) => prev.map((shift) => (shift.id === updatedShift.id ? updatedShift : shift)))
         }
-        onShiftDeleted={(shiftId) =>
-          setShifts((prev) => prev.filter((shift) => shift.id !== shiftId))
-        }
       />
     </>
   );

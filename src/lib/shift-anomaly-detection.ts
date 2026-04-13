@@ -109,7 +109,7 @@ function clientDisplayName(shift: Shift): string | null {
 }
 
 /**
- * Build a {@link ShiftAnomaly} for {@link ShiftCorrectionModal} when any codes apply.
+ * Build a {@link ShiftAnomaly} for {@link ShiftDetailsModal} (badges) when any codes apply.
  */
 export function shiftToAnomalyRecord(shift: Shift): ShiftAnomaly | null {
   const anomalyCodes = detectShiftAnomalyCodes(shift);

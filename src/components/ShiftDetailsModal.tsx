@@ -1,25 +1,35 @@
-import React, { useState, useEffect } from "react";
-import { AlertCircle, CheckCircle2, X } from "lucide-react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { AlertCircle, CheckCircle2, Loader2, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { deleteShift, updateShift, Shift, ShiftStatus, formatShiftLocation } from "@/lib/api/shifts";
+import {
+  updateShift,
+  getShiftById,
+  Shift,
+  ShiftStatus,
+  formatShiftLocation,
+  type AnomalyCode,
+} from "@/lib/api/shifts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
-import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import TimePicker from "@/components/TimePicker";
+import { ANOMALY_LABELS } from "@/pages/shared/shift-maintenance/audit-display";
+
+const REASON_MAX = 500;
 
 type ShiftDetailsModalProps = {
   isOpen: boolean;
   onClose: () => void;
   shift: Shift | null;
-  onSendNotification?: (shift: Shift) => void;
-  onMessage?: (shift: Shift) => void;
-  onCall?: (shift: Shift) => void;
-  onMarkCompleted?: (shift: Shift) => void;
-  onDelete?: (shift: Shift) => void;
-  onAssignManual?: (shift: Shift) => void;
+  /** Shown as badges; missed callout copy prefers anomaly list when this includes `missed`. */
+  anomalyCodes?: AnomalyCode[];
+  /** When true, load full shift (client/employee) via `getShiftById` using `agencyId`. */
+  hydrateFromServer?: boolean;
+  agencyId?: string;
   onShiftUpdated?: (shift: Shift) => void;
-  onShiftDeleted?: (shiftId: string) => void;
+  /** e.g. shift maintenance: refresh list after a successful save. */
+  onMaintenanceComplete?: () => void;
 };
 
 const getInitialsFromName = (name: string) => {
@@ -29,29 +39,23 @@ const getInitialsFromName = (name: string) => {
   return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
 };
 
-const getShiftDateLabel = (shift: Shift) => {
-  if (!shift.date) return "-";
+const getShiftDateLabel = (s: { date?: string }) => {
+  if (!s.date) return "-";
   try {
-    return format(parseISO(shift.date), "d MMMM yyyy");
+    return format(parseISO(s.date), "d MMMM yyyy");
   } catch {
-    return shift.date;
+    return s.date;
   }
 };
 
-/** Safely format clock time for display. Handles string, Date, or Firestore timestamp. Never returns an object. */
-const formatClockTime = (value: unknown): string => {
-  if (value == null) return "--------";
+function parseClockToDate(value: unknown): Date | null {
+  if (value == null) return null;
   if (typeof value === "string") {
-    if (value.includes("AM") || value.includes("PM")) return value;
-    try {
-      const d = new Date(value);
-      return Number.isNaN(d.getTime()) ? "--------" : format(d, "h:mm a");
-    } catch {
-      return "--------";
-    }
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
   }
   if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? "--------" : format(value, "h:mm a");
+    return Number.isNaN(value.getTime()) ? null : value;
   }
   if (typeof value === "object" && value !== null) {
     const obj = value as Record<string, unknown>;
@@ -60,35 +64,63 @@ const formatClockTime = (value: unknown): string => {
       const ns = (obj._nanoseconds ?? obj.nanoseconds ?? 0) as number;
       const ms = seconds * 1000 + (typeof ns === "number" ? ns / 1_000_000 : 0);
       const d = new Date(ms);
-      return Number.isNaN(d.getTime()) ? "--------" : format(d, "h:mm a");
+      return Number.isNaN(d.getTime()) ? null : d;
     }
   }
-  return "--------";
-};
+  return null;
+}
+
+/** Match legacy save: UTC time-of-day from stored clock matches draft HH:mm from TimePicker. */
+function clockedAtToHHmm(value: unknown): string {
+  const d = parseClockToDate(value);
+  if (!d) return "";
+  const h = d.getUTCHours();
+  const m = d.getUTCMinutes();
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function hhmmToIso(hhmm: string, shiftDateStr: string | undefined): string | null {
+  if (!hhmm || !/^\d{2}:\d{2}$/.test(hhmm)) return null;
+  const [hStr, mStr] = hhmm.split(":");
+  const hours = parseInt(hStr, 10);
+  const minutes = parseInt(mStr, 10);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+  const shiftDate = shiftDateStr ? parseISO(shiftDateStr) : new Date();
+  return new Date(
+    Date.UTC(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(), hours, minutes, 0, 0)
+  ).toISOString();
+}
+
+/** 12h label for a draft HH:mm (matches TimePicker display, no timezone shift). */
+function formatDraftHHmmLabel(hhmm: string): string {
+  const m = hhmm.match(/^(\d{2}):(\d{2})$/);
+  if (!m) return "--------";
+  const hour24 = parseInt(m[1], 10);
+  const min = m[2];
+  const displayHour = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+  const displayPeriod = hour24 >= 12 ? "PM" : "AM";
+  return `${String(displayHour).padStart(2, "0")}:${min} ${displayPeriod}`;
+}
 
 const parseTimeToParts = (time: string): { hours: number; minutes: number } | null => {
   const match = time.match(/(\d{1,2})[.:](\d{2})[:]?([AaPp][Mm])/);
   if (!match) return null;
-
   let hours = parseInt(match[1], 10);
   const minutes = parseInt(match[2], 10);
   const period = match[3].toUpperCase();
   if (period === "PM" && hours !== 12) hours += 12;
   if (period === "AM" && hours === 12) hours = 0;
-
   return { hours, minutes };
 };
 
-const isShiftMissed = (shift: Shift): boolean => {
-  if (shift.status === ShiftStatus.COMPLETED) return false;
-  if (shift.clockedInAt) return false;
-  if (!shift.date) return false;
-
-  const date = parseISO(shift.date);
+const isShiftMissed = (s: Shift): boolean => {
+  if (s.status === ShiftStatus.COMPLETED) return false;
+  if (s.clockedInAt) return false;
+  if (!s.date) return false;
+  const date = parseISO(s.date);
   let endDateTime: Date;
-
-  if (shift.endTime) {
-    const parsedTime = parseTimeToParts(shift.endTime);
+  if (s.endTime) {
+    const parsedTime = parseTimeToParts(s.endTime);
     if (parsedTime) {
       endDateTime = new Date(
         date.getFullYear(),
@@ -98,439 +130,399 @@ const isShiftMissed = (shift: Shift): boolean => {
         parsedTime.minutes
       );
     } else {
-      // If endTime exists but can't be parsed, use end of day
-      endDateTime = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        23,
-        59,
-        59
-      );
+      endDateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
     }
   } else {
-    // If no endTime, use end of day
-    endDateTime = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      23,
-      59,
-      59
-    );
+    endDateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
   }
-
   return endDateTime.getTime() < Date.now();
 };
 
-const getStatusCallout = (shift: Shift) => {
-  if (isShiftMissed(shift)) {
+function getStatusCallout(s: Shift, codes: AnomalyCode[]) {
+  if (codes.includes("missed")) {
     return {
       tone: "missed" as const,
       title: "Missed",
-      description: "This shift marked as missed as it doesn't have any clock out time",
+      description: "This shift was missed — no one clocked in before the scheduled time passed.",
     };
   }
-
-  if (shift.status === ShiftStatus.COMPLETED) {
+  if (isShiftMissed(s)) {
+    return {
+      tone: "missed" as const,
+      title: "Missed",
+      description: "This shift was missed — no one clocked in before the scheduled time passed.",
+    };
+  }
+  if (s.status === ShiftStatus.COMPLETED) {
     return {
       tone: "completed" as const,
       title: "Completed",
-      description: "This shift marked as completed.",
+      description: "This shift was marked as completed.",
     };
   }
-
   return null;
-};
+}
 
 export default function ShiftDetailsModal({
   isOpen,
   onClose,
   shift,
-  onSendNotification,
-  onMessage,
-  onCall,
-  onMarkCompleted,
-  onDelete,
-  onAssignManual,
+  anomalyCodes = [],
+  hydrateFromServer = false,
+  agencyId,
   onShiftUpdated,
-  onShiftDeleted,
+  onMaintenanceComplete,
 }: ShiftDetailsModalProps) {
-  if (!isOpen || !shift) return null;
-
   const { toast } = useToast();
   const { user } = useAuth();
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isSavingTime, setIsSavingTime] = useState(false);
-  const [currentShift, setCurrentShift] = useState<Shift>(shift);
-  const [commentInput, setCommentInput] = useState("");
-  const [isSavingComment, setIsSavingComment] = useState(false);
 
-  // Update currentShift when shift prop changes
+  const [fetchedShift, setFetchedShift] = useState<Shift | null>(null);
+  const [loadingFull, setLoadingFull] = useState(false);
+
+  const [draftClockIn, setDraftClockIn] = useState("");
+  const [draftClockOut, setDraftClockOut] = useState("");
+  const [draftCompleted, setDraftCompleted] = useState(false);
+  const [reason, setReason] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const shiftRef = useRef(shift);
+  shiftRef.current = shift;
+
+  const shiftResetKey = shift
+    ? `${shift.id}|${String(shift.clockedInAt)}|${String(shift.clockedOutAt)}|${shift.status}`
+    : "";
+
+  const resolvedShift = useMemo(() => {
+    if (!shift) return null;
+    return fetchedShift ?? shift;
+  }, [shift, fetchedShift]);
+
+  const resetDraftsFromShift = useCallback((s: Shift) => {
+    setDraftClockIn(clockedAtToHHmm(s.clockedInAt));
+    setDraftClockOut(clockedAtToHHmm(s.clockedOutAt));
+    setDraftCompleted(s.status === ShiftStatus.COMPLETED);
+  }, []);
+
   useEffect(() => {
-    if (shift) {
-      setCurrentShift(shift);
-      setCommentInput(shift.comment || "");
+    if (!isOpen) return;
+    const s = shiftRef.current;
+    if (!s) return;
+
+    let cancelled = false;
+    setFetchedShift(null);
+    setReason("");
+
+    if (hydrateFromServer && agencyId) {
+      setLoadingFull(true);
+      getShiftById(s.id, { agencyId, client: true, employee: true })
+        .then((res) => {
+          if (!cancelled) {
+            setFetchedShift(res.shift);
+            resetDraftsFromShift(res.shift);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            toast({
+              title: "Couldn't load shift details",
+              description: "We loaded the basics. Some fields may be empty.",
+              variant: "destructive",
+            });
+            resetDraftsFromShift(s);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoadingFull(false);
+        });
+    } else {
+      setLoadingFull(false);
+      resetDraftsFromShift(s);
     }
-  }, [shift]);
 
-  const dspName = currentShift.employee?.fullName || "Unknown DSP";
-  const clientName = currentShift.client
-    ? `${currentShift.client.firstName || ""} ${currentShift.client.lastName || ""}`.trim() || "Unknown Client"
-    : "Unknown Client";
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, shiftResetKey, hydrateFromServer, agencyId, toast, resetDraftsFromShift]);
 
-  const callout = getStatusCallout(currentShift);
-  const canMarkCompleted = currentShift.status !== ShiftStatus.COMPLETED;
+  if (!isOpen || !shift) return null;
 
-  const handleMarkCompleted = async () => {
-    if (!canMarkCompleted || isUpdating) return;
-    setIsUpdating(true);
-    try {
-      const trimmedComment = commentInput.trim();
-      const currentComment = (currentShift.comment || "").trim();
-      const hasUnsavedComment = trimmedComment && trimmedComment !== currentComment;
+  const dspName =
+    resolvedShift?.employee?.fullName ||
+    resolvedShift?.assignedDsp ||
+    "Unknown DSP";
+  const clientExtra = resolvedShift
+    ? (resolvedShift as unknown as { clientName?: string | null; clientId?: string | null })
+    : null;
+  const clientName = resolvedShift?.client
+    ? `${resolvedShift.client.firstName || ""} ${resolvedShift.client.lastName || ""}`.trim() || "Unknown Client"
+    : clientExtra?.clientName || clientExtra?.clientId || "Unknown Client";
 
-      const payload: {
-        status: ShiftStatus;
-        actionStatus: null;
-        completedBy?: string;
-        comment?: string;
-        commentedBy?: string;
-      } = {
-        status: ShiftStatus.COMPLETED,
-        actionStatus: null,
-        completedBy: user?.uid || undefined,
-      };
-      if (hasUnsavedComment) {
-        payload.comment = trimmedComment;
-        payload.commentedBy = user?.uid || undefined;
+  const callout = resolvedShift ? getStatusCallout(resolvedShift, anomalyCodes) : null;
+
+  const handleUpdateChanges = async () => {
+    if (!resolvedShift || !reason.trim()) {
+      toast({
+        title: "Add a short note",
+        description: "Explain why you're saving these changes so others can follow the activity history.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const maintenanceReason = reason.trim();
+    const serverIn = clockedAtToHHmm(resolvedShift.clockedInAt);
+    const serverOut = clockedAtToHHmm(resolvedShift.clockedOutAt);
+    const inNorm = draftClockIn.trim();
+    const outNorm = draftClockOut.trim();
+    const serverCompleted = resolvedShift.status === ShiftStatus.COMPLETED;
+
+    const payload: Parameters<typeof updateShift>[1] = {
+      maintenanceReason,
+    };
+
+    if (inNorm !== serverIn) {
+      const iso = hhmmToIso(inNorm, resolvedShift.date);
+      if (iso) payload.clockedInAt = iso;
+    }
+    if (outNorm !== serverOut) {
+      const iso = hhmmToIso(outNorm, resolvedShift.date);
+      if (iso) payload.clockedOutAt = iso;
+    }
+
+    if (draftCompleted !== serverCompleted) {
+      if (draftCompleted) {
+        payload.status = ShiftStatus.COMPLETED;
+        payload.actionStatus = null;
+        payload.completedBy = user?.uid ?? undefined;
+      } else {
+        // Backend may reject; if so, constrain UI later.
+        payload.status = ShiftStatus.AVAILABLE;
+        payload.actionStatus = null;
       }
+    }
 
-      const response = await updateShift(currentShift.id, payload);
-      setCurrentShift(response.shift);
-      setCommentInput(response.shift.comment || "");
-      onShiftUpdated?.(response.shift);
-      onMarkCompleted?.(response.shift);
+    const hasClockOrStatusChange =
+      inNorm !== serverIn ||
+      outNorm !== serverOut ||
+      draftCompleted !== serverCompleted;
+    if (!hasClockOrStatusChange && Object.keys(payload).length === 1) {
       toast({
-        title: "Shift updated",
-        description: "Shift marked as completed.",
-      });
-    } catch (error) {
-      console.error("Failed to mark shift completed:", error);
-      toast({
-        title: "Error",
-        description: "Failed to mark shift as completed.",
+        title: "Nothing to update",
+        description: "Change the clock times or completion status, or close the window.",
         variant: "destructive",
       });
-    } finally {
-      setIsUpdating(false);
+      return;
     }
-  };
 
-  const handleSaveComment = async () => {
-    if (!commentInput.trim() || isSavingComment) return;
-    setIsSavingComment(true);
+    setIsSubmitting(true);
     try {
-      const response = await updateShift(currentShift.id, {
-        comment: commentInput.trim(),
-        commentedBy: user?.uid || undefined,
-      });
-      setCurrentShift(response.shift);
+      const response = await updateShift(resolvedShift.id, payload);
+      if (hydrateFromServer) setFetchedShift(response.shift);
+      resetDraftsFromShift(response.shift);
+      setReason("");
       onShiftUpdated?.(response.shift);
+      onMaintenanceComplete?.();
       toast({
-        title: "Comment saved",
-        description: "Shift comment has been updated.",
+        title: "Changes saved",
+        description: "The shift was updated.",
       });
-    } catch (error) {
-      console.error("Failed to save comment:", error);
+    } catch (e) {
+      console.error(e);
       toast({
-        title: "Error",
-        description: "Failed to save comment.",
+        title: "Couldn't save changes",
+        description: "Check your connection and try again.",
         variant: "destructive",
       });
     } finally {
-      setIsSavingComment(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleDeleteClick = () => {
-    setShowDeleteConfirm(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (isDeleting) return;
-    setIsDeleting(true);
-    try {
-      await deleteShift(currentShift.id);
-      onShiftDeleted?.(currentShift.id);
-      onDelete?.(currentShift);
-      toast({
-        title: "Shift deleted",
-        description: "The shift was deleted successfully.",
-      });
-      setShowDeleteConfirm(false);
-      onClose();
-    } catch (error) {
-      console.error("Failed to delete shift:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete shift.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleNotImplemented = (label: string) => {
-    toast({
-      title: "Coming soon",
-      description: `${label} action is not wired yet.`,
-    });
-  };
-
-  const handleTimeUpdate = async (field: "clockedInAt" | "clockedOutAt", timeValue: string) => {
-    if (isSavingTime) return;
-    setIsSavingTime(true);
-    try {
-      // Build an ISO string by combining the shift date with the picked time
-      const shiftDate = currentShift.date ? parseISO(currentShift.date) : new Date();
-      const [hours, minutes] = timeValue.split(":").map(Number);
-      const combined = new Date(Date.UTC(
-        shiftDate.getFullYear(),
-        shiftDate.getMonth(),
-        shiftDate.getDate(),
-        hours,
-        minutes,
-        0,
-        0
-      ));
-      const isoString = combined.toISOString();
-
-      const response = await updateShift(currentShift.id, { [field]: isoString });
-      setCurrentShift(response.shift);
-      onShiftUpdated?.(response.shift);
-      toast({
-        title: "Shift updated",
-        description: `${field === "clockedInAt" ? "Clock in" : "Clock out"} time saved.`,
-      });
-    } catch (error) {
-      console.error(`Failed to update ${field}:`, error);
-      toast({
-        title: "Error",
-        description: `Failed to update ${field === "clockedInAt" ? "clock in" : "clock out"} time.`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingTime(false);
-    }
-  };
+  const showBody = !hydrateFromServer || !loadingFull;
+  const canSubmit = Boolean(reason.trim()) && !isSubmitting && resolvedShift;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-[547px] max-w-[90vw] rounded-[20px] bg-white px-6 pt-6 pb-5 shadow-xl flex flex-col min-h-[553px]">
+      <div className="relative flex min-h-[553px] w-[547px] max-w-[90vw] flex-col rounded-[20px] bg-white px-6 pt-6 pb-5 shadow-xl">
         <button
+          type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 bg-[#eff2f3] border border-[rgba(255,255,255,0.3)] rounded-full p-2 hover:bg-gray-200 transition-colors cursor-pointer"
-          aria-label="Close shift details"
+          className="absolute top-4 right-4 cursor-pointer rounded-full border border-[rgba(255,255,255,0.3)] bg-[#eff2f3] p-2 transition-colors hover:bg-gray-200"
+          aria-label="Close"
         >
-          <X className="w-4 h-4 text-[#10141a]" />
+          <X className="h-4 w-4 text-[#10141a]" />
         </button>
 
         <div className="mb-4">
-          <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">Shift</h2>
-          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            {getShiftDateLabel(currentShift)}
+          <h2 className="text-[20px] leading-[1.6] font-medium text-[#10141a]">Update this shift</h2>
+          <p className="text-[14px] leading-[1.4] font-medium text-[#808081]">
+            {resolvedShift ? getShiftDateLabel(resolvedShift) : getShiftDateLabel(shift)}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-6 mb-4">
-          <div className="flex items-center gap-3">
-            <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-              {currentShift.employee?.profilePicture && (
-                <AvatarImage
-                  src={currentShift.employee.profilePicture}
-                  alt={dspName}
-                  className="w-full h-full object-cover aspect-auto"
-                />
-              )}
-              <AvatarFallback className="w-full h-full rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-                {getInitialsFromName(dspName)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[16px] font-semibold leading-[1.6] text-black">{dspName}</span>
-              <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">DSP</span>
-            </div>
+        {loadingFull && hydrateFromServer ? (
+          <div className="flex flex-1 items-center justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-[#00b4b8]" aria-label="Loading shift" />
           </div>
+        ) : null}
 
-          <div className="flex items-center gap-3">
-            <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-              {currentShift.client?.profileImage && (
-                <AvatarImage
-                  src={currentShift.client.profileImage}
-                  alt={clientName}
-                  className="w-full h-full object-cover aspect-auto"
-                />
-              )}
-              <AvatarFallback className="w-full h-full rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-                {getInitialsFromName(clientName)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[16px] font-semibold leading-[1.6] text-black">{clientName}</span>
-              <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">Client</span>
-            </div>
-          </div>
-        </div>
+        {showBody && resolvedShift ? (
+          <>
+            {anomalyCodes.length > 0 ? (
+              <div className="mb-4 flex flex-wrap gap-1.5">
+                {anomalyCodes.map((code) => {
+                  const meta = ANOMALY_LABELS[code];
+                  return (
+                    <span
+                      key={code}
+                      className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${meta?.color || "border-gray-200 bg-gray-100 text-gray-600"}`}
+                    >
+                      {meta?.label || code}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : null}
 
-        <div className="w-full rounded-[8px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.4)] p-3 text-[14px] leading-[1.4] mb-4">
-          <div className="flex gap-2">
-            <span className="w-[90px] text-[#808081]">Location</span>
-            <span className="text-[#10141a] font-semibold">{formatShiftLocation(currentShift.location) || "--------"}</span>
-          </div>
-          <div className="flex gap-2 mt-2">
-            <span className="w-[90px] text-[#808081]">Clock In</span>
-            {currentShift.clockedInAt ? (
-              <span className="text-[#10141a] font-semibold">{formatClockTime(currentShift.clockedInAt)}</span>
-            ) : (
-              <TimePicker value="" onChange={(val) => handleTimeUpdate("clockedInAt", val)}>
-                <span className="text-[#10141a] font-semibold cursor-pointer hover:text-[#00b4b8] transition-colors">
-                  {isSavingTime ? "Saving..." : "--------"}
+            <div className="mb-4 flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-[60px] w-[52.5px] shrink-0 rounded-[8px]">
+                  {resolvedShift.employee?.profilePicture && (
+                    <AvatarImage
+                      src={resolvedShift.employee.profilePicture}
+                      alt={dspName}
+                      className="aspect-auto h-full w-full object-cover"
+                    />
+                  )}
+                  <AvatarFallback className="h-full w-full rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-sm font-medium text-white">
+                    {getInitialsFromName(dspName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[16px] leading-[1.6] font-semibold text-black">{dspName}</span>
+                  <span className="text-[14px] leading-[1.4] font-medium text-[#808081]">DSP</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Avatar className="h-[60px] w-[52.5px] shrink-0 rounded-[8px]">
+                  {resolvedShift.client?.profileImage && (
+                    <AvatarImage
+                      src={resolvedShift.client.profileImage}
+                      alt={clientName}
+                      className="aspect-auto h-full w-full object-cover"
+                    />
+                  )}
+                  <AvatarFallback className="h-full w-full rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-sm font-medium text-white">
+                    {getInitialsFromName(clientName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[16px] leading-[1.6] font-semibold text-black">{clientName}</span>
+                  <span className="text-[14px] leading-[1.4] font-medium text-[#808081]">Client</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-4 w-full rounded-[8px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.4)] p-3 text-[14px] leading-[1.4]">
+              <div className="flex gap-2">
+                <span className="w-[90px] text-[#808081]">Location</span>
+                <span className="font-semibold text-[#10141a]">
+                  {formatShiftLocation(resolvedShift.location) || "--------"}
                 </span>
-              </TimePicker>
-            )}
-          </div>
-          <div className="flex gap-2 mt-2">
-            <span className="w-[90px] text-[#808081]">Clock Out</span>
-            {currentShift.clockedOutAt ? (
-              <span className="text-[#10141a] font-semibold">{formatClockTime(currentShift.clockedOutAt)}</span>
-            ) : (
-              <TimePicker value="" onChange={(val) => handleTimeUpdate("clockedOutAt", val)}>
-                <span className="text-[#10141a] font-semibold cursor-pointer hover:text-[#00b4b8] transition-colors">
-                  {isSavingTime ? "Saving..." : "--------"}
-                </span>
-              </TimePicker>
-            )}
-          </div>
-        </div>
-
-        {callout && (
-          <div
-            className={`mb-4 flex gap-2 rounded-[8px] border border-[rgba(255,255,255,0.3)] p-3 text-[14px] leading-[1.4] ${callout.tone === "completed"
-              ? "bg-[rgba(0,216,65,0.08)]"
-              : "bg-[rgba(213,52,17,0.08)]"
-              }`}
-          >
-            {callout.tone === "completed" ? (
-              <CheckCircle2 className="mt-0.5 h-5 w-5 text-[#0EAF52]" />
-            ) : (
-              <AlertCircle className="mt-0.5 h-5 w-5 text-[#D53411]" />
-            )}
-            <div>
-              <p className="font-semibold text-[#10141a]">{callout.title}</p>
-              <p className="text-[#808081]">{callout.description}</p>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <span className="w-[90px] text-[#808081]">Clock In</span>
+                <TimePicker value={draftClockIn} onChange={setDraftClockIn}>
+                  <span className="cursor-pointer font-semibold text-[#10141a] transition-colors hover:text-[#00b4b8]">
+                    {draftClockIn ? formatDraftHHmmLabel(draftClockIn) : "--------"}
+                  </span>
+                </TimePicker>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <span className="w-[90px] text-[#808081]">Clock Out</span>
+                <TimePicker value={draftClockOut} onChange={setDraftClockOut}>
+                  <span className="cursor-pointer font-semibold text-[#10141a] transition-colors hover:text-[#00b4b8]">
+                    {draftClockOut ? formatDraftHHmmLabel(draftClockOut) : "--------"}
+                  </span>
+                </TimePicker>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-[rgba(0,0,0,0.06)] pt-3">
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold text-[#10141a]">Mark shift as completed</p>
+                  <p className="text-[11px] text-[#808081]">Applies when you tap Update changes.</p>
+                </div>
+                <Switch
+                  checked={draftCompleted}
+                  onCheckedChange={setDraftCompleted}
+                  aria-label="Mark shift as completed"
+                />
+              </div>
             </div>
-          </div>
-        )}
 
-        <div className="mt-auto">
-          <div className="mb-3">
-            <textarea
-              value={commentInput}
-              onChange={(e) => setCommentInput(e.target.value)}
-              placeholder="Add a comment..."
-              rows={3}
-              className="w-full rounded-[8px] border-2 border-[#d1d5db] bg-white p-3 text-[14px] leading-[1.4] text-[#10141a] placeholder:text-[#808081] resize-none focus:outline-none focus:ring-2 focus:ring-[#00b4b8] focus:border-[#00b4b8]"
-            />
-          </div>
-          <div className="flex w-full justify-between gap-2">
-            <button
-              onClick={() =>
-                onSendNotification ? onSendNotification(currentShift) : handleNotImplemented("Send Notification")
-              }
-              disabled={!onSendNotification}
-              className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${onSendNotification
-                ? "bg-[#b2b2b3] hover:bg-[#9a9a9b] cursor-pointer active:bg-[#828283]"
-                : "bg-[#b2b2b3] opacity-50 cursor-not-allowed"
+            {callout ? (
+              <div
+                className={`mb-4 flex gap-2 rounded-[8px] border border-[rgba(255,255,255,0.3)] p-3 text-[14px] leading-[1.4] ${
+                  callout.tone === "completed"
+                    ? "bg-[rgba(0,216,65,0.08)]"
+                    : "bg-[rgba(213,52,17,0.08)]"
                 }`}
-            >
-              Send Notification
-            </button>
-            <button
-              onClick={handleSaveComment}
-              disabled={!commentInput.trim() || isSavingComment}
-              className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${commentInput.trim() && !isSavingComment
-                ? "bg-[#3b82f6] hover:bg-[#2563eb] cursor-pointer active:bg-[#1d4ed8]"
-                : "bg-[#3b82f6] opacity-50 cursor-not-allowed"
-                }`}
-            >
-              {isSavingComment ? "Saving..." : "Comment"}
-            </button>
-            <button
-              onClick={() => (onCall ? onCall(currentShift) : handleNotImplemented("Call"))}
-              disabled={!onCall}
-              className={`h-9 w-[152px] rounded-full text-[14px] font-semibold text-white transition-colors ${onCall
-                ? "bg-[#b2b2b3] hover:bg-[#9a9a9b] cursor-pointer active:bg-[#828283]"
-                : "bg-[#b2b2b3] opacity-50 cursor-not-allowed"
-                }`}
-            >
-              Call
-            </button>
-          </div>
+              >
+                {callout.tone === "completed" ? (
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 text-[#0EAF52]" />
+                ) : (
+                  <AlertCircle className="mt-0.5 h-5 w-5 text-[#D53411]" />
+                )}
+                <div>
+                  <p className="font-semibold text-[#10141a]">{callout.title}</p>
+                  <p className="text-[#808081]">{callout.description}</p>
+                </div>
+              </div>
+            ) : null}
 
-          <div className="mt-3 flex w-full justify-between gap-2">
-            <button
-              onClick={handleMarkCompleted}
-              disabled={!canMarkCompleted || isUpdating}
-              className={`h-9 w-[235px] rounded-full text-[14px] font-semibold text-white transition-colors ${canMarkCompleted && !isUpdating
-                ? "bg-[#00b4b8] hover:bg-[#00a0a4] cursor-pointer active:bg-[#008c90]"
-                : "bg-[#00b4b8] opacity-50 cursor-not-allowed"
-                }`}
-            >
-              {isUpdating ? "Updating..." : "Mark As Completed"}
-            </button>
-            <button
-              onClick={handleDeleteClick}
-              disabled={isDeleting}
-              className={`h-9 w-[235px] rounded-full text-[14px] font-semibold text-white transition-colors ${isDeleting
-                ? "bg-[#d53411] opacity-50 cursor-not-allowed"
-                : "bg-[#d53411] hover:bg-[#c02e0f] cursor-pointer active:bg-[#ab280d]"
-                }`}
-            >
-              Delete Shift
-            </button>
-          </div>
+            <div className="mt-auto">
+              <div className="mb-3">
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="text-[12px] font-medium text-[#808081]" htmlFor="shift-update-reason">
+                    Note for activity history (required)
+                  </label>
+                  <span
+                    className={`text-[12px] ${reason.length > REASON_MAX ? "text-red-500" : "text-[#808081]"}`}
+                  >
+                    {reason.length}/{REASON_MAX}
+                  </span>
+                </div>
+                <textarea
+                  id="shift-update-reason"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value.slice(0, REASON_MAX))}
+                  rows={3}
+                  placeholder="Example: Correcting clock-in time; client canceled; duplicate entry."
+                  className="w-full resize-none rounded-[8px] border-2 border-[#d1d5db] bg-white p-3 text-[14px] leading-[1.4] text-[#10141a] placeholder:text-[#808081] focus:border-[#00b4b8] focus:ring-2 focus:ring-[#00b4b8] focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-[#808081]">
+                  Others with access can read this note. Keep it factual and brief.
+                </p>
+              </div>
 
-          <button
-            onClick={() =>
-              onAssignManual ? onAssignManual(currentShift) : handleNotImplemented("Assign Manual Shift")
-            }
-            disabled={!onAssignManual}
-            className={`mt-3 w-full h-9 rounded-full border text-[14px] font-semibold transition-colors ${onAssignManual
-              ? "border-[#525253] text-[#525253] hover:bg-[#f5f5f5] cursor-pointer active:bg-[#ebebeb]"
-              : "border-[#b2b2b3] text-[#b2b2b3] opacity-50 cursor-not-allowed"
-              }`}
-          >
-            Assign Manual Shift
-          </button>
-        </div>
+              <button
+                type="button"
+                onClick={handleUpdateChanges}
+                disabled={!canSubmit}
+                className={`h-11 w-full rounded-full text-[14px] font-semibold text-white transition-colors ${
+                  canSubmit
+                    ? "cursor-pointer bg-[#00b4b8] hover:bg-[#00a0a4] active:bg-[#008c90]"
+                    : "cursor-not-allowed bg-[#00b4b8] opacity-50"
+                }`}
+              >
+                {isSubmitting ? "Saving…" : "Update changes"}
+              </button>
+            </div>
+          </>
+        ) : null}
       </div>
-
-      <DeleteConfirmationModal
-        isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={handleDeleteConfirm}
-        isDeleting={isDeleting}
-        title="Delete Shift?"
-        message="Are you sure you want to delete this shift? This action cannot be undone."
-        confirmText="Delete"
-        cancelText="Cancel"
-      />
     </div>
   );
 }
