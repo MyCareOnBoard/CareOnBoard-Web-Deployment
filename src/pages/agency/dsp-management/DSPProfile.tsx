@@ -314,6 +314,8 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
           shifts={shifts}
           isLoading={detailsLoading}
           getInitials={getInitials}
+          agencyId={user?.agencyId ?? ""}
+          dspId={currentDsp.id}
         />
       )}
 

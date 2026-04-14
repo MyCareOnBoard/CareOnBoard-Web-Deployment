@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ShiftsMonthCalendar } from "@/components/shifts/ShiftsMonthCalendar";
 import { listShifts, type Shift, formatShiftLocation } from "@/lib/api/shifts";
 
 type ShiftRow = {
@@ -31,40 +32,42 @@ export function ActivityTab({
   setCurrentPage: (next: number) => void;
   itemsPerPage: number;
 }) {
+  const [shiftsView, setShiftsView] = useState<"calendar" | "list">("calendar");
   const [shifts, setShifts] = useState<Shift[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const listFetchedRef = useRef(false);
 
-  // Fetch shifts for this client
+  // Lazy-fetch list shifts when user opens List view
   useEffect(() => {
-    const fetchShifts = async () => {
-      if (!clientId || !agencyId) {
-        setIsLoading(false);
-        return;
-      }
+    if (shiftsView !== "list" || !clientId || !agencyId) return;
+    if (listFetchedRef.current) return;
 
+    const fetchShifts = async () => {
       try {
         setIsLoading(true);
         setError(null);
         const response = await listShifts({
           agencyId,
           clientId,
-          client: true, // Populate client data
-          employee: true, // Populate employee/DSP data
-          limit: 100, // Get all shifts for client-side pagination
+          client: true,
+          employee: true,
+          limit: 100,
         });
         setShifts(response.shifts || []);
-      } catch (err: any) {
+        listFetchedRef.current = true;
+      } catch (err: unknown) {
         console.error("Failed to fetch shifts:", err);
-        setError(err.message || "Failed to load shifts");
+        const message = err instanceof Error ? err.message : "Failed to load shifts";
+        setError(message);
         setShifts([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchShifts();
-  }, [clientId, agencyId]);
+    void fetchShifts();
+  }, [shiftsView, clientId, agencyId]);
 
   // Format date from ISO string or Firestore Timestamp
   const formatDate = useCallback((dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): string => {
@@ -212,25 +215,61 @@ export function ActivityTab({
     return shiftRows.slice(start, start + itemsPerPage);
   }, [shiftRows, currentPage, itemsPerPage]);
 
+  const tabClass = (view: "calendar" | "list") =>
+    `px-5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer border ${
+      shiftsView === view
+        ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+        : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
+    }`;
+
   return (
     <>
       {/* Shifts Header */}
-      <div className="mt-8">
-        <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-          Shifts
-        </p>
-        <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-          Shifts for {clientName}
-        </p>
+      <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
+            Shifts
+          </p>
+          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+            Shifts for {clientName}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0" role="tablist" aria-label="Shifts view">
+          <button
+            type="button"
+            role="tab"
+            aria-pressed={shiftsView === "calendar"}
+            className={tabClass("calendar")}
+            onClick={() => setShiftsView("calendar")}
+          >
+            Calendar
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-pressed={shiftsView === "list"}
+            className={tabClass("list")}
+            onClick={() => setShiftsView("list")}
+          >
+            List
+          </button>
+        </div>
       </div>
 
+      {shiftsView === "calendar" && (
+        <div className="mt-4">
+          <ShiftsMonthCalendar variant="client" agencyId={agencyId} clientId={clientId} />
+        </div>
+      )}
+
       {/* Shift Rows */}
+      {shiftsView === "list" && (
       <div className="mt-4 space-y-3">
         {isLoading ? (
           <div className="py-12 flex flex-col items-center justify-center gap-2 text-center">
             <Loader2 className="w-6 h-6 animate-spin text-[#00b4b8]" />
             <p className="text-[14px] font-medium text-[#808081]">
-              Loading shifts...
+              Loading shifts…
             </p>
           </div>
         ) : error ? (
@@ -242,7 +281,7 @@ export function ActivityTab({
         ) : paginatedShifts.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-[14px] font-medium text-[#808081]">
-              No shifts found for this client.
+              No shifts to show in this list yet.
             </p>
           </div>
         ) : (
@@ -308,8 +347,10 @@ export function ActivityTab({
           ))
         )}
       </div>
+      )}
 
       {/* Pagination */}
+      {shiftsView === "list" && (
       <div className="mt-6 flex items-center justify-center gap-2">
         <span className="text-[16px] font-medium leading-[1.6] text-[#10141a]">
           {Math.min(currentPage, totalPages)}
@@ -332,6 +373,7 @@ export function ActivityTab({
           <ChevronRight className="w-5 h-5 text-[#10141a]" />
         </button>
       </div>
+      )}
     </>
   );
 }

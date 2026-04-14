@@ -1,12 +1,15 @@
 import { useState, useMemo } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
+import { ShiftsMonthCalendar } from "@/components/shifts/ShiftsMonthCalendar";
 import { type Shift, categorizeShifts, formatShiftLocation } from "@/lib/api/shifts";
 
 interface ShiftsTabProps {
   shifts: Shift[];
   isLoading: boolean;
   getInitials: (name: string) => string;
+  agencyId: string;
+  dspId: string;
 }
 
 function getClientName(shift: Shift): string {
@@ -76,7 +79,8 @@ function getSessionDuration(shift: Shift): string {
   return "";
 }
 
-export function ShiftsTab({ shifts, isLoading, getInitials }: ShiftsTabProps) {
+export function ShiftsTab({ shifts, isLoading, getInitials, agencyId, dspId }: ShiftsTabProps) {
+  const [shiftsView, setShiftsView] = useState<"calendar" | "list">("calendar");
   const [shiftsTab, setShiftsTab] = useState<"previous" | "ongoing" | "upcoming">("previous");
   const [page, setPage] = useState(1);
   const pageSize = 8;
@@ -107,21 +111,57 @@ export function ShiftsTab({ shifts, isLoading, getInitials }: ShiftsTabProps) {
         : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
     }`;
 
+  const viewToggleClass = (view: "calendar" | "list") =>
+    `px-5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer border ${
+      shiftsView === view
+        ? "bg-teal-500 text-white border-teal-500"
+        : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
+    }`;
+
   return (
     <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2" role="tablist" aria-label="Shifts view">
+          <button
+            type="button"
+            role="tab"
+            aria-pressed={shiftsView === "calendar"}
+            className={viewToggleClass("calendar")}
+            onClick={() => setShiftsView("calendar")}
+          >
+            Calendar
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-pressed={shiftsView === "list"}
+            className={viewToggleClass("list")}
+            onClick={() => setShiftsView("list")}
+          >
+            List
+          </button>
+        </div>
+      </div>
+
+      {shiftsView === "calendar" && (
+        <ShiftsMonthCalendar variant="dsp" agencyId={agencyId} employeeId={dspId} />
+      )}
+
+      {shiftsView === "list" && (
+        <>
       {/* Tab Navigation */}
-      <div className="flex items-center gap-2">
-        <button onClick={() => handleTabChange("previous")} className={tabClass("previous")}>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => handleTabChange("previous")} className={tabClass("previous")}>
           Previous Shifts
           {categorized.previous.length > 0 && (
             <span className="ml-1.5 text-xs opacity-80">({categorized.previous.length})</span>
           )}
         </button>
-        <button onClick={() => handleTabChange("ongoing")} className={tabClass("ongoing")}>
+        <button type="button" onClick={() => handleTabChange("ongoing")} className={tabClass("ongoing")}>
           Ongoing Shifts
           {categorized.current && <span className="ml-1.5 text-xs opacity-80">(1)</span>}
         </button>
-        <button onClick={() => handleTabChange("upcoming")} className={tabClass("upcoming")}>
+        <button type="button" onClick={() => handleTabChange("upcoming")} className={tabClass("upcoming")}>
           Upcoming Shifts
           {categorized.upcoming.length > 0 && (
             <span className="ml-1.5 text-xs opacity-80">({categorized.upcoming.length})</span>
@@ -295,6 +335,7 @@ export function ShiftsTab({ shifts, isLoading, getInitials }: ShiftsTabProps) {
       {!isLoading && filteredShifts.length > pageSize && (
         <div className="flex items-center justify-center gap-2 pt-4">
           <button
+            type="button"
             onClick={() => setPage(Math.max(1, page - 1))}
             disabled={page === 1}
             className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
@@ -303,6 +344,7 @@ export function ShiftsTab({ shifts, isLoading, getInitials }: ShiftsTabProps) {
           </button>
           <span className="text-sm text-gray-600 px-1">{page} / {totalPages}</span>
           <button
+            type="button"
             onClick={() => setPage(Math.min(totalPages, page + 1))}
             disabled={page === totalPages}
             className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
@@ -310,6 +352,8 @@ export function ShiftsTab({ shifts, isLoading, getInitials }: ShiftsTabProps) {
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
+      )}
+        </>
       )}
     </div>
   );
