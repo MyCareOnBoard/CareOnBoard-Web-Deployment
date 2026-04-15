@@ -121,6 +121,10 @@ export default function AgencyShiftDetailsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const goBack = useCallback(() => {
+    navigate(-1);
+  }, [navigate]);
+
   const [shift, setShift] = useState<Shift | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -237,7 +241,7 @@ export default function AgencyShiftDetailsPage() {
         description: "This shift was removed from the schedule.",
       });
       setShiftPendingDelete(false);
-      navigate(Routes.agency.scheduling);
+      goBack();
     } catch (err) {
       console.error(err);
       toast({
@@ -262,8 +266,8 @@ export default function AgencyShiftDetailsPage() {
     return (
       <div className="px-4 py-8">
         <p className="text-[#808081]">Invalid link.</p>
-        <Button type="button" variant="outline" className="mt-4" onClick={() => navigate(Routes.agency.scheduling)}>
-          Back to Shift Management
+        <Button type="button" variant="outline" className="mt-4" onClick={goBack}>
+          Go back
         </Button>
       </div>
     );
@@ -286,8 +290,8 @@ export default function AgencyShiftDetailsPage() {
           <Button type="button" variant="outline" onClick={() => refetchShiftAndRelated()}>
             Try again
           </Button>
-          <Button type="button" variant="outline" onClick={() => navigate(Routes.agency.scheduling)}>
-            Back to Shift Management
+          <Button type="button" variant="outline" onClick={goBack}>
+            Go back
           </Button>
         </div>
       </div>
@@ -305,9 +309,9 @@ export default function AgencyShiftDetailsPage() {
           <div className="flex items-start gap-4">
             <button
               type="button"
-              onClick={() => navigate(Routes.agency.scheduling)}
+              onClick={goBack}
               className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] backdrop-blur-sm transition-colors hover:bg-[rgba(255,255,255,0.7)]"
-              aria-label="Back to Shift Management"
+              aria-label="Go back"
             >
               <ArrowLeft className="h-5 w-5 text-[#10141a]" />
             </button>

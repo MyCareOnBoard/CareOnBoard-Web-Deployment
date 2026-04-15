@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import axios from "axios";
 import {
   eachDayOfInterval,
@@ -94,6 +94,8 @@ export interface ShiftsMonthCalendarProps {
   agencyId: string;
   clientId?: string;
   employeeId?: string;
+  /** Rendered after month/year selects in the header row (e.g. view toggles) */
+  headerActions?: ReactNode;
 }
 
 export function ShiftsMonthCalendar({
@@ -101,6 +103,7 @@ export function ShiftsMonthCalendar({
   agencyId,
   clientId,
   employeeId,
+  headerActions,
 }: ShiftsMonthCalendarProps) {
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -271,6 +274,7 @@ export function ShiftsMonthCalendar({
               ))}
             </SelectContent>
           </Select>
+          {headerActions}
         </div>
       </div>
 

@@ -252,7 +252,7 @@ export function useDSPDetails(dspId: string | null) {
 
       const [ shiftsData ] = await Promise.all([
         // getEmployeeTrainings(dspId),
-        listShifts({ employeeId: dspId, agencyId, client: true }),
+        listShifts({ employeeId: dspId, agencyId, client: true, employee: true }),
       ]);
 
       // setTrainings(trainingsData);

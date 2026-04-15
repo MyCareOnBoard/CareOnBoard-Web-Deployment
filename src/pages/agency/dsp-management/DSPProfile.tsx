@@ -32,7 +32,7 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
   const messaging = useMessaging();
 
   const navigate = useNavigate();
-  const { shifts, isLoading: detailsLoading } = useDSPDetails(dsp.id);
+  const { shifts, isLoading: detailsLoading, refetch: refetchDspDetails } = useDSPDetails(dsp.id);
   const { updateStatus } = useUpdateDSPStatus();
 
   const [totalCount, setTotalCount] = useState(0);
@@ -216,9 +216,13 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
       {/* Profile Section */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
-          <Avatar className="h-24 w-24 border-2 border-gray-200">
-            <AvatarImage src={currentDsp.profilePicture} alt={currentDsp.fullName} />
-            <AvatarFallback className="bg-gray-200 text-gray-700 text-lg font-medium">
+          <Avatar className="h-[110px] w-24 shrink-0 overflow-hidden rounded-[8px]">
+            <AvatarImage
+              src={currentDsp.profilePicture}
+              alt={currentDsp.fullName}
+              className="h-full w-full object-cover aspect-auto"
+            />
+            <AvatarFallback className="rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-lg font-medium">
               {getInitials(currentDsp.fullName)}
             </AvatarFallback>
           </Avatar>
@@ -316,6 +320,9 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
           getInitials={getInitials}
           agencyId={user?.agencyId ?? ""}
           dspId={currentDsp.id}
+          dspFullName={currentDsp.fullName}
+          dspProfilePicture={currentDsp.profilePicture}
+          onShiftsUpdated={() => void refetchDspDetails()}
         />
       )}
 
