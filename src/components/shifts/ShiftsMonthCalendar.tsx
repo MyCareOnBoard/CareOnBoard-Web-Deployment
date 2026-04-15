@@ -1,23 +1,39 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
-  addMonths,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
   format,
   isSameMonth,
+  setMonth,
+  setYear,
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { listShifts, type Shift } from "@/lib/api/shifts";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const RANGE_LIMIT = 200;
 const WEEK_STARTS_ON = 1 as const;
 const WEEK_DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const MAX_SHIFT_LINES = 2;
+
+/** Years for dropdown: today ±10, expanded to always include visibleYear */
+function getYearRange(visibleYear: number): number[] {
+  const center = new Date().getFullYear();
+  const low = Math.min(center - 10, visibleYear);
+  const high = Math.max(center + 10, visibleYear);
+  return Array.from({ length: high - low + 1 }, (_, i) => low + i);
+}
 
 type CacheEntry = { shifts: Shift[]; hitLimit: boolean };
 const monthShiftCache = new Map<string, CacheEntry>();
@@ -94,6 +110,9 @@ export function ShiftsMonthCalendar({
   const [retryToken, setRetryToken] = useState(0);
 
   const ym = format(visibleMonth, "yyyy-MM");
+  const monthIndex = visibleMonth.getMonth();
+  const year = visibleMonth.getFullYear();
+  const yearOptions = useMemo(() => getYearRange(year), [year]);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(visibleMonth);
@@ -209,26 +228,49 @@ export function ShiftsMonthCalendar({
             Scheduled shifts for the selected month.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setVisibleMonth((m) => addMonths(m, -1))}
-            className="rounded-full border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] p-1.5 hover:bg-white/70 cursor-pointer"
-            aria-label="Previous month"
+        <div className="inline-flex max-w-full flex-row flex-nowrap items-center gap-2 shrink-0">
+          <Select
+            value={String(monthIndex)}
+            onValueChange={(v) =>
+              setVisibleMonth((prev) => startOfMonth(setMonth(prev, parseInt(v, 10))))
+            }
           >
-            <ChevronLeft className="h-5 w-5 text-[#10141a]" />
-          </button>
-          <span className="min-w-[140px] text-center text-sm font-semibold text-[#10141a]">
-            {format(visibleMonth, "MMMM yyyy")}
-          </span>
-          <button
-            type="button"
-            onClick={() => setVisibleMonth((m) => addMonths(m, 1))}
-            className="rounded-full border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] p-1.5 hover:bg-white/70 cursor-pointer"
-            aria-label="Next month"
+            <SelectTrigger
+              size="sm"
+              className="h-9 w-[9.25rem] shrink-0 border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] backdrop-blur-[2.909px]"
+              aria-label="Month"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 12 }, (_, i) => (
+                <SelectItem key={i} value={String(i)}>
+                  {format(new Date(2000, i, 1), "MMMM")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={String(year)}
+            onValueChange={(v) =>
+              setVisibleMonth((prev) => startOfMonth(setYear(prev, parseInt(v, 10))))
+            }
           >
-            <ChevronRight className="h-5 w-5 text-[#10141a]" />
-          </button>
+            <SelectTrigger
+              size="sm"
+              className="h-9 w-[4.75rem] shrink-0 border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] backdrop-blur-[2.909px]"
+              aria-label="Year"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
