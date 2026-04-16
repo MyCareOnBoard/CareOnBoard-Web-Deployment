@@ -11,6 +11,8 @@ const badgeVariants = cva(
 const badgeStyles: Record<string, string> = {
   confirmed: "bg-[rgba(14,175,82,0.1)] border-[#0eaf52] text-[#0eaf52]",
   success: "bg-[rgba(14,175,82,0.1)] border-[#0eaf52] text-[#0eaf52]",
+  completed: "border-[#10141a]/20 bg-white text-[#10141a]",
+  incomplete: "border-amber-300 bg-amber-100 text-amber-900",
   warning: "border-[#ff4545] bg-[#f0faf4] text-[#ff4545]",
   pending: "border-[var(--grey-200)] bg-[#f0faf4] text-[var(--grey-200)]",
   expired: "border-[#ff4545] bg-[#fef2f2] text-[#ff4545]",

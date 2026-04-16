@@ -13,6 +13,7 @@ export enum AccessScope {
   OVERSIGHT_CENTER = "Oversight Center",
   CLIENTS_DIRECTORY = "Clients Directory",
   STAFF_DIRECTORY = "Staff Directory",
+  SHIFT_MAINTENANCE = "Shift Maintenance",
   REPORTS = "Reports",
   SERVICES = "Services",
   SYSTEM_SETTINGS = "System Settings",

@@ -32,11 +32,15 @@ interface AddNewUserModalProps {
   }) => Promise<void>;
 }
 
+function normalizeAgencyAccessListForUi(list: string[]): string[] {
+  return list.map((item) => (item === "Scheduling" ? "Shift Management" : item));
+}
+
 // Agency-specific access options
 const ACCESS_OPTIONS = [
   "DSP Management",
   "Client Management",
-  "Scheduling",
+  "Shift Management",
   "Notes",
   "Billing & Management",
   "AI Automation",
@@ -138,7 +142,7 @@ export default function AddNewUserModal({
         setName(initialData.name);
         setEmail(initialData.email);
         setPassword(initialData.password);
-        setAccessList(initialData.accessList);
+        setAccessList(normalizeAgencyAccessListForUi(initialData.accessList));
       } else {
         setName("");
         setEmail("");

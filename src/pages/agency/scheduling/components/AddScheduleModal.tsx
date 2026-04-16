@@ -5,7 +5,7 @@ import TimePicker from "@/components/TimePicker";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { searchClients, Client, ClientService, getAgencyClientById } from "@/lib/api/clients";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { searchEmployees, Employee } from "@/lib/api/employees";
+import { searchEmployees, getEmployeeById, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import { Routes } from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -220,6 +220,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   // Debounce refs
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  /** Discards stale async results when the user selects another client quickly. */
+  const latestClientSelectIdRef = useRef<string | null>(null);
 
   // Success / saved modals state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -440,7 +442,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     dspSearchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearchingDsps(true);
-        const results = await searchEmployees(query, agencyId);
+        const results = await searchEmployees(query, agencyId, {
+          workAvailability: true,
+        });
         setDspSearchResults(results);
         setShowDspDropdown(results.length > 0);
       } catch (error) {
@@ -476,17 +480,52 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     return null;
   };
 
-  const handleClientSelect = (client: Client) => {
-    setFormData(prev => ({
+  const handleClientSelect = async (client: Client) => {
+    const selectId = client.id;
+    latestClientSelectIdRef.current = selectId;
+
+    let assignedDsp = client.primaryDsp?.name || "";
+    let assignedDspId = client.primaryDsp?.id || "";
+
+    if (client.primaryDsp?.id) {
+      try {
+        const emp = await getEmployeeById(client.primaryDsp.id);
+        if (latestClientSelectIdRef.current !== selectId) return;
+        if (emp.workAvailability !== true) {
+          assignedDsp = "";
+          assignedDspId = "";
+          toast({
+            title: "Primary DSP unavailable",
+            description:
+              "Primary DSP is currently unavailable, please select another.",
+            variant: "destructive",
+          });
+        }
+      } catch {
+        if (latestClientSelectIdRef.current !== selectId) return;
+        assignedDsp = "";
+        assignedDspId = "";
+        toast({
+          title: "Could not verify primary DSP",
+          description: "Please select a DSP manually.",
+          variant: "destructive",
+        });
+      }
+    }
+
+    if (latestClientSelectIdRef.current !== selectId) return;
+
+    setFormData((prev) => ({
       ...prev,
-      client: client.firstName && client.lastName
-        ? `${client.firstName} ${client.lastName}`
-        : client.id,
+      client:
+        client.firstName && client.lastName
+          ? `${client.firstName} ${client.lastName}`
+          : client.id,
       clientId: client.id,
       clientLocation: getClientPrimaryAddress(client),
       serviceCode: client.services?.[0]?.code || "",
-      assignedDsp: client.primaryDsp?.name || "",
-      assignedDspId: client.primaryDsp?.id || "",
+      assignedDsp,
+      assignedDspId,
       billingRate: client.services?.[0]?.rate || "",
       ispOutcome: client.ispOutcomes || "",
     }));
@@ -545,11 +584,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     setFormData(prev => ({ ...prev, endDate: date }));
     setShowEndDatePicker(false);
     clearError("endDate");
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setFormData(prev => ({ ...prev, planOfCare: file }));
   };
 
   // Handle weekday toggle
@@ -795,7 +829,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         } catch (error: any) {
           console.error("Failed to save draft schedule:", error);
           toast({
-            title: "Save Failed",
+            title: error?.response?.data?.code || "Save Failed",
             description: error?.response?.data?.error || "Failed to save draft. Please try again.",
             variant: "destructive",
           });
@@ -833,8 +867,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           });
         } else {
           toast({
-            title: "Save Failed",
-            description: "Failed to save schedule drafts. Please try again.",
+            title: failures[0]?.reason?.response?.data?.code || "Save Failed",
+            description: failures[0]?.reason?.response?.data?.error || "Failed to save schedule drafts. Please try again.",
             variant: "destructive",
           });
           return;
@@ -860,7 +894,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     } catch (error: any) {
       console.error("Failed to save draft schedule:", error);
       toast({
-        title: "Save Failed",
+        title: error?.response?.data?.code || "Save Failed",
         description: error?.response?.data?.error || "Failed to save draft. Please try again.",
         variant: "destructive",
       });
@@ -1098,8 +1132,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           });
         } else {
           toast({
-            title: "Scheduling Failed",
-            description: "Failed to schedule shifts. Please try again.",
+            title: failures[0]?.reason?.response?.data?.code || "Scheduling Failed",
+            description: failures[0]?.reason?.response?.data?.error || "Failed to schedule shifts. Please try again.",
             variant: "destructive",
           });
           return;
@@ -1133,7 +1167,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     } catch (error: any) {
       console.error("Failed to create schedule:", error);
       toast({
-        title: "Scheduling Failed",
+        title: error?.response?.data?.code || "Scheduling Failed",
         description: error?.response?.data?.error || "Failed to create schedule. Please try again.",
         variant: "destructive",
       });
@@ -1196,6 +1230,12 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   {errors.client && (
                     <span className="text-[12px] font-normal text-[#D53411]">{errors.client}</span>
                   )}
+                  {formData.clientId ? (
+                    <span className="text-[12px] font-normal text-[#808081]">
+                      Location:{" "}
+                      {formatShiftLocation(formData.clientLocation) || "Not on file"}
+                    </span>
+                  ) : null}
                   {/* Client Dropdown */}
                   {showClientDropdown && clientSearchResults.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">

@@ -284,6 +284,7 @@ export interface ListClientsParams {
   search?: string;
   limit?: number;
   agency?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface Address {
@@ -614,7 +615,8 @@ export async function listClients(params?: ListClientsParams): Promise<Client[]>
         search: params?.search,
         limit: params?.limit,
         agency: params?.agency,
-      }
+      },
+      signal: params?.signal,
     });
 
     if (!response.data.success) {

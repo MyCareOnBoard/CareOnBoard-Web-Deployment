@@ -332,7 +332,7 @@ export default function InternalUsersPage() {
                         key={level}
                         className="rounded-full bg-[#f5f5f5] px-3 py-1 text-[11px] font-medium text-[#525253]"
                       >
-                        {level}
+                        {level === "Scheduling" ? "Shift Management" : level}
                       </span>
                     ))}
                   </div>

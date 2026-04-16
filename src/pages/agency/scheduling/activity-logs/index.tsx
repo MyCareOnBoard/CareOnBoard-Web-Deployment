@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { parseISO } from "date-fns";
-import { ArrowUpRight, ChevronLeft, ChevronRight, Loader2, Plus } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Loader2, Plus, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listShifts, Shift, ShiftStatus } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
 import { useAuth } from "@/utils/auth";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
+import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 
 type ActivityFilter = "all" | "active" | "completed" | "missed" | "incomplete";
 
@@ -66,7 +67,6 @@ const parseTimeToParts = (time: string): { hours: number; minutes: number } | nu
 };
 
 const isShiftMissed = (shift: Shift): boolean => {
-  console.log(shift);
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (shift.clockedInAt) return false;
   if (!shift.date) return false;
@@ -107,12 +107,16 @@ const isShiftMissed = (shift: Shift): boolean => {
     );
   }
 
-  console.log(endDateTime.getTime(), Date.now());
-
   return endDateTime.getTime() < Date.now();
 };
 
-const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
+const INCOMPLETE_PILL_STYLE = {
+  label: "Incomplete",
+  color: "#B45309",
+  bgColor: "rgba(254, 243, 199, 0.65)",
+};
+
+const getStatusInfoByStatus = (status: ShiftStatus, _approved?: boolean) => {
   switch (status) {
     case ShiftStatus.ONGOING:
       return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
@@ -129,11 +133,24 @@ const getStatusInfo = (status: ShiftStatus, approved?: boolean) => {
   }
 };
 
+const getActivityRowStatusInfo = (shift: Shift) => {
+  if (isShiftMissed(shift)) {
+    return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
+  }
+  if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
+    return INCOMPLETE_PILL_STYLE;
+  }
+  return getStatusInfoByStatus(shift.status, shift.approved);
+};
+
 const getStatusInfoForTab = (shift: Shift, tab: ActivityFilter) => {
   switch (tab) {
     case "all":
-      return getStatusInfo(shift.status, shift.approved);
+      return getActivityRowStatusInfo(shift);
     case "active":
+      if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
+        return INCOMPLETE_PILL_STYLE;
+      }
       if (shift.status === ShiftStatus.ONGOING) {
         return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
       }
@@ -143,9 +160,9 @@ const getStatusInfoForTab = (shift: Shift, tab: ActivityFilter) => {
     case "missed":
       return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
     case "incomplete":
-      return { label: "Incomplete", color: "#D53411", bgColor: "rgba(213,52,17,0.05)" };
+      return INCOMPLETE_PILL_STYLE;
     default:
-      return getStatusInfo(shift.status, shift.approved);
+      return getActivityRowStatusInfo(shift);
   }
 };
 
@@ -293,7 +310,7 @@ export default function ActivityLogsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-            Scheduling
+            Shift Management
           </h1>
           <Button
             onClick={() => {
@@ -339,6 +356,26 @@ export default function ActivityLogsPage() {
                 })}
               </div>
             </div>
+
+            {/* Cross-link to Shift Maintenance for relevant filters */}
+            {(activeFilter === "missed" || activeFilter === "incomplete") && filteredShifts.length > 0 && (
+              <div
+                className="flex items-center gap-3 mb-4 px-4 py-3 rounded-2xl border border-[#00b4b8]/20 bg-[#00b4b8]/5 cursor-pointer hover:bg-[#00b4b8]/10 transition-colors"
+                onClick={() => navigate(Routes.agency.shiftMaintenance)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") navigate(Routes.agency.shiftMaintenance); }}
+              >
+                <Wrench className="w-4 h-4 text-[#00b4b8] shrink-0" />
+                <span className="text-[13px] font-medium text-[#10141a]">
+                  Need a written note on file when you fix or remove shifts?{" "}
+                  <span className="text-[#00b4b8] font-semibold">
+                    Open shift maintenance
+                    <ArrowUpRight className="inline w-3.5 h-3.5 ml-0.5 -mt-0.5" />
+                  </span>
+                </span>
+              </div>
+            )}
 
             {/* Activity Items */}
             <div className="space-y-3">
@@ -502,9 +539,6 @@ export default function ActivityLogsPage() {
         }}
         onShiftUpdated={(updatedShift) =>
           setShifts((prev) => prev.map((shift) => (shift.id === updatedShift.id ? updatedShift : shift)))
-        }
-        onShiftDeleted={(shiftId) =>
-          setShifts((prev) => prev.filter((shift) => shift.id !== shiftId))
         }
       />
     </>

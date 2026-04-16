@@ -27,20 +27,29 @@ import {
     Sun
 } from "lucide-react";
 
+/** Canonical scope for the scheduling hub; legacy token "Scheduling" still honored in accessList. */
+const SHIFT_MANAGEMENT_ACCESS_KEY = "Shift Management";
+
+function hasAgencyStaffAccess(accessList: string[], accessKey: string | undefined): boolean {
+    if (!accessKey) return true;
+    if (accessList.includes(accessKey)) return true;
+    if (accessKey === SHIFT_MANAGEMENT_ACCESS_KEY && accessList.includes("Scheduling")) return true;
+    return false;
+}
 
 const allNavItems: NavItem[] = [
     { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon }, // Always accessible
+    { label: "Shift Management", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: SHIFT_MANAGEMENT_ACCESS_KEY },
     { label: "DSP Management", path: Routes.agency.dspManagement, icon: DSPManagementIcon, accessKey: "DSP Management" },
     { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
+    { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
+    { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
     { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion" },
     { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun, accessKey: "Day Program" },
-    { label: "Scheduling", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: "Scheduling" },
-    { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
     // { label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText, accessKey: "Billing & Management" },
     { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
     { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
     { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
-    { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
     { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },
     { label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: GoaslAndDocumentsIcon, accessKey: "Goals & Documents" },
     { label: "Trainings", path: Routes.agency.trainings, icon: Network, accessKey: "Trainings" },
@@ -80,7 +89,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
 
         return allNavItems.filter(item => {
             if (!item.accessKey) return true; // Always show items without accessKey (Dashboard, Incident, Mileage)
-            return accessList.includes(item.accessKey);
+            return hasAgencyStaffAccess(accessList, item.accessKey);
         });
     }, [user?.userType, user?.profile?.accessList]);
 
@@ -103,7 +112,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
 
         // Check if user has access to this page
         const userAccessList = user.profile?.accessList || [];
-        const hasAccess = userAccessList.includes(currentNavItem.accessKey);
+        const hasAccess = hasAgencyStaffAccess(userAccessList, currentNavItem.accessKey);
 
         if (!hasAccess) {
             console.warn(`[AgencyLayout] Access denied to ${currentNavItem.label}. Redirecting to dashboard.`);

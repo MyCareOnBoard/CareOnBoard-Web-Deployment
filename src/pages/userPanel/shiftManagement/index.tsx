@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation, listShifts, categorizeShifts, clockIn as apiClockIn, shiftStarted as apiShiftStarted, clockOut as apiClockOut } from "@/lib/api/shifts";
+import { Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation, listShifts, categorizeShifts, clockIn as apiClockIn, clockOut as apiClockOut } from "@/lib/api/shifts";
 import { format } from "date-fns";
 import { ClockOutModal } from "./ClockOutModal";
 import { ClockInModal } from "./ClockInModal";
@@ -86,7 +86,7 @@ const getInitialsFromName = (name: string) => {
   const last = parts[parts.length - 1].charAt(0);
   return `${first}${last}`.toUpperCase();
 };
-const GEOFENCE_RADIUS_METERS = 50;
+const GEOFENCE_RADIUS_METERS = 91.44; // 300 ft — must match server CLOCK_GEOFENCE_RADIUS_METERS default
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371e3;
@@ -190,6 +190,19 @@ const isShiftExpired = (shift: Shift): boolean => {
 
   try {
     const now = new Date();
+
+    // Mirror server: available/pending without clock-in expires 15 minutes after scheduled start
+    if (
+      (shift.status === ShiftStatus.AVAILABLE || shift.status === ShiftStatus.PENDING) &&
+      shift.startTime
+    ) {
+      const startDateTime = convertTimeToISODate(shift.startTime, shift.date);
+      const graceEnd = startDateTime.getTime() + 15 * 60 * 1000;
+      if (now.getTime() > graceEnd) {
+        return true;
+      }
+    }
+
     let endDateTime: Date;
 
     if (shift.endTime) {
@@ -709,10 +722,10 @@ export default function ShiftManagementPage() {
   }
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.profile?.id) {
       loadShifts();
     }
-  }, [user?.id]);
+  }, [user?.profile?.id]);
 
   useEffect(() => {
     initiateTimeRemaining();
@@ -762,22 +775,27 @@ export default function ShiftManagementPage() {
   };
 
   useEffect(() => {
+    let cancelled = false;
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
+          if (cancelled) return;
           const { latitude, longitude } = position.coords;
           setUserCoords({ lat: latitude, lng: longitude });
 
           try {
             const result = await reverseGeocode(latitude, longitude);
+            if (cancelled) return;
             setUserLocation(
               result?.formattedAddress ?? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
             );
           } catch {
+            if (cancelled) return;
             setUserLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
           }
         },
         (error) => {
+          if (cancelled) return;
           switch (error.code) {
             case error.PERMISSION_DENIED:
               setUserLocation("Location access denied");
@@ -796,13 +814,16 @@ export default function ShiftManagementPage() {
         {
           enableHighAccuracy: true,
           timeout: 10000,
-          maximumAge: 300000
+          maximumAge: 60000
         }
       );
     } else {
       setUserLocation("Geolocation not supported");
       setLocationError(true);
     }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleShiftAction = async (shiftId: string) => {
@@ -817,13 +838,8 @@ export default function ShiftManagementPage() {
         return;
       }
 
-      const shiftLocation = shift.location;
-      const shiftLat = parseFloat(shiftLocation?.latlon?.lat ?? '0');
-      const shiftLon = parseFloat(shiftLocation?.latlon?.lon ?? '0');
-      const result = await reverseGeocode(shiftLat, shiftLon);
-
       const [isLocationMatch, distance] = checkLocationMatch(userCoords, shift.location);
-      if (!isLocationMatch && result?.formattedAddress !== userLocation) {
+      if (!isLocationMatch) {
         setShowLocationErrorModal(true);
         setLocationDistance(distance);
         return;
@@ -834,6 +850,18 @@ export default function ShiftManagementPage() {
     }
 
     if (shift.actionStatus === ShiftActionStatus.CLOCK_OUT) {
+      if (locationError || !userCoords) {
+        toast.error('Location unavailable', {
+          description: 'Please enable location services to clock out',
+        });
+        return;
+      }
+      const [isLocationMatch, distance] = checkLocationMatch(userCoords, shift.location);
+      if (!isLocationMatch) {
+        setShowLocationErrorModal(true);
+        setLocationDistance(distance);
+        return;
+      }
       setClockOutShiftId(shiftId);
       setShowClockOutModal(true);
       return;
@@ -846,9 +874,19 @@ export default function ShiftManagementPage() {
     const shiftToClockIn = todayShift?.id === clockInShiftId ? todayShift : null;
     if (!shiftToClockIn) return;
 
+    if (!userCoords) {
+      toast.error('Location unavailable', {
+        description: 'Cannot clock in without GPS coordinates',
+      });
+      return;
+    }
+
     try {
       setShiftsLoading(true);
-      const response = await apiClockIn(clockInShiftId);
+      const response = await apiClockIn(clockInShiftId, {
+        latitude: userCoords.lat,
+        longitude: userCoords.lng,
+      });
 
       if (response?.success) {
         setTodayShift(response.shift);
@@ -873,9 +911,19 @@ export default function ShiftManagementPage() {
     const shiftToClockOut = todayShift?.id === clockOutShiftId ? todayShift : null;
     if (!shiftToClockOut) return;
 
+    if (!userCoords) {
+      toast.error('Location unavailable', {
+        description: 'Cannot clock out without GPS coordinates',
+      });
+      return;
+    }
+
     try {
       setShiftsLoading(true);
-      const response = await apiClockOut(clockOutShiftId);
+      const response = await apiClockOut(clockOutShiftId, {
+        latitude: userCoords.lat,
+        longitude: userCoords.lng,
+      });
 
       if (response?.success) {
         setPreviousShifts((prev) => [response.shift, ...prev]);
@@ -885,7 +933,7 @@ export default function ShiftManagementPage() {
         toast.success('Clocked out successfully');
 
         const agencyId = user?.agencyId;
-        const employeeId = user?.id;
+        const employeeId = user?.profile?.id;
         if (agencyId && employeeId) {
           await loadShifts();
         }

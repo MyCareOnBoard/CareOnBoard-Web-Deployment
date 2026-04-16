@@ -57,7 +57,7 @@ axiosClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    const environment = import.meta.env.VITE_API_ENVIRONMENT || 'development';
+    const environment = import.meta.env.VITE_API_ENVIRONMENT || 'staging';
     config.headers['x-environment'] = environment;
 
     return config;
@@ -69,7 +69,7 @@ axiosClient.interceptors.request.use(
 
 axiosClientWithoutAuth.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const environment = import.meta.env.VITE_API_ENVIRONMENT || 'development';
+    const environment = import.meta.env.VITE_API_ENVIRONMENT || 'staging';
     config.headers['x-environment'] = environment;
 
     return config;
