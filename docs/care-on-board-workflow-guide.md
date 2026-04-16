@@ -1,14 +1,8 @@
 # Care On Board: Process and Workflow Guide
 
-**Purpose:** This document describes how major processes work in Care On Board—for applicants, caregivers (DSPs), agency office staff, and (in one section) the team that first sets up an agency on the platform. It is intended for **program managers, billing staff, trainers, quality staff, and leadership**. You do not need a technical background.
+**Purpose:** This document describes how major processes work in Care On Board—for applicants, caregivers (DSPs), agency office staff, and (in one section) the team that first sets up an agency on the platform. It is intended for \*\*program managers, billing staff, trainers, quality staff, and
 
-**About the diagrams:** Sections include **flowcharts** in Mermaid format. If your PDF tool shows plain text instead of pictures, open this file in GitHub, GitLab, Notion, or a Markdown app with Mermaid support, then export or print to PDF from there.
-
-**Scope:** The guide reflects the product workflows documented for internal use. Platform-wide **super administrator** day-to-day tools are not covered in depth here.
-
-_Document generated from the internal workflow plan — April 2026._
-
----
+**Scope:** The guide reflects the product workflows documented for internal use.
 
 ## Table of contents
 
