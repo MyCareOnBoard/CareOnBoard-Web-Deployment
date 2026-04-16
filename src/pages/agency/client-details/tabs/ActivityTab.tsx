@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, List, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { ShiftsMonthCalendar } from "@/components/shifts/ShiftsMonthCalendar";
+import { cn } from "@/lib/utils";
 import { listShifts, type Shift, formatShiftLocation } from "@/lib/api/shifts";
 
 type ShiftRow = {
@@ -18,7 +20,7 @@ type ShiftRow = {
 };
 
 export function ActivityTab({
-  clientName,
+  clientName: _clientName,
   clientId,
   agencyId,
   currentPage,
@@ -215,56 +217,57 @@ export function ActivityTab({
     return shiftRows.slice(start, start + itemsPerPage);
   }, [shiftRows, currentPage, itemsPerPage]);
 
-  const tabClass = (view: "calendar" | "list") =>
-    `px-5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer border ${
-      shiftsView === view
-        ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-        : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
-    }`;
+  const shiftsViewToggle = (opts?: { dividerAfterYear?: boolean }) => (
+    <div
+      className={cn(
+        "flex items-center gap-1",
+        opts?.dividerAfterYear && "ml-0.5 border-l border-gray-200/80 pl-2",
+      )}
+      role="tablist"
+      aria-label="Shifts view"
+    >
+      <Button
+        type="button"
+        variant={shiftsView === "calendar" ? "default" : "outline"}
+        size="icon-sm"
+        className="rounded-[5px] px-0"
+        aria-pressed={shiftsView === "calendar"}
+        aria-label="Calendar view"
+        onClick={() => setShiftsView("calendar")}
+      >
+        <CalendarDays className="size-5 shrink-0" />
+      </Button>
+      <Button
+        type="button"
+        variant={shiftsView === "list" ? "default" : "outline"}
+        size="icon-sm"
+        className="rounded-[5px] px-0"
+        aria-pressed={shiftsView === "list"}
+        aria-label="List view"
+        onClick={() => setShiftsView("list")}
+      >
+        <List className="size-5 shrink-0" />
+      </Button>
+    </div>
+  );
 
   return (
     <>
-      {/* Shifts Header */}
-      <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-            Shifts
-          </p>
-          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            Shifts for {clientName}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0" role="tablist" aria-label="Shifts view">
-          <button
-            type="button"
-            role="tab"
-            aria-pressed={shiftsView === "calendar"}
-            className={tabClass("calendar")}
-            onClick={() => setShiftsView("calendar")}
-          >
-            Calendar
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-pressed={shiftsView === "list"}
-            className={tabClass("list")}
-            onClick={() => setShiftsView("list")}
-          >
-            List
-          </button>
-        </div>
-      </div>
-
       {shiftsView === "calendar" && (
         <div className="mt-4">
-          <ShiftsMonthCalendar variant="client" agencyId={agencyId} clientId={clientId} />
+          <ShiftsMonthCalendar
+            variant="client"
+            agencyId={agencyId}
+            clientId={clientId}
+            headerActions={shiftsViewToggle({ dividerAfterYear: true })}
+          />
         </div>
       )}
 
-      {/* Shift Rows */}
       {shiftsView === "list" && (
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-4">
+      <div className="flex justify-end">{shiftsViewToggle()}</div>
+      <div className="space-y-3">
         {isLoading ? (
           <div className="py-12 flex flex-col items-center justify-center gap-2 text-center">
             <Loader2 className="w-6 h-6 animate-spin text-[#00b4b8]" />
@@ -347,11 +350,8 @@ export function ActivityTab({
           ))
         )}
       </div>
-      )}
 
-      {/* Pagination */}
-      {shiftsView === "list" && (
-      <div className="mt-6 flex items-center justify-center gap-2">
+      <div className="flex items-center justify-center gap-2 pt-2">
         <span className="text-[16px] font-medium leading-[1.6] text-[#10141a]">
           {Math.min(currentPage, totalPages)}
           <span className="text-[14px] text-[#808081]">/{totalPages}</span>
@@ -372,6 +372,7 @@ export function ActivityTab({
         >
           <ChevronRight className="w-5 h-5 text-[#10141a]" />
         </button>
+      </div>
       </div>
       )}
     </>

@@ -21,10 +21,10 @@ import {
   formatShiftLocation,
   getShiftById,
   Shift,
-  ShiftStatus,
   type ShiftAuditRecord,
 } from "@/lib/api/shifts";
-import { detectShiftAnomalyCodes, shiftToAnomalyRecord } from "@/lib/shift-anomaly-detection";
+import { shiftToAnomalyRecord } from "@/lib/shift-anomaly-detection";
+import { getShiftStatusBadgePresentation } from "@/lib/shift-status-badge";
 import { shiftToScheduleFormData } from "@/pages/agency/scheduling/shift-to-schedule-form";
 import type { ScheduleFormData } from "@/pages/agency/scheduling/components/AddScheduleModal";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
@@ -81,29 +81,6 @@ function shiftDeleteConfirmMessage(shift: Shift): string {
     : "this client";
   const when = shift.date ? format(parseISO(shift.date), "MMMM d, yyyy") : "the scheduled date";
   return `Removes ${clientLabel}'s shift on ${when} from the schedule. This can't be undone.`;
-}
-
-function shiftStatusBadgeProps(shift: Shift): {
-  label: string;
-  variant: React.ComponentProps<typeof Badge>["variant"];
-} {
-  if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
-    return { label: "Incomplete", variant: "incomplete" };
-  }
-  switch (shift.status) {
-    case ShiftStatus.ONGOING:
-      return { label: "Active", variant: "success" };
-    case ShiftStatus.COMPLETED:
-      return { label: "Completed", variant: "completed" };
-    case ShiftStatus.PENDING:
-      return { label: "Pending", variant: "pending" };
-    case ShiftStatus.AVAILABLE:
-      return { label: "Available", variant: "info" };
-    case ShiftStatus.EXPIRED:
-      return { label: "Expired", variant: "expired" };
-    default:
-      return { label: String(shift.status), variant: "pending" };
-  }
 }
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -300,7 +277,7 @@ export default function AgencyShiftDetailsPage() {
 
   if (!shift) return null;
 
-  const scheduleStatusBadge = shiftStatusBadgeProps(shift);
+  const scheduleStatusBadge = getShiftStatusBadgePresentation(shift);
 
   return (
     <>

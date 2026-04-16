@@ -2,6 +2,7 @@ import { parseISO } from "date-fns";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import type { Shift } from "@/lib/api/shifts";
 import { ShiftStatus } from "@/lib/api/shifts";
+import { SHIFT_ROW_PILL } from "@/lib/shift-visual-tokens";
 
 export type ShiftRowStatusInfo = {
   label: string;
@@ -68,25 +69,39 @@ export function isShiftMissed(shift: Shift): boolean {
 /** Same rules as Scheduling “Recent shifts” status pill. */
 export function getShiftRowStatusInfo(shift: Shift, _approved?: boolean): ShiftRowStatusInfo {
   if (isShiftMissed(shift)) {
-    return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
+    const s = SHIFT_ROW_PILL.missed;
+    return { label: "Missed", color: s.color, bgColor: s.bgColor };
   }
   if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
-    return { label: "Incomplete", color: "#B45309", bgColor: "rgba(254, 243, 199, 0.65)" };
+    const s = SHIFT_ROW_PILL.incomplete;
+    return { label: "Incomplete", color: s.color, bgColor: s.bgColor };
   }
 
   switch (shift.status) {
-    case ShiftStatus.ONGOING:
-      return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
-    case ShiftStatus.COMPLETED:
-      return { label: "Completed", color: "#525253", bgColor: "rgba(178,178,179,0.05)" };
-    case ShiftStatus.EXPIRED:
-      return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
-    case ShiftStatus.PENDING:
-      return { label: "Pending", color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
-    case ShiftStatus.AVAILABLE:
-      return { label: "Available", color: "#00b4b8", bgColor: "rgba(0,180,184,0.05)" };
-    default:
-      return { label: String(shift.status), color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
+    case ShiftStatus.ONGOING: {
+      const s = SHIFT_ROW_PILL.active;
+      return { label: "Active", color: s.color, bgColor: s.bgColor };
+    }
+    case ShiftStatus.COMPLETED: {
+      const s = SHIFT_ROW_PILL.completed;
+      return { label: "Completed", color: s.color, bgColor: s.bgColor };
+    }
+    case ShiftStatus.EXPIRED: {
+      const s = SHIFT_ROW_PILL.missed;
+      return { label: "Missed", color: s.color, bgColor: s.bgColor };
+    }
+    case ShiftStatus.PENDING: {
+      const s = SHIFT_ROW_PILL.pending;
+      return { label: "Pending", color: s.color, bgColor: s.bgColor };
+    }
+    case ShiftStatus.AVAILABLE: {
+      const s = SHIFT_ROW_PILL.available;
+      return { label: "Available", color: s.color, bgColor: s.bgColor };
+    }
+    default: {
+      const s = SHIFT_ROW_PILL.pending;
+      return { label: String(shift.status), color: s.color, bgColor: s.bgColor };
+    }
   }
 }
 
