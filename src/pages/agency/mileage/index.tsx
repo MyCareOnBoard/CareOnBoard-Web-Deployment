@@ -5,6 +5,7 @@ import { Plus, ArrowUpRight, Loader2, Pencil, Trash2, XCircle, Eye } from "lucid
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import AddMileageModal from "./components/AddMileageModal";
 import RideDetailModal from "./components/RideDetailModal";
+import AddManualMileageModal from "../../userPanel/mileage/components/AddManualMileageModal";
 import { mileageApi, MileageRide } from "@/lib/api/mileage";
 
 const getInitials = (name: string) =>
@@ -23,6 +24,7 @@ export default function MileagePage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [rideToCancel, setRideToCancel] = useState<MileageRide | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [rides, setRides] = useState<MileageRide[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,13 +105,22 @@ export default function MileagePage() {
             Mileage
           </h1>
         </div>
-        <Button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-[#00b8d4] hover:bg-[#00a0bd] text-white rounded-full px-4 sm:px-5 lg:px-6 py-2 sm:py-2.5 lg:py-3 h-auto text-[13px] sm:text-[14px] lg:text-[15px] font-semibold shadow-none"
-        >
-          <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-          Add Mileage
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => setIsManualModalOpen(true)}
+            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009ba1] text-white rounded-full px-4 sm:px-5 lg:px-6 py-2 sm:py-2.5 lg:py-3 h-auto text-[13px] sm:text-[14px] lg:text-[15px] font-medium shadow-none"
+          >
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            Track Mileage
+          </Button>
+          <Button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-[#00b8d4] hover:bg-[#00a0bd] text-white rounded-full px-4 sm:px-5 lg:px-6 py-2 sm:py-2.5 lg:py-3 h-auto text-[13px] sm:text-[14px] lg:text-[15px] font-semibold shadow-none"
+          >
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            Add Mileage
+          </Button>
+        </div>
       </div>
 
       {/* Mileage Overview Section */}
@@ -328,6 +339,13 @@ export default function MileagePage() {
           )}
         </div>
       </div>
+
+      {/* Track Mileage Modal */}
+      <AddManualMileageModal
+        isOpen={isManualModalOpen}
+        onClose={() => setIsManualModalOpen(false)}
+        onCreated={fetchRides}
+      />
 
       {/* Add Mileage Modal */}
       <AddMileageModal

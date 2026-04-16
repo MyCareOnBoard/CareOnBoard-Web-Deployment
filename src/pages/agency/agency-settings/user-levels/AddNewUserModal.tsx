@@ -52,6 +52,8 @@ const ACCESS_OPTIONS = [
   "Incident",
 ];
 
+const CREATE_DEFAULTS = ["Mileage"];
+
 
 export default function AddNewUserModal({
   open,
@@ -64,7 +66,7 @@ export default function AddNewUserModal({
   const [email, setEmail] = useState(initialData?.email || "");
   const [password, setPassword] = useState(initialData?.password || "");
   const [accessList, setAccessList] = useState<string[]>(
-    initialData?.accessList || []
+    initialData?.accessList || (mode === "create" ? CREATE_DEFAULTS : [])
   );
   const [isAccessOpen, setIsAccessOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -143,7 +145,7 @@ export default function AddNewUserModal({
         setName("");
         setEmail("");
         setPassword("");
-        setAccessList([]);
+        setAccessList(mode === "create" ? CREATE_DEFAULTS : []);
       }
       setIsSaving(false);
       setShowPassword(false);
