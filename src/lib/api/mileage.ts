@@ -1,6 +1,6 @@
 import axiosClient from '../axios';
 
-export type RideStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
+export type RideStatus = "scheduled" | "in_progress" | "paused" | "completed" | "cancelled";
 
 export interface Coordinates {
   latitude: number;
@@ -17,30 +17,39 @@ export interface MileageRide {
   agencyId: string;
   caregiverId: string;
   caregiverName?: string;
-  clientId: string;
-  clientName: string;
+  clientId: string | null;
+  clientName: string | null;
   clientAvatarUrl?: string | null;
   caregiverAvatarUrl?: string | null;
-  location: string;
-  pickupLocation?: string;
-  dropOffLocation?: string;
+  purpose?: string | null;
+  isManual?: boolean;
   scheduledStartTime: string;
-  estimatedDistance: number | null;
-  estimatedDuration?: number | null;
   actualDistance: number | null;
-  pickupLatLon?: LatLng | null;
-  dropOffLatLon?: LatLng | null;
+  segmentCount?: number;
   isRecurring?: boolean;
   status: RideStatus;
-  startLocation: Coordinates | null;
-  endLocation: Coordinates | null;
+  startLocation?: Coordinates | null;
   startedAt: string | null;
   completedAt: string | null;
   cancelledAt: string | null;
   cancelReason: string | null;
+  notes?: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface MileageSegment {
+  id: string;
+  rideId: string;
+  agencyId: string;
+  caregiverId: string;
+  startLocation: Coordinates;
+  endLocation: Coordinates | null;
+  startedAt: string;
+  stoppedAt: string | null;
+  distance: number | null;
+  segmentIndex: number;
 }
 
 export interface MileageListResponse {
@@ -74,7 +83,6 @@ export interface StartRidePayload {
 }
 
 export interface StopRidePayload {
-  actualDistance: number;
   endLocation: Coordinates;
 }
 
@@ -87,24 +95,12 @@ export type RecurringFrequency = "daily" | "weekly" | "monthly";
 export interface CreateMileageRideBase {
   clientId: string;
   caregiverId: string;
-  pickupLocation: string;
-  dropOffLocation: string;
-  estimatedDistance: number;
-  estimatedDuration?: number;
-  pickupLatLon?: LatLng;
-  dropOffLatLon?: LatLng;
   notes?: string;
 }
 
 export interface UpdateAgencyRideRequest {
   caregiverId?: string;
-  pickupLocation?: string;
-  dropOffLocation?: string;
   scheduledStartTime?: string;
-  estimatedDistance?: number;
-  estimatedDuration?: number;
-  pickupLatLon?: LatLng;
-  dropOffLatLon?: LatLng;
   notes?: string;
 }
 
@@ -124,6 +120,13 @@ export interface CreateRecurringMileageRideRequest extends CreateMileageRideBase
 export type CreateMileageRideRequest =
   | CreateOneTimeMileageRideRequest
   | CreateRecurringMileageRideRequest;
+
+export interface CreateManualMileageRequest {
+  purpose: string;
+  clientId?: string;
+  clientName?: string;
+  notes?: string;
+}
 
 export interface RideActionResponse {
   success: boolean;
@@ -183,6 +186,21 @@ export const mileageApi = {
     return response.data;
   },
 
+  complete: async (id: string) => {
+    const response = await axiosClient.post<RideActionResponse>(`/mileage/${id}/complete`);
+    return response.data;
+  },
+
+  createManual: async (payload: CreateManualMileageRequest) => {
+    const response = await axiosClient.post(`/mileage`, payload);
+    return response.data;
+  },
+
+  getSegments: async (id: string) => {
+    const response = await axiosClient.get<{ success: boolean; data: MileageSegment[] }>(`/mileage/${id}/segments`);
+    return response.data;
+  },
+
   create: async (payload: CreateMileageRideRequest) => {
     const response = await axiosClient.post(`/agencyMileage`, payload);
     return response.data;
@@ -200,6 +218,11 @@ export const mileageApi = {
 
   cancelAgency: async (id: string, reason?: string) => {
     const response = await axiosClient.put(`/agencyMileage/${id}/cancel`, reason ? { reason } : {});
+    return response.data;
+  },
+
+  getAgencySegments: async (id: string) => {
+    const response = await axiosClient.get<{ success: boolean; data: MileageSegment[] }>(`/agencyMileage/${id}/segments`);
     return response.data;
   },
 };
