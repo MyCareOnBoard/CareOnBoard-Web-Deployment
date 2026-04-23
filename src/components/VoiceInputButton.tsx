@@ -68,10 +68,12 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   const [isConnected, setIsConnected] = useState(false);
   const [draftTranscript, setDraftTranscript] = useState("");
   const skipLiveSyncRef = useRef(false);
+  const draftAtFocusRef = useRef("");
 
   const committedText = committedTranscripts.join(" ").trim();
   const liveTranscript = [committedText, partialTranscript].filter(Boolean).join(" ");
 
+  // Resume live sync each session so a prior "focus to pause overwrites" does not stick across recordings.
   useEffect(() => {
     if (!isRecording) return;
     skipLiveSyncRef.current = false;
@@ -147,7 +149,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
 
   return (
     <>
-      {/* AssemblyAI Transcription Service - can be swapped for other services */}
+      {/* ElevenLabs realtime STT */}
       <ElevenLabsTranscription
         isRecording={isRecording}
         onPartialTranscript={setPartialTranscript}
@@ -248,10 +250,16 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
                   onChange={(e) => setDraftTranscript(e.target.value)}
                   onFocus={() => {
                     skipLiveSyncRef.current = true;
+                    draftAtFocusRef.current = draftTranscript;
                   }}
                   onBlur={() => {
                     skipLiveSyncRef.current = false;
-                    setDraftTranscript(liveTranscript);
+                    setDraftTranscript((current) => {
+                      if (current === draftAtFocusRef.current) {
+                        return liveTranscript;
+                      }
+                      return current;
+                    });
                   }}
                   placeholder="Your transcription will appear here..."
                   className="w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none h-[140px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8]"

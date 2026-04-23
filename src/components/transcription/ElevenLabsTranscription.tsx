@@ -6,7 +6,14 @@
 import { useEffect, useRef } from "react";
 import { getScribeToken } from "@/lib/api/elevenlabs";
 
-const ELEVENLABS_REALTIME_WS = "wss://api.elevenlabs.io/v1/speech-to-text/realtime";
+/** Regional host only (no path). Example: `wss://api.us.elevenlabs.io` */
+const DEFAULT_ELEVENLABS_WS_ORIGIN = "wss://api.elevenlabs.io";
+
+function elevenLabsRealtimeWsUrl(): string {
+  const raw = import.meta.env.VITE_ELEVENLABS_WS_ORIGIN;
+  const base = (raw?.trim() || DEFAULT_ELEVENLABS_WS_ORIGIN).replace(/\/$/, "");
+  return `${base}/v1/speech-to-text/realtime`;
+}
 
 /** When true, only `committed_transcript_with_timestamps` is handled for finals — API often sends both and would duplicate segments. */
 const INCLUDE_TIMESTAMPS = true;
@@ -35,7 +42,7 @@ function buildRealtimeUrl(token: string): string {
     include_language_detection: "true",
     include_timestamps: INCLUDE_TIMESTAMPS ? "true" : "false",
   });
-  return `${ELEVENLABS_REALTIME_WS}?${params.toString()}`;
+  return `${elevenLabsRealtimeWsUrl()}?${params.toString()}`;
 }
 
 interface ElevenLabsTranscriptionProps {
@@ -94,7 +101,8 @@ export default function ElevenLabsTranscription({
   const speechTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionReadyRef = useRef(false);
   const pendingAudioRef = useRef<ArrayBuffer[]>([]);
-  const maxPendingChunks = 80;
+  const pendingAudioDropWarnedRef = useRef(false);
+  const maxPendingChunks = 200;
 
   const flushPendingAudio = (socket: WebSocket) => {
     if (socket.readyState !== WebSocket.OPEN) return;
@@ -115,6 +123,12 @@ export default function ElevenLabsTranscription({
 
     if (!sessionReadyRef.current) {
       if (pendingAudioRef.current.length >= maxPendingChunks) {
+        if (!pendingAudioDropWarnedRef.current) {
+          pendingAudioDropWarnedRef.current = true;
+          console.warn(
+            "[ElevenLabs STT] Pre-session audio buffer full; oldest chunks dropped until session_started."
+          );
+        }
         pendingAudioRef.current.shift();
       }
       pendingAudioRef.current.push(audioBuffer.slice(0));
@@ -137,6 +151,7 @@ export default function ElevenLabsTranscription({
           hasConnected.current = true;
           sessionReadyRef.current = false;
           pendingAudioRef.current = [];
+          pendingAudioDropWarnedRef.current = false;
           onError("");
           onConnecting(true);
 
@@ -286,6 +301,8 @@ export default function ElevenLabsTranscription({
               console.error("ElevenLabs Scribe error:", mt, msg);
               onError(msg);
               onConnectionChange(false);
+              hasConnected.current = false;
+              onStopRecording();
             }
           };
 
@@ -293,6 +310,8 @@ export default function ElevenLabsTranscription({
             console.error("ElevenLabs WebSocket error");
             onError("WebSocket connection error");
             onConnectionChange(false);
+            hasConnected.current = false;
+            onStopRecording();
           };
 
           socket.onclose = () => {
