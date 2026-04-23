@@ -40,12 +40,12 @@ jobs:
 #        run: |
 #          echo ${{ env.ENV_TOKEN }} | gh auth login --with-token
 #          gh auth setup-git
-#          gh repo clone https://github.com/iOta-Digital-Lab-Inc/Care-On-Board.git
+#          gh repo clone https://github.com/CareOnBoard/CareOnBoard-Frontend.git
 #          cd Care-On-Board
 #          rm .github/workflows/deploy-to-vercel.yml
 #          git config --global user.email "phaisalsey6@gmail.com"
 #          git config --global user.name "Faisal-Sey"
 #          git add .
 #          git commit -m "Remove GitHub Actions workflows"
-#          git remote add target https://github.com/Faisal-Sey/myCareOnBoard.git
+#          git remote add target https://github.com/careonboard-user/myCareOnBoard-Frontend.git
 #          git push target main --force

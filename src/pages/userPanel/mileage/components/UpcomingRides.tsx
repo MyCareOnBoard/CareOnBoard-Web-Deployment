@@ -45,10 +45,9 @@ export default function UpcomingRides({ rides, onCancel, actionLoading }: Upcomi
             key={ride.id}
             id={ride.id}
             clientName={ride.clientName}
+            purpose={ride.purpose}
             clientAvatarUrl={ride.clientAvatarUrl ?? ""}
-            location={ride.location}
             time={formatTime(ride.scheduledStartTime)}
-            distance={ride.estimatedDistance != null ? `${ride.estimatedDistance}Km` : "--"}
             status={ride.status}
             onCancel={onCancel}
             actionLoading={actionLoading}
