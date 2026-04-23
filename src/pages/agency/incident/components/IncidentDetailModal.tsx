@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
+import VoiceInputButton from "@/components/VoiceInputButton";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import { 
   IncidentReport, 
   resolveIncident, 
@@ -214,8 +216,9 @@ export default function IncidentDetailModal({ incident, onClose, onStatusUpdate 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-[90%] sm:max-w-[600px] lg:max-w-[800px] bg-white rounded-[16px] sm:rounded-[20px] lg:rounded-[24px] shadow-lg max-h-[90vh] overflow-y-auto">
-        <div className="p-4 sm:p-6 lg:p-8">
+      <VoiceRecordingProvider pageTitle="Incident review">
+      <div className="relative z-[51] w-full max-w-[90%] sm:max-w-[600px] lg:max-w-[800px] bg-white rounded-[16px] sm:rounded-[20px] lg:rounded-[24px] shadow-lg max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 lg:p-8 pb-20">
           <div className="flex items-start justify-between mb-4 sm:mb-6">
             <div>
               <h2 className="text-[20px] sm:text-[22px] lg:text-[24px] font-bold text-[#10141a]">
@@ -313,11 +316,13 @@ export default function IncidentDetailModal({ incident, onClose, onStatusUpdate 
               <label className="block text-[14px] font-semibold text-[#10141a] mb-2">
                 Reviewer Notes <span className="text-[#ef4444]">*</span>
               </label>
-              <Textarea
+              <VoiceEnabledTextarea
                 value={resolveNotes}
-                onChange={(e) => setResolveNotes(e.target.value)}
+                onChange={setResolveNotes}
                 placeholder="Enter your notes about the resolution..."
                 className="min-h-[100px] text-[13px] sm:text-[14px]"
+                fieldName="Reviewer notes"
+                pageTitle="Incident review"
               />
             </div>
           )}
@@ -327,14 +332,18 @@ export default function IncidentDetailModal({ incident, onClose, onStatusUpdate 
               <label className="block text-[14px] font-semibold text-[#10141a] mb-2">
                 Reason for Not Resolving <span className="text-[#ef4444]">*</span>
               </label>
-              <Textarea
+              <VoiceEnabledTextarea
                 value={notResolvedReason}
-                onChange={(e) => setNotResolvedReason(e.target.value)}
+                onChange={setNotResolvedReason}
                 placeholder="Enter the reason why this incident cannot be resolved..."
                 className="min-h-[100px] text-[13px] sm:text-[14px]"
+                fieldName="Reason for not resolving"
+                pageTitle="Incident review"
               />
             </div>
           )}
+
+          {canTakeAction && <VoiceInputButton className="z-[60]" />}
 
           {canTakeAction && (
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -402,6 +411,7 @@ export default function IncidentDetailModal({ incident, onClose, onStatusUpdate 
           )}
         </div>
       </div>
+      </VoiceRecordingProvider>
     </div>
   );
 }

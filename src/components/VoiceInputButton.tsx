@@ -1,8 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import MicrophoneIcon from "@/assets/icons/microphone.svg?react";
 import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
-// import ElevenLabsTranscription from "@/components/transcription/ElevenLabsTranscription";
-import AssemblyAITranscription from "@/components/transcription/AssemblyAITranscription";
+import ElevenLabsTranscription from "@/components/transcription/ElevenLabsTranscription";
+import {
+  shouldTranslateToEnglish,
+  translateToEnglish,
+} from "@/lib/translation";
+import { useToast } from "@/hooks/use-toast";
+// import AssemblyAITranscription from "@/components/transcription/AssemblyAITranscription";
 
 interface VoiceInputButtonProps {
   onClick?: () => void;
@@ -50,6 +55,7 @@ function WaveformIcon({ isActive }: { isActive: boolean }) {
 }
 
 export default function VoiceInputButton({ onClick, onAccept, className = "" }: VoiceInputButtonProps) {
+  const { toast } = useToast();
   const { 
     isRecording, 
     partialTranscript,
@@ -66,6 +72,26 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [draftTranscript, setDraftTranscript] = useState("");
+  const lastAppliedCommittedIndexRef = useRef(0);
+
+  useEffect(() => {
+    if (!isRecording) return;
+    lastAppliedCommittedIndexRef.current = 0;
+    setDraftTranscript("");
+  }, [isRecording]);
+
+  useEffect(() => {
+    if (!isRecording) return;
+    const len = committedTranscripts.length;
+    const start = lastAppliedCommittedIndexRef.current;
+    if (len <= start) return;
+    const newSegments = committedTranscripts.slice(start).join(" ").trim();
+    lastAppliedCommittedIndexRef.current = len;
+    if (!newSegments) return;
+    setDraftTranscript((prev) => (prev ? `${prev} ${newSegments}` : newSegments));
+  }, [isRecording, committedTranscripts]);
 
   const handleStop = () => {
     setIsConnecting(false);
@@ -74,46 +100,50 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
     stopRecording();
   };
 
-  const handleAccept = () => {
-    // Get the full transcript (combine committed transcripts)
-    const fullTranscript = committedTranscripts.join(' ').trim();
-    
-    // Call the onAccept callback from the context (for ContentEditableCell)
+  const handleAccept = async () => {
+    if (isTranslating) return;
+    const fullTranscript = draftTranscript.trim();
+    if (!fullTranscript) return;
+
+    let finalText = fullTranscript;
+    if (shouldTranslateToEnglish(detectedLanguage)) {
+      setIsTranslating(true);
+      try {
+        finalText = await translateToEnglish(fullTranscript, detectedLanguage);
+      } catch (err) {
+        finalText = fullTranscript;
+        toast({
+          variant: "destructive",
+          title: "Translation failed",
+          description: err instanceof Error ? err.message : "Using original transcript.",
+        });
+      } finally {
+        setIsTranslating(false);
+      }
+    }
+
     const contextOnAccept = getOnAcceptCallback();
-    if (contextOnAccept && fullTranscript) {
-      contextOnAccept(fullTranscript);
+    if (contextOnAccept && finalText) {
+      contextOnAccept(finalText);
     }
-    
-    // Call the onAccept prop callback with the transcript and language code
-    if (onAccept && fullTranscript) {
-      onAccept(fullTranscript, detectedLanguage);
+
+    if (onAccept && finalText) {
+      onAccept(finalText, detectedLanguage);
     }
-    
-    // Stop recording
+
     setIsConnecting(false);
     setIsSpeaking(false);
     setIsConnected(false);
     stopRecording();
-    
-    // Trigger the onClick callback if provided
+
     onClick?.();
   };
 
-  // Don't render anything if not recording
   if (!isRecording) {
     return null;
   }
 
-  // With VAD enabled, separate committed and partial transcripts
-  const committedText = committedTranscripts.join(' ').trim();
-  
-  // For the accept button, use committed transcripts (VAD auto-commits on silence)
-  const fullTranscript = committedText;
-  
-  // Combined display text for textarea (committed + partial)
-  const displayTranscript = committedText 
-    ? (partialTranscript ? `${committedText} ${partialTranscript}` : committedText)
-    : partialTranscript;
+  const fullTranscript = draftTranscript.trim();
 
   // Format language code for display (e.g., "en" -> "English")
   const getLanguageName = (code: string): string => {
@@ -142,8 +172,8 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
 
   return (
     <>
-      {/* AssemblyAI Transcription Service - can be swapped for other services */}
-      <AssemblyAITranscription
+      {/* ElevenLabs realtime STT */}
+      <ElevenLabsTranscription
         isRecording={isRecording}
         onPartialTranscript={setPartialTranscript}
         onCommittedTranscript={addCommittedTranscript}
@@ -191,12 +221,21 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             {/* Accept button - show when we have transcript and not connecting */}
             {fullTranscript && !error && !isConnecting && (
               <button
-                onClick={handleAccept}
-                className="px-3 py-1.5 bg-[#00b4b8] hover:bg-[#009da1] text-white text-[12px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap"
-                aria-label="Accept transcript"
-                title="Accept transcript"
+                type="button"
+                onClick={() => void handleAccept()}
+                disabled={isTranslating}
+                className="px-3 py-1.5 bg-[#00b4b8] hover:bg-[#009da1] disabled:opacity-60 disabled:cursor-not-allowed text-white text-[12px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5"
+                aria-label={isTranslating ? "Translating transcript" : "Accept transcript"}
+                title={isTranslating ? "Translating…" : "Accept transcript"}
               >
-                Accept
+                {isTranslating ? (
+                  <>
+                    <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                    Translating…
+                  </>
+                ) : (
+                  "Accept"
+                )}
               </button>
             )}
 
@@ -213,10 +252,12 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             
             {/* Stop button */}
             <button
+              type="button"
               onClick={handleStop}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors shrink-0 cursor-pointer"
+              disabled={isTranslating}
+              className="p-2 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-full transition-colors shrink-0 cursor-pointer"
               aria-label="Cancel recording"
-              title="Cancel recording"
+              title={isTranslating ? "Wait for translation to finish" : "Cancel recording"}
             >
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
@@ -237,16 +278,28 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
                 <p className="text-[12px] font-normal text-red-500 font-['Urbanist',sans-serif] px-1">
                   {error}
                 </p>
-              ) : (committedText || partialTranscript) ? (
-                <textarea
-                  value={committedText || partialTranscript}
-                  readOnly
-                  placeholder="Your transcription will appear here..."
-                  className="w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none h-[140px] overflow-y-auto focus:outline-none"
-                  style={{
-                    color: '#10141a',
-                  }}
-                />
+              ) : draftTranscript || partialTranscript ? (
+                <div className="flex flex-col gap-1 min-w-0">
+                  <textarea
+                    value={draftTranscript}
+                    onChange={(e) => setDraftTranscript(e.target.value)}
+                    placeholder="Your transcription will appear here..."
+                    className="w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none h-[140px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8]"
+                    style={{
+                      color: "#10141a",
+                    }}
+                    aria-label="Transcript, editable"
+                  />
+                  {partialTranscript.trim() ? (
+                    <p
+                      className="text-[11px] font-normal text-[#808081] font-['Urbanist',sans-serif] px-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                      title={partialTranscript}
+                      aria-live="polite"
+                    >
+                      Listening: {partialTranscript}
+                    </p>
+                  ) : null}
+                </div>
               ) : (
                 <div className="w-full h-[140px] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 flex items-center justify-center">
                   <p className="text-[12px] text-[#808081] font-['Urbanist',sans-serif]">
