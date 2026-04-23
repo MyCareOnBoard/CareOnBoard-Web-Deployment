@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation, listShifts, categorizeShifts, clockIn as apiClockIn, clockOut as apiClockOut } from "@/lib/api/shifts";
+import { getExpiryState, formatCountdown, convertTimeToISODate } from "@/lib/shift-expiry";
 import { format } from "date-fns";
 import { ClockOutModal } from "./ClockOutModal";
 import { ClockInModal } from "./ClockInModal";
@@ -13,29 +14,6 @@ import { toast } from "sonner";
 import { useAuth } from "@/utils/auth/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useReverseGeocode } from "@/hooks/useReverseGeocode";
-
-const convertTimeToISODate = (timeStringReplaced: string, dateString: string): Date => {
-  const timeString = timeStringReplaced.replace(".", ":");
-  const timeMatch = timeString.match(/(\d+):(\d+):?\s*(AM|PM)/i);
-  if (!timeMatch) {
-    throw new Error(`Invalid time format: ${timeString}`);
-  }
-
-  let hours = parseInt(timeMatch[1], 10);
-  const minutes = parseInt(timeMatch[2], 10);
-  const period = timeMatch[3].toUpperCase();
-
-  if (period === 'PM' && hours !== 12) {
-    hours += 12;
-  } else if (period === 'AM' && hours === 12) {
-    hours = 0;
-  }
-
-  const date = new Date(dateString);
-  date.setHours(hours, minutes, 0, 0);
-
-  return date;
-};
 
 const formatTimeRemaining = (minutes: number): string => {
   if (minutes < 60) {
@@ -124,23 +102,6 @@ const checkLocationMatch = (
   return [false, 0];
 };
 
-const isShiftExpiringSoon = (startTime: string, endTime: string, date: string): boolean => {
-  try {
-    const now = new Date();
-    const startDateTime = convertTimeToISODate(startTime, date);
-    const endDateTime = convertTimeToISODate(endTime, date);
-
-    const totalDuration = endDateTime.getTime() - startDateTime.getTime();
-    const elapsed = now.getTime() - startDateTime.getTime();
-
-    const threshold = totalDuration * 0.25;
-    return elapsed >= threshold;
-  } catch (error) {
-    console.error('Error calculating if shift is expiring soon:', error);
-    return false;
-  }
-};
-
 const calculateTimeUntilStart = (startTime: string, date: string): string => {
   try {
     const now = new Date();
@@ -183,49 +144,6 @@ const isShiftPassed = (endTime: string | undefined, date: string): boolean => {
   }
 };
 
-const isShiftExpired = (shift: Shift): boolean => {
-  if (shift.status === ShiftStatus.COMPLETED) return false;
-  if (shift.clockedInAt) return false;
-  if (!shift.date) return false;
-
-  try {
-    const now = new Date();
-
-    // Mirror server: available/pending without clock-in expires 15 minutes after scheduled start
-    if (
-      (shift.status === ShiftStatus.AVAILABLE || shift.status === ShiftStatus.PENDING) &&
-      shift.startTime
-    ) {
-      const startDateTime = convertTimeToISODate(shift.startTime, shift.date);
-      const graceEnd = startDateTime.getTime() + 15 * 60 * 1000;
-      if (now.getTime() > graceEnd) {
-        return true;
-      }
-    }
-
-    let endDateTime: Date;
-
-    if (shift.endTime) {
-      endDateTime = convertTimeToISODate(shift.endTime, shift.date);
-    } else {
-      const date = new Date(shift.date);
-      endDateTime = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        23,
-        59,
-        59
-      );
-    }
-
-    return endDateTime.getTime() < now.getTime();
-  } catch (error) {
-    console.error('Error checking if shift is expired:', error);
-    return false;
-  }
-};
-
 interface ShiftCardProps {
   shift: Shift;
   panel: ShiftPanel;
@@ -243,6 +161,59 @@ function ShiftCard({
   onActionClick,
   isLoading = false
 }: ShiftCardProps) {
+  const [expiryTick, setExpiryTick] = useState(0);
+  useEffect(() => {
+    let intervalId: ReturnType<typeof window.setInterval> | null = null;
+    let timeoutId: ReturnType<typeof window.setTimeout> | null = null;
+    const tick = () => setExpiryTick((x) => x + 1);
+
+    if (shift.clockedInAt) {
+      return undefined;
+    }
+
+    const state = getExpiryState(shift, new Date());
+    if (!state) {
+      return undefined;
+    }
+
+    if (state.isExpiringWindow) {
+      intervalId = window.setInterval(tick, 1000);
+    } else if (!state.isExpired) {
+      const msToWindow = state.graceEnd - Date.now();
+      if (msToWindow > 0 && msToWindow < 6 * 60 * 60 * 1000) {
+        timeoutId = window.setTimeout(() => {
+          tick();
+          intervalId = window.setInterval(tick, 1000);
+        }, msToWindow);
+      }
+    }
+
+    return () => {
+      if (intervalId !== null) window.clearInterval(intervalId);
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
+  }, [
+    shift.id,
+    shift.clockedInAt,
+    shift.status,
+    shift.date,
+    shift.startTime,
+    shift.endTime,
+    shift.actionStatus,
+  ]);
+  const expiryState = useMemo(
+    () => getExpiryState(shift, new Date()),
+    [
+      shift.id,
+      shift.status,
+      shift.clockedInAt,
+      shift.startTime,
+      shift.endTime,
+      shift.date,
+      expiryTick,
+    ],
+  );
+
   const getStatusColor = (status?: string) => {
     if (!status) return "";
 
@@ -258,7 +229,7 @@ function ShiftCard({
 
   const getActionButton = () => {
     if (!showAction || !shift.actionStatus) return null;
-    if (panel === 'today' && isShiftExpired(shift)) return null;
+    if (panel === 'today' && expiryState?.isExpired) return null;
 
     const buttonConfig = {
       [ShiftActionStatus.CLOCK_IN]: {
@@ -357,17 +328,26 @@ function ShiftCard({
         <div className="flex flex-wrap items-center gap-2">
           {panel === 'today' && (
             <>
-              {isShiftExpired(shift) ? (
+              {expiryState?.isExpired ? (
                 <span
                   className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
                   Expired
                 </span>
-              ) : shift.startTime && shift.endTime && shift.date && isShiftExpiringSoon(shift.startTime, shift.endTime, shift.date) && shift.actionStatus === ShiftActionStatus.CLOCK_IN && (
-                <span
-                  className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  Expiring Soon
-                </span>
-              )}
+              ) : expiryState?.isExpiringWindow && shift.actionStatus === ShiftActionStatus.CLOCK_IN ? (
+                <>
+                  <span
+                    className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
+                    {formatCountdown(expiryState.msUntilHardExpiry)}
+                  </span>
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className="sr-only">
+                    {`Shift expires in ${Math.ceil(expiryState.msUntilHardExpiry / 60000)} minutes`}
+                  </span>
+                </>
+              ) : null}
 
               {(shift.status === ShiftStatus.ONGOING || shift.actionStatus === ShiftActionStatus.CLOCK_OUT) && (
                 <span
@@ -498,17 +478,26 @@ function ShiftCard({
         <div className="flex flex-wrap items-center gap-2">
           {panel === 'today' && (
             <>
-              {isShiftExpired(shift) ? (
+              {expiryState?.isExpired ? (
                 <span
                   className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
                   Expired
                 </span>
-              ) : shift.startTime && shift.endTime && shift.date && isShiftExpiringSoon(shift.startTime, shift.endTime, shift.date) && shift.actionStatus === ShiftActionStatus.CLOCK_IN && (
-                <span
-                  className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  Expiring Soon
-                </span>
-              )}
+              ) : expiryState?.isExpiringWindow && shift.actionStatus === ShiftActionStatus.CLOCK_IN ? (
+                <>
+                  <span
+                    className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
+                    {formatCountdown(expiryState.msUntilHardExpiry)}
+                  </span>
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className="sr-only">
+                    {`Shift expires in ${Math.ceil(expiryState.msUntilHardExpiry / 60000)} minutes`}
+                  </span>
+                </>
+              ) : null}
 
               {(shift.status === ShiftStatus.ONGOING || shift.actionStatus === ShiftActionStatus.CLOCK_OUT) && (
                 <span
