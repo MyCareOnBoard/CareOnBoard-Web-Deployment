@@ -57,7 +57,6 @@ export default function AssemblyAITranscription({
             sample_rate: "16000",
             formatted_finals: "true",
             speech_model: "universal-streaming-multilingual",
-            // Enable language detection so Turn messages may include language_code
             language_detection: "true",
             token,
           };
