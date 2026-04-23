@@ -67,23 +67,24 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [draftTranscript, setDraftTranscript] = useState("");
-  const skipLiveSyncRef = useRef(false);
-  const draftAtFocusRef = useRef("");
+  const lastAppliedCommittedIndexRef = useRef(0);
 
-  const committedText = committedTranscripts.join(" ").trim();
-  const liveTranscript = [committedText, partialTranscript].filter(Boolean).join(" ");
-
-  // Resume live sync each session so a prior "focus to pause overwrites" does not stick across recordings.
   useEffect(() => {
     if (!isRecording) return;
-    skipLiveSyncRef.current = false;
+    lastAppliedCommittedIndexRef.current = 0;
+    setDraftTranscript("");
   }, [isRecording]);
 
   useEffect(() => {
     if (!isRecording) return;
-    if (skipLiveSyncRef.current) return;
-    setDraftTranscript(liveTranscript);
-  }, [isRecording, liveTranscript]);
+    const len = committedTranscripts.length;
+    const start = lastAppliedCommittedIndexRef.current;
+    if (len <= start) return;
+    const newSegments = committedTranscripts.slice(start).join(" ").trim();
+    lastAppliedCommittedIndexRef.current = len;
+    if (!newSegments) return;
+    setDraftTranscript((prev) => (prev ? `${prev} ${newSegments}` : newSegments));
+  }, [isRecording, committedTranscripts]);
 
   const handleStop = () => {
     setIsConnecting(false);
@@ -244,30 +245,28 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
                 <p className="text-[12px] font-normal text-red-500 font-['Urbanist',sans-serif] px-1">
                   {error}
                 </p>
-              ) : (committedText || partialTranscript || draftTranscript) ? (
-                <textarea
-                  value={draftTranscript}
-                  onChange={(e) => setDraftTranscript(e.target.value)}
-                  onFocus={() => {
-                    skipLiveSyncRef.current = true;
-                    draftAtFocusRef.current = draftTranscript;
-                  }}
-                  onBlur={() => {
-                    skipLiveSyncRef.current = false;
-                    setDraftTranscript((current) => {
-                      if (current === draftAtFocusRef.current) {
-                        return liveTranscript;
-                      }
-                      return current;
-                    });
-                  }}
-                  placeholder="Your transcription will appear here..."
-                  className="w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none h-[140px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8]"
-                  style={{
-                    color: "#10141a",
-                  }}
-                  aria-label="Transcript, editable"
-                />
+              ) : draftTranscript || partialTranscript ? (
+                <div className="flex flex-col gap-1 min-w-0">
+                  <textarea
+                    value={draftTranscript}
+                    onChange={(e) => setDraftTranscript(e.target.value)}
+                    placeholder="Your transcription will appear here..."
+                    className="w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none h-[140px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8]"
+                    style={{
+                      color: "#10141a",
+                    }}
+                    aria-label="Transcript, editable"
+                  />
+                  {partialTranscript.trim() ? (
+                    <p
+                      className="text-[11px] font-normal text-[#808081] font-['Urbanist',sans-serif] px-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                      title={partialTranscript}
+                      aria-live="polite"
+                    >
+                      Listening: {partialTranscript}
+                    </p>
+                  ) : null}
+                </div>
               ) : (
                 <div className="w-full h-[140px] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 flex items-center justify-center">
                   <p className="text-[12px] text-[#808081] font-['Urbanist',sans-serif]">
