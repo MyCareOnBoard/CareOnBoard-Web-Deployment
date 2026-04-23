@@ -17,6 +17,8 @@ import {
     useSubmitGoalDocumentMutation
 } from "./api";
 import {DocumentType, NaturalSupportsTrainingDocument} from "@/lib/api/goals-and-documents";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
+import VoiceInputButton from "@/components/VoiceInputButton";
 import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 
 export default function NaturalSupportsTraining() {
@@ -242,7 +244,7 @@ export default function NaturalSupportsTraining() {
 
     return (
         <VoiceRecordingProvider pageTitle="Natural Supports Training">
-        <div className="min-h-[calc(100vh-200px)]">
+        <div className="min-h-[calc(100vh-200px)] pb-20">
             {/* Header with Back Button */}
             <div className="mb-8">
                 <button
@@ -494,13 +496,25 @@ export default function NaturalSupportsTraining() {
                                             className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
                                             Brief Description of Content of Training Topic #{index + 1}:
                                         </label>
-                                        <Textarea
-                                            value={training.description}
-                                            onChange={(e) => handleTrainingChange(index, "description", e.target.value)}
-                                            placeholder=""
-                                            className="w-full bg-white border border-[#cccccd]"
-                                            rows={4}
-                                        />
+                                        {!isReadOnly ? (
+                                            <VoiceEnabledTextarea
+                                                value={training.description}
+                                                onChange={(v) => handleTrainingChange(index, "description", v)}
+                                                placeholder=""
+                                                className="w-full bg-white border border-[#cccccd] min-h-[104px]"
+                                                fieldName={`Training topic ${index + 1} description`}
+                                                pageTitle="Natural Supports Training"
+                                            />
+                                        ) : (
+                                            <Textarea
+                                                value={training.description}
+                                                readOnly
+                                                disabled
+                                                placeholder=""
+                                                className="w-full bg-white border border-[#cccccd]"
+                                                rows={4}
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -548,6 +562,7 @@ export default function NaturalSupportsTraining() {
                     )}
                 </form>
             </div>
+            {!isReadOnly && <VoiceInputButton />}
         </div>
         </VoiceRecordingProvider>
     );

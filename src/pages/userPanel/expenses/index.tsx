@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
+import VoiceInputButton from "@/components/VoiceInputButton";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import { Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { submitExpense, uploadExpenseReceipt } from "@/lib/api/expenses";
@@ -133,7 +135,8 @@ export default function ExpensesPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)]">
+    <VoiceRecordingProvider pageTitle="Expenses">
+    <div className="min-h-[calc(100vh-200px)] pb-20">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
@@ -252,11 +255,13 @@ export default function ExpensesPage() {
           <label className="block text-base font-semibold text-[#10141a] mb-3">
             Your message
           </label>
-          <Textarea
+          <VoiceEnabledTextarea
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={setMessage}
             placeholder="Describe your expense here..."
             className="min-h-[200px] resize-none border-[#e5e5e6] rounded-xl focus:border-[#00b4b8] focus:ring-[#00b4b8] text-[#10141a] placeholder:text-[#a0a0a1]"
+            fieldName="Expense message"
+            pageTitle="Expenses"
           />
           <p className="text-xs text-[#808081] mt-2">
             {message.length} / 500 characters
@@ -281,6 +286,8 @@ export default function ExpensesPage() {
           </Button>
         </div>
       </div>
+      <VoiceInputButton />
     </div>
+    </VoiceRecordingProvider>
   );
 }
