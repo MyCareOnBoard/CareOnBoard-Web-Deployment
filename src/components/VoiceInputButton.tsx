@@ -2,6 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import MicrophoneIcon from "@/assets/icons/microphone.svg?react";
 import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
 import ElevenLabsTranscription from "@/components/transcription/ElevenLabsTranscription";
+import {
+  shouldTranslateToEnglish,
+  translateToEnglish,
+} from "@/lib/translation";
+import { useToast } from "@/hooks/use-toast";
 // import AssemblyAITranscription from "@/components/transcription/AssemblyAITranscription";
 
 interface VoiceInputButtonProps {
@@ -50,6 +55,7 @@ function WaveformIcon({ isActive }: { isActive: boolean }) {
 }
 
 export default function VoiceInputButton({ onClick, onAccept, className = "" }: VoiceInputButtonProps) {
+  const { toast } = useToast();
   const { 
     isRecording, 
     partialTranscript,
@@ -66,6 +72,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [draftTranscript, setDraftTranscript] = useState("");
   const lastAppliedCommittedIndexRef = useRef(0);
 
@@ -93,27 +100,42 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
     stopRecording();
   };
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
+    if (isTranslating) return;
     const fullTranscript = draftTranscript.trim();
-    
-    // Call the onAccept callback from the context (for ContentEditableCell)
+    if (!fullTranscript) return;
+
+    let finalText = fullTranscript;
+    if (shouldTranslateToEnglish(detectedLanguage)) {
+      setIsTranslating(true);
+      try {
+        finalText = await translateToEnglish(fullTranscript, detectedLanguage);
+      } catch (err) {
+        finalText = fullTranscript;
+        toast({
+          variant: "destructive",
+          title: "Translation failed",
+          description: err instanceof Error ? err.message : "Using original transcript.",
+        });
+      } finally {
+        setIsTranslating(false);
+      }
+    }
+
     const contextOnAccept = getOnAcceptCallback();
-    if (contextOnAccept && fullTranscript) {
-      contextOnAccept(fullTranscript);
+    if (contextOnAccept && finalText) {
+      contextOnAccept(finalText);
     }
-    
-    // Call the onAccept prop callback with the transcript and language code
-    if (onAccept && fullTranscript) {
-      onAccept(fullTranscript, detectedLanguage);
+
+    if (onAccept && finalText) {
+      onAccept(finalText, detectedLanguage);
     }
-    
-    // Stop recording
+
     setIsConnecting(false);
     setIsSpeaking(false);
     setIsConnected(false);
     stopRecording();
-    
-    // Trigger the onClick callback if provided
+
     onClick?.();
   };
 
@@ -199,12 +221,21 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             {/* Accept button - show when we have transcript and not connecting */}
             {fullTranscript && !error && !isConnecting && (
               <button
-                onClick={handleAccept}
-                className="px-3 py-1.5 bg-[#00b4b8] hover:bg-[#009da1] text-white text-[12px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap"
-                aria-label="Accept transcript"
-                title="Accept transcript"
+                type="button"
+                onClick={() => void handleAccept()}
+                disabled={isTranslating}
+                className="px-3 py-1.5 bg-[#00b4b8] hover:bg-[#009da1] disabled:opacity-60 disabled:cursor-not-allowed text-white text-[12px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5"
+                aria-label={isTranslating ? "Translating transcript" : "Accept transcript"}
+                title={isTranslating ? "Translating…" : "Accept transcript"}
               >
-                Accept
+                {isTranslating ? (
+                  <>
+                    <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                    Translating…
+                  </>
+                ) : (
+                  "Accept"
+                )}
               </button>
             )}
 
@@ -221,10 +252,12 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             
             {/* Stop button */}
             <button
+              type="button"
               onClick={handleStop}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors shrink-0 cursor-pointer"
+              disabled={isTranslating}
+              className="p-2 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-full transition-colors shrink-0 cursor-pointer"
               aria-label="Cancel recording"
-              title="Cancel recording"
+              title={isTranslating ? "Wait for translation to finish" : "Cancel recording"}
             >
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path

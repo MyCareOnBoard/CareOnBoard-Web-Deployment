@@ -163,8 +163,8 @@ function ShiftCard({
 }: ShiftCardProps) {
   const [expiryTick, setExpiryTick] = useState(0);
   useEffect(() => {
-    let intervalId: ReturnType<typeof window.setInterval> | null = null;
-    let timeoutId: ReturnType<typeof window.setTimeout> | null = null;
+    let intervalId: number | null = null;
+    let timeoutId: number | null = null;
     const tick = () => setExpiryTick((x) => x + 1);
 
     if (shift.clockedInAt) {
