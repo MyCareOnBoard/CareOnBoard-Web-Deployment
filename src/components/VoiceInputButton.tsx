@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import MicrophoneIcon from "@/assets/icons/microphone.svg?react";
 import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
-// import ElevenLabsTranscription from "@/components/transcription/ElevenLabsTranscription";
-import AssemblyAITranscription from "@/components/transcription/AssemblyAITranscription";
+import ElevenLabsTranscription from "@/components/transcription/ElevenLabsTranscription";
+// import AssemblyAITranscription from "@/components/transcription/AssemblyAITranscription";
 
 interface VoiceInputButtonProps {
   onClick?: () => void;
@@ -66,6 +66,22 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [draftTranscript, setDraftTranscript] = useState("");
+  const skipLiveSyncRef = useRef(false);
+
+  const committedText = committedTranscripts.join(" ").trim();
+  const liveTranscript = [committedText, partialTranscript].filter(Boolean).join(" ");
+
+  useEffect(() => {
+    if (!isRecording) return;
+    skipLiveSyncRef.current = false;
+  }, [isRecording]);
+
+  useEffect(() => {
+    if (!isRecording) return;
+    if (skipLiveSyncRef.current) return;
+    setDraftTranscript(liveTranscript);
+  }, [isRecording, liveTranscript]);
 
   const handleStop = () => {
     setIsConnecting(false);
@@ -75,8 +91,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   };
 
   const handleAccept = () => {
-    // Get the full transcript (combine committed transcripts)
-    const fullTranscript = committedTranscripts.join(' ').trim();
+    const fullTranscript = draftTranscript.trim();
     
     // Call the onAccept callback from the context (for ContentEditableCell)
     const contextOnAccept = getOnAcceptCallback();
@@ -99,21 +114,11 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
     onClick?.();
   };
 
-  // Don't render anything if not recording
   if (!isRecording) {
     return null;
   }
 
-  // With VAD enabled, separate committed and partial transcripts
-  const committedText = committedTranscripts.join(' ').trim();
-  
-  // For the accept button, use committed transcripts (VAD auto-commits on silence)
-  const fullTranscript = committedText;
-  
-  // Combined display text for textarea (committed + partial)
-  const displayTranscript = committedText 
-    ? (partialTranscript ? `${committedText} ${partialTranscript}` : committedText)
-    : partialTranscript;
+  const fullTranscript = draftTranscript.trim();
 
   // Format language code for display (e.g., "en" -> "English")
   const getLanguageName = (code: string): string => {
@@ -143,7 +148,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   return (
     <>
       {/* AssemblyAI Transcription Service - can be swapped for other services */}
-      <AssemblyAITranscription
+      <ElevenLabsTranscription
         isRecording={isRecording}
         onPartialTranscript={setPartialTranscript}
         onCommittedTranscript={addCommittedTranscript}
@@ -237,15 +242,23 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
                 <p className="text-[12px] font-normal text-red-500 font-['Urbanist',sans-serif] px-1">
                   {error}
                 </p>
-              ) : (committedText || partialTranscript) ? (
+              ) : (committedText || partialTranscript || draftTranscript) ? (
                 <textarea
-                  value={committedText || partialTranscript}
-                  readOnly
-                  placeholder="Your transcription will appear here..."
-                  className="w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none h-[140px] overflow-y-auto focus:outline-none"
-                  style={{
-                    color: '#10141a',
+                  value={draftTranscript}
+                  onChange={(e) => setDraftTranscript(e.target.value)}
+                  onFocus={() => {
+                    skipLiveSyncRef.current = true;
                   }}
+                  onBlur={() => {
+                    skipLiveSyncRef.current = false;
+                    setDraftTranscript(liveTranscript);
+                  }}
+                  placeholder="Your transcription will appear here..."
+                  className="w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none h-[140px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8]"
+                  style={{
+                    color: "#10141a",
+                  }}
+                  aria-label="Transcript, editable"
                 />
               ) : (
                 <div className="w-full h-[140px] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 flex items-center justify-center">

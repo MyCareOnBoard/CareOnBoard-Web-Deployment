@@ -58,6 +58,7 @@ export function VoiceRecordingProvider({ children, pageTitle }: VoiceRecordingPr
 
   const addCommittedTranscript = useCallback((text: string) => {
     setCommittedTranscripts(prev => [...prev, text]);
+    setPartialTranscript("");
     if (onTranscriptCallback.current) {
       onTranscriptCallback.current(text);
     }
