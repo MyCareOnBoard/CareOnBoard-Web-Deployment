@@ -202,7 +202,7 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
                   key={dsp.id}
                   className="flex items-center justify-between py-4 px-4 bg-gray-50 rounded-lg hover:bg-teal-50 cursor-pointer transition-colors"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 w-[350px]">
                     <button
                       onClick={() => navigateToProfile(dsp)}
                       className="flex items-center gap-4 cursor-pointer"

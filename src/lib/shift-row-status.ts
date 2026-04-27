@@ -1,6 +1,6 @@
 import { parseISO } from "date-fns";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
-import type { Shift } from "@/lib/api/shifts";
+import type { AnomalyCode, Shift } from "@/lib/api/shifts";
 import { ShiftStatus } from "@/lib/api/shifts";
 import { SHIFT_ROW_PILL } from "@/lib/shift-visual-tokens";
 
@@ -8,6 +8,34 @@ export type ShiftRowStatusInfo = {
   label: string;
   color: string;
   bgColor: string;
+};
+
+const ANOMALY_ROW_STATUS: Record<AnomalyCode, ShiftRowStatusInfo> = {
+  invalid_time: {
+    label: "Bad window",
+    color: "#7c3aed",
+    bgColor: "rgba(124,58,237,0.08)",
+  },
+  unassigned: {
+    label: "No DSP",
+    color: "#2563eb",
+    bgColor: "rgba(37,99,235,0.08)",
+  },
+  missed: {
+    label: "Missed",
+    color: SHIFT_ROW_PILL.missed.color,
+    bgColor: SHIFT_ROW_PILL.missed.bgColor,
+  },
+  incomplete_clock: {
+    label: "Incomplete",
+    color: SHIFT_ROW_PILL.incomplete.color,
+    bgColor: SHIFT_ROW_PILL.incomplete.bgColor,
+  },
+  late_clock_in: {
+    label: "Late clock-in",
+    color: SHIFT_ROW_PILL.late.color,
+    bgColor: SHIFT_ROW_PILL.late.bgColor,
+  },
 };
 
 export function parseShiftEndTimeToParts(time: string): { hours: number; minutes: number } | null {
@@ -68,13 +96,13 @@ export function isShiftMissed(shift: Shift): boolean {
 
 /** Same rules as Scheduling “Recent shifts” status pill. */
 export function getShiftRowStatusInfo(shift: Shift, _approved?: boolean): ShiftRowStatusInfo {
+  const anomalyCode = detectShiftAnomalyCodes(shift)[0];
+  if (anomalyCode) {
+    return ANOMALY_ROW_STATUS[anomalyCode];
+  }
   if (isShiftMissed(shift)) {
     const s = SHIFT_ROW_PILL.missed;
     return { label: "Missed", color: s.color, bgColor: s.bgColor };
-  }
-  if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
-    const s = SHIFT_ROW_PILL.incomplete;
-    return { label: "Incomplete", color: s.color, bgColor: s.bgColor };
   }
 
   switch (shift.status) {

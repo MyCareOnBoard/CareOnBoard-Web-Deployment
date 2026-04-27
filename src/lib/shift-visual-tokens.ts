@@ -7,6 +7,7 @@ import type { AnomalyCode } from "@/lib/api/shifts";
 export const SHIFT_ROW_PILL = {
   missed: { color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" },
   incomplete: { color: "#B45309", bgColor: "rgba(254, 243, 199, 0.65)" },
+  late: { color: "#b45309", bgColor: "rgba(251,191,36,0.18)" },
   active: { color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" },
   completed: { color: "#525253", bgColor: "rgba(178,178,179,0.05)" },
   pending: { color: "#808081", bgColor: "rgba(128,128,129,0.05)" },
@@ -17,6 +18,7 @@ export const SHIFT_ROW_PILL = {
 export const ANOMALY_CHIP_CLASS: Record<AnomalyCode, string> = {
   missed: "border border-[#FF6C10] bg-[rgba(255,108,16,0.05)] text-[#FF6C10]",
   incomplete_clock: "border border-[#B45309] bg-[rgba(254,243,199,0.65)] text-[#B45309]",
+  late_clock_in: "border border-[#d97706] bg-[rgba(251,191,36,0.18)] text-[#b45309]",
   unassigned: "border border-[#2563eb] bg-[rgba(37,99,235,0.08)] text-[#2563eb]",
   invalid_time: "border border-[#7c3aed] bg-[rgba(124,58,237,0.08)] text-[#7c3aed]",
 };

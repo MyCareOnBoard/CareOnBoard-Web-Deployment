@@ -31,6 +31,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/utils/auth";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
+import { ANOMALY_LABELS } from "@/pages/shared/shift-maintenance/audit-display";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import {
   getInitialsFromShiftPersonName,
@@ -685,6 +686,11 @@ export default function SchedulingPage() {
             ) : (
               paginatedShifts.map((shift) => {
                 const statusInfo = getShiftRowStatusInfo(shift, shift.approved);
+                const anomalyCodes = detectShiftAnomalyCodes(shift);
+                const primaryAnomaly = anomalyCodes[0];
+                const primaryAnomalyMeta = primaryAnomaly ? ANOMALY_LABELS[primaryAnomaly] : null;
+                const primaryAnomalyLabel =
+                  primaryAnomaly === "incomplete_clock" ? "Incomplete shift" : primaryAnomalyMeta?.label;
                 const clientName = shift.client
                   ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
                   : "Unknown Client";
@@ -745,21 +751,30 @@ export default function SchedulingPage() {
 
                     {/* Status & Times */}
                     <div className="flex items-center gap-16 flex-1 w-[100px]">
-                      {/* Status Badge */}
-                      <div
-                        className="rounded-full min-w-[54px] min-h-7 flex items-center justify-center gap-1 px-2.5"
-                        style={{
-                          backgroundColor: statusInfo.bgColor,
-                          border: `1px solid ${statusInfo.color}`
-                        }}
-                      >
-                        <span
-                          className="text-[12px] font-semibold"
-                          style={{ color: statusInfo.color }}
+                      {/* Anomaly takes priority over status when present. */}
+                      {primaryAnomalyMeta ? (
+                        <div
+                          className={`rounded-full min-h-7 flex items-center justify-center gap-1 px-2.5 text-[12px] font-semibold whitespace-nowrap ${primaryAnomalyMeta.color}`}
+                          title={primaryAnomalyMeta.label}
                         >
-                          {statusInfo.label}
-                        </span>
-                      </div>
+                          {primaryAnomalyLabel}
+                        </div>
+                      ) : (
+                        <div
+                          className="rounded-full min-w-[54px] min-h-7 flex items-center justify-center gap-1 px-2.5"
+                          style={{
+                            backgroundColor: statusInfo.bgColor,
+                            border: `1px solid ${statusInfo.color}`
+                          }}
+                        >
+                          <span
+                            className="text-[12px] font-semibold"
+                            style={{ color: statusInfo.color }}
+                          >
+                            {statusInfo.label}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-16 flex-1 w-[100px]">

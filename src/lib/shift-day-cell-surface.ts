@@ -7,6 +7,7 @@ import { getShiftRowStatusInfo } from "@/lib/shift-row-status";
 const ANOMALY_DAY_SURFACE: Record<AnomalyCode, Pick<CSSProperties, "backgroundColor">> = {
   missed: { backgroundColor: "rgba(255,108,16,0.14)" },
   incomplete_clock: { backgroundColor: "rgba(254, 243, 199, 0.38)" },
+  late_clock_in: { backgroundColor: "rgba(251,191,36,0.22)" },
   unassigned: { backgroundColor: "rgba(37,99,235,0.1)" },
   invalid_time: { backgroundColor: "rgba(124,58,237,0.1)" },
 };

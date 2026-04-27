@@ -34,13 +34,14 @@ Plain-language summary of what the platform enforces and validates. No action re
 **No clock-in yet (shift still pending or available to clock in)**
 
 - **Grace (first 15 minutes after start):** You are still in the normal on-time window. The app does not show an “expiring” countdown during this period.
-- **After 15 minutes without clock-in:** The app can show a **countdown** until the hard cutoff (you still have time to clock in). The system may send the assigned caregiver a **reminder** that they have not clocked in yet (not every minute—scheduled checks). **Agency staff are not notified** just because the grace window passed with no clock-in; they are notified when someone **actually clocks in late** (see below).
+- **After 15 minutes without clock-in:** The app can show a **countdown** until the hard cutoff (you still have time to clock in). The system may send the assigned caregiver a **reminder** that they have not clocked in yet (not every minute—scheduled checks). Agency staff may also receive a one-time **shift expiring / no clock-in** alert for the same warning window.
 - **Hard no-show cutoff:** If there is still **no clock-in** by **one hour after** the scheduled start, the shift is treated as **expired** (no clock-in). When that happens, the system may send an **expiration** notification where that is enabled.
 - **Short visits:** If the scheduled **end time** is already in the past before that one-hour cutoff, the shift can still expire as **past the visit window** even if the one-hour rule has not been reached.
 
 **After you clock in**
 
 - A clock-in **more than 15 minutes after** the scheduled start counts as **late**. The system may store an **estimated end time** for that visit: your actual clock-in time plus the **planned length** of the shift (start-to-end, including overnight visits where the end is the next calendar day). Ongoing shifts are treated as past the visit when **now** is after the **scheduled end** or, when present, after that **estimated end time**—whichever applies.
+- Shift Maintenance flags those visits as **Late clock-in** when an estimated end time is present.
 - **Agency admins** may be notified when someone **clocks in late** (after the 15-minute grace). They are **not** sent a separate “shift started” notice for that same late clock-in, so they get one clear late clock-in alert instead of two.
 
 **Overnight visits**
@@ -62,6 +63,8 @@ Plain-language summary of what the platform enforces and validates. No action re
 ## Messages and notifications
 
 - Only appropriate updates are allowed on notification and conversation records so each account stays tied to the right person.
+
+For **how in-app, email (Mailgun), push (Expo), compliance expiry, and certification reminders work** in the backend (including scheduled jobs and delivery behavior), see **`docs/notifications-and-expiry-delivery.md`**.
 
 ---
 

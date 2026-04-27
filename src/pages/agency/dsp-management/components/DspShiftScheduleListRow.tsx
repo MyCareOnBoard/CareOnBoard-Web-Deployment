@@ -29,10 +29,11 @@ export type DspShiftScheduleListRowProps = {
   clockedOutDisplay: string;
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
-  onDetails: () => void;
-  onEdit: () => void;
-  onMaintenance: () => void;
-  onDelete: () => void;
+  onDetails?: () => void;
+  onEdit?: () => void;
+  onMaintenance?: () => void;
+  onDelete?: () => void;
+  showActions?: boolean;
   showApproveMenuItem?: boolean;
   onApprove?: () => void;
 };
@@ -56,6 +57,7 @@ function DspShiftScheduleListRowInner({
   onEdit,
   onMaintenance,
   onDelete,
+  showActions = true,
   showApproveMenuItem,
   onApprove,
 }: DspShiftScheduleListRowProps) {
@@ -117,14 +119,6 @@ function DspShiftScheduleListRowInner({
         <span className="text-[#10141a] break-words">{loc}</span>
       </div>
 
-      {durationLabel ? (
-        <div className="shrink-0">
-          <span className="px-4 py-1.5 rounded-full text-xs font-medium border border-teal-400 text-teal-600 bg-white whitespace-nowrap">
-            {durationLabel}
-          </span>
-        </div>
-      ) : null}
-
       <div className="flex items-center gap-16 flex-1 min-w-[100px] shrink-0">
         <div
           className="rounded-full min-w-[54px] min-h-7 flex items-center justify-center gap-1 px-2.5"
@@ -153,6 +147,15 @@ function DspShiftScheduleListRowInner({
         </div>
       </div>
 
+      {durationLabel ? (
+        <div className="shrink-0">
+          <span className="px-4 py-1.5 rounded-full text-xs font-medium border border-teal-400 text-teal-600 bg-white whitespace-nowrap">
+            {durationLabel}
+          </span>
+        </div>
+      ) : null}
+
+      {showActions ? (
       <Popover open={menuOpen} onOpenChange={onMenuOpenChange}>
         <PopoverTrigger asChild>
           <Button
@@ -172,36 +175,42 @@ function DspShiftScheduleListRowInner({
           align="end"
         >
           <div className="flex flex-col gap-0.5" role="menu">
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#10141a] hover:bg-black/[0.06]"
-              aria-label="Open full shift details page"
-              onClick={onDetails}
-            >
-              <FileText className="size-4 shrink-0 text-[#808081]" aria-hidden />
-              Details
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#10141a] hover:bg-black/[0.06]"
-              aria-label="Edit this shift in the schedule"
-              onClick={onEdit}
-            >
-              <Pencil className="size-4 shrink-0 text-[#808081]" aria-hidden />
-              Edit
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#10141a] hover:bg-black/[0.06]"
-              aria-label="Adjust clock times, notes, or mark shift completed"
-              onClick={onMaintenance}
-            >
-              <Wrench className="size-4 shrink-0 text-[#808081]" aria-hidden />
-              Maintenance
-            </button>
+            {onDetails ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#10141a] hover:bg-black/[0.06]"
+                aria-label="Open full shift details page"
+                onClick={onDetails}
+              >
+                <FileText className="size-4 shrink-0 text-[#808081]" aria-hidden />
+                Details
+              </button>
+            ) : null}
+            {onEdit ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#10141a] hover:bg-black/[0.06]"
+                aria-label="Edit this shift in the schedule"
+                onClick={onEdit}
+              >
+                <Pencil className="size-4 shrink-0 text-[#808081]" aria-hidden />
+                Edit
+              </button>
+            ) : null}
+            {onMaintenance ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#10141a] hover:bg-black/[0.06]"
+                aria-label="Adjust clock times, notes, or mark shift completed"
+                onClick={onMaintenance}
+              >
+                <Wrench className="size-4 shrink-0 text-[#808081]" aria-hidden />
+                Maintenance
+              </button>
+            ) : null}
             {showApproveMenuItem && onApprove ? (
               <button
                 type="button"
@@ -214,19 +223,22 @@ function DspShiftScheduleListRowInner({
                 Approve
               </button>
             ) : null}
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#D53411] hover:bg-red-50"
-              aria-label="Delete this shift from the schedule"
-              onClick={onDelete}
-            >
-              <Trash2 className="size-4 shrink-0" aria-hidden />
-              Delete
-            </button>
+            {onDelete ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#D53411] hover:bg-red-50"
+                aria-label="Delete this shift from the schedule"
+                onClick={onDelete}
+              >
+                <Trash2 className="size-4 shrink-0" aria-hidden />
+                Delete
+              </button>
+            ) : null}
           </div>
         </PopoverContent>
       </Popover>
+      ) : null}
     </div>
   );
 }

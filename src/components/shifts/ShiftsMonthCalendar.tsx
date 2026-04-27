@@ -195,11 +195,9 @@ function CompactShiftSummary({
       <div className="text-[10px] font-semibold leading-tight text-[#10141a]">
         {inC}–{outC}
       </div>
-      {!hasAnyClock && (
-        <div className="text-[9px] font-medium leading-tight text-[#565656]">
-          Scheduled: {formatShiftWindow(shift)}
-        </div>
-      )}
+      <div className="text-[9px] font-medium leading-tight text-[#565656]">
+        Scheduled: {formatShiftWindow(shift)}
+      </div>
       <div className="truncate text-[10px] font-medium leading-tight text-[#10141a]">{name}</div>
       {showBadge ? (
         <div className="flex min-w-0">
@@ -468,16 +466,20 @@ export function ShiftsMonthCalendar({
     for (const day of calendarDays) {
       const key = format(day, "yyyy-MM-dd");
       const list = shiftsByDate.get(key) ?? [];
-      const first = list[0];
+      const anomalyFirst = list.find((shift) => detectShiftAnomalyCodes(shift).length > 0);
+      const displayList = anomalyFirst
+        ? [anomalyFirst, ...list.filter((shift) => shift.id !== anomalyFirst.id)]
+        : list;
+      const first = displayList[0];
       const inMonth = isSameMonth(day, visibleMonth);
       const surface =
         inMonth && first ? getShiftDayCellSurfaceStyle(first) : undefined;
       out.set(key, {
         first,
-        rest: list.slice(1),
+        rest: displayList.slice(1),
         count: list.length,
         surface,
-        gridAria: buildGridcellAriaLabel(day, variant, list),
+        gridAria: buildGridcellAriaLabel(day, variant, displayList),
       });
     }
     return out;

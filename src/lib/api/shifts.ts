@@ -790,7 +790,7 @@ export const clearShifts = async (): Promise<ClearShiftsResponse> => {
  */
 // ==================== Maintenance API ====================
 
-export type AnomalyCode = "missed" | "incomplete_clock" | "unassigned" | "invalid_time";
+export type AnomalyCode = "missed" | "incomplete_clock" | "late_clock_in" | "unassigned" | "invalid_time";
 
 export interface ShiftAnomaly {
     id: string;

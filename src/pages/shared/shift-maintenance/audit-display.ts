@@ -8,6 +8,7 @@ export const ANOMALY_LABELS: Record<AnomalyCode, { label: string; color: string 
     label: "Incomplete shift (no clock-out)",
     color: ANOMALY_CHIP_CLASS.incomplete_clock,
   },
+  late_clock_in: { label: "Late clock-in", color: ANOMALY_CHIP_CLASS.late_clock_in },
   unassigned: { label: "No DSP assigned", color: ANOMALY_CHIP_CLASS.unassigned },
   invalid_time: { label: "End before start", color: ANOMALY_CHIP_CLASS.invalid_time },
 };
@@ -16,6 +17,7 @@ export const ANOMALY_LABELS: Record<AnomalyCode, { label: string; color: string 
 export const ANOMALY_CALENDAR_SHORT_LABEL: Record<AnomalyCode, string> = {
   missed: "Missed",
   incomplete_clock: "No clock-out",
+  late_clock_in: "Late in",
   unassigned: "No DSP",
   invalid_time: "Bad window",
 };
