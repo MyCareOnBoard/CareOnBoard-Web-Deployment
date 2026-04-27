@@ -181,6 +181,7 @@ export default function ShiftDetailsModal({
 
   const [draftClockIn, setDraftClockIn] = useState("");
   const [draftClockOut, setDraftClockOut] = useState("");
+  const [draftResolveLateClockIn, setDraftResolveLateClockIn] = useState(false);
   const [draftCompleted, setDraftCompleted] = useState(false);
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -200,6 +201,7 @@ export default function ShiftDetailsModal({
   const resetDraftsFromShift = useCallback((s: Shift) => {
     setDraftClockIn(clockedAtToHHmm(s.clockedInAt));
     setDraftClockOut(clockedAtToHHmm(s.clockedOutAt));
+    setDraftResolveLateClockIn(false);
     setDraftCompleted(s.status === ShiftStatus.COMPLETED);
   }, []);
 
@@ -258,6 +260,8 @@ export default function ShiftDetailsModal({
     : clientExtra?.clientName || clientExtra?.clientId || "Unknown Client";
 
   const callout = resolvedShift ? getStatusCallout(resolvedShift, anomalyCodes) : null;
+  const showResolveLateClockIn =
+    Boolean(resolvedShift?.estimatedEndTime) || anomalyCodes.includes("late_clock_in");
 
   const handleUpdateChanges = async () => {
     if (!resolvedShift || !reason.trim()) {
@@ -301,14 +305,20 @@ export default function ShiftDetailsModal({
       }
     }
 
-    const hasClockOrStatusChange =
+    const shouldResolveLateClockIn = draftResolveLateClockIn && Boolean(resolvedShift.estimatedEndTime);
+    if (shouldResolveLateClockIn) {
+      payload.estimatedEndTime = null;
+    }
+
+    const hasMeaningfulChange =
       inNorm !== serverIn ||
       outNorm !== serverOut ||
-      draftCompleted !== serverCompleted;
-    if (!hasClockOrStatusChange && Object.keys(payload).length === 1) {
+      draftCompleted !== serverCompleted ||
+      shouldResolveLateClockIn;
+    if (!hasMeaningfulChange && Object.keys(payload).length === 1) {
       toast({
         title: "Nothing to update",
-        description: "Change the clock times or completion status, or close the window.",
+        description: "Change the clock times, completion status, or late clock-in resolution, or close the window.",
         variant: "warning",
       });
       return;
@@ -450,6 +460,21 @@ export default function ShiftDetailsModal({
                   </span>
                 </TimePicker>
               </div>
+              {showResolveLateClockIn ? (
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-[rgba(0,0,0,0.06)] pt-3">
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-semibold text-[#10141a]">Resolve late clock-in</p>
+                    <p className="text-[11px] text-[#808081]">
+                      Clears the estimated end time and removes the Late clock-in flag when you save.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={draftResolveLateClockIn}
+                    onCheckedChange={setDraftResolveLateClockIn}
+                    aria-label="Resolve late clock-in"
+                  />
+                </div>
+              ) : null}
               <div className="mt-3 flex items-center justify-between gap-3 border-t border-[rgba(0,0,0,0.06)] pt-3">
                 <div className="min-w-0">
                   <p className="text-[14px] font-semibold text-[#10141a]">Mark shift as completed</p>

@@ -77,7 +77,7 @@ export interface Shift {
     clockedInAt?: string;
     clockedOutAt?: string;
     /** ISO timestamp: projected end when DSP clocked in after grace (server-set). */
-    estimatedEndTime?: string;
+    estimatedEndTime?: string | null;
     status: ShiftStatus;
     actionStatus?: ShiftActionStatus;
     type?: ShiftType; // Default: automatic
@@ -169,7 +169,7 @@ export interface UpdateShiftRequest {
     sessionDuration?: string;
     clockedInAt?: string;
     clockedOutAt?: string;
-    estimatedEndTime?: string;
+    estimatedEndTime?: string | null;
     type?: ShiftType;
     submissionStatus?: SubmissionStatus;
     employeeId?: string;
