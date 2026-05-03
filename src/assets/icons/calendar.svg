@@ -1,0 +1,10 @@
+<svg width="42" height="42" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+<foreignObject x="-16" y="-16" width="74" height="74"><div xmlns="http://www.w3.org/1999/xhtml" style="backdrop-filter:blur(8px);clip-path:url(#bgblur_0_413_3216_clip_path);height:100%;width:100%"></div></foreignObject><g data-figma-bg-blur-radius="16">
+<rect width="42" height="42" rx="21" fill="white" fill-opacity="0.5"/>
+<rect x="0.5" y="0.5" width="41" height="41" rx="20.5" stroke="white" stroke-opacity="0.3"/>
+<path d="M16.625 13.5V15.375M25.375 13.5V15.375M13.5 26.625V17.25C13.5 16.2145 14.3395 15.375 15.375 15.375H26.625C27.6605 15.375 28.5 16.2145 28.5 17.25V26.625M13.5 26.625C13.5 27.6605 14.3395 28.5 15.375 28.5H26.625C27.6605 28.5 28.5 27.6605 28.5 26.625M13.5 26.625V20.375C13.5 19.3395 14.3395 18.5 15.375 18.5H26.625C27.6605 18.5 28.5 19.3395 28.5 20.375V26.625M21 21.625H21.0063V21.6313H21V21.625ZM21 23.5H21.0063V23.5063H21V23.5ZM21 25.375H21.0063V25.3813H21V25.375ZM19.125 23.5H19.1313V23.5063H19.125V23.5ZM19.125 25.375H19.1313V25.3813H19.125V25.375ZM17.25 23.5H17.2563V23.5063H17.25V23.5ZM17.25 25.375H17.2563V25.3813H17.25V25.375ZM22.875 21.625H22.8813V21.6313H22.875V21.625ZM22.875 23.5H22.8813V23.5063H22.875V23.5ZM22.875 25.375H22.8813V25.3813H22.875V25.375ZM24.75 21.625H24.7563V21.6313H24.75V21.625ZM24.75 23.5H24.7563V23.5063H24.75V23.5Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<defs>
+<clipPath id="bgblur_0_413_3216_clip_path" transform="translate(16 16)"><rect width="42" height="42" rx="21"/>
+</clipPath></defs>
+</svg>

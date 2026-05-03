@@ -1,0 +1,170 @@
+﻿import React, {useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Search, ChevronLeft, ChevronRight, Trash2, ArrowLeft} from "lucide-react";
+import {useNavigate} from "react-router";
+import {Routes} from "@/routes/constants";
+import {cn} from "@/lib/utils";
+import {
+    useGetDraftAgenciesQuery,
+    useDeleteDraftAgencyMutation
+} from "@/pages/super-admin/agencies/api";
+import {toast} from "sonner";
+
+export default function SavedAgencies() {
+    const navigate = useNavigate();
+    const [searchQuery, setSearchQuery] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
+
+    const {data: draftAgencies, refetch, isLoading: isDraftingAgencies} = useGetDraftAgenciesQuery(undefined, {
+        
+    });
+
+    const filteredAgencies = draftAgencies?.data?.filter((agency) =>
+        agency?.draftName?.toLowerCase().includes(searchQuery.toLowerCase())
+    ) || [];
+
+    const [deleteDraftAgency] = useDeleteDraftAgencyMutation();
+
+    const totalPages = Math.ceil(filteredAgencies.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedAgencies = filteredAgencies.slice(startIndex, startIndex + itemsPerPage);
+
+    const handleEdit = (draftId: string) => {
+        navigate(Routes.superAdmin.addAgency + `?draftId=${draftId}`);
+    };
+
+    const handleDelete = async (draftId: string) => {
+        try {
+            await deleteDraftAgency(draftId).unwrap();
+            toast.success("Agency deleted successfully");
+            refetch();
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    return (
+        <div className="min-h-screen sflex flex-col">
+            <div className="flex-1 flex flex-col">
+                {/* Header */}
+                <div className="sticky top-0 px-8 py-6 z-10">
+                    <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => navigate(Routes.superAdmin.agencies)}
+                                className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-full bg-[rgba(255,255,255,0.5)] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+                            >
+                                <ArrowLeft className="w-5 h-5 text-[#10141a]" />
+                            </button>
+                            <h2 className="text-4xl font-bold text-[#10141a]">Add new agency</h2>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div
+                    className={cn(
+                        "flex-1 overflow-y-auto px-8 py-6 bg-[#FFFFFF4D] rounded-xl",
+                        (paginatedAgencies.length === 0 || isDraftingAgencies) && "min-h-[calc(100vh-200px)]"
+                    )}
+                >
+                    <div className="max-w-7xl mx-auto">
+                        {/* Saved Agencies Header */}
+                        <div className="mb-6">
+                            <div className="flex items-center justify-between mb-2">
+                                <div>
+                                    <h3 className="text-[20px] font-medium text-[#10141a]">Saved Agencies</h3>
+                                    <p className="text-[14px] text-[#808081]">These Are The Saved Applications</p>
+                                </div>
+                                <div className="relative w-[300px]">
+                                    <Search
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#808081]"/>
+                                    <Input
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Search"
+                                        className="h-[44px] pl-10 rounded-[12px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Saved Agencies List */}
+                        <div className="space-y-4">
+                            {!isDraftingAgencies && (
+                                paginatedAgencies.length > 0
+                                ? paginatedAgencies.map((agency) => (
+                                    <div
+                                        key={agency.id}
+                                        className="rounded-[20px] flex items-center justify-between border border-transparent transition-colors"
+                                    >
+                                        <div className="flex items-center gap-16">
+                                            <div className="flex flex-col">
+                                                <p className="text-[16px] font-semibold text-[#10141a]">{agency.draftName}</p>
+                                            </div>
+                                            <div className="text-[14px] font-medium">
+                                                <p className="text-[#808081] mb-0">Saved on</p>
+                                                <p className="text-[#10141a]">{agency.createdAt ? new Date(agency.createdAt)?.toDateString() : ""}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                onClick={() => handleEdit(agency.id)}
+                                                className="bg-[#00b4b8] hover:bg-[#009da1] text-white px-4 py-2 rounded-[60px] font-semibold text-[14px] h-[36px] w-[159px]"
+                                            >
+                                                Edit Application
+                                            </Button>
+                                            <Button
+                                                onClick={() => handleDelete(agency.id)}
+                                                className="bg-[#f04438] hover:bg-[#d63b2f] text-white px-4 py-2 rounded-[60px] font-semibold text-[14px] h-[36px]"
+                                            >
+                                                <Trash2 className="w-4 h-4 mr-2"/>
+                                                Delete
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))
+                                : (
+                                    <div className="mt-20 flex items-center justify-center">
+                                        <p>No saved agencies found</p>
+                                    </div>
+                                )
+                            )}
+                            {isDraftingAgencies && (
+                                <div className="mt-20 flex items-center justify-center">
+                                    <p>Loading...</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-center gap-2 mt-8">
+                                <p className="text-[16px] font-medium text-[#10141a]">
+                                    {currentPage}
+                                    <span className="text-[14px] text-[#808081]">/{totalPages}</span>
+                                </p>
+                                <Button
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                    className="bg-white/50 backdrop-blur border border-white/30 p-[6px] rounded-full hover:bg-white/70 disabled:opacity-50"
+                                >
+                                    <ChevronLeft className="w-5 h-5 text-[#10141a]"/>
+                                </Button>
+                                <Button
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="bg-white/50 backdrop-blur border border-white/30 p-[6px] rounded-full hover:bg-white/70 disabled:opacity-50"
+                                >
+                                    <ChevronRight className="w-5 h-5 text-[#10141a]"/>
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
