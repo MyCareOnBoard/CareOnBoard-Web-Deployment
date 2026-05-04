@@ -2,7 +2,6 @@ import React, {useState, useMemo, useEffect} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {Search, X, MapPin, Loader2, ArrowLeft} from "lucide-react";
-import {Skeleton} from "@/components/ui/skeleton";
 import CustomDatePicker from "@/components/ui/datePicker";
 import {cn} from "@/lib/utils";
 import {useAuth} from "@/utils/auth";
@@ -190,31 +189,8 @@ export default function MileageReport() {
 
                 <div className="flex-1 mt-6 overflow-auto">
                     {isLoading ? (
-                        <div className="space-y-4">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                                <div key={i} className="flex justify-between gap-4 bg-white/50 rounded-[20px] items-center p-4">
-                                    <div className="flex gap-4 items-center">
-                                        <Skeleton className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0" />
-                                        <div className="space-y-2">
-                                            <Skeleton className="h-4 w-32" />
-                                            <Skeleton className="h-3 w-40" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Skeleton className="h-3 w-16" />
-                                        <Skeleton className="h-4 w-12" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Skeleton className="h-3 w-16" />
-                                        <Skeleton className="h-4 w-12" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Skeleton className="h-3 w-16" />
-                                        <Skeleton className="h-4 w-16" />
-                                    </div>
-                                    <Skeleton className="h-8 w-24 rounded-[60px]" />
-                                </div>
-                            ))}
+                        <div className="flex items-center justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-[#00b4b8]" />
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -343,10 +319,11 @@ export default function MileageReport() {
                                                             {ride.clientName}
                                                         </p>
                                                         <div className="text-sm text-[#808081] mt-2 space-y-1">
-                                                            <p>Scheduled: {new Date(ride.scheduledStartTime).toLocaleString()}</p>
-                                                            <p>Segments: {ride.segmentCount ?? "—"}</p>
-                                                            <p>Distance: {ride.actualDistance != null ? `${ride.actualDistance.toFixed(2)} mi` : "—"}</p>
-                                                            {ride.notes && <p className="text-xs italic">{ride.notes}</p>}
+                                                            <p>From: {ride.pickupLocation}</p>
+                                                            <p>To: {ride.dropOffLocation}</p>
+                                                            <p className="text-xs mt-2">
+                                                                Scheduled: {new Date(ride.scheduledStartTime).toLocaleString()}
+                                                            </p>
                                                         </div>
                                                     </div>
                                                     <div className="ml-4 text-right">
@@ -359,7 +336,7 @@ export default function MileageReport() {
                                                             {ride.status.replace('_', ' ').toUpperCase()}
                                                         </span>
                                                         <p className="text-sm font-semibold text-[#10141a] mt-2">
-                                                            {ride.actualDistance != null ? `${ride.actualDistance.toFixed(2)} mi` : "—"}
+                                                            {ride.actualDistance || ride.estimatedDistance} mi
                                                         </p>
                                                     </div>
                                                 </div>

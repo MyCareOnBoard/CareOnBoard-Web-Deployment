@@ -57,6 +57,7 @@ export default function AssemblyAITranscription({
             sample_rate: "16000",
             formatted_finals: "true",
             speech_model: "universal-streaming-multilingual",
+            language_detection: "true",
             token,
           };
           
@@ -158,8 +159,16 @@ export default function AssemblyAITranscription({
             const data = JSON.parse(event.data);
 
             // Handle different message types
-            if (data.type === "Turn" && data.transcript && data.turn_is_formatted && data.end_of_turn) {
-              onCommittedTranscript(data.transcript);
+            if (data.type === "Turn") {
+              const detectedLanguageCode: string | undefined =
+                data.language_code || data.languageCode;
+              if (detectedLanguageCode) {
+                onLanguageDetected(detectedLanguageCode);
+              }
+
+              if (data.transcript && data.end_of_turn) {
+                onCommittedTranscript(data.transcript);
+              }
             } else if (data.message_type === "PartialTranscript" && data.text) {
               onPartialTranscript(data.text);
 

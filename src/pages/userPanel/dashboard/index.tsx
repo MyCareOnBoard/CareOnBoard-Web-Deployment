@@ -1,4 +1,4 @@
-﻿import React, {useState, useCallback, useEffect} from "react";
+import React, {useState, useCallback, useEffect} from "react";
 import {useNavigate} from "react-router";
 import {Plus, X} from "lucide-react";
 import {Button} from "@/components/ui/button";
@@ -36,7 +36,7 @@ export default function UserPanelDashboardPage() {
 
     const {data: employeeDocuments = []} = useGetEmployeeDocumentsQuery();
     const {data: trainings = [], isLoading: isTrainingLoading, refetch} = useGetEmployeeTrainingsQuery(undefined, {
-        
+        refetchOnMountOrArgChange: true
     });
     const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
     const [completeTraining] = useCompleteTrainingMutation();

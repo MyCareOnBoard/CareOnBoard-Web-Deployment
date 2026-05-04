@@ -1,4 +1,4 @@
-﻿import { FileUpload } from "@/components/ui/file-upload";
+import { FileUpload } from "@/components/ui/file-upload";
 import React, { useRef, useState, FormEvent, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -94,7 +94,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
 
   const [uploadFile, { isLoading }] = useUploadDocumentMutation();
   const { data: eligibilityVerificationData } = useGetEligibilityVerificationQuery(undefined, {
-    
+    refetchOnMountOrArgChange: true
   });
 
   const [

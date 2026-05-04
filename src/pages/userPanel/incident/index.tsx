@@ -6,7 +6,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
+import VoiceInputButton from "@/components/VoiceInputButton";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import CustomDatePicker from "@/components/ui/datePicker";
@@ -205,7 +207,8 @@ export default function UserIncidentPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
+    <VoiceRecordingProvider pageTitle="Incident">
+    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0 pb-20">
       {/* Header */}
       <div className="mb-6 sm:mb-8">
         <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.4] text-[#10141a]">
@@ -302,11 +305,13 @@ export default function UserIncidentPage() {
           <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
             What Happened
           </Label>
-          <Textarea
+          <VoiceEnabledTextarea
             value={whatHappened}
-            onChange={(e) => setWhatHappened(e.target.value)}
+            onChange={setWhatHappened}
             className="min-h-[120px]"
             placeholder="Describe what happened..."
+            fieldName="What happened"
+            pageTitle="Incident"
           />
         </div>
 
@@ -315,11 +320,13 @@ export default function UserIncidentPage() {
           <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
             What Actions were taken?
           </Label>
-          <Textarea
+          <VoiceEnabledTextarea
             value={actionsTaken}
-            onChange={(e) => setActionsTaken(e.target.value)}
+            onChange={setActionsTaken}
             className="min-h-[120px]"
             placeholder="Describe the actions taken..."
+            fieldName="What actions were taken"
+            pageTitle="Incident"
           />
         </div>
 
@@ -328,11 +335,13 @@ export default function UserIncidentPage() {
           <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
             What did you do?
           </Label>
-          <Textarea
+          <VoiceEnabledTextarea
             value={whatDidYouDo}
-            onChange={(e) => setWhatDidYouDo(e.target.value)}
+            onChange={setWhatDidYouDo}
             className="min-h-[120px]"
             placeholder="Describe your actions..."
+            fieldName="What did you do"
+            pageTitle="Incident"
           />
         </div>
 
@@ -360,6 +369,8 @@ export default function UserIncidentPage() {
           </Button>
         </div>
       </form>
+      <VoiceInputButton />
     </div>
+    </VoiceRecordingProvider>
   );
 }

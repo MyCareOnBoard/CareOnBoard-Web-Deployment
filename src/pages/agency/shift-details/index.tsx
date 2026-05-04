@@ -21,10 +21,10 @@ import {
   formatShiftLocation,
   getShiftById,
   Shift,
-  ShiftStatus,
   type ShiftAuditRecord,
 } from "@/lib/api/shifts";
-import { detectShiftAnomalyCodes, shiftToAnomalyRecord } from "@/lib/shift-anomaly-detection";
+import { shiftToAnomalyRecord } from "@/lib/shift-anomaly-detection";
+import { getShiftStatusBadgePresentation } from "@/lib/shift-status-badge";
 import { shiftToScheduleFormData } from "@/pages/agency/scheduling/shift-to-schedule-form";
 import type { ScheduleFormData } from "@/pages/agency/scheduling/components/AddScheduleModal";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
@@ -83,29 +83,6 @@ function shiftDeleteConfirmMessage(shift: Shift): string {
   return `Removes ${clientLabel}'s shift on ${when} from the schedule. This can't be undone.`;
 }
 
-function shiftStatusBadgeProps(shift: Shift): {
-  label: string;
-  variant: React.ComponentProps<typeof Badge>["variant"];
-} {
-  if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
-    return { label: "Incomplete", variant: "incomplete" };
-  }
-  switch (shift.status) {
-    case ShiftStatus.ONGOING:
-      return { label: "Active", variant: "success" };
-    case ShiftStatus.COMPLETED:
-      return { label: "Completed", variant: "completed" };
-    case ShiftStatus.PENDING:
-      return { label: "Pending", variant: "pending" };
-    case ShiftStatus.AVAILABLE:
-      return { label: "Available", variant: "info" };
-    case ShiftStatus.EXPIRED:
-      return { label: "Expired", variant: "expired" };
-    default:
-      return { label: String(shift.status), variant: "pending" };
-  }
-}
-
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5 border-b border-white/30 py-2.5 last:border-0 sm:flex-row sm:items-start sm:gap-4">
@@ -120,6 +97,10 @@ export default function AgencyShiftDetailsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+
+  const goBack = useCallback(() => {
+    navigate(-1);
+  }, [navigate]);
 
   const [shift, setShift] = useState<Shift | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
@@ -237,7 +218,7 @@ export default function AgencyShiftDetailsPage() {
         description: "This shift was removed from the schedule.",
       });
       setShiftPendingDelete(false);
-      navigate(Routes.agency.scheduling);
+      goBack();
     } catch (err) {
       console.error(err);
       toast({
@@ -262,8 +243,8 @@ export default function AgencyShiftDetailsPage() {
     return (
       <div className="px-4 py-8">
         <p className="text-[#808081]">Invalid link.</p>
-        <Button type="button" variant="outline" className="mt-4" onClick={() => navigate(Routes.agency.scheduling)}>
-          Back to Shift Management
+        <Button type="button" variant="outline" className="mt-4" onClick={goBack}>
+          Go back
         </Button>
       </div>
     );
@@ -286,8 +267,8 @@ export default function AgencyShiftDetailsPage() {
           <Button type="button" variant="outline" onClick={() => refetchShiftAndRelated()}>
             Try again
           </Button>
-          <Button type="button" variant="outline" onClick={() => navigate(Routes.agency.scheduling)}>
-            Back to Shift Management
+          <Button type="button" variant="outline" onClick={goBack}>
+            Go back
           </Button>
         </div>
       </div>
@@ -296,7 +277,7 @@ export default function AgencyShiftDetailsPage() {
 
   if (!shift) return null;
 
-  const scheduleStatusBadge = shiftStatusBadgeProps(shift);
+  const scheduleStatusBadge = getShiftStatusBadgePresentation(shift);
 
   return (
     <>
@@ -305,9 +286,9 @@ export default function AgencyShiftDetailsPage() {
           <div className="flex items-start gap-4">
             <button
               type="button"
-              onClick={() => navigate(Routes.agency.scheduling)}
+              onClick={goBack}
               className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] backdrop-blur-sm transition-colors hover:bg-[rgba(255,255,255,0.7)]"
-              aria-label="Back to Shift Management"
+              aria-label="Go back"
             >
               <ArrowLeft className="h-5 w-5 text-[#10141a]" />
             </button>

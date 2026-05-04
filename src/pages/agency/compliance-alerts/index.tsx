@@ -1,4 +1,4 @@
-﻿import React, {useState, useEffect} from "react";
+import React, {useState, useEffect} from "react";
 import {ArrowLeft, ChevronLeft, ChevronRight, Search} from "lucide-react";
 import {useNavigate} from "react-router";
 import {Button} from "@/components/ui/button";
@@ -22,7 +22,8 @@ export default function ComplianceAlertsPage() {
 
   // Fetch expired documents
   const {data, isLoading, isError} = useGetExpiredDocumentsQuery(user?.agencyId ?? '', {
-    skip: !user?.agencyId
+    skip: !user?.agencyId,
+    refetchOnMountOrArgChange: true
   });
   const expiredDocuments = data?.data || [];
 

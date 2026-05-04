@@ -1,4 +1,4 @@
-﻿import { createApi } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 
 
@@ -41,10 +41,6 @@ export interface DSPReport {
   status: string;
   createdAt: string;
   documentCount: number;
-  profilePictureUrl?: string | null;
-  clientCount: number;
-  trainingCompleted: number;
-  trainingTotal: number;
 }
 
 export interface DSPDocument {
@@ -118,15 +114,13 @@ export interface MileageReport {
 
 export interface MileageDetail {
   id: string;
-  clientName: string | null;
-  purpose?: string | null;
+  clientName: string;
+  pickupLocation: string;
+  dropOffLocation: string;
   scheduledStartTime: string;
+  estimatedDistance: number;
   actualDistance: number | null;
-  segmentCount?: number;
   status: string;
-  startedAt?: string | null;
-  completedAt?: string | null;
-  notes?: string | null;
 }
 
 export interface ExpenseReport {
@@ -206,7 +200,6 @@ export const reportsApi = createApi({
   reducerPath: "reportsApi",
   baseQuery: customBaseQuery,
   tagTypes: ["ClientsReport", "DSPsReport", "ShiftsReport", "NotesReport", "AgenciesSummary", "MileageReport", "ExpenseReport", "BillingReport", "IncidentReport", "CommunityInclusionReport"],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     // Clients Report
     getClientsReport: builder.query<

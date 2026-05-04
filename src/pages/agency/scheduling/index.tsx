@@ -31,145 +31,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/utils/auth";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
+import { ANOMALY_LABELS } from "@/pages/shared/shift-maintenance/audit-display";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
-
-/** Normalize timestamp-like values to a display-safe string. Never returns an object. */
-function normalizeTimestampToDisplayString(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? "" : value.toISOString();
-  }
-  if (typeof value === "object" && value !== null) {
-    const obj = value as Record<string, unknown>;
-    const seconds = obj._seconds ?? obj.seconds;
-    if (typeof seconds === "number") {
-      const ns = (obj._nanoseconds ?? obj.nanoseconds ?? 0) as number;
-      const ms = seconds * 1000 + (typeof ns === "number" ? ns / 1_000_000 : 0);
-      const d = new Date(ms);
-      return Number.isNaN(d.getTime()) ? "" : d.toISOString();
-    }
-  }
-  return "";
-}
-
-/** Format time for display. Accepts string, Date, or Firestore timestamp. Always returns a string. */
-const formatTime = (time?: unknown): string => {
-  const str = normalizeTimestampToDisplayString(time);
-  if (!str) return "-";
-  try {
-    if (str.includes("AM") || str.includes("PM")) return str;
-    const timePart = str.split("T")[1];
-    if (!timePart) return "-";
-    const [hours, minutes] = timePart.split(":");
-    const hour = parseInt(hours, 10);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const formattedHour = hour % 12 || 12;
-    return `${formattedHour}:${(minutes || "00").split(".")[0]} ${ampm}`;
-  } catch {
-    return "-";
-  }
-};
-
-const parseTimeToParts = (time: string): { hours: number; minutes: number } | null => {
-  const match = time.match(/(\d{1,2})[.:](\d{2})[:]?([AaPp][Mm])/);
-  if (!match) return null;
-
-  let hours = parseInt(match[1], 10);
-  const minutes = parseInt(match[2], 10);
-  const period = match[3].toUpperCase();
-
-  if (period === "PM" && hours !== 12) hours += 12;
-  if (period === "AM" && hours === 12) hours = 0;
-
-  return { hours, minutes };
-};
-
-const isShiftMissed = (shift: Shift): boolean => {
-  if (shift.status === ShiftStatus.COMPLETED) return false;
-  if (shift.clockedInAt) return false;
-  if (!shift.date) return false;
-
-  const date = parseISO(shift.date);
-  let endDateTime: Date;
-
-  if (shift.endTime) {
-    const parsedTime = parseTimeToParts(shift.endTime);
-    if (parsedTime) {
-      endDateTime = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        parsedTime.hours,
-        parsedTime.minutes
-      );
-    } else {
-      // If endTime exists but can't be parsed, use end of day
-      endDateTime = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        23,
-        59,
-        59
-      );
-    }
-  } else {
-    // If no endTime, use end of day
-    endDateTime = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      23,
-      59,
-      59
-    );
-  }
-
-  return endDateTime.getTime() < Date.now();
-};
-// Helper function to get status display info
-const getStatusInfo = (shift: Shift, approved?: boolean) => {
-  // Check if shift is missed first, regardless of status
-  if (isShiftMissed(shift)) {
-    return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
-  }
-  if (detectShiftAnomalyCodes(shift).includes("incomplete_clock")) {
-    return { label: "Incomplete", color: "#B45309", bgColor: "rgba(254, 243, 199, 0.65)" };
-  }
-
-  switch (shift.status) {
-    case ShiftStatus.ONGOING:
-      return { label: "Active", color: "#0EAF52", bgColor: "rgba(14,175,82,0.05)" };
-    case ShiftStatus.COMPLETED:
-      return { label: "Completed", color: "#525253", bgColor: "rgba(178,178,179,0.05)" };
-    case ShiftStatus.EXPIRED:
-      return { label: "Missed", color: "#FF6C10", bgColor: "rgba(255,108,16,0.05)" };
-    case ShiftStatus.PENDING:
-      return { label: "Pending", color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
-    case ShiftStatus.AVAILABLE:
-      return { label: "Available", color: "#00b4b8", bgColor: "rgba(0,180,184,0.05)" };
-    default:
-      return { label: shift.status, color: "#808081", bgColor: "rgba(128,128,129,0.05)" };
-  }
-};
-
-const getInitialsFromName = (name: string) => {
-  const parts = name.split(" ").filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  const first = parts[0].charAt(0);
-  const last = parts[parts.length - 1].charAt(0);
-  return `${first}${last}`.toUpperCase();
-};
-
-function shiftDeleteConfirmMessage(shift: Shift): string {
-  const clientLabel = shift.client
-    ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "this client"
-    : "this client";
-  const when = shift.date ? format(parseISO(shift.date), "MMMM d, yyyy") : "the scheduled date";
-  return `Removes ${clientLabel}'s shift on ${when} from the schedule. This can't be undone.`;
-}
+import {
+  getInitialsFromShiftPersonName,
+  getShiftRowStatusInfo,
+  isShiftMissed,
+} from "@/lib/shift-row-status";
+import { formatShiftRowClockDisplay } from "@/lib/shift-row-time";
+import { shiftDeleteConfirmMessage } from "@/lib/shift-delete-confirm";
 
 const PERSON_TYPEAHEAD_LIMIT = 10;
 const PERSON_RESULTS_MERGED_MAX = 15;
@@ -815,7 +685,12 @@ export default function SchedulingPage() {
               </div>
             ) : (
               paginatedShifts.map((shift) => {
-                const statusInfo = getStatusInfo(shift, shift.approved);
+                const statusInfo = getShiftRowStatusInfo(shift, shift.approved);
+                const anomalyCodes = detectShiftAnomalyCodes(shift);
+                const primaryAnomaly = anomalyCodes[0];
+                const primaryAnomalyMeta = primaryAnomaly ? ANOMALY_LABELS[primaryAnomaly] : null;
+                const primaryAnomalyLabel =
+                  primaryAnomaly === "incomplete_clock" ? "Incomplete shift" : primaryAnomalyMeta?.label;
                 const clientName = shift.client
                   ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
                   : "Unknown Client";
@@ -837,7 +712,7 @@ export default function SchedulingPage() {
                           />
                         )}
                         <AvatarFallback className="w-full h-full rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-                          {getInitialsFromName(clientName)}
+                          {getInitialsFromShiftPersonName(clientName)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col gap-1.5">
@@ -861,7 +736,7 @@ export default function SchedulingPage() {
                           />
                         )}
                         <AvatarFallback className="w-full h-full rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-                          {getInitialsFromName(employeeName)}
+                          {getInitialsFromShiftPersonName(employeeName)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col gap-1.5">
@@ -876,21 +751,30 @@ export default function SchedulingPage() {
 
                     {/* Status & Times */}
                     <div className="flex items-center gap-16 flex-1 w-[100px]">
-                      {/* Status Badge */}
-                      <div
-                        className="rounded-full min-w-[54px] min-h-7 flex items-center justify-center gap-1 px-2.5"
-                        style={{
-                          backgroundColor: statusInfo.bgColor,
-                          border: `1px solid ${statusInfo.color}`
-                        }}
-                      >
-                        <span
-                          className="text-[12px] font-semibold"
-                          style={{ color: statusInfo.color }}
+                      {/* Anomaly takes priority over status when present. */}
+                      {primaryAnomalyMeta ? (
+                        <div
+                          className={`rounded-full min-h-7 flex items-center justify-center gap-1 px-2.5 text-[12px] font-semibold whitespace-nowrap ${primaryAnomalyMeta.color}`}
+                          title={primaryAnomalyMeta.label}
                         >
-                          {statusInfo.label}
-                        </span>
-                      </div>
+                          {primaryAnomalyLabel}
+                        </div>
+                      ) : (
+                        <div
+                          className="rounded-full min-w-[54px] min-h-7 flex items-center justify-center gap-1 px-2.5"
+                          style={{
+                            backgroundColor: statusInfo.bgColor,
+                            border: `1px solid ${statusInfo.color}`
+                          }}
+                        >
+                          <span
+                            className="text-[12px] font-semibold"
+                            style={{ color: statusInfo.color }}
+                          >
+                            {statusInfo.label}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-16 flex-1 w-[100px]">
@@ -898,7 +782,7 @@ export default function SchedulingPage() {
                       <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
                         <span className="text-[#808081] whitespace-nowrap">Clocked In </span>
                         <span className="text-[#10141a]">
-                          {shift.clockedInAt ? formatTime(shift.clockedInAt) : "--:-- --"}
+                          {shift.clockedInAt ? formatShiftRowClockDisplay(shift.clockedInAt) : "--:-- --"}
                         </span>
                       </div>
                     </div>
@@ -907,7 +791,7 @@ export default function SchedulingPage() {
                       <div className="text-[14px] font-medium leading-[1.4] flex flex-col">
                         <span className="text-[#808081] whitespace-nowrap">Clocked Out </span>
                         <span className="text-[#10141a]">
-                          {shift.clockedOutAt ? formatTime(shift.clockedOutAt) : "--:-- --"}
+                          {shift.clockedOutAt ? formatShiftRowClockDisplay(shift.clockedOutAt) : "--:-- --"}
                         </span>
                       </div>
                     </div>

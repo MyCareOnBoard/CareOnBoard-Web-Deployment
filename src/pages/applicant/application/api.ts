@@ -1,4 +1,4 @@
-﻿import {createApi} from "@reduxjs/toolkit/query/react";
+import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 import {
   CheckOfficialSignatureStatusResponse,
@@ -11,7 +11,6 @@ import {
 export const applicationApi = createApi({
     reducerPath: "applicationApi",
     baseQuery: customBaseQuery,
-    keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         uploadDocument: builder.mutation<UploadDocumentResponse, UploadDocumentPayload>({
             query: ({documentType, data}: UploadDocumentPayload) => ({

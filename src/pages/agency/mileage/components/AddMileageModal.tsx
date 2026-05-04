@@ -182,7 +182,7 @@ export default function AddMileageModal({
 
     setFormData({
       client: initialRide.clientName || "",
-      clientId: initialRide.clientId ?? undefined,
+      clientId: initialRide.clientId ?? "",
       assignDsp: initialRide.caregiverName || "",
       assignDspId: initialRide.caregiverId,
       notes: initialRide.notes || "",

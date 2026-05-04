@@ -68,9 +68,9 @@ function transformEmployeeToDSP(employee: Employee): DSP {
     updatedAt: employee.updatedAt,
     // Computed fields for UI
     age: calculateAge(employee.dateOfBirth),
-    clients: employee.clientCount ?? 0,
-    completedTrainings: employee.trainingCompleted ?? 0,
-    totalTrainings: employee.trainingTotal ?? 0,
+    clients: 0,
+    completedTrainings: 0,
+    totalTrainings: 0,
   };
 }
 
@@ -145,10 +145,8 @@ export function useDSPList() {
       do {
         const employeesResponse = await listEmployees({
           agencyId,
-          role: 'dsp',
           limit: pageSize,
           page,
-          includeStats: true,
         });
 
         const batch = employeesResponse.employees || [];
@@ -254,7 +252,7 @@ export function useDSPDetails(dspId: string | null) {
 
       const [ shiftsData ] = await Promise.all([
         // getEmployeeTrainings(dspId),
-        listShifts({ employeeId: dspId, agencyId, client: true }),
+        listShifts({ employeeId: dspId, agencyId, client: true, employee: true }),
       ]);
 
       // setTrainings(trainingsData);

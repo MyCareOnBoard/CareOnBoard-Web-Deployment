@@ -1,4 +1,4 @@
-﻿import React, {useState, useEffect, useCallback, useRef} from "react";
+import React, {useState, useEffect, useCallback, useRef} from "react";
 import {useNavigate, useLocation} from "react-router";
 import {Routes} from "@/routes/constants";
 import {ChevronLeft, Loader2} from "lucide-react";
@@ -36,11 +36,13 @@ export default function IndividualizedGoalsTemplate(
     const backLabel = isUserPanel ? "Back to Plan of Care" : "Back to Goals & Documents";
 
     const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
-        skip: !documentType || !!firebaseId
+        skip: !documentType || !!firebaseId,
+        refetchOnMountOrArgChange: true
     });
 
     const {data: firebaseDocument, isLoading: isLoadingFirebaseDoc} = useGetGoalDocumentByFirebaseIdQuery(firebaseId!, {
-        skip: !firebaseId
+        skip: !firebaseId,
+        refetchOnMountOrArgChange: true
     });
     const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
     const [submitDocument, {isLoading: isSubmitting}] = useSubmitGoalDocumentMutation();

@@ -1,4 +1,4 @@
-﻿import React, {useEffect, useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Checkbox} from "@/components/ui/checkbox";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
@@ -54,7 +54,8 @@ export default function CommunityBasedPage() {
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
 
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
-    skip: !activityLogId
+    skip: !activityLogId,
+    refetchOnMountOrArgChange: true
   });
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
   const [updateLog] = useUpdateActivityLogMutation();

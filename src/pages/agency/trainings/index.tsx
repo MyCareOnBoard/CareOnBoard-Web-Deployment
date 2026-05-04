@@ -1,7 +1,6 @@
-﻿import React, {useMemo, useState} from "react";
+import React, {useMemo, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
-import {Skeleton} from "@/components/ui/skeleton";
 import {ChevronLeft, ChevronRight, Search} from "lucide-react";
 import AgencyAssignTrainingModal, {SaveTrainingData} from "@/pages/agency/trainings/assignTraining";
 import ReviewTrainingsModal from "@/pages/agency/trainings/reviewTrainingsModal";
@@ -30,7 +29,8 @@ export default function AgencyTrainings() {
   const {user} = useAuth();
   const [saveTraining, {isLoading}] = useSaveTrainingMutation();
   const {data: trainings, isLoading: trainingsLoading} = useGetTrainingsQuery(user?.agencyId!, {
-    skip: !user?.agencyId
+    skip: !user?.agencyId,
+    refetchOnMountOrArgChange: true
   });
   const filteredTrainings = useMemo(() => {
     if (!trainings) return [];
@@ -164,17 +164,9 @@ export default function AgencyTrainings() {
                       </div>
                     </div>
 
-                    <div className={`${
-                      (item?.status ?? "Not Assigned") === "Not Assigned" 
-                        ? "bg-[#8080811A] border border-[#808081]" 
-                        : "bg-[#0EAF520D] border border-[#0EAF52]"
-                    } rounded-[60px] px-4 py-2`}>
-                      <p className={`text-[12px] font-semibold capitalize ${
-                        (item?.status ?? "Not Assigned") === "Not Assigned" 
-                          ? "text-[#808081]" 
-                          : "text-[#0EAF52]"
-                      }`}>
-                        {item?.status ?? "Not Assigned"}
+                    <div className="bg-[#0EAF520D] border border-[#0EAF52] rounded-[60px] px-4 py-2">
+                      <p className="text-[12px] font-semibold text-[#0EAF52] capitalize">
+                        {item?.status}
                       </p>
                     </div>
 
@@ -221,27 +213,9 @@ export default function AgencyTrainings() {
               ))
             }
             {trainingsLoading && (
-              Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex justify-between gap-4 bg-white/50 rounded-[20px] items-center p-4">
-                  {/* Avatar + name */}
-                  <div className="flex gap-4 items-center">
-                    <Skeleton className="w-[52.5px] h-[60px] rounded-[8px] flex-shrink-0" />
-                    <Skeleton className="h-4 w-32" />
-                  </div>
-                  {/* Status badge */}
-                  <Skeleton className="h-8 w-28 rounded-[60px]" />
-                  {/* Training count */}
-                  <div className="space-y-2">
-                    <Skeleton className="h-3 w-14" />
-                    <Skeleton className="h-4 w-6" />
-                  </div>
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Skeleton className="h-8 w-32 rounded-[60px]" />
-                    <Skeleton className="h-8 w-32 rounded-[60px]" />
-                  </div>
-                </div>
-              ))
+              <div className="flex items-center justify-center py-20">
+                <p className="text-[16px] text-[#808081]">Loading...</p>
+              </div>
             )}
           </div>
         </div>
