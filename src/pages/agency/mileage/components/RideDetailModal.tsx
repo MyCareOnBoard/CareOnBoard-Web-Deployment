@@ -255,29 +255,16 @@ export default function RideDetailModal({ ride, isOpen, onClose }: RideDetailMod
                         </div>
                       </div>
 
-                      {/* Location links */}
+                      {/* GPS coords (compact) */}
                       {seg.startLocation && (
-                        <div className="mt-3 pt-3 border-t border-[#e5e7eb] flex gap-3">
-                          {seg.endLocation ? (
-                            <a
-                              href={`https://www.google.com/maps/dir/${seg.startLocation.latitude},${seg.startLocation.longitude}/${seg.endLocation.latitude},${seg.endLocation.longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-[11px] text-[#00b4b8] hover:underline"
-                            >
-                              <MapPin className="w-3 h-3" />
-                              View route on Maps
-                            </a>
-                          ) : (
-                            <a
-                              href={`https://www.google.com/maps?q=${seg.startLocation.latitude},${seg.startLocation.longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-[11px] text-[#00b4b8] hover:underline"
-                            >
-                              <MapPin className="w-3 h-3" />
-                              View start on Maps
-                            </a>
+                        <div className="mt-3 pt-3 border-t border-[#e5e7eb] flex gap-4 text-[11px] text-[#9ca3af]">
+                          <span>
+                            Start: {seg.startLocation.latitude.toFixed(5)}, {seg.startLocation.longitude.toFixed(5)}
+                          </span>
+                          {seg.endLocation && (
+                            <span>
+                              End: {seg.endLocation.latitude.toFixed(5)}, {seg.endLocation.longitude.toFixed(5)}
+                            </span>
                           )}
                         </div>
                       )}

@@ -45,7 +45,7 @@ const allNavItems: NavItem[] = [
     { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
     { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion" },
-    { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun, accessKey: "Day Program" },
+    { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun },
     // { label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText, accessKey: "Billing & Management" },
     { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
     { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },

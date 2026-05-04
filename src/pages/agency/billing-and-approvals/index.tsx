@@ -1,4 +1,4 @@
-﻿import React, {useState, useEffect, useCallback} from "react";
+import React, {useState, useEffect, useCallback} from "react";
 import {ChevronLeft, ChevronRight} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {useAuth} from "@/utils/auth";
@@ -54,6 +54,7 @@ export default function BillingAndApprovalsPage() {
     },
     {
       skip: !user?.agencyId,
+      refetchOnMountOrArgChange: true,
     }
   );
 

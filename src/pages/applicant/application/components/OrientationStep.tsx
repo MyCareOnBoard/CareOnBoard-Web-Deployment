@@ -1,4 +1,4 @@
-﻿import {Button} from "@/components/ui/button";
+import {Button} from "@/components/ui/button";
 import DigitalSignatureModal from "@/pages/applicant/application/components/DigitalSignature";
 import {useState} from "react";
 import EmployeeUserPanelLoginDetailsModal from "@/pages/applicant/application/components/EmployeeUserPanelLoginDetailsModal";
@@ -22,13 +22,15 @@ export default function OrientationStep() {
         isLoading: isLoadingSignatureStatus,
         refetch: refetchSignatureStatus,
     } = useCheckSignatureStatusQuery("official-hire", {
-        });
+        refetchOnMountOrArgChange: true,
+    });
     const {
         data: officialHireStatus,
         isLoading: isLoadingOfficialHireStatus,
         refetch: refetchOfficialHireStatus,
     } = useGetOfficialHireStatusQuery(undefined, {
-        });
+        refetchOnMountOrArgChange: true,
+    });
     const [submitOfficialHire] = useSubmitOfficialHireMutation();
 
     const handleProfileRetrieve = async () => {

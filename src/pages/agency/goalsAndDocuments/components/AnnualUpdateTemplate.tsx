@@ -1,9 +1,11 @@
-﻿import React, {useState, useEffect, useCallback, useRef} from "react";
+import React, {useState, useEffect, useCallback, useRef} from "react";
 import {useNavigate, useLocation} from "react-router";
 import {Routes} from "@/routes/constants";
 import {ChevronLeft, Loader2} from "lucide-react";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
+import VoiceInputButton from "@/components/VoiceInputButton";
 import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Button} from "@/components/ui/button";
 import {useAuth} from "@/utils/auth";
@@ -31,11 +33,13 @@ export default function AnnualUpdateTemplate(
     const backLabel = isUserPanel ? "Back to Plan of Care" : "Back to Goals & Documents";
     
     const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
-        skip: !documentType || !!firebaseId
+        skip: !documentType || !!firebaseId,
+        refetchOnMountOrArgChange: true
     });
     
     const {data: firebaseDocument, isLoading: isLoadingFirebaseDoc} = useGetGoalDocumentByFirebaseIdQuery(firebaseId!, {
-        skip: !firebaseId
+        skip: !firebaseId,
+        refetchOnMountOrArgChange: true
     });
     const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
     const [submitDocument, {isLoading: isSubmitting}] = useSubmitGoalDocumentMutation();
@@ -199,7 +203,7 @@ export default function AnnualUpdateTemplate(
 
     return (
         <VoiceRecordingProvider pageTitle={pageTitle}>
-            <div className="min-h-[calc(100vh-200px)]">
+            <div className="min-h-[calc(100vh-200px)] pb-20">
                 {/* Header with Back Button */}
                 <div className="mb-8">
                     <button
@@ -317,13 +321,25 @@ export default function AnnualUpdateTemplate(
                             Describe how the activities participated in during this year assisted the individual in
                             moving toward his/her ISP outcome(s).
                         </label>
-                        <Textarea
-                            value={formData.activitiesDescription}
-                            onChange={(e) => handleInputChange("activitiesDescription", e.target.value)}
-                            placeholder=""
-                            className="w-full bg-white border border-[#cccccd]"
-                            rows={4}
-                        />
+                        {!isReadOnly ? (
+                            <VoiceEnabledTextarea
+                                value={formData.activitiesDescription}
+                                onChange={(v) => handleInputChange("activitiesDescription", v)}
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd] min-h-[104px]"
+                                fieldName="Activities and ISP outcomes"
+                                pageTitle={pageTitle}
+                            />
+                        ) : (
+                            <Textarea
+                                value={formData.activitiesDescription}
+                                readOnly
+                                disabled
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd]"
+                                rows={4}
+                            />
+                        )}
                     </div>
 
                     {/* Changes Needed */}
@@ -331,13 +347,25 @@ export default function AnnualUpdateTemplate(
                         <label className="block text-[14px] font-medium text-[#10141a] mb-2">
                             Do changes need to be made to the strategies/activities based on the above information?
                         </label>
-                        <Textarea
-                            value={formData.changesNeeded}
-                            onChange={(e) => handleInputChange("changesNeeded", e.target.value)}
-                            placeholder=""
-                            className="w-full bg-white border border-[#cccccd]"
-                            rows={4}
-                        />
+                        {!isReadOnly ? (
+                            <VoiceEnabledTextarea
+                                value={formData.changesNeeded}
+                                onChange={(v) => handleInputChange("changesNeeded", v)}
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd] min-h-[104px]"
+                                fieldName="Changes to strategies or activities"
+                                pageTitle={pageTitle}
+                            />
+                        ) : (
+                            <Textarea
+                                value={formData.changesNeeded}
+                                readOnly
+                                disabled
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd]"
+                                rows={4}
+                            />
+                        )}
                     </div>
 
                     {/* Outstanding Issues */}
@@ -345,13 +373,25 @@ export default function AnnualUpdateTemplate(
                         <label className="block text-[14px] font-medium text-[#10141a] mb-2">
                             Are there any outstanding issues/concerns?
                         </label>
-                        <Textarea
-                            value={formData.outstandingIssues}
-                            onChange={(e) => handleInputChange("outstandingIssues", e.target.value)}
-                            placeholder=""
-                            className="w-full bg-white border border-[#cccccd]"
-                            rows={4}
-                        />
+                        {!isReadOnly ? (
+                            <VoiceEnabledTextarea
+                                value={formData.outstandingIssues}
+                                onChange={(v) => handleInputChange("outstandingIssues", v)}
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd] min-h-[104px]"
+                                fieldName="Outstanding issues or concerns"
+                                pageTitle={pageTitle}
+                            />
+                        ) : (
+                            <Textarea
+                                value={formData.outstandingIssues}
+                                readOnly
+                                disabled
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd]"
+                                rows={4}
+                            />
+                        )}
                     </div>
 
                     {/* Planning Examples */}
@@ -360,13 +400,25 @@ export default function AnnualUpdateTemplate(
                             Give example(s) of how the individual participated in the planning of his/her activities
                             throughout the year.
                         </label>
-                        <Textarea
-                            value={formData.planningExamples}
-                            onChange={(e) => handleInputChange("planningExamples", e.target.value)}
-                            placeholder=""
-                            className="w-full bg-white border border-[#cccccd]"
-                            rows={4}
-                        />
+                        {!isReadOnly ? (
+                            <VoiceEnabledTextarea
+                                value={formData.planningExamples}
+                                onChange={(v) => handleInputChange("planningExamples", v)}
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd] min-h-[104px]"
+                                fieldName="Planning participation examples"
+                                pageTitle={pageTitle}
+                            />
+                        ) : (
+                            <Textarea
+                                value={formData.planningExamples}
+                                readOnly
+                                disabled
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd]"
+                                rows={4}
+                            />
+                        )}
                     </div>
 
                     {/* Connections Examples */}
@@ -375,13 +427,25 @@ export default function AnnualUpdateTemplate(
                             Give example(s) from this year that demonstrate how the individual made new connections
                             and/or participated more fully in his/her community.
                         </label>
-                        <Textarea
-                            value={formData.connectionsExamples}
-                            onChange={(e) => handleInputChange("connectionsExamples", e.target.value)}
-                            placeholder=""
-                            className="w-full bg-white border border-[#cccccd]"
-                            rows={4}
-                        />
+                        {!isReadOnly ? (
+                            <VoiceEnabledTextarea
+                                value={formData.connectionsExamples}
+                                onChange={(v) => handleInputChange("connectionsExamples", v)}
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd] min-h-[104px]"
+                                fieldName="Community connections examples"
+                                pageTitle={pageTitle}
+                            />
+                        ) : (
+                            <Textarea
+                                value={formData.connectionsExamples}
+                                readOnly
+                                disabled
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd]"
+                                rows={4}
+                            />
+                        )}
                     </div>
 
                     {/* Employment Opportunities */}
@@ -390,13 +454,25 @@ export default function AnnualUpdateTemplate(
                             Have any opportunities for employment of additional community participation been identified
                             during this year?
                         </label>
-                        <Textarea
-                            value={formData.employmentOpportunities}
-                            onChange={(e) => handleInputChange("employmentOpportunities", e.target.value)}
-                            placeholder=""
-                            className="w-full bg-white border border-[#cccccd]"
-                            rows={4}
-                        />
+                        {!isReadOnly ? (
+                            <VoiceEnabledTextarea
+                                value={formData.employmentOpportunities}
+                                onChange={(v) => handleInputChange("employmentOpportunities", v)}
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd] min-h-[104px]"
+                                fieldName="Employment or community opportunities"
+                                pageTitle={pageTitle}
+                            />
+                        ) : (
+                            <Textarea
+                                value={formData.employmentOpportunities}
+                                readOnly
+                                disabled
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd]"
+                                rows={4}
+                            />
+                        )}
                     </div>
 
                     {/* Employment Pursuits */}
@@ -405,13 +481,25 @@ export default function AnnualUpdateTemplate(
                             What has been done to pursue these employment or additional community participation
                             opportunities?
                         </label>
-                        <Textarea
-                            value={formData.employmentPursuits}
-                            onChange={(e) => handleInputChange("employmentPursuits", e.target.value)}
-                            placeholder=""
-                            className="w-full bg-white border border-[#cccccd]"
-                            rows={4}
-                        />
+                        {!isReadOnly ? (
+                            <VoiceEnabledTextarea
+                                value={formData.employmentPursuits}
+                                onChange={(v) => handleInputChange("employmentPursuits", v)}
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd] min-h-[104px]"
+                                fieldName="Pursuit of employment or community opportunities"
+                                pageTitle={pageTitle}
+                            />
+                        ) : (
+                            <Textarea
+                                value={formData.employmentPursuits}
+                                readOnly
+                                disabled
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd]"
+                                rows={4}
+                            />
+                        )}
                     </div>
 
                     {/* Health/Safety Changes */}
@@ -420,13 +508,25 @@ export default function AnnualUpdateTemplate(
                             Has anything changed related to the individual's health/safety during this year? If follow
                             up needed?
                         </label>
-                        <Textarea
-                            value={formData.healthSafetyChanges}
-                            onChange={(e) => handleInputChange("healthSafetyChanges", e.target.value)}
-                            placeholder=""
-                            className="w-full bg-white border border-[#cccccd]"
-                            rows={4}
-                        />
+                        {!isReadOnly ? (
+                            <VoiceEnabledTextarea
+                                value={formData.healthSafetyChanges}
+                                onChange={(v) => handleInputChange("healthSafetyChanges", v)}
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd] min-h-[104px]"
+                                fieldName="Health and safety changes"
+                                pageTitle={pageTitle}
+                            />
+                        ) : (
+                            <Textarea
+                                value={formData.healthSafetyChanges}
+                                readOnly
+                                disabled
+                                placeholder=""
+                                className="w-full bg-white border border-[#cccccd]"
+                                rows={4}
+                            />
+                        )}
                     </div>
 
                     <div className="mt-8">
@@ -470,6 +570,7 @@ export default function AnnualUpdateTemplate(
                     )}
                 </form>
             </div>
+            {!isReadOnly && <VoiceInputButton />}
         </div>
         </VoiceRecordingProvider>
     );

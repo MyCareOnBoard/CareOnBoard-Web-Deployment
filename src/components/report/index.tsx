@@ -28,6 +28,7 @@ export default function GenerateReport() {
     endDate: "",
     isLifetime: false
   });
+  const [isGenerating, setIsGenerating] = useState(false);
   const {user} = useAuth();
   const navigate = useNavigate();
 
@@ -142,21 +143,25 @@ export default function GenerateReport() {
   }
 
   const handleGenerateReport = () => {
-    const userRoutes: any = Routes[userRoutesPrefix[user?.userType as UserType] as keyof typeof Routes];
-
-    const reportFilters = {
-      status: formData.status,
-      noteType: formData.noteType,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
-      isLifetime: formData.isLifetime
-    };
-
-    sessionStorage.setItem('reportFilters', JSON.stringify(reportFilters));
-
-    navigate(userRoutes.reports[formData.reportType], {
-      state: reportFilters
-    });
+    setIsGenerating(true);
+    setTimeout(() => {
+      setIsGenerating(false);
+      const userRoutes: any = Routes[userRoutesPrefix[user?.userType as UserType] as keyof typeof Routes];
+      
+      const reportFilters = {
+        status: formData.status,
+        noteType: formData.noteType,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        isLifetime: formData.isLifetime
+      };
+      
+      sessionStorage.setItem('reportFilters', JSON.stringify(reportFilters));
+      
+      navigate(userRoutes.reports[formData.reportType], { 
+        state: reportFilters 
+      });
+    }, 3000);
   };
 
   return (
@@ -290,6 +295,43 @@ export default function GenerateReport() {
         </Button>
       </div>
 
+      {/* Generating Modal */}
+      {isGenerating && (
+        <>
+          {/* Overlay */}
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50"/>
+
+          {/* Modal */}
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+            <div
+              className="backdrop-blur bg-white border border-white/30 rounded-[30px] p-5 pb-[38px] pt-5 w-[379px] flex flex-col items-center gap-6">
+              {/* Success Icon with Loading Spinner */}
+              <div className="relative w-[100px] h-[100px]">
+                {/* Outer ring */}
+                <div className="absolute inset-0 rounded-full border-4 border-[#f0faf4]"/>
+
+                {/* Green circle with spinner */}
+                <div
+                  className="absolute left-[14.5px] top-[14px] w-[72px] h-[72px] bg-[#0eaf52] rounded-full flex items-center justify-center">
+                  {/* Loading spinner */}
+                  <div
+                    className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"/>
+                </div>
+              </div>
+
+              {/* Text Content */}
+              <div className="flex flex-col gap-3 items-center text-center w-full">
+                <p className="text-[32px] font-semibold text-[#10141a] leading-[1]">
+                  Please wait
+                </p>
+                <p className="text-[16px] font-medium text-[#808081] leading-[1.6]">
+                  Please wait while we generate your report
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

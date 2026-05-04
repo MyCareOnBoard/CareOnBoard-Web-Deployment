@@ -1,4 +1,4 @@
-﻿import {createApi} from "@reduxjs/toolkit/query/react";
+import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 import {Agency} from "@/lib/api/agencies";
 import {ListAgenciesResponse} from "@/lib/api/agencies";
@@ -134,7 +134,6 @@ export const superAdminApi = createApi({
   reducerPath: "superAdminApi",
   baseQuery: customBaseQuery,
   tagTypes: ['Agencies'],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     createAgencyWithUser: builder.mutation<CreateAgencyWithUserResponse, CreateAgencyWithUserPayload>({
       query: (data) => ({

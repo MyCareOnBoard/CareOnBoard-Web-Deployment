@@ -1,4 +1,4 @@
-﻿import {createApi} from "@reduxjs/toolkit/query/react";
+import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 
 export interface SuperAdminStats {
@@ -41,7 +41,6 @@ export const superAdminDashboardApi = createApi({
   reducerPath: "superAdminDashboardApi",
   baseQuery: customBaseQuery,
   tagTypes: ["SuperAdminStats", "ShiftStats", "AttendanceReport"],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getSuperAdminStats: builder.query<SuperAdminStatsResponse, void>({
       query: () => ({

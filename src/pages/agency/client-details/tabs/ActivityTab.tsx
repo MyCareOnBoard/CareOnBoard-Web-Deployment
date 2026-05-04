@@ -1,20 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight, List, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { ShiftsMonthCalendar } from "@/components/shifts/ShiftsMonthCalendar";
+import { cn } from "@/lib/utils";
 import { listShifts, type Shift, formatShiftLocation } from "@/lib/api/shifts";
-
-type ShiftRow = {
-  id: string;
-  dspName: string;
-  dspRole: string;
-  avatarUrl?: string;
-  dateLabel: string;
-  location: string;
-  clockedIn: string;
-  clockedOut: string;
-  durationLabel: string;
-};
+import { generatePath, useNavigate } from "react-router";
+import { Routes } from "@/routes/constants";
+import { DspShiftScheduleListRow } from "@/pages/agency/dsp-management/components/DspShiftScheduleListRow";
+import {
+  getInitialsFromShiftPersonName,
+  getShiftRowStatusInfo,
+} from "@/lib/shift-row-status";
+import { formatShiftRowClockDisplay } from "@/lib/shift-row-time";
 
 export function ActivityTab({
   clientName,
@@ -31,40 +29,44 @@ export function ActivityTab({
   setCurrentPage: (next: number) => void;
   itemsPerPage: number;
 }) {
+  const [shiftsView, setShiftsView] = useState<"calendar" | "list">("calendar");
   const [shifts, setShifts] = useState<Shift[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shiftMenuOpenForId, setShiftMenuOpenForId] = useState<string | null>(null);
+  const listFetchedRef = useRef(false);
+  const navigate = useNavigate();
 
-  // Fetch shifts for this client
+  // Lazy-fetch list shifts when user opens List view
   useEffect(() => {
-    const fetchShifts = async () => {
-      if (!clientId || !agencyId) {
-        setIsLoading(false);
-        return;
-      }
+    if (shiftsView !== "list" || !clientId || !agencyId) return;
+    if (listFetchedRef.current) return;
 
+    const fetchShifts = async () => {
       try {
         setIsLoading(true);
         setError(null);
         const response = await listShifts({
           agencyId,
           clientId,
-          client: true, // Populate client data
-          employee: true, // Populate employee/DSP data
-          limit: 100, // Get all shifts for client-side pagination
+          client: true,
+          employee: true,
+          limit: 100,
         });
         setShifts(response.shifts || []);
-      } catch (err: any) {
+        listFetchedRef.current = true;
+      } catch (err: unknown) {
         console.error("Failed to fetch shifts:", err);
-        setError(err.message || "Failed to load shifts");
+        const message = err instanceof Error ? err.message : "Failed to load shifts";
+        setError(message);
         setShifts([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchShifts();
-  }, [clientId, agencyId]);
+    void fetchShifts();
+  }, [shiftsView, clientId, agencyId]);
 
   // Format date from ISO string or Firestore Timestamp
   const formatDate = useCallback((dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): string => {
@@ -94,39 +96,6 @@ export function ActivityTab({
       }
       
       return format(date, "d MMMM");
-    } catch {
-      return "N/A";
-    }
-  }, []);
-
-  // Format time from ISO string or Firestore Timestamp
-  const formatTime = useCallback((timeValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): string => {
-    if (!timeValue) return "N/A";
-    
-    try {
-      let date: Date;
-      
-      // Handle Firestore Timestamp object
-      if (typeof timeValue === 'object' && '_seconds' in timeValue && timeValue._seconds) {
-        date = new Date(timeValue._seconds * 1000);
-      }
-      // Handle Date object
-      else if (timeValue instanceof Date) {
-        date = timeValue;
-      }
-      // Handle ISO string
-      else if (typeof timeValue === 'string') {
-        date = new Date(timeValue);
-      }
-      else {
-        return "N/A";
-      }
-      
-      if (isNaN(date.getTime())) {
-        return "N/A";
-      }
-      
-      return format(date, "h:mm a");
     } catch {
       return "N/A";
     }
@@ -180,57 +149,69 @@ export function ActivityTab({
     }
   }, []);
 
-  // Transform API shifts to display format
-  const shiftRows: ShiftRow[] = useMemo(() => {
-    return shifts.map((shift) => {
-      const dspName = shift.employee?.fullName || shift.assignedDsp || "Unassigned";
-      const dspRole = "DSP"; // Employee doesn't have a role field, defaulting to DSP
-      const dateLabel = formatDate(shift.date);
-      const location = formatShiftLocation(shift.location) || "Location not specified";
-      const clockedIn = shift.clockedInAt ? formatTime(shift.clockedInAt) : "Not clocked in";
-      const clockedOut = shift.clockedOutAt ? formatTime(shift.clockedOutAt) : shift.status === "ongoing" ? "In progress" : "Not clocked out";
-      const durationLabel = shift.sessionDuration || (shift.clockedInAt && shift.clockedOutAt ? calculateDuration(shift.clockedInAt, shift.clockedOutAt) : "N/A");
-      
-      return {
-        id: shift.id,
-        dspName,
-        dspRole,
-        avatarUrl: shift.employee?.profilePicture,
-        dateLabel,
-        location,
-        clockedIn,
-        clockedOut,
-        durationLabel,
-      };
-    });
-  }, [shifts, formatDate, formatTime, calculateDuration]);
-
-  const totalPages = Math.max(1, Math.ceil(shiftRows.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(shifts.length / itemsPerPage));
 
   const paginatedShifts = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
-    return shiftRows.slice(start, start + itemsPerPage);
-  }, [shiftRows, currentPage, itemsPerPage]);
+    return shifts.slice(start, start + itemsPerPage);
+  }, [shifts, currentPage, itemsPerPage]);
+
+  const shiftsViewToggle = (opts?: { dividerAfterYear?: boolean }) => (
+    <div
+      className={cn(
+        "flex items-center gap-1",
+        opts?.dividerAfterYear && "ml-0.5 border-l border-gray-200/80 pl-2",
+      )}
+      role="tablist"
+      aria-label="Shifts view"
+    >
+      <Button
+        type="button"
+        variant={shiftsView === "calendar" ? "default" : "outline"}
+        size="icon-sm"
+        className="rounded-[5px] px-0"
+        aria-pressed={shiftsView === "calendar"}
+        aria-label="Calendar view"
+        onClick={() => setShiftsView("calendar")}
+      >
+        <CalendarDays className="size-5 shrink-0" />
+      </Button>
+      <Button
+        type="button"
+        variant={shiftsView === "list" ? "default" : "outline"}
+        size="icon-sm"
+        className="rounded-[5px] px-0"
+        aria-pressed={shiftsView === "list"}
+        aria-label="List view"
+        onClick={() => setShiftsView("list")}
+      >
+        <List className="size-5 shrink-0" />
+      </Button>
+    </div>
+  );
 
   return (
     <>
-      {/* Shifts Header */}
-      <div className="mt-8">
-        <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-          Shifts
-        </p>
-        <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-          Shifts for {clientName}
-        </p>
-      </div>
+      {shiftsView === "calendar" && (
+        <div className="mt-4">
+          <ShiftsMonthCalendar
+            variant="client"
+            agencyId={agencyId}
+            clientId={clientId}
+            headerActions={shiftsViewToggle({ dividerAfterYear: true })}
+          />
+        </div>
+      )}
 
-      {/* Shift Rows */}
-      <div className="mt-4 space-y-3">
+      {shiftsView === "list" && (
+      <div className="mt-4 space-y-4">
+      <div className="flex justify-end">{shiftsViewToggle()}</div>
+      <div className="space-y-3">
         {isLoading ? (
           <div className="py-12 flex flex-col items-center justify-center gap-2 text-center">
             <Loader2 className="w-6 h-6 animate-spin text-[#00b4b8]" />
             <p className="text-[14px] font-medium text-[#808081]">
-              Loading shifts...
+              Loading shifts…
             </p>
           </div>
         ) : error ? (
@@ -242,75 +223,49 @@ export function ActivityTab({
         ) : paginatedShifts.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-[14px] font-medium text-[#808081]">
-              No shifts found for this client.
+              No shifts to show in this list yet.
             </p>
           </div>
         ) : (
-          paginatedShifts.map((shift) => (
-          <div
-            key={shift.id}
-            className="flex items-center gap-4 backdrop-blur-[20px] rounded-[20px]"
-          >
-            <Avatar className="w-[52.5px] h-[60px] rounded-lg shrink-0">
-              {shift.avatarUrl && (
-                <AvatarImage
-                  src={shift.avatarUrl}
-                  alt={shift.dspName}
-                  className="w-full h-full object-cover aspect-auto rounded-lg"
-                />
-              )}
-              <AvatarFallback className="w-full h-full rounded-lg bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-                {shift.dspName
-                  .split(" ")
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((w) => w[0]?.toUpperCase())
-                  .join("")}
-              </AvatarFallback>
-            </Avatar>
+          paginatedShifts.map((shift) => {
+            const dspName = shift.employee?.fullName || shift.assignedDsp || "Unassigned";
+            const resolvedClientName = shift.client
+              ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || clientName
+              : clientName;
+            const durationLabel =
+              shift.sessionDuration ||
+              (shift.clockedInAt && shift.clockedOutAt
+                ? calculateDuration(shift.clockedInAt, shift.clockedOutAt)
+                : null);
 
-            <div className="flex flex-1 items-center gap-16 min-w-0">
-              <div className="flex flex-col gap-1 min-w-[160px]">
-                <p className="text-[16px] font-semibold leading-[1.6] text-black truncate">
-                  {shift.dspName}
-                </p>
-                <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                  {shift.dspRole}
-                </p>
-              </div>
-
-              <div className="w-[75px] text-[14px] font-medium leading-[1.4]">
-                <p className="mb-0 text-[#808081]">Date</p>
-                <p className="text-[#10141a]">{shift.dateLabel}</p>
-              </div>
-
-              <div className="w-[180px] text-[14px] font-medium leading-[1.4]">
-                <p className="mb-0 text-[#808081]">Location</p>
-                <p className="text-[#10141a]">{formatShiftLocation(shift.location)}</p>
-              </div>
-
-              <p className="w-[95px] text-[14px] font-medium leading-[1.4] text-[#808081]">
-                Clocked In <span className="text-[#10141a]">{shift.clockedIn}</span>
-              </p>
-
-              <p className="w-[105px] text-[14px] font-medium leading-[1.4] text-[#808081]">
-                Clocked Out{" "}
-                <span className="text-[#10141a]">{shift.clockedOut}</span>
-              </p>
-            </div>
-
-            <div className="bg-[rgba(178,178,179,0.1)] border-[#b2b2b3] border-[0.5px] border-solid rounded-[60px] px-[10px] py-[10px] flex items-center justify-center">
-              <span className="text-[12px] font-semibold leading-[normal] text-[#565656] whitespace-nowrap">
-                {shift.durationLabel}
-              </span>
-            </div>
-          </div>
-          ))
+            return (
+              <DspShiftScheduleListRow
+                key={shift.id}
+                clientName={resolvedClientName}
+                clientImageUrl={shift.client?.profileImage}
+                clientInitials={getInitialsFromShiftPersonName(resolvedClientName)}
+                dspName={dspName}
+                dspImageUrl={shift.employee?.profilePicture}
+                dspInitials={getInitialsFromShiftPersonName(dspName)}
+                dateLabel={formatDate(shift.date)}
+                locationAddress={formatShiftLocation(shift.location) || "Location not specified"}
+                durationLabel={durationLabel}
+                statusInfo={getShiftRowStatusInfo(shift, shift.approved)}
+                clockedInDisplay={formatShiftRowClockDisplay(shift.clockedInAt)}
+                clockedOutDisplay={formatShiftRowClockDisplay(shift.clockedOutAt)}
+                menuOpen={shiftMenuOpenForId === shift.id}
+                onMenuOpenChange={(open) => setShiftMenuOpenForId(open ? shift.id : null)}
+                onDetails={() => {
+                  setShiftMenuOpenForId(null);
+                  navigate(generatePath(Routes.agency.shiftDetails, { shiftId: shift.id }));
+                }}
+              />
+            );
+          })
         )}
       </div>
 
-      {/* Pagination */}
-      <div className="mt-6 flex items-center justify-center gap-2">
+      <div className="flex items-center justify-center gap-2 pt-2">
         <span className="text-[16px] font-medium leading-[1.6] text-[#10141a]">
           {Math.min(currentPage, totalPages)}
           <span className="text-[14px] text-[#808081]">/{totalPages}</span>
@@ -332,6 +287,8 @@ export function ActivityTab({
           <ChevronRight className="w-5 h-5 text-[#10141a]" />
         </button>
       </div>
+      </div>
+      )}
     </>
   );
 }

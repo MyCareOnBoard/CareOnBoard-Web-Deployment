@@ -1,4 +1,4 @@
-﻿import { createApi } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 
 
@@ -31,7 +31,6 @@ export const employeeTrainingsApi = createApi({
     reducerPath: "employeeTrainingsApi",
     baseQuery: customBaseQuery,
     tagTypes: ["Trainings"],
-    keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         getEmployeesNonPaginated: builder.query<GetEmployeesNonPaginatedResponseItem[], string>({
             query: (agencyId) => ({

@@ -1,11 +1,25 @@
 import { format } from "date-fns";
 import type { ShiftAnomaly, ShiftAuditRecord, AnomalyCode } from "@/lib/api/shifts";
+import { ANOMALY_CHIP_CLASS } from "@/lib/shift-visual-tokens";
 
 export const ANOMALY_LABELS: Record<AnomalyCode, { label: string; color: string }> = {
-  missed: { label: "Missed shift", color: "bg-red-100 text-red-700" },
-  incomplete_clock: { label: "Incomplete shift (no clock-out)", color: "bg-amber-100 text-amber-700" },
-  unassigned: { label: "No DSP assigned", color: "bg-blue-100 text-blue-700" },
-  invalid_time: { label: "End before start", color: "bg-purple-100 text-purple-700" },
+  missed: { label: "Missed shift", color: ANOMALY_CHIP_CLASS.missed },
+  incomplete_clock: {
+    label: "Incomplete shift (no clock-out)",
+    color: ANOMALY_CHIP_CLASS.incomplete_clock,
+  },
+  late_clock_in: { label: "Late clock-in", color: ANOMALY_CHIP_CLASS.late_clock_in },
+  unassigned: { label: "No DSP assigned", color: ANOMALY_CHIP_CLASS.unassigned },
+  invalid_time: { label: "End before start", color: ANOMALY_CHIP_CLASS.invalid_time },
+};
+
+/** Compact chip text for tight calendar cells; use `ANOMALY_LABELS[code].label` for `title`. */
+export const ANOMALY_CALENDAR_SHORT_LABEL: Record<AnomalyCode, string> = {
+  missed: "Missed",
+  incomplete_clock: "No clock-out",
+  late_clock_in: "Late in",
+  unassigned: "No DSP",
+  invalid_time: "Bad window",
 };
 
 export const ACTION_LABELS: Record<

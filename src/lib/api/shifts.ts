@@ -76,6 +76,8 @@ export interface Shift {
     availableAt?: string;
     clockedInAt?: string;
     clockedOutAt?: string;
+    /** ISO timestamp: projected end when DSP clocked in after grace (server-set). */
+    estimatedEndTime?: string | null;
     status: ShiftStatus;
     actionStatus?: ShiftActionStatus;
     type?: ShiftType; // Default: automatic
@@ -167,6 +169,7 @@ export interface UpdateShiftRequest {
     sessionDuration?: string;
     clockedInAt?: string;
     clockedOutAt?: string;
+    estimatedEndTime?: string | null;
     type?: ShiftType;
     submissionStatus?: SubmissionStatus;
     employeeId?: string;
@@ -207,8 +210,10 @@ export interface ListShiftsParams {
     status?: ShiftStatus;
     type?: ShiftType;
     submissionStatus?: SubmissionStatus;
-    date?: string; // Format: YYYY-MM-DD
-    limit?: number; // 1-100, default: 50
+    date?: string; // Format: YYYY-MM-DD (exact day; not used with startDate/endDate)
+    startDate?: string; // YYYY-MM-DD inclusive range (requires endDate; use with clientId or employeeId)
+    endDate?: string; // YYYY-MM-DD inclusive range (requires startDate)
+    limit?: number; // 1–100 default 50; up to 200 when startDate+endDate are set
     agencyId?: string; // Filter by agency ID
     employeeId?: string; // Filter by employee ID
     clientId?: string; // Filter by client ID
@@ -461,14 +466,18 @@ export const getShiftById = async (
 /**
  * List all shifts for the authenticated user with optional filters
  * @param params - Optional query parameters for filtering
+ * @param options - Optional AbortSignal to cancel in-flight requests
  * @returns Promise with list of shifts
  */
-export const listShifts = async (params?: ListShiftsParams): Promise<ListShiftsResponse> => {
+export const listShifts = async (
+    params?: ListShiftsParams,
+    options?: { signal?: AbortSignal },
+): Promise<ListShiftsResponse> => {
     try {
-        const response = await axiosClient.get<ListShiftsResponse>(
-            SHIFT_BASE,
-            { params }
-        );
+        const response = await axiosClient.get<ListShiftsResponse>(SHIFT_BASE, {
+            params,
+            signal: options?.signal,
+        });
 
         return response.data;
     } catch (error) {
@@ -781,7 +790,7 @@ export const clearShifts = async (): Promise<ClearShiftsResponse> => {
  */
 // ==================== Maintenance API ====================
 
-export type AnomalyCode = "missed" | "incomplete_clock" | "unassigned" | "invalid_time";
+export type AnomalyCode = "missed" | "incomplete_clock" | "late_clock_in" | "unassigned" | "invalid_time";
 
 export interface ShiftAnomaly {
     id: string;

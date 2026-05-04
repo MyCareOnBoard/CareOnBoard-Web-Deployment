@@ -1,4 +1,4 @@
-﻿import React, {useState} from "react";
+import React, {useState} from "react";
 import {Button} from "@/components/ui/button";
 import {ChevronLeft, ChevronRight, Loader2} from "lucide-react";
 import {
@@ -26,7 +26,7 @@ export default function ComplianceMonitor() {
     error: documentsError,
   } = useGetComplianceDocumentsQuery(
     {page: currentPage, limit: itemsPerPage, search: searchTerm},
-    {skip: activeTab !== "documents"}
+    {skip: activeTab !== "documents", refetchOnMountOrArgChange: true}
   );
 
   const {
@@ -35,7 +35,7 @@ export default function ComplianceMonitor() {
     error: notesError,
   } = useGetComplianceNotesQuery(
     {page: currentPage, limit: itemsPerPage, search: searchTerm},
-    {skip: activeTab !== "notes"}
+    {skip: activeTab !== "notes", refetchOnMountOrArgChange: true}
   );
 
   const {
@@ -44,7 +44,7 @@ export default function ComplianceMonitor() {
     error: evvError,
   } = useGetComplianceEvvQuery(
     {page: currentPage, limit: itemsPerPage, search: searchTerm},
-    {skip: activeTab !== "evv"}
+    {skip: activeTab !== "evv", refetchOnMountOrArgChange: true}
   );
 
   const {

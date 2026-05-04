@@ -1,9 +1,9 @@
-﻿import {Input} from "@/components/ui/input";
+import {Input} from "@/components/ui/input";
 import {useGetDocumentsQuery} from "@/pages/applicant/documents/api";
 
 export default function DocumentsPage() {
   const {data, isLoading} = useGetDocumentsQuery(undefined, {
-    
+    refetchOnMountOrArgChange: true
   });
 
   const extractFileName = (url: string | null) => {

@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import {Link} from "react-router";
 import UserIcon from "@/assets/icons/user-heroicon.svg?react";
 import ChatBubbleIcon from "@/assets/icons/chat-bubble-heroicon.svg?react";
@@ -117,7 +117,8 @@ export function NoteCard({note, noteId}: { note: NoteCardType, noteId: string | 
 
 export default function NotesPage() {
   const {data: notes = [], isLoading} = useGetAllActivityLogsQuery(undefined, {
-    });
+    refetchOnMountOrArgChange: true,
+  });
 
   if (isLoading) {
     return (

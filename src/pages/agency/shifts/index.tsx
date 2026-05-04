@@ -1,4 +1,4 @@
-﻿import React, {useState, useMemo, useRef, useEffect} from "react";
+import React, {useState, useMemo, useRef, useEffect} from "react";
 import {ArrowLeft, ChevronLeft, ChevronRight} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Routes} from "@/routes/constants";
@@ -20,7 +20,7 @@ export default function ShiftsPage() {
   // Fetch shift stats with current filter
   const {data: shiftStatsData, refetch, isLoading} = useGetShiftStatsQuery(
     {agencyId: user?.agencyId || '', range: timeFilter},
-    {skip: !user?.agencyId}
+    {skip: !user?.agencyId, refetchOnMountOrArgChange: true}
   );
   const shifts = shiftStatsData?.buckets || [];
 
