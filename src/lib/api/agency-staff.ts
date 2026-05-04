@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Agency Staff Management API
  * Handles all API calls related to agency staff management
  */
@@ -130,7 +130,6 @@ export const agencyStaffApi = createApi({
     reducerPath: "agencyStaffApi",
     baseQuery: customBaseQuery,
     tagTypes: ["AgencyStaff"],
-    keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         /**
          * List all agency staff members

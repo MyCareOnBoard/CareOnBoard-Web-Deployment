@@ -1,4 +1,4 @@
-﻿/**
+/**
  * User Messaging API Service
  * Handles all API calls related to user/employee messaging
  * Uses Redux RTK Query for state management
@@ -206,7 +206,6 @@ export const userMessagingApi = createApi({
   reducerPath: "userMessagingApi",
   baseQuery: customBaseQuery,
   tagTypes: ['Conversations', 'Messages', 'Contacts'],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     // Get all conversations for authenticated user
     getConversations: builder.query<GetConversationsResponse, void>({

@@ -1,4 +1,4 @@
-﻿import {createApi} from "@reduxjs/toolkit/query/react";
+import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 import {SubmittedNotesResponse, SubmittedNotesQueryParams, SubmittedNoteDetails} from "./apiTypes";
 
@@ -6,7 +6,6 @@ export const agencyNotesApi = createApi({
   reducerPath: "agencyNotesApi",
   baseQuery: customBaseQuery,
   tagTypes: ['SubmittedNotes', 'SubmittedNoteDetails'],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getAllSubmittedNotes: builder.query<SubmittedNotesResponse, SubmittedNotesQueryParams>({
       query: (params) => {

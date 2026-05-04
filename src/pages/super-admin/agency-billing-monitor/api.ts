@@ -1,4 +1,4 @@
-﻿import { createApi } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 
 export type BillingPlanCode = "basic" | "pro" | "enterprise" | (string & {});
@@ -170,7 +170,6 @@ export const billingMonitorApi = createApi({
   reducerPath: "billingMonitorApi",
   baseQuery: customBaseQuery,
   tagTypes: ["BillingMonitorAgencies", "BillingMonitorHistory", "BillingMonitorStats"],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getBillingMonitorAgencies: builder.query<
       BillingMonitorAgenciesResponse,

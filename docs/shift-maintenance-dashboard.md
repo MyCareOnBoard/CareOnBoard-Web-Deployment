@@ -16,6 +16,7 @@ Both Super Admins and Agency admins get a **Shift Maintenance** area with two ta
 
 - **Missed shift** — The scheduled time has passed and no one clocked in  
 - **Incomplete shift** — Past the scheduled end, someone clocked in, and there is still no clock-out (shown in its own **Incomplete shifts** block under **Flagged issues** on the same tab)  
+- **Late clock-in** — The DSP clocked in after the grace window, so the system estimated a new end time  
 - **No DSP assigned** — Shift has no assigned caregiver  
 - **End before start** — End time is before start time  
 

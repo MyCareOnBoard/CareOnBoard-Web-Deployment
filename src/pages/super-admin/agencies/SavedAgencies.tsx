@@ -1,4 +1,4 @@
-﻿import React, {useState} from "react";
+import React, {useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Search, ChevronLeft, ChevronRight, Trash2, ArrowLeft} from "lucide-react";
@@ -18,7 +18,7 @@ export default function SavedAgencies() {
     const itemsPerPage = 8;
 
     const {data: draftAgencies, refetch, isLoading: isDraftingAgencies} = useGetDraftAgenciesQuery(undefined, {
-        
+        refetchOnMountOrArgChange: true
     });
 
     const filteredAgencies = draftAgencies?.data?.filter((agency) =>

@@ -99,6 +99,10 @@ function hasIncompleteClockOut(shift: Shift): boolean {
   return endIsPast;
 }
 
+function hasLateClockIn(shift: Shift): boolean {
+  return Boolean(shift.estimatedEndTime);
+}
+
 function hasNoDspAssigned(shift: Shift): boolean {
   if (shift.employee?.id) return false;
   const extra = shift as unknown as { employeeId?: string | null };
@@ -106,7 +110,7 @@ function hasNoDspAssigned(shift: Shift): boolean {
   return true;
 }
 
-const ORDER: AnomalyCode[] = ["invalid_time", "unassigned", "missed", "incomplete_clock"];
+const ORDER: AnomalyCode[] = ["invalid_time", "unassigned", "missed", "incomplete_clock", "late_clock_in"];
 
 /**
  * Derive maintenance-style anomaly codes from shift fields only (no API).
@@ -117,6 +121,7 @@ export function detectShiftAnomalyCodes(shift: Shift): AnomalyCode[] {
   if (hasNoDspAssigned(shift)) codes.add("unassigned");
   if (isShiftMissed(shift)) codes.add("missed");
   if (hasIncompleteClockOut(shift)) codes.add("incomplete_clock");
+  if (hasLateClockIn(shift)) codes.add("late_clock_in");
   return ORDER.filter((c) => codes.has(c));
 }
 

@@ -1,4 +1,4 @@
-﻿import { createApi } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import { Client } from "@/lib/api/clients";
 import { Employee } from "@/lib/api/employees";
@@ -249,7 +249,6 @@ export const billingApi = createApi({
   reducerPath: "billingApi",
   baseQuery: customBaseQuery,
   tagTypes: ['BillingRecords'],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getBillingRecords: builder.query<ListBillingRecordsResponse, ListBillingRecordsParams>({
       query: ({ agencyId, billingStatus, date, serviceType, limit = 10, page = 1, groupBy = 'client' }) => {

@@ -7,7 +7,6 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const axiosClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -15,59 +14,57 @@ const axiosClient: AxiosInstance = axios.create({
 
 export const axiosClientWithoutAuth: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Resolved once at startup; every subsequent call gets the same promise.
-let authInitPromise: Promise<void> | null = null;
-
+/**
+ * Wait for Firebase auth to initialize
+ * This prevents race conditions on page refresh
+ */
 const waitForAuthInit = (): Promise<void> => {
-  if (authInitPromise) return authInitPromise;
-  authInitPromise = new Promise((resolve) => {
+  return new Promise((resolve) => {
+    // If there's already a current user, auth is initialized
     if (auth.currentUser !== null) {
       resolve();
       return;
     }
-    const timeout = setTimeout(() => { unsubscribe(); resolve(); }, 5000);
+
+    // Wait for auth state to be determined (max 5 seconds)
+    const timeout = setTimeout(() => {
+      unsubscribe();
+      resolve();
+    }, 5000);
+
     const unsubscribe = auth.onAuthStateChanged(() => {
       clearTimeout(timeout);
       unsubscribe();
       resolve();
     });
   });
-  return authInitPromise;
-};
-
-// Cache the token so we don't hit Firebase on every request.
-// Firebase tokens live 1 hour; we invalidate 60 s before expiry.
-let cachedToken: { value: string; expiresAt: number } | null = null;
-
-const getCachedIdToken = async (forceRefresh = false): Promise<string | null> => {
-  if (!forceRefresh && cachedToken && Date.now() < cachedToken.expiresAt - 60_000) {
-    return cachedToken.value;
-  }
-  const token = await getIdToken();
-  if (token) {
-    cachedToken = { value: token, expiresAt: Date.now() + 55 * 60 * 1000 };
-  }
-  return token ?? null;
 };
 
 axiosClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    // Wait for Firebase auth to initialize before getting token
     await waitForAuthInit();
-    const token = await getCachedIdToken();
+
+    // Get Firebase ID token
+    const token = await getIdToken();
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     const environment = import.meta.env.VITE_API_ENVIRONMENT || 'staging';
     config.headers['x-environment'] = environment;
+
     return config;
   },
-  (error: AxiosError) => Promise.reject(error)
+  (error: AxiosError) => {
+    return Promise.reject(error);
+  }
 );
 
 axiosClientWithoutAuth.interceptors.request.use(
@@ -107,29 +104,18 @@ const getAgencyId = (): string => {
 };
 
 axiosClient.interceptors.response.use(
-  (response: AxiosResponse) => response,
+  (response: AxiosResponse) => {
+    return response;
+  },
   async (error: AxiosError) => {
     if (error.response) {
       switch (error.response.status) {
-        case 401: {
-          // Try a silent token refresh before redirecting
-          try {
-            cachedToken = null;
-            const newToken = await getCachedIdToken(true);
-            if (newToken && error.config) {
-              error.config.headers = error.config.headers ?? {};
-              error.config.headers.Authorization = `Bearer ${newToken}`;
-              return axiosClient(error.config);
-            }
-          } catch {
-            // fall through to redirect
-          }
+        case 401:
           const agencyId = getAgencyId();
           if (window.location.pathname !== Routes.auth.login) {
             window.location.href = Routes.auth.login + `?agencyId=${agencyId}`;
           }
           break;
-        }
         case 403:
           console.error('Access forbidden:', error.response.data);
           break;

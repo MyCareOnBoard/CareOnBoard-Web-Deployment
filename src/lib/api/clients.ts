@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Clients and Services API Service
  * Handles all API calls related to clients assigned to the user
  */
@@ -773,7 +773,6 @@ export const clientsApi = createApi({
   reducerPath: "clientsApi",
   baseQuery: customBaseQuery,
   tagTypes: ['Clients', 'ClientStats'],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     listClients: builder.query<
       ListClientsResponse,

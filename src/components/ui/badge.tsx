@@ -3,6 +3,7 @@ import { Slot } from "@radix-ui/react-slot"
 import { cva } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
+import { SHIFT_STATUS_BADGE_CLASS } from "@/lib/shift-visual-tokens"
 
 const badgeVariants = cva(
   "inline-flex items-center justify-center rounded-[60px] border px-[10px] py-[8px] text-[12px] font-semibold leading-[14px] tracking-tight whitespace-nowrap"
@@ -18,6 +19,7 @@ const badgeStyles: Record<string, string> = {
   expired: "border-[#ff4545] bg-[#fef2f2] text-[#ff4545]",
   error: "border-[#ff4545] bg-[#fef2f2] text-[#ff4545]",
   info: "border-[#00b4b8] bg-[#f0faf4] text-[#00b4b8]",
+  ...SHIFT_STATUS_BADGE_CLASS,
 }
 
 type BadgeProps = React.ComponentProps<"span"> & {

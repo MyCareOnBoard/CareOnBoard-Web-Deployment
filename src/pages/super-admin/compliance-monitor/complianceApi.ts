@@ -1,4 +1,4 @@
-﻿import { createApi } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 
 export interface ComplianceIssue {
@@ -91,7 +91,6 @@ export const complianceApi = createApi({
     reducerPath: "complianceApi",
     baseQuery: customBaseQuery,
     tagTypes: ["ComplianceDocuments", "ComplianceNotes", "ComplianceEvv", "ComplianceOthers", "ComplianceStats"],
-    keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         getComplianceDocuments: builder.query<ComplianceResponse, ComplianceQueryParams>({
             query: (params) => ({

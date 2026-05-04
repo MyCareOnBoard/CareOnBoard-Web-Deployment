@@ -1,4 +1,4 @@
-﻿import { createApi } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import type { PlanOfCareListResponse, PlanOfCareResponse } from "./types";
 
@@ -6,7 +6,6 @@ export const planOfCareApi = createApi({
   reducerPath: "planOfCareApi",
   baseQuery: customBaseQuery,
   tagTypes: ["PlanOfCare", "PlanOfCareItem"],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getPlanOfCareList: builder.query<PlanOfCareListResponse, void>({
       query: () => ({

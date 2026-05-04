@@ -1,4 +1,4 @@
-﻿import { createApi } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import {
   CreateActivityLogPayload,
@@ -11,7 +11,6 @@ export const userPanelNotesApi = createApi({
   reducerPath: "userPanelNotesApi",
   baseQuery: customBaseQuery,
   tagTypes: ['ActivityLogs', 'SingleActivityLog'],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getAllActivityLogs: builder.query<ActivityLog[], void>({
       query: () => ({

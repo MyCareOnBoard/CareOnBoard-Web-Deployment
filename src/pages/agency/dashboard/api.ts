@@ -1,4 +1,4 @@
-﻿import { createApi } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import { ClientStatsResponse } from "@/lib/api/clients";
 import { EmployeeStatsResponse } from "@/lib/api/employees";
@@ -8,7 +8,6 @@ export const agencyDashboardApi = createApi({
   reducerPath: "agencyDashboardApi",
   baseQuery: customBaseQuery,
   tagTypes: ['SubmittedNotes', 'SubmittedNoteDetails'],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getDSPStats: builder.query<EmployeeStatsResponse, string>({
       query: (agencyId) => ({

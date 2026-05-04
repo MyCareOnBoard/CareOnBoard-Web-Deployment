@@ -1,4 +1,4 @@
-﻿import {createApi} from "@reduxjs/toolkit/query/react";
+import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 import {
     UploadDocumentPayload,
@@ -15,7 +15,6 @@ export const userPanelDashboardApi = createApi({
     reducerPath: "userPanelDashboardApi",
     baseQuery: customBaseQuery,
     tagTypes: ['EmployeeDocuments', 'EmployeeInfo'],
-    keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         getEmployeeDocuments: builder.query<GetEmployeeDocumentsResponse[], void>({
             query: () => ({

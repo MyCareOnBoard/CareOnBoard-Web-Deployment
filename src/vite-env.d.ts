@@ -2,6 +2,8 @@
 /// <reference types="vite-plugin-svgr/client" />
 
 interface ImportMetaEnv {
+  /** ElevenLabs realtime STT WebSocket origin only, e.g. wss://api.us.elevenlabs.io */
+  readonly VITE_ELEVENLABS_WS_ORIGIN?: string
   readonly VITE_API_BASE_URL: string
   readonly VITE_GOOGLE_PLACES_API_KEY: string
   readonly VITE_FIREBASE_API_KEY: string

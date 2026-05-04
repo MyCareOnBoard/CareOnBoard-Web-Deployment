@@ -1,4 +1,4 @@
-﻿import { createApi } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import {
   GoalDocument,
@@ -17,7 +17,6 @@ export const goalsAndDocumentsApi = createApi({
   reducerPath: "goalsAndDocumentsApi",
   baseQuery: customBaseQuery,
   tagTypes: [],
-  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getAllGoalDocuments: builder.query<ListGoalDocumentsResponse, ListGoalDocumentsParams | void>({
       query: (params) => ({

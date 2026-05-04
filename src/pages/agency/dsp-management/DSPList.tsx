@@ -3,7 +3,6 @@ import { useNavigate } from "react-router";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DSP } from "./types";
 import { Routes } from "@/routes/constants";
@@ -96,43 +95,27 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
           <p className="text-sm text-gray-600">DSP overview who are managing shifts for clients</p>
         </div>
         <div className="flex items-center gap-12">
-          {isLoading ? (
-            <>
-              {[["bg-green-500", "Active"], ["bg-blue-500", "Inactive"], ["bg-gray-500", "Total"]].map(([color, label]) => (
-                <div key={label} className="text-center">
-                  <Skeleton className="h-10 w-14 mx-auto mb-2" />
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className={`w-2 h-2 rounded-full ${color}`} />
-                    <span className="text-sm text-gray-600">{label}</span>
-                  </div>
-                </div>
-              ))}
-            </>
-          ) : (
-            <>
-              <div className="text-center">
-                <p className="text-4xl font-bold text-gray-900">{activeCount}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                  <span className="text-sm text-gray-600">Active</span>
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="text-4xl font-bold text-gray-900">{inactiveCount}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span className="text-sm text-gray-600">Inactive</span>
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="text-4xl font-bold text-gray-900">{totalCount}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                  <span className="text-sm text-gray-600">Total</span>
-                </div>
-              </div>
-            </>
-          )}
+          <div className="text-center">
+            <p className="text-4xl font-bold text-gray-900">{activeCount}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-sm text-gray-600">Active</span>
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="text-4xl font-bold text-gray-900">{inactiveCount}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              <span className="text-sm text-gray-600">Inactive</span>
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="text-4xl font-bold text-gray-900">{totalCount}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <div className="w-2 h-2 rounded-full bg-gray-500"></div>
+              <span className="text-sm text-gray-600">Total</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -208,32 +191,8 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
 
         {/* DSP List */}
         {isLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between py-4 px-4 bg-gray-50 rounded-lg">
-                {/* Avatar + name */}
-                <div className="flex items-center gap-4">
-                  <Skeleton className="h-12 w-12 rounded-full" />
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-8" />
-                  </div>
-                </div>
-                {/* Status + clients + training + button */}
-                <div className="flex items-center w-[50%] justify-between">
-                  <Skeleton className="h-7 w-20 rounded-full" />
-                  <div className="text-center space-y-1">
-                    <Skeleton className="h-3 w-10 mx-auto" />
-                    <Skeleton className="h-5 w-8 mx-auto" />
-                  </div>
-                  <div className="text-center space-y-1">
-                    <Skeleton className="h-3 w-14 mx-auto" />
-                    <Skeleton className="h-5 w-12 mx-auto" />
-                  </div>
-                </div>
-                <Skeleton className="h-8 w-20 rounded-full" />
-              </div>
-            ))}
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
           </div>
         ) : (
           <div className="space-y-2">
@@ -243,7 +202,7 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
                   key={dsp.id}
                   className="flex items-center justify-between py-4 px-4 bg-gray-50 rounded-lg hover:bg-teal-50 cursor-pointer transition-colors"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 w-[350px]">
                     <button
                       onClick={() => navigateToProfile(dsp)}
                       className="flex items-center gap-4 cursor-pointer"

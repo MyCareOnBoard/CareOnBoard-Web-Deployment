@@ -35,10 +35,6 @@ export interface Employee {
   status?: 'active' | 'inactive' | 'pending' | 'suspended';
   createdAt?: string;
   updatedAt?: string;
-  // Stats fields (populated when includeStats=true)
-  clientCount?: number;
-  trainingCompleted?: number;
-  trainingTotal?: number;
 }
 
 /**
@@ -88,7 +84,6 @@ export interface ListEmployeesParams {
   search?: string;
   limit?: number;
   page?: number;
-  includeStats?: boolean;
   signal?: AbortSignal;
 }
 
@@ -190,7 +185,6 @@ export async function listEmployees(params?: ListEmployeesParams): Promise<ListE
         search: params?.search,
         limit: params?.limit || 50,
         page: params?.page,
-        includeStats: params?.includeStats,
       },
       signal: params?.signal,
     });
