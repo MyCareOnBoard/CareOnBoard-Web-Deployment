@@ -1,7 +1,7 @@
 import React, {useState, useMemo, useEffect} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
-import {Search, X, MapPin, ArrowLeft} from "lucide-react";
+import {Search, X, MapPin, ArrowLeft, Loader2} from "lucide-react";
 import {Skeleton} from "@/components/ui/skeleton";
 import CustomDatePicker from "@/components/ui/datePicker";
 import {cn} from "@/lib/utils";
