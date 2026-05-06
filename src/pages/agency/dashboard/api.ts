@@ -8,6 +8,7 @@ export const agencyDashboardApi = createApi({
   reducerPath: "agencyDashboardApi",
   baseQuery: customBaseQuery,
   tagTypes: ['SubmittedNotes', 'SubmittedNoteDetails'],
+  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getDSPStats: builder.query<EmployeeStatsResponse, string>({
       query: (agencyId) => ({

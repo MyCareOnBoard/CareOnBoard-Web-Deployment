@@ -15,6 +15,7 @@ export const userPanelDashboardApi = createApi({
     reducerPath: "userPanelDashboardApi",
     baseQuery: customBaseQuery,
     tagTypes: ['EmployeeDocuments', 'EmployeeInfo'],
+    keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         getEmployeeDocuments: builder.query<GetEmployeeDocumentsResponse[], void>({
             query: () => ({

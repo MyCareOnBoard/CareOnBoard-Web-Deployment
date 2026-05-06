@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useCallback} from "react";
+import {Skeleton} from "@/components/ui/skeleton";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {ChevronLeft, ChevronRight, ArrowLeft, Search} from "lucide-react";
@@ -48,7 +49,6 @@ export default function BillingReport() {
         },
         {
             skip: !user?.agencyId,
-            refetchOnMountOrArgChange: true,
         }
     );
 
@@ -179,12 +179,23 @@ export default function BillingReport() {
 
                 {/* Billing Records */}
                 {loading ? (
-                    <div className="flex items-center justify-center py-12">
-                        <div className="text-center">
-                            <div
-                                className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
-                            <p className="text-sm text-[#808081]">Loading billing records…</p>
-                        </div>
+                    <div className="space-y-4">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className="flex justify-between rounded-lg p-4">
+                                <div className="flex gap-4">
+                                    <Skeleton className="w-12 h-12 rounded-[8px] flex-shrink-0" />
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-32" />
+                                        <Skeleton className="h-3 w-24" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Skeleton className="h-3 w-16" />
+                                    <Skeleton className="h-4 w-20" />
+                                </div>
+                                <Skeleton className="h-8 w-24 rounded-[60px]" />
+                            </div>
+                        ))}
                     </div>
                 ) : servicesGroupedByRole.length === 0 ? (
                     <div className="text-center py-12">

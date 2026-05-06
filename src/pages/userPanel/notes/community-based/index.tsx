@@ -55,7 +55,6 @@ export default function CommunityBasedPage() {
 
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId,
-    refetchOnMountOrArgChange: true
   });
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
   const [updateLog] = useUpdateActivityLogMutation();

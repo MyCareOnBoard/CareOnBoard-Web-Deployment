@@ -35,9 +35,7 @@ export default function UserPanelDashboardPage() {
     const itemsPerPage = 5;
 
     const {data: employeeDocuments = []} = useGetEmployeeDocumentsQuery();
-    const {data: trainings = [], isLoading: isTrainingLoading, refetch} = useGetEmployeeTrainingsQuery(undefined, {
-        refetchOnMountOrArgChange: true
-    });
+    const {data: trainings = [], isLoading: isTrainingLoading, refetch} = useGetEmployeeTrainingsQuery(undefined);
     const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
     const [completeTraining] = useCompleteTrainingMutation();
 

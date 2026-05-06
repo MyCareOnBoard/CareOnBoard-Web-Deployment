@@ -91,6 +91,7 @@ export const complianceApi = createApi({
     reducerPath: "complianceApi",
     baseQuery: customBaseQuery,
     tagTypes: ["ComplianceDocuments", "ComplianceNotes", "ComplianceEvv", "ComplianceOthers", "ComplianceStats"],
+    keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         getComplianceDocuments: builder.query<ComplianceResponse, ComplianceQueryParams>({
             query: (params) => ({

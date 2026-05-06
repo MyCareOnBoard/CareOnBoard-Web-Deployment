@@ -20,7 +20,7 @@ export default function ShiftsPage() {
   // Fetch shift stats with current filter
   const {data: shiftStatsData, refetch, isLoading} = useGetShiftStatsQuery(
     {agencyId: user?.agencyId || '', range: timeFilter},
-    {skip: !user?.agencyId, refetchOnMountOrArgChange: true}
+    {skip: !user?.agencyId}
   );
   const shifts = shiftStatsData?.buckets || [];
 

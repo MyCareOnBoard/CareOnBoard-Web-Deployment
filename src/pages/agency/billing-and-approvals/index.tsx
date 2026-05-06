@@ -54,7 +54,6 @@ export default function BillingAndApprovalsPage() {
     },
     {
       skip: !user?.agencyId,
-      refetchOnMountOrArgChange: true,
     }
   );
 

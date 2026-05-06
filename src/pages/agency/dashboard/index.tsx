@@ -1,5 +1,6 @@
 import React, {useState} from "react";
 import {ChevronRight, ArrowUpRight, ChevronLeft} from "lucide-react";
+import {Skeleton} from "@/components/ui/skeleton";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {
@@ -29,25 +30,22 @@ export default function AgencyDashboardPage() {
   const [hoveredShift, setHoveredShift] = useState<number | null>(null);
   const {data: expiredDocsData, isLoading: isLoadingAlerts} = useGetExpiredDocumentsQuery(user?.agencyId || '', {
     skip: !user?.agencyId,
-    refetchOnMountOrArgChange: true
   });
   const expiredDocuments = expiredDocsData?.data || [];
 
-  const {data: clientStatsData} = useGetClientStatsQuery(user?.agencyId || '', {
+  const {data: clientStatsData, isLoading: isLoadingClients} = useGetClientStatsQuery(user?.agencyId || '', {
     skip: !user?.agencyId,
-    refetchOnMountOrArgChange: true
   });
   const clients = clientStatsData?.stats || {active: 0, inactive: 0, total: 0};
 
-  const {data: dspStatsData} = useGetDSPStatsQuery(user?.agencyId || '', {
+  const {data: dspStatsData, isLoading: isLoadingDsp} = useGetDSPStatsQuery(user?.agencyId || '', {
     skip: !user?.agencyId,
-    refetchOnMountOrArgChange: true
   });
   const dspStats = dspStatsData?.stats || {active: 0, inactive: 0, total: 0};
 
-  const {data: shiftStatsData} = useGetShiftStatsQuery(
+  const {data: shiftStatsData, isLoading: isLoadingShifts} = useGetShiftStatsQuery(
     {agencyId: user?.agencyId || '', range: 'lastWeek'},
-    {skip: !user?.agencyId, refetchOnMountOrArgChange: true}
+    {skip: !user?.agencyId}
   )
   const shifts = shiftStatsData?.buckets || [];
 
@@ -125,33 +123,49 @@ export default function AgencyDashboardPage() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-[32px] font-bold text-[#10141a]">{dspStats.active}</div>
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <div className={"flex"}>
-                    <div className="w-2 h-2 rounded-full bg-[#0EAF52]"></div>
+              {isLoadingDsp ? (
+                <>
+                  {[["#0EAF52", "Active"], ["#2B82FF", "Inactive"], ["#808081", "Total"]].map(([color, label]) => (
+                    <div key={label} className="text-center">
+                      <Skeleton className="h-9 w-12 mx-auto mb-2" />
+                      <div className="flex items-center justify-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full" style={{background: color}} />
+                        <div className="text-[12px] font-medium text-[#808081]">{label}</div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="text-center">
+                    <div className="text-[32px] font-bold text-[#10141a]">{dspStats.active}</div>
+                    <div className="flex items-center justify-center gap-1.5 mt-1">
+                      <div className={"flex"}>
+                        <div className="w-2 h-2 rounded-full bg-[#0EAF52]"></div>
+                      </div>
+                      <div className="text-[12px] font-medium text-[#808081]">Active</div>
+                    </div>
                   </div>
-                  <div className="text-[12px] font-medium text-[#808081]">Active</div>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-[32px] font-bold text-[#10141a]">{dspStats.inactive}</div>
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <div className={"flex"}>
-                    <div className="w-2 h-2 rounded-full bg-[#2B82FF]"></div>
+                  <div className="text-center">
+                    <div className="text-[32px] font-bold text-[#10141a]">{dspStats.inactive}</div>
+                    <div className="flex items-center justify-center gap-1.5 mt-1">
+                      <div className={"flex"}>
+                        <div className="w-2 h-2 rounded-full bg-[#2B82FF]"></div>
+                      </div>
+                      <div className="text-[12px] font-medium text-[#808081]">Inactive</div>
+                    </div>
                   </div>
-                  <div className="text-[12px] font-medium text-[#808081]">Inactive</div>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-[32px] font-bold text-[#10141a]">{dspStats.total}</div>
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <div className={"flex"}>
-                    <div className="w-2 h-2 rounded-full bg-[#808081]"></div>
+                  <div className="text-center">
+                    <div className="text-[32px] font-bold text-[#10141a]">{dspStats.total}</div>
+                    <div className="flex items-center justify-center gap-1.5 mt-1">
+                      <div className={"flex"}>
+                        <div className="w-2 h-2 rounded-full bg-[#808081]"></div>
+                      </div>
+                      <div className="text-[12px] font-medium text-[#808081]">Total</div>
+                    </div>
                   </div>
-                  <div className="text-[12px] font-medium text-[#808081]">Total</div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -167,33 +181,49 @@ export default function AgencyDashboardPage() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-[32px] font-bold text-[#10141a]">{clients.active}</div>
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <div className={"flex"}>
-                    <div className="w-2 h-2 rounded-full bg-[#0EAF52]"></div>
+              {isLoadingClients ? (
+                <>
+                  {[["#0EAF52", "Active"], ["#2B82FF", "Inactive"], ["#808081", "Total"]].map(([color, label]) => (
+                    <div key={label} className="text-center">
+                      <Skeleton className="h-9 w-12 mx-auto mb-2" />
+                      <div className="flex items-center justify-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full" style={{background: color}} />
+                        <div className="text-[12px] font-medium text-[#808081]">{label}</div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="text-center">
+                    <div className="text-[32px] font-bold text-[#10141a]">{clients.active}</div>
+                    <div className="flex items-center justify-center gap-1.5 mt-1">
+                      <div className={"flex"}>
+                        <div className="w-2 h-2 rounded-full bg-[#0EAF52]"></div>
+                      </div>
+                      <div className="text-[12px] font-medium text-[#808081]">Active</div>
+                    </div>
                   </div>
-                  <div className="text-[12px] font-medium text-[#808081]">Active</div>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-[32px] font-bold text-[#10141a]">{clients.inactive}</div>
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <div className={"flex"}>
-                    <div className="w-2 h-2 rounded-full bg-[#2B82FF]"></div>
+                  <div className="text-center">
+                    <div className="text-[32px] font-bold text-[#10141a]">{clients.inactive}</div>
+                    <div className="flex items-center justify-center gap-1.5 mt-1">
+                      <div className={"flex"}>
+                        <div className="w-2 h-2 rounded-full bg-[#2B82FF]"></div>
+                      </div>
+                      <div className="text-[12px] font-medium text-[#808081]">Inactive</div>
+                    </div>
                   </div>
-                  <div className="text-[12px] font-medium text-[#808081]">Inactive</div>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-[32px] font-bold text-[#10141a]">{clients.total}</div>
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <div className={"flex"}>
-                    <div className="w-2 h-2 rounded-full bg-[#808081]"></div>
+                  <div className="text-center">
+                    <div className="text-[32px] font-bold text-[#10141a]">{clients.total}</div>
+                    <div className="flex items-center justify-center gap-1.5 mt-1">
+                      <div className={"flex"}>
+                        <div className="w-2 h-2 rounded-full bg-[#808081]"></div>
+                      </div>
+                      <div className="text-[12px] font-medium text-[#808081]">Total</div>
+                    </div>
                   </div>
-                  <div className="text-[12px] font-medium text-[#808081]">Total</div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -237,7 +267,15 @@ export default function AgencyDashboardPage() {
               </div>
 
               <div className="flex items-end justify-between gap-3 h-[200px] relative">
-                {transformedShifts.map((shift, index) => (
+                {isLoadingShifts ? (
+                  [55, 80, 40, 90, 65, 45, 70].map((h, i) => (
+                    <div key={i} className="flex flex-col items-center flex-1 h-full justify-end gap-2">
+                      <Skeleton className="w-full rounded-t-md" style={{height: `${h}%`}} />
+                      <Skeleton className="h-3 w-8" />
+                      <Skeleton className="h-2.5 w-10" />
+                    </div>
+                  ))
+                ) : transformedShifts.map((shift, index) => (
                   <div
                     key={`${shift.day}-${index}`}
                     className="flex flex-col items-center flex-1 h-full justify-end relative"
@@ -326,8 +364,24 @@ export default function AgencyDashboardPage() {
               {/* Table */}
               <div className="space-y-3">
                 {isLoadingAlerts ? (
-                  <div className="flex items-center justify-center py-8">
-                    <p className="text-[14px] text-[#808081]">Loading compliance alerts...</p>
+                  <div className="space-y-3">
+                    {Array.from({length: 5}).map((_, i) => (
+                      <div key={i} className="flex items-center justify-between py-4 px-4 border-b border-[#e5e5e6] last:border-0">
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                        <div className="flex-1 px-4 space-y-2">
+                          <Skeleton className="h-3 w-16" />
+                          <Skeleton className="h-4 w-24" />
+                        </div>
+                        <div className="flex-1 px-4 space-y-2">
+                          <Skeleton className="h-3 w-12" />
+                          <Skeleton className="h-4 w-28" />
+                        </div>
+                        <Skeleton className="h-8 w-24 rounded-full shrink-0" />
+                      </div>
+                    ))}
                   </div>
                 ) : complianceAlerts.length === 0 ? (
                   <div className="flex items-center justify-center py-8">

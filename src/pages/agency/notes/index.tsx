@@ -1,5 +1,6 @@
 import React, {useState, useRef, useEffect} from "react";
 import {Search, ChevronLeft, ChevronRight, CornerDownLeft} from "lucide-react";
+import {Skeleton} from "@/components/ui/skeleton";
 import {useGetAllSubmittedNotesQuery, useApproveSubmittedNotesMutation, useRejectSubmittedNotesMutation} from "./api";
 import {formatDistanceToNow} from "date-fns";
 import AgencyEditNote from "@/pages/agency/notes/editNote";
@@ -372,9 +373,26 @@ export default function AgencyNotesPage() {
         {/* Table */}
         <div className="overflow-x-auto">
           {(isLoading || isFetching) ? (
-            <div className="flex items-center justify-center py-8">
-              <p className="text-[14px] text-[#808081]">Loading submitted notes...</p>
-            </div>
+            <table className="w-full">
+              <tbody>
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <tr key={i} className="border-b border-[#e5e5e6]">
+                    <td className="py-3 px-4 w-[180px]"><Skeleton className="h-4 w-28" /></td>
+                    <td className="py-3 px-4 w-[120px]"><Skeleton className="h-6 w-20 rounded-full" /></td>
+                    <td className="py-3 px-4 w-[200px]"><Skeleton className="h-4 w-40" /></td>
+                    <td className="py-3 w-[120px]"><Skeleton className="h-6 w-20 rounded-full mx-auto" /></td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2 justify-end">
+                        <Skeleton className="h-7 w-16 rounded-full" />
+                        <Skeleton className="h-7 w-16 rounded-full" />
+                        <Skeleton className="h-7 w-20 rounded-full" />
+                        <Skeleton className="h-7 w-16 rounded-full" />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : isError ? (
             <div className="flex items-center justify-center py-8">
               <p className="text-[14px] text-red-500">Error loading submitted notes. Please try again.</p>

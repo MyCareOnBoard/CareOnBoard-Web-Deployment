@@ -31,6 +31,7 @@ export const employeeTrainingsApi = createApi({
     reducerPath: "employeeTrainingsApi",
     baseQuery: customBaseQuery,
     tagTypes: ["Trainings"],
+    keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         getEmployeesNonPaginated: builder.query<GetEmployeesNonPaginatedResponseItem[], string>({
             query: (agencyId) => ({

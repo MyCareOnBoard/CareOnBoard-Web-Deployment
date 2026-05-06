@@ -7,6 +7,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const axiosClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -14,6 +15,7 @@ const axiosClient: AxiosInstance = axios.create({
 
 export const axiosClientWithoutAuth: AxiosInstance = axios.create({
   baseURL: BASE_URL,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -23,26 +25,36 @@ export const axiosClientWithoutAuth: AxiosInstance = axios.create({
  * Wait for Firebase auth to initialize
  * This prevents race conditions on page refresh
  */
+let authInitPromise: Promise<void> | null = null;
+
 const waitForAuthInit = (): Promise<void> => {
-  return new Promise((resolve) => {
-    // If there's already a current user, auth is initialized
+  if (authInitPromise) return authInitPromise;
+  authInitPromise = new Promise((resolve) => {
     if (auth.currentUser !== null) {
       resolve();
       return;
     }
-
-    // Wait for auth state to be determined (max 5 seconds)
-    const timeout = setTimeout(() => {
-      unsubscribe();
-      resolve();
-    }, 5000);
-
+    const timeout = setTimeout(() => { unsubscribe(); resolve(); }, 5000);
     const unsubscribe = auth.onAuthStateChanged(() => {
       clearTimeout(timeout);
       unsubscribe();
       resolve();
     });
   });
+  return authInitPromise;
+};
+
+let cachedToken: { value: string; expiresAt: number } | null = null;
+
+const getCachedIdToken = async (forceRefresh = false): Promise<string | null> => {
+  if (!forceRefresh && cachedToken && Date.now() < cachedToken.expiresAt - 60_000) {
+    return cachedToken.value;
+  }
+  const token = await getIdToken();
+  if (token) {
+    cachedToken = { value: token, expiresAt: Date.now() + 55 * 60 * 1000 };
+  }
+  return token ?? null;
 };
 
 axiosClient.interceptors.request.use(
@@ -51,7 +63,7 @@ axiosClient.interceptors.request.use(
     await waitForAuthInit();
 
     // Get Firebase ID token
-    const token = await getIdToken();
+    const token = await getCachedIdToken();
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -110,12 +122,24 @@ axiosClient.interceptors.response.use(
   async (error: AxiosError) => {
     if (error.response) {
       switch (error.response.status) {
-        case 401:
+        case 401: {
+          try {
+            cachedToken = null;
+            const newToken = await getCachedIdToken(true);
+            if (newToken && error.config) {
+              error.config.headers = error.config.headers ?? {};
+              error.config.headers.Authorization = `Bearer ${newToken}`;
+              return axiosClient(error.config);
+            }
+          } catch {
+            // fall through to redirect
+          }
           const agencyId = getAgencyId();
           if (window.location.pathname !== Routes.auth.login) {
             window.location.href = Routes.auth.login + `?agencyId=${agencyId}`;
           }
           break;
+        }
         case 403:
           console.error('Access forbidden:', error.response.data);
           break;

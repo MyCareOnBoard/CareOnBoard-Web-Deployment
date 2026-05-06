@@ -116,9 +116,7 @@ export function NoteCard({note, noteId}: { note: NoteCardType, noteId: string | 
 }
 
 export default function NotesPage() {
-  const {data: notes = [], isLoading} = useGetAllActivityLogsQuery(undefined, {
-    refetchOnMountOrArgChange: true,
-  });
+  const {data: notes = [], isLoading} = useGetAllActivityLogsQuery(undefined);
 
   if (isLoading) {
     return (

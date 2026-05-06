@@ -6,6 +6,7 @@ export const planOfCareApi = createApi({
   reducerPath: "planOfCareApi",
   baseQuery: customBaseQuery,
   tagTypes: ["PlanOfCare", "PlanOfCareItem"],
+  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getPlanOfCareList: builder.query<PlanOfCareListResponse, void>({
       query: () => ({

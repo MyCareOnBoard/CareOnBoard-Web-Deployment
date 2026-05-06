@@ -35,12 +35,10 @@ export default function NaturalSupportsTraining() {
     
     const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
         skip: !documentType || !!firebaseId,
-        refetchOnMountOrArgChange: true
     });
-    
+
     const {data: firebaseDocument, isLoading: isLoadingFirebaseDoc} = useGetGoalDocumentByFirebaseIdQuery(firebaseId!, {
         skip: !firebaseId,
-        refetchOnMountOrArgChange: true
     });
     const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
     const [updateByFirebaseId] = useUpdateGoalDocumentByFirebaseIdMutation();

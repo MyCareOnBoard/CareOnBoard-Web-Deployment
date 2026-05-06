@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, ArrowUpRight, Loader2, Pencil, Trash2, XCircle, Eye } from "lucide-react";
+import { Plus, ArrowUpRight, Pencil, Trash2, XCircle, Eye } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import AddMileageModal from "./components/AddMileageModal";
 import RideDetailModal from "./components/RideDetailModal";
@@ -137,34 +138,48 @@ export default function MileagePage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 lg:flex lg:justify-end">
-          <div className="text-center p-3 sm:p-0">
-            <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">{activeCount}</div>
-            <div className="flex items-center justify-center gap-1.5 sm:gap-2">
-              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#22c55e]"></div>
-              <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Active</span>
-            </div>
-          </div>
-          <div className="text-center p-3 sm:p-0">
-            <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">{completedCount}</div>
-            <div className="flex items-center justify-center gap-1.5 sm:gap-2">
-              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3b82f6]"></div>
-              <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Completed</span>
-            </div>
-          </div>
-          <div className="text-center p-3 sm:p-0">
-            <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">0</div>
-            <div className="flex items-center justify-center gap-1.5 sm:gap-2">
-              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3b82f6]"></div>
-              <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Missed</span>
-            </div>
-          </div>
-          <div className="text-center p-3 sm:p-0">
-            <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">{cancelledCount}</div>
-            <div className="flex items-center justify-center gap-1.5 sm:gap-2">
-              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3b82f6]"></div>
-              <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Cancelled</span>
-            </div>
-          </div>
+          {loading ? (
+            [["#22c55e", "Active"], ["#3b82f6", "Completed"], ["#3b82f6", "Missed"], ["#3b82f6", "Cancelled"]].map(([color, label]) => (
+              <div key={label} className="text-center p-3 sm:p-0">
+                <Skeleton className="h-10 sm:h-12 w-14 mx-auto mb-2" />
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full" style={{ background: color }} />
+                  <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">{label}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <>
+              <div className="text-center p-3 sm:p-0">
+                <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">{activeCount}</div>
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#22c55e]"></div>
+                  <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Active</span>
+                </div>
+              </div>
+              <div className="text-center p-3 sm:p-0">
+                <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">{completedCount}</div>
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3b82f6]"></div>
+                  <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Completed</span>
+                </div>
+              </div>
+              <div className="text-center p-3 sm:p-0">
+                <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">0</div>
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3b82f6]"></div>
+                  <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Missed</span>
+                </div>
+              </div>
+              <div className="text-center p-3 sm:p-0">
+                <div className="text-[32px] sm:text-[40px] lg:text-[48px] font-bold text-[#10141a] mb-1 sm:mb-2">{cancelledCount}</div>
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3b82f6]"></div>
+                  <span className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#6b7280]">Cancelled</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -189,9 +204,42 @@ export default function MileagePage() {
         {/* Table */}
         <div className="overflow-x-auto">
           {loading ? (
-            <div className="p-8 sm:p-10 lg:p-12 flex items-center justify-center gap-2">
-              <Loader2 className="w-6 h-6 animate-spin text-[#6b7280]" />
-              <span className="text-[#6b7280] text-[14px]">Loading mileage…</span>
+            <div className="divide-y divide-[#e5e7eb]">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="p-6">
+                  <div className="flex items-center gap-8">
+                    <div className="flex items-center gap-6 min-w-[300px]">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="w-[52.5px] h-[60px] rounded-[8px] shrink-0" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-3 w-10" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="w-[52.5px] h-[60px] rounded-[8px] shrink-0" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-3 w-8" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid flex-1 grid-cols-4 gap-6">
+                      {Array.from({ length: 4 }).map((_, j) => (
+                        <div key={j} className="space-y-2">
+                          <Skeleton className="h-3 w-16" />
+                          <Skeleton className="h-4 w-20" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {Array.from({ length: 3 }).map((_, k) => (
+                        <Skeleton key={k} className="w-8 h-8 rounded-lg" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : error ? (
             <div className="p-8 sm:p-10 lg:p-12 text-center">

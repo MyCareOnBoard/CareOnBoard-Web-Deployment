@@ -21,16 +21,12 @@ export default function OrientationStep() {
         data,
         isLoading: isLoadingSignatureStatus,
         refetch: refetchSignatureStatus,
-    } = useCheckSignatureStatusQuery("official-hire", {
-        refetchOnMountOrArgChange: true,
-    });
+    } = useCheckSignatureStatusQuery("official-hire");
     const {
         data: officialHireStatus,
         isLoading: isLoadingOfficialHireStatus,
         refetch: refetchOfficialHireStatus,
-    } = useGetOfficialHireStatusQuery(undefined, {
-        refetchOnMountOrArgChange: true,
-    });
+    } = useGetOfficialHireStatusQuery(undefined);
     const [submitOfficialHire] = useSubmitOfficialHireMutation();
 
     const handleProfileRetrieve = async () => {

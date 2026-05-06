@@ -34,12 +34,10 @@ export default function AnnualUpdateTemplate(
     
     const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
         skip: !documentType || !!firebaseId,
-        refetchOnMountOrArgChange: true
     });
-    
+
     const {data: firebaseDocument, isLoading: isLoadingFirebaseDoc} = useGetGoalDocumentByFirebaseIdQuery(firebaseId!, {
         skip: !firebaseId,
-        refetchOnMountOrArgChange: true
     });
     const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
     const [submitDocument, {isLoading: isSubmitting}] = useSubmitGoalDocumentMutation();

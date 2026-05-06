@@ -41,6 +41,7 @@ export const superAdminDashboardApi = createApi({
   reducerPath: "superAdminDashboardApi",
   baseQuery: customBaseQuery,
   tagTypes: ["SuperAdminStats", "ShiftStats", "AttendanceReport"],
+  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getSuperAdminStats: builder.query<SuperAdminStatsResponse, void>({
       query: () => ({

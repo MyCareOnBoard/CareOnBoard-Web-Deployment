@@ -55,31 +55,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
 
+      const currentFirebaseUser = await new Promise<import('firebase/auth').User | null>(
+        (resolve) => {
+          const unsub = auth.onAuthStateChanged((u) => { unsub(); resolve(u); });
+        }
+      );
+
       if (reduxUser) {
-        setUserState(reduxUser)
-        setIsInitialized(true)
-        setLoading(false)
-        return
+        if (currentFirebaseUser && currentFirebaseUser.uid === reduxUser.uid) {
+          setUserState(reduxUser)
+          setIsInitialized(true)
+          setLoading(false)
+          return
+        }
+        dispatch(setUser(null))
       }
 
-      // If no Redux user, check Firebase auth state synchronously
-      const currentUser = auth.currentUser;
-      if (currentUser) {
+      if (currentFirebaseUser) {
         const user = {
-          uid: currentUser.uid,
-          email: currentUser.email || '',
-          fullName: currentUser.displayName || '',
-          emailVerified: currentUser.emailVerified,
-          createdAt: currentUser.metadata.creationTime
-            ? new Date(currentUser.metadata.creationTime)
+          uid: currentFirebaseUser.uid,
+          email: currentFirebaseUser.email || '',
+          fullName: currentFirebaseUser.displayName || '',
+          emailVerified: currentFirebaseUser.emailVerified,
+          createdAt: currentFirebaseUser.metadata.creationTime
+            ? new Date(currentFirebaseUser.metadata.creationTime)
             : new Date(),
           updatedAt: new Date(),
-          photoURL: currentUser.photoURL || undefined,
-          phoneNumber: currentUser.phoneNumber || undefined,
-          userType: 'applicant' as any, // Default to applicant, will be updated from backend
+          photoURL: currentFirebaseUser.photoURL || undefined,
+          phoneNumber: currentFirebaseUser.phoneNumber || undefined,
+          userType: 'applicant' as any,
         }
         setUserState(user)
-        dispatch(setUser(user))
+        // Do NOT dispatch to Redux here — avoid persisting 'applicant' as the real type.
       }
 
       setIsInitialized(true)
@@ -107,9 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(response.error || "Login failed")
     }
 
-    // Update local state and Redux
+    // Update local state
     setUserState(response.user)
-    dispatch(setUser(response.user))
   }
 
   /**

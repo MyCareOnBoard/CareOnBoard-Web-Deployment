@@ -7,7 +7,7 @@ import {
 export function DspCount({ agencyId }: { agencyId: string }) {
 	const { data, isLoading, isFetching, error } = useGetAgencyDspCountQuery(
 		{ agencyId },
-		{ refetchOnMountOrArgChange: true }
+		{}
 	);
 
 	if (isLoading || isFetching) return <span>…</span>;
@@ -18,7 +18,7 @@ export function DspCount({ agencyId }: { agencyId: string }) {
 export function ClientCount({ agencyId }: { agencyId: string }) {
 	const { data, isLoading, isFetching, error } = useGetAgencyClientCountQuery(
 		{ agencyId },
-		{ refetchOnMountOrArgChange: true }
+		{}
 	);
 
 	if (isLoading || isFetching) return <span>…</span>;

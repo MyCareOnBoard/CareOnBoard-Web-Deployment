@@ -6,6 +6,7 @@ export const complianceAlertsApi = createApi({
     reducerPath: "complianceAlertsApi",
     baseQuery: customBaseQuery,
     tagTypes: ['ExpiredDocuments'],
+    keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         getExpiredDocuments: builder.query<ExpiredDocumentsResponse, string>({
             query: (agencyId) => ({

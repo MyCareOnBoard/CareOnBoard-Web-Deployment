@@ -170,6 +170,7 @@ export const billingMonitorApi = createApi({
   reducerPath: "billingMonitorApi",
   baseQuery: customBaseQuery,
   tagTypes: ["BillingMonitorAgencies", "BillingMonitorHistory", "BillingMonitorStats"],
+  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getBillingMonitorAgencies: builder.query<
       BillingMonitorAgenciesResponse,

@@ -26,7 +26,7 @@ export default function ComplianceMonitor() {
     error: documentsError,
   } = useGetComplianceDocumentsQuery(
     {page: currentPage, limit: itemsPerPage, search: searchTerm},
-    {skip: activeTab !== "documents", refetchOnMountOrArgChange: true}
+    {skip: activeTab !== "documents"}
   );
 
   const {
@@ -35,7 +35,7 @@ export default function ComplianceMonitor() {
     error: notesError,
   } = useGetComplianceNotesQuery(
     {page: currentPage, limit: itemsPerPage, search: searchTerm},
-    {skip: activeTab !== "notes", refetchOnMountOrArgChange: true}
+    {skip: activeTab !== "notes"}
   );
 
   const {
@@ -44,7 +44,7 @@ export default function ComplianceMonitor() {
     error: evvError,
   } = useGetComplianceEvvQuery(
     {page: currentPage, limit: itemsPerPage, search: searchTerm},
-    {skip: activeTab !== "evv", refetchOnMountOrArgChange: true}
+    {skip: activeTab !== "evv"}
   );
 
   const {

@@ -249,6 +249,7 @@ export const billingApi = createApi({
   reducerPath: "billingApi",
   baseQuery: customBaseQuery,
   tagTypes: ['BillingRecords'],
+  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getBillingRecords: builder.query<ListBillingRecordsResponse, ListBillingRecordsParams>({
       query: ({ agencyId, billingStatus, date, serviceType, limit = 10, page = 1, groupBy = 'client' }) => {

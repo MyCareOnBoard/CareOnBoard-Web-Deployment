@@ -21,16 +21,13 @@ export default function AgencyView() {
   const itemsPerPage = 5;
 
   const {data: agency, isLoading, refetch} = useGetSummaryAgencyInfoQuery(id!, {
-    refetchOnMountOrArgChange: true,
     skip: !id
   });
   const [updateAgencyStatus, {isLoading: updateAgencyStatusLoading}] = useUpdateAgencyStatusMutation();
   const {data: users = []} = useGetSingleAgencyUsersQuery(id!, {
-    refetchOnMountOrArgChange: true,
     skip: !id
   });
   const {data: clients = []} = useGetSingleAgencyClientsQuery(id!, {
-    refetchOnMountOrArgChange: true,
     skip: !id
   });
 

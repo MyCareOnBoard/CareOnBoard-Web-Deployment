@@ -134,6 +134,7 @@ export const superAdminApi = createApi({
   reducerPath: "superAdminApi",
   baseQuery: customBaseQuery,
   tagTypes: ['Agencies'],
+  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     createAgencyWithUser: builder.mutation<CreateAgencyWithUserResponse, CreateAgencyWithUserPayload>({
       query: (data) => ({

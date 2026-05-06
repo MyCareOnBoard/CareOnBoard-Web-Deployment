@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { ChevronLeft, FileText, Calendar, User } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/utils/auth";
 import { useGetAllGoalDocumentsQuery } from "./api";
 import { GoalDocument, SubmissionStatus, DocumentType } from "@/lib/api/goals-and-documents";
@@ -119,8 +120,30 @@ export default function GoalsAndDocumentsList() {
 
             {/* Documents List */}
             {isLoading ? (
-                <div className="flex justify-center items-center py-12">
-                    <div className="text-[#808081]">Loading documents...</div>
+                <div className="space-y-3">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="bg-white border border-[#e5e5e5] rounded-xl p-6">
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <Skeleton className="h-5 w-56" />
+                                        <Skeleton className="h-6 w-20 rounded-full" />
+                                    </div>
+                                    <div className="flex items-center gap-6">
+                                        <div className="flex items-center gap-2">
+                                            <User size={16} className="text-[#d1d5db]" />
+                                            <Skeleton className="h-4 w-32" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Calendar size={16} className="text-[#d1d5db]" />
+                                            <Skeleton className="h-4 w-40" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <Skeleton className="h-8 w-20 rounded-md" />
+                            </div>
+                        </div>
+                    ))}
                 </div>
             ) : error ? (
                 <div className="flex justify-center items-center py-12">

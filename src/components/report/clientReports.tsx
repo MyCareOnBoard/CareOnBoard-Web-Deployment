@@ -2,6 +2,7 @@ import React, {useState, useMemo, useEffect} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {Search, X, FileText, ExternalLink, Loader2, ArrowLeft} from "lucide-react";
+import {Skeleton} from "@/components/ui/skeleton";
 import CustomDatePicker from "@/components/ui/datePicker";
 import {cn} from "@/lib/utils";
 import {useAuth} from "@/utils/auth";
@@ -189,8 +190,23 @@ export default function ClientReport() {
 
                 <div className="flex-1 mt-6 overflow-auto">
                     {isLoading ? (
-                        <div className="flex items-center justify-center py-20">
-                            <Loader2 className="h-8 w-8 animate-spin text-[#00b4b8]" />
+                        <div className="space-y-4">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <div key={i} className="flex justify-between rounded-lg p-4">
+                                    <div className="flex gap-4">
+                                        <Skeleton className="w-12 h-12 rounded-[8px] flex-shrink-0" />
+                                        <div className="space-y-2">
+                                            <Skeleton className="h-4 w-32" />
+                                            <Skeleton className="h-3 w-24" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-3 w-16" />
+                                        <Skeleton className="h-4 w-20" />
+                                    </div>
+                                    <Skeleton className="h-8 w-24 rounded-[60px]" />
+                                </div>
+                            ))}
                         </div>
                     ) : (
                         <div className="space-y-4">

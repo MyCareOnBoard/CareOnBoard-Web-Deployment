@@ -206,6 +206,7 @@ export const userMessagingApi = createApi({
   reducerPath: "userMessagingApi",
   baseQuery: customBaseQuery,
   tagTypes: ['Conversations', 'Messages', 'Contacts'],
+  keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     // Get all conversations for authenticated user
     getConversations: builder.query<GetConversationsResponse, void>({

@@ -17,9 +17,7 @@ export default function SavedAgencies() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 8;
 
-    const {data: draftAgencies, refetch, isLoading: isDraftingAgencies} = useGetDraftAgenciesQuery(undefined, {
-        refetchOnMountOrArgChange: true
-    });
+    const {data: draftAgencies, refetch, isLoading: isDraftingAgencies} = useGetDraftAgenciesQuery(undefined);
 
     const filteredAgencies = draftAgencies?.data?.filter((agency) =>
         agency?.draftName?.toLowerCase().includes(searchQuery.toLowerCase())

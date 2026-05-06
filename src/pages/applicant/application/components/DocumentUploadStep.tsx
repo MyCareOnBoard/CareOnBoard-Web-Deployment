@@ -93,9 +93,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
   })));
 
   const [uploadFile, { isLoading }] = useUploadDocumentMutation();
-  const { data: eligibilityVerificationData } = useGetEligibilityVerificationQuery(undefined, {
-    refetchOnMountOrArgChange: true
-  });
+  const { data: eligibilityVerificationData } = useGetEligibilityVerificationQuery(undefined);
 
   const [
     submitDocumentUploadAndEligibilityVerification,
