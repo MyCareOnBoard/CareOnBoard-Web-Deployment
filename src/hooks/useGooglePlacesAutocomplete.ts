@@ -132,6 +132,39 @@ async function fetchPlaceDetails(
     }
 }
 
+/** Fetches autocomplete for the query, then fills details from the top result (same Places flow as manual search). */
+export async function fetchFirstPlaceDetailsForQuery(query: string): Promise<AddressDetails | null> {
+    const q = query.trim();
+    if (q.length < 3) return null;
+
+    const tryAutocompleteAndDetails = async (): Promise<AddressDetails | null> => {
+        if (!window.google?.maps?.importLibrary) return null;
+        try {
+            const { AutocompleteSuggestion } = await window.google.maps.importLibrary("places");
+            const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+                input: q,
+            });
+            const firstId = suggestions[0]?.placePrediction?.placeId;
+            if (!firstId) return null;
+            return fetchPlaceDetails(firstId);
+        } catch {
+            return null;
+        }
+    };
+
+    let result = await tryAutocompleteAndDetails();
+    if (result) return result;
+
+    const deadline = Date.now() + 12000;
+    while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 300));
+        result = await tryAutocompleteAndDetails();
+        if (result) return result;
+    }
+
+    return null;
+}
+
 export function useGooglePlacesAutocomplete(): UseGooglePlacesAutocompleteReturn {
     const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
     const [isSearching, setIsSearching] = useState(false);
