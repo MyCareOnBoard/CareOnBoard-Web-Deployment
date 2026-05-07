@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, Suspense, lazy } from "react";
 import { AddClientFormData } from "./types/formData";
 import { ClientFormConfig } from "./types/config";
 import { useClientForm } from "./hooks/useClientForm";
@@ -15,6 +15,10 @@ import { Stage6GoalsAndEmergency } from "./stages/Stage6GoalsAndEmergency";
 import { Stage7SystemAiAndAudit } from "./stages/Stage7SystemAiAndAudit";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+
+const ClientImportFromFilePanel = lazy(
+  () => import("./components/ClientImportFromFilePanel"),
+);
 
 type ClientFormWizardProps = {
   initialFormData?: AddClientFormData;
@@ -133,6 +137,13 @@ export function ClientFormWizard({
           backNavigate={config.backNavigate}
           clientId={config.clientId}
           isEditMode={config.isEditMode}
+          headerRightAction={
+            !isEditMode ? (
+              <Suspense fallback={null}>
+                <ClientImportFromFilePanel formData={formData} setFormData={setFormData} />
+              </Suspense>
+            ) : undefined
+          }
         />
       );
     if (stage === 2)
@@ -190,14 +201,7 @@ export function ClientFormWizard({
         />
       );
     return null;
-  }, [
-    stage,
-    config,
-    formData,
-    setFormData,
-    pageTitle,
-    footer,
-  ]);
+  }, [stage, config, formData, setFormData, pageTitle, footer, isEditMode]);
 
   return (
     <>

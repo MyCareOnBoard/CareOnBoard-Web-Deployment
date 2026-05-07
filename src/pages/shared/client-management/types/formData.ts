@@ -154,6 +154,11 @@ export type Stage7SystemAiAndAuditData = {
 
 export type AddClientFormData = {
     agencyId?: string;
+    /**
+     * Stage 1 should run Places autocomplete on imported primary address and clear after processing.
+     * Not sent to APIs.
+     */
+    _pendingImportedPrimaryGeocode?: boolean;
     stage1: Stage1ClientIdentityAndContactData;
     stage2: Stage2GuardianAndFundingData;
     stage3: Stage3HealthcareAndDocumentsData;

@@ -18,7 +18,10 @@ import {
 } from "@/components/ui/select";
 import { AddClientFormData } from "@/pages/shared/client-management/types/formData";
 import { Agency } from "@/lib/api/clients";
-import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
+import { useGooglePlacesAutocomplete, fetchFirstPlaceDetailsForQuery } from "@/hooks/useGooglePlacesAutocomplete";
+
+const SELECT_TRIGGER_CN =
+  "w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 
 export function Stage1ClientIdentityAndContact({
   showAgencySelection = false,
@@ -32,6 +35,7 @@ export function Stage1ClientIdentityAndContact({
   backNavigate,
   clientId,
   isEditMode = false,
+  headerRightAction,
 }: {
   showAgencySelection?: boolean;
   agencies?: Agency[];
@@ -44,6 +48,7 @@ export function Stage1ClientIdentityAndContact({
   backNavigate?: string;
   clientId?: string;
   isEditMode?: boolean;
+  headerRightAction?: React.ReactNode;
 }) {
   const stage1 = formData.stage1;
   const updateStage1 = (patch: Partial<AddClientFormData["stage1"]>) =>
@@ -82,6 +87,72 @@ export function Stage1ClientIdentityAndContact({
 
   const primaryAddress = useGooglePlacesAutocomplete();
   const secondaryAddress = useGooglePlacesAutocomplete();
+
+  useEffect(() => {
+    if (!formData._pendingImportedPrimaryGeocode) return undefined;
+
+    let cancelled = false;
+    const rawQuery = String(formData.stage1.address ?? "").trim();
+
+    if (rawQuery.length < 3) {
+      setFormData((prev) => {
+        if (!prev._pendingImportedPrimaryGeocode) return prev;
+        const next = { ...prev };
+        delete next._pendingImportedPrimaryGeocode;
+        return next;
+      });
+      return undefined;
+    }
+
+    void (async () => {
+      const details = await fetchFirstPlaceDetailsForQuery(rawQuery);
+      if (cancelled) return;
+
+      setFormData((prev) => {
+        if (!prev._pendingImportedPrimaryGeocode) return prev;
+
+        const base: AddClientFormData = { ...prev };
+        delete base._pendingImportedPrimaryGeocode;
+
+        if (String(prev.stage1.address ?? "").trim() !== rawQuery) {
+          return base;
+        }
+
+        if (!details) {
+          return base;
+        }
+
+        const countyStateValue =
+          details.county && details.state
+            ? `${details.county} / ${details.state}`
+            : details.county || details.state;
+
+        return {
+          ...base,
+          stage1: {
+            ...prev.stage1,
+            address: details.formattedAddress,
+            location: { lat: String(details.lat), lon: String(details.lng) },
+            countyState: countyStateValue,
+            zipCode: details.zipCode,
+          },
+        };
+      });
+
+      if (!cancelled) {
+        primaryAddress.clearSuggestions();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    formData._pendingImportedPrimaryGeocode,
+    formData.stage1.address,
+    setFormData,
+    primaryAddress.clearSuggestions,
+  ]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -131,16 +202,24 @@ export function Stage1ClientIdentityAndContact({
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
-      <div className="mb-10 flex items-center gap-4">
-        <button
-          onClick={handleBack}
-          className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-full bg-[rgba(255,255,255,0.5)] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-[#10141a]" />
-        </button>
-        <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-          {pageTitle}
-        </h1>
+      <div className="mb-10 flex flex-wrap items-center justify-between gap-3 gap-y-2">
+        <div className="flex min-w-0 max-w-full flex-1 items-center gap-4">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="cursor-pointer flex shrink-0 items-center justify-center w-10 h-10 rounded-full bg-[rgba(255,255,255,0.5)] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.7)] transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-[#10141a]" />
+          </button>
+          <h1 className="min-w-0 text-[28px] font-semibold leading-[1.3] text-[#10141a] sm:text-[36px] sm:leading-[1.5] md:text-[40px] md:leading-[1.6]">
+            {pageTitle}
+          </h1>
+        </div>
+        {headerRightAction ? (
+          <div className="flex w-full shrink-0 items-center justify-end sm:ml-auto sm:w-auto">
+            {headerRightAction}
+          </div>
+        ) : null}
       </div>
 
       {showAgencySelection && (
@@ -155,7 +234,7 @@ export function Stage1ClientIdentityAndContact({
               onValueChange={(v) => setFormData((prev) => ({ ...prev, agencyId: v }))}
               disabled={loadingAgencies}
             >
-              <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+              <SelectTrigger className={SELECT_TRIGGER_CN}>
                 <SelectValue placeholder={loadingAgencies ? "Loading agencies..." : "Select agency"} />
               </SelectTrigger>
               <SelectContent>
@@ -212,12 +291,13 @@ export function Stage1ClientIdentityAndContact({
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Gender</label>
             <Select value={stage1.gender} onValueChange={(v) => updateStage1({ gender: v })}>
-              <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+              <SelectTrigger className={SELECT_TRIGGER_CN} aria-label="Gender">
                 <SelectValue placeholder="Select gender type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="female">Female</SelectItem>
                 <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
                 <SelectItem value="non-binary">Non-binary</SelectItem>
                 <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
               </SelectContent>
@@ -305,7 +385,7 @@ export function Stage1ClientIdentityAndContact({
               value={stage1.tier}
               onValueChange={(v) => updateStage1({ tier: v })}
             >
-              <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+              <SelectTrigger className={SELECT_TRIGGER_CN}>
                 <SelectValue placeholder="Select tier" />
               </SelectTrigger>
               <SelectContent>
@@ -495,7 +575,7 @@ export function Stage1ClientIdentityAndContact({
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Language preference</label>
             <Select value={stage1.language} onValueChange={(v) => updateStage1({ language: v })}>
-              <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+              <SelectTrigger className={SELECT_TRIGGER_CN}>
                 <SelectValue placeholder="Select language" />
               </SelectTrigger>
               <SelectContent>
@@ -512,7 +592,7 @@ export function Stage1ClientIdentityAndContact({
               value={stage1.communicationMethod}
               onValueChange={(v) => updateStage1({ communicationMethod: v })}
             >
-              <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+              <SelectTrigger className={SELECT_TRIGGER_CN}>
                 <SelectValue placeholder="Select method" />
               </SelectTrigger>
               <SelectContent>
