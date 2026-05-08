@@ -14,6 +14,7 @@ import {
 import { createUser as createBackendUser } from "../api/client"
 import { PageLoader } from "@/components/ui/loader"
 import { auth } from "@/lib/firebase";
+import { clearAuthCache } from "@/lib/axios";
 import type { User } from "../types/user.types"
 
 interface AuthContextType {
@@ -169,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const logout = async () => {
     await logoutUser()
+    clearAuthCache()
     setUserState(null)
     dispatch(setUser(null))
   }
