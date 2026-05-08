@@ -46,6 +46,10 @@ const waitForAuthInit = (): Promise<void> => {
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
+export const clearAuthCache = (): void => {
+  cachedToken = null;
+};
+
 const getCachedIdToken = async (forceRefresh = false): Promise<string | null> => {
   if (!forceRefresh && cachedToken && Date.now() < cachedToken.expiresAt - 60_000) {
     return cachedToken.value;
