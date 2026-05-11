@@ -170,6 +170,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   };
 
   const languageDisplay = detectedLanguage ? getLanguageName(detectedLanguage) : null;
+  const partialPreview = partialTranscript.trim();
 
   return (
     <>
@@ -279,25 +280,42 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
                 <p className="text-[12px] font-normal text-red-500 font-['Urbanist',sans-serif] px-1">
                   {error}
                 </p>
-              ) : draftTranscript || partialTranscript ? (
+              ) : draftTranscript || partialPreview ? (
                 <div className="flex flex-col gap-1 min-w-0">
-                  <textarea
-                    value={draftTranscript}
-                    onChange={(e) => setDraftTranscript(e.target.value)}
-                    placeholder="Your transcription will appear here..."
-                    className="w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none h-[140px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8]"
-                    style={{
-                      color: "#10141a",
-                    }}
-                    aria-label="Transcript, editable"
-                  />
-                  {partialTranscript.trim() ? (
+                  <div className="relative h-[140px]">
+                    <textarea
+                      value={draftTranscript}
+                      onChange={(e) => setDraftTranscript(e.target.value)}
+                      placeholder={partialPreview ? "" : "Your transcription will appear here..."}
+                      className="absolute inset-0 w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8]"
+                      style={{
+                        color: "#10141a",
+                      }}
+                      aria-label="Transcript, editable"
+                    />
+                    {partialPreview ? (
+                      <div
+                        className="pointer-events-none absolute inset-0 px-3 py-2 text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] whitespace-pre-wrap break-words overflow-hidden"
+                        aria-hidden="true"
+                      >
+                        {draftTranscript ? (
+                          <>
+                            <span className="invisible">{draftTranscript} </span>
+                            <span className="text-[#808081]/60">{partialPreview}</span>
+                          </>
+                        ) : (
+                          <span className="text-[#808081]/60">{partialPreview}</span>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                  {partialPreview ? (
                     <p
                       className="text-[11px] font-normal text-[#808081] font-['Urbanist',sans-serif] px-1 overflow-hidden text-ellipsis whitespace-nowrap"
-                      title={partialTranscript}
+                      title={partialPreview}
                       aria-live="polite"
                     >
-                      Listening: {partialTranscript}
+                      Listening...
                     </p>
                   ) : null}
                 </div>
