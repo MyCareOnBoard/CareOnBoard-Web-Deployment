@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import MicrophoneIcon from "@/assets/icons/microphone.svg?react";
 import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
 import ElevenLabsTranscription from "@/components/transcription/ElevenLabsTranscription";
+import AssemblyAITranscription from "@/components/transcription/AssemblyAITranscription";
 import {
   shouldTranslateToEnglish,
   translateToEnglish,
@@ -65,7 +66,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
     addCommittedTranscript,
     setDetectedLanguage,
     stopRecording,
-    getOnAcceptCallback
+    getOnAcceptCallback,
   } = useVoiceRecording();
 
   const [error, setError] = useState<string | null>(null);
@@ -105,11 +106,23 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
     const fullTranscript = draftTranscript.trim();
     if (!fullTranscript) return;
 
-    let finalText = fullTranscript;
-    if (shouldTranslateToEnglish(detectedLanguage)) {
+    const contextOnAccept = getOnAcceptCallback();
+    const languageSnapshot = detectedLanguage;
+    const needsTranslation = shouldTranslateToEnglish(languageSnapshot);
+
+    if (needsTranslation) {
       setIsTranslating(true);
+      setIsConnecting(false);
+      setIsSpeaking(false);
+      setIsConnected(false);
+      setPartialTranscript("");
+      stopRecording();
+    }
+
+    let finalText = fullTranscript;
+    if (needsTranslation) {
       try {
-        finalText = await translateToEnglish(fullTranscript, detectedLanguage);
+        finalText = await translateToEnglish(fullTranscript, languageSnapshot);
       } catch (err) {
         finalText = fullTranscript;
         toast({
@@ -122,24 +135,25 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
       }
     }
 
-    const contextOnAccept = getOnAcceptCallback();
     if (contextOnAccept && finalText) {
       contextOnAccept(finalText);
     }
 
     if (onAccept && finalText) {
-      onAccept(finalText, detectedLanguage);
+      onAccept(finalText, languageSnapshot);
     }
 
-    setIsConnecting(false);
-    setIsSpeaking(false);
-    setIsConnected(false);
-    stopRecording();
+    if (!needsTranslation) {
+      setIsConnecting(false);
+      setIsSpeaking(false);
+      setIsConnected(false);
+      stopRecording();
+    }
 
     onClick?.();
   };
 
-  if (!isRecording) {
+  if (!isRecording && !isTranslating) {
     return null;
   }
 
@@ -169,11 +183,12 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   };
 
   const languageDisplay = detectedLanguage ? getLanguageName(detectedLanguage) : null;
+  const partialPreview = partialTranscript.trim();
 
   return (
     <>
       {/* ElevenLabs realtime STT */}
-      <ElevenLabsTranscription
+      <AssemblyAITranscription
         isRecording={isRecording}
         onPartialTranscript={setPartialTranscript}
         onCommittedTranscript={addCommittedTranscript}
@@ -195,7 +210,14 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             
             {/* Language or Status */}
             <div className="flex-1 min-w-0">
-              {isConnecting ? (
+              {isTranslating ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-[#00b4b8] border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-[13px] font-medium text-[#00b4b8] font-['Urbanist',sans-serif]">
+                    Translating…
+                  </p>
+                </div>
+              ) : isConnecting ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-[#00b4b8] border-t-transparent rounded-full animate-spin"></div>
                   <p className="text-[13px] font-medium text-[#00b4b8] font-['Urbanist',sans-serif]">
@@ -278,25 +300,43 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
                 <p className="text-[12px] font-normal text-red-500 font-['Urbanist',sans-serif] px-1">
                   {error}
                 </p>
-              ) : draftTranscript || partialTranscript ? (
+              ) : draftTranscript || partialPreview ? (
                 <div className="flex flex-col gap-1 min-w-0">
-                  <textarea
-                    value={draftTranscript}
-                    onChange={(e) => setDraftTranscript(e.target.value)}
-                    placeholder="Your transcription will appear here..."
-                    className="w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none h-[140px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8]"
-                    style={{
-                      color: "#10141a",
-                    }}
-                    aria-label="Transcript, editable"
-                  />
-                  {partialTranscript.trim() ? (
+                  <div className="relative h-[140px]">
+                    <textarea
+                      value={draftTranscript}
+                      onChange={(e) => setDraftTranscript(e.target.value)}
+                      disabled={isTranslating}
+                      placeholder={partialPreview ? "" : "Your transcription will appear here..."}
+                      className="absolute inset-0 w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8] disabled:opacity-70 disabled:cursor-wait"
+                      style={{
+                        color: "#10141a",
+                      }}
+                      aria-label="Transcript, editable"
+                    />
+                    {partialPreview ? (
+                      <div
+                        className="pointer-events-none absolute inset-0 px-3 py-2 text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] whitespace-pre-wrap break-words overflow-hidden"
+                        aria-hidden="true"
+                      >
+                        {draftTranscript ? (
+                          <>
+                            <span className="invisible">{draftTranscript} </span>
+                            <span className="text-[#808081]/60">{partialPreview}</span>
+                          </>
+                        ) : (
+                          <span className="text-[#808081]/60">{partialPreview}</span>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                  {partialPreview ? (
                     <p
                       className="text-[11px] font-normal text-[#808081] font-['Urbanist',sans-serif] px-1 overflow-hidden text-ellipsis whitespace-nowrap"
-                      title={partialTranscript}
+                      title={partialPreview}
                       aria-live="polite"
                     >
-                      Listening: {partialTranscript}
+                      Listening...
                     </p>
                   ) : null}
                 </div>
