@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import MicrophoneIcon from "@/assets/icons/microphone.svg?react";
 import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
 import ElevenLabsTranscription from "@/components/transcription/ElevenLabsTranscription";
+import AssemblyAITranscription from "@/components/transcription/AssemblyAITranscription";
 import {
   shouldTranslateToEnglish,
   translateToEnglish,
@@ -173,7 +174,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
   return (
     <>
       {/* ElevenLabs realtime STT */}
-      <ElevenLabsTranscription
+      <AssemblyAITranscription
         isRecording={isRecording}
         onPartialTranscript={setPartialTranscript}
         onCommittedTranscript={addCommittedTranscript}
