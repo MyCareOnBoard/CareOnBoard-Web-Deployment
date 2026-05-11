@@ -11,6 +11,10 @@ interface VoiceEnabledTextareaProps {
   fieldName?: string;
   pageTitle?: string;
   disabled?: boolean;
+  /** When set, Accept applies transcribed text via this callback instead of replacing the field with `onChange(transcript)`. */
+  onVoiceAccepted?: (transcript: string) => void;
+  id?: string;
+  rows?: number;
 }
 
 const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
@@ -20,7 +24,10 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
   placeholder = "",
   fieldName,
   pageTitle,
-  disabled = false
+  disabled = false,
+  onVoiceAccepted,
+  id,
+  rows,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const { startRecording } = useVoiceRecording();
@@ -28,32 +35,37 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
   const handleMicrophoneClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     startRecording(
-      fieldName, 
+      fieldName,
       pageTitle,
-      undefined, // onTranscript - not needed during recording
+      undefined,
       (transcript) => {
-        // onAccept - only called when Accept button is clicked
-        // Update the textarea value with the transcribed text
-        onChange(transcript);
+        if (onVoiceAccepted) {
+          onVoiceAccepted(transcript);
+        } else {
+          onChange(transcript);
+        }
       }
     );
   };
 
   return (
-    <div 
+    <div
       className="relative w-full"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <Textarea
+        id={id}
+        rows={rows}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={className}
         placeholder={placeholder}
         disabled={disabled}
       />
-      {isHovered && (
+      {isHovered && !disabled && (
         <button
+          type="button"
           className="absolute bottom-4 right-4 bg-[#00b4b8] border border-[rgba(0,0,0,0.12)] rounded-full w-8 h-8 flex items-center justify-center shadow-md hover:bg-[#009da1] transition-colors z-10 cursor-pointer"
           aria-label="Voice input"
           title="Voice input"
@@ -67,4 +79,3 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
 };
 
 export default VoiceEnabledTextarea;
-

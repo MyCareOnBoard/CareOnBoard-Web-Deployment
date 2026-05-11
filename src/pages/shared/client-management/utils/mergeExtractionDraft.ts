@@ -3,10 +3,12 @@ import { isDocKeyForImport } from "../types/clientExtraction";
 import type {
   AddClientFormData,
   DocKey,
+  EmergencyContactRelationship,
   Service,
   ServicePayType,
   YesNo,
 } from "../types/formData";
+import { EMERGENCY_CONTACT_RELATIONSHIP_VALUES } from "../types/formData";
 
 export type MergeExtractionOptions = {
   /** When true, imported values replace non-empty fields. */
@@ -42,6 +44,22 @@ function mergeString(
   if (!t) return current;
   if (overwrite || !String(current ?? "").trim()) return t;
   return current;
+}
+
+const EMERGENCY_CONTACT_RELATIONSHIP_SET = new Set<string>(
+  EMERGENCY_CONTACT_RELATIONSHIP_VALUES,
+);
+
+function mergeEmergencyContactRelationship(
+  current: string | undefined,
+  incoming: string | undefined,
+  overwrite: boolean,
+): EmergencyContactRelationship | undefined {
+  const merged = mergeString(current ?? "", incoming ?? "", overwrite).trim();
+  if (!merged) return undefined;
+  return EMERGENCY_CONTACT_RELATIONSHIP_SET.has(merged)
+    ? (merged as EmergencyContactRelationship)
+    : undefined;
 }
 
 function parseIsoOrUsDate(s: string | undefined): Date | undefined {
@@ -579,11 +597,11 @@ export function mergeExtractionDraft(
       s6.emergencyName,
       overwrite,
     );
-    next.stage6.emergencyRelationship = mergeString(
-      next.stage6.emergencyRelationship ?? "",
+    next.stage6.emergencyRelationship = mergeEmergencyContactRelationship(
+      next.stage6.emergencyRelationship,
       s6.emergencyRelationship,
       overwrite,
-    ) || undefined;
+    );
     next.stage6.primaryPhone = mergeString(
       next.stage6.primaryPhone,
       s6.primaryPhone,
@@ -626,11 +644,11 @@ export function mergeExtractionDraft(
           );
         }
         if (first.relationship?.trim() && !isExtractedNoDataToken(first.relationship)) {
-          next.stage6.emergencyRelationship = mergeString(
-            next.stage6.emergencyRelationship ?? "",
+          next.stage6.emergencyRelationship = mergeEmergencyContactRelationship(
+            next.stage6.emergencyRelationship,
             first.relationship,
             !next.stage6.emergencyRelationship?.trim() || overwrite,
-          ) || undefined;
+          );
         }
         if (first.primaryPhone?.trim() && !isExtractedNoDataToken(first.primaryPhone)) {
           next.stage6.primaryPhone = mergeString(

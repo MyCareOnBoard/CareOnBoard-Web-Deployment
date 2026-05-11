@@ -102,6 +102,25 @@ export type Stage4EvvAndVisitConfigData = {
 
 export type AutoCheckKey = "compliance" | "training" | "background" | "expired";
 
+/** Stage 6 emergency contact — single source of truth for the Select. */
+export const EMERGENCY_CONTACT_RELATIONSHIP_OPTIONS = [
+    { value: "parent", label: "Parent" },
+    { value: "guardian", label: "Guardian" },
+    { value: "spouse", label: "Spouse" },
+    { value: "sibling", label: "Sibling" },
+    { value: "relative", label: "Relative" },
+    { value: "friend", label: "Friend" },
+    { value: "case-manager", label: "Case manager" },
+    { value: "other", label: "Other" },
+] as const;
+
+export const EMERGENCY_CONTACT_RELATIONSHIP_VALUES = EMERGENCY_CONTACT_RELATIONSHIP_OPTIONS.map(
+    (o) => o.value,
+) as ReadonlyArray<(typeof EMERGENCY_CONTACT_RELATIONSHIP_OPTIONS)[number]["value"]>;
+
+export type EmergencyContactRelationship =
+    (typeof EMERGENCY_CONTACT_RELATIONSHIP_OPTIONS)[number]["value"];
+
 export type Dsp = {
     id: string;
     name: string;
@@ -129,7 +148,8 @@ export type Stage6GoalsAndEmergencyData = {
     targetBehaviors: string;
     supportStrategies: string;
     emergencyName: string;
-    emergencyRelationship?: string;
+    /** Must match Select options in Stage 6 emergency contact. */
+    emergencyRelationship?: EmergencyContactRelationship;
     primaryPhone: string;
     secondaryPhone: string;
     hospitalPreference: string;

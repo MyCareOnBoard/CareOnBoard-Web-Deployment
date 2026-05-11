@@ -15,6 +15,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import TimePicker from "@/components/TimePicker";
 import { ANOMALY_LABELS } from "@/pages/shared/shift-maintenance/audit-display";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
+import VoiceInputButton from "@/components/VoiceInputButton";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 
 const REASON_MAX = 500;
 
@@ -353,7 +356,9 @@ export default function ShiftDetailsModal({
   const canSubmit = Boolean(reason.trim()) && !isSubmitting && resolvedShift;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <VoiceRecordingProvider pageTitle="Shift details">
+      <VoiceInputButton className="z-[60]" />
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative flex min-h-[553px] w-[547px] max-w-[90vw] flex-col rounded-[20px] bg-white px-6 pt-6 pb-5 shadow-xl">
@@ -520,13 +525,22 @@ export default function ShiftDetailsModal({
                     {reason.length}/{REASON_MAX}
                   </span>
                 </div>
-                <textarea
+                <VoiceEnabledTextarea
                   id="shift-update-reason"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value.slice(0, REASON_MAX))}
                   rows={3}
+                  value={reason}
+                  onChange={(v) => setReason(v.slice(0, REASON_MAX))}
+                  onVoiceAccepted={(t) =>
+                    setReason((prev) => {
+                      const next = prev.trim() ? `${prev.trim()} ${t.trim()}` : t.trim();
+                      return next.slice(0, REASON_MAX);
+                    })
+                  }
                   placeholder="Example: Correcting clock-in time; client canceled; duplicate entry."
-                  className="w-full resize-none rounded-[8px] border-2 border-[#d1d5db] bg-white p-3 text-[14px] leading-[1.4] text-[#10141a] placeholder:text-[#808081] focus:border-[#00b4b8] focus:ring-2 focus:ring-[#00b4b8] focus:outline-none"
+                  className="min-h-[5.25rem] w-full resize-none rounded-[8px] border-2 border-[#d1d5db] bg-white p-3 text-[14px] leading-[1.4] text-[#10141a] placeholder:text-[#808081] shadow-none focus-visible:border-[#00b4b8] focus-visible:ring-2 focus-visible:ring-[#00b4b8]/30 focus-visible:outline-none"
+                  fieldName="Shift update note"
+                  pageTitle="Shift details"
+                  disabled={isSubmitting}
                 />
                 <p className="mt-1 text-[11px] text-[#808081]">
                   Others with access can read this note. Keep it factual and brief.
@@ -550,5 +564,6 @@ export default function ShiftDetailsModal({
         ) : null}
       </div>
     </div>
+    </VoiceRecordingProvider>
   );
 }

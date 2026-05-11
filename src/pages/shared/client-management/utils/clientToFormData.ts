@@ -1,5 +1,26 @@
 import { Client } from "@/lib/api/clients";
-import { AddClientFormData, createInitialAddClientFormData, createInitialDocs } from "../types/formData";
+import {
+    AddClientFormData,
+    createInitialAddClientFormData,
+    createInitialDocs,
+    EMERGENCY_CONTACT_RELATIONSHIP_VALUES,
+    type EmergencyContactRelationship,
+} from "../types/formData";
+
+const EMERGENCY_CONTACT_RELATIONSHIP_LOOKUP = new Set<string>(
+    EMERGENCY_CONTACT_RELATIONSHIP_VALUES,
+);
+
+function coerceEmergencyRelationship(
+    raw: unknown,
+): EmergencyContactRelationship | undefined {
+    if (typeof raw !== "string") return undefined;
+    const v = raw.trim();
+    if (!v) return undefined;
+    return EMERGENCY_CONTACT_RELATIONSHIP_LOOKUP.has(v)
+        ? (v as EmergencyContactRelationship)
+        : undefined;
+}
 
 export function clientToFormData(client: Client, includeAgencyId: boolean = false): AddClientFormData {
     const initial = createInitialAddClientFormData();
@@ -169,7 +190,9 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             targetBehaviors: client.goalsAndEmergency?.targetBehaviors ?? (client as any).targetBehaviors ?? "",
             supportStrategies: client.goalsAndEmergency?.supportStrategies ?? (client as any).supportStrategies ?? "",
             emergencyName: client.goalsAndEmergency?.emergencyName ?? (client as any).emergencyName ?? "",
-            emergencyRelationship: client.goalsAndEmergency?.emergencyRelationship ?? (client as any).emergencyRelationship ?? undefined,
+            emergencyRelationship: coerceEmergencyRelationship(
+                client.goalsAndEmergency?.emergencyRelationship ?? (client as any).emergencyRelationship,
+            ),
             primaryPhone: client.goalsAndEmergency?.primaryPhone ?? (client as any).primaryPhone ?? "",
             secondaryPhone: client.goalsAndEmergency?.secondaryPhone ?? (client as any).secondaryPhone ?? "",
             hospitalPreference: client.goalsAndEmergency?.hospitalPreference ?? (client as any).hospitalPreference ?? "",
