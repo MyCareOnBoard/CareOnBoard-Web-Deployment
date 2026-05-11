@@ -66,7 +66,7 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
     addCommittedTranscript,
     setDetectedLanguage,
     stopRecording,
-    getOnAcceptCallback
+    getOnAcceptCallback,
   } = useVoiceRecording();
 
   const [error, setError] = useState<string | null>(null);
@@ -106,11 +106,23 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
     const fullTranscript = draftTranscript.trim();
     if (!fullTranscript) return;
 
-    let finalText = fullTranscript;
-    if (shouldTranslateToEnglish(detectedLanguage)) {
+    const contextOnAccept = getOnAcceptCallback();
+    const languageSnapshot = detectedLanguage;
+    const needsTranslation = shouldTranslateToEnglish(languageSnapshot);
+
+    if (needsTranslation) {
       setIsTranslating(true);
+      setIsConnecting(false);
+      setIsSpeaking(false);
+      setIsConnected(false);
+      setPartialTranscript("");
+      stopRecording();
+    }
+
+    let finalText = fullTranscript;
+    if (needsTranslation) {
       try {
-        finalText = await translateToEnglish(fullTranscript, detectedLanguage);
+        finalText = await translateToEnglish(fullTranscript, languageSnapshot);
       } catch (err) {
         finalText = fullTranscript;
         toast({
@@ -123,24 +135,25 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
       }
     }
 
-    const contextOnAccept = getOnAcceptCallback();
     if (contextOnAccept && finalText) {
       contextOnAccept(finalText);
     }
 
     if (onAccept && finalText) {
-      onAccept(finalText, detectedLanguage);
+      onAccept(finalText, languageSnapshot);
     }
 
-    setIsConnecting(false);
-    setIsSpeaking(false);
-    setIsConnected(false);
-    stopRecording();
+    if (!needsTranslation) {
+      setIsConnecting(false);
+      setIsSpeaking(false);
+      setIsConnected(false);
+      stopRecording();
+    }
 
     onClick?.();
   };
 
-  if (!isRecording) {
+  if (!isRecording && !isTranslating) {
     return null;
   }
 
@@ -197,7 +210,14 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
             
             {/* Language or Status */}
             <div className="flex-1 min-w-0">
-              {isConnecting ? (
+              {isTranslating ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-[#00b4b8] border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-[13px] font-medium text-[#00b4b8] font-['Urbanist',sans-serif]">
+                    Translating…
+                  </p>
+                </div>
+              ) : isConnecting ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-[#00b4b8] border-t-transparent rounded-full animate-spin"></div>
                   <p className="text-[13px] font-medium text-[#00b4b8] font-['Urbanist',sans-serif]">
@@ -286,8 +306,9 @@ export default function VoiceInputButton({ onClick, onAccept, className = "" }: 
                     <textarea
                       value={draftTranscript}
                       onChange={(e) => setDraftTranscript(e.target.value)}
+                      disabled={isTranslating}
                       placeholder={partialPreview ? "" : "Your transcription will appear here..."}
-                      className="absolute inset-0 w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8]"
+                      className="absolute inset-0 w-full text-[13px] font-normal leading-[1.6] font-['Urbanist',sans-serif] bg-gray-50 border border-gray-200 rounded-md px-3 py-2 resize-none overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30 focus:border-[#00b4b8] disabled:opacity-70 disabled:cursor-wait"
                       style={{
                         color: "#10141a",
                       }}
