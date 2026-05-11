@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React from "react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -7,7 +7,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AddClientFormData } from "@/pages/shared/client-management/types/formData";
+import {
+  AddClientFormData,
+  EMERGENCY_CONTACT_RELATIONSHIP_OPTIONS,
+  type EmergencyContactRelationship,
+} from "@/pages/shared/client-management/types/formData";
+
+const AUTO_POPULATE_CHIPS = [
+  "Service notes",
+  "Goal progress",
+  "AI notes review",
+  "AI POC builder",
+] as const;
 
 export function Stage6GoalsAndEmergency({
   footer,
@@ -23,11 +34,6 @@ export function Stage6GoalsAndEmergency({
   const stage6 = formData.stage6;
   const updateStage6 = (patch: Partial<AddClientFormData["stage6"]>) =>
     setFormData((prev) => ({ ...prev, stage6: { ...prev.stage6, ...patch } }));
-
-  const autoPopulateChips = useMemo(
-    () => ["Service notes", "Goal progress", "AI notes review", "AI POC builder"],
-    []
-  );
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -148,7 +154,7 @@ export function Stage6GoalsAndEmergency({
             This data auto-populates:
           </p>
           <div className="mt-3 flex flex-wrap gap-3">
-            {autoPopulateChips.map((label) => (
+            {AUTO_POPULATE_CHIPS.map((label) => (
               <div
                 key={label}
                 className="cursor-pointer rounded-[6px] border border-[#808081] bg-transparent px-[10px] py-[6px] text-[14px] font-medium leading-[1.4] text-[#10141a]"
@@ -193,20 +199,21 @@ export function Stage6GoalsAndEmergency({
             </label>
             <Select
               value={stage6.emergencyRelationship}
-              onValueChange={(v) => updateStage6({ emergencyRelationship: v })}
+              onValueChange={(v) =>
+                updateStage6({
+                  emergencyRelationship: v as EmergencyContactRelationship,
+                })
+              }
             >
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
                 <SelectValue placeholder="Select relationship" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="parent">Parent</SelectItem>
-                <SelectItem value="guardian">Guardian</SelectItem>
-                <SelectItem value="spouse">Spouse</SelectItem>
-                <SelectItem value="sibling">Sibling</SelectItem>
-                <SelectItem value="relative">Relative</SelectItem>
-                <SelectItem value="friend">Friend</SelectItem>
-                <SelectItem value="case-manager">Case manager</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                {EMERGENCY_CONTACT_RELATIONSHIP_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

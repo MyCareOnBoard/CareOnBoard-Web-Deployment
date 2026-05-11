@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Routes } from "@/routes/constants";
 import { applicantsApi, type ComplianceData } from "@/lib/api/applicants";
 import type { EligibilityData } from "@/lib/api/applicants";
@@ -26,6 +25,9 @@ import { DocumentsTab } from "./components/DocumentsTab";
 import { ConditionalHireTab } from "./components/ConditionalHireTab";
 import { OfficialHireTab } from "./components/OfficialHireTab";
 import { FinalReviewTab, type ReviewStepsState } from "./components/FinalReviewTab";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
+import VoiceInputButton from "@/components/VoiceInputButton";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 
 // Type alias for document file from eligibility data
 type DocumentFile = NonNullable<EligibilityData['photoIdUrl']>;
@@ -691,6 +693,8 @@ export default function ApplicantProfilePage() {
   };
 
   return (
+    <VoiceRecordingProvider pageTitle="Applicant profile">
+      <VoiceInputButton className="z-[60]" />
     <div className="min-h-screen">
       <div className="p-2">
         <div className="mx-auto max-w-7xl">
@@ -990,11 +994,21 @@ export default function ApplicantProfilePage() {
               )}
               loadingText="Rejecting..."
             >
-              <Textarea
+              <VoiceEnabledTextarea
                 value={rejectReason}
-                onChange={(event) => setRejectReason(event.target.value)}
+                onChange={(v) => setRejectReason(v)}
+                onVoiceAccepted={(t) =>
+                  setRejectReason((prev) =>
+                    prev.trim() ? `${prev.trim()} ${t.trim()}` : t.trim()
+                  )
+                }
                 placeholder="Enter rejection reason"
                 className="mt-3 min-h-[96px]"
+                fieldName="Document rejection reason"
+                pageTitle="Applicant profile"
+                disabled={Boolean(
+                  pendingRejectDocumentId && actionLoading === pendingRejectDocumentId,
+                )}
               />
             </ConfirmDialogContent>
           </ConfirmDialog>
@@ -1019,16 +1033,27 @@ export default function ApplicantProfilePage() {
               )}
               loadingText="Rejecting..."
             >
-              <Textarea
+              <VoiceEnabledTextarea
                 value={rejectReviewStepReason}
-                onChange={(event) => setRejectReviewStepReason(event.target.value)}
+                onChange={(v) => setRejectReviewStepReason(v)}
+                onVoiceAccepted={(t) =>
+                  setRejectReviewStepReason((prev) =>
+                    prev.trim() ? `${prev.trim()} ${t.trim()}` : t.trim()
+                  )
+                }
                 placeholder="Enter rejection reason (optional)"
                 className="mt-3 min-h-[96px]"
+                fieldName="Review step rejection reason"
+                pageTitle="Applicant profile"
+                disabled={Boolean(
+                  pendingRejectStepKey && actionLoading === pendingRejectStepKey,
+                )}
               />
             </ConfirmDialogContent>
           </ConfirmDialog>
         </div>
       </div>
     </div>
+    </VoiceRecordingProvider>
   );
 }

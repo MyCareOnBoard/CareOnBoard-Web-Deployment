@@ -3,6 +3,11 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { mileageApi } from "@/lib/api/mileage";
 import { useToast } from "@/hooks/use-toast";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
+import VoiceInputButton from "@/components/VoiceInputButton";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
+
+const NOTES_MAX = 1000;
 
 interface AddManualMileageModalProps {
   isOpen: boolean;
@@ -55,7 +60,9 @@ export default function AddManualMileageModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <VoiceRecordingProvider pageTitle="Manual mileage">
+      <VoiceInputButton className="z-[60]" />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={handleClose} />
       <div className="relative bg-white rounded-[24px] w-full max-w-[420px] shadow-xl">
         {/* Header */}
@@ -94,13 +101,21 @@ export default function AddManualMileageModal({
           {/* Notes */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[13px] font-medium text-[#10141a]">Notes (optional)</label>
-            <textarea
+            <VoiceEnabledTextarea
               placeholder="Any additional details..."
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(v) => setNotes(v.slice(0, NOTES_MAX))}
+              onVoiceAccepted={(t) =>
+                setNotes((prev) => {
+                  const next = prev.trim() ? `${prev.trim()} ${t.trim()}` : t.trim();
+                  return next.slice(0, NOTES_MAX);
+                })
+              }
               rows={3}
-              className="bg-white border border-[#cccccd] rounded-xl px-4 py-3 text-[14px] text-[#10141a] placeholder:text-[#b2b2b3] outline-none focus:border-[#00b4b8] transition-colors resize-none"
-              maxLength={1000}
+              fieldName="Manual mileage notes"
+              pageTitle="Manual mileage"
+              disabled={isSubmitting}
+              className="min-h-[5.25rem] resize-none rounded-xl border border-[#cccccd] bg-white px-4 py-3 text-[14px] text-[#10141a] shadow-none placeholder:text-[#b2b2b3] focus-visible:border-[#00b4b8]"
             />
           </div>
 
@@ -128,5 +143,6 @@ export default function AddManualMileageModal({
         </div>
       </div>
     </div>
+    </VoiceRecordingProvider>
   );
 }

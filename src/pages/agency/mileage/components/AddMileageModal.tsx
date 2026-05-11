@@ -7,6 +7,9 @@ import { searchClients, Client } from "@/lib/api/clients";
 import { searchEmployees, Employee } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import { mileageApi, CreateMileageRideRequest, MileageRide, UpdateAgencyRideRequest } from "@/lib/api/mileage";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
+import VoiceInputButton from "@/components/VoiceInputButton";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 
 interface AddMileageModalProps {
   isOpen: boolean;
@@ -322,7 +325,9 @@ export default function AddMileageModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end pr-8">
+    <VoiceRecordingProvider pageTitle="Mileage">
+      <VoiceInputButton className="z-[60]" />
+      <div className="fixed inset-0 z-50 flex items-center justify-end pr-8">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/30 backdrop-blur-sm"
@@ -429,13 +434,22 @@ export default function AddMileageModal({
             {/* Notes */}
             <div className="flex flex-col gap-1">
               <label className="text-[12px] font-normal text-[#10141a]">Notes (optional)</label>
-              <div className="bg-white border border-[#cccccd] rounded-xl px-4 py-2.5">
-                <textarea
+              <div className="rounded-xl border border-[#cccccd] bg-white px-4 py-2.5">
+                <VoiceEnabledTextarea
                   placeholder="Add any notes..."
                   value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  onChange={(v) => setFormData((prev) => ({ ...prev, notes: v }))}
+                  onVoiceAccepted={(t) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      notes: prev.notes.trim() ? `${prev.notes.trim()} ${t.trim()}` : t.trim(),
+                    }))
+                  }
                   rows={2}
-                  className="w-full text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent resize-none"
+                  fieldName="Mileage notes"
+                  pageTitle="Mileage"
+                  disabled={isSubmitting}
+                  className="min-h-[3rem] w-full resize-none border-0 bg-transparent p-0 text-[14px] font-normal text-black shadow-none placeholder:text-[#b2b2b3] focus-visible:ring-0"
                 />
               </div>
             </div>
@@ -598,5 +612,6 @@ export default function AddMileageModal({
         </div>
       </div>
     </div>
+    </VoiceRecordingProvider>
   );
 }

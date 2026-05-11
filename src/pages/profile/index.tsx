@@ -34,6 +34,11 @@ import {
 import { updateAccountInfo } from "@/lib/api/settings"
 import { getAuth } from "firebase/auth"
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal"
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext"
+import VoiceInputButton from "@/components/VoiceInputButton"
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea"
+
+const PROFILE_SUMMARY_MAX = 500
 
 function formatISODateToLong(iso: string) {
   if (!iso) return "N/A"
@@ -569,7 +574,9 @@ export default function ProfilePage() {
       {/* Slide-in Edit Drawer */}
       <AnimatePresence>
         {showEdit && (
-          <>
+          <VoiceRecordingProvider pageTitle="Profile">
+            <VoiceInputButton className="z-[60]" />
+            <>
             <motion.div
               className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
               initial={{ opacity: 0 }}
@@ -826,16 +833,30 @@ export default function ProfilePage() {
                     <label className="block mb-2 text-sm font-medium text-gray-700">
                       Professional Summary
                     </label>
-                    <textarea
-                      className="w-full p-3 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00B4B8] resize-none"
+                    <VoiceEnabledTextarea
+                      className="min-h-[8rem] w-full resize-none rounded-xl border p-3 text-sm shadow-none focus-visible:ring-2 focus-visible:ring-[#00B4B8]"
                       rows={5}
                       value={formData.summary || ''}
-                      onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
+                      onChange={(v) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          summary: v.slice(0, PROFILE_SUMMARY_MAX),
+                        }))
+                      }
+                      onVoiceAccepted={(t) =>
+                        setFormData((prev) => {
+                          const cur = prev.summary || '';
+                          const next = cur.trim() ? `${cur.trim()} ${t.trim()}` : t.trim();
+                          return { ...prev, summary: next.slice(0, PROFILE_SUMMARY_MAX) };
+                        })
+                      }
                       placeholder="Tell us about your professional experience, skills, and career highlights..."
-                      maxLength={500}
+                      fieldName="Professional summary"
+                      pageTitle="Profile"
+                      disabled={saving}
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      {(formData.summary || '').length}/500 characters
+                      {(formData.summary || '').length}/{PROFILE_SUMMARY_MAX} characters
                     </p>
                   </div>
                 </div>
@@ -862,7 +883,8 @@ export default function ProfilePage() {
                 </Button>
               </div>
             </motion.div>
-          </>
+            </>
+          </VoiceRecordingProvider>
         )}
       </AnimatePresence>
 

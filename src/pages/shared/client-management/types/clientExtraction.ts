@@ -1,4 +1,6 @@
-import type { DocKey } from "./formData";
+import type { DocKey, EmergencyContactRelationship } from "./formData";
+
+export type ExtractedEmergencyContactRelationship = EmergencyContactRelationship | "";
 
 export type DetectedDocumentType = DocKey | "unknown";
 
@@ -92,7 +94,7 @@ export type ClientExtractionDraft = {
     targetBehaviors: string;
     supportStrategies: string;
     emergencyName: string;
-    emergencyRelationship: string;
+    emergencyRelationship: ExtractedEmergencyContactRelationship;
     primaryPhone: string;
     secondaryPhone: string;
     hospitalPreference: string;
@@ -100,7 +102,7 @@ export type ClientExtractionDraft = {
     medicationList: string;
     emergencyContacts: {
       name?: string;
-      relationship?: string;
+      relationship?: ExtractedEmergencyContactRelationship;
       primaryPhone?: string;
       secondaryPhone?: string;
       priority?: string;
