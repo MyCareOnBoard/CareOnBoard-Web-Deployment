@@ -1346,7 +1346,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                             ? "15 minutes"
                             : selectedService.payType === "daily"
                               ? "Daily"
-                              : selectedService.payType
+                              : selectedService.payType === "mile"
+                                ? "Mile"
+                                : selectedService.payType
                         }`}
                     </span>
                   )}

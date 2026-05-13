@@ -77,9 +77,9 @@ export interface ClientServiceDefinition {
   code: string;
   name: string;
   rate: string;
-  payType: "hourly" | "15-min" | "daily";
+  payType: "hourly" | "15-min" | "daily" | "mile";
   clientRate?: string;
-  clientPayType?: "hourly" | "15-min" | "daily";
+  clientPayType?: "hourly" | "15-min" | "daily" | "mile";
   hours?: string;
   totalApprovedHours?: string;
 }

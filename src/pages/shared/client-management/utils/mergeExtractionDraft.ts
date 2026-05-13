@@ -4,11 +4,12 @@ import type {
   AddClientFormData,
   DocKey,
   EmergencyContactRelationship,
+  GuardianRelationship,
   Service,
   ServicePayType,
   YesNo,
 } from "../types/formData";
-import { EMERGENCY_CONTACT_RELATIONSHIP_VALUES } from "../types/formData";
+import { EMERGENCY_CONTACT_RELATIONSHIP_VALUES, GUARDIAN_RELATIONSHIP_VALUES } from "../types/formData";
 
 export type MergeExtractionOptions = {
   /** When true, imported values replace non-empty fields. */
@@ -62,6 +63,104 @@ function mergeEmergencyContactRelationship(
     : undefined;
 }
 
+const GUARDIAN_RELATIONSHIP_SET = new Set<string>(GUARDIAN_RELATIONSHIP_VALUES);
+
+const GUARDIAN_SYNONYM_TO_CANONICAL: Record<string, GuardianRelationship> = {
+  mom: "mother",
+  mommy: "mother",
+  mama: "mother",
+  mother: "mother",
+  mthr: "mother",
+  dad: "father",
+  daddy: "father",
+  father: "father",
+  papa: "father",
+  fthr: "father",
+  bro: "brother",
+  brother: "brother",
+  sis: "sister",
+  sister: "sister",
+  son: "child",
+  daughter: "child",
+  child: "child",
+  grandma: "grandmother",
+  grandmother: "grandmother",
+  grandpa: "grandfather",
+  grandfather: "grandfather",
+  grandparent: "grandparent",
+  auntie: "aunt",
+  aunt: "aunt",
+  uncle: "uncle",
+  nephew: "nephew",
+  niece: "niece",
+  cousin: "cousin",
+  "step-parent": "step-parent",
+  stepmother: "step-parent",
+  stepfather: "step-parent",
+  stepmom: "step-parent",
+  stepdad: "step-parent",
+  relative: "relative",
+  guardian: "guardian",
+  "support-coordinator": "support-coordinator",
+  caregiver: "caregiver",
+  friend: "friend",
+  spouse: "spouse",
+  wife: "wife",
+  husband: "husband",
+  partner: "partner",
+  other: "other",
+};
+
+function normalizeGuardianRelationship(
+  raw: string | undefined,
+): GuardianRelationship | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (isExtractedNoDataToken(raw)) return undefined;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return undefined;
+
+  const t = trimmed.toLowerCase().replace(/_/g, "-");
+
+  if (t === "parent") return "relative";
+
+  if (GUARDIAN_RELATIONSHIP_SET.has(t)) return t as GuardianRelationship;
+
+  const hyphenated = t.replace(/\s+/g, "-");
+  if (GUARDIAN_RELATIONSHIP_SET.has(hyphenated)) return hyphenated as GuardianRelationship;
+
+  const spaced = t.replace(/\s+/g, " ").trim();
+  if (spaced === "support coordinator") return "support-coordinator";
+  if (spaced === "domestic partner") return "partner";
+  if (spaced === "care giver" || spaced === "caregiver") return "caregiver";
+
+  const synonym =
+    GUARDIAN_SYNONYM_TO_CANONICAL[spaced] ?? GUARDIAN_SYNONYM_TO_CANONICAL[hyphenated];
+  if (synonym) return synonym;
+
+  const collapsedNoParen = t.replace(/[()]/g, "").trim();
+  if (collapsedNoParen.length && GUARDIAN_SYNONYM_TO_CANONICAL[collapsedNoParen]) {
+    return GUARDIAN_SYNONYM_TO_CANONICAL[collapsedNoParen];
+  }
+
+  return undefined;
+}
+
+function mergeGuardianRelationship(
+  current: GuardianRelationship | undefined,
+  incoming: string | undefined,
+  overwrite: boolean,
+): GuardianRelationship | undefined {
+  const next = normalizeGuardianRelationship(incoming);
+  if (next === undefined) {
+    if (incoming === undefined || incoming === null) return current;
+    if (isExtractedNoDataToken(incoming)) return current;
+    if (!String(incoming).trim()) return current;
+    return current;
+  }
+  if (overwrite || !current) return next;
+  return current;
+}
+
 function parseIsoOrUsDate(s: string | undefined): Date | undefined {
   if (!s || !String(s).trim()) return undefined;
   if (isExtractedNoDataToken(s)) return undefined;
@@ -93,17 +192,33 @@ function applyYesNo(current: YesNo, incoming: string | undefined, overwrite: boo
   return current;
 }
 
-function normalizePayType(raw: string | undefined): ServicePayType | undefined {
+function normalizeClientPayType(raw: string | undefined): ServicePayType | undefined {
   if (!raw?.trim() || isExtractedNoDataToken(raw)) return undefined;
-  const t = raw.toLowerCase();
-  if (t === "hourly" || t === "15-min" || t === "daily") {
+  const orig = String(raw).trim();
+  const t = orig.toLowerCase();
+
+  if (t === "service(s)" || t === "services" || t === "service") return "hourly";
+  if (/^service\s*\(?s\)?$/i.test(orig.trim())) return "hourly";
+
+  if (t === "hourly" || t === "15-min" || t === "daily" || t === "mile") {
     return t as ServicePayType;
   }
   if (t.includes("15") && t.includes("min")) return "15-min";
+  if (t.includes("mile") || t === "mi" || t.includes("per mile")) return "mile";
   if (t.includes("hour") || t === "hr" || (t.includes("unit") && t.includes("hour")))
     return "hourly";
   if (t.includes("day")) return "daily";
   return undefined;
+}
+
+/** Staff pay basis — same canonical values as client when the document uses per-mile payroll. */
+function normalizeStaffPayType(raw: string | undefined): ServicePayType | undefined {
+  return normalizeClientPayType(raw);
+}
+
+function isLikelyTransportationService(name?: string, code?: string): boolean {
+  const blob = `${name ?? ""} ${code ?? ""}`.toLowerCase();
+  return /\btransport(ation)?\b|\bmileage\b|\bnemt\b/i.test(blob);
 }
 
 function newServiceId(): string {
@@ -119,16 +234,38 @@ function mapRowToService(row: Record<string, unknown>): Service {
     if (!v || isExtractedNoDataToken(x)) return undefined;
     return v;
   };
+
+  const cRaw = strOrUndef(r.clientRate);
+  const sRaw = strOrUndef(r.rate);
+  let clientRate = "";
+  let rate = "";
+  if (cRaw && sRaw) {
+    clientRate = mergeString("", cRaw, true);
+    rate = mergeString("", sRaw, true);
+  } else if (cRaw) {
+    clientRate = mergeString("", cRaw, true);
+    rate = "";
+  } else if (sRaw) {
+    clientRate = mergeString("", sRaw, true);
+    rate = "";
+  }
+
+  let clientPayType =
+    normalizeClientPayType(r.clientPayType) ?? normalizeClientPayType(r.unitType);
+  if (!clientPayType && isLikelyTransportationService(strOrUndef(r.name), strOrUndef(r.code))) {
+    clientPayType = "mile";
+  }
+
   return {
     id: newServiceId(),
     name: strOrUndef(r.name),
     code: strOrUndef(r.code),
     hours: mergeString("", r.hours, true),
     totalApprovedHours: mergeString("", r.totalApprovedHours, true),
-    rate: mergeString("", r.rate, true),
-    payType: normalizePayType(r.payType) ?? normalizePayType(r.unitType),
-    clientRate: mergeString("", r.clientRate, true),
-    clientPayType: normalizePayType(r.clientPayType),
+    rate,
+    payType: normalizeStaffPayType(r.payType),
+    clientRate,
+    clientPayType,
     ispEffectiveDate: parseIsoOrUsDate(r.ispEffectiveDate),
     startAuthDate: parseIsoOrUsDate(r.startAuthDate),
     endAuthDate: parseIsoOrUsDate(r.endAuthDate),
@@ -189,7 +326,8 @@ function isServiceRowEmpty(s: Service): boolean {
     !String(s.name ?? "").trim() &&
     !String(s.code ?? "").trim() &&
     !String(s.hours ?? "").trim() &&
-    !String(s.rate ?? "").trim()
+    !String(s.rate ?? "").trim() &&
+    !String(s.clientRate ?? "").trim()
   );
 }
 
@@ -382,11 +520,11 @@ export function mergeExtractionDraft(
   const s2 = draft.stage2;
   if (s2) {
     next.stage2.guardianName = mergeString(next.stage2.guardianName, s2.guardianName, overwrite);
-    next.stage2.guardianRelationship = mergeString(
-      next.stage2.guardianRelationship ?? "",
+    next.stage2.guardianRelationship = mergeGuardianRelationship(
+      next.stage2.guardianRelationship,
       s2.guardianRelationship,
       overwrite,
-    ) || undefined;
+    );
     next.stage2.guardianEmail = mergeString(
       next.stage2.guardianEmail,
       s2.guardianEmail,

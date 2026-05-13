@@ -13,7 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AddClientFormData, Service, type ServicePayType } from "@/pages/shared/client-management/types/formData";
+import {
+  AddClientFormData,
+  GUARDIAN_RELATIONSHIP_LABELS,
+  GUARDIAN_RELATIONSHIP_VALUES,
+  type GuardianRelationship,
+  Service,
+  type ServicePayType,
+} from "@/pages/shared/client-management/types/formData";
 import { useListServicesQuery, type Service as ApiService } from "@/lib/api/services";
 import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 
@@ -24,12 +31,15 @@ function RatePayTypeField({
   label,
   rate,
   payType,
+  includeMile = false,
   onRateChange,
   onPayTypeChange,
 }: {
   label: string;
   rate: string;
   payType?: ServicePayType;
+  /** Include per-mile option (client and staff reimbursement). */
+  includeMile?: boolean;
   onRateChange: (value: string) => void;
   onPayTypeChange: (value: ServicePayType) => void;
 }) {
@@ -55,6 +65,7 @@ function RatePayTypeField({
             <SelectItem value="hourly">Hourly</SelectItem>
             <SelectItem value="15-min">15 minutes</SelectItem>
             <SelectItem value="daily">Daily</SelectItem>
+            {includeMile ? <SelectItem value="mile">Mile</SelectItem> : null}
           </SelectContent>
         </Select>
       </div>
@@ -239,6 +250,7 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
         label="Client Rate / Pay Type"
         rate={service.clientRate ?? ""}
         payType={service.clientPayType}
+        includeMile
         onRateChange={(v) => update({ clientRate: v })}
         onPayTypeChange={(v) => update({ clientPayType: v })}
       />
@@ -247,6 +259,7 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
         label="Staff Rate / Pay Type"
         rate={service.rate ?? ""}
         payType={service.payType}
+        includeMile
         onRateChange={(v) => update({ rate: v })}
         onPayTypeChange={(v) => update({ payType: v })}
       />
@@ -652,16 +665,17 @@ export function Stage2GuardianAndFunding({
             </label>
             <Select
               value={stage2.guardianRelationship}
-              onValueChange={(v) => updateStage2({ guardianRelationship: v })}
+              onValueChange={(v) => updateStage2({ guardianRelationship: v as GuardianRelationship })}
             >
               <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
                 <SelectValue placeholder="Select relationship" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="parent">Parent</SelectItem>
-                <SelectItem value="guardian">Guardian</SelectItem>
-                <SelectItem value="support-coordinator">Support Coordinator</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+              <SelectContent className="max-h-[300px]">
+                {GUARDIAN_RELATIONSHIP_VALUES.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {GUARDIAN_RELATIONSHIP_LABELS[value]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

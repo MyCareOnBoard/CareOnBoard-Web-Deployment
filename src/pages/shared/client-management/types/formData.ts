@@ -22,7 +22,65 @@ export type Stage1ClientIdentityAndContactData = {
     communicationMethod?: string;
 };
 
-export type ServicePayType = "hourly" | "15-min" | "daily";
+/** Client pay type may include per-mile billing; staff pay type uses only hourly / 15-min / daily in the UI. */
+export type ServicePayType = "hourly" | "15-min" | "daily" | "mile";
+
+/** Wizard Stage 2 guardian / representative relationship — keep in sync with Gemini `GUARDIAN_RELATIONSHIP_ENUM`. */
+export const GUARDIAN_RELATIONSHIP_VALUES = [
+    "mother",
+    "father",
+    "sister",
+    "brother",
+    "child",
+    "wife",
+    "husband",
+    "spouse",
+    "partner",
+    "grandmother",
+    "grandfather",
+    "grandparent",
+    "aunt",
+    "uncle",
+    "nephew",
+    "niece",
+    "cousin",
+    "step-parent",
+    "relative",
+    "guardian",
+    "support-coordinator",
+    "caregiver",
+    "friend",
+    "other",
+] as const;
+
+export type GuardianRelationship = (typeof GUARDIAN_RELATIONSHIP_VALUES)[number];
+
+export const GUARDIAN_RELATIONSHIP_LABELS: Record<GuardianRelationship, string> = {
+    mother: "Mother",
+    father: "Father",
+    sister: "Sister",
+    brother: "Brother",
+    child: "Child",
+    wife: "Wife",
+    husband: "Husband",
+    spouse: "Spouse",
+    partner: "Partner",
+    grandmother: "Grandmother",
+    grandfather: "Grandfather",
+    grandparent: "Grandparent",
+    aunt: "Aunt",
+    uncle: "Uncle",
+    nephew: "Nephew",
+    niece: "Niece",
+    cousin: "Cousin",
+    "step-parent": "Step-parent",
+    relative: "Relative",
+    guardian: "Guardian",
+    "support-coordinator": "Support coordinator",
+    caregiver: "Caregiver",
+    friend: "Friend",
+    other: "Other",
+};
 
 export type Service = {
     id: string;
@@ -44,7 +102,7 @@ export type Service = {
 
 export type Stage2GuardianAndFundingData = {
     guardianName: string;
-    guardianRelationship?: string;
+    guardianRelationship?: GuardianRelationship;
     guardianEmail: string;
     guardianPhone: string;
     guardianAddress: string;

@@ -93,9 +93,9 @@ export interface ClientService {
   hours?: string;
   totalApprovedHours?: string;
   rate?: string;
-  payType?: "hourly" | "15-min" | "daily";
+  payType?: "hourly" | "15-min" | "daily" | "mile";
   clientRate?: string;
-  clientPayType?: "hourly" | "15-min" | "daily";
+  clientPayType?: "hourly" | "15-min" | "daily" | "mile";
   ispEffectiveDate?: string;
   startAuthDate?: string;
   endAuthDate?: string;

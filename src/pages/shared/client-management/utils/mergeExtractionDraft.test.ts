@@ -113,6 +113,87 @@ describe("mergeExtractionDraft", () => {
     const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: false });
     expect(formData.stage2.services.length).toBe(1);
     expect(formData.stage2.services[0].hours).toBe("12");
-    expect(formData.stage2.services[0].rate).toBe("45");
+    expect(formData.stage2.services[0].clientRate).toBe("45");
+    expect(formData.stage2.services[0].rate).toBe("");
+  });
+
+  it("maps unitType to clientPayType, not staff payType", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: {
+        stage2: {
+          services: [
+            {
+              name: "Hab",
+              code: "H1",
+              unitType: "15 min",
+              payType: "hourly",
+            },
+          ],
+        },
+      },
+    });
+    const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: true });
+    const s = formData.stage2.services[0];
+    expect(s.clientPayType).toBe("15-min");
+    expect(s.payType).toBe("hourly");
+  });
+
+  it("does not put unitType on staff payType when staff payType empty", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: {
+        stage2: {
+          services: [{ name: "X", code: "C1", unitType: "daily", payType: "" }],
+        },
+      },
+    });
+    const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: true });
+    const s = formData.stage2.services.find((x) => x.code === "C1");
+    expect(s?.clientPayType).toBe("daily");
+    expect(s?.payType).toBeUndefined();
+  });
+
+  it("normalizes Service(s) unit label to hourly client pay type", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: {
+        stage2: {
+          services: [{ name: "Respite", code: "R1", unitType: "Service(s)" }],
+        },
+      },
+    });
+    const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: true });
+    expect(formData.stage2.services[0].clientPayType).toBe("hourly");
+  });
+
+  it("defaults transportation-like service to mile when unit unknown", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: {
+        stage2: {
+          services: [{ name: "Non-emergency medical transport", code: "T1", unitType: "" }],
+        },
+      },
+    });
+    const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: true });
+    expect(formData.stage2.services[0].clientPayType).toBe("mile");
+  });
+
+  it("maps guardian relationship synonyms and legacy parent", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: {
+        stage2: { guardianRelationship: "mom" },
+      },
+    });
+    const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: true });
+    expect(formData.stage2.guardianRelationship).toBe("mother");
+
+    const extraction2 = makeExtraction({
+      draft: { stage2: { guardianRelationship: "parent" } },
+    });
+    const { formData: fd2 } = mergeExtractionDraft(initial, extraction2, { overwrite: true });
+    expect(fd2.stage2.guardianRelationship).toBe("relative");
   });
 });

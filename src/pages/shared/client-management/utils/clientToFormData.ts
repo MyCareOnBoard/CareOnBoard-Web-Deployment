@@ -4,12 +4,25 @@ import {
     createInitialAddClientFormData,
     createInitialDocs,
     EMERGENCY_CONTACT_RELATIONSHIP_VALUES,
+    GUARDIAN_RELATIONSHIP_VALUES,
     type EmergencyContactRelationship,
+    type GuardianRelationship,
 } from "../types/formData";
 
 const EMERGENCY_CONTACT_RELATIONSHIP_LOOKUP = new Set<string>(
     EMERGENCY_CONTACT_RELATIONSHIP_VALUES,
 );
+
+const GUARDIAN_RELATIONSHIP_LOOKUP = new Set<string>(GUARDIAN_RELATIONSHIP_VALUES);
+
+function coerceGuardianRelationship(raw: unknown): GuardianRelationship | undefined {
+    if (typeof raw !== "string") return undefined;
+    const v = raw.trim();
+    if (!v) return undefined;
+    if (v === "parent") return "relative";
+    if (GUARDIAN_RELATIONSHIP_LOOKUP.has(v)) return v as GuardianRelationship;
+    return undefined;
+}
 
 function coerceEmergencyRelationship(
     raw: unknown,
@@ -79,7 +92,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
         },
         stage2: {
             guardianName: client.guardianName || "",
-            guardianRelationship: client.guardianRelationship,
+            guardianRelationship: coerceGuardianRelationship(client.guardianRelationship),
             guardianEmail: client.guardianEmail || "",
             guardianPhone: client.guardianPhone || "",
             guardianAddress: client.guardianAddress || "",

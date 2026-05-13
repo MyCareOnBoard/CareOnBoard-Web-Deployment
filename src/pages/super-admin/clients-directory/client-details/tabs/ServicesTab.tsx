@@ -366,6 +366,7 @@ function ServiceRow({
                     <SelectItem value="hourly">Hourly</SelectItem>
                     <SelectItem value="15-min">15 minutes</SelectItem>
                     <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="mile">Mile</SelectItem>
                   </SelectContent>
                 </Select>
               </>
@@ -376,8 +377,10 @@ function ServiceRow({
                       service.payType === "15-min"
                         ? "/ 15 mins"
                         : service.payType === "daily"
-                        ? "/ day"
-                        : "/ hour"
+                          ? "/ day"
+                          : service.payType === "mile"
+                            ? "/ mile"
+                            : "/ hour"
                     }`
                   : "-"}
               </p>
@@ -412,6 +415,7 @@ function ServiceRow({
                     <SelectItem value="hourly">Hourly</SelectItem>
                     <SelectItem value="15-min">15 minutes</SelectItem>
                     <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="mile">Mile</SelectItem>
                   </SelectContent>
                 </Select>
               </>
@@ -422,8 +426,10 @@ function ServiceRow({
                       service.clientPayType === "15-min"
                         ? "/ 15 mins"
                         : service.clientPayType === "daily"
-                        ? "/ day"
-                        : "/ hour"
+                          ? "/ day"
+                          : service.clientPayType === "mile"
+                            ? "/ mile"
+                            : "/ hour"
                     }`
                   : "-"}
               </p>
