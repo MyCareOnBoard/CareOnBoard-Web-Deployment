@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CalendarDays, Upload, File } from "lucide-react";
+import { CalendarDays, Upload, File, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -14,9 +14,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MultiSelect, MultiSelectItem } from "@/components/ui/multi-select";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { AddClientFormData, DocKey, DocState, createInitialDocs } from "@/pages/shared/client-management/types/formData";
 
 const OTHER_VALUE = "Other (specify)";
+
+const SECTION_HEADER_ACTION_BTN =
+  "h-11 shrink-0 rounded-[60px] border border-[#b2b2b3] bg-white/40 px-5 text-[14px] font-semibold text-[#10141a] hover:bg-white/60";
 
 /** Parse comma-separated text into array; only splits on commas, preserves spaces within values */
 function parseCommaSeparated(text: string): string[] {
@@ -291,6 +296,55 @@ export function Stage3HealthcareAndDocuments({
             )}
           </div>
 
+          <div className="col-span-1 border-t border-[#e5e5e6] pt-6 lg:col-span-2 xl:col-span-4 space-y-4">
+            <div>
+              <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+                Clinical details
+              </p>
+              <p className="text-[13px] font-medium leading-[1.4] text-[#808081] mt-1">
+                Diagnoses and clinical notes from the ISP or physician.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Primary diagnosis</label>
+                <Input
+                  value={stage3.primaryDiagnosis ?? ""}
+                  onChange={(e) => updateStage3({ primaryDiagnosis: e.target.value })}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="As documented"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Secondary diagnosis</label>
+                <Input
+                  value={stage3.secondaryDiagnosis ?? ""}
+                  onChange={(e) => updateStage3({ secondaryDiagnosis: e.target.value })}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="If applicable"
+                />
+              </div>
+              <div className="flex flex-col gap-1 md:col-span-2">
+                <label className="text-[12px] font-normal text-[#10141a]">Health or environmental hazards</label>
+                <Textarea
+                  value={stage3.healthHazards ?? ""}
+                  onChange={(e) => updateStage3({ healthHazards: e.target.value })}
+                  className="min-h-[88px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Allergies, seizures, equipment, or safety risks staff should know"
+                />
+              </div>
+              <div className="flex flex-col gap-1 md:col-span-2 xl:col-span-4">
+                <label className="text-[12px] font-normal text-[#10141a]">Nutrition notes</label>
+                <Textarea
+                  value={stage3.nutritionNotes ?? ""}
+                  onChange={(e) => updateStage3({ nutritionNotes: e.target.value })}
+                  className="min-h-[88px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Diet orders, textures, hydration, or meal support"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Behavior Support Plan (if any)</label>
             <Select
@@ -315,8 +369,7 @@ export function Stage3HealthcareAndDocuments({
             {(stage3.behaviorSupportPlan === OTHER_VALUE ||
               (stage3.behaviorSupportPlan &&
                 !BEHAVIOR_SUPPORT_PLAN_OPTIONS.includes(stage3.behaviorSupportPlan))) && (
-              <Input
-                type="text"
+              <Textarea
                 value={
                   stage3.behaviorSupportPlan &&
                   !BEHAVIOR_SUPPORT_PLAN_OPTIONS.includes(stage3.behaviorSupportPlan)
@@ -324,7 +377,8 @@ export function Stage3HealthcareAndDocuments({
                     : ""
                 }
                 placeholder="Specify (spaces and commas allowed)"
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
+                rows={3}
+                className="min-h-[88px] resize-y rounded-[12px] border border-[#cccccd] bg-white px-4 py-3 mt-2 text-sm font-normal leading-[1.4] text-[#10141a] placeholder:text-[#b2b2b3] shadow-none outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:ring-offset-0"
                 onChange={(e) => updateStage3({ behaviorSupportPlan: e.target.value })}
               />
             )}
@@ -395,15 +449,15 @@ export function Stage3HealthcareAndDocuments({
             {(stage3.seizurePlan === OTHER_VALUE ||
               (stage3.seizurePlan &&
                 !SEIZURE_PLAN_OPTIONS.includes(stage3.seizurePlan))) && (
-              <Input
-                type="text"
+              <Textarea
                 value={
                   stage3.seizurePlan && !SEIZURE_PLAN_OPTIONS.includes(stage3.seizurePlan)
                     ? stage3.seizurePlan
                     : ""
                 }
                 placeholder="Specify (spaces and commas allowed)"
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
+                rows={3}
+                className="min-h-[88px] resize-y rounded-[12px] border border-[#cccccd] bg-white px-4 py-3 mt-2 text-sm font-normal leading-[1.4] text-[#10141a] placeholder:text-[#b2b2b3] shadow-none outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:ring-offset-0"
                 onChange={(e) => updateStage3({ seizurePlan: e.target.value })}
               />
             )}
@@ -448,6 +502,96 @@ export function Stage3HealthcareAndDocuments({
                 }}
               />
             )}
+          </div>
+
+          <div className="col-span-1 border-t border-[#e5e5e6] pt-6 lg:col-span-2 xl:col-span-4 space-y-4">
+            <div className="mb-4">
+              <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+                Daily living support needs
+              </p>
+              <p className="text-[13px] font-medium leading-[1.4] text-[#808081] mt-1">
+                Bathing, dressing, meals, and other ADLs the ISP calls out.
+              </p>
+            </div>
+            {(stage3.selfCareNeeds ?? []).length === 0 ? (
+              <p className="text-[14px] text-[#808081]">No daily living support needs added yet.</p>
+            ) : null}
+            {(stage3.selfCareNeeds ?? []).map((row, idx) => (
+              <div
+                key={idx}
+                className="flex flex-col gap-3 rounded-[12px] border border-[#e5e5e6] bg-white/60 p-4 lg:flex-row lg:flex-wrap lg:items-end"
+              >
+                <div className="flex min-w-[140px] flex-1 flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Area</label>
+                  <Input
+                    value={row.domain ?? ""}
+                    onChange={(e) => {
+                      const next = [...(stage3.selfCareNeeds ?? [])];
+                      next[idx] = { ...next[idx], domain: e.target.value };
+                      updateStage3({ selfCareNeeds: next });
+                    }}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                    placeholder="e.g. Bathing, meals"
+                  />
+                </div>
+                <div className="flex min-w-[140px] flex-1 flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Level of support</label>
+                  <Input
+                    value={row.levelOfSupport ?? ""}
+                    onChange={(e) => {
+                      const next = [...(stage3.selfCareNeeds ?? [])];
+                      next[idx] = { ...next[idx], levelOfSupport: e.target.value };
+                      updateStage3({ selfCareNeeds: next });
+                    }}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                    placeholder="e.g. Full hands-on, set-up only"
+                  />
+                </div>
+                <div className="flex min-w-[200px] flex-[2] flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Notes</label>
+                  <Input
+                    value={row.notes ?? ""}
+                    onChange={(e) => {
+                      const next = [...(stage3.selfCareNeeds ?? [])];
+                      next[idx] = { ...next[idx], notes: e.target.value };
+                      updateStage3({ selfCareNeeds: next });
+                    }}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                    placeholder="Optional details"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-[44px] w-[44px] shrink-0 border-[#cccccd]"
+                  aria-label="Remove daily living need"
+                  onClick={() =>
+                    updateStage3({
+                      selfCareNeeds: (stage3.selfCareNeeds ?? []).filter((_, i) => i !== idx),
+                    })
+                  }
+                >
+                  <Trash2 className="h-4 w-4 text-[#10141a]" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-dashed border-[#808081] text-[#10141a] sm:w-auto mt-2"
+              onClick={() =>
+                updateStage3({
+                  selfCareNeeds: [
+                    ...(stage3.selfCareNeeds ?? []),
+                    { domain: "", levelOfSupport: "", notes: "" },
+                  ],
+                })
+              }
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add daily living need
+            </Button>
           </div>
 
           <div className="flex flex-col gap-1">
@@ -515,8 +659,7 @@ export function Stage3HealthcareAndDocuments({
             {(stage3.emergencyProtocols === OTHER_VALUE ||
               (stage3.emergencyProtocols &&
                 !EMERGENCY_PROTOCOLS_OPTIONS.includes(stage3.emergencyProtocols))) && (
-              <Input
-                type="text"
+              <Textarea
                 value={
                   stage3.emergencyProtocols &&
                   !EMERGENCY_PROTOCOLS_OPTIONS.includes(stage3.emergencyProtocols)
@@ -524,7 +667,8 @@ export function Stage3HealthcareAndDocuments({
                     : ""
                 }
                 placeholder="Specify (spaces and commas allowed)"
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white mt-2"
+                rows={3}
+                className="min-h-[88px] resize-y rounded-[12px] border border-[#cccccd] bg-white px-4 py-3 mt-2 text-sm font-normal leading-[1.4] text-[#10141a] placeholder:text-[#b2b2b3] shadow-none outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:ring-offset-0"
                 onChange={(e) => updateStage3({ emergencyProtocols: e.target.value })}
               />
             )}

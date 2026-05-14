@@ -19,6 +19,96 @@ export type FieldConfidence = {
   requiresReview?: boolean;
 };
 
+export type ExtractionInsuranceDetail = Partial<{
+  type: string;
+  name: string;
+  idGroup: string;
+  caseManager: string;
+  contact: string;
+}>;
+
+export type ExtractionGuardianContact = Partial<{
+  name: string;
+  relationship: string;
+  email: string;
+  primaryPhone: string;
+  secondaryPhone: string;
+  address: string;
+  priority: string;
+}>;
+
+export type ExtractionCareTeamContact = Partial<{
+  role: string;
+  name: string;
+  agency: string;
+  phone: string;
+  email: string;
+  address: string;
+}>;
+
+export type ExtractionAdlSupportNeed = Partial<{
+  domain: string;
+  levelOfSupport: string;
+  notes: string;
+}>;
+
+export type ExtractionMedication = Partial<{
+  name: string;
+  dosage: string;
+  frequency: string;
+  notes: string;
+  selfAdminister: string;
+}>;
+
+export type ExtractionEmergencyBackupPlan = Partial<{
+  pers: string;
+  providerManagedSetting: string;
+  advanceDirective: string;
+  proxyDecisionMaker: string;
+  narrative: string;
+}>;
+
+export type ExtractionTeamMember = Partial<{
+  name: string;
+  relationship: string;
+  contact: string;
+}>;
+
+export type ExtractionServiceRow = Partial<{
+  name: string;
+  code: string;
+  hours: string;
+  totalApprovedHours: string;
+  rate: string;
+  payType: string;
+  clientRate: string;
+  clientPayType: string;
+  provider: string;
+  location: string;
+  claimsSource: string;
+  unitType: string;
+  frequency: string;
+  totalUnits: string;
+  totalCost: string;
+  evvStatus: string;
+  evvDescription: string;
+  narrative: string;
+  ispEffectiveDate: string;
+  startAuthDate: string;
+  endAuthDate: string;
+  pcptDate: string;
+  sdrStartDate: string;
+  sdrEndDate: string;
+  /** @deprecated Legacy per-service outcome tags; prefer `stage2.outcomes[].services`. */
+  outcomes: string[];
+}>;
+
+/** Extracted outcome row (owns nested service lines). */
+export type ExtractionOutcomeRow = Partial<{
+  statement: string;
+  services: ExtractionServiceRow[];
+}>;
+
 /** Raw draft from Gemini (strings / ISO date strings). */
 export type ClientExtractionDraft = {
   stage1?: Partial<{
@@ -42,7 +132,13 @@ export type ClientExtractionDraft = {
     language: string;
     communicationMethod: string;
     planId: string;
+    planType: string;
+    planPrintDate: string;
     program: string;
+    waiverEnrollmentDate: string;
+    dddStatus: string;
+    medicaidType: string;
+    insuranceDetails: ExtractionInsuranceDetail[];
   }>;
   stage2?: Partial<{
     guardianName: string;
@@ -53,7 +149,12 @@ export type ClientExtractionDraft = {
     supportCoordinatorName: string;
     supportCoordinatorAgency: string;
     supportCoordinatorContact: string;
-    services: ExtractionServiceRow[];
+    /** Canonical: outcome rows with nested service authorizations. */
+    outcomes?: ExtractionOutcomeRow[];
+    /** @deprecated Legacy extraction shape; merged into `outcomes` when present. */
+    services?: ExtractionServiceRow[];
+    guardians?: ExtractionGuardianContact[];
+    careTeam?: ExtractionCareTeamContact[];
   }>;
   stage3?: Partial<{
     medicalConditions: string[];
@@ -66,6 +167,11 @@ export type ClientExtractionDraft = {
     emergencyProtocols: string;
     preferredHospital: string;
     primaryCarePhysician: string;
+    primaryDiagnosis: string;
+    secondaryDiagnosis: string;
+    healthHazards: string;
+    nutritionNotes: string;
+    selfCareNeeds: ExtractionAdlSupportNeed[];
   }>;
   stage4?: Partial<{
     evvRequirement: string;
@@ -105,8 +211,15 @@ export type ClientExtractionDraft = {
       relationship?: ExtractedEmergencyContactRelationship;
       primaryPhone?: string;
       secondaryPhone?: string;
+      hospitalPreference?: string;
+      emergencyProtocol?: string;
       priority?: string;
     }[];
+    medications: ExtractionMedication[];
+    emergencyBackupPlan: ExtractionEmergencyBackupPlan;
+    employmentStatus: string;
+    employmentPlan: string;
+    votingPlan: string;
   }>;
   stage7?: Partial<{
     aiNotesReview: boolean;
@@ -119,41 +232,17 @@ export type ClientExtractionDraft = {
     requiredVisitDocumentation: string;
     notesReviewRules: string;
     billingValidationRules: string;
+    teamMembers: ExtractionTeamMember[];
   }>;
 };
-
-export type ExtractionServiceRow = Partial<{
-  name: string;
-  code: string;
-  hours: string;
-  totalApprovedHours: string;
-  rate: string;
-  payType: string;
-  clientRate: string;
-  clientPayType: string;
-  provider: string;
-  location: string;
-  claimsSource: string;
-  unitType: string;
-  frequency: string;
-  totalUnits: string;
-  totalCost: string;
-  evvStatus: string;
-  narrative: string;
-  ispEffectiveDate: string;
-  startAuthDate: string;
-  endAuthDate: string;
-  pcptDate: string;
-  sdrStartDate: string;
-  sdrEndDate: string;
-}>;
 
 export type ClientExtractionResponse = {
   detectedDocumentType: DetectedDocumentType;
   draft: ClientExtractionDraft;
   fieldConfidences: FieldConfidence[];
   warnings: ExtractionWarning[];
-  unmappedText: string[];
+  /** Present on older extractions; omitted when using the slim Gemini response schema. */
+  unmappedText?: string[];
   extractionJobId?: string;
   sourceDocument?: {
     fileName: string;

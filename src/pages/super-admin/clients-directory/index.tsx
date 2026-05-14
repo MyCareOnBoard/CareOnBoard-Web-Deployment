@@ -10,6 +10,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { useListClientsQuery, useGetClientStatsQuery, type Client, type Agency } from "@/lib/api/clients";
+import { countUniqueAssignedDspsForClient } from "@/lib/countUniqueAssignedDsps";
 
 interface DisplayClient {
   id: string;
@@ -114,9 +115,7 @@ export default function ClientsDirectory() {
       const statusCapitalized = status.charAt(0).toUpperCase() + status.slice(1) as DisplayClient["status"];
       const statusLabel = status === "pending" ? "Pending Setup" : statusCapitalized;
 
-      const primaryDspCount = client?.primaryDsp ? 1 : 0;
-      const secondaryDspsCount = client?.secondaryDsps?.length || 0;
-      const dspCount = primaryDspCount + secondaryDspsCount;
+      const dspCount = countUniqueAssignedDspsForClient(client);
 
       return {
         id: client.id,

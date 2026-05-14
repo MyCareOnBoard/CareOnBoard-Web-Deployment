@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Loader2, Plus, Trash2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
-import { Client, ClientService } from "@/lib/api/clients";
+import { Client, ClientOutcome, ClientService } from "@/lib/api/clients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { updateClient } from "@/lib/api/clients";
-import { listServices, useListServicesQuery, type Service as ApiService } from "@/lib/api/services";
+import { useListServicesQuery, type Service as ApiService } from "@/lib/api/services";
 
 interface ServicesTabProps {
   client: Client;
@@ -32,7 +33,7 @@ interface ServicesTabProps {
 }
 
 // Editable model mirroring Stage 2 service fields
-type EditableService = {
+type EditableServiceRow = {
   id: string;
   name: string;
   code: string;
@@ -49,6 +50,46 @@ type EditableService = {
   sdrStartDate?: Date | null;
   sdrEndDate?: Date | null;
 };
+
+type EditableOutcomeGroup = {
+  id: string;
+  statement: string;
+  services: EditableServiceRow[];
+};
+
+function newEntityId(prefix: string) {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Math.random().toString(16).slice(2)}`;
+}
+
+function emptyEditableServiceRow(): EditableServiceRow {
+  return {
+    id: newEntityId("svc"),
+    name: "",
+    code: "",
+    hours: "",
+    totalApprovedHours: "",
+    rate: "",
+    payType: undefined,
+    clientRate: "",
+    clientPayType: undefined,
+    ispEffectiveDate: null,
+    startAuthDate: null,
+    endAuthDate: null,
+    pcptDate: null,
+    sdrStartDate: null,
+    sdrEndDate: null,
+  };
+}
+
+function emptyOutcomeGroup(): EditableOutcomeGroup {
+  return {
+    id: newEntityId("outcome"),
+    statement: "",
+    services: [emptyEditableServiceRow()],
+  };
+}
 
 function parseDate(
   value?: string | { _seconds?: number; _nanoseconds?: number } | Date,
@@ -69,7 +110,7 @@ function parseDate(
   }
 }
 
-function mapClientServicesToEditable(services?: ClientService[]): EditableService[] {
+function mapClientServicesToEditable(services?: ClientService[]): EditableServiceRow[] {
   if (!services) return [];
   return services.map((svc) => ({
     id: svc.id,
@@ -90,7 +131,7 @@ function mapClientServicesToEditable(services?: ClientService[]): EditableServic
   }));
 }
 
-function mapEditableToClientServices(services: EditableService[]): ClientService[] {
+function mapEditableToClientServices(services: EditableServiceRow[]): ClientService[] {
   return services.map<ClientService>((svc) => ({
     id: svc.id,
     name: svc.name,
@@ -116,11 +157,33 @@ function mapEditableToClientServices(services: EditableService[]): ClientService
   }));
 }
 
+function mapClientOutcomesToEditable(
+  outcomes?: ClientOutcome[],
+): EditableOutcomeGroup[] {
+  if (!outcomes?.length) return [emptyOutcomeGroup()];
+  return outcomes.map((o) => ({
+    id: o.id?.trim() || newEntityId("outcome"),
+    statement: o.statement ?? "",
+    services:
+      o.services && o.services.length > 0
+        ? mapClientServicesToEditable(o.services)
+        : [emptyEditableServiceRow()],
+  }));
+}
+
+function mapEditableOutcomesToApi(outcomes: EditableOutcomeGroup[]): ClientOutcome[] {
+  return outcomes.map((o) => ({
+    id: o.id,
+    statement: o.statement,
+    services: mapEditableToClientServices(o.services),
+  }));
+}
+
 type ServiceRowProps = {
-  service: EditableService;
+  service: EditableServiceRow;
   offeredServices: ApiService[];
   isEditing: boolean;
-  onChange: (next: EditableService) => void;
+  onChange: (next: EditableServiceRow) => void;
   onRemove?: () => void;
 };
 
@@ -171,11 +234,11 @@ function ServiceRow({
     }
   }, [offeredServices, service.name, service.code, selectedType]);
 
-  const handleFieldChange = (field: keyof EditableService, value: any) => {
+  const handleFieldChange = (field: keyof EditableServiceRow, value: unknown) => {
     onChange({ ...service, [field]: value });
   };
 
-  const handleFieldsChange = (patch: Partial<EditableService>) => {
+  const handleFieldsChange = (patch: Partial<EditableServiceRow>) => {
     onChange({ ...service, ...patch });
   };
 
@@ -779,15 +842,15 @@ function ServiceRow({
 }
 
 export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTabProps) {
-  const [services, setServices] = useState<EditableService[]>(
-    mapClientServicesToEditable(client.services),
+  const [outcomeGroups, setOutcomeGroups] = useState<EditableOutcomeGroup[]>(() =>
+    mapClientOutcomesToEditable(client.outcomes),
   );
   const [isSaving, setIsSaving] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offeredServices, setOfferedServices] = useState<ApiService[]>([]);
-  const {data, isLoading: loadingServices} = useListServicesQuery({});
+  const { data, isLoading: loadingServices } = useListServicesQuery({});
 
   useEffect(() => {
     if (data && !loadingServices) {
@@ -795,47 +858,101 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
     }
   }, [data, loadingServices]);
 
-  // Keep local state in sync when client.services changes
   useEffect(() => {
-    setServices(mapClientServicesToEditable(client.services));
-  }, [client.services]);
+    if (isEditing) return;
+    setOutcomeGroups(mapClientOutcomesToEditable(client.outcomes));
+  }, [client.outcomes, client.id, isEditing]);
 
-  const hasServices = useMemo(() => services.length > 0, [services.length]);
+  useEffect(() => {
+    const has = client.outcomes?.some((o) =>
+      o.services?.some((s) => s.name?.trim() && s.code?.trim()),
+    );
+    if (!has) setIsEditing(true);
+  }, [client.id]);
 
-  const handleAddService = () => {
-    const newService: EditableService = {
-      id:
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? `svc-${crypto.randomUUID()}`
-          : `svc-${Math.random().toString(16).slice(2)}`,
-      name: "",
-      code: "",
-      hours: "",
-      totalApprovedHours: "",
-      rate: "",
-      payType: undefined,
-      clientRate: "",
-      clientPayType: undefined,
-      ispEffectiveDate: null,
-      startAuthDate: null,
-      endAuthDate: null,
-      pcptDate: null,
-      sdrStartDate: null,
-      sdrEndDate: null,
-    };
+  const hasConfiguredServices = useMemo(
+    () =>
+      outcomeGroups.some((g) =>
+        g.services.some((s) => s.name?.trim() && s.code?.trim()),
+      ),
+    [outcomeGroups],
+  );
 
-    setServices((prev) => [newService, ...prev]);
+  const handleAddOutcome = () => {
+    setOutcomeGroups((prev) => [...prev, emptyOutcomeGroup()]);
     setIsEditing(true);
   };
 
-  const handleRemoveService = (id: string) => {
-    setServices((prev) => prev.filter((svc) => svc.id !== id));
+  /** Add an authorization row to the first outcome group (matches common single-outcome flow). */
+  const handleAddService = () => {
+    setOutcomeGroups((prev) => {
+      if (!prev.length) return [emptyOutcomeGroup()];
+      const next = [...prev];
+      next[0] = {
+        ...next[0],
+        services: [emptyEditableServiceRow(), ...next[0].services],
+      };
+      return next;
+    });
+    setIsEditing(true);
+  };
+
+  const handleAddServiceToOutcome = (outcomeIndex: number) => {
+    setOutcomeGroups((prev) => {
+      const next = [...prev];
+      const g = next[outcomeIndex];
+      if (!g) return prev;
+      next[outcomeIndex] = {
+        ...g,
+        services: [emptyEditableServiceRow(), ...g.services],
+      };
+      return next;
+    });
+    setIsEditing(true);
+  };
+
+  const handleRemoveOutcome = (outcomeIndex: number) => {
+    setOutcomeGroups((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== outcomeIndex);
+    });
+  };
+
+  const handleRemoveService = (outcomeIndex: number, serviceId: string) => {
+    setOutcomeGroups((prev) => {
+      const next = [...prev];
+      const g = next[outcomeIndex];
+      if (!g) return prev;
+      const services = g.services.filter((s) => s.id !== serviceId);
+      next[outcomeIndex] = {
+        ...g,
+        services: services.length ? services : [emptyEditableServiceRow()],
+      };
+      return next;
+    });
   };
 
   const handleSave = async () => {
     if (!clientId) return;
 
-    const invalid = services.find((svc) => !svc.name || !svc.code);
+    const pruned = outcomeGroups
+      .map((g) => ({
+        ...g,
+        services: g.services.filter(
+          (s) => s.name?.trim() || s.code?.trim(),
+        ),
+      }))
+      .filter((g) => g.services.length > 0);
+
+    if (!pruned.length) {
+      setError("Add at least one service with a name and code before saving.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    const invalid = pruned
+      .flatMap((g) => g.services)
+      .find((svc) => !svc.name?.trim() || !svc.code?.trim());
     if (invalid) {
       setError("Each service must have a name and code before saving.");
       setShowErrorModal(true);
@@ -846,16 +963,17 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
       setIsSaving(true);
       setError(null);
 
-      const payload = mapEditableToClientServices(services);
-      await updateClient(clientId, { services: payload });
+      await updateClient(clientId, {
+        outcomes: mapEditableOutcomesToApi(pruned),
+      });
 
-      if (onServicesUpdated) {
-        onServicesUpdated();
-      }
+      onServicesUpdated?.();
       setIsEditing(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to update services:", err);
-      setError(err?.message || "Failed to update services. Please try again.");
+      setError(
+        err instanceof Error ? err.message : "Failed to update services. Please try again.",
+      );
       setShowErrorModal(true);
     } finally {
       setIsSaving(false);
@@ -863,7 +981,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
   };
 
   const handleCancel = () => {
-    setServices(mapClientServicesToEditable(client.services));
+    setOutcomeGroups(mapClientOutcomesToEditable(client.outcomes));
     setError(null);
     setIsEditing(false);
   };
@@ -874,10 +992,10 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <p className="text-[24px] font-medium leading-[normal] text-[#10141a]">
-            Services
+            Outcomes &amp; services
           </p>
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            Manage the services authorized for this client.
+            Edit ISP outcome statements and nested service authorizations (saved as <code className="text-xs">outcomes</code> only).
           </p>
           {loadingServices && (
             <p className="text-[12px] text-[#808081] flex items-center gap-2">
@@ -887,8 +1005,8 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          {hasServices && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {hasConfiguredServices && (
             <Button
               type="button"
               variant="outline"
@@ -896,9 +1014,19 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
               onClick={() => setIsEditing((prev) => !prev)}
               disabled={loadingServices || isSaving}
             >
-              {isEditing ? "Stop Editing" : "Edit services"}
+              {isEditing ? "Stop Editing" : "Edit"}
             </Button>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 rounded-[60px] border-[#b2b2b3] text-[#10141a] bg-white/60 hover:bg-white"
+            onClick={handleAddOutcome}
+            disabled={loadingServices || isSaving}
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add outcome
+          </Button>
           <Button
             type="button"
             className="h-11 rounded-[60px] bg-[#00b4b8] text-white hover:bg-[#00a0a4] px-5 shrink-0"
@@ -906,7 +1034,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
             disabled={loadingServices || isSaving}
           >
             <Plus className="w-5 h-5 mr-2" />
-            Add Service
+            Add service
           </Button>
         </div>
       </div>
@@ -935,35 +1063,97 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
         </div>
       )}
 
-      {/* Services List */}
-      {!hasServices ? (
-        <div className="py-12 text-center">
-          <p className="text-[14px] font-medium text-[#808081]">
-            No services configured for this client yet. Click &quot;Add
-            Service&quot; to create one.
+      <div className="mt-2 space-y-8">
+        {!hasConfiguredServices && (
+          <p className="text-[13px] text-[#808081]">
+            Add at least one authorization with a service name and code. Outcome statements are optional but recommended.
           </p>
-        </div>
-      ) : (
-        <div className="mt-2 space-y-4">
-          {services.map((svc) => (
-            <ServiceRow
-              key={svc.id}
-              service={svc}
-              offeredServices={offeredServices}
-              isEditing={isEditing}
-              onChange={(next) =>
-                setServices((prev) =>
-                  prev.map((s) => (s.id === svc.id ? next : s)),
-                )
-              }
-              onRemove={isEditing ? () => handleRemoveService(svc.id) : undefined}
-            />
+        )}
+        {outcomeGroups.map((group, oi) => (
+            <div
+              key={group.id}
+              className="rounded-[24px] border border-[rgba(16,20,26,0.08)] bg-white/50 p-4 flex flex-col gap-3"
+            >
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] font-medium text-[#808081] mb-1">Outcome statement</p>
+                  {isEditing ? (
+                    <Textarea
+                      value={group.statement}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setOutcomeGroups((prev) => {
+                          const n = [...prev];
+                          n[oi] = { ...n[oi], statement: v };
+                          return n;
+                        });
+                      }}
+                      className="min-h-[80px] rounded-[12px] border-[#cccccd] bg-white"
+                      placeholder="Describe the ISP outcome this group supports"
+                    />
+                  ) : (
+                    <p className="text-[14px] font-semibold text-[#10141a] whitespace-pre-wrap">
+                      {group.statement?.trim() ? group.statement : "—"}
+                    </p>
+                  )}
+                </div>
+                {isEditing && outcomeGroups.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-9 rounded-full px-2 text-[#d53411] hover:bg-red-50 shrink-0"
+                    onClick={() => handleRemoveOutcome(oi)}
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Remove outcome
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                {group.services.map((svc) => (
+                  <ServiceRow
+                    key={svc.id}
+                    service={svc}
+                    offeredServices={offeredServices}
+                    isEditing={isEditing}
+                    onChange={(next) =>
+                      setOutcomeGroups((prev) => {
+                        const n = [...prev];
+                        const g = n[oi];
+                        if (!g) return prev;
+                        n[oi] = {
+                          ...g,
+                          services: g.services.map((s) => (s.id === svc.id ? next : s)),
+                        };
+                        return n;
+                      })
+                    }
+                    onRemove={
+                      isEditing
+                        ? () => handleRemoveService(oi, svc.id)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+
+              {isEditing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="self-start rounded-[60px]"
+                  onClick={() => handleAddServiceToOutcome(oi)}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add service to this outcome
+                </Button>
+              )}
+            </div>
           ))}
         </div>
-      )}
 
-      {/* Footer actions */}
-      {hasServices && isEditing && (
+      {isEditing && (
         <div className="mt-4 flex items-center justify-end gap-3">
           <Button
             type="button"
@@ -986,18 +1176,15 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
         </div>
       )}
 
-      {/* Saving modal */}
       {isSaving && (
         <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/30">
           <div className="w-full max-w-sm rounded-[20px] bg-white shadow-lg p-6 flex flex-col items-center gap-3 text-center">
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#e6f7f7]">
               <Loader2 className="w-7 h-7 animate-spin text-[#00b4b8]" />
             </div>
-            <p className="text-[16px] font-medium text-[#10141a]">
-              Saving services...
-            </p>
+            <p className="text-[16px] font-medium text-[#10141a]">Saving…</p>
             <p className="text-[13px] text-[#808081]">
-              Please wait while we save the updated service details for this client.
+              Updating outcome groups for this client.
             </p>
           </div>
         </div>

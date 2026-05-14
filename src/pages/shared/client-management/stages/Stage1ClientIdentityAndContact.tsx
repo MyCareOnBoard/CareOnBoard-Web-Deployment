@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { CalendarDays, ArrowLeft } from "lucide-react";
+import { CalendarDays, ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
@@ -16,12 +16,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AddClientFormData } from "@/pages/shared/client-management/types/formData";
+import { AddClientFormData, type InsuranceDetail } from "@/pages/shared/client-management/types/formData";
+import { Button } from "@/components/ui/button";
 import { Agency } from "@/lib/api/clients";
 import { useGooglePlacesAutocomplete, fetchFirstPlaceDetailsForQuery } from "@/hooks/useGooglePlacesAutocomplete";
 
 const SELECT_TRIGGER_CN =
   "w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white";
+
+const SECTION_HEADER_ACTION_BTN =
+  "h-11 shrink-0 rounded-[60px] border border-[#b2b2b3] bg-white/40 px-5 text-[14px] font-semibold text-[#10141a] hover:bg-white/60";
 
 export function Stage1ClientIdentityAndContact({
   showAgencySelection = false,
@@ -81,6 +85,8 @@ export function Stage1ClientIdentityAndContact({
   }, [showAgencySelection, userAgencyId, formData.agencyId, setFormData]);
 
   const [isDobOpen, setIsDobOpen] = useState(false);
+  const [isWaiverEnrollmentOpen, setIsWaiverEnrollmentOpen] = useState(false);
+  const [isPlanPrintOpen, setIsPlanPrintOpen] = useState(false);
 
   const addressInputRef = useRef<HTMLDivElement>(null);
   const secondaryAddressInputRef = useRef<HTMLDivElement>(null);
@@ -602,6 +608,244 @@ export function Stage1ClientIdentityAndContact({
               </SelectContent>
             </Select>
           </div>
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <div className="mb-2">
+          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+            2.1 ISP plan details
+          </p>
+          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+            Information taken from the approved ISP when available.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Plan ID</label>
+            <Input
+              value={stage1.planId ?? ""}
+              onChange={(e) => updateStage1({ planId: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="e.g. authorization or plan reference"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Plan type</label>
+            <Input
+              value={stage1.planType ?? ""}
+              onChange={(e) => updateStage1({ planType: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="e.g. annual, amendment"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Program</label>
+            <Input
+              value={stage1.program ?? ""}
+              onChange={(e) => updateStage1({ program: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Program or waiver name"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">DDD status</label>
+            <Input
+              value={stage1.dddStatus ?? ""}
+              onChange={(e) => updateStage1({ dddStatus: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="As listed on ISP"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Medicaid type</label>
+            <Input
+              value={stage1.medicaidType ?? ""}
+              onChange={(e) => updateStage1({ medicaidType: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="e.g. MCO, FFS"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Waiver enrollment date</label>
+            <Popover open={isWaiverEnrollmentOpen} onOpenChange={setIsWaiverEnrollmentOpen}>
+              <PopoverTrigger asChild>
+                <button type="button" className="w-full focus:outline-none">
+                  <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                    <InputGroupInput
+                      value={
+                        stage1.waiverEnrollmentDate
+                          ? format(stage1.waiverEnrollmentDate, "MMM d, yyyy")
+                          : ""
+                      }
+                      placeholder="Select date"
+                      readOnly
+                      className="text-[#10141a]"
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <CalendarDays className="h-5 w-5 text-[#10141a]" />
+                    </InputGroupAddon>
+                  </InputGroup>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                <Calendar
+                  mode="single"
+                  selected={stage1.waiverEnrollmentDate}
+                  defaultMonth={stage1.waiverEnrollmentDate ?? new Date()}
+                  captionLayout="dropdown"
+                  fromYear={1990}
+                  toYear={new Date().getFullYear() + 5}
+                  formatters={{
+                    formatMonthDropdown: (date) =>
+                      date.toLocaleString("default", { month: "long" }),
+                  }}
+                  classNames={{
+                    dropdown_root:
+                      "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+                  }}
+                  onSelect={(d) => {
+                    if (d) {
+                      updateStage1({ waiverEnrollmentDate: d });
+                      setIsWaiverEnrollmentOpen(false);
+                    }
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Plan print date</label>
+            <Popover open={isPlanPrintOpen} onOpenChange={setIsPlanPrintOpen}>
+              <PopoverTrigger asChild>
+                <button type="button" className="w-full focus:outline-none">
+                  <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                    <InputGroupInput
+                      value={
+                        stage1.planPrintDate ? format(stage1.planPrintDate, "MMM d, yyyy") : ""
+                      }
+                      placeholder="Select date"
+                      readOnly
+                      className="text-[#10141a]"
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <CalendarDays className="h-5 w-5 text-[#10141a]" />
+                    </InputGroupAddon>
+                  </InputGroup>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                <Calendar
+                  mode="single"
+                  selected={stage1.planPrintDate}
+                  defaultMonth={stage1.planPrintDate ?? new Date()}
+                  captionLayout="dropdown"
+                  fromYear={1990}
+                  toYear={new Date().getFullYear() + 5}
+                  formatters={{
+                    formatMonthDropdown: (date) =>
+                      date.toLocaleString("default", { month: "long" }),
+                  }}
+                  classNames={{
+                    dropdown_root:
+                      "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+                  }}
+                  onSelect={(d) => {
+                    if (d) {
+                      updateStage1({ planPrintDate: d });
+                      setIsPlanPrintOpen(false);
+                    }
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <div className="mb-4">
+          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+            2.2 Insurance details
+          </p>
+          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+            Add each payer or coverage row from the ISP (MCO, ASO, private, etc.).
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {(stage1.insuranceDetails ?? []).length === 0 ? (
+            <p className="text-[14px] text-[#808081]">No insurance plans added yet.</p>
+          ) : null}
+
+          {(stage1.insuranceDetails ?? []).map((row, idx) => (
+            <div
+              key={idx}
+              className="flex flex-col gap-3 rounded-[12px] border border-[#e5e5e6] bg-white/60 p-4 lg:flex-row lg:flex-wrap lg:items-end"
+            >
+              {(
+                [
+                  ["type", "Plan type", "e.g. MCO, Commercial"] as const,
+                  ["name", "Plan name", "Insurance name"] as const,
+                  ["idGroup", "Member / group ID", "ID or group number"] as const,
+                  ["caseManager", "Case manager", "Name"] as const,
+                  ["contact", "Contact", "Phone or email"] as const,
+                ] as const
+              ).map(([key, label, ph]) => (
+                <div key={key} className="flex min-w-[160px] flex-1 flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">{label}</label>
+                  <Input
+                    value={(row[key as keyof InsuranceDetail] as string) ?? ""}
+                    onChange={(e) => {
+                      const next = [...(stage1.insuranceDetails ?? [])];
+                      next[idx] = { ...next[idx], [key]: e.target.value };
+                      updateStage1({ insuranceDetails: next });
+                    }}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                    placeholder={ph}
+                  />
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-[44px] w-[44px] shrink-0 border-[#cccccd]"
+                aria-label="Remove insurance plan"
+                onClick={() => {
+                  updateStage1({
+                    insuranceDetails: (stage1.insuranceDetails ?? []).filter((_, i) => i !== idx),
+                  });
+                }}
+              >
+                <Trash2 className="h-4 w-4 text-[#10141a]" />
+              </Button>
+            </div>
+          ))}
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full border-dashed border-[#808081] text-[#10141a] sm:w-auto"
+            onClick={() =>
+              updateStage1({
+                insuranceDetails: [
+                  ...(stage1.insuranceDetails ?? []),
+                  { type: "", name: "", idGroup: "", caseManager: "", contact: "" },
+                ],
+              })
+            }
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Add insurance plan
+          </Button>
         </div>
       </div>
 

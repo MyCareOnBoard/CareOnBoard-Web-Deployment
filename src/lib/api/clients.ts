@@ -44,8 +44,18 @@ export interface Client {
   ssn?: string;
   tier?: string;
   billingRate?: string;
+  /**
+   * Flat list derived from `outcomes` on the server for each read. Omit from create/update payloads.
+   */
   services?: ClientService[];
+  /** Canonical nested outcome groups (each owns `services[]`). */
+  outcomes?: ClientOutcome[];
   ispOutcomes?: string;
+  ispMetadata?: ClientIspMetadata;
+  guardians?: ClientGuardianContactRow[];
+  careTeam?: ClientCareTeamContact[];
+  /** When the API nests guardian rows under `guardianInfo`. */
+  guardianInfo?: ClientGuardianInfo;
 
   // Add Client wizard sections (Stage 2–7)
   guardianName?: string;
@@ -67,9 +77,21 @@ export interface Client {
   behaviorSupportPlan?: string;
   communicationNeeds?: string[];
   emergencyProtocols?: string;
+  primaryDiagnosis?: string;
+  secondaryDiagnosis?: string;
+  healthHazards?: string;
+  nutritionNotes?: string;
+  selfCareNeeds?: ClientAdlSupportNeed[];
   evvVisitConfig?: ClientEvvVisitConfig;
   goalsAndEmergency?: ClientGoalsAndEmergency;
+  medications?: ClientMedicationRow[];
+  emergencyBackupPlan?: ClientEmergencyBackupPlan;
+  emergencyContacts?: ClientEmergencyContactRow[];
+  employmentStatus?: string;
+  employmentPlan?: string;
+  votingPlan?: string;
   systemAiAndAudit?: ClientSystemAiAndAudit;
+  teamMembers?: ClientTeamMember[];
 
   // Agency relationship
   agencyId?: string;
@@ -102,6 +124,68 @@ export interface ClientService {
   pcptDate?: string;
   sdrStartDate?: string;
   sdrEndDate?: string;
+  provider?: string;
+  location?: string;
+  claimsSource?: string;
+  unitType?: string;
+  frequency?: string;
+  totalUnits?: string;
+  totalCost?: string;
+  evvStatus?: string;
+  evvDescription?: string;
+  narrative?: string;
+  /** Direct support staff assigned to this service (id + name). */
+  assignedDsps?: ClientDsp[];
+  /** ISP outcome statements for this service (derived / legacy flat row). */
+  outcomes?: string[];
+}
+
+/** Canonical outcome group: outcome statement owns nested service authorization rows. */
+export interface ClientOutcome {
+  id: string;
+  statement: string;
+  services: ClientService[];
+}
+
+export interface ClientInsuranceDetail {
+  type?: string;
+  name?: string;
+  idGroup?: string;
+  caseManager?: string;
+  contact?: string;
+}
+
+export interface ClientIspMetadata {
+  planId?: string;
+  planType?: string;
+  planPrintDate?: string;
+  program?: string;
+  waiverEnrollmentDate?: string;
+  dddStatus?: string;
+  medicaidType?: string;
+  insuranceDetails?: ClientInsuranceDetail[];
+}
+
+export interface ClientGuardianContactRow {
+  name?: string;
+  relationship?: string;
+  email?: string;
+  primaryPhone?: string;
+  secondaryPhone?: string;
+  address?: string;
+  priority?: number;
+  supportCoordinatorName?: string;
+  supportCoordinatorAgency?: string;
+  supportCoordinatorContact?: string;
+}
+
+export interface ClientCareTeamContact {
+  role?: string;
+  name?: string;
+  agency?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
 }
 
 export interface ClientGuardianInfo {
@@ -113,6 +197,14 @@ export interface ClientGuardianInfo {
   supportCoordinatorName?: string;
   supportCoordinatorAgency?: string;
   supportCoordinatorContact?: string;
+  guardians?: ClientGuardianContactRow[];
+  careTeam?: ClientCareTeamContact[];
+}
+
+export interface ClientAdlSupportNeed {
+  domain?: string;
+  levelOfSupport?: string;
+  notes?: string;
 }
 
 export interface ClientHealthcareSafety {
@@ -124,6 +216,11 @@ export interface ClientHealthcareSafety {
   behaviorSupportPlan?: string;
   communicationNeeds?: string[];
   emergencyProtocols?: string;
+  primaryDiagnosis?: string;
+  secondaryDiagnosis?: string;
+  healthHazards?: string;
+  nutritionNotes?: string;
+  selfCareNeeds?: ClientAdlSupportNeed[];
 }
 
 export type ClientDocumentKey =
@@ -180,6 +277,38 @@ export interface ClientDsp {
   name: string;
 }
 
+export interface ClientMedicationRow {
+  name?: string;
+  dosage?: string;
+  frequency?: string;
+  notes?: string;
+  selfAdminister?: boolean;
+}
+
+export interface ClientEmergencyBackupPlan {
+  pers?: ClientYesNo;
+  providerManagedSetting?: ClientYesNo;
+  advanceDirective?: ClientYesNo;
+  proxyDecisionMaker?: ClientYesNo;
+  narrative?: string;
+}
+
+export interface ClientEmergencyContactRow {
+  name?: string;
+  relationship?: string;
+  primaryPhone?: string;
+  secondaryPhone?: string;
+  hospitalPreference?: string;
+  emergencyProtocol?: string;
+  priority?: number;
+}
+
+export interface ClientTeamMember {
+  name?: string;
+  relationship?: string;
+  contact?: string;
+}
+
 export interface ClientGoalsAndEmergency {
   // Goals
   clientGoals?: string;
@@ -199,6 +328,13 @@ export interface ClientGoalsAndEmergency {
   hospitalPreference?: string;
   emergencyProtocol?: string;
   medicationList?: string;
+
+  medications?: ClientMedicationRow[];
+  emergencyBackupPlan?: ClientEmergencyBackupPlan;
+  emergencyContacts?: ClientEmergencyContactRow[];
+  employmentStatus?: string;
+  employmentPlan?: string;
+  votingPlan?: string;
 }
 
 export type ClientAuditCycle = "monthly" | "quarterly";
@@ -214,6 +350,7 @@ export interface ClientSystemAiAndAudit {
   requiredVisitDocumentation?: string;
   notesReviewRules?: string;
   billingValidationRules?: string;
+  teamMembers?: ClientTeamMember[];
 }
 
 export interface Agency {
@@ -323,7 +460,10 @@ export interface CreateClientRequest {
   service?: string;
   serviceCode?: string;
   billingRate?: string;
-  services?: ClientService[];
+  outcomes?: ClientOutcome[];
+  ispMetadata?: ClientIspMetadata;
+  guardians?: ClientGuardianContactRow[];
+  careTeam?: ClientCareTeamContact[];
 
   /**
    * Flattened wizard fields (Stage 2–7)
@@ -347,6 +487,12 @@ export interface CreateClientRequest {
   communicationNeeds?: string[];
   emergencyProtocols?: string;
 
+  primaryDiagnosis?: string;
+  secondaryDiagnosis?: string;
+  healthHazards?: string;
+  nutritionNotes?: string;
+  selfCareNeeds?: ClientAdlSupportNeed[];
+
   evvRequirement?: ClientYesNo;
   primaryVisitLocationGps?: ClientYesNo;
   allowedSecondaryLocations?: ClientYesNo;
@@ -355,8 +501,6 @@ export interface CreateClientRequest {
   backToBackAllowed?: ClientYesNo;
   travelTimeAllowed?: ClientYesNo;
 
-  primaryDsp?: ClientDsp;
-  secondaryDsps?: ClientDsp[];
   genderPreference?: string;
   requiredCertifications?: string;
   specialConditions?: string;
@@ -382,6 +526,13 @@ export interface CreateClientRequest {
   emergencyProtocol?: string;
   medicationList?: string;
 
+  medications?: ClientMedicationRow[];
+  emergencyBackupPlan?: ClientEmergencyBackupPlan;
+  emergencyContacts?: ClientEmergencyContactRow[];
+  employmentStatus?: string;
+  employmentPlan?: string;
+  votingPlan?: string;
+
   aiNotesReview?: boolean;
   aiPlanOfCareBuilder?: boolean;
   aiGoalTracking?: boolean;
@@ -392,6 +543,7 @@ export interface CreateClientRequest {
   requiredVisitDocumentation?: string;
   notesReviewRules?: string;
   billingValidationRules?: string;
+  teamMembers?: ClientTeamMember[];
   guardianInfo?: ClientGuardianInfo;
   healthcareSafety?: ClientHealthcareSafety;
   documents?: ClientDocument[];
@@ -428,7 +580,10 @@ export interface UpdateClientRequest {
   service?: string;
   serviceCode?: string;
   billingRate?: string;
-  services?: ClientService[];
+  outcomes?: ClientOutcome[] | null;
+  ispMetadata?: ClientIspMetadata | null;
+  guardians?: ClientGuardianContactRow[] | null;
+  careTeam?: ClientCareTeamContact[] | null;
   guardianName?: string | null;
   guardianRelationship?: string | null;
   guardianEmail?: string | null;
@@ -445,6 +600,11 @@ export interface UpdateClientRequest {
   behaviorSupportPlan?: string | null;
   communicationNeeds?: string[] | null;
   emergencyProtocols?: string | null;
+  primaryDiagnosis?: string | null;
+  secondaryDiagnosis?: string | null;
+  healthHazards?: string | null;
+  nutritionNotes?: string | null;
+  selfCareNeeds?: ClientAdlSupportNeed[] | null;
   evvRequirement?: ClientYesNo | null;
   primaryVisitLocationGps?: ClientYesNo | null;
   allowedSecondaryLocations?: ClientYesNo | null;
@@ -452,8 +612,6 @@ export interface UpdateClientRequest {
   maxShiftLength?: string | null;
   backToBackAllowed?: ClientYesNo | null;
   travelTimeAllowed?: ClientYesNo | null;
-  primaryDsp?: ClientDsp | null;
-  secondaryDsps?: ClientDsp[] | null;
   genderPreference?: string | null;
   requiredCertifications?: string | null;
   specialConditions?: string | null;
@@ -476,6 +634,12 @@ export interface UpdateClientRequest {
   hospitalPreference?: string | null;
   emergencyProtocol?: string | null;
   medicationList?: string | null;
+  medications?: ClientMedicationRow[] | null;
+  emergencyBackupPlan?: ClientEmergencyBackupPlan | null;
+  emergencyContacts?: ClientEmergencyContactRow[] | null;
+  employmentStatus?: string | null;
+  employmentPlan?: string | null;
+  votingPlan?: string | null;
   aiNotesReview?: boolean | null;
   aiPlanOfCareBuilder?: boolean | null;
   aiGoalTracking?: boolean | null;
@@ -486,6 +650,7 @@ export interface UpdateClientRequest {
   requiredVisitDocumentation?: string | null;
   notesReviewRules?: string | null;
   billingValidationRules?: string | null;
+  teamMembers?: ClientTeamMember[] | null;
   guardianInfo?: ClientGuardianInfo | null;
   healthcareSafety?: ClientHealthcareSafety | null;
   documents?: ClientDocument[] | null;

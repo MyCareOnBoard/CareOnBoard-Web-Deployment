@@ -1,8 +1,9 @@
 import React, { useMemo } from "react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { AddClientFormData } from "@/pages/shared/client-management/types/formData";
-import { ArrowLeft } from "lucide-react";
+import { AddClientFormData, type TeamMember } from "@/pages/shared/client-management/types/formData";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 
 export function Stage7SystemAiAndAudit({
   footer,
@@ -181,6 +182,95 @@ export function Stage7SystemAiAndAudit({
             />
           </div> */}
         </div>
+      </div>
+
+      <div className="mb-10">
+        <div className="mb-4">
+          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+            Team members (ISP)
+          </p>
+          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+            Coordinators, nurses, or other people named on the plan who are not the main guardian.
+          </p>
+        </div>
+        {(stage7.teamMembers ?? []).length === 0 ? (
+          <p className="text-[14px] text-[#808081]">No team members added yet.</p>
+        ) : null}
+        <div className="space-y-4">
+          {(stage7.teamMembers ?? []).map((member: TeamMember, idx: number) => (
+            <div
+              key={idx}
+              className="flex flex-col gap-3 rounded-[12px] border border-[#e5e5e6] bg-white/60 p-4 lg:flex-row lg:flex-wrap lg:items-end"
+            >
+              <div className="flex min-w-[160px] flex-1 flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Name</label>
+                <Input
+                  value={member.name ?? ""}
+                  onChange={(e) => {
+                    const next = [...(stage7.teamMembers ?? [])];
+                    next[idx] = { ...next[idx], name: e.target.value };
+                    updateStage7({ teamMembers: next });
+                  }}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Full name"
+                />
+              </div>
+              <div className="flex min-w-[140px] flex-1 flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Role / relationship</label>
+                <Input
+                  value={member.relationship ?? ""}
+                  onChange={(e) => {
+                    const next = [...(stage7.teamMembers ?? [])];
+                    next[idx] = { ...next[idx], relationship: e.target.value };
+                    updateStage7({ teamMembers: next });
+                  }}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="e.g. SC, nurse, therapist"
+                />
+              </div>
+              <div className="flex min-w-[180px] flex-[2] flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Contact</label>
+                <Input
+                  value={member.contact ?? ""}
+                  onChange={(e) => {
+                    const next = [...(stage7.teamMembers ?? [])];
+                    next[idx] = { ...next[idx], contact: e.target.value };
+                    updateStage7({ teamMembers: next });
+                  }}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Phone or email"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-[44px] w-[44px] shrink-0 border-[#cccccd]"
+                aria-label="Remove team member"
+                onClick={() =>
+                  updateStage7({
+                    teamMembers: (stage7.teamMembers ?? []).filter((_, i) => i !== idx),
+                  })
+                }
+              >
+                <Trash2 className="h-4 w-4 text-[#10141a]" />
+              </Button>
+            </div>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-4 w-full border-dashed border-[#808081] text-[#10141a] sm:w-auto"
+          onClick={() =>
+            updateStage7({
+              teamMembers: [...(stage7.teamMembers ?? []), { name: "", relationship: "", contact: "" }],
+            })
+          }
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Add team member
+        </Button>
       </div>
 
       {footer}

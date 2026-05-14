@@ -1,14 +1,34 @@
-import type { ClientExtractionResponse } from "../types/clientExtraction";
+import type {
+  ClientExtractionResponse,
+  ExtractionAdlSupportNeed,
+  ExtractionCareTeamContact,
+  ExtractionEmergencyBackupPlan,
+  ExtractionGuardianContact,
+  ExtractionInsuranceDetail,
+  ExtractionMedication,
+  ExtractionOutcomeRow,
+  ExtractionTeamMember,
+} from "../types/clientExtraction";
 import { isDocKeyForImport } from "../types/clientExtraction";
 import type {
   AddClientFormData,
+  AdlSupportNeed,
+  CareTeamContact,
+  ClientMedication,
   DocKey,
+  EmergencyBackupPlan,
   EmergencyContactRelationship,
+  GuardianContact,
   GuardianRelationship,
+  InsuranceDetail,
+  Outcome,
   Service,
   ServicePayType,
+  Stage6EmergencyContact,
+  TeamMember,
   YesNo,
 } from "../types/formData";
+import { groupLoadedServicesIntoOutcomes, type ServiceLoadRow } from "./outcomeServices";
 import { EMERGENCY_CONTACT_RELATIONSHIP_VALUES, GUARDIAN_RELATIONSHIP_VALUES } from "../types/formData";
 
 export type MergeExtractionOptions = {
@@ -221,10 +241,24 @@ function isLikelyTransportationService(name?: string, code?: string): boolean {
   return /\btransport(ation)?\b|\bmileage\b|\bnemt\b/i.test(blob);
 }
 
+function newOutcomeId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? `outcome-${crypto.randomUUID()}`
+    : `outcome-${Math.random().toString(16).slice(2)}`;
+}
+
 function newServiceId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? `service-${crypto.randomUUID()}`
     : `service-${Math.random().toString(16).slice(2)}`;
+}
+
+function parseExtractedOutcomeStrings(row: Record<string, unknown>): string[] {
+  const raw = row.outcomes;
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  return raw
+    .map((x) => String(x ?? "").trim())
+    .filter((s) => Boolean(s) && !isExtractedNoDataToken(s));
 }
 
 function mapRowToService(row: Record<string, unknown>): Service {
@@ -272,6 +306,16 @@ function mapRowToService(row: Record<string, unknown>): Service {
     pcptDate: parseIsoOrUsDate(r.pcptDate),
     sdrStartDate: parseIsoOrUsDate(r.sdrStartDate),
     sdrEndDate: parseIsoOrUsDate(r.sdrEndDate),
+    provider: strOrUndef(r.provider),
+    location: strOrUndef(r.location),
+    claimsSource: strOrUndef(r.claimsSource),
+    unitType: strOrUndef(r.unitType),
+    frequency: strOrUndef(r.frequency),
+    totalUnits: strOrUndef(r.totalUnits),
+    totalCost: strOrUndef(r.totalCost),
+    evvStatus: strOrUndef(r.evvStatus),
+    evvDescription: strOrUndef(r.evvDescription),
+    narrative: strOrUndef(r.narrative),
   };
 }
 
@@ -353,6 +397,11 @@ function mergeServiceIntoExisting(
   const pay = (cur: ServicePayType | undefined, inc: ServicePayType | undefined) =>
     overwrite && inc ? inc : cur ?? inc;
 
+  const optStr = (cur: string | undefined, inc: string | undefined) => {
+    const merged = mergeString(cur ?? "", inc ?? "", overwrite).trim();
+    return merged || undefined;
+  };
+
   return {
     ...existing,
     id: existing.id,
@@ -374,6 +423,20 @@ function mergeServiceIntoExisting(
     pcptDate: date(existing.pcptDate, incoming.pcptDate),
     sdrStartDate: date(existing.sdrStartDate, incoming.sdrStartDate),
     sdrEndDate: date(existing.sdrEndDate, incoming.sdrEndDate),
+    provider: optStr(existing.provider, incoming.provider),
+    location: optStr(existing.location, incoming.location),
+    claimsSource: optStr(existing.claimsSource, incoming.claimsSource),
+    unitType: optStr(existing.unitType, incoming.unitType),
+    frequency: optStr(existing.frequency, incoming.frequency),
+    totalUnits: optStr(existing.totalUnits, incoming.totalUnits),
+    totalCost: optStr(existing.totalCost, incoming.totalCost),
+    evvStatus: optStr(existing.evvStatus, incoming.evvStatus),
+    evvDescription: optStr(existing.evvDescription, incoming.evvDescription),
+    narrative: optStr(existing.narrative, incoming.narrative),
+    assignedDsps:
+      incoming.assignedDsps !== undefined && incoming.assignedDsps.length > 0
+        ? [...incoming.assignedDsps]
+        : [...(existing.assignedDsps ?? [])],
   };
 }
 
@@ -411,6 +474,342 @@ function applyImportedServices(
   return pool;
 }
 
+function normalizeOutcomeStatementKey(s: string | undefined): string {
+  return String(s ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function mergeTwoOutcomeRows(
+  existing: Outcome,
+  incoming: Outcome,
+  overwrite: boolean,
+): Outcome {
+  return {
+    ...existing,
+    id: existing.id,
+    statement:
+      mergeString(existing.statement ?? "", incoming.statement ?? "", overwrite).trim() ||
+      existing.statement,
+    services: applyImportedServices(existing.services, incoming.services, overwrite),
+  };
+}
+
+function mergeOutcomeGroups(
+  current: Outcome[],
+  incoming: Outcome[],
+  overwrite: boolean,
+): Outcome[] {
+  const pool = current.map((o) => ({
+    ...o,
+    services: o.services.map((s) => ({ ...s })),
+  }));
+
+  for (const inc of incoming) {
+    const key = normalizeOutcomeStatementKey(inc.statement);
+    const idx =
+      key.length > 0
+        ? pool.findIndex((o) => normalizeOutcomeStatementKey(o.statement) === key)
+        : -1;
+    if (idx < 0) {
+      pool.push({
+        ...inc,
+        id: inc.id || newOutcomeId(),
+        services: inc.services.map((s) => ({ ...s })),
+      });
+    } else {
+      pool[idx] = mergeTwoOutcomeRows(pool[idx], inc, overwrite);
+    }
+  }
+  return pool;
+}
+
+function applyImportedOutcomeGroups(
+  current: Outcome[],
+  extracted: ExtractionOutcomeRow[],
+  overwrite: boolean,
+): Outcome[] {
+  const incoming: Outcome[] = extracted
+    .filter(
+      (e) =>
+        String(e.statement ?? "").trim().length > 0 || (e.services?.length ?? 0) > 0,
+    )
+    .map((e) => ({
+      id: newOutcomeId(),
+      statement: mergeString("", e.statement ?? "", true).trim(),
+      services: (e.services ?? []).map((r) =>
+        mapRowToService(r as unknown as Record<string, unknown>),
+      ),
+    }));
+  if (!incoming.length) return current;
+  return mergeOutcomeGroups(current, incoming, overwrite);
+}
+
+function mergeInsuranceDetails(
+  current: InsuranceDetail[],
+  incoming: ExtractionInsuranceDetail[] | undefined,
+  overwrite: boolean,
+): InsuranceDetail[] {
+  if (!incoming?.length) return current;
+  const mapped: InsuranceDetail[] = incoming
+    .map((i) => ({
+      type: mergeString("", i.type ?? "", true).trim() || undefined,
+      name: mergeString("", i.name ?? "", true).trim() || undefined,
+      idGroup: mergeString("", i.idGroup ?? "", true).trim() || undefined,
+      caseManager: mergeString("", i.caseManager ?? "", true).trim() || undefined,
+      contact: mergeString("", i.contact ?? "", true).trim() || undefined,
+    }))
+    .filter(
+      (r) =>
+        (Boolean(r.type) || Boolean(r.name) || Boolean(r.contact)) &&
+        !isExtractedNoDataToken(r.name) &&
+        !isExtractedNoDataToken(r.type),
+    );
+  if (!mapped.length) return current;
+  if (overwrite) return mapped;
+  const key = (x: InsuranceDetail) => `${x.type ?? ""}|${x.name ?? ""}|${x.idGroup ?? ""}`;
+  const seen = new Set(current.map(key));
+  const next = [...current];
+  for (const m of mapped) {
+    const k = key(m);
+    if (!seen.has(k)) {
+      next.push(m);
+      seen.add(k);
+    }
+  }
+  return next;
+}
+
+function mergeGuardianContacts(
+  current: GuardianContact[],
+  incoming: ExtractionGuardianContact[] | undefined,
+  overwrite: boolean,
+): GuardianContact[] {
+  if (!incoming?.length) return current;
+  const mapped: GuardianContact[] = incoming
+    .map((g) => ({
+      name: mergeString("", g.name ?? "", true).trim() || undefined,
+      relationship: mergeGuardianRelationship(undefined, g.relationship, true),
+      email: mergeString("", g.email ?? "", true).trim() || undefined,
+      primaryPhone: mergeString("", g.primaryPhone ?? "", true).trim() || undefined,
+      secondaryPhone: mergeString("", g.secondaryPhone ?? "", true).trim() || undefined,
+      address: mergeString("", g.address ?? "", true).trim() || undefined,
+      priority: g.priority
+        ? Number.parseInt(String(g.priority).trim(), 10)
+        : undefined,
+    }))
+    .filter((g) => Boolean(g.name) && !isExtractedNoDataToken(g.name));
+  if (!mapped.length) return current;
+  if (overwrite) return mapped;
+  const key = (g: GuardianContact) => `${g.name}|${g.primaryPhone ?? ""}`;
+  const seen = new Set(current.map(key));
+  const next = [...current];
+  for (const m of mapped) {
+    const k = key(m);
+    if (!seen.has(k)) {
+      next.push(m);
+      seen.add(k);
+    }
+  }
+  return next;
+}
+
+function mergeCareTeamContacts(
+  current: CareTeamContact[],
+  incoming: ExtractionCareTeamContact[] | undefined,
+  overwrite: boolean,
+): CareTeamContact[] {
+  if (!incoming?.length) return current;
+  const mapped: CareTeamContact[] = incoming
+    .map((c) => ({
+      role: mergeString("", c.role ?? "", true).trim() || undefined,
+      name: mergeString("", c.name ?? "", true).trim() || undefined,
+      agency: mergeString("", c.agency ?? "", true).trim() || undefined,
+      phone: mergeString("", c.phone ?? "", true).trim() || undefined,
+      email: mergeString("", c.email ?? "", true).trim() || undefined,
+      address: mergeString("", c.address ?? "", true).trim() || undefined,
+    }))
+    .filter(
+      (c) =>
+        (Boolean(c.role) || Boolean(c.name) || Boolean(c.phone)) &&
+        !isExtractedNoDataToken(c.name),
+    );
+  if (!mapped.length) return current;
+  if (overwrite) return mapped;
+  const key = (c: CareTeamContact) => `${c.role ?? ""}|${c.name ?? ""}|${c.phone ?? ""}`;
+  const seen = new Set(current.map(key));
+  const next = [...current];
+  for (const m of mapped) {
+    const k = key(m);
+    if (!seen.has(k)) {
+      next.push(m);
+      seen.add(k);
+    }
+  }
+  return next;
+}
+
+function mergeAdlSupportNeeds(
+  current: AdlSupportNeed[],
+  incoming: ExtractionAdlSupportNeed[] | undefined,
+  overwrite: boolean,
+): AdlSupportNeed[] {
+  if (!incoming?.length) return current;
+  const mapped: AdlSupportNeed[] = incoming
+    .map((a) => ({
+      domain: mergeString("", a.domain ?? "", true).trim() || undefined,
+      levelOfSupport: mergeString("", a.levelOfSupport ?? "", true).trim() || undefined,
+      notes: mergeString("", a.notes ?? "", true).trim() || undefined,
+    }))
+    .filter((a) => (Boolean(a.domain) || Boolean(a.notes)) && !isExtractedNoDataToken(a.domain));
+  if (!mapped.length) return current;
+  if (overwrite) return mapped;
+  const key = (a: AdlSupportNeed) => `${a.domain ?? ""}|${a.levelOfSupport ?? ""}`;
+  const seen = new Set(current.map(key));
+  const next = [...current];
+  for (const m of mapped) {
+    const k = key(m);
+    if (!seen.has(k)) {
+      next.push(m);
+      seen.add(k);
+    }
+  }
+  return next;
+}
+
+function parseSelfAdminister(raw: string | undefined): boolean | undefined {
+  if (!raw?.trim() || isExtractedNoDataToken(raw)) return undefined;
+  const x = String(raw).trim().toLowerCase();
+  if (x === "yes" || x === "y" || x === "true" || x === "1") return true;
+  if (x === "no" || x === "n" || x === "false" || x === "0") return false;
+  return undefined;
+}
+
+function mergeMedications(
+  current: ClientMedication[],
+  incoming: ExtractionMedication[] | undefined,
+  overwrite: boolean,
+): ClientMedication[] {
+  if (!incoming?.length) return current;
+  const mapped: ClientMedication[] = incoming
+    .map((m) => ({
+      name: mergeString("", m.name ?? "", true).trim() || undefined,
+      dosage: mergeString("", m.dosage ?? "", true).trim() || undefined,
+      frequency: mergeString("", m.frequency ?? "", true).trim() || undefined,
+      notes: mergeString("", m.notes ?? "", true).trim() || undefined,
+      selfAdminister: parseSelfAdminister(m.selfAdminister as string | undefined),
+    }))
+    .filter((m) => (Boolean(m.name) || Boolean(m.dosage)) && !isExtractedNoDataToken(m.name));
+  if (!mapped.length) return current;
+  if (overwrite) return mapped;
+  const key = (m: ClientMedication) =>
+    `${m.name ?? ""}|${m.dosage ?? ""}|${m.frequency ?? ""}`;
+  const seen = new Set(current.map(key));
+  const next = [...current];
+  for (const m of mapped) {
+    const kk = key(m);
+    if (!seen.has(kk)) {
+      next.push(m);
+      seen.add(kk);
+    }
+  }
+  return next;
+}
+
+function mergeEmergencyBackupPlan(
+  current: EmergencyBackupPlan | undefined,
+  incoming: ExtractionEmergencyBackupPlan | undefined,
+  overwrite: boolean,
+): EmergencyBackupPlan | undefined {
+  if (!incoming) return current;
+  const base: EmergencyBackupPlan = { ...(current ?? {}) };
+  const mergeYn = (cur: YesNo | undefined, inc: string | undefined): YesNo | undefined => {
+    const n = toYesNo(inc);
+    if (!n) return cur;
+    if (overwrite || !cur) return n;
+    return cur;
+  };
+  return {
+    pers: mergeYn(base.pers, incoming.pers),
+    providerManagedSetting: mergeYn(base.providerManagedSetting, incoming.providerManagedSetting),
+    advanceDirective: mergeYn(base.advanceDirective, incoming.advanceDirective),
+    proxyDecisionMaker: mergeYn(base.proxyDecisionMaker, incoming.proxyDecisionMaker),
+    narrative: mergeString(base.narrative ?? "", incoming.narrative, overwrite).trim() || undefined,
+  };
+}
+
+function mergeEmergencyContactRows(
+  current: Stage6EmergencyContact[],
+  incoming:
+    | {
+        name?: string;
+        relationship?: string;
+        primaryPhone?: string;
+        secondaryPhone?: string;
+        priority?: string;
+      }[]
+    | undefined,
+  overwrite: boolean,
+): Stage6EmergencyContact[] {
+  if (!incoming?.length) return current;
+  const mapped: Stage6EmergencyContact[] = incoming
+    .map((e) => ({
+      name: mergeString("", e.name ?? "", true).trim() || undefined,
+      relationship: mergeEmergencyContactRelationship(undefined, e.relationship, true),
+      primaryPhone: mergeString("", e.primaryPhone ?? "", true).trim() || undefined,
+      secondaryPhone: mergeString("", e.secondaryPhone ?? "", true).trim() || undefined,
+      hospitalPreference: mergeString("", (e as { hospitalPreference?: string }).hospitalPreference ?? "", true).trim() || undefined,
+      emergencyProtocol: mergeString("", (e as { emergencyProtocol?: string }).emergencyProtocol ?? "", true).trim() || undefined,
+      priority: e.priority
+        ? Number.parseInt(String(e.priority).trim(), 10)
+        : undefined,
+    }))
+    .filter((e) => Boolean(e.name) && !isExtractedNoDataToken(e.name));
+  if (!mapped.length) return current;
+  const sorted = [...mapped].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+  if (overwrite) return sorted;
+  const key = (e: Stage6EmergencyContact) => `${e.name}|${e.primaryPhone ?? ""}`;
+  const seen = new Set(current.map(key));
+  const next = [...current];
+  for (const m of sorted) {
+    const k = key(m);
+    if (!seen.has(k)) {
+      next.push(m);
+      seen.add(k);
+    }
+  }
+  return next.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+}
+
+function mergeTeamMembers(
+  current: TeamMember[],
+  incoming: ExtractionTeamMember[] | undefined,
+  overwrite: boolean,
+): TeamMember[] {
+  if (!incoming?.length) return current;
+  const mapped: TeamMember[] = incoming
+    .map((t) => ({
+      name: mergeString("", t.name ?? "", true).trim() || undefined,
+      relationship: mergeString("", t.relationship ?? "", true).trim() || undefined,
+      contact: mergeString("", t.contact ?? "", true).trim() || undefined,
+    }))
+    .filter((t) => Boolean(t.name) && !isExtractedNoDataToken(t.name));
+  if (!mapped.length) return current;
+  if (overwrite) return mapped;
+  const key = (t: TeamMember) => `${t.name}|${t.contact ?? ""}`;
+  const seen = new Set(current.map(key));
+  const next = [...current];
+  for (const m of mapped) {
+    const k = key(m);
+    if (!seen.has(k)) {
+      next.push(m);
+      seen.add(k);
+    }
+  }
+  return next;
+}
+
 /**
  * Merges a Gemini extraction response into wizard state.
  */
@@ -428,7 +827,15 @@ export function mergeExtractionDraft(
     stage1: { ...prev.stage1 },
     stage2: {
       ...prev.stage2,
-      services: prev.stage2.services.map((s) => ({ ...s })),
+      outcomes: prev.stage2.outcomes.map((o) => ({
+        ...o,
+        services: o.services.map((s) => ({
+          ...s,
+          assignedDsps: [...(s.assignedDsps ?? [])],
+        })),
+      })),
+      guardians: prev.stage2.guardians?.map((g) => ({ ...g })) ?? [],
+      careTeam: prev.stage2.careTeam?.map((c) => ({ ...c })) ?? [],
     },
     stage3: {
       ...prev.stage3,
@@ -437,16 +844,26 @@ export function mergeExtractionDraft(
       dietaryRestrictions: [...prev.stage3.dietaryRestrictions],
       mobilitySupportNeeds: [...prev.stage3.mobilitySupportNeeds],
       communicationNeeds: [...prev.stage3.communicationNeeds],
+      selfCareNeeds: prev.stage3.selfCareNeeds?.map((a) => ({ ...a })) ?? [],
       docs: prev.stage3.docs.map((d) => ({ ...d })),
     },
     stage4: { ...prev.stage4 },
     stage5: {
       ...prev.stage5,
-      secondaryDsps: [...prev.stage5.secondaryDsps],
       autoChecks: { ...prev.stage5.autoChecks },
     },
-    stage6: { ...prev.stage6 },
-    stage7: { ...prev.stage7 },
+    stage6: {
+      ...prev.stage6,
+      medications: prev.stage6.medications?.map((m) => ({ ...m })) ?? [],
+      emergencyContacts: prev.stage6.emergencyContacts?.map((e) => ({ ...e })) ?? [],
+      emergencyBackupPlan: prev.stage6.emergencyBackupPlan
+        ? { ...prev.stage6.emergencyBackupPlan }
+        : undefined,
+    },
+    stage7: {
+      ...prev.stage7,
+      teamMembers: prev.stage7.teamMembers?.map((t) => ({ ...t })) ?? [],
+    },
   };
 
   const s1 = draft.stage1;
@@ -508,6 +925,25 @@ export function mergeExtractionDraft(
       overwrite,
     ) || undefined;
 
+    next.stage1.planId = mergeString(next.stage1.planId ?? "", s1.planId, overwrite) || undefined;
+    next.stage1.planType = mergeString(next.stage1.planType ?? "", s1.planType, overwrite) || undefined;
+    next.stage1.program = mergeString(next.stage1.program ?? "", s1.program, overwrite) || undefined;
+    next.stage1.dddStatus = mergeString(next.stage1.dddStatus ?? "", s1.dddStatus, overwrite) || undefined;
+    next.stage1.medicaidType = mergeString(next.stage1.medicaidType ?? "", s1.medicaidType, overwrite) || undefined;
+
+    const planPrint = parseIsoOrUsDate(s1.planPrintDate);
+    if (planPrint && (!next.stage1.planPrintDate || overwrite)) next.stage1.planPrintDate = planPrint;
+
+    const waiver = parseIsoOrUsDate(s1.waiverEnrollmentDate);
+    if (waiver && (!next.stage1.waiverEnrollmentDate || overwrite))
+      next.stage1.waiverEnrollmentDate = waiver;
+
+    next.stage1.insuranceDetails = mergeInsuranceDetails(
+      next.stage1.insuranceDetails ?? [],
+      s1.insuranceDetails,
+      overwrite,
+    );
+
     if (
       String(s1.address ?? "").trim() &&
       String(next.stage1.address ?? "").trim() &&
@@ -556,13 +992,61 @@ export function mergeExtractionDraft(
       overwrite,
     );
 
-    if (s2.services?.length) {
-      const mapped = s2.services.map((row) =>
-        mapRowToService(row as unknown as Record<string, unknown>),
+    next.stage2.guardians = mergeGuardianContacts(
+      next.stage2.guardians ?? [],
+      s2.guardians,
+      overwrite,
+    );
+    if (!next.stage2.guardians?.length) {
+      const r = next.stage2;
+      const hasRow =
+        (r.guardianName?.trim() ?? "") ||
+        (r.guardianEmail?.trim() ?? "") ||
+        (r.guardianPhone?.trim() ?? "") ||
+        (r.guardianAddress?.trim() ?? "") ||
+        (r.supportCoordinatorName?.trim() ?? "") ||
+        (r.supportCoordinatorAgency?.trim() ?? "") ||
+        (r.supportCoordinatorContact?.trim() ?? "") ||
+        r.guardianRelationship;
+      if (hasRow) {
+        next.stage2.guardians = [
+          {
+            name: r.guardianName?.trim() || undefined,
+            relationship: r.guardianRelationship,
+            email: r.guardianEmail?.trim() || undefined,
+            primaryPhone: r.guardianPhone?.trim() || undefined,
+            address: r.guardianAddress?.trim() || undefined,
+            supportCoordinatorName: r.supportCoordinatorName?.trim() || undefined,
+            supportCoordinatorAgency: r.supportCoordinatorAgency?.trim() || undefined,
+            supportCoordinatorContact: r.supportCoordinatorContact?.trim() || undefined,
+          },
+        ];
+      }
+    }
+    next.stage2.careTeam = mergeCareTeamContacts(
+      next.stage2.careTeam ?? [],
+      s2.careTeam,
+      overwrite,
+    );
+
+    if (s2.outcomes?.length) {
+      next.stage2.outcomes = applyImportedOutcomeGroups(
+        next.stage2.outcomes,
+        s2.outcomes,
+        overwrite,
       );
-      next.stage2.services = applyImportedServices(
-        next.stage2.services,
-        mapped,
+      localWarnings.push(
+        "Confirm each imported service matches your agency's service list before saving.",
+      );
+    } else if (s2.services?.length) {
+      const rows: ServiceLoadRow[] = s2.services.map((row) => ({
+        svc: mapRowToService(row as unknown as Record<string, unknown>),
+        outcomeTags: parseExtractedOutcomeStrings(row as unknown as Record<string, unknown>),
+      }));
+      const legacyOutcomes = groupLoadedServicesIntoOutcomes(rows);
+      next.stage2.outcomes = mergeOutcomeGroups(
+        next.stage2.outcomes,
+        legacyOutcomes,
         overwrite,
       );
       localWarnings.push(
@@ -603,6 +1087,32 @@ export function mergeExtractionDraft(
     next.stage3.emergencyProtocols = mergeString(
       next.stage3.emergencyProtocols,
       s3.emergencyProtocols,
+      overwrite,
+    );
+
+    next.stage3.primaryDiagnosis = mergeString(
+      next.stage3.primaryDiagnosis ?? "",
+      s3.primaryDiagnosis,
+      overwrite,
+    ) || undefined;
+    next.stage3.secondaryDiagnosis = mergeString(
+      next.stage3.secondaryDiagnosis ?? "",
+      s3.secondaryDiagnosis,
+      overwrite,
+    ) || undefined;
+    next.stage3.healthHazards = mergeString(
+      next.stage3.healthHazards ?? "",
+      s3.healthHazards,
+      overwrite,
+    ) || undefined;
+    next.stage3.nutritionNotes = mergeString(
+      next.stage3.nutritionNotes ?? "",
+      s3.nutritionNotes,
+      overwrite,
+    ) || undefined;
+    next.stage3.selfCareNeeds = mergeAdlSupportNeeds(
+      next.stage3.selfCareNeeds ?? [],
+      s3.selfCareNeeds,
       overwrite,
     );
 
@@ -766,6 +1276,37 @@ export function mergeExtractionDraft(
       overwrite,
     );
 
+    next.stage6.medications = mergeMedications(
+      next.stage6.medications ?? [],
+      s6.medications,
+      overwrite,
+    );
+    next.stage6.emergencyBackupPlan = mergeEmergencyBackupPlan(
+      next.stage6.emergencyBackupPlan,
+      s6.emergencyBackupPlan,
+      overwrite,
+    );
+    next.stage6.emergencyContacts = mergeEmergencyContactRows(
+      next.stage6.emergencyContacts ?? [],
+      s6.emergencyContacts,
+      overwrite,
+    );
+    next.stage6.employmentStatus = mergeString(
+      next.stage6.employmentStatus ?? "",
+      s6.employmentStatus,
+      overwrite,
+    ) || undefined;
+    next.stage6.employmentPlan = mergeString(
+      next.stage6.employmentPlan ?? "",
+      s6.employmentPlan,
+      overwrite,
+    ) || undefined;
+    next.stage6.votingPlan = mergeString(
+      next.stage6.votingPlan ?? "",
+      s6.votingPlan,
+      overwrite,
+    ) || undefined;
+
     if (s6.emergencyContacts?.length) {
       const sorted = [...s6.emergencyContacts].sort(
         (a, b) =>
@@ -800,6 +1341,22 @@ export function mergeExtractionDraft(
             next.stage6.secondaryPhone,
             first.secondaryPhone,
             !next.stage6.secondaryPhone?.trim() || overwrite,
+          );
+        }
+        const firstH = (first as Stage6EmergencyContact).hospitalPreference;
+        if (firstH?.trim() && !isExtractedNoDataToken(firstH)) {
+          next.stage6.hospitalPreference = mergeString(
+            next.stage6.hospitalPreference,
+            firstH,
+            !next.stage6.hospitalPreference?.trim() || overwrite,
+          );
+        }
+        const firstP = (first as Stage6EmergencyContact).emergencyProtocol;
+        if (firstP?.trim() && !isExtractedNoDataToken(firstP)) {
+          next.stage6.emergencyProtocol = mergeString(
+            next.stage6.emergencyProtocol,
+            firstP,
+            !next.stage6.emergencyProtocol?.trim() || overwrite,
           );
         }
       }
@@ -848,6 +1405,12 @@ export function mergeExtractionDraft(
     next.stage7.billingValidationRules = mergeString(
       next.stage7.billingValidationRules,
       s7.billingValidationRules,
+      overwrite,
+    );
+
+    next.stage7.teamMembers = mergeTeamMembers(
+      next.stage7.teamMembers ?? [],
+      s7.teamMembers,
       overwrite,
     );
   }

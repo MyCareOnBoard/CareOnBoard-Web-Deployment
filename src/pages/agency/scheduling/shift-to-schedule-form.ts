@@ -1,5 +1,6 @@
 import type { Shift } from "@/lib/api/shifts";
 import type { ScheduleFormData } from "./components/AddScheduleModal";
+import { ispOutcomesToDisplayText, parseIspOutcomesFromShift } from "./isp-outcomes";
 
 /** Build Add Schedule modal edit payload from an API shift (same mapping as scheduling page `handleEdit`). */
 export function shiftToScheduleFormData(shift: Shift): ScheduleFormData {
@@ -26,7 +27,7 @@ export function shiftToScheduleFormData(shift: Shift): ScheduleFormData {
     endDate: null,
     clockInTime: shift.startTime,
     clockOutTime: shift.endTime || "",
-    ispOutcome: shift.ispOutcome || "",
+    ispOutcome: ispOutcomesToDisplayText(parseIspOutcomesFromShift(shift.ispOutcome)),
     planOfCare: null,
     submissionStatus: shift.submissionStatus,
     goalsType: (anyShift.goalsType as string) || "",

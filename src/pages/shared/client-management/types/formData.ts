@@ -1,3 +1,12 @@
+/** Insurance / payer row from an ISP (ASO, MCO, private). */
+export type InsuranceDetail = {
+    type?: string;
+    name?: string;
+    idGroup?: string;
+    caseManager?: string;
+    contact?: string;
+};
+
 export type Stage1ClientIdentityAndContactData = {
     firstName: string;
     lastName: string;
@@ -20,6 +29,15 @@ export type Stage1ClientIdentityAndContactData = {
     email: string;
     language?: string;
     communicationMethod?: string;
+    /** ISP / program metadata */
+    planId?: string;
+    planType?: string;
+    planPrintDate?: Date;
+    program?: string;
+    waiverEnrollmentDate?: Date;
+    dddStatus?: string;
+    medicaidType?: string;
+    insuranceDetails?: InsuranceDetail[];
 };
 
 /** Client pay type may include per-mile billing; staff pay type uses only hourly / 15-min / daily in the UI. */
@@ -98,6 +116,49 @@ export type Service = {
     pcptDate?: Date;
     sdrStartDate?: Date;
     sdrEndDate?: Date;
+    /** Rich ISP authorization fields (optional; billing/scheduling may ignore) */
+    provider?: string;
+    location?: string;
+    claimsSource?: string;
+    unitType?: string;
+    frequency?: string;
+    totalUnits?: string;
+    totalCost?: string;
+    evvStatus?: string;
+    evvDescription?: string;
+    narrative?: string;
+    /** Manually assigned staff for this service only (not extracted by AI). */
+    assignedDsps?: Dsp[];
+};
+
+/** ISP outcome row: one statement owning one or more service authorization rows (wizard canonical model). */
+export type Outcome = {
+    id: string;
+    statement: string;
+    services: Service[];
+};
+
+/** Guardians / representatives; optional support coordinator fields mirror the legacy single-row ISP layout. */
+export type GuardianContact = {
+    name?: string;
+    relationship?: GuardianRelationship;
+    email?: string;
+    primaryPhone?: string;
+    secondaryPhone?: string;
+    address?: string;
+    priority?: number;
+    supportCoordinatorName?: string;
+    supportCoordinatorAgency?: string;
+    supportCoordinatorContact?: string;
+};
+
+export type CareTeamContact = {
+    role?: string;
+    name?: string;
+    agency?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
 };
 
 export type Stage2GuardianAndFundingData = {
@@ -109,7 +170,10 @@ export type Stage2GuardianAndFundingData = {
     supportCoordinatorName: string;
     supportCoordinatorAgency: string;
     supportCoordinatorContact: string;
-    services: Service[];
+    /** Canonical: each outcome nests its service authorization rows. */
+    outcomes: Outcome[];
+    guardians?: GuardianContact[];
+    careTeam?: CareTeamContact[];
 };
 
 export type DocKey =
@@ -134,6 +198,12 @@ export type DocState = {
     autoReminder: boolean;
 };
 
+export type AdlSupportNeed = {
+    domain?: string;
+    levelOfSupport?: string;
+    notes?: string;
+};
+
 export type Stage3HealthcareAndDocumentsData = {
     medicalConditions: string[];
     allergies: string[];
@@ -144,6 +214,11 @@ export type Stage3HealthcareAndDocumentsData = {
     communicationNeeds: string[];
     emergencyProtocols: string;
     docs: DocState[];
+    primaryDiagnosis?: string;
+    secondaryDiagnosis?: string;
+    healthHazards?: string;
+    nutritionNotes?: string;
+    selfCareNeeds?: AdlSupportNeed[];
 };
 
 export type YesNo = "yes" | "no" | "";
@@ -185,8 +260,6 @@ export type Dsp = {
 };
 
 export type Stage5StaffAssignmentAndRestrictionsData = {
-    primaryDsp?: Dsp;
-    secondaryDsps: Dsp[];
     genderPreference?: string;
     requiredCertifications: string;
     specialConditions: string;
@@ -194,6 +267,38 @@ export type Stage5StaffAssignmentAndRestrictionsData = {
     noMaleFemaleStaff: YesNo;
     medicalRestrictionsTrained: YesNo;
     autoChecks: Record<AutoCheckKey, boolean>;
+};
+
+export type ClientMedication = {
+    name?: string;
+    dosage?: string;
+    frequency?: string;
+    notes?: string;
+    selfAdminister?: boolean;
+};
+
+export type EmergencyBackupPlan = {
+    pers?: YesNo;
+    providerManagedSetting?: YesNo;
+    advanceDirective?: YesNo;
+    proxyDecisionMaker?: YesNo;
+    narrative?: string;
+};
+
+export type Stage6EmergencyContact = {
+    name?: string;
+    relationship?: EmergencyContactRelationship;
+    primaryPhone?: string;
+    secondaryPhone?: string;
+    hospitalPreference?: string;
+    emergencyProtocol?: string;
+    priority?: number;
+};
+
+export type TeamMember = {
+    name?: string;
+    relationship?: string;
+    contact?: string;
 };
 
 export type Stage6GoalsAndEmergencyData = {
@@ -213,6 +318,12 @@ export type Stage6GoalsAndEmergencyData = {
     hospitalPreference: string;
     emergencyProtocol: string;
     medicationList: string;
+    medications?: ClientMedication[];
+    emergencyBackupPlan?: EmergencyBackupPlan;
+    emergencyContacts?: Stage6EmergencyContact[];
+    employmentStatus?: string;
+    employmentPlan?: string;
+    votingPlan?: string;
 };
 
 export type AuditCycle = "monthly" | "quarterly";
@@ -228,6 +339,7 @@ export type Stage7SystemAiAndAuditData = {
     requiredVisitDocumentation: string;
     notesReviewRules: string;
     billingValidationRules: string;
+    teamMembers?: TeamMember[];
 };
 
 export type AddClientFormData = {
@@ -246,7 +358,7 @@ export type AddClientFormData = {
     stage7: Stage7SystemAiAndAuditData;
 };
 
-function createEmptyServiceAuthorization(): Service {
+export function createEmptyServiceAuthorization(): Service {
     return {
         id:
             typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -266,6 +378,28 @@ function createEmptyServiceAuthorization(): Service {
         pcptDate: undefined,
         sdrStartDate: undefined,
         sdrEndDate: undefined,
+        provider: undefined,
+        location: undefined,
+        claimsSource: undefined,
+        unitType: undefined,
+        frequency: undefined,
+        totalUnits: undefined,
+        totalCost: undefined,
+        evvStatus: undefined,
+        evvDescription: undefined,
+        narrative: undefined,
+        assignedDsps: [],
+    };
+}
+
+export function createEmptyOutcome(): Outcome {
+    return {
+        id:
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+                ? `outcome-${crypto.randomUUID()}`
+                : `outcome-${Math.random().toString(16).slice(2)}`,
+        statement: "",
+        services: [createEmptyServiceAuthorization()],
     };
 }
 
@@ -341,6 +475,14 @@ export function createInitialAddClientFormData(): AddClientFormData {
             email: "",
             language: undefined,
             communicationMethod: undefined,
+            planId: undefined,
+            planType: undefined,
+            planPrintDate: undefined,
+            program: undefined,
+            waiverEnrollmentDate: undefined,
+            dddStatus: undefined,
+            medicaidType: undefined,
+            insuranceDetails: [],
         },
         stage2: {
             guardianName: "",
@@ -351,7 +493,9 @@ export function createInitialAddClientFormData(): AddClientFormData {
             supportCoordinatorName: "",
             supportCoordinatorAgency: "",
             supportCoordinatorContact: "",
-            services: [createEmptyServiceAuthorization()],
+            outcomes: [createEmptyOutcome()],
+            guardians: [],
+            careTeam: [],
         },
         stage3: {
             medicalConditions: [],
@@ -363,6 +507,11 @@ export function createInitialAddClientFormData(): AddClientFormData {
             communicationNeeds: [],
             emergencyProtocols: "",
             docs: createInitialDocs(),
+            primaryDiagnosis: undefined,
+            secondaryDiagnosis: undefined,
+            healthHazards: undefined,
+            nutritionNotes: undefined,
+            selfCareNeeds: [],
         },
         stage4: {
             evvRequirement: "",
@@ -374,8 +523,6 @@ export function createInitialAddClientFormData(): AddClientFormData {
             travelTimeAllowed: "",
         },
         stage5: {
-            primaryDsp: undefined,
-            secondaryDsps: [],
             genderPreference: undefined,
             requiredCertifications: "",
             specialConditions: "",
@@ -405,6 +552,12 @@ export function createInitialAddClientFormData(): AddClientFormData {
             hospitalPreference: "",
             emergencyProtocol: "",
             medicationList: "",
+            medications: [],
+            emergencyBackupPlan: undefined,
+            emergencyContacts: [],
+            employmentStatus: undefined,
+            employmentPlan: undefined,
+            votingPlan: undefined,
         },
         stage7: {
             aiNotesReview: true,
@@ -417,6 +570,7 @@ export function createInitialAddClientFormData(): AddClientFormData {
             requiredVisitDocumentation: "",
             notesReviewRules: "",
             billingValidationRules: "",
+            teamMembers: [],
         },
     };
 }

@@ -1,13 +1,18 @@
 import { Client } from "@/lib/api/clients";
 import {
     AddClientFormData,
+    createEmptyOutcome,
+    createEmptyServiceAuthorization,
     createInitialAddClientFormData,
     createInitialDocs,
     EMERGENCY_CONTACT_RELATIONSHIP_VALUES,
     GUARDIAN_RELATIONSHIP_VALUES,
+    type Dsp,
     type EmergencyContactRelationship,
     type GuardianRelationship,
+    type Outcome,
 } from "../types/formData";
+import { groupLoadedServicesIntoOutcomes, type ServiceLoadRow } from "./outcomeServices";
 
 const EMERGENCY_CONTACT_RELATIONSHIP_LOOKUP = new Set<string>(
     EMERGENCY_CONTACT_RELATIONSHIP_VALUES,
@@ -57,6 +62,41 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
         return undefined;
     };
 
+    const apiServiceToWizard = (svc: import("@/lib/api/clients").ClientService) => ({
+        id: svc.id,
+        name: svc.name || "",
+        code: svc.code || "",
+        hours: svc.hours || "",
+        totalApprovedHours: svc.totalApprovedHours || "",
+        rate: svc.rate || "",
+        payType: svc.payType,
+        clientRate: svc.clientRate || "",
+        clientPayType: svc.clientPayType,
+        ispEffectiveDate: svc.ispEffectiveDate ? parseDate(svc.ispEffectiveDate) : undefined,
+        startAuthDate: svc.startAuthDate ? parseDate(svc.startAuthDate) : undefined,
+        endAuthDate: svc.endAuthDate ? parseDate(svc.endAuthDate) : undefined,
+        pcptDate: svc.pcptDate ? parseDate(svc.pcptDate) : undefined,
+        sdrStartDate: svc.sdrStartDate ? parseDate(svc.sdrStartDate) : undefined,
+        sdrEndDate: svc.sdrEndDate ? parseDate(svc.sdrEndDate) : undefined,
+        provider: svc.provider,
+        location: svc.location,
+        claimsSource: svc.claimsSource,
+        unitType: svc.unitType,
+        frequency: svc.frequency,
+        totalUnits: svc.totalUnits,
+        totalCost: svc.totalCost,
+        evvStatus: svc.evvStatus,
+        evvDescription: svc.evvDescription,
+        narrative: svc.narrative,
+        assignedDsps:
+            svc.assignedDsps?.map((d) => ({ id: d.id, name: d.name ?? "" })) ?? [],
+    });
+
+    const newOutcomeId = () =>
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? `outcome-${crypto.randomUUID()}`
+            : `outcome-${Math.random().toString(16).slice(2)}`;
+
     const normalizeYesNo = (value: any): "yes" | "no" | "" => {
         if (value === "yes" || value === "no") return value;
         if (value === true || value === "true") return "yes";
@@ -89,36 +129,194 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             email: client.email || "",
             language: client.languagePreference,
             communicationMethod: client.communicationMethod,
+            planId: client.ispMetadata?.planId,
+            planType: client.ispMetadata?.planType,
+            planPrintDate: client.ispMetadata?.planPrintDate
+                ? parseDate(client.ispMetadata.planPrintDate)
+                : undefined,
+            program: client.ispMetadata?.program,
+            waiverEnrollmentDate: client.ispMetadata?.waiverEnrollmentDate
+                ? parseDate(client.ispMetadata.waiverEnrollmentDate)
+                : undefined,
+            dddStatus: client.ispMetadata?.dddStatus,
+            medicaidType: client.ispMetadata?.medicaidType,
+            insuranceDetails: client.ispMetadata?.insuranceDetails?.length
+                ? client.ispMetadata.insuranceDetails.map((d) => ({
+                      type: d.type ?? "",
+                      name: d.name ?? "",
+                      idGroup: d.idGroup ?? "",
+                      caseManager: d.caseManager ?? "",
+                      contact: d.contact ?? "",
+                  }))
+                : [],
         },
-        stage2: {
-            guardianName: client.guardianName || "",
-            guardianRelationship: coerceGuardianRelationship(client.guardianRelationship),
-            guardianEmail: client.guardianEmail || "",
-            guardianPhone: client.guardianPhone || "",
-            guardianAddress: client.guardianAddress || "",
-            supportCoordinatorName: client.supportCoordinatorName || "",
-            supportCoordinatorAgency: client.supportCoordinatorAgency || "",
-            supportCoordinatorContact: client.supportCoordinatorContact || "",
-            services: client.services && client.services.length > 0
-                ? client.services.map((svc) => ({
-                    id: svc.id,
-                    name: svc.name || "",
-                    code: svc.code || "",
-                    hours: svc.hours || "",
-                    totalApprovedHours: svc.totalApprovedHours || "",
-                    rate: svc.rate || "",
-                    payType: svc.payType,
-                    clientRate: svc.clientRate || "",
-                    clientPayType: svc.clientPayType,
-                    ispEffectiveDate: svc.ispEffectiveDate ? parseDate(svc.ispEffectiveDate) : undefined,
-                    startAuthDate: svc.startAuthDate ? parseDate(svc.startAuthDate) : undefined,
-                    endAuthDate: svc.endAuthDate ? parseDate(svc.endAuthDate) : undefined,
-                    pcptDate: svc.pcptDate ? parseDate(svc.pcptDate) : undefined,
-                    sdrStartDate: svc.sdrStartDate ? parseDate(svc.sdrStartDate) : undefined,
-                    sdrEndDate: svc.sdrEndDate ? parseDate(svc.sdrEndDate) : undefined,
-                }))
-                : initial.stage2.services,
-        },
+        stage2: (() => {
+            let outcomes: Outcome[];
+
+            const nestedOutcomes = client.outcomes;
+            if (nestedOutcomes?.length) {
+                outcomes = nestedOutcomes.map((o) => ({
+                    id: (o.id && String(o.id).trim()) || newOutcomeId(),
+                    statement: o.statement ?? "",
+                    services:
+                        o.services && o.services.length > 0
+                            ? o.services.map((svc) => apiServiceToWizard(svc))
+                            : [createEmptyServiceAuthorization()],
+                }));
+            } else {
+                const loadRows: ServiceLoadRow[] =
+                    client.services && client.services.length > 0
+                        ? client.services.map((svc) => ({
+                              svc: apiServiceToWizard(svc),
+                              outcomeTags:
+                                  svc.outcomes
+                                      ?.map((x) => String(x).trim())
+                                      .filter((t) => Boolean(t)) ?? [],
+                          }))
+                        : [];
+                outcomes =
+                    loadRows.length > 0
+                        ? groupLoadedServicesIntoOutcomes(loadRows)
+                        : [createEmptyOutcome()];
+            }
+
+            const hasAssigned = outcomes.some((og) =>
+                og.services.some((s) => (s.assignedDsps?.length ?? 0) > 0),
+            );
+            if (!hasAssigned && (client.primaryDsp || client.secondaryDsps?.length)) {
+                const dspList: Dsp[] = [];
+                if (client.primaryDsp?.id) {
+                    dspList.push({
+                        id: client.primaryDsp.id,
+                        name: client.primaryDsp.name ?? "",
+                    });
+                }
+                for (const d of client.secondaryDsps ?? []) {
+                    if (d.id && !dspList.some((x) => x.id === d.id)) {
+                        dspList.push({ id: d.id, name: d.name ?? "" });
+                    }
+                }
+                if (dspList.length && outcomes[0]?.services[0]) {
+                    outcomes = outcomes.map((og, oi) =>
+                        oi === 0
+                            ? {
+                                  ...og,
+                                  services: og.services.map((s, si) =>
+                                      si === 0
+                                          ? { ...s, assignedDsps: dspList }
+                                          : s,
+                                  ),
+                              }
+                            : og,
+                    );
+                }
+            }
+
+            const gi = client.guardianInfo;
+
+            const rawGuardians =
+                (client.guardians && client.guardians.length > 0
+                    ? client.guardians
+                    : gi?.guardians) ?? [];
+
+            const mapGuardianRow = (g: (typeof rawGuardians)[number]) => ({
+                name: g.name ?? "",
+                relationship: coerceGuardianRelationship(g.relationship),
+                email: g.email ?? "",
+                primaryPhone: g.primaryPhone ?? "",
+                secondaryPhone: g.secondaryPhone ?? "",
+                address: g.address ?? "",
+                priority: g.priority,
+                supportCoordinatorName: g.supportCoordinatorName ?? "",
+                supportCoordinatorAgency: g.supportCoordinatorAgency ?? "",
+                supportCoordinatorContact: g.supportCoordinatorContact ?? "",
+            });
+
+            let guardians = rawGuardians.map(mapGuardianRow);
+
+            const hasFlatGuardian =
+                (client.guardianName && client.guardianName.trim()) ||
+                (gi?.guardianName && gi.guardianName.trim()) ||
+                (client.guardianEmail && client.guardianEmail.trim()) ||
+                (gi?.guardianEmail && gi.guardianEmail.trim()) ||
+                (client.guardianPhone && client.guardianPhone.trim()) ||
+                (gi?.guardianPhone && gi.guardianPhone.trim()) ||
+                (client.guardianAddress && client.guardianAddress.trim()) ||
+                (gi?.guardianAddress && gi.guardianAddress.trim()) ||
+                client.guardianRelationship ||
+                gi?.guardianRelationship;
+
+            const hasFlatSc =
+                (client.supportCoordinatorName && client.supportCoordinatorName.trim()) ||
+                (gi?.supportCoordinatorName && gi.supportCoordinatorName.trim()) ||
+                (client.supportCoordinatorAgency && client.supportCoordinatorAgency.trim()) ||
+                (gi?.supportCoordinatorAgency && gi.supportCoordinatorAgency.trim()) ||
+                (client.supportCoordinatorContact && client.supportCoordinatorContact.trim()) ||
+                (gi?.supportCoordinatorContact && gi.supportCoordinatorContact.trim());
+
+            if (guardians.length === 0 && (hasFlatGuardian || hasFlatSc)) {
+                guardians = [
+                    {
+                        name: client.guardianName || gi?.guardianName || "",
+                        relationship: coerceGuardianRelationship(
+                            client.guardianRelationship || gi?.guardianRelationship,
+                        ),
+                        email: client.guardianEmail || gi?.guardianEmail || "",
+                        primaryPhone: client.guardianPhone || gi?.guardianPhone || "",
+                        secondaryPhone: "",
+                        address: client.guardianAddress || gi?.guardianAddress || "",
+                        priority: undefined,
+                        supportCoordinatorName:
+                            client.supportCoordinatorName || gi?.supportCoordinatorName || "",
+                        supportCoordinatorAgency:
+                            client.supportCoordinatorAgency || gi?.supportCoordinatorAgency || "",
+                        supportCoordinatorContact:
+                            client.supportCoordinatorContact || gi?.supportCoordinatorContact || "",
+                    },
+                ];
+            } else if (guardians.length > 0 && hasFlatSc) {
+                const g0 = guardians[0];
+                const scN =
+                    client.supportCoordinatorName || gi?.supportCoordinatorName || "";
+                const scA =
+                    client.supportCoordinatorAgency || gi?.supportCoordinatorAgency || "";
+                const scC =
+                    client.supportCoordinatorContact || gi?.supportCoordinatorContact || "";
+                guardians = [
+                    {
+                        ...g0,
+                        supportCoordinatorName: g0.supportCoordinatorName?.trim() || scN || "",
+                        supportCoordinatorAgency: g0.supportCoordinatorAgency?.trim() || scA || "",
+                        supportCoordinatorContact: g0.supportCoordinatorContact?.trim() || scC || "",
+                    },
+                    ...guardians.slice(1),
+                ];
+            }
+
+            return {
+                guardianName: "",
+                guardianRelationship: undefined,
+                guardianEmail: "",
+                guardianPhone: "",
+                guardianAddress: "",
+                supportCoordinatorName: "",
+                supportCoordinatorAgency: "",
+                supportCoordinatorContact: "",
+                outcomes,
+                guardians,
+                careTeam:
+                    ((client.careTeam && client.careTeam.length > 0
+                        ? client.careTeam
+                        : client.guardianInfo?.careTeam) ?? []).map((c) => ({
+                        role: c.role ?? "",
+                        name: c.name ?? "",
+                        agency: c.agency ?? "",
+                        phone: c.phone ?? "",
+                        email: c.email ?? "",
+                        address: c.address ?? "",
+                    })),
+            };
+        })(),
         stage3: {
             medicalConditions: (() => {
                 const v = client.healthcareSafety?.medicalConditions ?? client.medicalConditions;
@@ -143,6 +341,23 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                 return Array.isArray(v) ? v : [];
             })(),
             emergencyProtocols: client.healthcareSafety?.emergencyProtocols ?? client.emergencyProtocols ?? "",
+            primaryDiagnosis:
+                client.healthcareSafety?.primaryDiagnosis ??
+                (client as any).primaryDiagnosis ??
+                undefined,
+            secondaryDiagnosis:
+                client.healthcareSafety?.secondaryDiagnosis ??
+                (client as any).secondaryDiagnosis ??
+                undefined,
+            healthHazards:
+                client.healthcareSafety?.healthHazards ?? (client as any).healthHazards ?? undefined,
+            nutritionNotes:
+                client.healthcareSafety?.nutritionNotes ?? (client as any).nutritionNotes ?? undefined,
+            selfCareNeeds: (() => {
+                const v =
+                    client.healthcareSafety?.selfCareNeeds ?? (client as any).selfCareNeeds;
+                return Array.isArray(v) ? v : [];
+            })(),
             docs: (() => {
                 const allDocs = createInitialDocs();
                 const existingDocs = client.documents || [];
@@ -173,8 +388,6 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             travelTimeAllowed: normalizeYesNo(client.evvVisitConfig?.travelTimeAllowed ?? (client as any).travelTimeAllowed),
         },
         stage5: {
-            primaryDsp: client.primaryDsp ? { id: client.primaryDsp.id, name: client.primaryDsp.name } : undefined,
-            secondaryDsps: client.secondaryDsps?.map((dsp) => ({ id: dsp.id, name: dsp.name })) || [],
             genderPreference: (client as any).genderPreference ?? undefined,
             requiredCertifications: (client as any).requiredCertifications ?? "",
             specialConditions: (client as any).specialConditions ?? "",
@@ -202,15 +415,107 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             ispOutcomes: client.goalsAndEmergency?.ispOutcomes ?? client.ispOutcomes ?? (client as any).ispOutcomes ?? "",
             targetBehaviors: client.goalsAndEmergency?.targetBehaviors ?? (client as any).targetBehaviors ?? "",
             supportStrategies: client.goalsAndEmergency?.supportStrategies ?? (client as any).supportStrategies ?? "",
-            emergencyName: client.goalsAndEmergency?.emergencyName ?? (client as any).emergencyName ?? "",
-            emergencyRelationship: coerceEmergencyRelationship(
-                client.goalsAndEmergency?.emergencyRelationship ?? (client as any).emergencyRelationship,
-            ),
-            primaryPhone: client.goalsAndEmergency?.primaryPhone ?? (client as any).primaryPhone ?? "",
-            secondaryPhone: client.goalsAndEmergency?.secondaryPhone ?? (client as any).secondaryPhone ?? "",
-            hospitalPreference: client.goalsAndEmergency?.hospitalPreference ?? (client as any).hospitalPreference ?? "",
-            emergencyProtocol: client.goalsAndEmergency?.emergencyProtocol ?? (client as any).emergencyProtocol ?? "",
+            ...(() => {
+                const raw =
+                    client.goalsAndEmergency?.emergencyContacts ?? client.emergencyContacts;
+                const flatName =
+                    client.goalsAndEmergency?.emergencyName ?? (client as any).emergencyName ?? "";
+                const flatRel = coerceEmergencyRelationship(
+                    client.goalsAndEmergency?.emergencyRelationship ??
+                        (client as any).emergencyRelationship,
+                );
+                const flatP1 =
+                    client.goalsAndEmergency?.primaryPhone ?? (client as any).primaryPhone ?? "";
+                const flatP2 =
+                    client.goalsAndEmergency?.secondaryPhone ?? (client as any).secondaryPhone ?? "";
+                const flatHosp =
+                    client.goalsAndEmergency?.hospitalPreference ??
+                    (client as any).hospitalPreference ??
+                    "";
+                const flatProt =
+                    client.goalsAndEmergency?.emergencyProtocol ??
+                    (client as any).emergencyProtocol ??
+                    "";
+
+                let rows: import("../types/formData").Stage6EmergencyContact[] =
+                    raw?.length ?
+                        raw.map((e) => ({
+                            name: e.name ?? "",
+                            relationship: coerceEmergencyRelationship(e.relationship),
+                            primaryPhone: e.primaryPhone ?? "",
+                            secondaryPhone: e.secondaryPhone ?? "",
+                            hospitalPreference: e.hospitalPreference ?? "",
+                            emergencyProtocol: e.emergencyProtocol ?? "",
+                            priority: e.priority,
+                        }))
+                    :   [];
+
+                const hasFlatPrimary =
+                    flatName.trim() ||
+                    flatP1.trim() ||
+                    flatP2.trim() ||
+                    flatHosp.trim() ||
+                    flatProt.trim() ||
+                    flatRel !== undefined;
+
+                if (rows.length === 0 && hasFlatPrimary) {
+                    rows = [
+                        {
+                            name: flatName,
+                            relationship: flatRel,
+                            primaryPhone: flatP1,
+                            secondaryPhone: flatP2,
+                            hospitalPreference: flatHosp,
+                            emergencyProtocol: flatProt,
+                            priority: 1,
+                        },
+                    ];
+                }
+
+                const first = rows[0];
+                return {
+                    emergencyName: first?.name ?? "",
+                    emergencyRelationship: first?.relationship,
+                    primaryPhone: first?.primaryPhone ?? "",
+                    secondaryPhone: first?.secondaryPhone ?? "",
+                    hospitalPreference: first?.hospitalPreference ?? "",
+                    emergencyProtocol: first?.emergencyProtocol ?? "",
+                    emergencyContacts: rows,
+                };
+            })(),
             medicationList: client.goalsAndEmergency?.medicationList ?? (client as any).medicationList ?? "",
+            medications: (() => {
+                const raw = client.goalsAndEmergency?.medications ?? (client as any).medications;
+                if (!raw?.length) return [];
+                return raw.map((m: import("@/lib/api/clients").ClientMedicationRow) => ({
+                    name: m.name ?? "",
+                    dosage: m.dosage ?? "",
+                    frequency: m.frequency ?? "",
+                    notes: m.notes ?? "",
+                    selfAdminister: typeof m.selfAdminister === "boolean" ? m.selfAdminister : undefined,
+                }));
+            })(),
+            emergencyBackupPlan: (() => {
+                const ebp =
+                    client.goalsAndEmergency?.emergencyBackupPlan ??
+                    (client as any).emergencyBackupPlan;
+                if (!ebp) return undefined;
+                return {
+                    pers: normalizeYesNo(ebp.pers),
+                    providerManagedSetting: normalizeYesNo(ebp.providerManagedSetting),
+                    advanceDirective: normalizeYesNo(ebp.advanceDirective),
+                    proxyDecisionMaker: normalizeYesNo(ebp.proxyDecisionMaker),
+                    narrative: ebp.narrative ?? "",
+                };
+            })(),
+            employmentStatus:
+                client.goalsAndEmergency?.employmentStatus ??
+                (client as any).employmentStatus ??
+                undefined,
+            employmentPlan:
+                client.goalsAndEmergency?.employmentPlan ?? (client as any).employmentPlan ?? undefined,
+            votingPlan:
+                client.goalsAndEmergency?.votingPlan ?? (client as any).votingPlan ?? undefined,
         },
         stage7: {
             aiNotesReview: client.systemAiAndAudit?.aiNotesReview ?? (client as any).aiNotesReview ?? true,
@@ -223,6 +528,16 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             requiredVisitDocumentation: client.systemAiAndAudit?.requiredVisitDocumentation ?? (client as any).requiredVisitDocumentation ?? "",
             notesReviewRules: client.systemAiAndAudit?.notesReviewRules ?? (client as any).notesReviewRules ?? "",
             billingValidationRules: client.systemAiAndAudit?.billingValidationRules ?? (client as any).billingValidationRules ?? "",
+            teamMembers: (() => {
+                const raw =
+                    client.systemAiAndAudit?.teamMembers ?? (client as any).teamMembers;
+                if (!raw?.length) return [];
+                return raw.map((t: import("@/lib/api/clients").ClientTeamMember) => ({
+                    name: t.name ?? "",
+                    relationship: t.relationship ?? "",
+                    contact: t.contact ?? "",
+                }));
+            })(),
         },
     };
 }

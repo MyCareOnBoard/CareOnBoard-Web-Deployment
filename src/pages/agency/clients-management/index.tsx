@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { useListAgencyClientsQuery, useGetClientStatsQuery, type Client } from "@/lib/api/clients";
+import { countUniqueAssignedDspsForClient } from "@/lib/countUniqueAssignedDsps";
 
 interface DisplayClient {
   id: string;
@@ -120,10 +121,7 @@ export default function ClientsPage() {
       const statusCapitalized = status.charAt(0).toUpperCase() + status.slice(1) as DisplayClient["status"];
       const statusLabel = status === "pending" ? "Pending Setup" : statusCapitalized;
 
-      // Calculate DSP count (primary + secondary)
-      const primaryDspCount = client?.primaryDsp ? 1 : 0;
-      const secondaryDspsCount = client?.secondaryDsps?.length || 0;
-      const dspCount = primaryDspCount + secondaryDspsCount;
+      const dspCount = countUniqueAssignedDspsForClient(client);
 
       return {
         id: client.id,

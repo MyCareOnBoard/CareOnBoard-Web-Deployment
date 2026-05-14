@@ -3,7 +3,7 @@ import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, 
 import { Button } from "@/components/ui/button";
 import TimePicker from "@/components/TimePicker";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { searchClients, Client, ClientService, getAgencyClientById } from "@/lib/api/clients";
+import { searchClients, Client, ClientService, ClientDsp, getAgencyClientById } from "@/lib/api/clients";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { searchEmployees, getEmployeeById, Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
@@ -15,6 +15,68 @@ import { createEmployeeActivityLog } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
 import { createGoalDocument, DocumentType, CreateGoalDocumentRequest } from "@/lib/api/goals-and-documents";
+import {
+  ispOutcomesToDisplayText,
+  parseIspOutcomesFromDisplayText,
+  serializeIspOutcomesForShift,
+} from "@/pages/agency/scheduling/isp-outcomes";
+import {
+  findOutcomeStatementsForServiceCode,
+  flattenOutcomeServices,
+} from "@/pages/shared/client-management/utils/outcomeServices";
+
+function clientServicesForScheduling(client: Client | null): ClientService[] {
+  if (!client) return [];
+  if (client.outcomes?.length) return flattenOutcomeServices(client.outcomes);
+  return client.services ?? [];
+}
+
+function pickSelectedServiceRow(
+  services: ClientService[],
+  data: Pick<ScheduleFormData, "serviceAuthorizationId" | "serviceCode">,
+): ClientService | null {
+  if (data.serviceAuthorizationId) {
+    const byId = services.find((s) => s.id === data.serviceAuthorizationId);
+    if (byId) return byId;
+  }
+  return services.find((s) => s.code === data.serviceCode) || null;
+}
+
+function shiftIspOutcomeApiValue(displayText: string): string | undefined {
+  return serializeIspOutcomesForShift(parseIspOutcomesFromDisplayText(displayText));
+}
+
+function resolveIspOutcomeShiftPayload(
+  client: Client | null,
+  services: ClientService[],
+  data: ScheduleFormData,
+): string | undefined {
+  const svc = pickSelectedServiceRow(services, data);
+  const fromNested =
+    client?.outcomes?.length && data.serviceCode
+      ? findOutcomeStatementsForServiceCode(client.outcomes, data.serviceCode)
+      : [];
+  const merged = [...new Set([...(svc?.outcomes ?? []), ...fromNested])].filter(Boolean);
+  if (merged.length > 0) {
+    return serializeIspOutcomesForShift(merged);
+  }
+  return shiftIspOutcomeApiValue(data.ispOutcome);
+}
+
+function resolveIspOutcomeActivityLabel(
+  client: Client | null,
+  services: ClientService[],
+  data: ScheduleFormData,
+): string {
+  const svc = pickSelectedServiceRow(services, data);
+  const fromNested =
+    client?.outcomes?.length && data.serviceCode
+      ? findOutcomeStatementsForServiceCode(client.outcomes, data.serviceCode)
+      : [];
+  const merged = [...new Set([...(svc?.outcomes ?? []), ...fromNested])].filter(Boolean);
+  if (merged.length) return merged.join("; ");
+  return parseIspOutcomesFromDisplayText(data.ispOutcome).join("; ");
+}
 
 interface AddScheduleModalProps {
   isOpen: boolean;
@@ -26,6 +88,7 @@ interface AddScheduleModalProps {
 
 interface FormErrors {
   client?: string;
+  serviceCode?: string;
   assignedDsp?: string;
   schedulingType?: string;
   date?: string;
@@ -44,6 +107,8 @@ export interface ScheduleFormData {
   assignedDspId: string;
   billingRate: string;
   serviceCode: string;
+  /** ClientService row id when authorizations are outcome-flattened (disambiguates duplicate codes). */
+  serviceAuthorizationId?: string;
   notesType: string;
   comment?: string;
   schedulingType: "one-time" | "recurring" | "";
@@ -136,6 +201,7 @@ const initialFormData: ScheduleFormData = {
   assignedDspId: "",
   billingRate: "",
   serviceCode: "",
+  serviceAuthorizationId: "",
   notesType: "",
   comment: "",
   schedulingType: "one-time",
@@ -222,6 +288,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   /** Discards stale async results when the user selects another client quickly. */
   const latestClientSelectIdRef = useRef<string | null>(null);
+  /** Discards stale `getEmployeeById` when service or DSP selection changes quickly. */
+  const dspVerifyTokenRef = useRef(0);
 
   // Success / saved modals state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -256,7 +324,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           getAgencyClientById(editData.clientId)
             .then((client) => {
               setSelectedClient(client);
-              setSelectedClientServices(client.services || []);
+              setSelectedClientServices(clientServicesForScheduling(client));
             })
             .catch((error) => {
               console.error("Failed to fetch client for edit:", error);
@@ -294,6 +362,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
     if (!user?.agencyId || !data.assignedDspId) return [];
 
+    const ispOutcomePayload = resolveIspOutcomeShiftPayload(selectedClient, selectedClientServices, data);
     const requests: CreateShiftRequest[] = [];
 
     if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
@@ -325,7 +394,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 goalsType: data.goalsType || undefined,
                 serviceCode: data.serviceCode,
                 schedulingType: data.schedulingType,
-                ispOutcome: data.ispOutcome || undefined,
+                ispOutcome: ispOutcomePayload,
                 assignedDsp: data.assignedDsp,
                 status: ShiftStatus.PENDING,
                 type: ShiftType.AUTOMATIC,
@@ -352,7 +421,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             goalsType: data.goalsType || undefined,
             serviceCode: data.serviceCode,
             schedulingType: data.schedulingType,
-            ispOutcome: data.ispOutcome || undefined,
+            ispOutcome: ispOutcomePayload,
             assignedDsp: data.assignedDsp,
             status: ShiftStatus.PENDING,
             type: ShiftType.AUTOMATIC,
@@ -377,7 +446,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         goalsType: data.goalsType || undefined,
         serviceCode: data.serviceCode,
         schedulingType: data.schedulingType,
-        ispOutcome: data.ispOutcome || undefined,
+        ispOutcome: ispOutcomePayload,
         assignedDsp: data.assignedDsp,
         status: ShiftStatus.PENDING,
         type: ShiftType.AUTOMATIC,
@@ -480,40 +549,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     return null;
   };
 
-  const handleClientSelect = async (client: Client) => {
+  const handleClientSelect = (client: Client) => {
     const selectId = client.id;
     latestClientSelectIdRef.current = selectId;
-
-    let assignedDsp = client.primaryDsp?.name || "";
-    let assignedDspId = client.primaryDsp?.id || "";
-
-    if (client.primaryDsp?.id) {
-      try {
-        const emp = await getEmployeeById(client.primaryDsp.id);
-        if (latestClientSelectIdRef.current !== selectId) return;
-        if (emp.workAvailability !== true) {
-          assignedDsp = "";
-          assignedDspId = "";
-          toast({
-            title: "Primary DSP unavailable",
-            description:
-              "Primary DSP is currently unavailable, please select another.",
-            variant: "destructive",
-          });
-        }
-      } catch {
-        if (latestClientSelectIdRef.current !== selectId) return;
-        assignedDsp = "";
-        assignedDspId = "";
-        toast({
-          title: "Could not verify primary DSP",
-          description: "Please select a DSP manually.",
-          variant: "destructive",
-        });
-      }
-    }
-
-    if (latestClientSelectIdRef.current !== selectId) return;
+    dspVerifyTokenRef.current += 1;
 
     setFormData((prev) => ({
       ...prev,
@@ -523,26 +562,17 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           : client.id,
       clientId: client.id,
       clientLocation: getClientPrimaryAddress(client),
-      serviceCode: client.services?.[0]?.code || "",
-      assignedDsp,
-      assignedDspId,
-      billingRate: client.services?.[0]?.rate || "",
-      ispOutcome: client.ispOutcomes || "",
+      serviceCode: "",
+      serviceAuthorizationId: "",
+      assignedDsp: "",
+      assignedDspId: "",
+      billingRate: "",
+      ispOutcome: "",
     }));
     setSelectedClient(client);
-    setSelectedClientServices(client.services || []);
+    setSelectedClientServices(clientServicesForScheduling(client));
     setShowClientDropdown(false);
     setClientSearchResults([]);
-  };
-
-  const handleDspSelect = (employee: Employee) => {
-    setFormData(prev => ({
-      ...prev,
-      assignedDsp: employee.fullName,
-      assignedDspId: employee.id,
-    }));
-    setShowDspDropdown(false);
-    setDspSearchResults([]);
   };
 
   // Calendar days calculation
@@ -556,11 +586,91 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   }, [currentMonth]);
 
   const selectedService = useMemo(
-    () =>
-      selectedClientServices.find(
-        (service) => service.code === formData.serviceCode,
-      ) || null,
-    [selectedClientServices, formData.serviceCode],
+    () => pickSelectedServiceRow(selectedClientServices, formData),
+    [selectedClientServices, formData.serviceAuthorizationId, formData.serviceCode],
+  );
+
+  const serviceSelectValue = useMemo(() => {
+    if (formData.serviceAuthorizationId) return formData.serviceAuthorizationId;
+    const m = selectedClientServices.find((s) => s.code === formData.serviceCode);
+    return m?.id ?? "";
+  }, [formData.serviceAuthorizationId, formData.serviceCode, selectedClientServices]);
+
+  /** Read-only copy shown in the modal: always the selected service's outcomes when available. */
+  const ispOutcomeDisplay = useMemo(() => {
+    if (selectedService?.outcomes && selectedService.outcomes.length > 0) {
+      return ispOutcomesToDisplayText(selectedService.outcomes);
+    }
+    if (!formData.serviceCode) return "";
+    return formData.ispOutcome;
+  }, [selectedService, formData.serviceCode, formData.ispOutcome]);
+
+  const verifyAndApplyDsp = useCallback(
+    async (dspId: string, dspName: string) => {
+      const token = ++dspVerifyTokenRef.current;
+      if (!dspId) {
+        setFormData((prev) => ({ ...prev, assignedDsp: "", assignedDspId: "" }));
+        return;
+      }
+      try {
+        const emp = await getEmployeeById(dspId);
+        if (token !== dspVerifyTokenRef.current) return;
+        if (emp.workAvailability !== true) {
+          setFormData((prev) => ({ ...prev, assignedDsp: "", assignedDspId: "" }));
+          toast({
+            title: "Assigned DSP unavailable",
+            description:
+              "The DSP assigned to this service is currently unavailable, please select another.",
+            variant: "destructive",
+          });
+          return;
+        }
+        setFormData((prev) => ({ ...prev, assignedDsp: dspName, assignedDspId: dspId }));
+      } catch {
+        if (token !== dspVerifyTokenRef.current) return;
+        setFormData((prev) => ({ ...prev, assignedDsp: "", assignedDspId: "" }));
+        toast({
+          title: "Could not verify assigned DSP",
+          description: "Please select a DSP manually.",
+          variant: "destructive",
+        });
+      }
+    },
+    [toast],
+  );
+
+  const handleServiceRowChange = useCallback(
+    (value: string) => {
+      dspVerifyTokenRef.current += 1;
+      const service = selectedClientServices.find((s) => s.id === value);
+      const outcomes = service?.outcomes || [];
+      setFormData((prev) => ({
+        ...prev,
+        serviceAuthorizationId: value,
+        serviceCode: service?.code || "",
+        billingRate: service?.rate || "",
+        ispOutcome: ispOutcomesToDisplayText(outcomes),
+        assignedDsp: "",
+        assignedDspId: "",
+      }));
+    },
+    [selectedClientServices],
+  );
+
+  const handleAssignedDspRowSelect = useCallback(
+    (dsp: ClientDsp) => {
+      void verifyAndApplyDsp(dsp.id, dsp.name);
+    },
+    [verifyAndApplyDsp],
+  );
+
+  const handleDspSelect = useCallback(
+    (employee: Employee) => {
+      void verifyAndApplyDsp(employee.id, employee.fullName);
+      setShowDspDropdown(false);
+      setDspSearchResults([]);
+    },
+    [verifyAndApplyDsp],
   );
 
   const pocDocument = useMemo(() => {
@@ -653,6 +763,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       newErrors.client = "Client is required";
     }
 
+    if (formData.clientId && !formData.serviceCode.trim()) {
+      newErrors.serviceCode = "Service is required";
+    }
+
     // Assigned DSP validation
     if (!formData.assignedDsp.trim()) {
       newErrors.assignedDsp = "Assigned DSP is required";
@@ -721,6 +835,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const isFormValid = useMemo(() => {
     // Client validation
     if (!formData.client.trim()) return false;
+
+    if (formData.clientId && !formData.serviceCode.trim()) return false;
 
     // Assigned DSP validation
     if (!formData.assignedDsp.trim()) return false;
@@ -795,7 +911,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             comment: formData.comment || undefined,
             serviceCode: formData.serviceCode,
             schedulingType: formData.schedulingType,
-            ispOutcome: formData.ispOutcome,
+            ispOutcome: resolveIspOutcomeShiftPayload(selectedClient, selectedClientServices, formData),
             assignedDsp: formData.assignedDsp,
             employeeId: formData.assignedDspId || undefined,
             clientId: formData.clientId || undefined
@@ -966,7 +1082,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           comment: formData.comment || undefined,
           serviceCode: formData.serviceCode,
           schedulingType: formData.schedulingType,
-          ispOutcome: formData.ispOutcome,
+          ispOutcome: resolveIspOutcomeShiftPayload(selectedClient, selectedClientServices, formData),
           assignedDsp: formData.assignedDsp,
           employeeId: formData.assignedDspId || undefined,
           clientId: formData.clientId || undefined,
@@ -1051,7 +1167,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   agency: user?.fullName || "",
                   serviceYear: shiftDate.getFullYear(),
                   serviceCode: formData.serviceCode || "",
-                  ISPOutcome: formData.ispOutcome || "",
+                  ISPOutcome: resolveIspOutcomeActivityLabel(selectedClient, selectedClientServices, formData),
                   strategies: [],
                 },
               }).catch((error) => {
@@ -1216,9 +1332,25 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                       value={formData.client}
                       onChange={(e) => {
                         const value = e.target.value;
-                        setFormData(prev => ({ ...prev, client: value, clientId: "", clientLocation: null }));
+                        dspVerifyTokenRef.current += 1;
+                        setFormData((prev) => ({
+                          ...prev,
+                          client: value,
+                          clientId: "",
+                          clientLocation: null,
+                          serviceCode: "",
+                          serviceAuthorizationId: "",
+                          assignedDsp: "",
+                          assignedDspId: "",
+                          billingRate: "",
+                          ispOutcome: "",
+                        }));
+                        setSelectedClient(null);
+                        setSelectedClientServices([]);
                         handleClientSearch(value);
                         clearError("client");
+                        clearError("serviceCode");
+                        clearError("assignedDsp");
                       }}
                       placeholder="Search client name..."
                       className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
@@ -1262,65 +1394,20 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   )}
                 </div>
 
-                {/* Assigned DSP Field */}
-                <div className="flex flex-col gap-1 relative">
-                  <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
-                  <div className={`bg-white border rounded-xl h-11 px-4 flex items-center ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}>
-                    <input
-                      type="text"
-                      value={formData.assignedDsp}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setFormData(prev => ({ ...prev, assignedDsp: value, assignedDspId: "", billingRate: "" }));
-                        handleDspSearch(value);
-                        clearError("assignedDsp");
-                      }}
-                      placeholder="Search DSP name..."
-                      className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
-                    />
-                    {isSearchingDsps && (
-                      <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
-                    )}
-                  </div>
-                  {errors.assignedDsp && (
-                    <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
-                  )}
-                  {/* DSP Dropdown */}
-                  {showDspDropdown && dspSearchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
-                      {dspSearchResults.map((employee) => (
-                        <button
-                          key={employee.id}
-                          onClick={() => {
-                            handleDspSelect(employee);
-                            clearError("assignedDsp");
-                          }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
-                        >
-                          <p className="text-[14px] font-normal text-black">{employee.fullName}</p>
-                          <p className="text-[12px] font-normal text-[#808081]">{employee.email}</p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {/* Billing Rate Display */}
-                  {/* {formData.billingRate && !errors.assignedDsp && (
-              <span className="text-[12px] font-normal text-[#808081]">
-                Billing Rate : {formData.billingRate}
-              </span>
-            )} */}
-                </div>
-
-                {/* Service Code */}
-                {/* Service Code */}
+                {/* Service */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[12px] font-normal text-[#10141a]">Service</label>
                   <Select
-                    value={formData.serviceCode}
-                    onValueChange={(value) => setFormData((prev) => ({ ...prev, serviceCode: value }))}
+                    value={serviceSelectValue}
+                    onValueChange={(value) => {
+                      handleServiceRowChange(value);
+                      clearError("serviceCode");
+                    }}
                     disabled={selectedClientServices.length === 0}
                   >
-                    <SelectTrigger className="w-full h-11 rounded-xl border-[#cccccd] bg-white">
+                    <SelectTrigger
+                      className={`w-full h-11 rounded-xl bg-white ${errors.serviceCode ? "border-[#D53411]" : "border-[#cccccd]"}`}
+                    >
                       <SelectValue
                         placeholder={
                           selectedClientServices.length === 0 ? "No services available" : "Select service"
@@ -1329,12 +1416,15 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                     </SelectTrigger>
                     <SelectContent>
                       {selectedClientServices.map((service) => (
-                        <SelectItem key={`${service.code}-${service.name}`} value={service.code}>
+                        <SelectItem key={service.id} value={service.id}>
                           {service.name ? `${service.name} — ${service.code}` : service.code}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {errors.serviceCode && (
+                    <span className="text-[12px] font-normal text-[#D53411]">{errors.serviceCode}</span>
+                  )}
                   {selectedService && (selectedService.rate || selectedService.payType) && (
                     <span className="text-[12px] font-normal text-[#808081]">
                       Service rate:{" "}
@@ -1352,6 +1442,80 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                         }`}
                     </span>
                   )}
+                </div>
+
+                {/* Assign DSP */}
+                <div className="flex flex-col gap-1 relative">
+                  <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
+                  {!formData.serviceCode ? (
+                    <span className="text-[12px] font-normal text-[#808081]">
+                      Select a service first to see DSPs assigned to that service.
+                    </span>
+                  ) : selectedService?.assignedDsps && selectedService.assignedDsps.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {selectedService.assignedDsps.map((dsp) => (
+                        <button
+                          key={dsp.id}
+                          type="button"
+                          onClick={() => {
+                            handleAssignedDspRowSelect(dsp);
+                            clearError("assignedDsp");
+                          }}
+                          className={`w-full rounded-xl border px-4 py-3 text-left text-[14px] font-normal transition-colors ${
+                            formData.assignedDspId === dsp.id
+                              ? "border-[#10141a] bg-[#f5f6f7]"
+                              : "border-[#cccccd] bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          {dsp.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-[12px] font-normal text-[#808081]">
+                      No DSPs assigned to this service. Search for a DSP below.
+                    </span>
+                  )}
+                  <div
+                    className={`bg-white border rounded-xl h-11 px-4 flex items-center ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}
+                  >
+                    <input
+                      type="text"
+                      value={formData.assignedDsp}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData((prev) => ({ ...prev, assignedDsp: value, assignedDspId: "" }));
+                        handleDspSearch(value);
+                        clearError("assignedDsp");
+                      }}
+                      placeholder={formData.serviceCode ? "Search DSP name..." : "Select a service first"}
+                      disabled={!formData.serviceCode}
+                      className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent disabled:cursor-not-allowed"
+                    />
+                    {isSearchingDsps && (
+                      <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
+                    )}
+                  </div>
+                  {errors.assignedDsp && (
+                    <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
+                  )}
+                  {showDspDropdown && dspSearchResults.length > 0 && formData.serviceCode ? (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
+                      {dspSearchResults.map((employee) => (
+                        <button
+                          key={employee.id}
+                          onClick={() => {
+                            handleDspSelect(employee);
+                            clearError("assignedDsp");
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
+                        >
+                          <p className="text-[14px] font-normal text-black">{employee.fullName}</p>
+                          <p className="text-[12px] font-normal text-[#808081]">{employee.email}</p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Notes Type */}
@@ -1893,18 +2057,22 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   </div>
                 )}
 
-                {/* ISP Outcome */}
+                {/* ISP Outcome — read-only, from selected service */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[12px] font-normal text-[#10141a]">ISP Outcome</label>
-                  <div className="bg-[#f5f5f5] border border-[#e0e0e0] rounded-xl h-11 px-4 flex items-center">
-                    <input
-                      type="text"
-                      value={formData.ispOutcome}
-                      readOnly
-                      placeholder={formData.ispOutcome ? "" : "No ISP outcome available"}
-                      className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent cursor-not-allowed"
-                    />
-                  </div>
+                  <textarea
+                    readOnly
+                    rows={4}
+                    value={ispOutcomeDisplay}
+                    placeholder={
+                      !formData.serviceCode
+                        ? "Select a service to view ISP outcomes"
+                        : ispOutcomeDisplay
+                          ? ""
+                          : "No ISP outcomes on file for this service"
+                    }
+                    className="w-full rounded-xl border border-[#e0e0e0] bg-[#f5f5f5] px-4 py-3 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none resize-none cursor-default min-h-[100px]"
+                  />
                 </div>
 
                 {/* Plan of Care */}

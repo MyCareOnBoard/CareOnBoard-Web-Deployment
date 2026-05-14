@@ -8,6 +8,7 @@ import { listShifts, Shift, deleteShift, updateShift, ShiftType, SubmissionStatu
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
+import { shiftToScheduleFormData } from "../shift-to-schedule-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   ConfirmDialog,
@@ -134,36 +135,7 @@ export default function ShiftsListPage() {
   );
 
   const handleEdit = (shift: Shift) => {
-    const clientName = shift.client
-      ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
-      : "Unknown Client";
-    const employeeName = shift.employee?.fullName || "";
-    const anyShift = shift as any;
-
-    const formData: ScheduleFormData = {
-      client: clientName,
-      clientId: shift.client?.id || "",
-      clientLocation: shift.location || null,
-      assignedDsp: employeeName,
-      assignedDspId: (shift.employee as any)?.id || "",
-      billingRate: "",
-      serviceCode: shift.serviceCode || "183535",
-      notesType: anyShift.notesType || "",
-      comment: anyShift.comment || "",
-      schedulingType: (shift.schedulingType as "one-time" | "recurring" | "") || "one-time",
-      date: shift.date ? new Date(shift.date) : null,
-      startDate: null,
-      endDate: null,
-      clockInTime: shift.startTime,
-      clockOutTime: shift.endTime || "",
-      ispOutcome: shift.ispOutcome || "",
-      planOfCare: null,
-      submissionStatus: shift.submissionStatus,
-    } as ScheduleFormData;
-
-    (formData as any).shiftId = shift.id;
-
-    setEditFormData(formData);
+    setEditFormData(shiftToScheduleFormData(shift));
     setModalMode("edit");
     setShowAddScheduleModal(true);
   };

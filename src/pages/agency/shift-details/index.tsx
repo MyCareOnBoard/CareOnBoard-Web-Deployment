@@ -26,6 +26,7 @@ import {
 import { shiftToAnomalyRecord } from "@/lib/shift-anomaly-detection";
 import { getShiftStatusBadgePresentation } from "@/lib/shift-status-badge";
 import { shiftToScheduleFormData } from "@/pages/agency/scheduling/shift-to-schedule-form";
+import { formatIspOutcomeForDisplay } from "@/pages/agency/scheduling/isp-outcomes";
 import type { ScheduleFormData } from "@/pages/agency/scheduling/components/AddScheduleModal";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import {
@@ -428,7 +429,10 @@ export default function AgencyShiftDetailsPage() {
             />
             <DetailRow label="Service code" value={shift.serviceCode || "—"} />
             <DetailRow label="Scheduling type" value={shift.schedulingType || "—"} />
-            <DetailRow label="ISP outcome" value={shift.ispOutcome || "—"} />
+            <DetailRow
+              label="ISP outcome"
+              value={formatIspOutcomeForDisplay(shift.ispOutcome) || "—"}
+            />
             <DetailRow label="Session duration" value={shift.sessionDuration || "—"} />
             <DetailRow label="Submission" value={shift.submissionStatus || "—"} />
           </dl>
