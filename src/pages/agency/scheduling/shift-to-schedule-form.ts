@@ -9,6 +9,10 @@ export function shiftToScheduleFormData(shift: Shift): ScheduleFormData {
     : "Unknown Client";
   const employeeName = shift.employee?.fullName || "";
   const anyShift = shift as unknown as Record<string, unknown>;
+  const svcAuthId =
+    typeof anyShift.serviceAuthorizationId === "string"
+      ? anyShift.serviceAuthorizationId
+      : "";
 
   const formData = {
     shiftId: shift.id,
@@ -19,6 +23,7 @@ export function shiftToScheduleFormData(shift: Shift): ScheduleFormData {
     assignedDspId: (shift.employee as { id?: string } | undefined)?.id || "",
     billingRate: "",
     serviceCode: shift.serviceCode || "183535",
+    serviceAuthorizationId: svcAuthId,
     notesType: (anyShift.notesType as string) || "",
     comment: (anyShift.comment as string) || "",
     schedulingType: (shift.schedulingType as "one-time" | "recurring" | "") || "one-time",

@@ -231,11 +231,6 @@ function normalizeClientPayType(raw: string | undefined): ServicePayType | undef
   return undefined;
 }
 
-/** Staff pay basis — same canonical values as client when the document uses per-mile payroll. */
-function normalizeStaffPayType(raw: string | undefined): ServicePayType | undefined {
-  return normalizeClientPayType(raw);
-}
-
 function isLikelyTransportationService(name?: string, code?: string): boolean {
   const blob = `${name ?? ""} ${code ?? ""}`.toLowerCase();
   return /\btransport(ation)?\b|\bmileage\b|\bnemt\b/i.test(blob);
@@ -295,9 +290,11 @@ function mapRowToService(row: Record<string, unknown>): Service {
     name: strOrUndef(r.name),
     code: strOrUndef(r.code),
     hours: mergeString("", r.hours, true),
-    totalApprovedHours: mergeString("", r.totalApprovedHours, true),
+    /** ISP extraction uses total units; do not map totalApprovedHours from documents. */
+    totalApprovedHours: "",
     rate,
-    payType: normalizeStaffPayType(r.payType),
+    /** Staff pay type is agency-defined; do not map from document extraction. */
+    payType: undefined,
     clientRate,
     clientPayType,
     ispEffectiveDate: parseIsoOrUsDate(r.ispEffectiveDate),
@@ -1036,7 +1033,7 @@ export function mergeExtractionDraft(
         overwrite,
       );
       localWarnings.push(
-        "Confirm each imported service matches your agency's service list before saving.",
+        "Review each imported service code and name against the ISP and your billing setup before saving.",
       );
     } else if (s2.services?.length) {
       const rows: ServiceLoadRow[] = s2.services.map((row) => ({
@@ -1050,7 +1047,7 @@ export function mergeExtractionDraft(
         overwrite,
       );
       localWarnings.push(
-        "Confirm each imported service matches your agency's service list before saving.",
+        "Review each imported service code and name against the ISP and your billing setup before saving.",
       );
     }
   }

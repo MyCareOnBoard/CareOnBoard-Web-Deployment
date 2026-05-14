@@ -153,7 +153,7 @@ describe("mergeExtractionDraft", () => {
     const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: true });
     const s = formData.stage2.outcomes.flatMap((o) => o.services).find((x) => x.code === "H1");
     expect(s?.clientPayType).toBe("15-min");
-    expect(s?.payType).toBe("hourly");
+    expect(s?.payType).toBeUndefined();
   });
 
   it("does not put unitType on staff payType when staff payType empty", () => {

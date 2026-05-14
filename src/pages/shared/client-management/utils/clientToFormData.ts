@@ -1,7 +1,6 @@
 import { Client } from "@/lib/api/clients";
 import {
     AddClientFormData,
-    createEmptyOutcome,
     createEmptyServiceAuthorization,
     createInitialAddClientFormData,
     createInitialDocs,
@@ -177,7 +176,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                 outcomes =
                     loadRows.length > 0
                         ? groupLoadedServicesIntoOutcomes(loadRows)
-                        : [createEmptyOutcome()];
+                        : [];
             }
 
             const hasAssigned = outcomes.some((og) =>

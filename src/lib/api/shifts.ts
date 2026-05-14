@@ -86,6 +86,11 @@ export interface Shift {
     timeRemaining?: number; // minutes remaining
     sessionDuration?: string; // e.g., "2 hour session"
     serviceCode?: string;
+    /** Nested client service row id — disambiguates duplicate serviceCode authorizations. */
+    serviceAuthorizationId?: string;
+    /** YYYY-MM-DD; sent with serviceCode when multiple authorizations share a code. */
+    serviceAuthStartDate?: string;
+    serviceAuthEndDate?: string;
     schedulingType?: string;
     ispOutcome?: string;
     assignedDsp?: string; // Name of assigned DSP
@@ -139,6 +144,9 @@ export interface CreateShiftRequest {
     client?: Client;
     type?: ShiftType; // Default: automatic
     submissionStatus?: SubmissionStatus; // Default: draft
+    serviceAuthorizationId?: string;
+    serviceAuthStartDate?: string;
+    serviceAuthEndDate?: string;
 }
 
 /**
@@ -176,6 +184,9 @@ export interface UpdateShiftRequest {
     clientId?: string;
     approved?: boolean;
     maintenanceReason?: string;
+    serviceAuthorizationId?: string;
+    serviceAuthStartDate?: string;
+    serviceAuthEndDate?: string;
 }
 
 /**

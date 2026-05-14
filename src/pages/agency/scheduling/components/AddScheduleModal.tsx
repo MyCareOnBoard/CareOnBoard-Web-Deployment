@@ -2,15 +2,13 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TimePicker from "@/components/TimePicker";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, eachDayOfInterval as eachDayOfIntervalDateFns, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO, isValid } from "date-fns";
 import { searchClients, Client, ClientService, ClientDsp, getAgencyClientById } from "@/lib/api/clients";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { searchEmployees, getEmployeeById, Employee } from "@/lib/api/employees";
+import { getEmployeeById } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import { Routes } from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
 import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation, ShiftResponse } from "@/lib/api/shifts";
-import { eachDayOfInterval as eachDayOfIntervalDateFns } from "date-fns";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
@@ -31,6 +29,45 @@ function clientServicesForScheduling(client: Client | null): ClientService[] {
   return client.services ?? [];
 }
 
+function tryParseServiceAuthDate(raw?: string): Date | null {
+  if (!raw?.trim()) return null;
+  const d = parseISO(raw.trim());
+  return isValid(d) ? d : null;
+}
+
+/** Authorization ended before today's local calendar day (YYYY-MM-DD); no end date = not expired. */
+function isServiceAuthorizationEndDatePast(service: ClientService): boolean {
+  const raw = service.endAuthDate?.trim();
+  if (!raw) return false;
+  const dayPrefix = raw.slice(0, 10);
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dayPrefix)) {
+    return dayPrefix < todayStr;
+  }
+  const end = tryParseServiceAuthDate(raw);
+  if (!end) return false;
+  return format(end, "yyyy-MM-dd") < todayStr;
+}
+
+/** Date range for the grey line under the service field (and building block for picker rows). */
+function formatServiceAuthorizationDatesSummary(service: ClientService): string {
+  const start = tryParseServiceAuthDate(service.startAuthDate);
+  const end = tryParseServiceAuthDate(service.endAuthDate);
+  const fmt = (d: Date) => format(d, "MMM d, yyyy");
+  if (start && end) return `${fmt(start)} – ${fmt(end)}`;
+  if (start) return `From ${fmt(start)}`;
+  if (end) return `Through ${fmt(end)}`;
+  return "Not on file";
+}
+
+/** Secondary line in service picker: authorization window. */
+function formatServiceAuthorizationLabel(service: ClientService): string {
+  const summary = formatServiceAuthorizationDatesSummary(service);
+  if (summary === "Not on file") return "Authorization dates not on file";
+  if (summary.includes(" – ")) return `Authorized ${summary}`;
+  return `Authorized ${summary.charAt(0).toLowerCase()}${summary.slice(1)}`;
+}
+
 function pickSelectedServiceRow(
   services: ClientService[],
   data: Pick<ScheduleFormData, "serviceAuthorizationId" | "serviceCode">,
@@ -40,6 +77,30 @@ function pickSelectedServiceRow(
     if (byId) return byId;
   }
   return services.find((s) => s.code === data.serviceCode) || null;
+}
+
+/** Server uses id and/or auth dates with serviceCode to pick the correct outcome row when codes repeat. */
+function serviceAuthorizationFieldsForApi(
+  services: ClientService[],
+  data: ScheduleFormData,
+): Pick<
+  CreateShiftRequest,
+  "serviceAuthorizationId" | "serviceAuthStartDate" | "serviceAuthEndDate"
+> {
+  const svc = pickSelectedServiceRow(services, data);
+  const id = (data.serviceAuthorizationId?.trim() || svc?.id?.trim()) || undefined;
+  const toYmd = (raw?: string) => {
+    if (!raw?.trim()) return undefined;
+    const d = parseISO(raw.trim());
+    return isValid(d) ? format(d, "yyyy-MM-dd") : undefined;
+  };
+  const start = toYmd(svc?.startAuthDate);
+  const end = toYmd(svc?.endAuthDate);
+  return {
+    ...(id ? { serviceAuthorizationId: id } : {}),
+    ...(start ? { serviceAuthStartDate: start } : {}),
+    ...(end ? { serviceAuthEndDate: end } : {}),
+  };
 }
 
 function shiftIspOutcomeApiValue(displayText: string): string | undefined {
@@ -269,7 +330,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const [showNotesTypeDropdown, setShowNotesTypeDropdown] = useState(false);
   const [showGoalsTypeDropdown, setShowGoalsTypeDropdown] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [showDspDropdown, setShowDspDropdown] = useState(false);
+  const [showAssignDspDropdown, setShowAssignDspDropdown] = useState(false);
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
 
   // Weekday scheduling state (for recurring schedules)
   const [selectedWeekdays, setSelectedWeekdays] = useState<WeekdaySchedule[]>([]);
@@ -277,19 +339,17 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
   // API search states
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
-  const [dspSearchResults, setDspSearchResults] = useState<Employee[]>([]);
   const [selectedClientServices, setSelectedClientServices] = useState<ClientService[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
-  const [isSearchingDsps, setIsSearchingDsps] = useState(false);
 
   // Debounce refs
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   /** Discards stale async results when the user selects another client quickly. */
   const latestClientSelectIdRef = useRef<string | null>(null);
   /** Discards stale `getEmployeeById` when service or DSP selection changes quickly. */
   const dspVerifyTokenRef = useRef(0);
+  const serviceDropdownRef = useRef<HTMLDivElement>(null);
 
   // Success / saved modals state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -336,7 +396,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       setErrors({});
       setIsSubmitting(false);
       setClientSearchResults([]);
-      setDspSearchResults([]);
+      setShowAssignDspDropdown(false);
+      setShowServiceDropdown(false);
       setSelectedWeekdays([]);
       setConfiguringWeekday(null);
       if (!(editData && mode === "edit")) {
@@ -350,9 +411,19 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   useEffect(() => {
     return () => {
       if (clientSearchTimeoutRef.current) clearTimeout(clientSearchTimeoutRef.current);
-      if (dspSearchTimeoutRef.current) clearTimeout(dspSearchTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!showServiceDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(e.target as Node)) {
+        setShowServiceDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showServiceDropdown]);
 
   /**
    * Build shift requests from form data
@@ -363,6 +434,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     if (!user?.agencyId || !data.assignedDspId) return [];
 
     const ispOutcomePayload = resolveIspOutcomeShiftPayload(selectedClient, selectedClientServices, data);
+    const authFields = serviceAuthorizationFieldsForApi(selectedClientServices, data);
     const requests: CreateShiftRequest[] = [];
 
     if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
@@ -393,6 +465,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 comment: data.comment || undefined,
                 goalsType: data.goalsType || undefined,
                 serviceCode: data.serviceCode,
+                ...authFields,
                 schedulingType: data.schedulingType,
                 ispOutcome: ispOutcomePayload,
                 assignedDsp: data.assignedDsp,
@@ -420,6 +493,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             comment: data.comment || undefined,
             goalsType: data.goalsType || undefined,
             serviceCode: data.serviceCode,
+            ...authFields,
             schedulingType: data.schedulingType,
             ispOutcome: ispOutcomePayload,
             assignedDsp: data.assignedDsp,
@@ -445,6 +519,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         comment: data.comment || undefined,
         goalsType: data.goalsType || undefined,
         serviceCode: data.serviceCode,
+        ...authFields,
         schedulingType: data.schedulingType,
         ispOutcome: ispOutcomePayload,
         assignedDsp: data.assignedDsp,
@@ -490,41 +565,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     }, 300);
   }, [user?.agencyId]);
 
-  // Search DSPs/employees with debouncing
-  const handleDspSearch = useCallback(async (query: string) => {
-    // Clear existing timeout
-    if (dspSearchTimeoutRef.current) {
-      clearTimeout(dspSearchTimeoutRef.current);
-    }
-
-    // If query is too short, clear results
-    if (query.trim().length < 2) {
-      setDspSearchResults([]);
-      setShowDspDropdown(false);
-      return;
-    }
-
-    // Get agencyId from profile or user
-    const agencyId = user?.agencyId || user?.uid;
-
-    // Debounce the search
-    dspSearchTimeoutRef.current = setTimeout(async () => {
-      try {
-        setIsSearchingDsps(true);
-        const results = await searchEmployees(query, agencyId, {
-          workAvailability: true,
-        });
-        setDspSearchResults(results);
-        setShowDspDropdown(results.length > 0);
-      } catch (error) {
-        console.error("Failed to search employees:", error);
-        setDspSearchResults([]);
-      } finally {
-        setIsSearchingDsps(false);
-      }
-    }, 300);
-  }, [user?.agencyId, user?.uid]);
-
   const getClientPrimaryAddress = (client: Client): ShiftLocation | null => {
     if (client.primaryAddress) {
       return {
@@ -553,6 +593,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     const selectId = client.id;
     latestClientSelectIdRef.current = selectId;
     dspVerifyTokenRef.current += 1;
+    setShowAssignDspDropdown(false);
+    setShowServiceDropdown(false);
 
     setFormData((prev) => ({
       ...prev,
@@ -590,11 +632,25 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     [selectedClientServices, formData.serviceAuthorizationId, formData.serviceCode],
   );
 
-  const serviceSelectValue = useMemo(() => {
-    if (formData.serviceAuthorizationId) return formData.serviceAuthorizationId;
-    const m = selectedClientServices.find((s) => s.code === formData.serviceCode);
-    return m?.id ?? "";
-  }, [formData.serviceAuthorizationId, formData.serviceCode, selectedClientServices]);
+  const hasAnySelectableService = useMemo(
+    () => selectedClientServices.some((s) => !isServiceAuthorizationEndDatePast(s)),
+    [selectedClientServices],
+  );
+
+  const serviceTriggerLabel = useMemo(() => {
+    if (selectedClientServices.length === 0) return "No services available";
+    if (!hasAnySelectableService) return "No active authorizations";
+    if (!formData.serviceAuthorizationId && !formData.serviceCode) return "Select service";
+    const s = selectedService;
+    if (!s) return "Select service";
+    return s.name ? `${s.name} — ${s.code}` : s.code;
+  }, [
+    selectedClientServices.length,
+    hasAnySelectableService,
+    formData.serviceAuthorizationId,
+    formData.serviceCode,
+    selectedService,
+  ]);
 
   /** Read-only copy shown in the modal: always the selected service's outcomes when available. */
   const ispOutcomeDisplay = useMemo(() => {
@@ -631,7 +687,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         setFormData((prev) => ({ ...prev, assignedDsp: "", assignedDspId: "" }));
         toast({
           title: "Could not verify assigned DSP",
-          description: "Please select a DSP manually.",
+          description: "Choose another DSP from this service's assigned list, or update staff on the client record.",
           variant: "destructive",
         });
       }
@@ -644,6 +700,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       dspVerifyTokenRef.current += 1;
       const service = selectedClientServices.find((s) => s.id === value);
       const outcomes = service?.outcomes || [];
+      const assigned = service?.assignedDsps;
+      const onlyDsp = assigned?.length === 1 ? assigned[0] : null;
+
       setFormData((prev) => ({
         ...prev,
         serviceAuthorizationId: value,
@@ -653,22 +712,19 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         assignedDsp: "",
         assignedDspId: "",
       }));
+      setShowAssignDspDropdown(false);
+
+      if (onlyDsp?.id) {
+        void verifyAndApplyDsp(onlyDsp.id, onlyDsp.name ?? "");
+      }
+      setShowServiceDropdown(false);
     },
-    [selectedClientServices],
+    [selectedClientServices, verifyAndApplyDsp],
   );
 
   const handleAssignedDspRowSelect = useCallback(
     (dsp: ClientDsp) => {
       void verifyAndApplyDsp(dsp.id, dsp.name);
-    },
-    [verifyAndApplyDsp],
-  );
-
-  const handleDspSelect = useCallback(
-    (employee: Employee) => {
-      void verifyAndApplyDsp(employee.id, employee.fullName);
-      setShowDspDropdown(false);
-      setDspSearchResults([]);
     },
     [verifyAndApplyDsp],
   );
@@ -767,6 +823,15 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       newErrors.serviceCode = "Service is required";
     }
 
+    if (
+      formData.clientId &&
+      formData.serviceCode.trim() &&
+      selectedService &&
+      isServiceAuthorizationEndDatePast(selectedService)
+    ) {
+      newErrors.serviceCode = "This authorization has ended. Choose an active service.";
+    }
+
     // Assigned DSP validation
     if (!formData.assignedDsp.trim()) {
       newErrors.assignedDsp = "Assigned DSP is required";
@@ -838,6 +903,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
     if (formData.clientId && !formData.serviceCode.trim()) return false;
 
+    if (selectedService && isServiceAuthorizationEndDatePast(selectedService)) return false;
+
     // Assigned DSP validation
     if (!formData.assignedDsp.trim()) return false;
 
@@ -868,7 +935,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     }
 
     return true;
-  }, [formData, selectedWeekdays, configuringWeekday]);
+  }, [formData, selectedWeekdays, configuringWeekday, selectedService]);
 
   // Handle saving schedule as draft
   const handleSaveDraft = async () => {
@@ -910,6 +977,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             notesType: formData.notesType || undefined,
             comment: formData.comment || undefined,
             serviceCode: formData.serviceCode,
+            ...serviceAuthorizationFieldsForApi(selectedClientServices, formData),
             schedulingType: formData.schedulingType,
             ispOutcome: resolveIspOutcomeShiftPayload(selectedClient, selectedClientServices, formData),
             assignedDsp: formData.assignedDsp,
@@ -1081,6 +1149,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           notesType: formData.notesType || undefined,
           comment: formData.comment || undefined,
           serviceCode: formData.serviceCode,
+          ...serviceAuthorizationFieldsForApi(selectedClientServices, formData),
           schedulingType: formData.schedulingType,
           ispOutcome: resolveIspOutcomeShiftPayload(selectedClient, selectedClientServices, formData),
           assignedDsp: formData.assignedDsp,
@@ -1333,6 +1402,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                       onChange={(e) => {
                         const value = e.target.value;
                         dspVerifyTokenRef.current += 1;
+                        setShowAssignDspDropdown(false);
+                        setShowServiceDropdown(false);
                         setFormData((prev) => ({
                           ...prev,
                           client: value,
@@ -1395,36 +1466,71 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 </div>
 
                 {/* Service */}
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 relative">
                   <label className="text-[12px] font-normal text-[#10141a]">Service</label>
-                  <Select
-                    value={serviceSelectValue}
-                    onValueChange={(value) => {
-                      handleServiceRowChange(value);
-                      clearError("serviceCode");
-                    }}
-                    disabled={selectedClientServices.length === 0}
-                  >
-                    <SelectTrigger
-                      className={`w-full h-11 rounded-xl bg-white ${errors.serviceCode ? "border-[#D53411]" : "border-[#cccccd]"}`}
+                  <div ref={serviceDropdownRef} className="relative">
+                    <button
+                      type="button"
+                      disabled={selectedClientServices.length === 0 || !hasAnySelectableService}
+                      onClick={() => {
+                        if (selectedClientServices.length === 0 || !hasAnySelectableService) return;
+                        setShowClientDropdown(false);
+                        setShowServiceDropdown((open) => !open);
+                      }}
+                      className={`flex h-11 w-full items-center gap-3 rounded-xl border bg-white px-4 ${
+                        errors.serviceCode ? "border-[#D53411]" : "border-[#cccccd]"
+                      } ${selectedClientServices.length === 0 || !hasAnySelectableService ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
                     >
-                      <SelectValue
-                        placeholder={
-                          selectedClientServices.length === 0 ? "No services available" : "Select service"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {selectedClientServices.map((service) => (
-                        <SelectItem key={service.id} value={service.id}>
-                          {service.name ? `${service.name} — ${service.code}` : service.code}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <span className="min-w-0 flex-1 truncate text-left text-[14px] font-normal text-black">
+                        {serviceTriggerLabel}
+                      </span>
+                      <ChevronDown className="h-5 w-5 shrink-0 text-[#10141a]" />
+                    </button>
+                    {showServiceDropdown && selectedClientServices.length > 0 ? (
+                      <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-[200px] overflow-y-auto rounded-xl border border-[#cccccd] bg-white shadow-lg">
+                        {selectedClientServices.map((service) => {
+                          const authEnded = isServiceAuthorizationEndDatePast(service);
+                          return (
+                            <button
+                              key={service.id}
+                              type="button"
+                              disabled={authEnded}
+                              title={authEnded ? "Authorization period has ended" : undefined}
+                              onClick={() => {
+                                if (authEnded) return;
+                                setShowServiceDropdown(false);
+                                handleServiceRowChange(service.id);
+                                clearError("serviceCode");
+                              }}
+                              className={`w-full border-b border-[#f0f0f0] px-4 py-3 text-left first:rounded-t-[12px] last:rounded-b-[12px] last:border-b-0 ${
+                                authEnded
+                                  ? "cursor-not-allowed opacity-50"
+                                  : "cursor-pointer hover:bg-gray-50"
+                              }`}
+                            >
+                              <p
+                                className={`text-[14px] font-normal ${authEnded ? "text-[#808081]" : "text-black"}`}
+                              >
+                                {service.name ? `${service.name} — ${service.code}` : service.code}
+                              </p>
+                              <p className="text-[12px] font-normal text-[#808081]">
+                                {formatServiceAuthorizationLabel(service)}
+                                {authEnded ? " — Authorization ended" : ""}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                   {errors.serviceCode && (
                     <span className="text-[12px] font-normal text-[#D53411]">{errors.serviceCode}</span>
                   )}
+                  {selectedService ? (
+                    <span className="text-[12px] font-normal text-[#808081]">
+                      Authorization: {formatServiceAuthorizationDatesSummary(selectedService)}
+                    </span>
+                  ) : null}
                   {selectedService && (selectedService.rate || selectedService.payType) && (
                     <span className="text-[12px] font-normal text-[#808081]">
                       Service rate:{" "}
@@ -1448,74 +1554,61 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 <div className="flex flex-col gap-1 relative">
                   <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
                   {!formData.serviceCode ? (
-                    <span className="text-[12px] font-normal text-[#808081]">
-                      Select a service first to see DSPs assigned to that service.
-                    </span>
+                    <>
+                      <span className="text-[12px] font-normal text-[#808081]">
+                        Select a service first to choose an assigned DSP.
+                      </span>
+                      {errors.assignedDsp ? (
+                        <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
+                      ) : null}
+                    </>
                   ) : selectedService?.assignedDsps && selectedService.assignedDsps.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      {selectedService.assignedDsps.map((dsp) => (
+                    <>
+                      <div className="relative">
                         <button
-                          key={dsp.id}
                           type="button"
-                          onClick={() => {
-                            handleAssignedDspRowSelect(dsp);
-                            clearError("assignedDsp");
-                          }}
-                          className={`w-full rounded-xl border px-4 py-3 text-left text-[14px] font-normal transition-colors ${
-                            formData.assignedDspId === dsp.id
-                              ? "border-[#10141a] bg-[#f5f6f7]"
-                              : "border-[#cccccd] bg-white hover:bg-gray-50"
-                          }`}
+                          onClick={() => setShowAssignDspDropdown((open) => !open)}
+                          className={`flex h-11 w-full cursor-pointer items-center gap-3 rounded-xl border bg-white px-4 ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}
                         >
-                          {dsp.name}
+                          <span className="flex-1 text-left text-[14px] font-normal text-black">
+                            {formData.assignedDsp || "Select DSP"}
+                          </span>
+                          <ChevronDown className="h-5 w-5 shrink-0 text-[#10141a]" />
                         </button>
-                      ))}
-                    </div>
+                        {showAssignDspDropdown ? (
+                          <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-[200px] overflow-y-auto rounded-xl border border-[#cccccd] bg-white shadow-lg">
+                            {selectedService.assignedDsps.map((dsp) => (
+                              <button
+                                key={dsp.id}
+                                type="button"
+                                onClick={() => {
+                                  setShowAssignDspDropdown(false);
+                                  handleAssignedDspRowSelect(dsp);
+                                  clearError("assignedDsp");
+                                }}
+                                className="w-full cursor-pointer px-4 py-3 text-left text-[14px] font-normal text-[#10141a] first:rounded-t-[12px] last:rounded-b-[12px] hover:bg-gray-50"
+                              >
+                                {dsp.name}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      {errors.assignedDsp ? (
+                        <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
+                      ) : null}
+                    </>
                   ) : (
-                    <span className="text-[12px] font-normal text-[#808081]">
-                      No DSPs assigned to this service. Search for a DSP below.
-                    </span>
+                    <>
+                      <span className="text-[12px] font-normal text-[#808081]">
+                        No DSPs are assigned to this service on the client record. Assign staff in client management,
+                        then schedule.
+                      </span>
+                      {errors.assignedDsp ? (
+                        <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
+                      ) : null}
+                    </>
                   )}
-                  <div
-                    className={`bg-white border rounded-xl h-11 px-4 flex items-center ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}
-                  >
-                    <input
-                      type="text"
-                      value={formData.assignedDsp}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setFormData((prev) => ({ ...prev, assignedDsp: value, assignedDspId: "" }));
-                        handleDspSearch(value);
-                        clearError("assignedDsp");
-                      }}
-                      placeholder={formData.serviceCode ? "Search DSP name..." : "Select a service first"}
-                      disabled={!formData.serviceCode}
-                      className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent disabled:cursor-not-allowed"
-                    />
-                    {isSearchingDsps && (
-                      <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
-                    )}
-                  </div>
-                  {errors.assignedDsp && (
-                    <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
-                  )}
-                  {showDspDropdown && dspSearchResults.length > 0 && formData.serviceCode ? (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
-                      {dspSearchResults.map((employee) => (
-                        <button
-                          key={employee.id}
-                          onClick={() => {
-                            handleDspSelect(employee);
-                            clearError("assignedDsp");
-                          }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
-                        >
-                          <p className="text-[14px] font-normal text-black">{employee.fullName}</p>
-                          <p className="text-[12px] font-normal text-[#808081]">{employee.email}</p>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
 
                 {/* Notes Type */}

@@ -31,7 +31,9 @@ export function formDataToApiPayload(
     const flatForValidation = s2.outcomes?.flatMap((o) => o.services) ?? [];
     const hasInvalidService = flatForValidation.some((svc) => !svc.name || !svc.code);
     if (hasInvalidService) {
-      throw new Error("Please select an Authorized Service for each service block (service code will auto-populate).");
+      throw new Error(
+        "Enter both a service code and service name for each service authorization row.",
+      );
     }
   }
 

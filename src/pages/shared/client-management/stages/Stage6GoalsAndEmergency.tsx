@@ -125,8 +125,8 @@ export function Stage6GoalsAndEmergency({
             9. Goals &amp; outcomes setup
           </p>
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            Goal summaries for notes and progress tracking. Outcome statements that belong to a specific
-            authorized service are entered in step 4 (Service authorizations) for that service.
+            Goal summaries for notes and progress tracking. Tie an outcome statement to a specific service
+            by entering it with the matching authorization row in step 4 (service code and name).
           </p>
         </div>
 

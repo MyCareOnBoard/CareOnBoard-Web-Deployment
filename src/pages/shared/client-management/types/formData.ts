@@ -493,7 +493,7 @@ export function createInitialAddClientFormData(): AddClientFormData {
             supportCoordinatorName: "",
             supportCoordinatorAgency: "",
             supportCoordinatorContact: "",
-            outcomes: [createEmptyOutcome()],
+            outcomes: [],
             guardians: [],
             careTeam: [],
         },

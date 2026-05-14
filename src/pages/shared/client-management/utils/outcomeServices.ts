@@ -1,6 +1,5 @@
 import type { ClientDsp, ClientOutcome, ClientService } from "@/lib/api/clients";
 import {
-  createEmptyOutcome,
   createEmptyServiceAuthorization,
   type Outcome,
   type Service,
@@ -257,7 +256,7 @@ function newServiceId(): string {
  * Migrate legacy flat `services[]` (optional per-service outcome tags) into outcome-owned groups.
  */
 export function groupLoadedServicesIntoOutcomes(rows: ServiceLoadRow[]): Outcome[] {
-  if (!rows.length) return [createEmptyOutcome()];
+  if (!rows.length) return [];
   const byStatement = new Map<string, Service[]>();
   const unassigned: Service[] = [];
 
@@ -287,5 +286,5 @@ export function groupLoadedServicesIntoOutcomes(rows: ServiceLoadRow[]): Outcome
       services: unassigned,
     });
   }
-  return outcomes.length ? outcomes : [createEmptyOutcome()];
+  return outcomes;
 }

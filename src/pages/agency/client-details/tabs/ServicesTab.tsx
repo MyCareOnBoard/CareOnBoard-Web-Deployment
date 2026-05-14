@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { updateClient } from "@/lib/api/clients";
-import { useListServicesQuery, type Service as ApiService } from "@/lib/api/services";
 
 interface ServicesTabProps {
   client: Client;
@@ -39,6 +38,7 @@ type EditableServiceRow = {
   code: string;
   hours?: string;
   totalApprovedHours?: string;
+  totalUnits?: string;
   rate?: string;
   payType?: ClientService["payType"];
   clientRate?: string;
@@ -70,6 +70,7 @@ function emptyEditableServiceRow(): EditableServiceRow {
     code: "",
     hours: "",
     totalApprovedHours: "",
+    totalUnits: "",
     rate: "",
     payType: undefined,
     clientRate: "",
@@ -118,6 +119,7 @@ function mapClientServicesToEditable(services?: ClientService[]): EditableServic
     code: svc.code,
     hours: svc.hours,
     totalApprovedHours: svc.totalApprovedHours,
+    totalUnits: svc.totalUnits,
     rate: svc.rate,
     payType: svc.payType,
     clientRate: svc.clientRate,
@@ -138,6 +140,7 @@ function mapEditableToClientServices(services: EditableServiceRow[]): ClientServ
     code: svc.code,
     hours: svc.hours,
     totalApprovedHours: svc.totalApprovedHours,
+    totalUnits: svc.totalUnits,
     rate: svc.rate,
     payType: svc.payType,
     clientRate: svc.clientRate,
@@ -181,7 +184,6 @@ function mapEditableOutcomesToApi(outcomes: EditableOutcomeGroup[]): ClientOutco
 
 type ServiceRowProps = {
   service: EditableServiceRow;
-  offeredServices: ApiService[];
   isEditing: boolean;
   onChange: (next: EditableServiceRow) => void;
   onRemove?: () => void;
@@ -189,7 +191,6 @@ type ServiceRowProps = {
 
 function ServiceRow({
   service,
-  offeredServices,
   isEditing,
   onChange,
   onRemove,
@@ -200,46 +201,9 @@ function ServiceRow({
   const [isPcptOpen, setIsPcptOpen] = useState(false);
   const [isSdrStartOpen, setIsSdrStartOpen] = useState(false);
   const [isSdrEndOpen, setIsSdrEndOpen] = useState(false);
-  const [selectedType, setSelectedType] = useState<string>("");
-
-  const serviceTypes = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          offeredServices
-            .map((s) => s.type)
-            .filter((t): t is string => Boolean(t)),
-        ),
-      ),
-    [offeredServices],
-  );
-
-  const filteredServices = useMemo(
-    () =>
-      offeredServices.filter((svc) =>
-        selectedType ? svc.type === selectedType : false,
-      ),
-    [offeredServices, selectedType],
-  );
-
-  // Infer type from existing service when possible
-  useEffect(() => {
-    if (!selectedType && service.name && service.code) {
-      const match = offeredServices.find(
-        (s) => s.name === service.name && s.code === service.code,
-      );
-      if (match && match.type) {
-        setSelectedType(match.type);
-      }
-    }
-  }, [offeredServices, service.name, service.code, selectedType]);
 
   const handleFieldChange = (field: keyof EditableServiceRow, value: unknown) => {
     onChange({ ...service, [field]: value });
-  };
-
-  const handleFieldsChange = (patch: Partial<EditableServiceRow>) => {
-    onChange({ ...service, ...patch });
   };
 
   const displayDate = (value?: Date | null) =>
@@ -250,90 +214,35 @@ function ServiceRow({
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1 flex-1 min-w-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-3">
-            {/* Service Type */}
+            {/* Service code & name (manual / ISP-aligned) */}
             <div className="flex flex-col gap-1">
-              <p className="text-[12px] font-normal text-[#10141a]">
-                Service Type
-              </p>
+              <p className="text-[12px] font-normal text-[#10141a]">Service code</p>
               {isEditing ? (
-                <Select
-                  value={selectedType}
-                  onValueChange={(v) => {
-                    setSelectedType(v);
-                    const stillValid = filteredServices.some(
-                      (s) => s.name === service.name && s.code === service.code,
-                    );
-                    if (!stillValid) {
-                      handleFieldsChange({ code: "", name: "" });
-                    }
-                  }}
-                  disabled={serviceTypes.length === 0}
-                >
-                  <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-                    <SelectValue
-                      placeholder={
-                        serviceTypes.length === 0
-                          ? "No service types available"
-                          : "Select service type"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {serviceTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={service.code || ""}
+                  onChange={(e) => handleFieldChange("code", e.target.value)}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Procedure or authorization code"
+                />
               ) : (
                 <p className="text-[14px] font-semibold text-[#10141a]">
-                  {selectedType || "Not set"}
+                  {service.code?.trim() || "—"}
                 </p>
               )}
             </div>
 
-            {/* Service (name + code) */}
             <div className="flex flex-col gap-1">
-              <p className="text-[12px] font-normal text-[#10141a]">Service</p>
+              <p className="text-[12px] font-normal text-[#10141a]">Service Name</p>
               {isEditing ? (
-                <Select
-                  value={service.code || ""}
-                  onValueChange={(v) => {
-                    const selected = filteredServices.find(
-                      (s) => s.code === v,
-                    );
-                    handleFieldsChange({
-                      name: selected?.name || "",
-                      code: selected?.code || "",
-                    });
-                  }}
-                  disabled={!selectedType || filteredServices.length === 0}
-                >
-                  <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-                    <SelectValue
-                      placeholder={
-                        !selectedType
-                          ? "Select service type first"
-                          : filteredServices.length === 0
-                          ? "No services for this type"
-                          : "Select service"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredServices.map((svc) => (
-                      <SelectItem key={svc.id} value={svc.code}>
-                        {svc.name} - {svc.code}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={service.name || ""}
+                  onChange={(e) => handleFieldChange("name", e.target.value)}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Full service name as on the ISP"
+                />
               ) : (
                 <p className="text-[14px] font-semibold text-[#10141a]">
-                  {service.name
-                    ? `${service.name} - ${service.code || ""}`
-                    : "Not set"}
+                  {service.name?.trim() || "—"}
                 </p>
               )}
             </div>
@@ -360,26 +269,26 @@ function ServiceRow({
               )}
             </div>
 
-            {/* Total approved hours */}
+            {/* Total units (ISP authorization) */}
             <div className="flex flex-col gap-1">
               <p className="text-[12px] font-normal text-[#10141a]">
-                Total approved hours
+                Total units
               </p>
               {isEditing ? (
                 <Input
                   type="number"
                   inputMode="numeric"
                   min={0}
-                  value={service.totalApprovedHours || ""}
+                  value={service.totalUnits || ""}
                   onChange={(e) =>
-                    handleFieldChange("totalApprovedHours", e.target.value)
+                    handleFieldChange("totalUnits", e.target.value)
                   }
                   className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                  placeholder="Enter total hours"
+                  placeholder="Units for the period"
                 />
               ) : (
                 <p className="text-[14px] font-semibold text-[#10141a]">
-                  {service.totalApprovedHours || "-"}
+                  {service.totalUnits || "-"}
                 </p>
               )}
             </div>
@@ -849,14 +758,6 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [offeredServices, setOfferedServices] = useState<ApiService[]>([]);
-  const { data, isLoading: loadingServices } = useListServicesQuery({});
-
-  useEffect(() => {
-    if (data && !loadingServices) {
-      setOfferedServices(data.services);
-    }
-  }, [data, loadingServices]);
 
   useEffect(() => {
     if (isEditing) return;
@@ -997,12 +898,6 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
             Edit ISP outcome statements and nested service authorizations (saved as <code className="text-xs">outcomes</code> only).
           </p>
-          {loadingServices && (
-            <p className="text-[12px] text-[#808081] flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Loading available services...
-            </p>
-          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1012,7 +907,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
               variant="outline"
               className="h-11 rounded-[60px] border-[#b2b2b3] text-[#10141a] bg-white/60 hover:bg-white"
               onClick={() => setIsEditing((prev) => !prev)}
-              disabled={loadingServices || isSaving}
+              disabled={isSaving}
             >
               {isEditing ? "Stop Editing" : "Edit"}
             </Button>
@@ -1022,7 +917,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
             variant="outline"
             className="h-11 rounded-[60px] border-[#b2b2b3] text-[#10141a] bg-white/60 hover:bg-white"
             onClick={handleAddOutcome}
-            disabled={loadingServices || isSaving}
+            disabled={isSaving}
           >
             <Plus className="w-5 h-5 mr-2" />
             Add outcome
@@ -1031,7 +926,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
             type="button"
             className="h-11 rounded-[60px] bg-[#00b4b8] text-white hover:bg-[#00a0a4] px-5 shrink-0"
             onClick={handleAddService}
-            disabled={loadingServices || isSaving}
+            disabled={isSaving}
           >
             <Plus className="w-5 h-5 mr-2" />
             Add service
@@ -1115,7 +1010,6 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
                   <ServiceRow
                     key={svc.id}
                     service={svc}
-                    offeredServices={offeredServices}
                     isEditing={isEditing}
                     onChange={(next) =>
                       setOutcomeGroups((prev) => {

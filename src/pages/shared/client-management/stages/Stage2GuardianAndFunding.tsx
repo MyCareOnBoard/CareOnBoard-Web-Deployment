@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Plus, Trash2, Loader2, X } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { CalendarDays, Plus, Trash2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
@@ -24,7 +24,6 @@ import {
   Service,
   type ServicePayType,
 } from "@/pages/shared/client-management/types/formData";
-import { useListServicesQuery, type Service as ApiService } from "@/lib/api/services";
 import { searchEmployees, type Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 
@@ -50,6 +49,7 @@ function DspSearchSlotRow({
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const runSearch = useCallback(
     (q: string) => {
@@ -85,35 +85,53 @@ function DspSearchSlotRow({
     };
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
   return (
-    <div className="flex gap-2 items-start max-w-md">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverAnchor asChild>
-          <div className="relative flex-1 min-w-0">
-            <Input
+    <div className="max-w-md">
+      <div ref={containerRef} className="relative flex flex-col gap-1">
+        <div className="flex h-11 w-full items-stretch overflow-hidden rounded-xl border border-[#cccccd] bg-white">
+          <div className="flex min-w-0 flex-1 items-center gap-2 px-4">
+            <input
+              type="text"
               value={query}
               onChange={(e) => {
                 const v = e.target.value;
                 setQuery(v);
                 runSearch(v);
               }}
-              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Search Dsps by name (at least 2 characters)"
+              className="min-w-0 flex-1 bg-transparent text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none"
             />
             {searching ? (
-              <div className="absolute right-3 top-3">
-                <Loader2 className="h-4 w-4 animate-spin text-[#808081]" />
-              </div>
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#808081]" />
             ) : null}
           </div>
-        </PopoverAnchor>
-        <PopoverContent className="p-0 w-[min(100vw-2rem,28rem)]" align="start">
-          <div className="max-h-48 overflow-y-auto">
+          <button
+            type="button"
+            className="flex h-full w-11 shrink-0 items-center justify-center text-[#10141a] transition-colors hover:bg-gray-50"
+            onClick={onRemoveSlot}
+            aria-label="Remove Dsp search row"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+        {open && results.length > 0 ? (
+          <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-[200px] overflow-y-auto rounded-xl border border-[#cccccd] bg-white shadow-lg">
             {results.map((emp) => (
               <button
                 key={emp.id}
                 type="button"
-                className="w-full px-3 py-2 text-left text-sm hover:bg-[#f8f9fa]"
+                className="w-full cursor-pointer border-b border-[#f0f0f0] px-4 py-3 text-left first:rounded-t-[12px] last:rounded-b-[12px] last:border-b-0 hover:bg-gray-50"
                 onClick={() => {
                   onPick(emp);
                   setQuery("");
@@ -121,22 +139,12 @@ function DspSearchSlotRow({
                   setResults([]);
                 }}
               >
-                {emp.fullName}
+                <p className="text-[14px] font-normal text-black">{emp.fullName}</p>
               </button>
             ))}
           </div>
-        </PopoverContent>
-      </Popover>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-[44px] w-[44px] shrink-0 text-[#10141a]"
-        onClick={onRemoveSlot}
-        aria-label="Remove Dsp search"
-      >
-        <X className="h-4 w-4" />
-      </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -191,20 +199,20 @@ function ServicePerServiceStaffOnly({
         {assigned.length === 0 ? (
           <p className="text-[13px] text-[#808081] mb-2">No Dsps assigned yet.</p>
         ) : (
-          <ul className="flex flex-col gap-2 mb-3">
+          <ul className="mb-3 flex w-full max-w-md flex-col gap-2">
             {assigned.map((d) => (
               <li
                 key={d.id}
-                className="flex items-center justify-between rounded-[12px] border border-[#cccccd] bg-white px-3 py-2"
+                className="flex min-w-0 items-center justify-between rounded-[12px] border border-[#cccccd] bg-white px-3 py-2"
               >
-                <span className="text-[14px] text-[#10141a]">{d.name}</span>
+                <span className="min-w-0 flex-1 truncate text-[14px] text-[#10141a]">{d.name}</span>
                 <button
                   type="button"
-                  className="text-[#10141a] p-1 rounded-md hover:bg-[#f8f9fa]"
+                  className="shrink-0 rounded-md p-1 text-[#10141a] transition-colors hover:bg-gray-50"
                   onClick={() => removeDsp(d.id)}
                   aria-label={`Remove ${d.name}`}
                 >
-                  <X className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </li>
             ))}
@@ -304,127 +312,32 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
   const [isPcptOpen, setIsPcptOpen] = useState(false);
   const [isSdrStartOpen, setIsSdrStartOpen] = useState(false);
   const [isSdrEndOpen, setIsSdrEndOpen] = useState(false);
-  const [offeredServices, setOfferedServices] = useState<ApiService[]>([]);
-  const [selectedType, setSelectedType] = useState<string>("");
-  const {data, isLoading: loadingServices} = useListServicesQuery({});
-
-  useEffect(() => {
-    if (data && !loadingServices) {
-      setOfferedServices(data.services);
-    }
-  }, [data, loadingServices]);
-
-  useEffect(() => {
-    if (!loadingServices && offeredServices.length > 0 && (service.name || service.code) && !selectedType) {
-      const matchingService = offeredServices.find(
-        (s) => (service.name && s.name === service.name) || (service.code && s.code === service.code)
-      );
-      if (matchingService && matchingService.type) {
-        setSelectedType(matchingService.type);
-      }
-    }
-  }, [loadingServices, offeredServices, service.name, service.code, selectedType]);
-
-  const serviceTypes = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          offeredServices
-            .map((svc) => svc.type)
-            .filter((t): t is string => Boolean(t)),
-        ),
-      ),
-    [offeredServices],
-  );
-
-  const filteredServices = useMemo(
-    () =>
-      offeredServices.filter((svc) =>
-        selectedType ? svc.type === selectedType : false,
-      ),
-    [offeredServices, selectedType],
-  );
-
-  useEffect(() => {
-    if (!selectedType || loadingServices || offeredServices.length === 0) return;
-    const stillValid = filteredServices.some(
-      (svc) => svc.name === service.name && svc.code === service.code,
-    );
-    if (!stillValid && (service.name || service.code)) {
-      update({ name: "", code: "" });
-    }
-  }, [selectedType, filteredServices, service.name, service.code, update, loadingServices, offeredServices.length]);
 
   return (
     <>
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
       <div className="flex flex-col gap-1">
         <label className="text-[12px] font-normal text-[#10141a]">
-          Service Type
+          Service code
         </label>
-        <Select
-          value={selectedType}
-          onValueChange={(v) => setSelectedType(v)}
-          disabled={loadingServices || serviceTypes.length === 0}
-        >
-          <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-            <SelectValue
-              placeholder={
-                loadingServices
-                  ? "Loading service types..."
-                  : serviceTypes.length === 0
-                  ? "No service types available"
-                  : "Select service type"
-              }
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {serviceTypes.map((type) => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Input
+          value={service.code ?? ""}
+          onChange={(e) => update({ code: e.target.value })}
+          className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+          placeholder="Procedure or authorization code (e.g. from ISP)"
+        />
       </div>
 
       <div className="flex flex-col gap-1">
         <label className="text-[12px] font-normal text-[#10141a]">
-          Service
+          Service Name
         </label>
-        <Select
-          value={service.name}
-          onValueChange={(v) => {
-            const selectedService = filteredServices.find((s) => s.name === v);
-            update({ name: v, code: selectedService?.code || "" });
-          }}
-          disabled={
-            loadingServices ||
-            !selectedType ||
-            filteredServices.length === 0
-          }
-        >
-          <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-            <SelectValue
-              placeholder={
-                loadingServices
-                  ? "Loading services..."
-                  : !selectedType
-                  ? "Select service type first"
-                  : filteredServices.length === 0
-                  ? "No services available for this type"
-                  : "Select service"
-              }
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {filteredServices.map((svc) => (
-              <SelectItem key={svc.id} value={svc.name}>
-                {svc.name} - {svc.code}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Input
+          value={service.name ?? ""}
+          onChange={(e) => update({ name: e.target.value })}
+          className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+          placeholder="Full service name as shown on the ISP"
+        />
       </div>
 
       <div className="flex flex-col gap-1">
@@ -445,17 +358,17 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
 
       <div className="flex flex-col gap-1">
         <label className="text-[12px] font-normal text-[#10141a]">
-          Total approved hours
+          Total units
         </label>
         <Input
           type="number"
           inputMode="numeric"
           min={0}
           step={1}
-          value={service.totalApprovedHours}
-          onChange={(e) => update({ totalApprovedHours: e.target.value })}
+          value={service.totalUnits ?? ""}
+          onChange={(e) => update({ totalUnits: e.target.value || undefined })}
           className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-          placeholder="Enter total approved hours"
+          placeholder="Authorized units for the period (e.g. from ISP)"
         />
       </div>
 
@@ -1144,6 +1057,11 @@ export function Stage2GuardianAndFunding({
         </div>
 
         <div className="mt-6 space-y-10">
+          {outcomes.length === 0 ? (
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              No outcomes yet. Use &quot;Add outcome&quot; below to add service authorization rows.
+            </p>
+          ) : null}
           {outcomes.map((outcome, oidx) => (
             <div key={outcome.id} className={oidx === 0 ? "" : "pt-6 border-t border-[#cccccd]/60"}>
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -1167,21 +1085,19 @@ export function Stage2GuardianAndFunding({
                     placeholder="ISP outcome / goal statement"
                   />
                 </div>
-                {outcomes.length > 1 ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className={SECTION_SUBROW_ACTION_BTN}
-                    onClick={() =>
-                      updateStage2({
-                        outcomes: stage2.outcomes.filter((o) => o.id !== outcome.id),
-                      })
-                    }
-                  >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Remove outcome
-                  </Button>
-                ) : null}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className={SECTION_SUBROW_ACTION_BTN}
+                  onClick={() =>
+                    updateStage2({
+                      outcomes: stage2.outcomes.filter((o) => o.id !== outcome.id),
+                    })
+                  }
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Remove outcome
+                </Button>
               </div>
 
               {outcome.services.map((service, sidx) => (
