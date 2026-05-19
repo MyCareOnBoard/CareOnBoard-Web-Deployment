@@ -1,11 +1,133 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface TimePickerProps {
   value: string;
   onChange: (value: string) => void;
   children?: React.ReactNode;
+}
+
+const SWIPE_THRESHOLD_PX = 20;
+
+function useVerticalSwipe(onSwipeUp: () => void, onSwipeDown: () => void) {
+  const startYRef = useRef<number | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (startYRef.current === null) return;
+      const dy = e.touches[0].clientY - startYRef.current;
+      if (Math.abs(dy) > 8) {
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener("touchmove", handleTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", handleTouchMove);
+  }, []);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    startYRef.current = e.touches[0].clientY;
+  }, []);
+
+  const onTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (startYRef.current === null) return;
+      const dy = e.changedTouches[0].clientY - startYRef.current;
+      if (dy < -SWIPE_THRESHOLD_PX) {
+        onSwipeUp();
+      } else if (dy > SWIPE_THRESHOLD_PX) {
+        onSwipeDown();
+      }
+      startYRef.current = null;
+    },
+    [onSwipeDown, onSwipeUp],
+  );
+
+  const onTouchCancel = useCallback(() => {
+    startYRef.current = null;
+  }, []);
+
+  const onWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        onSwipeUp();
+      } else {
+        onSwipeDown();
+      }
+    },
+    [onSwipeDown, onSwipeUp],
+  );
+
+  return { ref, onTouchStart, onTouchEnd, onTouchCancel, onWheel };
+}
+
+type SwipeColumnProps = {
+  topLabel: string;
+  centerLabel: string;
+  bottomLabel: string;
+  onSwipeUp: () => void;
+  onSwipeDown: () => void;
+  onTapTop: () => void;
+  onTapCenter: () => void;
+  onTapBottom: () => void;
+  className?: string;
+};
+
+function SwipeColumn({
+  topLabel,
+  centerLabel,
+  bottomLabel,
+  onSwipeUp,
+  onSwipeDown,
+  onTapTop,
+  onTapCenter,
+  onTapBottom,
+  className,
+}: SwipeColumnProps) {
+  const swipe = useVerticalSwipe(onSwipeUp, onSwipeDown);
+
+  return (
+    <div
+      ref={swipe.ref}
+      className={cn(
+        "flex min-h-[140px] min-w-[3rem] flex-col items-center gap-4 py-1 select-none touch-none",
+        className,
+      )}
+      onTouchStart={swipe.onTouchStart}
+      onTouchEnd={swipe.onTouchEnd}
+      onTouchCancel={swipe.onTouchCancel}
+      onWheel={swipe.onWheel}
+    >
+      <button
+        type="button"
+        onClick={onTapTop}
+        className="w-full py-1.5 text-center text-[16px] font-semibold text-[#b2b2b3] font-['Urbanist',sans-serif] hover:opacity-80 active:opacity-70"
+      >
+        {topLabel}
+      </button>
+      <button
+        type="button"
+        onClick={onTapCenter}
+        className="w-full py-1.5 text-center text-[16px] font-semibold text-black font-['Urbanist',sans-serif] hover:opacity-80 active:opacity-70"
+      >
+        {centerLabel}
+      </button>
+      <button
+        type="button"
+        onClick={onTapBottom}
+        className="w-full py-1.5 text-center text-[16px] font-semibold text-[#b2b2b3] font-['Urbanist',sans-serif] hover:opacity-80 active:opacity-70"
+      >
+        {bottomLabel}
+      </button>
+    </div>
+  );
 }
 
 export default function TimePicker({ value, onChange, children }: TimePickerProps) {
@@ -14,14 +136,13 @@ export default function TimePicker({ value, onChange, children }: TimePickerProp
   const [minutes, setMinutes] = useState("00");
   const [period, setPeriod] = useState<"AM" | "PM">("AM");
 
-  // Parse the initial value when component mounts or value changes
   useEffect(() => {
     if (value) {
       const match = value.match(/^(\d{2}):(\d{2})$/);
       if (match) {
-        const [_, h, m] = match;
-        const hour24 = parseInt(h);
-        
+        const [, h, m] = match;
+        const hour24 = parseInt(h, 10);
+
         if (hour24 === 0) {
           setHours("12");
           setPeriod("AM");
@@ -35,89 +156,79 @@ export default function TimePicker({ value, onChange, children }: TimePickerProp
           setHours((hour24 - 12).toString().padStart(2, "0"));
           setPeriod("PM");
         }
-        
+
         setMinutes(m);
       }
     }
   }, [value]);
 
-  // Lock body scroll when popover is open
-  useEffect(() => {
-    if (isOpen) {
-      // Store the original overflow value
-      const originalOverflow = document.body.style.overflow;
-      // Prevent scrolling
-      document.body.style.overflow = 'hidden';
-      
-      // Restore original overflow when popover closes or component unmounts
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
-    }
-  }, [isOpen]);
+  const incrementHours = useCallback(() => {
+    setHours((prev) => {
+      const h = parseInt(prev || "12", 10);
+      const newHour = h === 12 ? 1 : h + 1;
+      return newHour.toString().padStart(2, "0");
+    });
+  }, []);
 
-  const incrementHours = () => {
-    const h = parseInt(hours || "12");
-    const newHour = h === 12 ? 1 : h + 1;
-    setHours(newHour.toString().padStart(2, "0"));
-  };
+  const decrementHours = useCallback(() => {
+    setHours((prev) => {
+      const h = parseInt(prev || "12", 10);
+      const newHour = h === 1 ? 12 : h - 1;
+      return newHour.toString().padStart(2, "0");
+    });
+  }, []);
 
-  const decrementHours = () => {
-    const h = parseInt(hours || "12");
-    const newHour = h === 1 ? 12 : h - 1;
-    setHours(newHour.toString().padStart(2, "0"));
-  };
+  const incrementMinutes = useCallback(() => {
+    setMinutes((prev) => {
+      const m = parseInt(prev || "0", 10);
+      return ((m + 1) % 60).toString().padStart(2, "0");
+    });
+  }, []);
 
-  const incrementMinutes = () => {
-    const m = parseInt(minutes || "0");
-    const newMinute = (m + 1) % 60;
-    setMinutes(newMinute.toString().padStart(2, "0"));
-  };
+  const decrementMinutes = useCallback(() => {
+    setMinutes((prev) => {
+      const m = parseInt(prev || "0", 10);
+      return (m === 0 ? 59 : m - 1).toString().padStart(2, "0");
+    });
+  }, []);
 
-  const decrementMinutes = () => {
-    const m = parseInt(minutes || "0");
-    const newMinute = m === 0 ? 59 : m - 1;
-    setMinutes(newMinute.toString().padStart(2, "0"));
-  };
+  const togglePeriod = useCallback(() => {
+    setPeriod((prev) => (prev === "AM" ? "PM" : "AM"));
+  }, []);
 
   const getPrevHour = () => {
-    const h = parseInt(hours || "12");
-    return h === 1 ? 12 : h - 1;
+    const h = parseInt(hours || "12", 10);
+    return (h === 1 ? 12 : h - 1).toString().padStart(2, "0");
   };
 
   const getNextHour = () => {
-    const h = parseInt(hours || "12");
-    return h === 12 ? 1 : h + 1;
+    const h = parseInt(hours || "12", 10);
+    return (h === 12 ? 1 : h + 1).toString().padStart(2, "0");
   };
 
   const getPrevMinute = () => {
-    const m = parseInt(minutes || "0");
-    return m === 0 ? 59 : m - 1;
+    const m = parseInt(minutes || "0", 10);
+    return (m === 0 ? 59 : m - 1).toString().padStart(2, "0");
   };
 
   const getNextMinute = () => {
-    const m = parseInt(minutes || "0");
-    return (parseInt(minutes || "0") + 1) % 60;
+    const m = parseInt(minutes || "0", 10);
+    return ((m + 1) % 60).toString().padStart(2, "0");
   };
 
-  const getNextPeriod = () => {
-    return period === "AM" ? "PM" : "AM";
-  };
-
-  const getPrevPeriod = () => {
-    return period === "AM" ? "PM" : "AM";
-  };
+  const getNextPeriod = () => (period === "AM" ? "PM" : "AM");
+  const getPrevPeriod = () => (period === "AM" ? "PM" : "AM");
 
   const handleSave = () => {
-    const h = parseInt(hours || "12");
-    let hour24;
-    
+    const h = parseInt(hours || "12", 10);
+    let hour24: number;
+
     if (period === "AM") {
       hour24 = h === 12 ? 0 : h;
     } else {
       hour24 = h === 12 ? 12 : h + 12;
     }
-    
+
     const timeString = `${hour24.toString().padStart(2, "0")}:${(minutes || "00").padStart(2, "0")}`;
     onChange(timeString);
     setIsOpen(false);
@@ -127,30 +238,12 @@ export default function TimePicker({ value, onChange, children }: TimePickerProp
     setIsOpen(false);
   };
 
-  const handleHoursWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    if (e.deltaY < 0) {
-      decrementHours();
-    } else {
-      incrementHours();
-    }
-  };
-
-  const handleMinutesWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    if (e.deltaY < 0) {
-      decrementMinutes();
-    } else {
-      incrementMinutes();
-    }
-  };
-
   const displayTime = () => {
     if (!value) return "";
     const match = value.match(/^(\d{2}):(\d{2})$/);
     if (match) {
-      const [_, h, m] = match;
-      const hour24 = parseInt(h);
+      const [, h, m] = match;
+      const hour24 = parseInt(h, 10);
       const displayHour = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
       const displayPeriod = hour24 >= 12 ? "PM" : "AM";
       return `${displayHour.toString().padStart(2, "0")}:${m} ${displayPeriod}`;
@@ -162,122 +255,86 @@ export default function TimePicker({ value, onChange, children }: TimePickerProp
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         {children || (
-          <button 
-            type="button" 
-            className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
+          <button
+            type="button"
+            className="flex h-full w-full cursor-pointer items-center justify-center focus:outline-none"
           >
-            <span className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
+            <span className="font-['Urbanist',sans-serif] text-[14px] font-normal leading-[1.4] text-[#10141a]">
               {displayTime()}
             </span>
           </button>
         )}
       </PopoverTrigger>
-      <PopoverContent 
-        align="center" 
+      <PopoverContent
+        align="center"
         side="top"
-        className="bg-white rounded-[24px] p-6 shadow-lg border-none w-[320px]"
+        className="w-[320px] rounded-[24px] border-none bg-white p-6 shadow-lg"
         sideOffset={5}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="flex flex-col gap-4">
-          {/* Header */}
-          <h3 className="text-[16px] font-semibold leading-[1.6] text-[#10141a] text-center font-['Urbanist',sans-serif]">
+          <h3 className="text-center font-['Urbanist',sans-serif] text-[16px] font-semibold leading-[1.6] text-[#10141a]">
             Set Time
           </h3>
 
-          {/* Time Wheel - Previous Time */}
-          <div className="flex items-center justify-center gap-4 py-2">
-            <button
-              type="button"
-              onClick={decrementHours}
-              className="w-16 text-center text-[16px] font-semibold text-[#b2b2b3] font-['Urbanist',sans-serif] hover:opacity-80 transition-opacity"
-            >
-              {getPrevHour().toString().padStart(2, "0")}
-            </button>
-            <span className="text-[16px] font-semibold text-[#b2b2b3] font-['Urbanist',sans-serif]">:</span>
-            <button
-              type="button"
-              onClick={decrementMinutes}
-              className="w-16 text-center text-[16px] font-semibold text-[#b2b2b3] font-['Urbanist',sans-serif] hover:opacity-80 transition-opacity"
-            >
-              {getPrevMinute().toString().padStart(2, "0")}
-            </button>
-            <span className="w-12"></span>
+          <div className="relative px-1">
+            <div className="pointer-events-none absolute inset-x-0 top-[44px] h-px bg-[#e0e0e0]" />
+            <div className="pointer-events-none absolute inset-x-0 top-[96px] h-px bg-[#e0e0e0]" />
+
+            <div className="flex items-stretch justify-center gap-3">
+              <SwipeColumn
+                topLabel={getPrevHour()}
+                centerLabel={hours.padStart(2, "0")}
+                bottomLabel={getNextHour()}
+                onSwipeUp={incrementHours}
+                onSwipeDown={decrementHours}
+                onTapTop={decrementHours}
+                onTapCenter={incrementHours}
+                onTapBottom={incrementHours}
+              />
+
+              <span className="flex items-center justify-center self-center font-['Urbanist',sans-serif] text-[16px] font-semibold text-black">
+                :
+              </span>
+
+              <SwipeColumn
+                topLabel={getPrevMinute()}
+                centerLabel={minutes.padStart(2, "0")}
+                bottomLabel={getNextMinute()}
+                onSwipeUp={incrementMinutes}
+                onSwipeDown={decrementMinutes}
+                onTapTop={decrementMinutes}
+                onTapCenter={incrementMinutes}
+                onTapBottom={incrementMinutes}
+              />
+
+              <SwipeColumn
+                className="min-w-[2.75rem]"
+                topLabel={getPrevPeriod()}
+                centerLabel={period}
+                bottomLabel={getNextPeriod()}
+                onSwipeUp={togglePeriod}
+                onSwipeDown={togglePeriod}
+                onTapTop={togglePeriod}
+                onTapCenter={togglePeriod}
+                onTapBottom={togglePeriod}
+              />
+            </div>
           </div>
 
-          {/* Divider Above Current */}
-          <div className="w-full h-[1px] bg-[#e0e0e0]" />
-
-          {/* Time Wheel - Current Time (Active) */}
-          <div className="flex items-center justify-center gap-4 py-2">
-            <button
-              type="button"
-              onClick={incrementHours}
-              onWheel={handleHoursWheel}
-              className="w-16 text-center text-[16px] font-semibold text-black font-['Urbanist',sans-serif] hover:opacity-80 transition-opacity cursor-pointer"
-            >
-              {hours.padStart(2, "0")}
-            </button>
-            <span className="text-[16px] font-semibold text-black font-['Urbanist',sans-serif]">:</span>
-            <button
-              type="button"
-              onClick={incrementMinutes}
-              onWheel={handleMinutesWheel}
-              className="w-16 text-center text-[16px] font-semibold text-black font-['Urbanist',sans-serif] hover:opacity-80 transition-opacity cursor-pointer"
-            >
-              {minutes.padStart(2, "0")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setPeriod(period === "AM" ? "PM" : "AM")}
-              className="w-12 text-center text-[16px] font-semibold text-black font-['Urbanist',sans-serif] hover:opacity-70 transition-opacity"
-            >
-              {period}
-            </button>
-          </div>
-
-          {/* Divider Below Current */}
-          <div className="w-full h-[1px] bg-[#e0e0e0]" />
-
-          {/* Time Wheel - Next Time */}
-          <div className="flex items-center justify-center gap-4 py-2">
-            <button
-              type="button"
-              onClick={incrementHours}
-              className="w-16 text-center text-[16px] font-semibold text-[#b2b2b3] font-['Urbanist',sans-serif] hover:opacity-80 transition-opacity"
-            >
-              {getNextHour().toString().padStart(2, "0")}
-            </button>
-            <span className="text-[16px] font-semibold text-[#b2b2b3] font-['Urbanist',sans-serif]">:</span>
-            <button
-              type="button"
-              onClick={incrementMinutes}
-              className="w-16 text-center text-[16px] font-semibold text-[#b2b2b3] font-['Urbanist',sans-serif] hover:opacity-80 transition-opacity"
-            >
-              {getNextMinute().toString().padStart(2, "0")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setPeriod(period === "AM" ? "PM" : "AM")}
-              className="w-12 text-center text-[16px] font-semibold text-[#b2b2b3] font-['Urbanist',sans-serif] hover:opacity-80 transition-opacity"
-            >
-              {getNextPeriod()}
-            </button>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 mt-4">
+          <div className="mt-1 flex gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={handleCancel}
-              className="flex-1 rounded-[60px] border-[#e0e0e0] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-[#808081] hover:bg-[#f5f5f5] h-auto"
+              className="h-auto flex-1 rounded-[60px] border-[#e0e0e0] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-[#808081] hover:bg-[#f5f5f5]"
             >
               Cancel
             </Button>
             <Button
               type="button"
               onClick={handleSave}
-              className="flex-1 rounded-[60px] bg-[#00b4b8] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-white hover:bg-[#00a3a7] h-auto"
+              className="h-auto flex-1 rounded-[60px] bg-[#00b4b8] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-white hover:bg-[#00a3a7]"
             >
               Save
             </Button>
@@ -287,4 +344,3 @@ export default function TimePicker({ value, onChange, children }: TimePickerProp
     </Popover>
   );
 }
-
