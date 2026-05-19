@@ -116,6 +116,7 @@ function AIAutomationContent() {
         const response = await sendMessage({
           conversationId,
           message: content,
+          context: selectedArea ? { area: selectedArea } : undefined,
           attachments: attachmentsSnapshot.length ? attachmentsSnapshot : undefined,
         }).unwrap();
         setMessages((prev) =>
