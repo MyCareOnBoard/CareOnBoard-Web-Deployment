@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Loader2, Plus, Trash2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
-import { Client, ClientOutcome, ClientService } from "@/lib/api/clients";
+import {
+  Client,
+  ClientOutcome,
+  ClientService,
+  ClientServiceSdrDetails,
+  updateClient,
+} from "@/lib/api/clients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +29,19 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { updateClient } from "@/lib/api/clients";
+import {
+  WeeklyDistributionInline,
+  WEEKLY_DIST_DISPLAY_CAP,
+  type WeeklyDistributionData,
+} from "@/pages/shared/client-management/components/WeeklyDistributionInline";
+import { deriveAuthorizedHoursPerWeek } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
+import {
+  cloneWeeklyDistributionForPersist,
+  sanitizeWeeklyPartsFromUnknown,
+  weeklyDistributionFingerprintFromWd,
+  weeklyDistributionForDerivation,
+  weeklyDistributionForPersist,
+} from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
 
 interface ServicesTabProps {
   client: Client;
@@ -49,6 +67,21 @@ type EditableServiceRow = {
   pcptDate?: Date | null;
   sdrStartDate?: Date | null;
   sdrEndDate?: Date | null;
+  provider?: string;
+  location?: string;
+  claimsSource?: string;
+  unitType?: string;
+  frequency?: string;
+  totalCost?: string;
+  procedureName?: string;
+  sdrComputedTotalHours?: string;
+  /** Canonical PA metadata only; auth dates live on startAuthDate/endAuthDate */
+  sdrPriorAuthorization?: {
+    paNumber?: string;
+    approvedUnitsTillDate?: string;
+  };
+  sdrWeeklyDistribution?: ClientService["sdrWeeklyDistribution"];
+  sdrDetails?: ClientServiceSdrDetails;
 };
 
 type EditableOutcomeGroup = {
@@ -56,6 +89,125 @@ type EditableOutcomeGroup = {
   statement: string;
   services: EditableServiceRow[];
 };
+
+const MAX_SDR_LIST_LINES = 50;
+
+function priorAuthMetadataFromApi(
+  pa:
+    | ClientService["sdrPriorAuthorization"]
+    | EditableServiceRow["sdrPriorAuthorization"]
+    | undefined,
+): EditableServiceRow["sdrPriorAuthorization"] {
+  if (!pa || typeof pa !== "object") return undefined;
+  const n = typeof pa.paNumber === "string" ? pa.paNumber.trim() : "";
+  const u = typeof pa.approvedUnitsTillDate === "string" ? pa.approvedUnitsTillDate.trim() : "";
+  if (!n && !u) return undefined;
+  return {
+    ...(n ? { paNumber: n } : {}),
+    ...(u ? { approvedUnitsTillDate: u } : {}),
+  };
+}
+
+function priorAuthMetadataToApi(
+  pa: EditableServiceRow["sdrPriorAuthorization"],
+): ClientService["sdrPriorAuthorization"] | undefined {
+  return priorAuthMetadataFromApi(pa);
+}
+
+function cloneSdrDetails(d?: ClientServiceSdrDetails): ClientServiceSdrDetails | undefined {
+  if (!d || typeof d !== "object") return undefined;
+  const source = d.source
+    ? {
+        ...(d.source.outcomeStatement?.trim()
+          ? { outcomeStatement: d.source.outcomeStatement.trim() }
+          : {}),
+        ...(d.source.serviceName?.trim() ? { serviceName: d.source.serviceName.trim() } : {}),
+        ...(d.source.serviceCode?.trim() ? { serviceCode: d.source.serviceCode.trim() } : {}),
+        ...(d.source.provider?.trim() ? { provider: d.source.provider.trim() } : {}),
+        ...(d.source.claimsSource?.trim()
+          ? { claimsSource: d.source.claimsSource.trim() }
+          : {}),
+      }
+    : undefined;
+  const out: ClientServiceSdrDetails = {
+    ...(d.deliveryMethods?.length ? { deliveryMethods: [...d.deliveryMethods] } : {}),
+    ...(d.supportTasks?.length ? { supportTasks: [...d.supportTasks] } : {}),
+    ...(d.frequency?.trim() ? { frequency: d.frequency.trim() } : {}),
+    ...(d.duration?.trim() ? { duration: d.duration.trim() } : {}),
+    ...(d.setting?.trim() ? { setting: d.setting.trim() } : {}),
+    ...(d.staffing?.trim() ? { staffing: d.staffing.trim() } : {}),
+    ...(source && Object.keys(source).length ? { source } : {}),
+    ...(d.importedAt?.trim() ? { importedAt: d.importedAt.trim() } : {}),
+  };
+  return Object.keys(out).length ? out : undefined;
+}
+
+function cloneWeeklyDist(
+  raw: ClientService["sdrWeeklyDistribution"] | undefined,
+): ClientService["sdrWeeklyDistribution"] | undefined {
+  return cloneWeeklyDistributionForPersist(raw) as ClientService["sdrWeeklyDistribution"] | undefined;
+}
+
+function splitLinesToList(text: string, max: number): string[] {
+  return text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+function weeklyRowsToText(
+  rows?: Array<Partial<{ weekRange: string; units: string; hours: string }>>,
+): string {
+  if (!rows?.length) return "";
+  return rows
+    .map((r) => [r.weekRange ?? "", r.units ?? "", r.hours ?? ""].join(" | "))
+    .join("\n");
+}
+
+function parseWeeklyRowsText(text: string): Array<{ weekRange: string; units: string; hours: string }> {
+  const out: Array<{ weekRange: string; units: string; hours: string }> = [];
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (!t) continue;
+    const parts = t.split("|").map((s) => s.trim());
+    const weekRange = parts[0] ?? "";
+    const units = parts[1] ?? "";
+    const hours = parts[2] ?? "";
+    if (weekRange || units || hours) out.push({ weekRange, units, hours });
+    if (out.length >= WEEKLY_DIST_DISPLAY_CAP) break;
+  }
+  return out;
+}
+
+function emptish(v: string | undefined): string | undefined {
+  const t = (v ?? "").trim();
+  return t ? t : undefined;
+}
+
+function applyWeeklyDistToServiceRow(
+  service: EditableServiceRow,
+  patchWd: Partial<NonNullable<ClientService["sdrWeeklyDistribution"]>>,
+): EditableServiceRow {
+  const merged: ClientService["sdrWeeklyDistribution"] = {
+    ...(service.sdrWeeklyDistribution ?? {}),
+    ...patchWd,
+  };
+  const parts = sanitizeWeeklyPartsFromUnknown(merged);
+  if (!parts) {
+    return {
+      ...service,
+      sdrWeeklyDistribution: undefined,
+    };
+  }
+  const normalized = weeklyDistributionForPersist(parts);
+  const dh = deriveAuthorizedHoursPerWeek(weeklyDistributionForDerivation(parts));
+  return {
+    ...service,
+    sdrWeeklyDistribution: normalized ?? undefined,
+    ...(dh !== undefined ? { hours: dh } : {}),
+  };
+}
 
 function newEntityId(prefix: string) {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -81,6 +233,17 @@ function emptyEditableServiceRow(): EditableServiceRow {
     pcptDate: null,
     sdrStartDate: null,
     sdrEndDate: null,
+    provider: "",
+    location: "",
+    claimsSource: "",
+    unitType: "",
+    frequency: "",
+    totalCost: "",
+    procedureName: "",
+    sdrComputedTotalHours: "",
+    sdrPriorAuthorization: undefined,
+    sdrWeeklyDistribution: undefined,
+    sdrDetails: undefined,
   };
 }
 
@@ -130,6 +293,17 @@ function mapClientServicesToEditable(services?: ClientService[]): EditableServic
     pcptDate: parseDate(svc.pcptDate),
     sdrStartDate: parseDate(svc.sdrStartDate),
     sdrEndDate: parseDate(svc.sdrEndDate),
+    provider: svc.provider ?? "",
+    location: svc.location ?? "",
+    claimsSource: svc.claimsSource ?? "",
+    unitType: svc.unitType ?? "",
+    frequency: svc.frequency ?? "",
+    totalCost: svc.totalCost ?? "",
+    procedureName: svc.procedureName ?? "",
+    sdrComputedTotalHours: svc.sdrComputedTotalHours ?? "",
+    sdrPriorAuthorization: priorAuthMetadataFromApi(svc.sdrPriorAuthorization),
+    sdrWeeklyDistribution: cloneWeeklyDist(svc.sdrWeeklyDistribution),
+    sdrDetails: cloneSdrDetails(svc.sdrDetails),
   }));
 }
 
@@ -138,12 +312,12 @@ function mapEditableToClientServices(services: EditableServiceRow[]): ClientServ
     id: svc.id,
     name: svc.name,
     code: svc.code,
-    hours: svc.hours,
-    totalApprovedHours: svc.totalApprovedHours,
-    totalUnits: svc.totalUnits,
-    rate: svc.rate,
+    hours: emptish(svc.hours),
+    totalApprovedHours: emptish(svc.totalApprovedHours),
+    totalUnits: emptish(svc.totalUnits),
+    rate: emptish(svc.rate),
     payType: svc.payType,
-    clientRate: svc.clientRate,
+    clientRate: emptish(svc.clientRate),
     clientPayType: svc.clientPayType,
     ispEffectiveDate: svc.ispEffectiveDate
       ? svc.ispEffectiveDate.toISOString()
@@ -157,6 +331,17 @@ function mapEditableToClientServices(services: EditableServiceRow[]): ClientServ
       ? svc.sdrStartDate.toISOString()
       : undefined,
     sdrEndDate: svc.sdrEndDate ? svc.sdrEndDate.toISOString() : undefined,
+    provider: emptish(svc.provider),
+    location: emptish(svc.location),
+    claimsSource: emptish(svc.claimsSource),
+    unitType: emptish(svc.unitType),
+    frequency: emptish(svc.frequency),
+    totalCost: emptish(svc.totalCost),
+    procedureName: emptish(svc.procedureName),
+    sdrComputedTotalHours: emptish(svc.sdrComputedTotalHours),
+    sdrPriorAuthorization: priorAuthMetadataToApi(svc.sdrPriorAuthorization),
+    sdrWeeklyDistribution: cloneWeeklyDist(svc.sdrWeeklyDistribution),
+    sdrDetails: cloneSdrDetails(svc.sdrDetails),
   }));
 }
 
@@ -206,8 +391,38 @@ function ServiceRow({
     onChange({ ...service, [field]: value });
   };
 
+  /** Stable key so unrelated service edits do not re-run weekly derivation (immutable WD updates assumed). */
+  const weeklyDistributionFingerprint = useMemo(
+    () => weeklyDistributionFingerprintFromWd(service.sdrWeeklyDistribution),
+    [service.sdrWeeklyDistribution],
+  );
+
+  const derivedAuthorizedHoursPerWeek = useMemo(
+    () => deriveAuthorizedHoursPerWeek(service.sdrWeeklyDistribution),
+    [weeklyDistributionFingerprint],
+  );
+
+  const hoursDerivedFromWeeklyDistribution =
+    derivedAuthorizedHoursPerWeek !== undefined;
+
+  const weeklyDistInlineModel = useMemo((): WeeklyDistributionData | undefined => {
+    return cloneWeeklyDist(service.sdrWeeklyDistribution);
+  }, [weeklyDistributionFingerprint]);
+
+  const displayAuthorizedHoursPerWeek =
+    derivedAuthorizedHoursPerWeek ?? service.hours?.trim() ?? "";
+
   const displayDate = (value?: Date | null) =>
     value ? format(value, "MMM d, yyyy") : "";
+
+  const textOrDash = (v?: string) => (v?.trim() ? v.trim() : "—");
+
+  const patchSdrDetails = (partial: Partial<ClientServiceSdrDetails>) => {
+    onChange({
+      ...service,
+      sdrDetails: { ...(service.sdrDetails ?? {}), ...partial },
+    });
+  };
 
   return (
     <div className="backdrop-blur-[20px] rounded-[20px] border border-[rgba(255,255,255,0.4)] bg-white/70 px-4 py-3 flex flex-col gap-3">
@@ -253,18 +468,33 @@ function ServiceRow({
                 Authorized hours per week
               </p>
               {isEditing ? (
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={service.hours || ""}
-                  onChange={(e) => handleFieldChange("hours", e.target.value)}
-                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                  placeholder="Enter hours"
-                />
+                <>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    readOnly={hoursDerivedFromWeeklyDistribution}
+                    title={
+                      hoursDerivedFromWeeklyDistribution
+                        ? "Derived from weekly distribution; change weekly rows or standard line."
+                        : undefined
+                    }
+                    value={
+                      hoursDerivedFromWeeklyDistribution
+                        ? (derivedAuthorizedHoursPerWeek ?? "")
+                        : (service.hours || "")
+                    }
+                    onChange={(e) => handleFieldChange("hours", e.target.value)}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                    placeholder="Enter hours"
+                  />
+                  {hoursDerivedFromWeeklyDistribution ? (
+                    <p className="text-[11px] text-[#808081]">From weekly distribution</p>
+                  ) : null}
+                </>
               ) : (
                 <p className="text-[14px] font-semibold text-[#10141a]">
-                  {service.hours || "-"}
+                  {displayAuthorizedHoursPerWeek || "-"}
                 </p>
               )}
             </div>
@@ -410,8 +640,126 @@ function ServiceRow({
         </div>
       </div>
 
-      {/* Date fields – same pattern as Stage 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-[#e5e5e6] mt-3">
+      {/* Procedure & billing (matches Stage 2 SDR-derived scalars where applicable) */}
+      <div className="space-y-3 pt-3 border-t border-[#e5e5e6] mt-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#808081]">
+          Procedure & billing
+        </p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Procedure</p>
+            {isEditing ? (
+              <Input
+                value={service.procedureName ?? ""}
+                onChange={(e) => handleFieldChange("procedureName", e.target.value)}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="e.g. CBS from SDR"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.procedureName)}</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Unit type</p>
+            {isEditing ? (
+              <Input
+                value={service.unitType ?? ""}
+                onChange={(e) => handleFieldChange("unitType", e.target.value)}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="e.g. 15 Min"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.unitType)}</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Total computed hours (SDR)</p>
+            {isEditing ? (
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                min={0}
+                value={service.sdrComputedTotalHours ?? ""}
+                onChange={(e) => handleFieldChange("sdrComputedTotalHours", e.target.value)}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="Hours from SDR"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">
+                {textOrDash(service.sdrComputedTotalHours)}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Total cost</p>
+            {isEditing ? (
+              <Input
+                value={service.totalCost ?? ""}
+                onChange={(e) => handleFieldChange("totalCost", e.target.value)}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="e.g. $2911.83"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.totalCost)}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Location, claims source & ISP-level frequency */}
+      <div className="space-y-3 pt-3 border-t border-[#e5e5e6] mt-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#808081]">
+          Location & claims
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Service location</p>
+            {isEditing ? (
+              <Input
+                value={service.location ?? ""}
+                onChange={(e) => handleFieldChange("location", e.target.value)}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.location)}</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Claims source</p>
+            {isEditing ? (
+              <Input
+                value={service.claimsSource ?? ""}
+                onChange={(e) => handleFieldChange("claimsSource", e.target.value)}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="e.g. Medicaid"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.claimsSource)}</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Service frequency (ISP)</p>
+            {isEditing ? (
+              <Input
+                value={service.frequency ?? ""}
+                onChange={(e) => handleFieldChange("frequency", e.target.value)}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="e.g. 3x/wk"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.frequency)}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Dates */}
+      <div className="pt-3 border-t border-[#e5e5e6] mt-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#808081] mb-3">
+          Dates
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {/* ISP Effective Date */}
         <div className="flex flex-col gap-1">
           <p className="text-[12px] font-normal text-[#10141a]">
@@ -699,7 +1047,7 @@ function ServiceRow({
           <Popover open={isSdrEndOpen} onOpenChange={setIsSdrEndOpen}>
             <PopoverTrigger asChild>
               <button type="button" className="w-full focus:outline-none">
-                <InputGroup className="h-[44px] bgwhite border border-[#cccccd] rounded-[12px] px-4">
+                <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
                   <InputGroupInput
                     value={displayDate(service.sdrEndDate)}
                     placeholder="Select date"
@@ -745,6 +1093,283 @@ function ServiceRow({
             </p>
           )}
         </div>
+      </div>
+      </div>
+
+      {/* Prior authorization metadata — dates are canonical on start/end above */}
+      <div className="mt-3 rounded-[12px] border border-[#e1e3e8] bg-[#fafbfc]/50 p-4">
+        <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#808081]">
+          Prior authorization
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">PA number</p>
+            {isEditing ? (
+              <Input
+                value={service.sdrPriorAuthorization?.paNumber ?? ""}
+                onChange={(e) =>
+                  handleFieldChange(
+                    "sdrPriorAuthorization",
+                    priorAuthMetadataFromApi({
+                      paNumber: e.target.value,
+                      approvedUnitsTillDate: service.sdrPriorAuthorization?.approvedUnitsTillDate,
+                    }),
+                  )
+                }
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">
+                {textOrDash(service.sdrPriorAuthorization?.paNumber)}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Approved units till date</p>
+            {isEditing ? (
+              <Input
+                value={service.sdrPriorAuthorization?.approvedUnitsTillDate ?? ""}
+                onChange={(e) =>
+                  handleFieldChange(
+                    "sdrPriorAuthorization",
+                    priorAuthMetadataFromApi({
+                      paNumber: service.sdrPriorAuthorization?.paNumber,
+                      approvedUnitsTillDate: e.target.value,
+                    }),
+                  )
+                }
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="e.g. 6,269 (may not be a date)"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">
+                {textOrDash(service.sdrPriorAuthorization?.approvedUnitsTillDate)}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Weekly distribution */}
+      <div className="space-y-3 pt-3 border-t border-[#e5e5e6] mt-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#808081]">
+          Weekly distribution
+        </p>
+        {isEditing ? (
+          <div className="grid grid-cols-1 gap-3">
+            <div className="flex flex-col gap-1">
+              <p className="text-[12px] font-normal text-[#10141a]">Standard line</p>
+              <Input
+                value={service.sdrWeeklyDistribution?.standardLine ?? ""}
+                onChange={(e) =>
+                  onChange(
+                    applyWeeklyDistToServiceRow(service, {
+                      ...service.sdrWeeklyDistribution,
+                      rows: service.sdrWeeklyDistribution?.rows,
+                      standardLine: e.target.value || undefined,
+                    }),
+                  )
+                }
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="40 @ 15 Min / Weekly"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <p className="text-[12px] font-normal text-[#10141a]">Rows</p>
+              <p className="text-[11px] text-[#808081] mb-1">
+                One row per line: week range | units | hours (e.g. 5/11/2025 - 5/17/2025 | 40 | 10.00 hours)
+              </p>
+              <Textarea
+                value={weeklyRowsToText(service.sdrWeeklyDistribution?.rows)}
+                onChange={(e) =>
+                  onChange(
+                    applyWeeklyDistToServiceRow(service, {
+                      standardLine: service.sdrWeeklyDistribution?.standardLine,
+                      rows: parseWeeklyRowsText(e.target.value),
+                    }),
+                  )
+                }
+                rows={4}
+                className="min-h-[88px] rounded-[12px] border-[#cccccd] bg-white text-[13px]"
+              />
+            </div>
+            {weeklyDistInlineModel ? (
+              <WeeklyDistributionInline hideTitle wd={weeklyDistInlineModel} className="mt-1" />
+            ) : null}
+          </div>
+        ) : weeklyDistInlineModel ? (
+          <WeeklyDistributionInline hideTitle wd={weeklyDistInlineModel} />
+        ) : (
+          <p className="text-[13px] text-[#808081]">—</p>
+        )}
+      </div>
+
+      {/* SDR breakdown */}
+      <div className="space-y-3 pt-3 border-t border-[#e5e5e6] mt-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#808081]">
+          SDR breakdown
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="flex flex-col gap-1 md:col-span-2">
+            <p className="text-[12px] font-normal text-[#10141a]">Delivery methods</p>
+            {isEditing ? (
+              <Textarea
+                value={(service.sdrDetails?.deliveryMethods ?? []).join("\n")}
+                onChange={(e) => {
+                  const list = splitLinesToList(e.target.value, MAX_SDR_LIST_LINES);
+                  patchSdrDetails({ deliveryMethods: list.length ? list : undefined });
+                }}
+                rows={3}
+                className="min-h-[72px] rounded-[12px] border-[#cccccd] bg-white text-[13px]"
+                placeholder="One per line"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a] whitespace-pre-wrap">
+                {(service.sdrDetails?.deliveryMethods ?? []).join("\n") || "—"}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1 md:col-span-2">
+            <p className="text-[12px] font-normal text-[#10141a]">Support tasks</p>
+            {isEditing ? (
+              <Textarea
+                value={(service.sdrDetails?.supportTasks ?? []).join("\n")}
+                onChange={(e) => {
+                  const list = splitLinesToList(e.target.value, MAX_SDR_LIST_LINES);
+                  patchSdrDetails({ supportTasks: list.length ? list : undefined });
+                }}
+                rows={3}
+                className="min-h-[72px] rounded-[12px] border-[#cccccd] bg-white text-[13px]"
+                placeholder="One per line"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a] whitespace-pre-wrap">
+                {(service.sdrDetails?.supportTasks ?? []).join("\n") || "—"}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Frequency (SDR detail)</p>
+            {isEditing ? (
+              <Input
+                value={service.sdrDetails?.frequency ?? ""}
+                onChange={(e) => patchSdrDetails({ frequency: e.target.value.trim() || undefined })}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.sdrDetails?.frequency)}</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Duration</p>
+            {isEditing ? (
+              <Input
+                value={service.sdrDetails?.duration ?? ""}
+                onChange={(e) => patchSdrDetails({ duration: e.target.value.trim() || undefined })}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.sdrDetails?.duration)}</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Setting</p>
+            {isEditing ? (
+              <Input
+                value={service.sdrDetails?.setting ?? ""}
+                onChange={(e) => patchSdrDetails({ setting: e.target.value.trim() || undefined })}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.sdrDetails?.setting)}</p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Staffing</p>
+            {isEditing ? (
+              <Input
+                value={service.sdrDetails?.staffing ?? ""}
+                onChange={(e) => patchSdrDetails({ staffing: e.target.value.trim() || undefined })}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.sdrDetails?.staffing)}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">SDR provider (source)</p>
+            {isEditing ? (
+              <Input
+                value={service.sdrDetails?.source?.provider ?? ""}
+                onChange={(e) =>
+                  patchSdrDetails({
+                    source: {
+                      ...service.sdrDetails?.source,
+                      provider: e.target.value.trim() || undefined,
+                    },
+                  })
+                }
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">
+                {textOrDash(service.sdrDetails?.source?.provider)}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] font-normal text-[#10141a]">Payer / claims source (SDR)</p>
+            {isEditing ? (
+              <Input
+                value={service.sdrDetails?.source?.claimsSource ?? ""}
+                onChange={(e) =>
+                  patchSdrDetails({
+                    source: {
+                      ...service.sdrDetails?.source,
+                      claimsSource: e.target.value.trim() || undefined,
+                    },
+                  })
+                }
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              />
+            ) : (
+              <p className="text-[14px] font-semibold text-[#10141a]">
+                {textOrDash(service.sdrDetails?.source?.claimsSource)}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {(service.sdrDetails?.source?.serviceCode ||
+          service.sdrDetails?.source?.serviceName ||
+          service.sdrDetails?.source?.outcomeStatement) && (
+          <div className="rounded-[12px] border border-[#e5e5e6] bg-white/70 p-3 text-[13px] text-[#4b4b4c] space-y-1">
+            {(service.sdrDetails?.source?.outcomeStatement?.trim()
+              ?? service.sdrDetails?.source?.serviceName?.trim()
+              ?? service.sdrDetails?.source?.serviceCode?.trim()) ? (
+              <>
+                {service.sdrDetails?.source?.outcomeStatement ? (
+                  <p>
+                    <span className="font-medium text-[#10141a]">Outcome: </span>
+                    {service.sdrDetails.source.outcomeStatement}
+                  </p>
+                ) : null}
+                {service.sdrDetails?.source?.serviceName ? (
+                  <p>
+                    <span className="font-medium text-[#10141a]">Extracted service: </span>
+                    {service.sdrDetails.source.serviceName}{" "}
+                    {service.sdrDetails.source.serviceCode
+                      ? `(${service.sdrDetails.source.serviceCode})`
+                      : ""}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );

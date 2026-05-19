@@ -100,6 +100,27 @@ export const GUARDIAN_RELATIONSHIP_LABELS: Record<GuardianRelationship, string> 
     other: "Other",
 };
 
+/** Structured SDR (service delivery) breakdown imported from client SDR docs. */
+export type ServiceSdrDetails = {
+    deliveryMethods?: string[];
+    supportTasks?: string[];
+    frequency?: string;
+    duration?: string;
+    setting?: string;
+    staffing?: string;
+    source?: {
+        outcomeStatement?: string;
+        serviceName?: string;
+        serviceCode?: string;
+        provider?: string;
+        claimsSource?: string;
+    };
+    importedAt?: string;
+};
+
+/** Max list length per SDR extraction / persistence (Firestore size guard). */
+export const SDR_DETAILS_LIST_MAX = 50;
+
 export type Service = {
     id: string;
     name?: string;
@@ -124,9 +145,33 @@ export type Service = {
     frequency?: string;
     totalUnits?: string;
     totalCost?: string;
+    /** Procedure label when separate from procedural code on SDRs (e.g. "CBS"). */
+    procedureName?: string;
+    /** Total hours interpreted from Total Units × unit type (SDR excerpt). */
+    sdrComputedTotalHours?: string;
+    sdrPriorAuthorization?: Partial<{
+        /** @deprecated Extraction-only; canonical auth dates use `startAuthDate` / `endAuthDate`. */
+        startDate: string;
+        /** @deprecated Extraction-only; canonical auth dates use `startAuthDate` / `endAuthDate`. */
+        endDate: string;
+        paNumber: string;
+        approvedUnitsTillDate: string;
+    }>;
+    sdrWeeklyDistribution?: Partial<{
+        standardLine: string;
+        rows: Array<
+            Partial<{
+                weekRange: string;
+                units: string;
+                hours: string;
+            }>
+        >;
+    }>;
     evvStatus?: string;
     evvDescription?: string;
     narrative?: string;
+    /** Imported SDR breakdown (delivery methods, tasks); not duplicated on provider/Sdr dates */
+    sdrDetails?: ServiceSdrDetails;
     /** Manually assigned staff for this service only (not extracted by AI). */
     assignedDsps?: Dsp[];
 };
@@ -388,6 +433,7 @@ export function createEmptyServiceAuthorization(): Service {
         evvStatus: undefined,
         evvDescription: undefined,
         narrative: undefined,
+        sdrDetails: undefined,
         assignedDsps: [],
     };
 }

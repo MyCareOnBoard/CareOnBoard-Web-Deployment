@@ -74,6 +74,50 @@ export type ExtractionTeamMember = Partial<{
   contact: string;
 }>;
 
+export type ExtractionSdrDetailsSource = Partial<{
+  outcomeStatement: string;
+  serviceName: string;
+  serviceCode: string;
+  /** Printed provider/agency line from the SDR PDF. */
+  provider: string;
+  /** Printed payer/source line (e.g. Medicaid). */
+  claimsSource: string;
+}>;
+
+export type ExtractionSdrDetails = Partial<{
+  deliveryMethods: string[];
+  supportTasks: string[];
+  frequency: string;
+  duration: string;
+  setting: string;
+  staffing: string;
+  source: ExtractionSdrDetailsSource;
+}>;
+
+/** Structured diagnosis from SDR (code before hyphen, description after). */
+export type ExtractionDiagnosisEntry = Partial<{
+  diagnosisCode: string;
+  diagnosisDescription: string;
+}>;
+
+export type ExtractionSdrPriorAuthorization = Partial<{
+  startDate: string;
+  endDate: string;
+  paNumber: string;
+  approvedUnitsTillDate: string;
+}>;
+
+export type ExtractionSdrWeeklyDistributionRow = Partial<{
+  weekRange: string;
+  units: string;
+  hours: string;
+}>;
+
+export type ExtractionSdrWeeklyDistribution = Partial<{
+  standardLine: string;
+  rows: ExtractionSdrWeeklyDistributionRow[];
+}>;
+
 export type ExtractionServiceRow = Partial<{
   name: string;
   code: string;
@@ -99,6 +143,17 @@ export type ExtractionServiceRow = Partial<{
   pcptDate: string;
   sdrStartDate: string;
   sdrEndDate: string;
+  sdrDetails?: ExtractionSdrDetails;
+  procedureName?: string;
+  /** Total hours derived from units / unit type (SDR detail). */
+  sdrComputedTotalHours?: string;
+  priorAuthorization?: ExtractionSdrPriorAuthorization;
+  weeklyDistribution?: ExtractionSdrWeeklyDistribution;
+  /** Model-suggested wizard row (SDR import); validated client-side before apply. */
+  matchedOutcomeId?: string;
+  matchedServiceId?: string;
+  matchConfidence?: string;
+  matchReason?: string;
   /** @deprecated Legacy per-service outcome tags; prefer `stage2.outcomes[].services`. */
   outcomes: string[];
 }>;
@@ -169,6 +224,8 @@ export type ClientExtractionDraft = {
     primaryCarePhysician: string;
     primaryDiagnosis: string;
     secondaryDiagnosis: string;
+    primaryDiagnosisEntry?: ExtractionDiagnosisEntry;
+    secondaryDiagnosisEntry?: ExtractionDiagnosisEntry;
     healthHazards: string;
     nutritionNotes: string;
     selfCareNeeds: ExtractionAdlSupportNeed[];

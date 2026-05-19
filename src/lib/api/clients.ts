@@ -108,6 +108,23 @@ export interface Client {
  * These mirror the fields collected in the Add Client flow.
  * NOTE: Backend support may be incremental; keep fields optional on requests.
  */
+export interface ClientServiceSdrDetails {
+  deliveryMethods?: string[];
+  supportTasks?: string[];
+  frequency?: string;
+  duration?: string;
+  setting?: string;
+  staffing?: string;
+  source?: {
+    outcomeStatement?: string;
+    serviceName?: string;
+    serviceCode?: string;
+    provider?: string;
+    claimsSource?: string;
+  };
+  importedAt?: string;
+}
+
 export interface ClientService {
   id: string;
   name: string;
@@ -134,6 +151,20 @@ export interface ClientService {
   evvStatus?: string;
   evvDescription?: string;
   narrative?: string;
+  procedureName?: string;
+  sdrComputedTotalHours?: string;
+  sdrPriorAuthorization?: Partial<{
+    startDate: string;
+    endDate: string;
+    paNumber: string;
+    approvedUnitsTillDate: string;
+  }>;
+  sdrWeeklyDistribution?: Partial<{
+    standardLine: string;
+    rows: Array<Partial<{ weekRange: string; units: string; hours: string }>>;
+  }>;
+  /** Structured SDR breakdown (from import or API). */
+  sdrDetails?: ClientServiceSdrDetails;
   /** Direct support staff assigned to this service (id + name). */
   assignedDsps?: ClientDsp[];
   /** ISP outcome statements for this service (derived / legacy flat row). */

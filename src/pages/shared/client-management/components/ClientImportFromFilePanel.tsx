@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { FileUp, Info, Loader2 } from "lucide-react";
-import { extractClientOnboardingViaApi } from "@/lib/api/gemini";
+import { extractClientIspViaApi } from "@/lib/api/gemini";
 import type { ClientExtractionResponse, FieldConfidence } from "../types/clientExtraction";
 import type { AddClientFormData } from "../types/formData";
 import { mergeExtractionDraft } from "../utils/mergeExtractionDraft";
@@ -170,7 +170,7 @@ export default function ClientImportFromFilePanel({
     setError(null);
     setPendingFile(file);
     try {
-      const res = await extractClientOnboardingViaApi(file);
+      const res = await extractClientIspViaApi(file);
       setExtraction(res);
       setModalStep("review");
     } catch (e: unknown) {
