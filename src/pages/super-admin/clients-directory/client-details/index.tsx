@@ -5,8 +5,8 @@ import { Routes } from "@/routes/constants";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ActivityTab } from "@/pages/super-admin/clients-directory/client-details/tabs/ActivityTab";
-import { ProfileTab } from "@/pages/super-admin/clients-directory/client-details/tabs/ProfileTab";
+import { ActivityTab } from "@/pages/shared/client-details/tabs/ActivityTab";
+import { ProfileTab } from "@/pages/shared/client-details/tabs/ProfileTab";
 import { ServicesTab } from "@/pages/super-admin/clients-directory/client-details/tabs/ServicesTab";
 import { DocumentsTab } from "@/pages/super-admin/clients-directory/client-details/tabs/DocumentsTab";
 import { UploadClientDocumentModal } from "@/pages/super-admin/clients-directory/client-details/components/UploadClientDocumentModal";
@@ -313,6 +313,7 @@ export default function ClientDetailsPage() {
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
           itemsPerPage={itemsPerPage}
+          shiftDetailsRoute={Routes.agency.shiftDetails}
         />
       )}
       {activeTab === "profile" && (
@@ -321,6 +322,7 @@ export default function ClientDetailsPage() {
           formatDate={formatDate}
           clientId={clientId || ""}
           onClientUpdated={fetchClient}
+          afterDeleteRoute={Routes.superAdmin.clientDirectory}
         />
       )}
       {activeTab === "services" && (
