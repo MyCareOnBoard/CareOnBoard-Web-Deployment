@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useCreateConversationMutation, useLazyGetConversationQuery, useSendMessageMutation, type AIMessage, type DSPSuggestion } from "./api";
+import type { Attachment } from "./types";
 import { toast } from "sonner";
 import AIAutomationHeader from "./components/AIAutomationHeader";
 import { useAuth } from "@/utils/auth";
@@ -24,6 +25,7 @@ function AIAutomationContent() {
   const [inputValue, setInputValue] = useState("");
   const [showConversations, setShowConversations] = useState(false);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -62,6 +64,7 @@ function AIAutomationContent() {
               content: message.content,
               suggestions: message.suggestions,
               actions: message.actions,
+              attachments: message.attachments,
             }))
           );
         }
@@ -91,10 +94,14 @@ function AIAutomationContent() {
         }
       }
 
+      const attachmentsSnapshot = [...pendingAttachments];
+      setPendingAttachments([]);
+
       const userMessage: LocalMessage = {
         id: `user-${Date.now()}`,
         role: "user",
         content,
+        attachments: attachmentsSnapshot.length ? attachmentsSnapshot : undefined,
       };
       const loadingMessage: LocalMessage = {
         id: `loading-${Date.now()}`,
@@ -106,7 +113,11 @@ function AIAutomationContent() {
       setMessages((prev) => [...prev, userMessage, loadingMessage]);
 
       try {
-        const response = await sendMessage({ conversationId, message: content }).unwrap();
+        const response = await sendMessage({
+          conversationId,
+          message: content,
+          attachments: attachmentsSnapshot.length ? attachmentsSnapshot : undefined,
+        }).unwrap();
         setMessages((prev) =>
           prev
             .filter((msg) => !msg.isLoading)
@@ -130,7 +141,7 @@ function AIAutomationContent() {
         );
       }
     },
-    [activeConversationId, createConversation, inputValue, isSending, sendMessage]
+    [activeConversationId, createConversation, inputValue, isSending, pendingAttachments, sendMessage]
   );
 
   const handleAssignDSP = useCallback(
@@ -185,6 +196,10 @@ function AIAutomationContent() {
               )
             }
             isRecording={isRecording}
+            attachments={pendingAttachments}
+            onRemoveAttachment={(index) =>
+              setPendingAttachments((prev) => prev.filter((_, i) => i !== index))
+            }
           />
         </div>
 
@@ -199,9 +214,9 @@ function AIAutomationContent() {
         <AddAttachmentModal
           isOpen={showAttachmentModal}
           onClose={() => setShowAttachmentModal(false)}
-          onUpload={(files) => {
-            // To handle uploaded files
-            toast.success(`${files.length} file(s) uploaded!`);
+          onUpload={(attachments) => {
+            setPendingAttachments((prev) => [...prev, ...attachments]);
+            toast.success(`${attachments.length} file(s) attached`);
           }}
         />
       </div>

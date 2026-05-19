@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { CheckCircle, Sparkles } from "lucide-react";
+import { CheckCircle, FileText, Sparkles } from "lucide-react";
 import { type DSPSuggestion } from "../api";
 import type { LocalMessage } from "../types";
 
@@ -59,8 +59,38 @@ export function MessageBubble({
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] sm:max-w-[80%] rounded-[18px] sm:rounded-[24px] rounded-tr-[4px] sm:rounded-tr-[6px] bg-white px-4 sm:px-5 py-3 sm:py-4 text-[13px] sm:text-[14px] leading-relaxed sm:leading-relaxed text-black break-words">
-          {msg.content}
+        <div className="max-w-[85%] sm:max-w-[80%]">
+          {msg.attachments && msg.attachments.length > 0 && (
+            <div className="mb-2 flex flex-wrap justify-end gap-2">
+              {msg.attachments.map((att, idx) =>
+                att.type === "image" ? (
+                  <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={att.url}
+                      alt={att.name}
+                      className="max-w-[200px] sm:max-w-[280px] rounded-[14px] object-cover border border-[#e5e7eb]"
+                    />
+                  </a>
+                ) : (
+                  <a
+                    key={idx}
+                    href={att.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#e5e7eb] bg-white px-3 py-1.5 text-[12px] text-[#111827] hover:border-[#00b4b8] transition"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-[#6b7280]" />
+                    <span className="max-w-[140px] truncate">{att.name}</span>
+                  </a>
+                )
+              )}
+            </div>
+          )}
+          {msg.content && (
+            <div className="rounded-[18px] sm:rounded-[24px] rounded-tr-[4px] sm:rounded-tr-[6px] bg-white px-4 sm:px-5 py-3 sm:py-4 text-[13px] sm:text-[14px] leading-relaxed text-black break-words">
+              {msg.content}
+            </div>
+          )}
         </div>
       </div>
     );
