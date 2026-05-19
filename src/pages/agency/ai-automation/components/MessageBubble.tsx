@@ -1,7 +1,10 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CheckCircle, FileText, Sparkles } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { type DSPSuggestion } from "../api";
 import type { LocalMessage } from "../types";
+import { ComponentRenderer } from "./response-components";
 
 function getInitials(name: string) {
   return name
@@ -102,7 +105,7 @@ export function MessageBubble({
         <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#00b4b8]" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="rounded-[18px] sm:rounded-[24px] rounded-tl-[4px] sm:rounded-tl-[6px] bg-[#f3f4f6] px-4 sm:px-5 py-3 sm:py-4 text-[13px] sm:text-[14px] leading-relaxed text-[#10141a] whitespace-pre-wrap">
+        <div className="rounded-[18px] sm:rounded-[24px] rounded-tl-[4px] sm:rounded-tl-[6px] bg-[#f3f4f6] px-4 sm:px-5 py-3 sm:py-4 text-[13px] sm:text-[14px] leading-relaxed text-[#10141a]">
           {msg.isLoading ? (
             <div className="flex items-center gap-1.5 sm:gap-2">
               <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-bounce rounded-full bg-[#00b4b8]" />
@@ -110,9 +113,52 @@ export function MessageBubble({
               <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-bounce rounded-full bg-[#00b4b8] delay-300" />
             </div>
           ) : (
-            msg.content
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                table: ({ children }) => (
+                  <div className="overflow-x-auto mt-1">
+                    <table className="w-full text-[12px] border-collapse">{children}</table>
+                  </div>
+                ),
+                thead: ({ children }) => <thead>{children}</thead>,
+                th: ({ children }) => (
+                  <th className="border border-[#e5e7eb] bg-[#f9fafb] px-3 py-1.5 text-left font-semibold text-[#374151]">
+                    {children}
+                  </th>
+                ),
+                td: ({ children }) => (
+                  <td className="border border-[#e5e7eb] px-3 py-1.5 text-[#374151]">{children}</td>
+                ),
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                ul: ({ children }) => (
+                  <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold text-[#10141a]">{children}</strong>
+                ),
+                code: ({ children }) => (
+                  <code className="rounded bg-[#e5e7eb] px-1 py-0.5 text-[11px] font-mono">
+                    {children}
+                  </code>
+                ),
+              }}
+            >
+              {msg.content}
+            </ReactMarkdown>
           )}
         </div>
+
+        {!msg.isLoading && msg.components && msg.components.length > 0 && (
+          <div className="mt-3 space-y-3">
+            {msg.components.map((comp, i) => (
+              <ComponentRenderer key={i} component={comp} />
+            ))}
+          </div>
+        )}
 
         {!msg.isLoading && msg.actions && msg.actions.length > 0 && (
           <div className="mt-2.5 sm:mt-3 flex flex-wrap gap-2">

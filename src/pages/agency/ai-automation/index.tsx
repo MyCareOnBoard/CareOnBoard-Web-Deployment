@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 import { useCreateConversationMutation, useLazyGetConversationQuery, useSendMessageMutation, type AIMessage, type DSPSuggestion } from "./api";
 import type { Attachment } from "./types";
 import { toast } from "sonner";
@@ -18,14 +19,17 @@ const MAX_CHARS = 500;
 
 function AIAutomationContent() {
   const { user } = useAuth();
+  const { conversationId: urlConversationId } = useParams<{ conversationId: string }>();
+  const navigate = useNavigate();
   const { startRecording, isRecording } = useVoiceRecording();
   const [selectedArea, setSelectedArea] = useState("");
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(urlConversationId ?? null);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [showConversations, setShowConversations] = useState(false);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -42,17 +46,31 @@ function AIAutomationContent() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  useEffect(() => {
+    if (urlConversationId) {
+      loadConversation(urlConversationId);
+    } else {
+      setActiveConversationId(null);
+      setMessages([]);
+      setIsLoadingConversation(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlConversationId]);
+
   const startNewConversation = useCallback(() => {
     setActiveConversationId(null);
     setMessages([]);
     setInputValue("");
+    navigate("/agency/automations", { replace: true });
     textareaRef.current?.focus();
-  }, []);
+  }, [navigate]);
 
   const loadConversation = useCallback(
     async (id: string) => {
       setActiveConversationId(id);
       setMessages([]);
+      setIsLoadingConversation(true);
+      navigate(`/agency/automations/${id}`, { replace: true });
 
       try {
         const result = await fetchConversation(id).unwrap();
@@ -65,14 +83,17 @@ function AIAutomationContent() {
               suggestions: message.suggestions,
               actions: message.actions,
               attachments: message.attachments,
+              components: message.components,
             }))
           );
         }
       } catch {
         toast.error("Failed to load conversation");
+      } finally {
+        setIsLoadingConversation(false);
       }
     },
-    [fetchConversation]
+    [fetchConversation, navigate]
   );
 
   const handleSend = useCallback(
@@ -88,6 +109,7 @@ function AIAutomationContent() {
           const result = await createConversation({}).unwrap();
           conversationId = result.id;
           setActiveConversationId(conversationId);
+          navigate(`/agency/automations/${conversationId}`, { replace: true });
         } catch {
           toast.error("Failed to start conversation");
           return;
@@ -128,6 +150,7 @@ function AIAutomationContent() {
               content: response.content,
               suggestions: response.suggestions,
               actions: response.actions,
+              components: response.components,
             })
         );
       } catch {
@@ -142,7 +165,7 @@ function AIAutomationContent() {
         );
       }
     },
-    [activeConversationId, createConversation, inputValue, isSending, pendingAttachments, sendMessage]
+    [activeConversationId, createConversation, inputValue, isSending, navigate, pendingAttachments, sendMessage]
   );
 
   const handleAssignDSP = useCallback(
@@ -165,14 +188,24 @@ function AIAutomationContent() {
         />
         <div className="flex-1 flex min-h-0 flex-col overflow-hidden rounded-[28px] border-2 border-white shadow-sm sm:rounded-[32px]">
           <div className="flex-1 p-4 overflow-y-auto sm:p-6 md:p-8">
-            {messages.length === 0 ? (
-              <EmptyState onQuickAction={(text) => handleSend(text)} onOpenConversations={function (): void {
-                throw new Error("Function not implemented.");
-              } } onNewConversation={function (): void {
-                throw new Error("Function not implemented.");
-              } } onAction={function (text: string): void {
-                throw new Error("Function not implemented.");
-              } } />
+            {isLoadingConversation ? (
+              <div className="flex flex-col gap-4 animate-pulse">
+                {[80, 60, 90, 50].map((w, i) => (
+                  <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
+                    <div
+                      className="h-10 rounded-2xl bg-[#e5e7eb]"
+                      style={{ width: `${w}%` }}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : messages.length === 0 ? (
+              <EmptyState
+                onQuickAction={(text) => handleSend(text)}
+                onOpenConversations={() => setShowConversations(true)}
+                onNewConversation={startNewConversation}
+                onAction={(text) => handleSend(text)}
+              />
             ) : (
               <div className="space-y-4">
                 {messages.map((msg) => (

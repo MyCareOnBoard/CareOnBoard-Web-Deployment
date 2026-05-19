@@ -28,6 +28,7 @@ export const Routes = {
         clientClaims: "/agency/billing-and-approvals/client/:clientId",
         dspClaims: "/agency/billing-and-approvals/dsp/:dsp",
         aiAutomation: "/agency/automations",
+        aiAutomationConversation: "/agency/automations/:conversationId",
         scheduling: "/agency/shifts",
         support: "/agency/support",
         supportConversation: "/agency/support/:conversationId",

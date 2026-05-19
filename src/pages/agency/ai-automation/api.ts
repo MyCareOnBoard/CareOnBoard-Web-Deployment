@@ -1,6 +1,6 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
-import type { Attachment } from "./types";
+import type { Attachment, ResponseComponent } from "./types";
 
 export interface DSPSuggestion {
   employeeId: string;
@@ -17,7 +17,8 @@ export interface AIMessage {
   suggestions?: DSPSuggestion[];
   actions?: Array<{ type: string; outcome: string; payload?: any }>;
   toolCallsMade?: string[];
-  attachments?: import("./types").Attachment[];
+  attachments?: Attachment[];
+  components?: ResponseComponent[];
   createdAt: any;
 }
 
@@ -42,6 +43,7 @@ export interface SendMessageResponse {
   suggestions: DSPSuggestion[];
   actions: Array<{ type: string; outcome: string; payload?: any }>;
   toolCallsMade: string[];
+  components?: ResponseComponent[];
 }
 
 export interface AttachmentUploadResponse {

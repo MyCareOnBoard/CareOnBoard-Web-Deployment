@@ -277,6 +277,10 @@ export const router = createBrowserRouter([
                 Component: AIAutomationPage,
             },
             {
+                path: Routes.agency.aiAutomationConversation,
+                Component: AIAutomationPage,
+            },
+            {
                 path: Routes.agency.scheduling,
                 Component: SchedulingPage,
             },
