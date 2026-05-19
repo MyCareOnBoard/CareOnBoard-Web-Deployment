@@ -1,5 +1,13 @@
 import { DSPSuggestion } from "./api";
 
+export interface Attachment {
+  type: "image" | "file";
+  url: string;
+  name: string;
+  fileSize?: number;
+  fileType?: string;
+}
+
 export interface LocalMessage {
   id: string;
   role: "user" | "assistant";
@@ -7,4 +15,5 @@ export interface LocalMessage {
   isLoading?: boolean;
   actions?: Array<{ type: string; outcome: string }>;
   suggestions?: DSPSuggestion[];
+  attachments?: Attachment[];
 }

@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useCreateConversationMutation, useLazyGetConversationQuery, useSendMessageMutation, type AIMessage, type DSPSuggestion } from "./api";
+import type { Attachment } from "./types";
 import { toast } from "sonner";
 import AIAutomationHeader from "./components/AIAutomationHeader";
 import { useAuth } from "@/utils/auth";
 import ChatComposer from "./components/ChatComposer";
 import { AddAttachmentModal } from "./components/AddAttachmentModal";
 import ConversationsSidebar from "./components/ConversationsSidebar";
+import { VoiceRecordingProvider, useVoiceRecording } from "@/contexts/VoiceRecordingContext";
+import VoiceInputButton from "@/components/VoiceInputButton";
 
 import { MessageBubble } from "./components/MessageBubble";
 import EmptyState from "./components/EmptyState";
@@ -13,14 +16,16 @@ import type { LocalMessage } from "./types";
 
 const MAX_CHARS = 500;
 
-export default function AIAutomationPage() {
+function AIAutomationContent() {
   const { user } = useAuth();
+  const { startRecording, isRecording } = useVoiceRecording();
   const [selectedArea, setSelectedArea] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [showConversations, setShowConversations] = useState(false);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -59,6 +64,7 @@ export default function AIAutomationPage() {
               content: message.content,
               suggestions: message.suggestions,
               actions: message.actions,
+              attachments: message.attachments,
             }))
           );
         }
@@ -88,10 +94,14 @@ export default function AIAutomationPage() {
         }
       }
 
+      const attachmentsSnapshot = [...pendingAttachments];
+      setPendingAttachments([]);
+
       const userMessage: LocalMessage = {
         id: `user-${Date.now()}`,
         role: "user",
         content,
+        attachments: attachmentsSnapshot.length ? attachmentsSnapshot : undefined,
       };
       const loadingMessage: LocalMessage = {
         id: `loading-${Date.now()}`,
@@ -103,7 +113,11 @@ export default function AIAutomationPage() {
       setMessages((prev) => [...prev, userMessage, loadingMessage]);
 
       try {
-        const response = await sendMessage({ conversationId, message: content }).unwrap();
+        const response = await sendMessage({
+          conversationId,
+          message: content,
+          attachments: attachmentsSnapshot.length ? attachmentsSnapshot : undefined,
+        }).unwrap();
         setMessages((prev) =>
           prev
             .filter((msg) => !msg.isLoading)
@@ -127,7 +141,7 @@ export default function AIAutomationPage() {
         );
       }
     },
-    [activeConversationId, createConversation, inputValue, isSending, sendMessage]
+    [activeConversationId, createConversation, inputValue, isSending, pendingAttachments, sendMessage]
   );
 
   const handleAssignDSP = useCallback(
@@ -138,6 +152,8 @@ export default function AIAutomationPage() {
   );
 
     return (
+      <>
+        <VoiceInputButton />
       <div className="flex min-h-screen flex-col gap-4 px-4 sm:gap-6 sm:px-6 sm:py-6">
         <AIAutomationHeader
           onOpenConversations={() => setShowConversations(true)}
@@ -174,6 +190,16 @@ export default function AIAutomationPage() {
             onSend={() => handleSend()}
             onQuickAction={(text) => handleSend(text)}
             onAddAttachment={() => setShowAttachmentModal(true)}
+            onMicClick={() =>
+              startRecording("message", "AI Automation", undefined, (transcript) =>
+                setInputValue((prev) => (prev ? `${prev} ${transcript}` : transcript))
+              )
+            }
+            isRecording={isRecording}
+            attachments={pendingAttachments}
+            onRemoveAttachment={(index) =>
+              setPendingAttachments((prev) => prev.filter((_, i) => i !== index))
+            }
           />
         </div>
 
@@ -188,11 +214,20 @@ export default function AIAutomationPage() {
         <AddAttachmentModal
           isOpen={showAttachmentModal}
           onClose={() => setShowAttachmentModal(false)}
-          onUpload={(files) => {
-            // To handle uploaded files
-            toast.success(`${files.length} file(s) uploaded!`);
+          onUpload={(attachments) => {
+            setPendingAttachments((prev) => [...prev, ...attachments]);
+            toast.success(`${attachments.length} file(s) attached`);
           }}
         />
       </div>
+      </>
     );
-  }
+}
+
+export default function AIAutomationPage() {
+  return (
+    <VoiceRecordingProvider pageTitle="AI Automation">
+      <AIAutomationContent />
+    </VoiceRecordingProvider>
+  );
+}

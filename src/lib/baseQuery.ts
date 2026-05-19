@@ -14,7 +14,7 @@ const baseQueryWithAuth: BaseQueryFn<
   try {
     const headers =
       args.data instanceof FormData
-        ? { "Content-Type": "multipart/form-data" }
+        ? { ...args.headers }
         : { "Content-Type": "application/json", ...args.headers };
 
     const result = await axiosClient({
@@ -50,7 +50,7 @@ const baseQueryWithoutAuth: BaseQueryFn<
   try {
     const headers =
       args.data instanceof FormData
-        ? { "Content-Type": "multipart/form-data" }
+        ? { ...args.headers }
         : { "Content-Type": "application/json", ...args.headers };
 
     const result = await axiosClientWithoutAuth({

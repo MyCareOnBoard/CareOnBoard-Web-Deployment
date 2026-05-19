@@ -1,67 +1,86 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Button } from "@/components/ui/button";
 import { X, Trash2 } from "lucide-react";
+import { useUploadAttachmentMutation } from "../api";
+import type { Attachment } from "../types";
 
-interface Attachment {
+interface FileEntry {
   file: File;
-  progress: number; // 0-100
+  progress: number;
   status: "pending" | "uploading" | "done" | "error";
+  errorMessage?: string;
 }
 
 interface AddAttachmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onUpload: (files: File[]) => void;
+  onUpload: (attachments: Attachment[]) => void;
 }
 
 export const AddAttachmentModal: React.FC<AddAttachmentModalProps> = ({ isOpen, onClose, onUpload }) => {
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [files, setFiles] = useState<FileEntry[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadAttachment] = useUploadAttachmentMutation();
 
-  const handleFilesSelected = (files: FileList | null) => {
-    if (!files) return;
-    const newAttachments: Attachment[] = Array.from(files).map((file) => ({
+  const handleFilesSelected = (selected: FileList | null) => {
+    if (!selected) return;
+    const newEntries: FileEntry[] = Array.from(selected).map((file) => ({
       file,
       progress: 0,
       status: "pending",
     }));
-    setAttachments((prev) => [...prev, ...newAttachments]);
+    setFiles((prev) => [...prev, ...newEntries]);
   };
 
   const handleRemove = (idx: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleUpload = async () => {
+    if (files.length === 0) return;
     setUploading(true);
-    // Simulate upload progress
-    for (let i = 0; i < attachments.length; i++) {
-      setAttachments((prev) =>
-        prev.map((att, idx) =>
-          idx === i ? { ...att, status: "uploading", progress: 0 } : att
-        )
+
+    const results: Attachment[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      setFiles((prev) =>
+        prev.map((f, idx) => (idx === i ? { ...f, status: "uploading", progress: 30 } : f))
       );
-      await new Promise((res) => setTimeout(res, 500));
-      for (let p = 10; p <= 100; p += 10) {
-        setAttachments((prev) =>
-          prev.map((att, idx) =>
-            idx === i ? { ...att, progress: p } : att
+
+      const formData = new FormData();
+      formData.append("file", files[i].file);
+
+      try {
+        const response = await uploadAttachment(formData).unwrap();
+        setFiles((prev) =>
+          prev.map((f, idx) => (idx === i ? { ...f, status: "done", progress: 100 } : f))
+        );
+        const isImage = files[i].file.type.startsWith("image/");
+        results.push({
+          type: isImage ? "image" : "file",
+          url: response.data.url,
+          name: response.data.fileName,
+          fileSize: response.data.fileSize,
+          fileType: response.data.fileType,
+        });
+      } catch {
+        setFiles((prev) =>
+          prev.map((f, idx) =>
+            idx === i ? { ...f, status: "error", progress: 0, errorMessage: "Upload failed" } : f
           )
         );
-        await new Promise((res) => setTimeout(res, 60));
       }
-      setAttachments((prev) =>
-        prev.map((att, idx) =>
-          idx === i ? { ...att, status: "done", progress: 100 } : att
-        )
-      );
     }
+
     setUploading(false);
-    onUpload(attachments.map((a) => a.file));
-    setAttachments([]);
-    onClose();
+
+    if (results.length > 0) {
+      onUpload(results);
+      setFiles([]);
+      onClose();
+    }
   };
 
   return (
@@ -91,43 +110,47 @@ export const AddAttachmentModal: React.FC<AddAttachmentModalProps> = ({ isOpen, 
               <X size={22} />
             </button>
             <h2 className="text-lg font-semibold mb-1">Add attachment</h2>
-            <p className="text-sm text-gray-500 mb-4">Upload your assets of choice to me.</p>
+            <p className="text-sm text-gray-500 mb-4">Upload images or PDFs to include in your message.</p>
             <FileUpload
               label="Click to upload or drag and drop"
-              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.gif"
               multiple
               onFilesSelected={handleFilesSelected}
               className="mb-4"
             />
             <div className="space-y-2 mb-4">
-              {attachments.map((att, idx) => (
+              {files.map((entry, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between border rounded-lg px-3 py-2 mb-1 bg-gray-50"
+                  className="flex items-center justify-between border rounded-lg px-3 py-2 bg-gray-50"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="inline-block w-7 text-center">
-                      {att.file.type.includes("pdf") ? (
+                      {entry.file.type.includes("pdf") ? (
                         <span className="text-blue-600">📄</span>
                       ) : (
                         <span className="text-green-600">🖼️</span>
                       )}
                     </span>
-                    <span className="truncate max-w-[160px] text-sm font-medium">
-                      {att.file.name}
-                    </span>
+                    <span className="truncate max-w-[160px] text-sm font-medium">{entry.file.name}</span>
                     <span className="ml-2 text-xs text-gray-400">
-                      {Math.round(att.file.size / 1024 / 1024 * 10) / 10} MB
+                      {Math.round((entry.file.size / 1024 / 1024) * 10) / 10} MB
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className={`h-2 rounded-full ${att.status === "done" ? "bg-emerald-500" : "bg-blue-400"}`}
-                        style={{ width: `${att.progress}%` }}
-                      />
-                    </div>
-                    {att.status !== "uploading" && (
+                    {entry.status === "error" ? (
+                      <span className="text-xs text-red-500">{entry.errorMessage}</span>
+                    ) : (
+                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            entry.status === "done" ? "bg-emerald-500" : "bg-blue-400"
+                          }`}
+                          style={{ width: `${entry.progress}%` }}
+                        />
+                      </div>
+                    )}
+                    {entry.status !== "uploading" && (
                       <button
                         className="ml-2 text-gray-400 hover:text-red-500"
                         onClick={() => handleRemove(idx)}
@@ -145,8 +168,8 @@ export const AddAttachmentModal: React.FC<AddAttachmentModalProps> = ({ isOpen, 
               <Button variant="outline" onClick={onClose} disabled={uploading}>
                 Cancel
               </Button>
-              <Button onClick={handleUpload} disabled={attachments.length === 0 || uploading}>
-                Upload
+              <Button onClick={handleUpload} disabled={files.length === 0 || uploading}>
+                {uploading ? "Uploading…" : "Upload"}
               </Button>
             </div>
           </motion.div>

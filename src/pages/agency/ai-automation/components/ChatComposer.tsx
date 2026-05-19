@@ -5,9 +5,12 @@ import {
   Mic,
   Paperclip,
   File,
+  FileText,
   Send,
   ChevronRight,
+  X,
 } from "lucide-react";
+import type { Attachment } from "../types";
 
 const QUICK_ACTIONS = [
   { label: "Find shift coverage" },
@@ -25,6 +28,10 @@ interface ChatComposerProps {
   onSend: () => void;
   onQuickAction: (text: string) => void;
   onAddAttachment?: () => void;
+  onMicClick?: () => void;
+  isRecording?: boolean;
+  attachments?: Attachment[];
+  onRemoveAttachment?: (index: number) => void;
 }
 
 export default function ChatComposer({
@@ -35,6 +42,10 @@ export default function ChatComposer({
   onSend,
   onQuickAction,
   onAddAttachment,
+  onMicClick,
+  isRecording = false,
+  attachments = [],
+  onRemoveAttachment,
 }: ChatComposerProps) {
   const [showActions, setShowActions] = useState(false);
 
@@ -77,6 +88,35 @@ export default function ChatComposer({
             transition
           "
         />
+
+        {attachments.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {attachments.map((att, idx) => (
+              <div key={idx} className="relative group">
+                {att.type === "image" ? (
+                  <img
+                    src={att.url}
+                    alt={att.name}
+                    className="h-14 w-14 rounded-xl object-cover border border-[#E7E7E7]"
+                  />
+                ) : (
+                  <div className="flex items-center gap-1.5 rounded-xl border border-[#E7E7E7] bg-[#F4F7F8] px-3 py-2 text-[13px] text-[#111827]">
+                    <FileText className="h-4 w-4 text-[#6B7280]" />
+                    <span className="max-w-[100px] truncate">{att.name}</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onRemoveAttachment?.(idx)}
+                  className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-[#6B7280] text-white"
+                  aria-label="Remove attachment"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="mt-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -170,12 +210,13 @@ export default function ChatComposer({
 
             <button
               type="button"
-              className="
+              onClick={onMicClick}
+              className={`
                 inline-flex h-11 w-11 items-center justify-center
                 rounded-xl border border-[#E7E7E7]
-                bg-white text-[#111827]
-                transition hover:bg-[#F8F8F8] cursor-pointer
-              "
+                bg-white transition hover:bg-[#F8F8F8] cursor-pointer
+                ${isRecording ? "text-[#00B4B8]" : "text-[#111827]"}
+              `}
             >
               <Mic className="h-5 w-5" />
             </button>
