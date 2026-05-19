@@ -1,7 +1,8 @@
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import type { ProfileField } from "../tabs/profileTabViewModel";
 
-export function ProfileFieldRow({ field }: { field: ProfileField }) {
+export const ProfileFieldRow = memo(function ProfileFieldRow({ field }: { field: ProfileField }) {
   return (
     <div
       className={cn(
@@ -23,4 +24,4 @@ export function ProfileFieldRow({ field }: { field: ProfileField }) {
       </p>
     </div>
   );
-}
+});

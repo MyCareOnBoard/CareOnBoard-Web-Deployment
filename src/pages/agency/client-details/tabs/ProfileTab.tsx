@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { memo, useCallback, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Client, updateClient, deleteClient } from "@/lib/api/clients";
@@ -8,13 +8,119 @@ import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { cn } from "@/lib/utils";
 import { ProfileSectionCard } from "@/pages/agency/client-details/components/ProfileSectionCard";
-import { buildProfileSections } from "./profileTabViewModel";
+import { buildProfileSections, type ProfileSection } from "./profileTabViewModel";
 
 const profileActionBtn =
   "h-9 min-h-9 rounded-lg px-3.5 text-[13px] font-medium shadow-none transition-colors focus-visible:ring-offset-0";
 
 const profileModalBtn =
   "h-9 min-h-9 rounded-lg px-4 text-[13px] font-medium shadow-none focus-visible:ring-offset-0";
+
+const ProfileTabSections = memo(function ProfileTabSections({
+  sections,
+}: {
+  sections: ProfileSection[];
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
+      {sections.map((section) => (
+        <ProfileSectionCard key={section.id} section={section} />
+      ))}
+    </div>
+  );
+});
+
+type ProfileTabToolbarProps = {
+  isInactive: boolean;
+  isActivating: boolean;
+  isDeactivating: boolean;
+  isDeleting: boolean;
+  onActivate: () => void;
+  onOpenDeactivate: () => void;
+  onOpenDelete: () => void;
+};
+
+const ProfileTabToolbar = memo(function ProfileTabToolbar({
+  isInactive,
+  isActivating,
+  isDeactivating,
+  isDeleting,
+  onActivate,
+  onOpenDeactivate,
+  onOpenDelete,
+}: ProfileTabToolbarProps) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {isInactive ? (
+        <Button
+          type="button"
+          variant="ghost"
+          className={cn(
+            profileActionBtn,
+            "gap-1.5 border border-[#00b4b8]/35 bg-[#00b4b8]/8 text-[#008f92] hover:bg-[#00b4b8]/14 hover:text-[#007a7d]",
+          )}
+          onClick={onActivate}
+          disabled={isActivating}
+        >
+          {isActivating ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Activating…
+            </>
+          ) : (
+            <>
+              <CheckCircle className="h-3.5 w-3.5" />
+              Activate
+            </>
+          )}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="ghost"
+          className={cn(
+            profileActionBtn,
+            "border border-[#e8eaed] bg-white/90 text-[#525253] hover:border-[#d8dadd] hover:bg-white hover:text-[#10141a]",
+          )}
+          onClick={onOpenDeactivate}
+          disabled={isDeactivating}
+        >
+          {isDeactivating ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Deactivating…
+            </>
+          ) : (
+            "Deactivate"
+          )}
+        </Button>
+      )}
+
+      <Button
+        type="button"
+        variant="ghost"
+        className={cn(
+          profileActionBtn,
+          "gap-1.5 border border-red-200/90 bg-white/90 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700",
+        )}
+        onClick={onOpenDelete}
+        disabled={isDeleting}
+      >
+        {isDeleting ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Deleting…
+          </>
+        ) : (
+          <>
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </>
+        )}
+      </Button>
+    </div>
+  );
+});
 
 export function ProfileTab({
   client,
@@ -41,7 +147,7 @@ export function ProfileTab({
     [client, formatDate],
   );
 
-  const handleDeactivate = async () => {
+  const handleDeactivate = useCallback(async () => {
     if (!clientId) return;
 
     try {
@@ -54,12 +160,10 @@ export function ProfileTab({
       });
 
       setShowConfirmModal(false);
-
-      if (onClientUpdated) {
-        onClientUpdated();
-      }
+      onClientUpdated?.();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "An error occurred while deactivating the client.";
+      const message =
+        error instanceof Error ? error.message : "An error occurred while deactivating the client.";
       console.error("Failed to deactivate client:", error);
       toast({
         title: "Failed to deactivate client",
@@ -69,9 +173,9 @@ export function ProfileTab({
     } finally {
       setIsDeactivating(false);
     }
-  };
+  }, [clientId, onClientUpdated, toast]);
 
-  const handleActivate = async () => {
+  const handleActivate = useCallback(async () => {
     if (!clientId) return;
 
     try {
@@ -83,11 +187,10 @@ export function ProfileTab({
         description: "The client has been successfully activated.",
       });
 
-      if (onClientUpdated) {
-        onClientUpdated();
-      }
+      onClientUpdated?.();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "An error occurred while activating the client.";
+      const message =
+        error instanceof Error ? error.message : "An error occurred while activating the client.";
       console.error("Failed to activate client:", error);
       toast({
         title: "Failed to activate client",
@@ -97,9 +200,9 @@ export function ProfileTab({
     } finally {
       setIsActivating(false);
     }
-  };
+  }, [clientId, onClientUpdated, toast]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!clientId || !user?.agencyId) return;
 
     try {
@@ -114,7 +217,8 @@ export function ProfileTab({
       setShowDeleteModal(false);
       navigate(Routes.agency.clients);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "An error occurred while deleting the client.";
+      const message =
+        error instanceof Error ? error.message : "An error occurred while deleting the client.";
       console.error("Failed to delete client:", error);
       toast({
         title: "Failed to delete client",
@@ -124,93 +228,34 @@ export function ProfileTab({
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [clientId, navigate, toast, user?.agencyId]);
+
+  const openDeactivateModal = useCallback(() => setShowConfirmModal(true), []);
+  const closeDeactivateModal = useCallback(() => setShowConfirmModal(false), []);
+  const openDeleteModal = useCallback(() => setShowDeleteModal(true), []);
+  const closeDeleteModal = useCallback(() => setShowDeleteModal(false), []);
 
   const isInactive = client.status === "inactive" || client.status === "archived";
 
   return (
     <>
       <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {isInactive ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className={cn(
-                profileActionBtn,
-                "gap-1.5 border border-[#00b4b8]/35 bg-[#00b4b8]/8 text-[#008f92] hover:bg-[#00b4b8]/14 hover:text-[#007a7d]",
-              )}
-              onClick={handleActivate}
-              disabled={isActivating}
-            >
-              {isActivating ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Activating…
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-3.5 w-3.5" />
-                  Activate
-                </>
-              )}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="ghost"
-              className={cn(
-                profileActionBtn,
-                "border border-[#e8eaed] bg-white/90 text-[#525253] hover:border-[#d8dadd] hover:bg-white hover:text-[#10141a]",
-              )}
-              onClick={() => setShowConfirmModal(true)}
-              disabled={isDeactivating}
-            >
-              {isDeactivating ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Deactivating…
-                </>
-              ) : (
-                "Deactivate"
-              )}
-            </Button>
-          )}
+        <ProfileTabToolbar
+          isInactive={isInactive}
+          isActivating={isActivating}
+          isDeactivating={isDeactivating}
+          isDeleting={isDeleting}
+          onActivate={handleActivate}
+          onOpenDeactivate={openDeactivateModal}
+          onOpenDelete={openDeleteModal}
+        />
 
-          <Button
-            type="button"
-            variant="ghost"
-            className={cn(
-              profileActionBtn,
-              "gap-1.5 border border-red-200/90 bg-white/90 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700",
-            )}
-            onClick={() => setShowDeleteModal(true)}
-            disabled={isDeleting}
-          >
-            {isDeleting ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Deleting…
-              </>
-            ) : (
-              <>
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete
-              </>
-            )}
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
-          {sections.map((section) => (
-            <ProfileSectionCard key={section.id} section={section} />
-          ))}
-        </div>
+        <ProfileTabSections sections={sections} />
       </div>
 
       {showConfirmModal ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-          <div className="flex w-full max-w-md max-w-[calc(100vw-2rem)] flex-col items-center gap-4 rounded-2xl bg-white p-6 text-center shadow-lg">
+          <div className="flex w-full max-w-[calc(100vw-2rem)] flex-col items-center gap-4 rounded-2xl bg-white p-6 text-center shadow-lg sm:max-w-md">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
               <AlertCircle className="h-7 w-7 text-red-500" />
             </div>
@@ -227,7 +272,7 @@ export function ProfileTab({
                   profileModalBtn,
                   "border border-[#e8eaed] bg-white text-[#525253] hover:bg-[#f5f6f7]",
                 )}
-                onClick={() => setShowConfirmModal(false)}
+                onClick={closeDeactivateModal}
                 disabled={isDeactivating}
               >
                 Cancel
@@ -252,7 +297,7 @@ export function ProfileTab({
 
       {showDeleteModal ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-          <div className="flex w-full max-w-md max-w-[calc(100vw-2rem)] flex-col items-center gap-4 rounded-2xl bg-white p-6 text-center shadow-lg">
+          <div className="flex w-full max-w-[calc(100vw-2rem)] flex-col items-center gap-4 rounded-2xl bg-white p-6 text-center shadow-lg sm:max-w-md">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
               <AlertCircle className="h-7 w-7 text-red-500" />
             </div>
@@ -269,7 +314,7 @@ export function ProfileTab({
                   profileModalBtn,
                   "border border-[#e8eaed] bg-white text-[#525253] hover:bg-[#f5f6f7]",
                 )}
-                onClick={() => setShowDeleteModal(false)}
+                onClick={closeDeleteModal}
                 disabled={isDeleting}
               >
                 Cancel

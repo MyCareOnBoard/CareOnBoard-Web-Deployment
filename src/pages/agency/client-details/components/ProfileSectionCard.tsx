@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import type {
   ProfileInsuranceRow,
@@ -18,7 +19,7 @@ const SECTION_LAYOUT: Record<string, string> = {
   guardian: "lg:col-span-1",
 };
 
-function InsuranceTable({
+const InsuranceTable = memo(function InsuranceTable({
   rows,
   className,
 }: {
@@ -54,8 +55,11 @@ function InsuranceTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-[#eef0f2]">
-            {rows.map((row, i) => (
-              <tr key={i} className="bg-white/80">
+            {rows.map((row) => (
+              <tr
+                key={`${row.type}-${row.name}-${row.idGroup}`}
+                className="bg-white/80"
+              >
                 <td className="px-4 py-2.5 text-[#10141a]">{row.type}</td>
                 <td className="px-4 py-2.5 text-[#10141a]">{row.name}</td>
                 <td className="px-4 py-2.5 text-[#10141a]">{row.idGroup}</td>
@@ -68,13 +72,16 @@ function InsuranceTable({
       </div>
     </div>
   );
-}
+});
 
-function StringListBlock({ items }: { items: string[] }) {
+const StringListBlock = memo(function StringListBlock({ items }: { items: string[] }) {
   return (
     <ul className="space-y-2">
       {items.map((text, i) => (
-        <li key={i} className="flex gap-3 text-[14px] leading-relaxed text-[#10141a] sm:text-[15px]">
+        <li
+          key={`${i}-${text}`}
+          className="flex gap-3 text-[14px] leading-relaxed text-[#10141a] sm:text-[15px]"
+        >
           <span
             className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#00b4b8]"
             aria-hidden
@@ -84,9 +91,9 @@ function StringListBlock({ items }: { items: string[] }) {
       ))}
     </ul>
   );
-}
+});
 
-function MedicationsTable({
+const MedicationsTable = memo(function MedicationsTable({
   rows,
   className,
 }: {
@@ -122,8 +129,11 @@ function MedicationsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-[#eef0f2]">
-            {rows.map((row, i) => (
-              <tr key={i} className="bg-white/80">
+            {rows.map((row) => (
+              <tr
+                key={`${row.name}-${row.dosage}-${row.frequency}`}
+                className="bg-white/80"
+              >
                 <td className="px-4 py-2.5 text-[#10141a]">{row.name}</td>
                 <td className="px-4 py-2.5 text-[#10141a]">{row.dosage}</td>
                 <td className="px-4 py-2.5 text-[#10141a]">{row.frequency}</td>
@@ -136,9 +146,9 @@ function MedicationsTable({
       </div>
     </div>
   );
-}
+});
 
-function OutcomesBlock({
+const OutcomesBlock = memo(function OutcomesBlock({
   statements,
   moreCount,
   narrative,
@@ -159,7 +169,10 @@ function OutcomesBlock({
           </p>
           <ul className="space-y-2.5">
             {statements.map((text, i) => (
-              <li key={i} className="flex gap-3 text-[14px] leading-relaxed text-[#10141a] sm:text-[15px]">
+              <li
+                key={`${i}-${text.slice(0, 48)}`}
+                className="flex gap-3 text-[14px] leading-relaxed text-[#10141a] sm:text-[15px]"
+              >
                 <span
                   className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00b4b8]/12 text-[12px] font-semibold text-[#008f92]"
                   aria-hidden
@@ -189,9 +202,13 @@ function OutcomesBlock({
       ) : null}
     </div>
   );
-}
+});
 
-export function ProfileSectionCard({ section }: { section: ProfileSection }) {
+export const ProfileSectionCard = memo(function ProfileSectionCard({
+  section,
+}: {
+  section: ProfileSection;
+}) {
   const hasFields = section.fields.length > 0;
   const hasInsurance = (section.insuranceRows?.length ?? 0) > 0;
   const hasListItems = (section.listItems?.length ?? 0) > 0;
@@ -205,8 +222,8 @@ export function ProfileSectionCard({ section }: { section: ProfileSection }) {
   return (
     <section
       className={cn(
-        "flex flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-[0_1px_3px_rgba(16,20,26,0.06),0_8px_24px_rgba(16,20,26,0.04)]",
-        "backdrop-blur-sm",
+        "flex flex-col overflow-hidden rounded-2xl border border-[#e8eaed]/80 bg-white shadow-[0_1px_3px_rgba(16,20,26,0.06),0_8px_24px_rgba(16,20,26,0.04)]",
+        "[content-visibility:auto] [contain-intrinsic-size:auto_320px]",
         layoutClass,
       )}
     >
@@ -252,9 +269,12 @@ export function ProfileSectionCard({ section }: { section: ProfileSection }) {
         ) : null}
 
         {hasInsurance && section.insuranceRows ? (
-          <InsuranceTable rows={section.insuranceRows} className={section.id === "insurance" ? "mt-0" : undefined} />
+          <InsuranceTable
+            rows={section.insuranceRows}
+            className={section.id === "insurance" ? "mt-0" : undefined}
+          />
         ) : null}
       </div>
     </section>
   );
-}
+});
