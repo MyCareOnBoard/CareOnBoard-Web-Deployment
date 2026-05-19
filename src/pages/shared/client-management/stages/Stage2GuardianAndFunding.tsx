@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarDays, Plus, Trash2, Loader2 } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, Plus, Trash2, Loader2, FileUp } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,13 @@ import {
   type GuardianRelationship,
   Service,
   type ServicePayType,
+  SDR_DETAILS_LIST_MAX,
+  type ServiceSdrDetails,
 } from "@/pages/shared/client-management/types/formData";
+import { Stage2SdrImportPanel } from "@/pages/shared/client-management/components/Stage2SdrImportPanel";
+import { WeeklyDistributionInline } from "@/pages/shared/client-management/components/WeeklyDistributionInline";
+import { deriveAuthorizedHoursPerWeek } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
+import { weeklyDistributionFingerprintFromWd } from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
 import { searchEmployees, type Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 
@@ -33,6 +39,90 @@ const SECTION_HEADER_ACTION_BTN =
   "h-11 shrink-0 rounded-[60px] border border-[#b2b2b3] bg-white/40 px-5 text-[14px] font-semibold text-[#10141a] hover:bg-white/60";
 const SECTION_SUBROW_ACTION_BTN =
   "h-9 shrink-0 rounded-[60px] border border-[#b2b2b3] bg-white/40 px-3 text-[14px] font-semibold text-[#10141a] hover:bg-white/60";
+
+function splitSdrLinesToList(raw: string, maxEntries: number): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of raw.split(/\n/)) {
+    const t = line.trim();
+    if (!t || seen.has(t) || out.length >= maxEntries) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
+}
+
+function stripCurrencyAndCommas(raw: string): string {
+  return raw.replace(/\$/g, "").replace(/,/g, "").trim();
+}
+
+/** Persist cost without `$`; allow decimals. */
+function normalizeCostStored(raw: string): string | undefined {
+  const s = stripCurrencyAndCommas(raw);
+  if (!s) return undefined;
+  const sanitized = s.replace(/[^\d.]/g, "");
+  return sanitized === "" ? undefined : sanitized;
+}
+
+function ServiceCalendarDateField({
+  label,
+  value,
+  open,
+  onOpenChange,
+  onSelectDate,
+}: {
+  label: string;
+  value: Date | undefined;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSelectDate: (d: Date | undefined) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-[12px] font-normal text-[#10141a]">{label}</label>
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger asChild>
+          <button type="button" className="w-full focus:outline-none">
+            <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+              <InputGroupInput
+                value={value ? format(value, "MMM d, yyyy") : ""}
+                placeholder=" "
+                readOnly
+                className="text-[#10141a]"
+              />
+              <InputGroupAddon align="inline-end">
+                <CalendarDays className="h-5 w-5 text-[#10141a]" />
+              </InputGroupAddon>
+            </InputGroup>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+          <Calendar
+            mode="single"
+            selected={value}
+            defaultMonth={value ?? new Date()}
+            captionLayout="dropdown"
+            fromYear={2000}
+            toYear={new Date().getFullYear() + 10}
+            formatters={{
+              formatMonthDropdown: (date) => date.toLocaleString("default", { month: "long" }),
+            }}
+            classNames={{
+              dropdown_root:
+                "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
+            }}
+            onSelect={(d) => {
+              if (d) {
+                onSelectDate(d);
+                onOpenChange(false);
+              }
+            }}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 
 function DspSearchSlotRow({
   assigned,
@@ -306,379 +396,332 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
     (patch: Partial<Service>) => onChange(outcomeId, serviceId, { ...service, ...patch }),
     [service, serviceId, outcomeId, onChange],
   );
+
   const [isIspOpen, setIsIspOpen] = useState(false);
-  const [isStartOpen, setIsStartOpen] = useState(false);
-  const [isEndOpen, setIsEndOpen] = useState(false);
   const [isPcptOpen, setIsPcptOpen] = useState(false);
+  const [isAuthStartOpen, setIsAuthStartOpen] = useState(false);
+  const [isAuthEndOpen, setIsAuthEndOpen] = useState(false);
   const [isSdrStartOpen, setIsSdrStartOpen] = useState(false);
   const [isSdrEndOpen, setIsSdrEndOpen] = useState(false);
 
+  function patchSdrDetails(partial: Partial<ServiceSdrDetails>): void {
+    const prev = service.sdrDetails;
+    update({
+      sdrDetails: {
+        ...(prev ?? {}),
+        ...partial,
+        importedAt: prev?.importedAt ?? new Date().toISOString(),
+      },
+    });
+  }
+
+  const weeklyDist = service.sdrWeeklyDistribution;
+  const weeklyDistributionFingerprint = useMemo(
+    () => weeklyDistributionFingerprintFromWd(weeklyDist),
+    [weeklyDist],
+  );
+  const derivedAuthorizedHours = useMemo(
+    () => deriveAuthorizedHoursPerWeek(weeklyDist),
+    [weeklyDistributionFingerprint],
+  );
+  const hoursDerivedFromWeekly = derivedAuthorizedHours !== undefined;
+  const showWeeklyDistribution =
+    !!(weeklyDist?.standardLine ?? "").trim() || (weeklyDist?.rows?.length ?? 0) > 0;
   return (
     <>
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">
-          Service code
-        </label>
-        <Input
-          value={service.code ?? ""}
-          onChange={(e) => update({ code: e.target.value })}
-          className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-          placeholder="Procedure or authorization code (e.g. from ISP)"
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Service code</label>
+          <Input
+            value={service.code ?? ""}
+            onChange={(e) => update({ code: e.target.value })}
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+            placeholder="Procedure or authorization code (e.g. from ISP)"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Service Name</label>
+          <Input
+            value={service.name ?? ""}
+            onChange={(e) => update({ name: e.target.value })}
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+            placeholder="Full service name as shown on the ISP"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Authorized hours per week</label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            readOnly={hoursDerivedFromWeekly}
+            title={
+              hoursDerivedFromWeekly
+                ? "Derived from weekly distribution; change weekly rows or standard line."
+                : undefined
+            }
+            value={hoursDerivedFromWeekly ? derivedAuthorizedHours ?? "" : service.hours}
+            onChange={(e) => update({ hours: e.target.value })}
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+            placeholder="Weekly hours"
+          />
+          {hoursDerivedFromWeekly ? (
+            <p className="text-[11px] text-[#808081]">From weekly distribution</p>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Total Computed Hours</label>
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="any"
+            min={0}
+            value={service.sdrComputedTotalHours ?? ""}
+            onChange={(e) =>
+              update({ sdrComputedTotalHours: e.target.value || undefined })
+            }
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+            placeholder="Computed from SDR"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Frequency</label>
+          <Input
+            value={service.sdrDetails?.frequency ?? ""}
+            onChange={(e) =>
+              patchSdrDetails({
+                frequency: e.target.value.trim() || undefined,
+              })
+            }
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Duration</label>
+          <Input
+            value={service.sdrDetails?.duration ?? ""}
+            onChange={(e) =>
+              patchSdrDetails({
+                duration: e.target.value.trim() || undefined,
+              })
+            }
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+            placeholder="Weekly detail"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Setting</label>
+          <Input
+            value={service.sdrDetails?.setting ?? ""}
+            onChange={(e) =>
+              patchSdrDetails({
+                setting: e.target.value.trim() || undefined,
+              })
+            }
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Staffing</label>
+          <Input
+            value={service.sdrDetails?.staffing ?? ""}
+            onChange={(e) =>
+              patchSdrDetails({
+                staffing: e.target.value.trim() || undefined,
+              })
+            }
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Procedure</label>
+          <Input
+            value={service.procedureName ?? ""}
+            onChange={(e) => update({ procedureName: e.target.value || undefined })}
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Unit type</label>
+          <Input
+            value={service.unitType ?? ""}
+            onChange={(e) => update({ unitType: e.target.value || undefined })}
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+            placeholder="e.g. 15 Min"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Total cost ($)</label>
+          <Input
+            type="number"
+            inputMode="decimal"
+            step={0.01}
+            min={0}
+            value={
+              service.totalCost != null ? stripCurrencyAndCommas(service.totalCost) : ""
+            }
+            onChange={(e) =>
+              update({ totalCost: normalizeCostStored(e.target.value) })
+            }
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+          />
+        </div>
+
+        <RatePayTypeField
+          label="Client Rate / Pay Type"
+          rate={service.clientRate ?? ""}
+          payType={service.clientPayType}
+          includeMile
+          onRateChange={(v) => update({ clientRate: v })}
+          onPayTypeChange={(v) => update({ clientPayType: v })}
         />
-      </div>
 
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">
-          Service Name
-        </label>
-        <Input
-          value={service.name ?? ""}
-          onChange={(e) => update({ name: e.target.value })}
-          className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-          placeholder="Full service name as shown on the ISP"
+        <RatePayTypeField
+          label="Staff Rate / Pay Type"
+          rate={service.rate ?? ""}
+          payType={service.payType}
+          includeMile
+          onRateChange={(v) => update({ rate: v })}
+          onPayTypeChange={(v) => update({ payType: v })}
         />
-      </div>
 
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">
-          Authorized hours per week
-        </label>
-        <Input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          step={1}
-          value={service.hours}
-          onChange={(e) => update({ hours: e.target.value })}
-          className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-          placeholder="Enter hours"
+        <ServiceCalendarDateField
+          label="ISP Effective Date"
+          value={service.ispEffectiveDate}
+          open={isIspOpen}
+          onOpenChange={setIsIspOpen}
+          onSelectDate={(d) => update({ ispEffectiveDate: d })}
         />
-      </div>
 
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">
-          Total units
-        </label>
-        <Input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          step={1}
-          value={service.totalUnits ?? ""}
-          onChange={(e) => update({ totalUnits: e.target.value || undefined })}
-          className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-          placeholder="Authorized units for the period (e.g. from ISP)"
+        <ServiceCalendarDateField
+          label="PCPT Date"
+          value={service.pcptDate}
+          open={isPcptOpen}
+          onOpenChange={setIsPcptOpen}
+          onSelectDate={(d) => update({ pcptDate: d })}
         />
-      </div>
 
-      <RatePayTypeField
-        label="Client Rate / Pay Type"
-        rate={service.clientRate ?? ""}
-        payType={service.clientPayType}
-        includeMile
-        onRateChange={(v) => update({ clientRate: v })}
-        onPayTypeChange={(v) => update({ clientPayType: v })}
-      />
-      
-      <RatePayTypeField
-        label="Staff Rate / Pay Type"
-        rate={service.rate ?? ""}
-        payType={service.payType}
-        includeMile
-        onRateChange={(v) => update({ rate: v })}
-        onPayTypeChange={(v) => update({ payType: v })}
-      />
+        <ServiceCalendarDateField
+          label="SDR Start Date"
+          value={service.sdrStartDate}
+          open={isSdrStartOpen}
+          onOpenChange={setIsSdrStartOpen}
+          onSelectDate={(d) => update({ sdrStartDate: d })}
+        />
 
-      
+        <ServiceCalendarDateField
+          label="SDR End Date"
+          value={service.sdrEndDate}
+          open={isSdrEndOpen}
+          onOpenChange={setIsSdrEndOpen}
+          onSelectDate={(d) => update({ sdrEndDate: d })}
+        />
 
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">
-          ISP Effective Date
-        </label>
-        <Popover open={isIspOpen} onOpenChange={setIsIspOpen}>
-          <PopoverTrigger asChild>
-            <button type="button" className="w-full focus:outline-none">
-              <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
-                <InputGroupInput
-                  value={
-                    service.ispEffectiveDate
-                      ? format(service.ispEffectiveDate, "MMM d, yyyy")
-                      : ""
-                  }
-                  placeholder=" "
-                  readOnly
-                  className="text-[#10141a]"
-                />
-                <InputGroupAddon align="inline-end">
-                  <CalendarDays className="h-5 w-5 text-[#10141a]" />
-                </InputGroupAddon>
-              </InputGroup>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
-            <Calendar
-              mode="single"
-              selected={service.ispEffectiveDate}
-              defaultMonth={service.ispEffectiveDate ?? new Date()}
-              captionLayout="dropdown"
-              fromYear={2000}
-              toYear={new Date().getFullYear() + 10}
-              formatters={{
-                formatMonthDropdown: (date) =>
-                  date.toLocaleString("default", { month: "long" }),
-              }}
-              classNames={{
-                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
-              }}
-              onSelect={(d) => {
-                if (d) {
-                  update({ ispEffectiveDate: d });
-                  setIsIspOpen(false);
-                }
-              }}
+        <div className="col-span-full rounded-[12px] border border-[#e1e3e8] bg-[#fafbfc]/50 p-4">
+          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#808081]">
+            Prior authorization
+          </p>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+            <ServiceCalendarDateField
+              label="Start Date of Authorization"
+              value={service.startAuthDate}
+              open={isAuthStartOpen}
+              onOpenChange={setIsAuthStartOpen}
+              onSelectDate={(d) => update({ startAuthDate: d })}
             />
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">
-          Start Date of Authorization
-        </label>
-        <Popover open={isStartOpen} onOpenChange={setIsStartOpen}>
-          <PopoverTrigger asChild>
-            <button type="button" className="w-full focus:outline-none">
-              <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
-                <InputGroupInput
-                  value={service.startAuthDate ? format(service.startAuthDate, "MMM d, yyyy") : ""}
-                  placeholder=" "
-                  readOnly
-                  className="text-[#10141a]"
-                />
-                <InputGroupAddon align="inline-end">
-                  <CalendarDays className="h-5 w-5 text-[#10141a]" />
-                </InputGroupAddon>
-              </InputGroup>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
-            <Calendar
-              mode="single"
-              selected={service.startAuthDate}
-              defaultMonth={service.startAuthDate ?? new Date()}
-              captionLayout="dropdown"
-              fromYear={2000}
-              toYear={new Date().getFullYear() + 10}
-              formatters={{
-                formatMonthDropdown: (date) =>
-                  date.toLocaleString("default", { month: "long" }),
-              }}
-              classNames={{
-                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
-              }}
-              onSelect={(d) => {
-                if (d) {
-                  update({ startAuthDate: d });
-                  setIsStartOpen(false);
-                }
-              }}
+            <ServiceCalendarDateField
+              label="End Date of Authorization"
+              value={service.endAuthDate}
+              open={isAuthEndOpen}
+              onOpenChange={setIsAuthEndOpen}
+              onSelectDate={(d) => update({ endAuthDate: d })}
             />
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">
-          End Date of Authorization
-        </label>
-        <Popover open={isEndOpen} onOpenChange={setIsEndOpen}>
-          <PopoverTrigger asChild>
-            <button type="button" className="w-full focus:outline-none">
-              <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
-                <InputGroupInput
-                  value={service.endAuthDate ? format(service.endAuthDate, "MMM d, yyyy") : ""}
-                  placeholder=" "
-                  readOnly
-                  className="text-[#10141a]"
-                />
-                <InputGroupAddon align="inline-end">
-                  <CalendarDays className="h-5 w-5 text-[#10141a]" />
-                </InputGroupAddon>
-              </InputGroup>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
-            <Calendar
-              mode="single"
-              selected={service.endAuthDate}
-              defaultMonth={service.endAuthDate ?? new Date()}
-              captionLayout="dropdown"
-              fromYear={2000}
-              toYear={new Date().getFullYear() + 10}
-              formatters={{
-                formatMonthDropdown: (date) =>
-                  date.toLocaleString("default", { month: "long" }),
-              }}
-              classNames={{
-                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
-              }}
-              onSelect={(d) => {
-                if (d) {
-                  update({ endAuthDate: d });
-                  setIsEndOpen(false);
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">PA number</label>
+              <Input
+                value={service.sdrPriorAuthorization?.paNumber ?? ""}
+                onChange={(e) =>
+                  update({
+                    sdrPriorAuthorization: {
+                      ...service.sdrPriorAuthorization,
+                      paNumber: e.target.value || undefined,
+                    },
+                  })
                 }
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">PCPT Date</label>
-        <Popover open={isPcptOpen} onOpenChange={setIsPcptOpen}>
-          <PopoverTrigger asChild>
-            <button type="button" className="w-full focus:outline-none">
-              <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
-                <InputGroupInput
-                  value={service.pcptDate ? format(service.pcptDate, "MMM d, yyyy") : ""}
-                  placeholder=" "
-                  readOnly
-                  className="text-[#10141a]"
-                />
-                <InputGroupAddon align="inline-end">
-                  <CalendarDays className="h-5 w-5 text-[#10141a]" />
-                </InputGroupAddon>
-              </InputGroup>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
-            <Calendar
-              mode="single"
-              selected={service.pcptDate}
-              defaultMonth={service.pcptDate ?? new Date()}
-              captionLayout="dropdown"
-              fromYear={2000}
-              toYear={new Date().getFullYear() + 10}
-              formatters={{
-                formatMonthDropdown: (date) =>
-                  date.toLocaleString("default", { month: "long" }),
-              }}
-              classNames={{
-                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
-              }}
-              onSelect={(d) => {
-                if (d) {
-                  update({ pcptDate: d });
-                  setIsPcptOpen(false);
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">
+                Approved units till date
+              </label>
+              <Input
+                value={service.sdrPriorAuthorization?.approvedUnitsTillDate ?? ""}
+                onChange={(e) =>
+                  update({
+                    sdrPriorAuthorization: {
+                      ...service.sdrPriorAuthorization,
+                      approvedUnitsTillDate: e.target.value.trim()
+                        ? e.target.value.trim()
+                        : undefined,
+                    },
+                  })
                 }
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="e.g. units from PA (may not be a date)"
+              />
+            </div>
+          </div>
+        </div>
 
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">
-          SDR Start Date
-        </label>
-        <Popover open={isSdrStartOpen} onOpenChange={setIsSdrStartOpen}>
-          <PopoverTrigger asChild>
-            <button type="button" className="w-full focus:outline-none">
-              <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
-                <InputGroupInput
-                  value={
-                    service.sdrStartDate
-                      ? format(service.sdrStartDate, "MMM d, yyyy")
-                      : ""
-                  }
-                  placeholder=" "
-                  readOnly
-                  className="text-[#10141a]"
-                />
-                <InputGroupAddon align="inline-end">
-                  <CalendarDays className="h-5 w-5 text-[#10141a]" />
-                </InputGroupAddon>
-              </InputGroup>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
-            <Calendar
-              mode="single"
-              selected={service.sdrStartDate}
-              defaultMonth={service.sdrStartDate ?? new Date()}
-              captionLayout="dropdown"
-              fromYear={2000}
-              toYear={new Date().getFullYear() + 10}
-              formatters={{
-                formatMonthDropdown: (date) =>
-                  date.toLocaleString("default", { month: "long" }),
-              }}
-              classNames={{
-                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
-              }}
-              onSelect={(d) => {
-                if (d) {
-                  update({ sdrStartDate: d });
-                  setIsSdrStartOpen(false);
-                }
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
+        {showWeeklyDistribution && weeklyDist ? (
+          <WeeklyDistributionInline wd={weeklyDist} className="col-span-full mt-2" />
+        ) : null}
 
-      <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-normal text-[#10141a]">
-          SDR End Date
-        </label>
-        <Popover open={isSdrEndOpen} onOpenChange={setIsSdrEndOpen}>
-          <PopoverTrigger asChild>
-            <button type="button" className="w-full focus:outline-none">
-              <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
-                <InputGroupInput
-                  value={
-                    service.sdrEndDate
-                      ? format(service.sdrEndDate, "MMM d, yyyy")
-                      : ""
-                  }
-                  placeholder=" "
-                  readOnly
-                  className="text-[#10141a]"
-                />
-                <InputGroupAddon align="inline-end">
-                  <CalendarDays className="h-5 w-5 text-[#10141a]" />
-                </InputGroupAddon>
-              </InputGroup>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
-            <Calendar
-              mode="single"
-              selected={service.sdrEndDate}
-              defaultMonth={service.sdrEndDate ?? new Date()}
-              captionLayout="dropdown"
-              fromYear={2000}
-              toYear={new Date().getFullYear() + 10}
-              formatters={{
-                formatMonthDropdown: (date) =>
-                  date.toLocaleString("default", { month: "long" }),
-              }}
-              classNames={{
-                dropdown_root: "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
-              }}
-              onSelect={(d) => {
-                if (d) {
-                  update({ sdrEndDate: d });
-                  setIsSdrEndOpen(false);
-                }
-              }}
-            />
-          </PopoverContent>
-        </Popover>
+        <div className="col-span-full flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Delivery methods</label>
+          <Textarea
+            value={(service.sdrDetails?.deliveryMethods ?? []).join("\n")}
+            onChange={(e) => {
+              const list = splitSdrLinesToList(e.target.value, SDR_DETAILS_LIST_MAX);
+              patchSdrDetails({
+                deliveryMethods: list.length ? list : undefined,
+              });
+            }}
+            rows={3}
+            className="min-h-[72px] rounded-[12px] border-[#cccccd] bg-white text-[13px]"
+            placeholder="One method per line"
+          />
+        </div>
+
+        <div className="col-span-full flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Support tasks</label>
+          <Textarea
+            value={(service.sdrDetails?.supportTasks ?? []).join("\n")}
+            onChange={(e) => {
+              const list = splitSdrLinesToList(e.target.value, SDR_DETAILS_LIST_MAX);
+              patchSdrDetails({
+                supportTasks: list.length ? list : undefined,
+              });
+            }}
+            rows={3}
+            className="min-h-[72px] rounded-[12px] border-[#cccccd] bg-white text-[13px]"
+            placeholder="One task per line"
+          />
+        </div>
       </div>
-    </div>
-    <ServicePerServiceStaffOnly service={service} update={update} />
+      <ServicePerServiceStaffOnly service={service} update={update} />
     </>
   );
 });
@@ -695,6 +738,7 @@ export function Stage2GuardianAndFunding({
   pageTitle?: string;
 }) {
   const stage2 = formData.stage2;
+  const [sdrImportOpen, setSdrImportOpen] = useState(false);
   const updateStage2 = useCallback(
     (patch: Partial<AddClientFormData["stage2"]>) =>
       setFormData((prev) => ({ ...prev, stage2: { ...prev.stage2, ...patch } })),
@@ -1047,14 +1091,34 @@ export function Stage2GuardianAndFunding({
       </div>
 
       <div className="mb-10">
-        <div className="mb-4">
-          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-            4. Outcomes &amp; service authorizations
-          </p>
-          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            Each ISP outcome owns one or more service authorization rows (billing and scheduling). Add Dsps per service row.
-          </p>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+              4. Outcomes &amp; service authorizations
+            </p>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              Each ISP outcome owns one or more service authorization rows (billing and scheduling). Add Dsps per service row.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            aria-label="Import service delivery report"
+            className="h-11 min-h-[44px] shrink-0 rounded-[12px] border-[#00b4b8] px-3 text-[#00b4b8] hover:bg-[#e6fafa] sm:px-4"
+            onClick={() => setSdrImportOpen(true)}
+          >
+            <FileUp className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="hidden font-semibold sm:inline">Import SDR</span>
+            <span className="font-semibold sm:hidden">Import</span>
+          </Button>
         </div>
+
+        <Stage2SdrImportPanel
+          open={sdrImportOpen}
+          onOpenChange={setSdrImportOpen}
+          formData={formData}
+          setFormData={setFormData}
+        />
 
         <div className="mt-6 space-y-10">
           {outcomes.length === 0 ? (

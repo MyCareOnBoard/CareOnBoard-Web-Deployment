@@ -1,13 +1,115 @@
 import type { ClientDsp, ClientOutcome, ClientService } from "@/lib/api/clients";
 import {
   createEmptyServiceAuthorization,
+  SDR_DETAILS_LIST_MAX,
   type Outcome,
   type Service,
+  type ServiceSdrDetails,
 } from "../types/formData";
 
 export const UNASSIGNED_OUTCOME_LABEL = "Unassigned outcome";
 
 const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
+
+/** Trim, dedupe, and cap SDR string lists for API / wizard. */
+function dedupeTrimStringList(
+  raw: string[] | undefined,
+  maxLen: number = SDR_DETAILS_LIST_MAX,
+): string[] | undefined {
+  if (!raw?.length) return undefined;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const t = String(item).trim();
+    if (!t || seen.has(t) || out.length >= maxLen) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out.length ? out : undefined;
+}
+
+export function trimWizardSdrDetailsForApi(d: ServiceSdrDetails): NonNullable<ClientService["sdrDetails"]> | undefined {
+  const src = d.source;
+  const source =
+    src &&
+    (src.outcomeStatement?.trim() ||
+      src.serviceName?.trim() ||
+      src.serviceCode?.trim() ||
+      src.provider?.trim() ||
+      src.claimsSource?.trim())
+      ? {
+          outcomeStatement: src.outcomeStatement?.trim() || undefined,
+          serviceName: src.serviceName?.trim() || undefined,
+          serviceCode: src.serviceCode?.trim() || undefined,
+          ...(src.provider?.trim() ? { provider: src.provider.trim() } : {}),
+          ...(src.claimsSource?.trim() ? { claimsSource: src.claimsSource.trim() } : {}),
+        }
+      : undefined;
+
+  const next: NonNullable<ClientService["sdrDetails"]> = {
+    deliveryMethods: dedupeTrimStringList(d.deliveryMethods),
+    supportTasks: dedupeTrimStringList(d.supportTasks),
+    frequency: d.frequency?.trim() || undefined,
+    duration: d.duration?.trim() || undefined,
+    setting: d.setting?.trim() || undefined,
+    staffing: d.staffing?.trim() || undefined,
+    source,
+    importedAt: d.importedAt?.trim() || undefined,
+  };
+  const empty =
+    !next.deliveryMethods?.length &&
+    !next.supportTasks?.length &&
+    !next.frequency &&
+    !next.duration &&
+    !next.setting &&
+    !next.staffing &&
+    !source &&
+    !next.importedAt;
+  return empty ? undefined : next;
+}
+
+/** Map API-returned nested SDR into wizard shape. */
+export function clientSdrDetailsToWizard(
+  d: ClientService["sdrDetails"] | undefined,
+): ServiceSdrDetails | undefined {
+  if (!d) return undefined;
+  const src = d.source;
+  const source =
+    src &&
+    (src.outcomeStatement?.trim() ||
+      src.serviceName?.trim() ||
+      src.serviceCode?.trim() ||
+      src.provider?.trim() ||
+      src.claimsSource?.trim())
+      ? {
+          outcomeStatement: src.outcomeStatement?.trim() || undefined,
+          serviceName: src.serviceName?.trim() || undefined,
+          serviceCode: src.serviceCode?.trim() || undefined,
+          ...(src.provider?.trim() ? { provider: src.provider.trim() } : {}),
+          ...(src.claimsSource?.trim() ? { claimsSource: src.claimsSource.trim() } : {}),
+        }
+      : undefined;
+  const out: ServiceSdrDetails = {
+    deliveryMethods: dedupeTrimStringList(d.deliveryMethods),
+    supportTasks: dedupeTrimStringList(d.supportTasks),
+    frequency: d.frequency?.trim() || undefined,
+    duration: d.duration?.trim() || undefined,
+    setting: d.setting?.trim() || undefined,
+    staffing: d.staffing?.trim() || undefined,
+    source,
+    importedAt: d.importedAt?.trim() || undefined,
+  };
+  const empty =
+    !out.deliveryMethods?.length &&
+    !out.supportTasks?.length &&
+    !out.frequency &&
+    !out.duration &&
+    !out.setting &&
+    !out.staffing &&
+    !source &&
+    !out.importedAt;
+  return empty ? undefined : out;
+}
 
 export function serviceRowDedupeKey(
   s: Pick<Service | ClientService, "name" | "code">,
@@ -60,6 +162,25 @@ function pickStr(a?: string, b?: string): string {
 }
 
 function mergeClientServicesForDedupe(a: ClientService, b: ClientService): ClientService {
+  const pickSdrDetails = (): ClientService["sdrDetails"] => {
+    const aD = a.sdrDetails;
+    const bD = b.sdrDetails;
+    const substantive = (x?: ClientService["sdrDetails"]) =>
+      !!x &&
+      ((x.deliveryMethods?.length ?? 0) > 0 ||
+        (x.supportTasks?.length ?? 0) > 0 ||
+        !!(x.frequency?.trim() || x.duration?.trim() || x.setting?.trim() || x.staffing?.trim()) ||
+        !!(x.source &&
+          (x.source.outcomeStatement?.trim() ||
+            x.source.serviceCode?.trim() ||
+            x.source.serviceName?.trim() ||
+            x.source.provider?.trim() ||
+            x.source.claimsSource?.trim())));
+    if (substantive(aD)) return aD;
+    if (substantive(bD)) return bD;
+    return aD ?? bD;
+  };
+
   return {
     ...a,
     id: pickStr(a.id, b.id) || a.id,
@@ -87,6 +208,7 @@ function mergeClientServicesForDedupe(a: ClientService, b: ClientService): Clien
     evvStatus: pickStr(a.evvStatus, b.evvStatus) || undefined,
     evvDescription: pickStr(a.evvDescription, b.evvDescription) || undefined,
     narrative: pickStr(a.narrative, b.narrative) || undefined,
+    sdrDetails: pickSdrDetails(),
     assignedDsps: mergeAssignedDsps(a.assignedDsps, b.assignedDsps),
     outcomes: (() => {
       const merged = mergeUniqueOutcomeStrings(a.outcomes, b.outcomes);
@@ -130,6 +252,38 @@ export function wizardServiceToClientService(
     evvStatus: svc.evvStatus?.trim() || undefined,
     evvDescription: svc.evvDescription?.trim() || undefined,
     narrative: svc.narrative?.trim() || undefined,
+    procedureName: svc.procedureName?.trim() || undefined,
+    sdrComputedTotalHours: svc.sdrComputedTotalHours?.trim() || undefined,
+    ...((): Partial<Pick<ClientService, "sdrPriorAuthorization">> => {
+      const pa = svc.sdrPriorAuthorization;
+      if (!pa) return {};
+      const next: NonNullable<ClientService["sdrPriorAuthorization"]> = {};
+      for (const k of ["startDate", "endDate", "paNumber", "approvedUnitsTillDate"] as const) {
+        const v = pa[k];
+        if (typeof v === "string" && v.trim()) next[k] = v.trim();
+      }
+      return Object.keys(next).length ? { sdrPriorAuthorization: next } : {};
+    })(),
+    ...((): Partial<Pick<ClientService, "sdrWeeklyDistribution">> => {
+      const wd = svc.sdrWeeklyDistribution;
+      if (!wd || typeof wd !== "object") return {};
+      const std = wd.standardLine?.trim();
+      const rows =
+        wd.rows
+          ?.map((r) => ({
+            weekRange: r.weekRange?.trim() ?? "",
+            units: r.units?.trim() ?? "",
+            hours: r.hours?.trim() ?? "",
+          }))
+          .filter((r) => r.weekRange || r.units || r.hours) ?? [];
+      if (!std?.length && !rows.length) return {};
+      const next: NonNullable<ClientService["sdrWeeklyDistribution"]> = {
+        ...(std ? { standardLine: std } : {}),
+        ...(rows.length ? { rows } : {}),
+      };
+      return { sdrWeeklyDistribution: next };
+    })(),
+    sdrDetails: svc.sdrDetails ? trimWizardSdrDetailsForApi(svc.sdrDetails) : undefined,
     assignedDsps:
       svc.assignedDsps && svc.assignedDsps.length > 0
         ? svc.assignedDsps

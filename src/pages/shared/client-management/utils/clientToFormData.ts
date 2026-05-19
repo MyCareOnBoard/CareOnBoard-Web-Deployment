@@ -11,7 +11,7 @@ import {
     type GuardianRelationship,
     type Outcome,
 } from "../types/formData";
-import { groupLoadedServicesIntoOutcomes, type ServiceLoadRow } from "./outcomeServices";
+import { groupLoadedServicesIntoOutcomes, clientSdrDetailsToWizard, type ServiceLoadRow } from "./outcomeServices";
 
 const EMERGENCY_CONTACT_RELATIONSHIP_LOOKUP = new Set<string>(
     EMERGENCY_CONTACT_RELATIONSHIP_VALUES,
@@ -87,6 +87,35 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
         evvStatus: svc.evvStatus,
         evvDescription: svc.evvDescription,
         narrative: svc.narrative,
+        procedureName: svc.procedureName,
+        sdrComputedTotalHours: svc.sdrComputedTotalHours,
+        sdrPriorAuthorization:
+          svc.sdrPriorAuthorization &&
+          typeof svc.sdrPriorAuthorization === "object"
+            ? { ...svc.sdrPriorAuthorization }
+            : undefined,
+        sdrWeeklyDistribution:
+          svc.sdrWeeklyDistribution && typeof svc.sdrWeeklyDistribution === "object"
+            ? {
+                ...(svc.sdrWeeklyDistribution.standardLine
+                  ? { standardLine: svc.sdrWeeklyDistribution.standardLine }
+                  : {}),
+                ...(Array.isArray(svc.sdrWeeklyDistribution.rows)
+                  ? {
+                      rows: svc.sdrWeeklyDistribution.rows.map((r) =>
+                        r && typeof r === "object"
+                          ? {
+                              weekRange: r.weekRange,
+                              units: r.units,
+                              hours: r.hours,
+                            }
+                          : {},
+                      ),
+                    }
+                  : {}),
+              }
+            : undefined,
+        sdrDetails: clientSdrDetailsToWizard(svc.sdrDetails),
         assignedDsps:
             svc.assignedDsps?.map((d) => ({ id: d.id, name: d.name ?? "" })) ?? [],
     });

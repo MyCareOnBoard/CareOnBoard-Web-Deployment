@@ -2,8 +2,8 @@
  * Server-side Gemini translation (Cloud Function `gemini`).
  */
 
-import axiosClient from '../axios';
-import type { ClientExtractionResponse } from '@/pages/shared/client-management/types/clientExtraction';
+import axiosClient from "../axios";
+import type { ClientExtractionResponse } from "@/pages/shared/client-management/types/clientExtraction";
 
 interface TranslateToEnglishResponse {
   translatedText: string;
@@ -14,7 +14,7 @@ export async function translateToEnglishViaApi(
   sourceLanguage?: string | null,
 ): Promise<string> {
   const response = await axiosClient.post<TranslateToEnglishResponse>(
-    '/gemini/translate-to-english',
+    "/gemini/translate-to-english",
     {
       text,
       ...(sourceLanguage?.trim()
@@ -26,22 +26,54 @@ export async function translateToEnglishViaApi(
 }
 
 /**
- * Multipart upload: extracts structured client draft from ISP/POC/PDF/image.
+ * ISP / POC document extraction (multipart file only).
  */
-export async function extractClientOnboardingViaApi(
+export async function extractClientIspViaApi(
   file: File,
+  options?: { signal?: AbortSignal },
 ): Promise<ClientExtractionResponse> {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
   const response = await axiosClient.post<ClientExtractionResponse>(
-    '/gemini/extract-client-onboarding',
+    "/gemini/extract-client-isp",
     formData,
     {
+      signal: options?.signal,
       transformRequest: [
         (data, headers) => {
           if (data instanceof FormData) {
-            delete headers['Content-Type'];
+            delete headers["Content-Type"];
+          }
+          return data;
+        },
+      ],
+    },
+  );
+
+  return response.data;
+}
+
+/**
+ * Service Delivery Report (SDR) extraction — requires Stage 2 authorizations JSON.
+ */
+export async function extractSdrDocumentViaApi(
+  file: File,
+  options: { availableServicesJson: string; signal?: AbortSignal },
+): Promise<ClientExtractionResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("availableServices", options.availableServicesJson.trim());
+
+  const response = await axiosClient.post<ClientExtractionResponse>(
+    "/gemini/extract-client-sdr",
+    formData,
+    {
+      signal: options.signal,
+      transformRequest: [
+        (data, headers) => {
+          if (data instanceof FormData) {
+            delete headers["Content-Type"];
           }
           return data;
         },
