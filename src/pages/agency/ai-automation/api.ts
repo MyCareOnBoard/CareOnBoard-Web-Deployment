@@ -1,5 +1,6 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
+import type { Attachment } from "./types";
 
 export interface DSPSuggestion {
   employeeId: string;
@@ -16,6 +17,7 @@ export interface AIMessage {
   suggestions?: DSPSuggestion[];
   actions?: Array<{ type: string; outcome: string; payload?: any }>;
   toolCallsMade?: string[];
+  attachments?: import("./types").Attachment[];
   createdAt: any;
 }
 
@@ -34,11 +36,24 @@ export interface ConversationWithMessages extends Conversation {
 
 export interface SendMessageResponse {
   id: string;
+  userMessageId?: string;
   role: string;
   content: string;
   suggestions: DSPSuggestion[];
   actions: Array<{ type: string; outcome: string; payload?: any }>;
   toolCallsMade: string[];
+}
+
+export interface AttachmentUploadResponse {
+  success: boolean;
+  data: {
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    url: string;
+    storagePath: string;
+    uploadedAt: string;
+  };
 }
 
 export const aiAutomationApi = createApi({
@@ -68,15 +83,23 @@ export const aiAutomationApi = createApi({
     }),
     sendMessage: builder.mutation<
       SendMessageResponse,
-      { conversationId: string; message: string; context?: Record<string, string> }
+      { conversationId: string; message: string; context?: Record<string, string>; attachments?: Attachment[] }
     >({
-      query: ({ conversationId, message, context }) => ({
+      query: ({ conversationId, message, context, attachments }) => ({
         url: `/aiAutomation/conversations/${conversationId}/messages`,
         method: "POST",
-        data: { message, context },
+        data: { message, context, attachments },
         requiresAuth: true,
       }),
       invalidatesTags: ["Conversation"],
+    }),
+    uploadAttachment: builder.mutation<AttachmentUploadResponse, FormData>({
+      query: (formData) => ({
+        url: "/aiAutomation/upload",
+        method: "POST",
+        data: formData,
+        requiresAuth: true,
+      }),
     }),
     deleteConversation: builder.mutation<void, string>({
       query: (id) => ({
@@ -95,5 +118,6 @@ export const {
   useGetConversationQuery,
   useLazyGetConversationQuery,
   useSendMessageMutation,
+  useUploadAttachmentMutation,
   useDeleteConversationMutation,
 } = aiAutomationApi;
