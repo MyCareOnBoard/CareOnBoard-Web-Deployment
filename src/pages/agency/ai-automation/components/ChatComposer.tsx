@@ -25,6 +25,8 @@ interface ChatComposerProps {
   onSend: () => void;
   onQuickAction: (text: string) => void;
   onAddAttachment?: () => void;
+  onMicClick?: () => void;
+  isRecording?: boolean;
 }
 
 export default function ChatComposer({
@@ -35,6 +37,8 @@ export default function ChatComposer({
   onSend,
   onQuickAction,
   onAddAttachment,
+  onMicClick,
+  isRecording = false,
 }: ChatComposerProps) {
   const [showActions, setShowActions] = useState(false);
 
@@ -170,12 +174,13 @@ export default function ChatComposer({
 
             <button
               type="button"
-              className="
+              onClick={onMicClick}
+              className={`
                 inline-flex h-11 w-11 items-center justify-center
                 rounded-xl border border-[#E7E7E7]
-                bg-white text-[#111827]
-                transition hover:bg-[#F8F8F8] cursor-pointer
-              "
+                bg-white transition hover:bg-[#F8F8F8] cursor-pointer
+                ${isRecording ? "text-[#00B4B8]" : "text-[#111827]"}
+              `}
             >
               <Mic className="h-5 w-5" />
             </button>

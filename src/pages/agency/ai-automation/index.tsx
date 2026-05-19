@@ -6,6 +6,8 @@ import { useAuth } from "@/utils/auth";
 import ChatComposer from "./components/ChatComposer";
 import { AddAttachmentModal } from "./components/AddAttachmentModal";
 import ConversationsSidebar from "./components/ConversationsSidebar";
+import { VoiceRecordingProvider, useVoiceRecording } from "@/contexts/VoiceRecordingContext";
+import VoiceInputButton from "@/components/VoiceInputButton";
 
 import { MessageBubble } from "./components/MessageBubble";
 import EmptyState from "./components/EmptyState";
@@ -13,8 +15,9 @@ import type { LocalMessage } from "./types";
 
 const MAX_CHARS = 500;
 
-export default function AIAutomationPage() {
+function AIAutomationContent() {
   const { user } = useAuth();
+  const { startRecording, isRecording } = useVoiceRecording();
   const [selectedArea, setSelectedArea] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
@@ -138,6 +141,8 @@ export default function AIAutomationPage() {
   );
 
     return (
+      <>
+        <VoiceInputButton />
       <div className="flex min-h-screen flex-col gap-4 px-4 sm:gap-6 sm:px-6 sm:py-6">
         <AIAutomationHeader
           onOpenConversations={() => setShowConversations(true)}
@@ -174,6 +179,12 @@ export default function AIAutomationPage() {
             onSend={() => handleSend()}
             onQuickAction={(text) => handleSend(text)}
             onAddAttachment={() => setShowAttachmentModal(true)}
+            onMicClick={() =>
+              startRecording("message", "AI Automation", undefined, (transcript) =>
+                setInputValue((prev) => (prev ? `${prev} ${transcript}` : transcript))
+              )
+            }
+            isRecording={isRecording}
           />
         </div>
 
@@ -194,5 +205,14 @@ export default function AIAutomationPage() {
           }}
         />
       </div>
+      </>
     );
-  }
+}
+
+export default function AIAutomationPage() {
+  return (
+    <VoiceRecordingProvider pageTitle="AI Automation">
+      <AIAutomationContent />
+    </VoiceRecordingProvider>
+  );
+}
