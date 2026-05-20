@@ -37,8 +37,8 @@ const RATE_INPUT_CLASS = "h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SELECT_TRIGGER_CLASS = "w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SECTION_HEADER_ACTION_BTN =
   "h-11 shrink-0 rounded-[60px] border border-[#b2b2b3] bg-white/40 px-5 text-[14px] font-semibold text-[#10141a] hover:bg-white/60";
-const SECTION_SUBROW_ACTION_BTN =
-  "h-9 shrink-0 rounded-[60px] border border-[#b2b2b3] bg-white/40 px-3 text-[14px] font-semibold text-[#10141a] hover:bg-white/60";
+const SECTION_DANGER_ACTION_BTN =
+  "h-9 shrink-0 rounded-[60px] border border-red-200/90 bg-red-50 px-3 text-[14px] font-semibold text-red-700 hover:border-red-300 hover:bg-red-100 hover:text-red-800";
 
 function splitSdrLinesToList(raw: string, maxEntries: number): string[] {
   const seen = new Set<string>();
@@ -797,7 +797,7 @@ export function Stage2GuardianAndFunding({
                 <Button
                   type="button"
                   variant="ghost"
-                  className={SECTION_SUBROW_ACTION_BTN}
+                  className={SECTION_DANGER_ACTION_BTN}
                   onClick={() =>
                     updateStage2({
                       guardians: (stage2.guardians ?? []).filter((_, i) => i !== gi),
@@ -996,7 +996,7 @@ export function Stage2GuardianAndFunding({
                 <Button
                   type="button"
                   variant="ghost"
-                  className={SECTION_SUBROW_ACTION_BTN}
+                  className={SECTION_DANGER_ACTION_BTN}
                   onClick={() =>
                     updateStage2({
                       careTeam: (stage2.careTeam ?? []).filter((_, i) => i !== ci),
@@ -1152,7 +1152,7 @@ export function Stage2GuardianAndFunding({
                 <Button
                   type="button"
                   variant="ghost"
-                  className={SECTION_SUBROW_ACTION_BTN}
+                  className={SECTION_DANGER_ACTION_BTN}
                   onClick={() =>
                     updateStage2({
                       outcomes: stage2.outcomes.filter((o) => o.id !== outcome.id),
@@ -1164,34 +1164,37 @@ export function Stage2GuardianAndFunding({
                 </Button>
               </div>
 
+              {outcome.services.length === 0 ? (
+                <p className="mb-4 text-[14px] font-medium leading-[1.4] text-[#808081]">
+                  No service authorizations for this outcome. Add one below or remove the outcome.
+                </p>
+              ) : null}
               {outcome.services.map((service, sidx) => (
                 <div key={service.id} className={sidx === 0 ? "" : "pt-6 mt-6 border-t border-[#cccccd]/40"}>
                   <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
                       Service authorization {sidx + 1}
                     </p>
-                    {outcome.services.length > 1 ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className={SECTION_SUBROW_ACTION_BTN}
-                        onClick={() =>
-                          updateStage2({
-                            outcomes: stage2.outcomes.map((o) =>
-                              o.id === outcome.id
-                                ? {
-                                    ...o,
-                                    services: o.services.filter((s) => s.id !== service.id),
-                                  }
-                                : o,
-                            ),
-                          })
-                        }
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Remove service
-                      </Button>
-                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className={SECTION_DANGER_ACTION_BTN}
+                      onClick={() =>
+                        updateStage2({
+                          outcomes: stage2.outcomes.map((o) =>
+                            o.id === outcome.id
+                              ? {
+                                  ...o,
+                                  services: o.services.filter((s) => s.id !== service.id),
+                                }
+                              : o,
+                          ),
+                        })
+                      }
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Remove service
+                    </Button>
                   </div>
                   <ServiceAuthorizationFields
                     service={service}
