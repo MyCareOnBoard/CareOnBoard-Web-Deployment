@@ -546,7 +546,7 @@ export default function CommunityBasedPage() {
         </div>
 
         {/* Floating Action Button */}
-        <VoiceInputButton/>
+        <VoiceInputButton minimal={false} />
       </div>
     </VoiceRecordingProvider>
   );

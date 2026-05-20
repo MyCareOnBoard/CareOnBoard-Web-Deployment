@@ -437,7 +437,7 @@ export default function AgencyActivitiesLogTemplate(
         </div>
 
         {/* Floating Action Button - Only show when editable */}
-        {submittedNote?.status === "submitted" && <VoiceInputButton/>}
+        {submittedNote?.status === "submitted" && <VoiceInputButton minimal={false} />}
       </div>
     </VoiceRecordingProvider>
   )

@@ -11,6 +11,8 @@ import {
   X,
 } from "lucide-react";
 import type { Attachment } from "../types";
+import VoiceMicControl from "@/components/VoiceMicControl";
+import type { VoiceRecordingUiState } from "@/contexts/VoiceRecordingContext";
 
 const QUICK_ACTIONS = [
   { label: "Find shift coverage" },
@@ -30,6 +32,11 @@ interface ChatComposerProps {
   onAddAttachment?: () => void;
   onMicClick?: () => void;
   isRecording?: boolean;
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  recordingUi?: VoiceRecordingUiState;
+  canAcceptVoice?: boolean;
+  onAcceptVoice?: () => void;
+  onCancelVoice?: () => void;
   attachments?: Attachment[];
   onRemoveAttachment?: (index: number) => void;
 }
@@ -44,6 +51,11 @@ export default function ChatComposer({
   onAddAttachment,
   onMicClick,
   isRecording = false,
+  textareaRef,
+  recordingUi,
+  canAcceptVoice = false,
+  onAcceptVoice,
+  onCancelVoice,
   attachments = [],
   onRemoveAttachment,
 }: ChatComposerProps) {
@@ -72,6 +84,7 @@ export default function ChatComposer({
     <div className="border-t border-[#e5e7eb] bg-[#FFFFFF42] px-4 py-5 sm:px-6 sm:py-6 flex-shrink-0">
       <div className="rounded-[28px] bg-white p-4 sm:p-5">
         <textarea
+          ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value.slice(0, maxLength))}
           placeholder="Talk to me, how can I help you today?"
@@ -208,18 +221,28 @@ export default function ChatComposer({
               {value.length}/{maxLength}
             </span>
 
-            <button
-              type="button"
-              onClick={onMicClick}
-              className={`
-                inline-flex h-11 w-11 items-center justify-center
-                rounded-xl border border-[#E7E7E7]
-                bg-white transition hover:bg-[#F8F8F8] cursor-pointer
-                ${isRecording ? "text-[#00B4B8]" : "text-[#111827]"}
-              `}
-            >
-              <Mic className="h-5 w-5" />
-            </button>
+            {isRecording && recordingUi && onAcceptVoice && onCancelVoice ? (
+              <VoiceMicControl
+                isConnecting={recordingUi.isConnecting}
+                isSpeaking={recordingUi.isSpeaking}
+                isTranslating={recordingUi.isTranslating}
+                canAccept={canAcceptVoice}
+                onAccept={onAcceptVoice}
+                onCancel={onCancelVoice}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={onMicClick}
+                className="
+                  inline-flex h-11 w-11 items-center justify-center
+                  rounded-xl border border-[#E7E7E7]
+                  bg-white text-[#111827] transition hover:bg-[#F8F8F8] cursor-pointer
+                "
+              >
+                <Mic className="h-5 w-5" />
+              </button>
+            )}
 
             <Button
               onClick={onSend}

@@ -948,7 +948,7 @@ export default function AgencySupportedEmploymentIntervention(
         </div>
 
         {/* Floating Action Button - Only show when editable */}
-        {isEditable && <VoiceInputButton/>}
+        {isEditable && <VoiceInputButton />}
       </div>
     </VoiceRecordingProvider>
   );

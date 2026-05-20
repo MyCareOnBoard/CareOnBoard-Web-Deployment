@@ -8,7 +8,11 @@ import { useAuth } from "@/utils/auth";
 import ChatComposer from "./components/ChatComposer";
 import { AddAttachmentModal } from "./components/AddAttachmentModal";
 import ConversationsSidebar from "./components/ConversationsSidebar";
-import { VoiceRecordingProvider, useVoiceRecording } from "@/contexts/VoiceRecordingContext";
+import {
+  VoiceRecordingProvider,
+  useVoiceRecording,
+  useVoiceSessionActions,
+} from "@/contexts/VoiceRecordingContext";
 import VoiceInputButton from "@/components/VoiceInputButton";
 
 import { MessageBubble } from "./components/MessageBubble";
@@ -21,7 +25,9 @@ function AIAutomationContent() {
   const { user } = useAuth();
   const { conversationId: urlConversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
-  const { startRecording, isRecording } = useVoiceRecording();
+  const { startRecording, isRecording, registerActiveTarget, committedTranscripts } =
+    useVoiceRecording();
+  const { acceptSession, cancelSession, recordingUi } = useVoiceSessionActions();
   const [selectedArea, setSelectedArea] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(urlConversationId ?? null);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
@@ -177,7 +183,7 @@ function AIAutomationContent() {
 
     return (
       <>
-        <VoiceInputButton />
+        <VoiceInputButton textareaRef={textareaRef} />
       <div className="flex min-h-screen flex-col gap-4 px-4 sm:gap-6 sm:px-6 sm:py-6">
         <AIAutomationHeader
           onOpenConversations={() => setShowConversations(true)}
@@ -224,12 +230,26 @@ function AIAutomationContent() {
             onSend={() => handleSend()}
             onQuickAction={(text) => handleSend(text)}
             onAddAttachment={() => setShowAttachmentModal(true)}
-            onMicClick={() =>
+            textareaRef={textareaRef}
+            onMicClick={() => {
+              if (isRecording) return;
+              registerActiveTarget({
+                fieldKey: "message",
+                ref: textareaRef,
+                baseline: inputValue,
+                setValue: setInputValue,
+              });
               startRecording("message", "AI Automation", undefined, (transcript) =>
                 setInputValue((prev) => (prev ? `${prev} ${transcript}` : transcript))
-              )
-            }
+              );
+            }}
             isRecording={isRecording}
+            recordingUi={recordingUi}
+            canAcceptVoice={
+              committedTranscripts.length > 0 || inputValue.trim().length > 0
+            }
+            onAcceptVoice={acceptSession}
+            onCancelVoice={cancelSession}
             attachments={pendingAttachments}
             onRemoveAttachment={(index) =>
               setPendingAttachments((prev) => prev.filter((_, i) => i !== index))

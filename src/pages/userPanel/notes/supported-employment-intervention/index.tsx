@@ -992,7 +992,7 @@ export default function SupportedEmploymentInterventionPage() {
         </div>
 
         {/* Floating Action Button */}
-        <VoiceInputButton/>
+        <VoiceInputButton />
       </div>
     </VoiceRecordingProvider>
   );

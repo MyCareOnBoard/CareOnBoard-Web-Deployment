@@ -106,6 +106,57 @@ body {
     animation: fadeIn 0.2s ease-out;
 }
 
+@keyframes voice-wave-active {
+    0%,
+    100% {
+        height: 6px;
+    }
+    50% {
+        height: 16px;
+    }
+}
+
+@keyframes voice-wave-idle {
+    0%,
+    100% {
+        height: 4px;
+    }
+    50% {
+        height: 8px;
+    }
+}
+
+@keyframes voice-pill-in {
+    from {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.animate-voice-wave-active {
+    animation: voice-wave-active 0.6s ease-in-out infinite;
+}
+
+.animate-voice-wave-idle {
+    animation: voice-wave-idle 1.5s ease-in-out infinite;
+}
+
+.animate-voice-pill-in {
+    animation: voice-pill-in 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-voice-wave-active,
+    .animate-voice-wave-idle,
+    .animate-voice-pill-in {
+        animation: none;
+    }
+}
+
 * {
     font-family: "Urbanist", system-ui, sans-serif;
 }

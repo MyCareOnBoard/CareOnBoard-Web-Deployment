@@ -463,7 +463,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
           </Button>
         </div>
         {/* Floating Action Button */}
-        <VoiceInputButton/>
+        <VoiceInputButton minimal={false} />
       </div>
     </VoiceRecordingProvider>
   );

@@ -733,7 +733,7 @@ export default function SupportedEmploymentPrePage() {
         </div>
 
         {/* Floating Action Button */}
-        <VoiceInputButton/>
+        <VoiceInputButton minimal={false} />
       </div>
     </VoiceRecordingProvider>
   );

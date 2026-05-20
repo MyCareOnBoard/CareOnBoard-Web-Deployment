@@ -1,7 +1,11 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import MicrophoneIcon from "@/assets/icons/microphone.svg?react";
-import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
+import {
+  useVoiceRecording,
+  useVoiceSessionActions,
+} from "@/contexts/VoiceRecordingContext";
+import VoiceMicControl from "@/components/VoiceMicControl";
 
 interface VoiceEnabledTextareaProps {
   value: string;
@@ -30,10 +34,30 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
   rows,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const { startRecording } = useVoiceRecording();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const {
+    startRecording,
+    registerActiveTarget,
+    isRecording,
+    isActiveField,
+    committedTranscripts,
+  } = useVoiceRecording();
+  const { acceptSession, cancelSession, recordingUi } = useVoiceSessionActions();
+
+  const fieldKey = fieldName ?? id ?? "voice-field";
+  const isActive = isActiveField(fieldKey);
 
   const handleMicrophoneClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isRecording && !isActive) return;
+
+    registerActiveTarget({
+      fieldKey,
+      ref: textareaRef,
+      baseline: value,
+      setValue: onChange,
+    });
+
     startRecording(
       fieldName,
       pageTitle,
@@ -48,6 +72,13 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
     );
   };
 
+  const hasCommitted = committedTranscripts.length > 0;
+  const canAccept =
+    hasCommitted || (isActive && value.trim().length > 0);
+
+  const showMic = (isHovered || isActive) && !disabled && !isActive;
+  const showPill = isActive && isRecording;
+
   return (
     <div
       className="relative w-full"
@@ -55,6 +86,7 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
       onMouseLeave={() => setIsHovered(false)}
     >
       <Textarea
+        ref={textareaRef}
         id={id}
         rows={rows}
         value={value}
@@ -63,7 +95,19 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
         placeholder={placeholder}
         disabled={disabled}
       />
-      {isHovered && !disabled && (
+      {showPill && (
+        <div className="absolute bottom-4 right-4 z-10">
+          <VoiceMicControl
+            isConnecting={recordingUi.isConnecting}
+            isSpeaking={recordingUi.isSpeaking}
+            isTranslating={recordingUi.isTranslating}
+            canAccept={canAccept}
+            onAccept={acceptSession}
+            onCancel={cancelSession}
+          />
+        </div>
+      )}
+      {showMic && (
         <button
           type="button"
           className="absolute bottom-4 right-4 bg-[#00b4b8] border border-[rgba(0,0,0,0.12)] rounded-full w-8 h-8 flex items-center justify-center shadow-md hover:bg-[#009da1] transition-colors z-10 cursor-pointer"
