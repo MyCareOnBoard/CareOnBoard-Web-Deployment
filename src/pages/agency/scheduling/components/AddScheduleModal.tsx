@@ -1384,7 +1384,11 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       ) => {
         const totalHours = requests.reduce(
           (sum, request) =>
-            sum + shiftDurationHoursFrom12h(request.startTime, request.endTime),
+            sum +
+            shiftDurationHoursFrom12h(
+              request.startTime ?? "",
+              request.endTime ?? "",
+            ),
           0,
         );
         return formatTotalDurationFromHours(totalHours);
