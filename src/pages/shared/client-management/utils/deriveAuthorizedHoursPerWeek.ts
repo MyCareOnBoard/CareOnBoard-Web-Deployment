@@ -11,7 +11,7 @@ export type WeeklyDistLike =
   | null
   | undefined;
 
-function parseHoursFromCell(raw: string | undefined): number | undefined {
+export function parseHoursFromCell(raw: string | undefined): number | undefined {
   const str = String(raw ?? "").trim();
   if (!str) return undefined;
 

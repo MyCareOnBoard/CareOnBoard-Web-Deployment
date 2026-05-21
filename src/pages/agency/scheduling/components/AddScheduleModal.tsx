@@ -22,6 +22,24 @@ import {
   findOutcomeStatementsForServiceCode,
   flattenOutcomeServices,
 } from "@/pages/shared/client-management/utils/outcomeServices";
+import {
+  sanitizeWeeklyPartsFromUnknown,
+  weeklyDistributionFingerprintFromWd,
+} from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
+import {
+  buildWeeklyDistributionSnapshot,
+  createShiftsCapAware,
+  describeWhyNoShiftsWouldBeBuilt,
+  effectiveWeekdaySchedulesForShiftBuild,
+  formatTotalDurationFromHours,
+  formatWeeklyDistributionDropdownLabel,
+  isWeekdayInDateRange,
+  recurringWeekdayDateRangeMismatchMessage,
+  shiftDurationHoursFrom12h,
+  validateScheduleAgainstWeeklyDistributionRow,
+  weekdayIndicesInDateRange,
+  type WeeklyDistributionSnapshot,
+} from "@/pages/agency/scheduling/weeklyDistributionSchedule";
 
 function clientServicesForScheduling(client: Client | null): ClientService[] {
   if (!client) return [];
@@ -80,6 +98,16 @@ function pickSelectedServiceRow(
 }
 
 /** Server uses id and/or auth dates with serviceCode to pick the correct outcome row when codes repeat. */
+function authDateToYmdUtc(raw?: string): string | undefined {
+  if (!raw?.trim()) return undefined;
+  const trimmed = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed.slice(0, 10))) {
+    return trimmed.slice(0, 10);
+  }
+  const d = parseISO(trimmed);
+  return isValid(d) ? d.toISOString().slice(0, 10) : undefined;
+}
+
 function serviceAuthorizationFieldsForApi(
   services: ClientService[],
   data: ScheduleFormData,
@@ -89,13 +117,8 @@ function serviceAuthorizationFieldsForApi(
 > {
   const svc = pickSelectedServiceRow(services, data);
   const id = (data.serviceAuthorizationId?.trim() || svc?.id?.trim()) || undefined;
-  const toYmd = (raw?: string) => {
-    if (!raw?.trim()) return undefined;
-    const d = parseISO(raw.trim());
-    return isValid(d) ? format(d, "yyyy-MM-dd") : undefined;
-  };
-  const start = toYmd(svc?.startAuthDate);
-  const end = toYmd(svc?.endAuthDate);
+  const start = authDateToYmdUtc(svc?.startAuthDate);
+  const end = authDateToYmdUtc(svc?.endAuthDate);
   return {
     ...(id ? { serviceAuthorizationId: id } : {}),
     ...(start ? { serviceAuthStartDate: start } : {}),
@@ -157,6 +180,7 @@ interface FormErrors {
   endDate?: string;
   clockInTime?: string;
   clockOutTime?: string;
+  weeklyDistribution?: string;
 }
 
 export interface ScheduleFormData {
@@ -211,6 +235,10 @@ const WEEKDAY_OPTIONS = [
   { label: "Thu", dayIndex: 4 },
   { label: "Fri", dayIndex: 5 },
 ];
+
+const WEEKDAY_LABEL_BY_INDEX = Object.fromEntries(
+  WEEKDAY_OPTIONS.map((option) => [option.dayIndex, option.label]),
+) as Record<number, string>;
 
 const noteTypes: { id: string, title: string }[] = [
   {
@@ -336,6 +364,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   // Weekday scheduling state (for recurring schedules)
   const [selectedWeekdays, setSelectedWeekdays] = useState<WeekdaySchedule[]>([]);
   const [configuringWeekday, setConfiguringWeekday] = useState<{ day: string; dayIndex: number } | null>(null);
+  const [selectedWeeklyDistributionIndex, setSelectedWeeklyDistributionIndex] = useState<number | null>(null);
+  const [selectedDistributionSnapshot, setSelectedDistributionSnapshot] =
+    useState<WeeklyDistributionSnapshot | null>(null);
 
   // API search states
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
@@ -400,6 +431,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       setShowServiceDropdown(false);
       setSelectedWeekdays([]);
       setConfiguringWeekday(null);
+      setSelectedWeeklyDistributionIndex(null);
+      setSelectedDistributionSnapshot(null);
       if (!(editData && mode === "edit")) {
         setSelectedClient(null);
         setSelectedClientServices([]);
@@ -433,6 +466,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
     if (!user?.agencyId || !data.assignedDspId) return [];
 
+    const weekdaySchedulesForBuild = effectiveWeekdaySchedulesForShiftBuild({
+      weekdaySchedules: selectedWeekdays,
+      clockInTime: data.clockInTime,
+      clockOutTime: data.clockOutTime,
+      configuringWeekday,
+    });
+
     const ispOutcomePayload = resolveIspOutcomeShiftPayload(selectedClient, selectedClientServices, data);
     const authFields = serviceAuthorizationFieldsForApi(selectedClientServices, data);
     const requests: CreateShiftRequest[] = [];
@@ -442,8 +482,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       const dateRange = eachDayOfIntervalDateFns({ start: data.startDate, end: data.endDate });
 
       // If weekdays are selected, filter dates by selected weekdays
-      if (selectedWeekdays.length > 0) {
-        const selectedDayIndices = new Set(selectedWeekdays.map(w => w.dayIndex));
+      if (weekdaySchedulesForBuild.length > 0) {
+        const selectedDayIndices = new Set(weekdaySchedulesForBuild.map(w => w.dayIndex));
 
         dateRange.forEach((date) => {
           const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
@@ -451,7 +491,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           // Only create shift if this day is in selected weekdays
           if (selectedDayIndices.has(dayOfWeek)) {
             // Find the weekday schedule for this day to get its specific times
-            const weekdaySchedule = selectedWeekdays.find(w => w.dayIndex === dayOfWeek);
+            const weekdaySchedule = weekdaySchedulesForBuild.find(w => w.dayIndex === dayOfWeek);
 
             if (weekdaySchedule) {
               const baseShiftData = {
@@ -613,6 +653,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     }));
     setSelectedClient(client);
     setSelectedClientServices(clientServicesForScheduling(client));
+    setSelectedWeeklyDistributionIndex(null);
+    setSelectedDistributionSnapshot(null);
     setShowClientDropdown(false);
     setClientSearchResults([]);
   };
@@ -660,6 +702,65 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     if (!formData.serviceCode) return "";
     return formData.ispOutcome;
   }, [selectedService, formData.serviceCode, formData.ispOutcome]);
+
+  const weeklyDistributionFingerprint = useMemo(
+    () => weeklyDistributionFingerprintFromWd(selectedService?.sdrWeeklyDistribution),
+    [selectedService?.sdrWeeklyDistribution],
+  );
+
+  const weeklyDistributionRows = useMemo(() => {
+    const parts = sanitizeWeeklyPartsFromUnknown(selectedService?.sdrWeeklyDistribution);
+    return parts?.fullSanitizedRows ?? [];
+  }, [selectedService?.id, weeklyDistributionFingerprint]);
+
+  const weeklyDistributionOptions = useMemo(
+    () =>
+      weeklyDistributionRows.map((row, index) => ({
+        index,
+        label: formatWeeklyDistributionDropdownLabel(row),
+      })),
+    [weeklyDistributionRows],
+  );
+
+  const weeklyDistributionStandardLine = useMemo(() => {
+    const line = selectedService?.sdrWeeklyDistribution?.standardLine;
+    return typeof line === "string" ? line.trim() : "";
+  }, [selectedService?.sdrWeeklyDistribution?.standardLine]);
+
+  const showWeeklyDistributionPicker =
+    formData.schedulingType === "recurring" && weeklyDistributionRows.length > 0;
+
+  const effectiveWeekdaySchedules = useMemo(
+    () =>
+      effectiveWeekdaySchedulesForShiftBuild({
+        weekdaySchedules: selectedWeekdays,
+        clockInTime: formData.clockInTime,
+        clockOutTime: formData.clockOutTime,
+        configuringWeekday,
+      }),
+    [selectedWeekdays, formData.clockInTime, formData.clockOutTime, configuringWeekday],
+  );
+
+  const weeklyDistributionCapError = useMemo(() => {
+    if (
+      formData.schedulingType !== "recurring" ||
+      selectedWeeklyDistributionIndex === null ||
+      !selectedDistributionSnapshot
+    ) {
+      return null;
+    }
+    const result = validateScheduleAgainstWeeklyDistributionRow({
+      formData,
+      snapshot: selectedDistributionSnapshot,
+      weekdaySchedules: effectiveWeekdaySchedules,
+    });
+    return result.ok ? null : result.message;
+  }, [
+    formData,
+    selectedWeeklyDistributionIndex,
+    selectedDistributionSnapshot,
+    effectiveWeekdaySchedules,
+  ]);
 
   const verifyAndApplyDsp = useCallback(
     async (dspId: string, dspName: string) => {
@@ -718,8 +819,37 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         void verifyAndApplyDsp(onlyDsp.id, onlyDsp.name ?? "");
       }
       setShowServiceDropdown(false);
+      setSelectedWeeklyDistributionIndex(null);
+      setSelectedDistributionSnapshot(null);
     },
     [selectedClientServices, verifyAndApplyDsp],
+  );
+
+  const handleWeeklyDistributionChange = useCallback(
+    (value: string) => {
+      clearError("weeklyDistribution");
+      if (value === "manual") {
+        setSelectedWeeklyDistributionIndex(null);
+        setSelectedDistributionSnapshot(null);
+        return;
+      }
+      const index = Number.parseInt(value, 10);
+      const row = weeklyDistributionRows[index];
+      if (!row) return;
+      const snapshot = buildWeeklyDistributionSnapshot(row);
+      setSelectedWeeklyDistributionIndex(index);
+      setSelectedDistributionSnapshot(snapshot);
+      if (snapshot) {
+        setFormData((prev) => ({
+          ...prev,
+          startDate: snapshot.weekStart,
+          endDate: snapshot.weekEnd,
+        }));
+        clearError("startDate");
+        clearError("endDate");
+      }
+    },
+    [weeklyDistributionRows],
   );
 
   const handleAssignedDspRowSelect = useCallback(
@@ -754,16 +884,28 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
   // Handle weekday toggle
   const handleWeekdayToggle = (day: string, dayIndex: number) => {
+    if (
+      !isWeekdayInDateRange(dayIndex, formData.startDate, formData.endDate)
+    ) {
+      return;
+    }
+
     const existing = selectedWeekdays.find(w => w.dayIndex === dayIndex);
 
     if (existing) {
-      // Remove the day if already selected
-      setSelectedWeekdays(prev => prev.filter(w => w.dayIndex !== dayIndex));
       if (configuringWeekday?.dayIndex === dayIndex) {
+        setSelectedWeekdays(prev => prev.filter(w => w.dayIndex !== dayIndex));
         setConfiguringWeekday(null);
-        // Reset clock times
         setFormData(prev => ({ ...prev, clockInTime: "", clockOutTime: "" }));
+        return;
       }
+      setConfiguringWeekday({ day, dayIndex });
+      setFormData(prev => ({
+        ...prev,
+        clockInTime: existing.clockInTime,
+        clockOutTime: existing.clockOutTime,
+      }));
+      return;
     } else {
       // Start configuring this weekday
       setConfiguringWeekday({ day, dayIndex });
@@ -802,11 +944,61 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     }
   }, [configuringWeekday, formData.clockInTime, formData.clockOutTime]);
 
+  // Keep a lone selected weekday in sync with the clock pickers
+  useEffect(() => {
+    if (configuringWeekday || selectedWeekdays.length !== 1) return;
+    if (!formData.clockInTime || !formData.clockOutTime) return;
+    const only = selectedWeekdays[0];
+    if (
+      only.clockInTime === formData.clockInTime &&
+      only.clockOutTime === formData.clockOutTime
+    ) {
+      return;
+    }
+    setSelectedWeekdays([
+      {
+        ...only,
+        clockInTime: formData.clockInTime,
+        clockOutTime: formData.clockOutTime,
+      },
+    ]);
+  }, [
+    configuringWeekday,
+    selectedWeekdays,
+    formData.clockInTime,
+    formData.clockOutTime,
+  ]);
+
+  // Drop weekdays (and in-progress config) that fall outside the recurring date range
+  useEffect(() => {
+    if (
+      formData.schedulingType !== "recurring" ||
+      !formData.startDate ||
+      !formData.endDate
+    ) {
+      return;
+    }
+    const allowed = weekdayIndicesInDateRange(formData.startDate, formData.endDate);
+    setSelectedWeekdays((prev) => {
+      const next = prev.filter((w) => allowed.has(w.dayIndex));
+      return next.length === prev.length ? prev : next;
+    });
+    setConfiguringWeekday((current) => {
+      if (current && !allowed.has(current.dayIndex)) {
+        setFormData((prev) => ({ ...prev, clockInTime: "", clockOutTime: "" }));
+        return null;
+      }
+      return current;
+    });
+  }, [formData.schedulingType, formData.startDate, formData.endDate]);
+
   // Clear selected weekdays when switching to one-time scheduling
   useEffect(() => {
     if (formData.schedulingType === "one-time") {
       setSelectedWeekdays([]);
       setConfiguringWeekday(null);
+      setSelectedWeeklyDistributionIndex(null);
+      setSelectedDistributionSnapshot(null);
     }
   }, [formData.schedulingType]);
 
@@ -881,6 +1073,35 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       }
     }
 
+    if (
+      formData.schedulingType === "recurring" &&
+      selectedWeeklyDistributionIndex !== null &&
+      selectedDistributionSnapshot
+    ) {
+      const distributionResult = validateScheduleAgainstWeeklyDistributionRow({
+        formData,
+        snapshot: selectedDistributionSnapshot,
+        weekdaySchedules: effectiveWeekdaySchedules,
+      });
+      if (!distributionResult.ok) {
+        newErrors.weeklyDistribution = distributionResult.message;
+      }
+    }
+
+    const weekdayRangeMismatch = recurringWeekdayDateRangeMismatchMessage({
+      formData,
+      weekdaySchedules: effectiveWeekdaySchedules,
+      weekdayLabelByIndex: WEEKDAY_LABEL_BY_INDEX,
+    });
+    if (weekdayRangeMismatch) {
+      newErrors.startDate = weekdayRangeMismatch;
+    }
+
+    if (!formData.assignedDspId.trim() && formData.assignedDsp.trim()) {
+      newErrors.assignedDsp =
+        "Select an assigned DSP from the service list. The chosen DSP must be linked to an employee record.";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -934,8 +1155,44 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       if (!formData.clockOutTime) return false;
     }
 
+    if (
+      formData.schedulingType === "recurring" &&
+      selectedWeeklyDistributionIndex !== null &&
+      selectedDistributionSnapshot
+    ) {
+      const distributionResult = validateScheduleAgainstWeeklyDistributionRow({
+        formData,
+        snapshot: selectedDistributionSnapshot,
+        weekdaySchedules: effectiveWeekdaySchedules,
+      });
+      if (!distributionResult.ok) return false;
+    }
+
+    if (weeklyDistributionCapError) return false;
+
+    if (
+      recurringWeekdayDateRangeMismatchMessage({
+        formData,
+        weekdaySchedules: effectiveWeekdaySchedules,
+        weekdayLabelByIndex: WEEKDAY_LABEL_BY_INDEX,
+      })
+    ) {
+      return false;
+    }
+
+    if (!formData.assignedDspId.trim() && formData.assignedDsp.trim()) return false;
+
     return true;
-  }, [formData, selectedWeekdays, configuringWeekday, selectedService]);
+  }, [
+    formData,
+    selectedWeekdays,
+    configuringWeekday,
+    selectedService,
+    selectedWeeklyDistributionIndex,
+    selectedDistributionSnapshot,
+    effectiveWeekdaySchedules,
+    weeklyDistributionCapError,
+  ]);
 
   // Handle saving schedule as draft
   const handleSaveDraft = async () => {
@@ -1027,18 +1284,25 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
       if (shiftRequests.length === 0) {
         toast({
-          title: "No Valid Entries",
-          description: "Please fill in all required fields before saving.",
+          title: "No shifts to save",
+          description: describeWhyNoShiftsWouldBeBuilt({
+            formData,
+            weekdaySchedules: selectedWeekdays,
+            weekdayLabelByIndex: WEEKDAY_LABEL_BY_INDEX,
+            hasAgencyId: Boolean(user?.agencyId),
+            hasAssignedDspId: Boolean(formData.assignedDspId.trim()),
+            action: "save",
+          }),
           variant: "destructive",
         });
         return;
       }
 
-      const savePromises = shiftRequests.map(async (request) => {
-        return createShift(request);
-      });
-
-      const results = await Promise.allSettled(savePromises);
+      const results = await createShiftsCapAware(
+        shiftRequests,
+        (request) => createShift(request),
+        selectedDistributionSnapshot,
+      );
 
       const failures = results.filter((r) => r.status === "rejected");
       const successes = results.filter((r) => r.status === "fulfilled");
@@ -1105,31 +1369,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
     setIsSubmitting(true);
     try {
-      const calculateDuration = () => {
-        if (!formData.clockInTime || !formData.clockOutTime) return "2 hours";
-        try {
-          const parseTime = (time: string) => {
-            const match = time.match(/(\d+)[.:](\d+):?(AM|PM)/i);
-            if (!match) return 0;
-            let hours = parseInt(match[1], 10);
-            const minutes = parseInt(match[2], 10);
-            const period = match[3].toUpperCase();
-            if (period === "PM" && hours !== 12) hours += 12;
-            if (period === "AM" && hours === 12) hours = 0;
-            return hours * 60 + minutes;
-          };
-          const startMinutes = parseTime(formData.clockInTime);
-          const endMinutes = parseTime(formData.clockOutTime);
-          const diffMinutes = endMinutes - startMinutes;
-          const hours = Math.floor(diffMinutes / 60);
-          const mins = diffMinutes % 60;
-          if (mins > 0) return `${hours} hours ${mins} minutes`;
-          return `${hours} hours`;
-        } catch {
-          return "2 hours";
-        }
-      };
-
       const getDisplayDate = () => {
         if (formData.schedulingType === "recurring" && formData.startDate && formData.endDate) {
           return `${format(formData.startDate, "d MMMM")} - ${format(formData.endDate, "d MMMM")}`;
@@ -1138,6 +1377,17 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           return format(formData.date, "d MMMM");
         }
         return format(new Date(), "d MMMM");
+      };
+
+      const durationFromShiftRequests = (
+        requests: Pick<CreateShiftRequest, "startTime" | "endTime">[],
+      ) => {
+        const totalHours = requests.reduce(
+          (sum, request) =>
+            sum + shiftDurationHoursFrom12h(request.startTime, request.endTime),
+          0,
+        );
+        return formatTotalDurationFromHours(totalHours);
       };
 
       // Edit existing shift - schedule (submit)
@@ -1167,7 +1417,12 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         setUpdatedShiftInfo({
           clientName: formData.client || "Client",
           dspName: formData.assignedDsp || "DSP",
-          duration: calculateDuration(),
+          duration: durationFromShiftRequests([
+            {
+              startTime: formData.clockInTime,
+              endTime: formData.clockOutTime,
+            },
+          ]),
           date: getDisplayDate(),
         });
         setShowUpdatedModal(true);
@@ -1194,8 +1449,15 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
       if (shiftRequests.length === 0) {
         toast({
-          title: "No Valid Entries",
-          description: "Please fill in all required fields before scheduling.",
+          title: "No shifts to schedule",
+          description: describeWhyNoShiftsWouldBeBuilt({
+            formData,
+            weekdaySchedules: selectedWeekdays,
+            weekdayLabelByIndex: WEEKDAY_LABEL_BY_INDEX,
+            hasAgencyId: Boolean(user?.agencyId),
+            hasAssignedDspId: Boolean(formData.assignedDspId.trim()),
+            action: "schedule",
+          }),
           variant: "destructive",
         });
         return;
@@ -1209,8 +1471,10 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         type: ShiftType.AUTOMATIC,
       }));
 
-      const results = await Promise.allSettled(
-        finalShiftRequests.map((request) => createShift(request))
+      const results = await createShiftsCapAware(
+        finalShiftRequests,
+        (request) => createShift(request),
+        selectedDistributionSnapshot,
       );
 
       const activityLogPromises = results
@@ -1329,7 +1593,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         setScheduledShiftInfo({
           clientName: formData.client || "Client",
           dspName: formData.assignedDsp || "DSP",
-          duration: calculateDuration(),
+          duration: durationFromShiftRequests(finalShiftRequests),
           date: getDisplayDate(),
         });
         setShowSuccessModal(true);
@@ -1721,6 +1985,44 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   )}
                 </div>
 
+                {showWeeklyDistributionPicker && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[12px] font-normal text-[#10141a]">
+                      Weekly distribution week
+                    </label>
+                    <select
+                      value={
+                        selectedWeeklyDistributionIndex === null
+                          ? "manual"
+                          : String(selectedWeeklyDistributionIndex)
+                      }
+                      onChange={(e) => handleWeeklyDistributionChange(e.target.value)}
+                      className={`bg-white border rounded-xl h-11 px-4 text-[14px] font-normal text-[#10141a] ${
+                        errors.weeklyDistribution || weeklyDistributionCapError
+                          ? "border-[#D53411]"
+                          : "border-[#b2b2b3]"
+                      }`}
+                    >
+                      <option value="manual">Manual date range</option>
+                      {weeklyDistributionOptions.map((option) => (
+                        <option key={option.index} value={String(option.index)}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {weeklyDistributionStandardLine ? (
+                      <span className="text-[12px] font-normal text-[#808081]">
+                        {weeklyDistributionStandardLine}
+                      </span>
+                    ) : null}
+                    {errors.weeklyDistribution || weeklyDistributionCapError ? (
+                      <span className="text-[12px] font-normal text-[#D53411]">
+                        {errors.weeklyDistribution ?? weeklyDistributionCapError}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+
                 {/* Date Fields - Conditional based on scheduling type */}
                 {formData.schedulingType === "recurring" ? (
                   <>
@@ -1903,16 +2205,26 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                         {WEEKDAY_OPTIONS.map((weekday) => {
                           const isSelected = selectedWeekdays.some(w => w.dayIndex === weekday.dayIndex);
                           const isConfiguring = configuringWeekday?.dayIndex === weekday.dayIndex;
+                          const inRange = isWeekdayInDateRange(
+                            weekday.dayIndex,
+                            formData.startDate,
+                            formData.endDate,
+                          );
                           return (
                             <button
                               key={weekday.dayIndex}
+                              type="button"
+                              disabled={!inRange}
                               onClick={() => handleWeekdayToggle(weekday.label, weekday.dayIndex)}
-                              className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${isSelected
-                                ? "bg-[#00b4b8] text-white border-[0.5px] border-[#808081]"
-                                : isConfiguring
-                                  ? "bg-[#ffa500] text-white border-[0.5px] border-[#ff8c00]"
-                                  : "border border-[#808081] text-[#10141a]"
-                                }`}
+                              className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium transition-colors ${
+                                !inRange
+                                  ? "border border-[#e0e0e0] text-[#b2b2b3] cursor-not-allowed opacity-60"
+                                  : isSelected
+                                    ? "bg-[#00b4b8] text-white border-[0.5px] border-[#808081] cursor-pointer"
+                                    : isConfiguring
+                                      ? "bg-[#ffa500] text-white border-[0.5px] border-[#ff8c00] cursor-pointer"
+                                      : "border border-[#808081] text-[#10141a] cursor-pointer"
+                              }`}
                             >
                               {weekday.label}
                             </button>
