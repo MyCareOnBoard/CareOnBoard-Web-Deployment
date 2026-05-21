@@ -84,7 +84,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(vitest@3.2.4(@types/debug@4.1.13)(@types/node@24.7.2)(jiti@2.6.1)(jsdom@27.0.0(postcss@8.5.6))(lightningcss@1.30.1)(msw@2.11.5(@types/node@24.7.2)(typescript@5.9.3)))
       axios:
-        specifier: ^1.16.1
+        specifier: ^1.13.5
         version: 1.16.1
       class-variance-authority:
         specifier: ^0.7.1
@@ -111,7 +111,7 @@ importers:
         specifier: ^27.0.0
         version: 27.0.0(postcss@8.5.6)
       jspdf:
-        specifier: ^4.2.1
+        specifier: ^4.2.0
         version: 4.2.1
       lucide-react:
         specifier: ^0.545.0
@@ -241,7 +241,7 @@ importers:
         specifier: ^8.45.0
         version: 8.46.0(eslint@9.37.0(jiti@2.6.1))(typescript@5.9.3)
       vite:
-        specifier: ^7.3.3
+        specifier: ^7.1.7
         version: 7.3.3(@types/node@24.7.2)(jiti@2.6.1)(lightningcss@1.30.1)
       vite-plugin-svgr:
         specifier: ^4.5.0
