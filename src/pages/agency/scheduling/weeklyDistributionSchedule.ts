@@ -6,6 +6,7 @@ export const WEEKLY_DISTRIBUTION_HOURS_EPSILON = 0.05;
 
 export type WeeklyDistributionFormSlice = {
   schedulingType: "one-time" | "recurring" | "";
+  date?: Date | null;
   startDate: Date | null;
   endDate: Date | null;
   clockInTime: string;
@@ -370,11 +371,11 @@ export function capBucketKeyForShiftRequest(
  * Create shifts with sequential ordering within the same cap bucket and parallel
  * ordering across unrelated buckets.
  */
-export async function createShiftsCapAware<T>(
-  requests: Array<{ clientId?: string; serviceCode?: string; date?: string }>,
-  createOne: (req: (typeof requests)[number]) => Promise<T>,
+export async function createShiftsCapAware<TRequest extends { clientId?: string; serviceCode?: string; date?: string }, TResult>(
+  requests: TRequest[],
+  createOne: (req: TRequest) => Promise<TResult>,
   distributionSnapshot: WeeklyDistributionSnapshot | null,
-): Promise<PromiseSettledResult<T>[]> {
+): Promise<PromiseSettledResult<TResult>[]> {
   const indexed = requests.map((req, index) => ({ req, index }));
   const groups = new Map<string, typeof indexed>();
 
@@ -385,7 +386,7 @@ export async function createShiftsCapAware<T>(
     groups.set(key, list);
   }
 
-  const results: PromiseSettledResult<T>[] = new Array(requests.length);
+  const results: PromiseSettledResult<TResult>[] = new Array(requests.length);
 
   await Promise.all(
     [...groups.values()].map(async (group) => {
