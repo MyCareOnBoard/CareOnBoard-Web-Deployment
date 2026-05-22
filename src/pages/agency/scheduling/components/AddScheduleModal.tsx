@@ -33,7 +33,8 @@ import {
   effectiveWeekdaySchedulesForShiftBuild,
   formatTotalDurationFromHours,
   formatWeeklyDistributionDropdownLabel,
-  isWeekdayInDateRange,
+  isOneTimeDateInSnapshot,
+  isWeekdayEnabledForSchedule,
   recurringWeekdayDateRangeMismatchMessage,
   shiftDurationHoursFrom12h,
   validateScheduleAgainstWeeklyDistributionRow,
@@ -95,6 +96,16 @@ function pickSelectedServiceRow(
     if (byId) return byId;
   }
   return services.find((s) => s.code === data.serviceCode) || null;
+}
+
+function oneTimePickerMonth(
+  snapshot: WeeklyDistributionSnapshot,
+  date: Date | null,
+): Date {
+  if (date && isOneTimeDateInSnapshot(date, snapshot)) {
+    return startOfMonth(date);
+  }
+  return startOfMonth(snapshot.weekStart);
 }
 
 /** Server uses id and/or auth dates with serviceCode to pick the correct outcome row when codes repeat. */
@@ -547,13 +558,14 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         });
       }
     } else if (data.date) {
-      // One-time schedule
+      const weekdaySchedule =
+        weekdaySchedulesForBuild.length === 1 ? weekdaySchedulesForBuild[0] : null;
       const baseShiftData = {
         employeeId: data.assignedDspId,
         agencyId: user?.agencyId || "",
         location: data.clientLocation || "",
-        startTime: data.clockInTime,
-        endTime: data.clockOutTime,
+        startTime: weekdaySchedule?.clockInTime || data.clockInTime,
+        endTime: weekdaySchedule?.clockOutTime || data.clockOutTime,
         clientId: data.clientId,
         notesType: data.notesType || undefined,
         comment: data.comment || undefined,
@@ -727,8 +739,33 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     return typeof line === "string" ? line.trim() : "";
   }, [selectedService?.sdrWeeklyDistribution?.standardLine]);
 
-  const showWeeklyDistributionPicker =
-    formData.schedulingType === "recurring" && weeklyDistributionRows.length > 0;
+  const showWeeklyDistributionPicker = weeklyDistributionRows.length > 0;
+
+  const sdrWeekdayIndices = useMemo(() => {
+    if (!selectedDistributionSnapshot) return null;
+    return weekdayIndicesInDateRange(
+      selectedDistributionSnapshot.weekStart,
+      selectedDistributionSnapshot.weekEnd,
+    );
+  }, [selectedDistributionSnapshot]);
+
+  const enabledWeekdayIndices = useMemo(() => {
+    if (formData.schedulingType === "one-time") {
+      if (sdrWeekdayIndices) return sdrWeekdayIndices;
+      if (formData.date) return new Set([formData.date.getDay()]);
+      return new Set<number>();
+    }
+    if (formData.startDate && formData.endDate) {
+      return weekdayIndicesInDateRange(formData.startDate, formData.endDate);
+    }
+    return new Set(WEEKDAY_OPTIONS.map((weekday) => weekday.dayIndex));
+  }, [
+    formData.schedulingType,
+    formData.date,
+    formData.startDate,
+    formData.endDate,
+    sdrWeekdayIndices,
+  ]);
 
   const effectiveWeekdaySchedules = useMemo(
     () =>
@@ -741,12 +778,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     [selectedWeekdays, formData.clockInTime, formData.clockOutTime, configuringWeekday],
   );
 
-  const weeklyDistributionCapError = useMemo(() => {
-    if (
-      formData.schedulingType !== "recurring" ||
-      selectedWeeklyDistributionIndex === null ||
-      !selectedDistributionSnapshot
-    ) {
+  const getWeeklyDistributionValidationError = useCallback((): string | null => {
+    if (selectedWeeklyDistributionIndex === null || !selectedDistributionSnapshot) {
       return null;
     }
     const result = validateScheduleAgainstWeeklyDistributionRow({
@@ -761,6 +794,11 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     selectedDistributionSnapshot,
     effectiveWeekdaySchedules,
   ]);
+
+  const weeklyDistributionCapError = useMemo(
+    () => getWeeklyDistributionValidationError(),
+    [getWeeklyDistributionValidationError],
+  );
 
   const verifyAndApplyDsp = useCallback(
     async (dspId: string, dspName: string) => {
@@ -840,16 +878,27 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       setSelectedWeeklyDistributionIndex(index);
       setSelectedDistributionSnapshot(snapshot);
       if (snapshot) {
-        setFormData((prev) => ({
-          ...prev,
-          startDate: snapshot.weekStart,
-          endDate: snapshot.weekEnd,
-        }));
+        if (formData.schedulingType === "one-time") {
+          setCurrentMonth(startOfMonth(snapshot.weekStart));
+        }
+        setFormData((prev) => {
+          if (prev.schedulingType === "one-time") {
+            return { ...prev, date: null };
+          }
+          return {
+            ...prev,
+            startDate: snapshot.weekStart,
+            endDate: snapshot.weekEnd,
+          };
+        });
+        setSelectedWeekdays([]);
+        setConfiguringWeekday(null);
         clearError("startDate");
         clearError("endDate");
+        clearError("date");
       }
     },
-    [weeklyDistributionRows],
+    [weeklyDistributionRows, formData.schedulingType],
   );
 
   const handleAssignedDspRowSelect = useCallback(
@@ -870,6 +919,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     clearError("date");
   };
 
+  const openOneTimeDatePicker = useCallback(() => {
+    if (selectedDistributionSnapshot) {
+      setCurrentMonth(oneTimePickerMonth(selectedDistributionSnapshot, formData.date));
+    }
+    setShowDatePicker((prev) => !prev);
+  }, [selectedDistributionSnapshot, formData.date]);
+
   const handleStartDateSelect = (date: Date) => {
     setFormData(prev => ({ ...prev, startDate: date }));
     setShowStartDatePicker(false);
@@ -885,8 +941,33 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   // Handle weekday toggle
   const handleWeekdayToggle = (day: string, dayIndex: number) => {
     if (
-      !isWeekdayInDateRange(dayIndex, formData.startDate, formData.endDate)
+      !isWeekdayEnabledForSchedule({
+        schedulingType: formData.schedulingType,
+        dayIndex,
+        date: formData.date,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        snapshot: selectedDistributionSnapshot,
+      })
     ) {
+      return;
+    }
+
+    if (
+      formData.schedulingType === "one-time" &&
+      selectedDistributionSnapshot
+    ) {
+      for (const d of eachDayOfInterval({
+        start: selectedDistributionSnapshot.weekStart,
+        end: selectedDistributionSnapshot.weekEnd,
+      })) {
+        if (d.getDay() === dayIndex) {
+          setConfiguringWeekday(null);
+          setFormData((prev) => ({ ...prev, date: d }));
+          clearError("date");
+          return;
+        }
+      }
       return;
     }
 
@@ -929,20 +1010,23 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               : w
           );
         } else {
-          // Add new
-          return [...prev, {
+          const entry = {
             day: configuringWeekday.day,
             dayIndex: configuringWeekday.dayIndex,
             clockInTime: formData.clockInTime,
             clockOutTime: formData.clockOutTime,
-          }];
+          };
+          if (formData.schedulingType === "one-time") {
+            return [entry];
+          }
+          return [...prev, entry];
         }
       });
 
       // Clear configuring state
       setConfiguringWeekday(null);
     }
-  }, [configuringWeekday, formData.clockInTime, formData.clockOutTime]);
+  }, [configuringWeekday, formData.clockInTime, formData.clockOutTime, formData.schedulingType]);
 
   // Keep a lone selected weekday in sync with the clock pickers
   useEffect(() => {
@@ -992,15 +1076,69 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     });
   }, [formData.schedulingType, formData.startDate, formData.endDate]);
 
-  // Clear selected weekdays when switching to one-time scheduling
+  // Sync SDR dates, one-time weekday selection, and clear out-of-range one-time dates
   useEffect(() => {
-    if (formData.schedulingType === "one-time") {
-      setSelectedWeekdays([]);
-      setConfiguringWeekday(null);
-      setSelectedWeeklyDistributionIndex(null);
-      setSelectedDistributionSnapshot(null);
+    if (formData.schedulingType === "recurring" && selectedDistributionSnapshot) {
+      if (!formData.startDate || !formData.endDate) {
+        setFormData((prev) => ({
+          ...prev,
+          startDate: prev.startDate ?? selectedDistributionSnapshot.weekStart,
+          endDate: prev.endDate ?? selectedDistributionSnapshot.weekEnd,
+        }));
+      }
+      return;
     }
-  }, [formData.schedulingType]);
+
+    if (formData.schedulingType !== "one-time") return;
+
+    if (
+      selectedDistributionSnapshot &&
+      formData.date &&
+      !isOneTimeDateInSnapshot(formData.date, selectedDistributionSnapshot)
+    ) {
+      setFormData((prev) => ({ ...prev, date: null }));
+      return;
+    }
+
+    if (!formData.date) return;
+
+    const dayIndex = formData.date.getDay();
+    const label = WEEKDAY_LABEL_BY_INDEX[dayIndex] ?? dayIndex.toString();
+
+    setSelectedWeekdays((prev) => {
+      const existing = prev.find((w) => w.dayIndex === dayIndex);
+      const nextEntry: WeekdaySchedule = {
+        day: label,
+        dayIndex,
+        clockInTime: existing?.clockInTime || formData.clockInTime || "",
+        clockOutTime: existing?.clockOutTime || formData.clockOutTime || "",
+      };
+      if (
+        prev.length === 1 &&
+        prev[0].dayIndex === dayIndex &&
+        prev[0].clockInTime === nextEntry.clockInTime &&
+        prev[0].clockOutTime === nextEntry.clockOutTime
+      ) {
+        return prev;
+      }
+      return [nextEntry];
+    });
+
+    setConfiguringWeekday((current) => {
+      if (current && current.dayIndex !== dayIndex) {
+        return null;
+      }
+      return current;
+    });
+  }, [
+    formData.schedulingType,
+    formData.date,
+    formData.startDate,
+    formData.endDate,
+    formData.clockInTime,
+    formData.clockOutTime,
+    selectedDistributionSnapshot,
+  ]);
 
   // Form validation
   const validateForm = (): boolean => {
@@ -1038,6 +1176,11 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     if (formData.schedulingType === "one-time") {
       if (!formData.date) {
         newErrors.date = "Please select a date";
+      } else if (
+        selectedDistributionSnapshot &&
+        !isOneTimeDateInSnapshot(formData.date, selectedDistributionSnapshot)
+      ) {
+        newErrors.date = "Date must fall within the selected weekly distribution week";
       }
     } else if (formData.schedulingType === "recurring") {
       if (!formData.startDate) {
@@ -1052,7 +1195,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     }
 
     // Clock time validation
-    if (formData.schedulingType === "recurring" && selectedWeekdays.length > 0) {
+    if (selectedWeekdays.length > 0) {
       // When weekdays are selected, validate each weekday has times
       const invalidWeekdays = selectedWeekdays.filter(w => !w.clockInTime || !w.clockOutTime);
       if (invalidWeekdays.length > 0) {
@@ -1064,7 +1207,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         newErrors.clockInTime = `Please finish setting times for ${configuringWeekday.day} or deselect it`;
       }
     } else {
-      // For one-time or recurring without weekdays, validate general times
+      // Without selected weekdays, validate general times
       if (!formData.clockInTime) {
         newErrors.clockInTime = "Please select a clock in time";
       }
@@ -1073,19 +1216,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       }
     }
 
-    if (
-      formData.schedulingType === "recurring" &&
-      selectedWeeklyDistributionIndex !== null &&
-      selectedDistributionSnapshot
-    ) {
-      const distributionResult = validateScheduleAgainstWeeklyDistributionRow({
-        formData,
-        snapshot: selectedDistributionSnapshot,
-        weekdaySchedules: effectiveWeekdaySchedules,
-      });
-      if (!distributionResult.ok) {
-        newErrors.weeklyDistribution = distributionResult.message;
-      }
+    const distributionError = getWeeklyDistributionValidationError();
+    if (distributionError) {
+      newErrors.weeklyDistribution = distributionError;
     }
 
     const weekdayRangeMismatch = recurringWeekdayDateRangeMismatchMessage({
@@ -1135,6 +1268,12 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     // Date validation based on scheduling type
     if (formData.schedulingType === "one-time") {
       if (!formData.date) return false;
+      if (
+        selectedDistributionSnapshot &&
+        !isOneTimeDateInSnapshot(formData.date, selectedDistributionSnapshot)
+      ) {
+        return false;
+      }
     } else if (formData.schedulingType === "recurring") {
       if (!formData.startDate) return false;
       if (!formData.endDate) return false;
@@ -1142,12 +1281,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     }
 
     // Clock time validation
-    if (formData.schedulingType === "recurring" && selectedWeekdays.length > 0) {
-      // When weekdays are selected, validate each weekday has times
+    if (selectedWeekdays.length > 0) {
       const invalidWeekdays = selectedWeekdays.filter(w => !w.clockInTime || !w.clockOutTime);
       if (invalidWeekdays.length > 0) return false;
-
-      // If a weekday is currently being configured, form is not valid
       if (configuringWeekday) return false;
     } else {
       // For one-time or recurring without weekdays, validate general times
@@ -1155,20 +1291,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       if (!formData.clockOutTime) return false;
     }
 
-    if (
-      formData.schedulingType === "recurring" &&
-      selectedWeeklyDistributionIndex !== null &&
-      selectedDistributionSnapshot
-    ) {
-      const distributionResult = validateScheduleAgainstWeeklyDistributionRow({
-        formData,
-        snapshot: selectedDistributionSnapshot,
-        weekdaySchedules: effectiveWeekdaySchedules,
-      });
-      if (!distributionResult.ok) return false;
-    }
-
-    if (weeklyDistributionCapError) return false;
+    if (getWeeklyDistributionValidationError()) return false;
 
     if (
       recurringWeekdayDateRangeMismatchMessage({
@@ -1191,7 +1314,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     selectedWeeklyDistributionIndex,
     selectedDistributionSnapshot,
     effectiveWeekdaySchedules,
-    weeklyDistributionCapError,
+    getWeeklyDistributionValidationError,
   ]);
 
   // Handle saving schedule as draft
@@ -1951,44 +2074,6 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   )}
                 </div>
 
-                {/* Scheduling Type */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">Scheduling Type</label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, schedulingType: "one-time" }));
-                        clearError("schedulingType");
-                      }}
-                      className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.schedulingType === "one-time"
-                        ? "bg-[#00b4b8] text-white"
-                        : errors.schedulingType
-                          ? "border border-[#D53411] text-[#10141a]"
-                          : "border border-[#808081] text-[#10141a]"
-                        }`}
-                    >
-                      One time
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, schedulingType: "recurring" }));
-                        clearError("schedulingType");
-                      }}
-                      className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.schedulingType === "recurring"
-                        ? "bg-[#00b4b8] text-white"
-                        : errors.schedulingType
-                          ? "border border-[#D53411] text-[#10141a]"
-                          : "border border-[#808081] text-[#10141a]"
-                        }`}
-                    >
-                      Recurring
-                    </button>
-                  </div>
-                  {errors.schedulingType && (
-                    <span className="text-[12px] font-normal text-[#D53411]">{errors.schedulingType}</span>
-                  )}
-                </div>
-
                 {showWeeklyDistributionPicker && (
                   <div className="flex flex-col gap-1">
                     <label className="text-[12px] font-normal text-[#10141a]">
@@ -2026,6 +2111,44 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                     ) : null}
                   </div>
                 )}
+
+                {/* Scheduling Type */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Scheduling Type</label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, schedulingType: "one-time" }));
+                        clearError("schedulingType");
+                      }}
+                      className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.schedulingType === "one-time"
+                        ? "bg-[#00b4b8] text-white"
+                        : errors.schedulingType
+                          ? "border border-[#D53411] text-[#10141a]"
+                          : "border border-[#808081] text-[#10141a]"
+                        }`}
+                    >
+                      One time
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, schedulingType: "recurring" }));
+                        clearError("schedulingType");
+                      }}
+                      className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.schedulingType === "recurring"
+                        ? "bg-[#00b4b8] text-white"
+                        : errors.schedulingType
+                          ? "border border-[#D53411] text-[#10141a]"
+                          : "border border-[#808081] text-[#10141a]"
+                        }`}
+                    >
+                      Recurring
+                    </button>
+                  </div>
+                  {errors.schedulingType && (
+                    <span className="text-[12px] font-normal text-[#D53411]">{errors.schedulingType}</span>
+                  )}
+                </div>
 
                 {/* Date Fields - Conditional based on scheduling type */}
                 {formData.schedulingType === "recurring" ? (
@@ -2201,53 +2324,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                         </div>
                       )}
                     </div>
-
-                    {/* Weekdays Selection */}
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[12px] font-normal text-[#10141a]">Weekdays</label>
-                      <div className="flex flex-wrap gap-2">
-                        {WEEKDAY_OPTIONS.map((weekday) => {
-                          const isSelected = selectedWeekdays.some(w => w.dayIndex === weekday.dayIndex);
-                          const isConfiguring = configuringWeekday?.dayIndex === weekday.dayIndex;
-                          const inRange = isWeekdayInDateRange(
-                            weekday.dayIndex,
-                            formData.startDate,
-                            formData.endDate,
-                          );
-                          return (
-                            <button
-                              key={weekday.dayIndex}
-                              type="button"
-                              disabled={!inRange}
-                              onClick={() => handleWeekdayToggle(weekday.label, weekday.dayIndex)}
-                              className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium transition-colors ${
-                                !inRange
-                                  ? "border border-[#e0e0e0] text-[#b2b2b3] cursor-not-allowed opacity-60"
-                                  : isSelected
-                                    ? "bg-[#00b4b8] text-white border-[0.5px] border-[#808081] cursor-pointer"
-                                    : isConfiguring
-                                      ? "bg-[#ffa500] text-white border-[0.5px] border-[#ff8c00] cursor-pointer"
-                                      : "border border-[#808081] text-[#10141a] cursor-pointer"
-                              }`}
-                            >
-                              {weekday.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {configuringWeekday && (
-                        <p className="text-[12px] font-normal text-[#ffa500] mt-1">
-                          Now select clock in and clock out times for {configuringWeekday.day}
-                        </p>
-                      )}
-                    </div>
                   </>
                 ) : (
                   /* Select Date - for one-time scheduling */
                   <div className="flex flex-col gap-1 relative">
                     <label className="text-[12px] font-normal text-[#10141a]">Select Date</label>
                     <button
-                      onClick={() => setShowDatePicker(!showDatePicker)}
+                      onClick={openOneTimeDatePicker}
                       className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${errors.date ? "border-[#D53411]" : showDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
                         }`}
                     >
@@ -2298,18 +2381,27 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                               {calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => {
                                 const isCurrentMonth = isSameMonth(day, currentMonth);
                                 const isSelected = formData.date && isSameDay(day, formData.date);
+                                const isAllowed = isOneTimeDateInSnapshot(day, selectedDistributionSnapshot);
 
                                 return (
                                   <button
                                     key={dayIndex}
-                                    onClick={() => handleDateSelect(day)}
+                                    type="button"
+                                    disabled={!isAllowed}
+                                    onClick={() => isAllowed && handleDateSelect(day)}
                                     className={`
-                                flex-1 flex items-center justify-center p-2 text-center transition-colors cursor-pointer
+                                flex-1 flex items-center justify-center p-2 text-center transition-colors
+                                ${!isAllowed
+                                        ? "text-[#e0e0e0] cursor-not-allowed opacity-50"
+                                        : "cursor-pointer"
+                                      }
                                 ${isSelected
                                         ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold"
-                                        : isCurrentMonth
+                                        : isAllowed && isCurrentMonth
                                           ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]"
-                                          : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
+                                          : isAllowed
+                                            ? "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
+                                            : ""
                                       }
                               `}
                                   >
@@ -2326,6 +2418,42 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                     )}
                   </div>
                 )}
+
+                {/* Weekdays Selection */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Weekdays</label>
+                  <div className="flex flex-wrap gap-2">
+                    {WEEKDAY_OPTIONS.map((weekday) => {
+                      const isSelected = selectedWeekdays.some(w => w.dayIndex === weekday.dayIndex);
+                      const isConfiguring = configuringWeekday?.dayIndex === weekday.dayIndex;
+                      const isEnabled = enabledWeekdayIndices.has(weekday.dayIndex);
+                      return (
+                        <button
+                          key={weekday.dayIndex}
+                          type="button"
+                          disabled={!isEnabled}
+                          onClick={() => handleWeekdayToggle(weekday.label, weekday.dayIndex)}
+                          className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium transition-colors ${
+                            !isEnabled
+                              ? "border border-[#e0e0e0] text-[#b2b2b3] cursor-not-allowed opacity-60"
+                              : isSelected
+                                ? "bg-[#00b4b8] text-white border-[0.5px] border-[#808081] cursor-pointer"
+                                : isConfiguring
+                                  ? "bg-[#ffa500] text-white border-[0.5px] border-[#ff8c00] cursor-pointer"
+                                  : "border border-[#808081] text-[#10141a] cursor-pointer"
+                          }`}
+                        >
+                          {weekday.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {configuringWeekday && (
+                    <p className="text-[12px] font-normal text-[#ffa500] mt-1">
+                      Now select clock in and clock out times for {configuringWeekday.day}
+                    </p>
+                  )}
+                </div>
 
                 {/* Clock In Time */}
                 <div className="flex flex-col gap-1">
@@ -2449,8 +2577,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   )}
                 </div>
 
-                {/* Selected Weekdays Display (only for recurring with selected weekdays) */}
-                {formData.schedulingType === "recurring" && selectedWeekdays.length > 0 && (
+                {/* Selected Weekdays Display */}
+                {selectedWeekdays.length > 0 && (
                   <div className="flex flex-col gap-2">
                     {selectedWeekdays.map((weekday) => (
                       <div

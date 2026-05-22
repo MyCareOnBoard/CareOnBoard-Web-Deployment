@@ -5,6 +5,7 @@ import {
   describeWhyNoShiftsWouldBeBuilt,
   effectiveWeekdaySchedulesForShiftBuild,
   formatWeeklyDistributionDropdownLabel,
+  isWeekdayEnabledForSchedule,
   isWeekdayInDateRange,
   parseSdrWeekRange,
   shiftDurationHoursFrom12h,
@@ -247,5 +248,83 @@ describe("weeklyDistributionSchedule", () => {
     );
     expect(a).toBe(b);
     expect(a).not.toBe(c);
+  });
+
+  it("isWeekdayEnabledForSchedule uses SDR range for one-time with snapshot", async () => {
+    const { isWeekdayEnabledForSchedule } = await import("./weeklyDistributionSchedule");
+    const snapshot = buildWeeklyDistributionSnapshot({
+      weekRange: "5/7/2025 - 5/10/2025",
+      hours: "5.75",
+    })!;
+    const wednesday = new Date(2025, 4, 7);
+    expect(
+      isWeekdayEnabledForSchedule({
+        schedulingType: "one-time",
+        dayIndex: 3,
+        date: wednesday,
+        snapshot,
+      }),
+    ).toBe(true);
+    expect(
+      isWeekdayEnabledForSchedule({
+        schedulingType: "one-time",
+        dayIndex: 4,
+        date: wednesday,
+        snapshot,
+      }),
+    ).toBe(true);
+    expect(
+      isWeekdayEnabledForSchedule({
+        schedulingType: "one-time",
+        dayIndex: 1,
+        date: wednesday,
+        snapshot,
+      }),
+    ).toBe(false);
+    expect(
+      isWeekdayEnabledForSchedule({
+        schedulingType: "one-time",
+        dayIndex: 3,
+        date: null,
+        snapshot,
+      }),
+    ).toBe(true);
+    expect(
+      isWeekdayEnabledForSchedule({
+        schedulingType: "one-time",
+        dayIndex: 6,
+        date: null,
+        snapshot,
+      }),
+    ).toBe(true);
+    expect(
+      isWeekdayEnabledForSchedule({
+        schedulingType: "one-time",
+        dayIndex: 0,
+        date: null,
+        snapshot,
+      }),
+    ).toBe(false);
+  });
+
+  it("validateScheduleAgainstWeeklyDistributionRow blocks one-time over-cap inside SDR week", () => {
+    const snapshot = buildWeeklyDistributionSnapshot({
+      weekRange: "5/7/2025 - 5/10/2025",
+      hours: "5.75",
+    })!;
+    const form = {
+      schedulingType: "one-time" as const,
+      date: new Date(2025, 4, 7),
+      startDate: null,
+      endDate: null,
+      clockInTime: "09:00:AM",
+      clockOutTime: "05:00:PM",
+    };
+    const result = validateScheduleAgainstWeeklyDistributionRow({
+      formData: form,
+      snapshot,
+      weekdaySchedules: [{ dayIndex: 3, clockInTime: "09:00:AM", clockOutTime: "05:00:PM" }],
+    });
+    expect(result.ok).toBe(false);
   });
 });
