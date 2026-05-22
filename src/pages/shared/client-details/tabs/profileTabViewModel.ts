@@ -401,17 +401,28 @@ function buildOutcomesSection(client: Client): ProfileSection | null {
   };
 }
 
-function buildAssignedDspsSection(client: Client): ProfileSection | null {
+function buildAssignedDspsSection(client: Client): ProfileSection {
   const names = collectUniqueAssignedDspsForClient(client)
     .map((d) => trimOrEmpty(d.name))
     .filter(Boolean);
 
-  return buildStringListSection(
-    "assigned-dsps",
-    "Assigned DSPs",
-    "Direct support professionals assigned to this client",
-    names,
-  );
+  if (names.length === 0) {
+    return {
+      id: "assigned-dsps",
+      title: "Assigned DSPs",
+      subtitle: "Direct support professionals assigned to this client",
+      fields: [],
+      emptyMessage: "No staff assigned yet. Assign staff on the Services tab.",
+    };
+  }
+
+  return {
+    id: "assigned-dsps",
+    title: "Assigned DSPs",
+    subtitle: "Direct support professionals assigned to this client",
+    fields: [],
+    listItems: names,
+  };
 }
 
 function buildGuardianSection(client: Client): ProfileSection | null {
@@ -475,8 +486,7 @@ export function buildProfileSections(
   const ispPlan = buildIspPlanSection(client, formatDate);
   if (ispPlan) sections.push(ispPlan);
 
-  const identifiers = buildIdentifiersSection(client);
-  if (identifiers) sections.push(identifiers);
+  sections.push(buildAssignedDspsSection(client));
 
   const insurance = buildInsuranceSection(client);
   if (insurance) sections.push(insurance);
@@ -490,14 +500,14 @@ export function buildProfileSections(
   const allergies = buildAllergiesSection(client);
   if (allergies) sections.push(allergies);
 
+  const identifiers = buildIdentifiersSection(client);
+  if (identifiers) sections.push(identifiers);
+
   const medications = buildMedicationsSection(client);
   if (medications) sections.push(medications);
 
   const outcomes = buildOutcomesSection(client);
   if (outcomes) sections.push(outcomes);
-
-  const assignedDsps = buildAssignedDspsSection(client);
-  if (assignedDsps) sections.push(assignedDsps);
 
   const guardian = buildGuardianSection(client);
   if (guardian) sections.push(guardian);

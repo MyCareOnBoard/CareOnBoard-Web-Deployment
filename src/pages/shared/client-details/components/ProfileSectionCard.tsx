@@ -9,13 +9,15 @@ import { ProfileFieldRow } from "./ProfileFieldRow";
 
 const SECTION_LAYOUT: Record<string, string> = {
   contact: "lg:col-span-2",
-  identifiers: "lg:col-span-1",
+  "isp-plan": "lg:col-span-1",
+  "assigned-dsps": "lg:col-span-1",
   insurance: "lg:col-span-2",
+  clinical: "lg:col-span-1",
   "medical-conditions": "lg:col-span-1",
   allergies: "lg:col-span-1",
+  identifiers: "lg:col-span-1",
   medications: "lg:col-span-2",
   outcomes: "lg:col-span-2",
-  "assigned-dsps": "lg:col-span-1",
   guardian: "lg:col-span-1",
 };
 

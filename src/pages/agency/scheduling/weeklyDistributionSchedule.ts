@@ -110,11 +110,54 @@ function dateStrInRange(d: string, lower: string, upper: string): boolean {
   return d >= lower && d <= upper;
 }
 
+export function isOneTimeDateInSnapshot(
+  date: Date | null | undefined,
+  snapshot: WeeklyDistributionSnapshot | null,
+): boolean {
+  if (!date) return false;
+  if (!snapshot) return true;
+  const dateStr = format(date, "yyyy-MM-dd");
+  return dateStrInRange(dateStr, snapshot.weekStartStr, snapshot.weekEndStr);
+}
+
+export function isWeekdayEnabledForSchedule(args: {
+  schedulingType: "one-time" | "recurring" | "";
+  dayIndex: number;
+  date?: Date | null;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  snapshot?: WeeklyDistributionSnapshot | null;
+}): boolean {
+  const { schedulingType, dayIndex, date, startDate, endDate, snapshot } = args;
+  if (schedulingType === "one-time") {
+    if (snapshot) {
+      return weekdayIndicesInDateRange(snapshot.weekStart, snapshot.weekEnd).has(dayIndex);
+    }
+    if (date) return date.getDay() === dayIndex;
+    return false;
+  }
+  if (schedulingType === "recurring") {
+    return isWeekdayInDateRange(dayIndex, startDate ?? null, endDate ?? null);
+  }
+  return false;
+}
+
 export function computeTotalScheduledHours(
   formData: WeeklyDistributionFormSlice,
   snapshot: WeeklyDistributionSnapshot,
   weekdaySchedules: WeekdayScheduleSlice[] = [],
 ): number {
+  if (formData.schedulingType === "one-time") {
+    if (!formData.date) return 0;
+    const dateStr = format(formData.date, "yyyy-MM-dd");
+    if (!dateStrInRange(dateStr, snapshot.weekStartStr, snapshot.weekEndStr)) return 0;
+    const weekday = weekdaySchedules.find((w) => w.dayIndex === formData.date!.getDay());
+    const inTime = weekday?.clockInTime || formData.clockInTime;
+    const outTime = weekday?.clockOutTime || formData.clockOutTime;
+    if (!inTime || !outTime) return 0;
+    return shiftDurationHoursFrom12h(inTime, outTime);
+  }
+
   if (
     formData.schedulingType !== "recurring" ||
     !formData.startDate ||

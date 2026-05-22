@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Plus, Trash2, Loader2, FileUp } from "lucide-react";
+import React, { useCallback, useMemo, useState } from "react";
+import { CalendarDays, Plus, Trash2, FileUp } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,11 +28,9 @@ import {
 } from "@/pages/shared/client-management/types/formData";
 import { Stage2SdrImportPanel } from "@/pages/shared/client-management/components/Stage2SdrImportPanel";
 import { WeeklyDistributionInline } from "@/pages/shared/client-management/components/WeeklyDistributionInline";
+import { ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
 import { deriveAuthorizedHoursPerWeek } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
 import { weeklyDistributionFingerprintFromWd } from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
-import { searchEmployees, type Employee } from "@/lib/api/employees";
-import { useAuth } from "@/utils/auth";
-
 const RATE_INPUT_CLASS = "h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SELECT_TRIGGER_CLASS = "w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SECTION_HEADER_ACTION_BTN =
@@ -129,217 +127,6 @@ function ServiceCalendarDateField({
           />
         </PopoverContent>
       </Popover>
-    </div>
-  );
-}
-
-function DspSearchSlotRow({
-  assigned,
-  onPick,
-  onRemoveSlot,
-}: {
-  assigned: { id: string }[];
-  onPick: (emp: Employee) => void;
-  onRemoveSlot: () => void;
-}) {
-  const { user } = useAuth();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Employee[]>([]);
-  const [open, setOpen] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const runSearch = useCallback(
-    (q: string) => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (q.trim().length < 2) {
-        setResults([]);
-        setOpen(false);
-        return;
-      }
-      const agencyId = user?.agencyId || user?.uid;
-      const assignedIds = new Set(assigned.map((d) => d.id));
-      timeoutRef.current = setTimeout(async () => {
-        try {
-          setSearching(true);
-          const res = await searchEmployees(q, agencyId);
-          const filtered = res.filter((e) => !assignedIds.has(e.id));
-          setResults(filtered);
-          setOpen(filtered.length > 0);
-        } catch {
-          setResults([]);
-          setOpen(false);
-        } finally {
-          setSearching(false);
-        }
-      }, 300);
-    },
-    [user?.agencyId, user?.uid, assigned],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  return (
-    <div className="max-w-md">
-      <div ref={containerRef} className="relative flex flex-col gap-1">
-        <div className="flex h-11 w-full items-stretch overflow-hidden rounded-xl border border-[#cccccd] bg-white">
-          <div className="flex min-w-0 flex-1 items-center gap-2 px-4">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => {
-                const v = e.target.value;
-                setQuery(v);
-                runSearch(v);
-              }}
-              placeholder="Search Dsps by name (at least 2 characters)"
-              className="min-w-0 flex-1 bg-transparent text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none"
-            />
-            {searching ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#808081]" />
-            ) : null}
-          </div>
-          <button
-            type="button"
-            className="flex h-full w-11 shrink-0 items-center justify-center text-[#10141a] transition-colors hover:bg-gray-50"
-            onClick={onRemoveSlot}
-            aria-label="Remove Dsp search row"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-        {open && results.length > 0 ? (
-          <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-[200px] overflow-y-auto rounded-xl border border-[#cccccd] bg-white shadow-lg">
-            {results.map((emp) => (
-              <button
-                key={emp.id}
-                type="button"
-                className="w-full cursor-pointer border-b border-[#f0f0f0] px-4 py-3 text-left first:rounded-t-[12px] last:rounded-b-[12px] last:border-b-0 hover:bg-gray-50"
-                onClick={() => {
-                  onPick(emp);
-                  setQuery("");
-                  setOpen(false);
-                  setResults([]);
-                }}
-              >
-                <p className="text-[14px] font-normal text-black">{emp.fullName}</p>
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function ServicePerServiceStaffOnly({
-  service,
-  update,
-}: {
-  service: Service;
-  update: (patch: Partial<Service>) => void;
-}) {
-  const [dspSearchSlotIds, setDspSearchSlotIds] = useState<string[]>([]);
-
-  const assigned = service.assignedDsps ?? [];
-
-  const addDspFromEmployee = useCallback(
-    (emp: Employee) => {
-      const cur = service.assignedDsps ?? [];
-      if (cur.some((d) => d.id === emp.id)) return;
-      update({ assignedDsps: [...cur, { id: emp.id, name: emp.fullName }] });
-    },
-    [service.assignedDsps, update],
-  );
-
-  const removeDsp = (id: string) => {
-    update({ assignedDsps: assigned.filter((d) => d.id !== id) });
-  };
-
-  const addSearchSlot = () => {
-    const id =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : String(Math.random());
-    setDspSearchSlotIds((s) => [...s, id]);
-  };
-
-  const removeSearchSlot = (slotId: string) => {
-    setDspSearchSlotIds((s) => s.filter((x) => x !== slotId));
-  };
-
-  return (
-    <div className="col-span-full mt-6 space-y-6 border-t border-[#cccccd]/60 pt-6">
-      <div>
-        <div className="mb-4">
-          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a] mb-1">
-            Dsps assigned to this service
-          </p>
-          <p className="text-[13px] text-[#808081]">
-            Add a search row for each Dsp you want to look up. Dsps are not imported from uploaded documents.
-          </p>
-        </div>
-        {assigned.length === 0 ? (
-          <p className="text-[13px] text-[#808081] mb-2">No Dsps assigned yet.</p>
-        ) : (
-          <ul className="mb-3 flex w-full max-w-md flex-col gap-2">
-            {assigned.map((d) => (
-              <li
-                key={d.id}
-                className="flex min-w-0 items-center justify-between rounded-[12px] border border-[#cccccd] bg-white px-3 py-2"
-              >
-                <span className="min-w-0 flex-1 truncate text-[14px] text-[#10141a]">{d.name}</span>
-                <button
-                  type="button"
-                  className="shrink-0 rounded-md p-1 text-[#10141a] transition-colors hover:bg-gray-50"
-                  onClick={() => removeDsp(d.id)}
-                  aria-label={`Remove ${d.name}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex flex-col gap-3 mb-2">
-          {dspSearchSlotIds.map((slotId) => (
-            <DspSearchSlotRow
-              key={slotId}
-              assigned={assigned}
-              onPick={(emp) => {
-                addDspFromEmployee(emp);
-                removeSearchSlot(slotId);
-              }}
-              onRemoveSlot={() => removeSearchSlot(slotId)}
-            />
-          ))}
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full border-dashed border-[#808081] text-[#10141a] sm:w-auto"
-          onClick={addSearchSlot}
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          Add Dsp
-        </Button>
-      </div>
     </div>
   );
 }
@@ -730,7 +517,11 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
           />
         </div>
       </div>
-      <ServicePerServiceStaffOnly service={service} update={update} />
+      <ServiceAssignedDspsSection
+        isEditing
+        assignedDsps={service.assignedDsps ?? []}
+        onChange={(assignedDsps) => update({ assignedDsps })}
+      />
     </>
   );
 });
