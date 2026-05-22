@@ -3,6 +3,7 @@ import { CalendarDays, Loader2, Plus, Trash2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import {
   Client,
+  ClientDsp,
   ClientOutcome,
   ClientService,
   ClientServiceSdrDetails,
@@ -34,6 +35,7 @@ import {
   WEEKLY_DIST_DISPLAY_CAP,
   type WeeklyDistributionData,
 } from "@/pages/shared/client-management/components/WeeklyDistributionInline";
+import { ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
 import { deriveAuthorizedHoursPerWeek } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
 import {
   cloneWeeklyDistributionForPersist,
@@ -82,6 +84,7 @@ type EditableServiceRow = {
   };
   sdrWeeklyDistribution?: ClientService["sdrWeeklyDistribution"];
   sdrDetails?: ClientServiceSdrDetails;
+  assignedDsps?: ClientDsp[];
 };
 
 type EditableOutcomeGroup = {
@@ -304,6 +307,7 @@ function mapClientServicesToEditable(services?: ClientService[]): EditableServic
     sdrPriorAuthorization: priorAuthMetadataFromApi(svc.sdrPriorAuthorization),
     sdrWeeklyDistribution: cloneWeeklyDist(svc.sdrWeeklyDistribution),
     sdrDetails: cloneSdrDetails(svc.sdrDetails),
+    assignedDsps: svc.assignedDsps?.length ? [...svc.assignedDsps] : undefined,
   }));
 }
 
@@ -342,6 +346,7 @@ function mapEditableToClientServices(services: EditableServiceRow[]): ClientServ
     sdrPriorAuthorization: priorAuthMetadataToApi(svc.sdrPriorAuthorization),
     sdrWeeklyDistribution: cloneWeeklyDist(svc.sdrWeeklyDistribution),
     sdrDetails: cloneSdrDetails(svc.sdrDetails),
+    ...(svc.assignedDsps?.length ? { assignedDsps: svc.assignedDsps } : {}),
   }));
 }
 
@@ -639,6 +644,14 @@ function ServiceRow({
           </div>
         </div>
       </div>
+
+      {(isEditing || (service.assignedDsps?.length ?? 0) > 0) && (
+        <ServiceAssignedDspsSection
+          isEditing={isEditing}
+          assignedDsps={service.assignedDsps ?? []}
+          onChange={(assignedDsps) => handleFieldChange("assignedDsps", assignedDsps)}
+        />
+      )}
 
       {/* Procedure & billing (matches Stage 2 SDR-derived scalars where applicable) */}
       <div className="space-y-3 pt-3 border-t border-[#e5e5e6] mt-3">
