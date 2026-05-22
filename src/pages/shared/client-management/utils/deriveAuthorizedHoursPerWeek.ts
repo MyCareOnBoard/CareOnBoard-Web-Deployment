@@ -50,10 +50,53 @@ function hoursFromStandardLine(standardLine: string | undefined): number | undef
   return Number.isFinite(h) ? h : undefined;
 }
 
-function formatHoursStored(n: number): string {
+export function formatHoursStored(n: number): string {
   if (Number.isInteger(n)) return String(Math.round(n));
   const rounded = Math.round(n * 10000) / 10000;
   return String(rounded);
+}
+
+export type WeeklyDistributionScalars = {
+  hoursPerWeek?: string;
+  totalApprovedHours?: string;
+};
+
+/**
+ * Derive weekly authorization scalars in one pass over rows.
+ * `hoursPerWeek`: first parsable row hours, else `@ N Min` from standard line.
+ * `totalApprovedHours`: sum of all parsable row hours.
+ */
+export function deriveWeeklyDistributionScalars(wd: WeeklyDistLike): WeeklyDistributionScalars {
+  if (!wd || typeof wd !== "object") return {};
+  const rows = Array.isArray(wd.rows) ? wd.rows : [];
+  let hoursPerWeek: string | undefined;
+  let totalSum = 0;
+  let hasTotal = false;
+
+  for (const r of rows) {
+    const h = parseHoursFromCell(r?.hours);
+    if (h === undefined) continue;
+    if (hoursPerWeek === undefined) hoursPerWeek = formatHoursStored(h);
+    totalSum += h;
+    hasTotal = true;
+  }
+
+  if (hoursPerWeek === undefined) {
+    const fromLine = hoursFromStandardLine(wd.standardLine);
+    if (fromLine !== undefined) hoursPerWeek = formatHoursStored(fromLine);
+  }
+
+  return {
+    ...(hoursPerWeek !== undefined ? { hoursPerWeek } : {}),
+    ...(hasTotal ? { totalApprovedHours: formatHoursStored(totalSum) } : {}),
+  };
+}
+
+/** Sum of parsable hours across all weekly distribution rows. */
+export function deriveTotalApprovedHoursFromWeeklyDistribution(
+  wd: WeeklyDistLike,
+): string | undefined {
+  return deriveWeeklyDistributionScalars(wd).totalApprovedHours;
 }
 
 /**
@@ -61,12 +104,5 @@ function formatHoursStored(n: number): string {
  * Prefer first parsable Hours cell in rows; else parse `@ N Min` from standard line (first occurrence).
  */
 export function deriveAuthorizedHoursPerWeek(wd: WeeklyDistLike): string | undefined {
-  if (!wd || typeof wd !== "object") return undefined;
-  const rows = Array.isArray(wd.rows) ? wd.rows : [];
-  for (const r of rows) {
-    const h = parseHoursFromCell(r?.hours);
-    if (h !== undefined) return formatHoursStored(h);
-  }
-  const fromLine = hoursFromStandardLine(wd.standardLine);
-  return fromLine !== undefined ? formatHoursStored(fromLine) : undefined;
+  return deriveWeeklyDistributionScalars(wd).hoursPerWeek;
 }

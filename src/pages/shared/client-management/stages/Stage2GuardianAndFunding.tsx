@@ -30,7 +30,7 @@ import { Stage2SdrImportPanel } from "@/pages/shared/client-management/component
 import { WeeklyDistributionInline } from "@/pages/shared/client-management/components/WeeklyDistributionInline";
 import { ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
 import { deriveAuthorizedHoursPerWeek } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
-import { weeklyDistributionFingerprintFromWd } from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
+import { weeklyDistributionFingerprintFromWd, normalizeWeeklyDistributionUpdate } from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
 const RATE_INPUT_CLASS = "h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SELECT_TRIGGER_CLASS = "w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SECTION_HEADER_ACTION_BTN =
@@ -299,39 +299,12 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[12px] font-normal text-[#10141a]">Duration</label>
-          <Input
-            value={service.sdrDetails?.duration ?? ""}
-            onChange={(e) =>
-              patchSdrDetails({
-                duration: e.target.value.trim() || undefined,
-              })
-            }
-            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-            placeholder="Weekly detail"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
           <label className="text-[12px] font-normal text-[#10141a]">Setting</label>
           <Input
             value={service.sdrDetails?.setting ?? ""}
             onChange={(e) =>
               patchSdrDetails({
                 setting: e.target.value.trim() || undefined,
-              })
-            }
-            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-[12px] font-normal text-[#10141a]">Staffing</label>
-          <Input
-            value={service.sdrDetails?.staffing ?? ""}
-            onChange={(e) =>
-              patchSdrDetails({
-                staffing: e.target.value.trim() || undefined,
               })
             }
             className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
@@ -482,7 +455,12 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
         </div>
 
         {showWeeklyDistribution && weeklyDist ? (
-          <WeeklyDistributionInline wd={weeklyDist} className="col-span-full mt-2" />
+          <WeeklyDistributionInline
+            wd={weeklyDist}
+            className="col-span-full mt-2"
+            isEditing
+            onChange={(nextWd) => update(normalizeWeeklyDistributionUpdate(service.sdrWeeklyDistribution, nextWd))}
+          />
         ) : null}
 
         <div className="col-span-full flex flex-col gap-1">

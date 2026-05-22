@@ -8,11 +8,10 @@ import type {
 } from "../types/clientExtraction";
 import { isDocKeyForImport } from "../types/clientExtraction";
 import { trimWizardSdrDetailsForApi } from "./outcomeServices";
-import { deriveAuthorizedHoursPerWeek } from "./deriveAuthorizedHoursPerWeek";
 import {
+  capPersistAndDerive,
   sanitizeWeeklyPartsFromUnknown,
-  weeklyDistributionForDerivation,
-  weeklyDistributionForPersist,
+  WEEKLY_DIST_DISPLAY_CAP,
 } from "./sdrWeeklyDistribution";
 
 function normalizeOutcomeKey(s: string | undefined): string {
@@ -225,19 +224,18 @@ function buildSdrEnrichmentPatch(row: ExtractionServiceRow, wizardSvc: Service, 
   }
 
   const wdParts = sanitizeWeeklyPartsFromUnknown(row.weeklyDistribution);
-  const wdPersist = wdParts ? weeklyDistributionForPersist(wdParts) : undefined;
-  if (wdPersist && (overwrite || !wizardHasWeekly(wizardSvc.sdrWeeklyDistribution))) {
-    patch.sdrWeeklyDistribution = wdPersist;
-    /**
-     * Intended precedence when weekly rows/standardLine are present:
-     * `deriveAuthorizedHoursPerWeek` overwrites extractor `mergeScalar("hours", row.hours)` when derivation succeeds (same guards: overwrite OR wizard hours empty).
-     */
-    const derived = wdParts
-      ? deriveAuthorizedHoursPerWeek(weeklyDistributionForDerivation(wdParts))
-      : undefined;
-    const wizardHoursEmpty = !String(wizardSvc.hours ?? "").trim();
-    if (derived !== undefined && (overwrite || wizardHoursEmpty)) {
-      patch.hours = derived;
+  if (wdParts) {
+    const { persisted, hours, totalApprovedHours } = capPersistAndDerive(wdParts);
+    if (persisted && (overwrite || !wizardHasWeekly(wizardSvc.sdrWeeklyDistribution))) {
+      patch.sdrWeeklyDistribution = persisted;
+      const wizardHoursEmpty = !String(wizardSvc.hours ?? "").trim();
+      if (overwrite || wizardHoursEmpty) {
+        patch.hours = hours;
+      }
+      const wizardTotalEmpty = !String(wizardSvc.totalApprovedHours ?? "").trim();
+      if (overwrite || wizardTotalEmpty) {
+        patch.totalApprovedHours = totalApprovedHours;
+      }
     }
   }
 
@@ -482,9 +480,26 @@ export function buildSdrImportPreview(
   const { refs: wiz, byOutcomeCode, byOutcomeName, byGlobalCode, byGlobalName } = wizIdx;
   const flatEx = flattenExtractionOutcomeServices(extraction);
   const seenWizardTargets = new Set<string>();
+  let weeklyTruncationWarned = false;
 
   for (const ex of flatEx) {
     const { row, parentOutcomeKey, parentOutcomeStmt } = ex;
+
+    if (
+      !weeklyTruncationWarned &&
+      row.weeklyDistribution &&
+      typeof row.weeklyDistribution === "object"
+    ) {
+      const wdRaw = row.weeklyDistribution as Record<string, unknown>;
+      const rowsRaw = Array.isArray(wdRaw.rows) ? wdRaw.rows : [];
+      if (rowsRaw.length > WEEKLY_DIST_DISPLAY_CAP) {
+        warnings.push(
+          `Weekly distribution exceeds ${WEEKLY_DIST_DISPLAY_CAP} rows; only the first ${WEEKLY_DIST_DISPLAY_CAP} will be stored.`,
+        );
+        weeklyTruncationWarned = true;
+      }
+    }
+
     const codeNorm = (row.code ?? "").trim().toLowerCase();
     const nameNorm = normalizeNameToken(row.name);
     const extProv = row.provider?.trim();

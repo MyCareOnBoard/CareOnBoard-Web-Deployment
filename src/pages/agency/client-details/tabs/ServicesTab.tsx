@@ -36,13 +36,11 @@ import {
   type WeeklyDistributionData,
 } from "@/pages/shared/client-management/components/WeeklyDistributionInline";
 import { ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
-import { deriveAuthorizedHoursPerWeek } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
+import { deriveWeeklyDistributionScalars } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
 import {
   cloneWeeklyDistributionForPersist,
-  sanitizeWeeklyPartsFromUnknown,
+  normalizeWeeklyDistributionUpdate,
   weeklyDistributionFingerprintFromWd,
-  weeklyDistributionForDerivation,
-  weeklyDistributionForPersist,
 } from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
 
 interface ServicesTabProps {
@@ -159,57 +157,25 @@ function splitLinesToList(text: string, max: number): string[] {
     .slice(0, max);
 }
 
-function weeklyRowsToText(
-  rows?: Array<Partial<{ weekRange: string; units: string; hours: string }>>,
-): string {
-  if (!rows?.length) return "";
-  return rows
-    .map((r) => [r.weekRange ?? "", r.units ?? "", r.hours ?? ""].join(" | "))
-    .join("\n");
-}
-
-function parseWeeklyRowsText(text: string): Array<{ weekRange: string; units: string; hours: string }> {
-  const out: Array<{ weekRange: string; units: string; hours: string }> = [];
-  for (const line of text.split("\n")) {
-    const t = line.trim();
-    if (!t) continue;
-    const parts = t.split("|").map((s) => s.trim());
-    const weekRange = parts[0] ?? "";
-    const units = parts[1] ?? "";
-    const hours = parts[2] ?? "";
-    if (weekRange || units || hours) out.push({ weekRange, units, hours });
-    if (out.length >= WEEKLY_DIST_DISPLAY_CAP) break;
-  }
-  return out;
-}
-
 function emptish(v: string | undefined): string | undefined {
   const t = (v ?? "").trim();
   return t ? t : undefined;
+}
+
+function hasWeeklyDistributionContent(
+  wd: ClientService["sdrWeeklyDistribution"] | undefined,
+): boolean {
+  if (!wd || typeof wd !== "object") return false;
+  if ((wd.standardLine ?? "").trim()) return true;
+  return (wd.rows?.length ?? 0) > 0;
 }
 
 function applyWeeklyDistToServiceRow(
   service: EditableServiceRow,
   patchWd: Partial<NonNullable<ClientService["sdrWeeklyDistribution"]>>,
 ): EditableServiceRow {
-  const merged: ClientService["sdrWeeklyDistribution"] = {
-    ...(service.sdrWeeklyDistribution ?? {}),
-    ...patchWd,
-  };
-  const parts = sanitizeWeeklyPartsFromUnknown(merged);
-  if (!parts) {
-    return {
-      ...service,
-      sdrWeeklyDistribution: undefined,
-    };
-  }
-  const normalized = weeklyDistributionForPersist(parts);
-  const dh = deriveAuthorizedHoursPerWeek(weeklyDistributionForDerivation(parts));
-  return {
-    ...service,
-    sdrWeeklyDistribution: normalized ?? undefined,
-    ...(dh !== undefined ? { hours: dh } : {}),
-  };
+  const patch = normalizeWeeklyDistributionUpdate(service.sdrWeeklyDistribution, patchWd);
+  return { ...service, ...patch };
 }
 
 function newEntityId(prefix: string) {
@@ -402,20 +368,30 @@ function ServiceRow({
     [service.sdrWeeklyDistribution],
   );
 
-  const derivedAuthorizedHoursPerWeek = useMemo(
-    () => deriveAuthorizedHoursPerWeek(service.sdrWeeklyDistribution),
+  const hasWd = hasWeeklyDistributionContent(service.sdrWeeklyDistribution);
+
+  const derivedWdScalars = useMemo(
+    () => deriveWeeklyDistributionScalars(service.sdrWeeklyDistribution),
     [weeklyDistributionFingerprint],
   );
 
   const hoursDerivedFromWeeklyDistribution =
-    derivedAuthorizedHoursPerWeek !== undefined;
+    hasWd && derivedWdScalars.hoursPerWeek !== undefined;
+
+  const totalApprovedHoursDerivedFromWeeklyDistribution =
+    hasWd && derivedWdScalars.totalApprovedHours !== undefined;
 
   const weeklyDistInlineModel = useMemo((): WeeklyDistributionData | undefined => {
     return cloneWeeklyDist(service.sdrWeeklyDistribution);
   }, [weeklyDistributionFingerprint]);
 
-  const displayAuthorizedHoursPerWeek =
-    derivedAuthorizedHoursPerWeek ?? service.hours?.trim() ?? "";
+  const displayAuthorizedHoursPerWeek = hasWd
+    ? (derivedWdScalars.hoursPerWeek ?? "")
+    : (service.hours?.trim() ?? "");
+
+  const displayTotalApprovedHours = hasWd
+    ? (derivedWdScalars.totalApprovedHours ?? "")
+    : (service.totalApprovedHours?.trim() ?? "");
 
   const displayDate = (value?: Date | null) =>
     value ? format(value, "MMM d, yyyy") : "";
@@ -486,7 +462,7 @@ function ServiceRow({
                     }
                     value={
                       hoursDerivedFromWeeklyDistribution
-                        ? (derivedAuthorizedHoursPerWeek ?? "")
+                        ? (derivedWdScalars.hoursPerWeek ?? "")
                         : (service.hours || "")
                     }
                     onChange={(e) => handleFieldChange("hours", e.target.value)}
@@ -500,6 +476,42 @@ function ServiceRow({
               ) : (
                 <p className="text-[14px] font-semibold text-[#10141a]">
                   {displayAuthorizedHoursPerWeek || "-"}
+                </p>
+              )}
+            </div>
+
+            {/* Total approved hours */}
+            <div className="flex flex-col gap-1">
+              <p className="text-[12px] font-normal text-[#10141a]">Total approved hours</p>
+              {isEditing ? (
+                <>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step={0.01}
+                    readOnly={totalApprovedHoursDerivedFromWeeklyDistribution}
+                    title={
+                      totalApprovedHoursDerivedFromWeeklyDistribution
+                        ? "Sum of weekly distribution row hours."
+                        : undefined
+                    }
+                    value={
+                      totalApprovedHoursDerivedFromWeeklyDistribution
+                        ? (derivedWdScalars.totalApprovedHours ?? "")
+                        : (service.totalApprovedHours || "")
+                    }
+                    onChange={(e) => handleFieldChange("totalApprovedHours", e.target.value)}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                    placeholder="Total hours for authorization period"
+                  />
+                  {totalApprovedHoursDerivedFromWeeklyDistribution ? (
+                    <p className="text-[11px] text-[#808081]">Sum of weekly distribution hours</p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="text-[14px] font-semibold text-[#10141a]">
+                  {displayTotalApprovedHours || "-"}
                 </p>
               )}
             </div>
@@ -1187,28 +1199,33 @@ function ServiceRow({
                 placeholder="40 @ 15 Min / Weekly"
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <p className="text-[12px] font-normal text-[#10141a]">Rows</p>
-              <p className="text-[11px] text-[#808081] mb-1">
-                One row per line: week range | units | hours (e.g. 5/11/2025 - 5/17/2025 | 40 | 10.00 hours)
-              </p>
-              <Textarea
-                value={weeklyRowsToText(service.sdrWeeklyDistribution?.rows)}
-                onChange={(e) =>
+            {weeklyDistInlineModel ? (
+              <WeeklyDistributionInline
+                hideTitle
+                hideStandardLine
+                isEditing
+                wd={weeklyDistInlineModel}
+                className="mt-1"
+                onChange={(nextWd) =>
                   onChange(
                     applyWeeklyDistToServiceRow(service, {
                       standardLine: service.sdrWeeklyDistribution?.standardLine,
-                      rows: parseWeeklyRowsText(e.target.value),
+                      rows: nextWd.rows,
                     }),
                   )
                 }
-                rows={4}
-                className="min-h-[88px] rounded-[12px] border-[#cccccd] bg-white text-[13px]"
               />
-            </div>
-            {weeklyDistInlineModel ? (
-              <WeeklyDistributionInline hideTitle wd={weeklyDistInlineModel} className="mt-1" />
-            ) : null}
+            ) : (
+              <WeeklyDistributionInline
+                hideTitle
+                hideStandardLine
+                isEditing
+                wd={{ standardLine: service.sdrWeeklyDistribution?.standardLine, rows: [] }}
+                onChange={(nextWd) =>
+                  onChange(applyWeeklyDistToServiceRow(service, nextWd))
+                }
+              />
+            )}
           </div>
         ) : weeklyDistInlineModel ? (
           <WeeklyDistributionInline hideTitle wd={weeklyDistInlineModel} />
@@ -1274,18 +1291,6 @@ function ServiceRow({
             )}
           </div>
           <div className="flex flex-col gap-1">
-            <p className="text-[12px] font-normal text-[#10141a]">Duration</p>
-            {isEditing ? (
-              <Input
-                value={service.sdrDetails?.duration ?? ""}
-                onChange={(e) => patchSdrDetails({ duration: e.target.value.trim() || undefined })}
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-              />
-            ) : (
-              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.sdrDetails?.duration)}</p>
-            )}
-          </div>
-          <div className="flex flex-col gap-1">
             <p className="text-[12px] font-normal text-[#10141a]">Setting</p>
             {isEditing ? (
               <Input
@@ -1295,18 +1300,6 @@ function ServiceRow({
               />
             ) : (
               <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.sdrDetails?.setting)}</p>
-            )}
-          </div>
-          <div className="flex flex-col gap-1">
-            <p className="text-[12px] font-normal text-[#10141a]">Staffing</p>
-            {isEditing ? (
-              <Input
-                value={service.sdrDetails?.staffing ?? ""}
-                onChange={(e) => patchSdrDetails({ staffing: e.target.value.trim() || undefined })}
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-              />
-            ) : (
-              <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.sdrDetails?.staffing)}</p>
             )}
           </div>
         </div>

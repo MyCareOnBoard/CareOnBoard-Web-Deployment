@@ -3,6 +3,8 @@
  * persisted payloads truncate to WEEKLY_DIST_DISPLAY_CAP.
  */
 
+import { deriveWeeklyDistributionScalars } from "./deriveAuthorizedHoursPerWeek";
+
 export const WEEKLY_DIST_DISPLAY_CAP = 120;
 
 /** Caps how many Excel-style rows participate in derivation (pathological payloads). */
@@ -74,31 +76,63 @@ export function weeklyDistributionForDerivation(parts: {
   };
 }
 
+/** Minimal shape aligned with ClientService[`sdrWeeklyDistribution`]. */
+export type ClientServiceWeeklyDist =
+  | {
+      standardLine?: string;
+      rows?: SanitizedWeeklyRow[];
+    }
+  | undefined;
+
+export type CapPersistAndDeriveResult = {
+  persisted: ClientServiceWeeklyDist;
+  hours: string;
+  totalApprovedHours: string;
+  truncatedRowCount: number;
+};
+
+/** Cap rows for persist, derive scalars from capped rows only (single pipeline). */
+export function capPersistAndDerive(
+  parts: { standardLineTrimmed: string; fullSanitizedRows: SanitizedWeeklyRow[] },
+  cap: number = WEEKLY_DIST_DISPLAY_CAP,
+): CapPersistAndDeriveResult {
+  const truncatedRowCount = Math.max(0, parts.fullSanitizedRows.length - cap);
+  const cappedRows = truncateWeeklyRows(parts.fullSanitizedRows, cap);
+  const standardLine = parts.standardLineTrimmed;
+  const persisted: ClientServiceWeeklyDist =
+    !standardLine && cappedRows.length === 0
+      ? undefined
+      : {
+          ...(standardLine ? { standardLine } : {}),
+          ...(cappedRows.length ? { rows: cappedRows } : {}),
+        };
+
+  const scalars = deriveWeeklyDistributionScalars(
+    weeklyDistributionForDerivation({
+      standardLineTrimmed: standardLine,
+      fullSanitizedRows: cappedRows,
+    }),
+  );
+
+  return {
+    persisted,
+    hours: scalars.hoursPerWeek ?? "",
+    totalApprovedHours: scalars.totalApprovedHours ?? "",
+    truncatedRowCount,
+  };
+}
+
 /** Shape stored on client service / wizard (rows capped). */
 export function weeklyDistributionForPersist(
   parts: { standardLineTrimmed: string; fullSanitizedRows: SanitizedWeeklyRow[] },
   cap: number = WEEKLY_DIST_DISPLAY_CAP,
 ): { standardLine?: string; rows?: SanitizedWeeklyRow[] } | undefined {
-  const rows = truncateWeeklyRows(parts.fullSanitizedRows, cap);
-  const standardLine = parts.standardLineTrimmed;
-  if (!standardLine && rows.length === 0) return undefined;
-  return {
-    ...(standardLine ? { standardLine } : {}),
-    ...(rows.length ? { rows } : {}),
-  };
+  return capPersistAndDerive(parts, cap).persisted;
 }
-
-/** Minimal shape aligned with ClientService[`sdrWeeklyDistribution`]. */
-export type ClientServiceWeeklyDist =
-  | {
-      standardLine?: string;
-      rows?: unknown[];
-    }
-  | undefined;
 
 /**
  * Persist-only normalize from loose client payload (caps rows). Use `sanitizeWeeklyPartsFromUnknown` +
- * `weeklyDistributionForDerivation` when deriving hours separately.
+ * `capPersistAndDerive` when deriving hours separately.
  */
 export function cloneWeeklyDistributionForPersist(
   raw: ClientServiceWeeklyDist | undefined,
@@ -106,4 +140,30 @@ export function cloneWeeklyDistributionForPersist(
   const parts = sanitizeWeeklyPartsFromUnknown(raw ?? undefined);
   if (!parts) return undefined;
   return weeklyDistributionForPersist(parts);
+}
+
+export type WeeklyDistributionScalarsUpdate = {
+  sdrWeeklyDistribution?: ClientServiceWeeklyDist;
+  hours: string;
+  totalApprovedHours: string;
+  truncatedRowCount?: number;
+};
+
+/** Normalize WD patch, persist-cap rows, and derive hours + totalApprovedHours scalars. */
+export function normalizeWeeklyDistributionUpdate(
+  prevWd: ClientServiceWeeklyDist | undefined,
+  patchWd: Partial<{ standardLine?: string; rows?: SanitizedWeeklyRow[] }>,
+): WeeklyDistributionScalarsUpdate {
+  const merged = { ...(prevWd ?? {}), ...patchWd };
+  const parts = sanitizeWeeklyPartsFromUnknown(merged);
+  if (!parts) {
+    return { sdrWeeklyDistribution: undefined, hours: "", totalApprovedHours: "" };
+  }
+  const { persisted, hours, totalApprovedHours, truncatedRowCount } = capPersistAndDerive(parts);
+  return {
+    sdrWeeklyDistribution: persisted ?? undefined,
+    hours,
+    totalApprovedHours,
+    ...(truncatedRowCount > 0 ? { truncatedRowCount } : {}),
+  };
 }

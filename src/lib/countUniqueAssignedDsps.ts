@@ -1,5 +1,4 @@
 import type { Client, ClientDsp, ClientService } from "@/lib/api/clients";
-import { countUniqueAssignedDspsFromOutcomeGroups } from "@/pages/shared/client-management/utils/outcomeServices";
 
 function dspDedupeKey(d: { id?: string; name?: string }): string | null {
   const id = d.id?.trim();
@@ -28,43 +27,34 @@ function sortDsps(dsps: ClientDsp[]): ClientDsp[] {
   return [...dsps].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", undefined, { sensitivity: "base" }));
 }
 
-function collectUniqueAssignedDspsFromServices(
-  services: ClientService[] | undefined,
-): ClientDsp[] {
-  const map = new Map<string, ClientDsp>();
-  for (const s of services ?? []) {
-    for (const d of s.assignedDsps ?? []) {
-      addDspToMap(map, d);
-    }
-  }
-  return sortDsps([...map.values()]);
-}
-
-function collectLegacyClientDsps(
-  client: Pick<Client, "primaryDsp" | "secondaryDsps">,
-): ClientDsp[] {
-  const map = new Map<string, ClientDsp>();
-  if (client.primaryDsp) addDspToMap(map, client.primaryDsp);
-  for (const d of client.secondaryDsps ?? []) {
-    addDspToMap(map, d);
-  }
-  return sortDsps([...map.values()]);
-}
-
 /** Distinct assigned DSPs for display (outcomes → flat services → legacy primary/secondary). */
 export function collectUniqueAssignedDspsForClient(
   client: Pick<Client, "outcomes" | "services" | "primaryDsp" | "secondaryDsps">,
 ): ClientDsp[] {
+  const map = new Map<string, ClientDsp>();
+
   if (client.outcomes?.length) {
-    const fromOutcomes = client.outcomes.flatMap((o) => o.services ?? []);
-    const fromOutcomeServices = collectUniqueAssignedDspsFromServices(fromOutcomes);
-    if (fromOutcomeServices.length > 0) return fromOutcomeServices;
+    for (const o of client.outcomes) {
+      for (const s of o.services ?? []) {
+        for (const d of s.assignedDsps ?? []) {
+          addDspToMap(map, d);
+        }
+      }
+    }
+  } else {
+    for (const s of client.services ?? []) {
+      for (const d of s.assignedDsps ?? []) {
+        addDspToMap(map, d);
+      }
+    }
   }
 
-  const fromFlatServices = collectUniqueAssignedDspsFromServices(client.services);
-  if (fromFlatServices.length > 0) return fromFlatServices;
+  if (client.primaryDsp) addDspToMap(map, client.primaryDsp);
+  for (const d of client.secondaryDsps ?? []) {
+    addDspToMap(map, d);
+  }
 
-  return collectLegacyClientDsps(client);
+  return sortDsps([...map.values()]);
 }
 
 /**
@@ -88,11 +78,5 @@ export function countUniqueAssignedDspsAcrossServices(
 export function countUniqueAssignedDspsForClient(
   client: Pick<Client, "outcomes" | "services" | "primaryDsp" | "secondaryDsps">,
 ): number {
-  if (client.outcomes?.length) {
-    const count = countUniqueAssignedDspsFromOutcomeGroups(client.outcomes);
-    if (count > 0) return count;
-  }
-  const fromServices = countUniqueAssignedDspsAcrossServices(client.services);
-  if (fromServices > 0) return fromServices;
-  return collectLegacyClientDsps(client).length;
+  return collectUniqueAssignedDspsForClient(client).length;
 }
