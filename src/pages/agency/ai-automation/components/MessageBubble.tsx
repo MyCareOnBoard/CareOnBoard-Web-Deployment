@@ -64,7 +64,7 @@ export function MessageBubble({
       <div className="flex justify-end">
         <div className="max-w-[85%] sm:max-w-[80%]">
           {msg.attachments && msg.attachments.length > 0 && (
-            <div className="mb-2 flex flex-wrap justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2 mb-2">
               {msg.attachments.map((att, idx) =>
                 att.type === "image" ? (
                   <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer">
@@ -117,7 +117,7 @@ export function MessageBubble({
               remarkPlugins={[remarkGfm]}
               components={{
                 table: ({ children }) => (
-                  <div className="overflow-x-auto mt-1">
+                  <div className="mt-1 overflow-x-auto">
                     <table className="w-full text-[12px] border-collapse">{children}</table>
                   </div>
                 ),
@@ -175,7 +175,7 @@ export function MessageBubble({
         )}
 
         {!msg.isLoading && msg.suggestions && msg.suggestions.length > 0 && (
-          <div className="mt-3 sm:mt-4 grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 mt-3 sm:mt-4 sm:gap-3 sm:grid-cols-2">
             {msg.suggestions.map((suggestion) => (
               <DSPCard
                 key={suggestion.employeeId}
