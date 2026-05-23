@@ -184,13 +184,13 @@ function AIAutomationContent() {
     return (
       <>
         <VoiceInputButton textareaRef={textareaRef} />
-      <div className="flex min-h-screen flex-col gap-4 px-4 sm:gap-6 sm:px-6 sm:py-6">
+      <div className="flex flex-col min-h-screen gap-4 px-4 sm:gap-6 sm:px-6 sm:py-6">
         <AIAutomationHeader
           onOpenConversations={() => setShowConversations(true)}
-          onNewConversation={startNewConversation}
+          // onNewConversation={startNewConversation}
           userName={user?.fullName || user?.email || undefined}
-          selectedArea={selectedArea}
-          onSelectArea={setSelectedArea}
+          // selectedArea={selectedArea}
+          // onSelectArea={setSelectedArea}
         />
         <div className="flex-1 flex min-h-0 flex-col overflow-hidden rounded-[28px] border-2 border-white shadow-sm sm:rounded-[32px]">
           <div className="flex-1 p-4 overflow-y-auto sm:p-6 md:p-8">

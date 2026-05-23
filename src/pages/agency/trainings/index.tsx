@@ -105,7 +105,7 @@ export default function AgencyTrainings() {
       <div className={"mb-8 flex items-center justify-between"}>
         <div>
           <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
-            Trainings
+            Staff Training Dashboard
           </h1>
         </div>
       </div>
@@ -113,7 +113,7 @@ export default function AgencyTrainings() {
         <div className={"flex items-center justify-between"}>
           <div>
             <h4 className={"font-semibold text-lg"}>Training Log</h4>
-            <p className={"text-[#808081]"}>These are your Pending Trainings</p>
+            <p className={"text-[#808081]"}>These are the list staff trainings</p>
           </div>
           <div className={"flex items-center gap-4"}>
             <div className="relative w-[240px] animate-in fade-in slide-in-from-right-2 duration-300">
@@ -147,7 +147,7 @@ export default function AgencyTrainings() {
                             <img
                               src={item?.profilePictureUrl}
                               alt={"DSP"}
-                              className="w-full h-full object-cover"
+                              className="object-cover w-full h-full"
                             />
                           ) : (
                             <div
@@ -188,7 +188,7 @@ export default function AgencyTrainings() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center flex-shrink-0 gap-2">
                       <Button
                         className="bg-[#B2B2B3] border border-[#B2B2B3] text-white hover:bg-[#00b4b8] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]"
                         onClick={() => handleReviewModalOpen(
@@ -291,7 +291,7 @@ export default function AgencyTrainings() {
               animate={{scale: 1, opacity: 1}}
               exit={{scale: 0.9, opacity: 0}}
               transition={{duration: 0.25}}
-              className="px-10 py-4 text-center bg-white shadow-lg rounded-xl max-w-sm flex flex-col justify-center"
+              className="flex flex-col justify-center max-w-sm px-10 py-4 text-center bg-white shadow-lg rounded-xl"
             >
               <div className={"flex justify-center mb-3"}>
                 <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">

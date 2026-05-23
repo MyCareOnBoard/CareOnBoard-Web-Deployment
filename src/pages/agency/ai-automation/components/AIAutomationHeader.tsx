@@ -1,22 +1,24 @@
 import { ArrowRight, CalendarDays, CreditCard, Clock, Plus, ShieldCheck, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import SelectAreaDropdown from "./SelectAreaDropdown";
+// import SelectAreaDropdown from "./SelectAreaDropdown";
 import type { ReactNode } from "react";
 
 interface AIAutomationHeaderProps {
   onOpenConversations: () => void;
-  onNewConversation: () => void;
+  // onNewConversation: () => void;
   userName?: string;
-  selectedArea: string;
-  onSelectArea: (area: string) => void;
+  // onNew: () => void;
+  // selectedArea: string;
+  // onSelectArea: (area: string) => void;
 }
 
 export default function AIAutomationHeader({
   onOpenConversations,
-  onNewConversation,
+  // onNewConversation,
+  // onNew,
   userName,
-  selectedArea,
-  onSelectArea,
+  // selectedArea,
+  // onSelectArea,
 }: AIAutomationHeaderProps) {
   return (
     <div className="flex flex-col gap-2 sm:gap-6">
@@ -35,7 +37,26 @@ export default function AIAutomationHeader({
             <span className="hidden sm:inline">Conversations</span>
             <span className="sm:hidden">Chats</span>
           </Button>
-          <SelectAreaDropdown selected={selectedArea} onSelect={onSelectArea} />
+          {/* New Conversation */}
+          {/* <Button
+            type="button"
+            onClick={onNew}
+            className="gap-2 rounded-[60px] bg-white border-[#e5e7eb] text-[#374151] hover:border-[#00b4b8] hover:text-white text-[12px] sm:text-[13px] px-3 sm:px-4 py-2"
+          >
+            <span className="flex items-center justify-center w-4 h-4 border rounded-full"><Plus className="w-3 h-3" /></span>
+            <span className="hidden sm:inline">New Conversation</span>
+          </Button> */}
+
+          {/* <Button variant="outline" onClick={onNew} className="flex justify-between w-full rounded-xl my-3 sm:mt-4 text-[13px] border-2 border-gray-400 border-dashed p-5 sm:text-[14px] hover:bg-[#00b4b8] hover:text-white transition cursor-pointer">
+              New Conversation 
+                <button
+                type="button"
+                className="flex items-center justify-center w-4 h-4 border rounded-full">
+                <Plus className="w-3 h-3" />
+              </button>
+          </Button> */}
+
+          {/* <SelectAreaDropdown selected={selectedArea} onSelect={onSelectArea} /> */}
         </div>
       </div>
 
