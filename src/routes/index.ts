@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
 
 const SplashScreen = lazy(() => import("@/pages/splash"));
@@ -52,6 +52,16 @@ const AgencyCommunityInclusionHistoryPage = lazy(() => import("@/pages/agency/co
 const AgencyDayProgramPage = lazy(() => import("@/pages/agency/day-program"));
 const AgencyDayProgramHistoryPage = lazy(() => import("@/pages/agency/day-program/history"));
 const BillingAndApprovalsPage = lazy(() => import("@/pages/agency/billing-and-approvals"));
+const BillingFinancialOverviewPage = lazy(() =>
+    import("@/pages/agency/billing/pages").then((module) => ({ default: module.FinancialOverview }))
+);
+const BillingPayrollManagementPage = lazy(() =>
+    import("@/pages/agency/billing/pages").then((module) => ({ default: module.PayrollManagement }))
+);
+const BillingClaimsDashboardPage = lazy(() =>
+    import("@/pages/agency/billing/pages").then((module) => ({ default: module.ClaimsDashboard }))
+);
+const BillingIndexRedirect = lazy(() => import("@/pages/agency/billing/BillingIndexRedirect"));
 const ClientClaimsPage = lazy(() => import("@/pages/agency/billing-and-approvals/client-claims"));
 const SchedulingPage = lazy(() => import("@/pages/agency/scheduling"));
 const SupportPage = lazy(() => import("@/pages/agency/support"));
@@ -263,6 +273,22 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.billingAndApprovals,
                 Component: BillingAndApprovalsPage,
+            },
+            {
+                path: Routes.agency.billing.index,
+                Component: BillingIndexRedirect,
+            },
+            {
+                path: Routes.agency.billing.financialOverview,
+                Component: BillingFinancialOverviewPage,
+            },
+            {
+                path: Routes.agency.billing.payrollManagement,
+                Component: BillingPayrollManagementPage,
+            },
+            {
+                path: Routes.agency.billing.claims,
+                Component: BillingClaimsDashboardPage,
             },
             {
                 path: Routes.agency.clientClaims,

@@ -6,6 +6,7 @@ import { Routes } from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, { NavItem } from "@/components/DashboardSidebar";
 import { UserType } from "@/utils/auth/types/user.types";
+import { resolveActiveNavItem } from "@/lib/nav-utils";
 import HomeIcon from "@/assets/icons/home.svg?react";
 import AiIcon from "@/assets/icons/ai.svg?react";
 import SupportIcon from "@/assets/icons/support.svg?react";
@@ -14,6 +15,7 @@ import ApplicantDirectoryIcon from "@/assets/icons/search-list.svg?react";
 import ReportIcon from "@/assets/icons/analysis-text-line.svg?react";
 import IncidentIcon from "@/assets/icons/incident.svg?react";
 import NotesIcon from "@/assets/icons/notes.svg?react";
+import BillingIcon from "@/assets/icons/billing.svg?react";
 import SchedulingIcon from "@/assets/icons/scheduling.svg?react";
 import DSPManagementIcon from "@/assets/icons/dsp-management.svg?react";
 import CommunityInclusionIcon from "@/assets/icons/community-inclusion.svg?react";
@@ -37,6 +39,21 @@ function hasAgencyStaffAccess(accessList: string[], accessKey: string | undefine
     return false;
 }
 
+function filterNavItemsByAccess(items: NavItem[], userType: UserType | undefined, accessList?: string[]): NavItem[] {
+    if (userType === UserType.AGENCY) {
+        return items;
+    }
+
+    if (!accessList) {
+        return items.filter((item) => !item.accessKey);
+    }
+
+    return items.filter((item) => {
+        if (!item.accessKey) return true;
+        return hasAgencyStaffAccess(accessList, item.accessKey);
+    });
+}
+
 const allNavItems: NavItem[] = [
     { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon }, // Always accessible
     { label: "Shift Management", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: SHIFT_MANAGEMENT_ACCESS_KEY },
@@ -46,8 +63,18 @@ const allNavItems: NavItem[] = [
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
     { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion" },
     { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun },
-    // { label: "Billing & Management", path: Routes.agency.billingAndApprovals, icon: ReceiptText, accessKey: "Billing & Management" },
     { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
+    {
+        label: "Billing",
+        path: Routes.agency.billing.index,
+        icon: BillingIcon,
+        accessKey: "Billing & Management",
+        children: [
+            { label: "Financial overview", path: Routes.agency.billing.financialOverview },
+            { label: "Payroll management", path: Routes.agency.billing.payrollManagement },
+            { label: "Claims dashboard", path: Routes.agency.billing.claims },
+        ],
+    },
     { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
     { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
     { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },
@@ -74,24 +101,10 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     };
 
     // Filter navigation items based on user access
-    const navItems = useMemo(() => {
-        // Agency owners have full access
-        if (user?.userType === UserType.AGENCY) {
-            return allNavItems;
-        }
-
-        // Agency staff have filtered access based on accessList
-        if (!user?.profile?.accessList) {
-            return allNavItems.filter(item => !item.accessKey);
-        }
-
-        const accessList = user.profile.accessList;
-
-        return allNavItems.filter(item => {
-            if (!item.accessKey) return true; // Always show items without accessKey (Dashboard, Incident, Mileage)
-            return hasAgencyStaffAccess(accessList, item.accessKey);
-        });
-    }, [user?.userType, user?.profile?.accessList]);
+    const navItems = useMemo(
+        () => filterNavItemsByAccess(allNavItems, user?.userType, user?.profile?.accessList),
+        [user?.userType, user?.profile?.accessList]
+    );
 
     // Protect routes - redirect if user tries to access unauthorized page
     useEffect(() => {
@@ -100,10 +113,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         // Agency owners have full access, no need to check
         if (user.userType === UserType.AGENCY) return;
 
-        const currentPath = location.pathname;
-
-        // Find the nav item that matches the current path
-        const currentNavItem = allNavItems.find(item => currentPath.includes(item.path));
+        const currentNavItem = resolveActiveNavItem(location.pathname, allNavItems);
 
         // If no nav item found or no access key required, allow access
         if (!currentNavItem || !currentNavItem.accessKey) {
