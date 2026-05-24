@@ -19,6 +19,7 @@ export type BillingSegment = {
 interface BillingSummaryProps {
   total?: number;
   data?: BillingSegment[];
+  isLoading?: boolean;
 }
 
 const FALLBACK_DATA: BillingSegment[] = [
@@ -53,7 +54,29 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 export default function BillingSummary({
   total = 40,
   data = FALLBACK_DATA,
+  isLoading,
 }: BillingSummaryProps) {
+  if (isLoading) {
+    return (
+      <div className="rounded-[32px] border border-[#E6EAEC] bg-[#FFFFFF66] p-6 animate-pulse">
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-6 w-40 rounded bg-gray-100" />
+          <div className="h-10 w-28 rounded-full bg-gray-100" />
+        </div>
+        <div className="flex flex-col items-center gap-6">
+          <div className="h-[190px] w-[190px] rounded-full bg-gray-100" />
+          <div className="w-full space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="h-4 w-40 rounded bg-gray-100" />
+                <div className="h-4 w-10 rounded bg-gray-100" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
   const [activeIndex, setActiveIndex] = useState<number | null>(
     null
   );
