@@ -202,10 +202,78 @@ export interface CommunityInclusionDetail {
     createdAt: string;
 }
 
+// ── Analytics interfaces ──────────────────────────────────────────────────────
+
+export interface SparklinePoint {
+    value: number;
+}
+
+export interface KpiMetric {
+    value: number;
+    trend: number;
+    sparkline: SparklinePoint[];
+}
+
+export interface ComplianceBreakdownItem {
+    label: string;
+    value: number;
+    color: string;
+    description?: string;
+}
+
+export interface BillingBreakdownItem {
+    label: string;
+    value: number;
+    color: string;
+}
+
+export interface RiskTrendPoint {
+    month: string;
+    expired: number;
+    overtime: number;
+    missing: number;
+}
+
+export interface OperationalMetricData {
+    value: string;
+    trend: number;
+    sparkline: SparklinePoint[];
+}
+
+export interface AnalyticsSummaryData {
+    overview: {
+        complianceRate: KpiMetric;
+        totalIssues: KpiMetric;
+        revenue: KpiMetric;
+        shiftsBilled: KpiMetric;
+    };
+    complianceInsights: {
+        total: number;
+        breakdown: ComplianceBreakdownItem[];
+    };
+    billingSummary: {
+        total: number;
+        breakdown: BillingBreakdownItem[];
+    };
+    riskTrends: RiskTrendPoint[];
+    operationalEfficiency: {
+        completionRate: OperationalMetricData;
+        onTimeRate: OperationalMetricData;
+        manualRate: OperationalMetricData;
+    };
+}
+
+export interface AnalyticsFilters {
+    startDate?: string;
+    endDate?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const reportsApi = createApi({
     reducerPath: "reportsApi",
     baseQuery: customBaseQuery,
-    tagTypes: ["ClientsReport", "DSPsReport", "ShiftsReport", "NotesReport", "AgenciesSummary", "MileageReport", "ExpenseReport", "BillingReport", "IncidentReport", "CommunityInclusionReport"],
+    tagTypes: ["ClientsReport", "DSPsReport", "ShiftsReport", "NotesReport", "AgenciesSummary", "MileageReport", "ExpenseReport", "BillingReport", "IncidentReport", "CommunityInclusionReport", "AnalyticsReport"],
     keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         // Clients Report
@@ -569,6 +637,21 @@ export const reportsApi = createApi({
             }),
             providesTags: ["CommunityInclusionReport"],
         }),
+
+        // Analytics Summary
+        getAnalyticsSummary: builder.query<
+            { success: boolean; data: AnalyticsSummaryData },
+            AnalyticsFilters
+        >({
+            query: (filters) => ({
+                url: "/reports/analytics/summary",
+                method: "GET",
+                params: filters,
+                requiresAuth: true,
+            }),
+            providesTags: ["AnalyticsReport"],
+            keepUnusedDataFor: 120,
+        }),
     }),
 });
 
@@ -602,4 +685,5 @@ export const {
     useGetSuperAdminBillingReportQuery,
     useGetSuperAdminIncidentReportQuery,
     useGetSuperAdminCommunityInclusionReportQuery,
+    useGetAnalyticsSummaryQuery,
 } = reportsApi;

@@ -1,77 +1,79 @@
-// AnalyticsPage.tsx
-
 import React from "react";
 
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { Clock3, WandSparkles, UserRoundCog } from "lucide-react";
 
 import OperationReportHeader from "./components/AnalyticsReportHeader";
 import AnalyticsDateRangeModal from "./components/AnalyticsDateRangeModal";
 import OverviewCards from "./components/OverviewCards";
 import ComplianceInsights from "./components/ComplianceInsights";
 import RiskTrends from "./components/RiskTrends";
-import OperationalEfficiency from "./components/OperationalEfficiency";
+import OperationalEfficiency, { type OperationalMetric } from "./components/OperationalEfficiency";
 import BillingSummary from "./components/BillingSummary";
 
+import { useGetAnalyticsSummaryQuery } from "@/lib/api/reports";
+import type { AnalyticsSummaryData } from "@/lib/api/reports";
+
+function buildOperationalMetrics(data: AnalyticsSummaryData["operationalEfficiency"]): OperationalMetric[] {
+  return [
+    {
+      id: "completion",
+      title: "Shift completion rate",
+      value: data.completionRate.value,
+      trend: data.completionRate.trend,
+      icon: Clock3,
+      chartColor: "#12B5B0",
+      data: data.completionRate.sparkline,
+    },
+    {
+      id: "ontime",
+      title: "On-time start rate",
+      value: data.onTimeRate.value,
+      trend: data.onTimeRate.trend,
+      icon: WandSparkles,
+      chartColor: "#12B5B0",
+      data: data.onTimeRate.sparkline,
+    },
+    {
+      id: "manual",
+      title: "Manual interventions",
+      value: data.manualRate.value,
+      trend: data.manualRate.trend,
+      icon: UserRoundCog,
+      chartColor: "#E5484D",
+      data: data.manualRate.sparkline,
+    },
+  ];
+}
+
 export default function AnalyticsPage() {
-  const [dateRange, setDateRange] =
-    React.useState({
-      startDate: "",
-      endDate: "",
-    });
+  const [dateRange, setDateRange] = React.useState({ startDate: "", endDate: "" });
+  const [showDateModal, setShowDateModal] = React.useState(false);
 
-  const [
-    showDateModal,
-    setShowDateModal,
-  ] = React.useState(false);
+  const { data: analyticsResponse, isLoading, isFetching } = useGetAnalyticsSummaryQuery(
+    {
+      startDate: dateRange.startDate || undefined,
+      endDate: dateRange.endDate || undefined,
+    },
+    { refetchOnMountOrArgChange: true }
+  );
 
-  // Download analytics report
+  const summary = analyticsResponse?.data;
+
   const downloadPDF = async () => {
-    const element =
-      document.getElementById(
-        "analytics-report"
-      );
+    const element = document.getElementById("analytics-report");
+    if (!element) return;
 
-    if (!element) {
-      return;
-    }
+    const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+    const image = canvas.toDataURL("image/png");
 
-    const canvas =
-      await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-      });
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    const image =
-      canvas.toDataURL(
-        "image/png"
-      );
-
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    const pdfWidth =
-      pdf.internal.pageSize.getWidth();
-
-    const pdfHeight =
-      (canvas.height * pdfWidth) /
-      canvas.width;
-
-    pdf.addImage(
-      image,
-      "PNG",
-      0,
-      0,
-      pdfWidth,
-      pdfHeight
-    );
-
-    pdf.save(
-      `analytics-report-${Date.now()}.pdf`
-    );
+    pdf.addImage(image, "PNG", 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`analytics-report-${Date.now()}.pdf`);
   };
 
   return (
@@ -79,28 +81,16 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="no-print">
         <OperationReportHeader
-          dateRange={
-            dateRange
-          }
-          onOpenDateModal={() =>
-            setShowDateModal(
-              true
-            )
-          }
-          onActionSelect={(
-            action
-          ) => {
+          dateRange={dateRange}
+          onOpenDateModal={() => setShowDateModal(true)}
+          onActionSelect={(action) => {
             switch (action) {
               case "Download report":
                 downloadPDF();
                 break;
-
               case "Share report":
-                console.log(
-                  "share report"
-                );
+                console.log("share report");
                 break;
-
               default:
                 break;
             }
@@ -109,32 +99,40 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Report */}
-      <div
-        id="analytics-report"
-        className="space-y-6  print-container"
-      >
-        {/* Analytics cards */}
+      <div id="analytics-report" className="space-y-6 print-container">
+        {/* Overview KPI cards */}
         <div className="print-card">
-          <OverviewCards />
+          <OverviewCards data={summary?.overview} isLoading={isLoading || isFetching} />
         </div>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <div className="print-card">
-            <ComplianceInsights />
+            <ComplianceInsights
+              total={summary?.complianceInsights.total}
+              data={summary?.complianceInsights.breakdown}
+              isLoading={isLoading || isFetching}
+            />
           </div>
 
           <div className="print-card">
-            <RiskTrends />
+            <RiskTrends data={summary?.riskTrends} isLoading={isLoading || isFetching} />
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <div className="print-card">
-            <OperationalEfficiency />
+            <OperationalEfficiency
+              metrics={summary ? buildOperationalMetrics(summary.operationalEfficiency) : undefined}
+              isLoading={isLoading || isFetching}
+            />
           </div>
 
           <div className="print-card">
-            <BillingSummary />
+            <BillingSummary
+              total={summary?.billingSummary.total}
+              data={summary?.billingSummary.breakdown}
+              isLoading={isLoading || isFetching}
+            />
           </div>
         </div>
       </div>
@@ -142,26 +140,11 @@ export default function AnalyticsPage() {
       {/* Date modal */}
       <AnalyticsDateRangeModal
         open={showDateModal}
-        onClose={() =>
-          setShowDateModal(
-            false
-          )
-        }
+        onClose={() => setShowDateModal(false)}
         values={dateRange}
-        onChange={
-          setDateRange
-        }
+        onChange={setDateRange}
         onApply={(values) => {
-          setDateRange(
-            values
-          );
-
-          console.log(
-            "refresh analytics",
-            values
-          );
-
-          // fetch analytics here
+          setDateRange(values);
         }}
       />
     </div>

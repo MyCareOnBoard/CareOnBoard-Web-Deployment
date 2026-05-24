@@ -30,6 +30,7 @@ export type OperationalMetric = {
 
 interface OperationalEfficiencyProps {
   metrics?: OperationalMetric[];
+  isLoading?: boolean;
 }
 
 const FALLBACK_METRICS: OperationalMetric[] = [
@@ -136,7 +137,32 @@ function Sparkline({
 
 export default function OperationalEfficiency({
   metrics = FALLBACK_METRICS,
+  isLoading,
 }: OperationalEfficiencyProps) {
+  if (isLoading) {
+    return (
+      <div className="rounded-[32px] border border-[#E8ECEF] bg-[#FFFFFF66] p-6 animate-pulse">
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-6 w-44 rounded bg-gray-100" />
+          <div className="h-10 w-28 rounded-full bg-gray-100" />
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center justify-between rounded-2xl border border-[#EEF2F4] bg-white/80 px-5 py-4">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-gray-100" />
+                <div className="space-y-2">
+                  <div className="h-4 w-44 rounded bg-gray-100" />
+                  <div className="h-5 w-24 rounded bg-gray-100" />
+                </div>
+              </div>
+              <div className="h-[56px] w-[120px] rounded bg-gray-100" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       className="
