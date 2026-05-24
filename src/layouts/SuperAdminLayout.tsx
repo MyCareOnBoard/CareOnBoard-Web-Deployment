@@ -78,7 +78,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
 
     const currentPath = location.pathname;
     
-    const currentNavItem = allNavItems.find(item => currentPath.includes(item.path));
+    const currentNavItem = allNavItems.find((item) => item.path && currentPath.includes(item.path));
     
     if (!currentNavItem || !currentNavItem.accessKey) {
       return;

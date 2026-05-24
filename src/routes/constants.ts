@@ -27,6 +27,12 @@ export const Routes = {
         billingAndApprovals: "/agency/billing-and-approvals",
         clientClaims: "/agency/billing-and-approvals/client/:clientId",
         dspClaims: "/agency/billing-and-approvals/dsp/:dsp",
+        billing: {
+            index: "/agency/billing",
+            financialOverview: "/agency/billing/financial-overview",
+            payrollManagement: "/agency/billing/payroll-management",
+            claims: "/agency/billing/claims",
+        },
         aiAutomation: "/agency/automations",
         aiAutomationConversation: "/agency/automations/:conversationId",
         scheduling: "/agency/shifts",
