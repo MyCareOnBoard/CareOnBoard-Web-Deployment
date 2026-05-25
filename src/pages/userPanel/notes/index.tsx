@@ -307,7 +307,7 @@ function ClientNotesView({ clientName, logs, client, onBack }: ClientNotesViewPr
 }
 
 export default function NotesPage() {
-  const [selectedClientName, setSelectedClientName] = useState<string | null>(null);
+  const [selectedClientKey, setSelectedClientKey] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   const { data: notes = [], isLoading: logsLoading } = useGetAllActivityLogsQuery(undefined);
@@ -316,8 +316,9 @@ export default function NotesPage() {
   const clientMap = useMemo(() => {
     const map: Record<string, Client> = {};
     for (const client of clientsData?.clients ?? []) {
+      map[client.id] = client;
       const fullName = [client.firstName, client.lastName].filter(Boolean).join(" ").trim();
-      if (fullName) map[fullName] = client;
+      if (fullName && !map[fullName]) map[fullName] = client;
     }
     return map;
   }, [clientsData]);
@@ -325,18 +326,27 @@ export default function NotesPage() {
   const clientGroups = useMemo(() => {
     const groups: Record<string, ActivityLog[]> = {};
     for (const log of notes) {
-      const name = log.metadata?.individual?.trim() || "Unknown Client";
-      if (!groups[name]) groups[name] = [];
-      groups[name].push(log);
+      const key = log.metadata?.clientId?.trim() || log.metadata?.individual?.trim() || "Unknown Client";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(log);
     }
     return groups;
   }, [notes]);
 
-  const filteredClientNames = useMemo(() => {
-    return Object.keys(clientGroups).filter((name) =>
-      name.toLowerCase().includes(search.toLowerCase())
+  const getDisplayName = (key: string): string => {
+    const client = clientMap[key];
+    if (client) {
+      return [client.firstName, client.lastName].filter(Boolean).join(" ").trim() || key;
+    }
+    return key;
+  };
+
+  const filteredClientKeys = useMemo(() => {
+    return Object.keys(clientGroups).filter((key) =>
+      getDisplayName(key).toLowerCase().includes(search.toLowerCase())
     );
-  }, [clientGroups, search]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientGroups, clientMap, search]);
 
   if (logsLoading) {
     return (
@@ -349,13 +359,13 @@ export default function NotesPage() {
     );
   }
 
-  if (selectedClientName !== null) {
+  if (selectedClientKey !== null) {
     return (
       <ClientNotesView
-        clientName={selectedClientName}
-        logs={clientGroups[selectedClientName] ?? []}
-        client={clientMap[selectedClientName]}
-        onBack={() => setSelectedClientName(null)}
+        clientName={getDisplayName(selectedClientKey)}
+        logs={clientGroups[selectedClientKey] ?? []}
+        client={clientMap[selectedClientKey]}
+        onBack={() => setSelectedClientKey(null)}
       />
     );
   }
@@ -379,14 +389,14 @@ export default function NotesPage() {
       </div>
 
       {/* Client count */}
-      {filteredClientNames.length > 0 && (
+      {filteredClientKeys.length > 0 && (
         <p className="text-[13px] text-[#808081] font-['Urbanist',sans-serif] mb-5">
-          {filteredClientNames.length} {filteredClientNames.length === 1 ? "client" : "clients"}
+          {filteredClientKeys.length} {filteredClientKeys.length === 1 ? "client" : "clients"}
         </p>
       )}
 
       {/* Empty state */}
-      {filteredClientNames.length === 0 && (
+      {filteredClientKeys.length === 0 && (
         <div className="flex flex-col items-center justify-center min-h-[350px] gap-4">
           <FileText className="w-14 h-14 text-[rgba(128,128,129,0.3)]" />
           <div className="text-center">
@@ -402,13 +412,13 @@ export default function NotesPage() {
 
       {/* Client cards grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredClientNames.map((clientName) => (
+        {filteredClientKeys.map((key) => (
           <ClientCard
-            key={clientName}
-            clientName={clientName}
-            logs={clientGroups[clientName]}
-            client={clientMap[clientName]}
-            onSelect={() => setSelectedClientName(clientName)}
+            key={key}
+            clientName={getDisplayName(key)}
+            logs={clientGroups[key]}
+            client={clientMap[key]}
+            onSelect={() => setSelectedClientKey(key)}
           />
         ))}
       </div>

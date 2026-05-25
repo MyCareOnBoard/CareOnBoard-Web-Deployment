@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 
 interface QuestionOption {
   id: string;
   label: string;
   description?: string;
+  message?: string;
 }
 
 interface QuickQuestionData {
@@ -14,13 +14,23 @@ interface QuickQuestionData {
   helpText?: string;
 }
 
-export default function QuickQuestionCard({ data }: { data: unknown }) {
+export default function QuickQuestionCard({
+  data,
+  onSendMessage,
+}: {
+  data: unknown;
+  onSendMessage?: (text: string) => void;
+}) {
   const cardData = data as QuickQuestionData;
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
-  const handleSelect = (optionId: string) => {
-    setSelectedOption(optionId);
-    cardData.onSelectOption?.(optionId);
+  const handleSelect = (option: QuestionOption) => {
+    setSelectedOption(option.id);
+    if (option.message && onSendMessage) {
+      onSendMessage(option.message);
+    } else {
+      cardData.onSelectOption?.(option.id);
+    }
   };
 
   return (
@@ -38,7 +48,7 @@ export default function QuickQuestionCard({ data }: { data: unknown }) {
         {cardData.options.map((option) => (
           <button
             key={option.id}
-            onClick={() => handleSelect(option.id)}
+            onClick={() => handleSelect(option)}
             className="w-full px-4 py-3 hover:bg-[#f9fafb] transition text-left flex items-start gap-3"
           >
             {/* Radio button */}

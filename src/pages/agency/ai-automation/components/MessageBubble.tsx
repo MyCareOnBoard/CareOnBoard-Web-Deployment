@@ -55,9 +55,11 @@ function DSPCard({ suggestion, onAssign }: { suggestion: DSPSuggestion; onAssign
 export function MessageBubble({
   msg,
   onAssignDSP,
+  onSendMessage,
 }: {
   msg: LocalMessage;
   onAssignDSP?: (suggestion: DSPSuggestion, message: LocalMessage) => void;
+  onSendMessage?: (text: string) => void;
 }) {
   if (msg.role === "user") {
     return (
@@ -169,7 +171,7 @@ export function MessageBubble({
         {!msg.isLoading && msg.components && msg.components.length > 0 && (
           <div className="mt-3 space-y-3">
             {msg.components.map((comp, i) => (
-              <ComponentRenderer key={i} component={comp} />
+              <ComponentRenderer key={i} component={comp} onSendMessage={onSendMessage} />
             ))}
           </div>
         )}
