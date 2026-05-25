@@ -94,8 +94,8 @@ export default function OperationReportHeader({
     <>
       {/* Header */}
       <div className="flex items-center justify-between gap-4 mb-6">
-        <h2 className="text-[22px] font-semibold text-[#111827]">
-          Operation report
+        <h2 className="text-[30px] font-semibold text-[#111827]">
+         AI Analytics & Operation report
         </h2>
 
         <div className="flex items-center gap-3">
