@@ -215,7 +215,7 @@ function AIAutomationContent() {
             ) : (
               <div className="space-y-4">
                 {messages.map((msg) => (
-                  <MessageBubble key={msg.id} msg={msg} onAssignDSP={handleAssignDSP} />
+                  <MessageBubble key={msg.id} msg={msg} onAssignDSP={handleAssignDSP} onSendMessage={handleSend} />
                 ))}
               </div>
             )}

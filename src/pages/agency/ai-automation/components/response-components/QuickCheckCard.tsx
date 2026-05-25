@@ -1,9 +1,10 @@
-import { AlertCircle, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface QuickCheckAction {
   label: string;
   onClick?: () => void;
+  message?: string;
   variant?: "primary" | "secondary";
 }
 
@@ -15,12 +16,25 @@ interface QuickCheckData {
   helpText?: string;
 }
 
-export default function QuickCheckCard({ data }: { data: unknown }) {
+export default function QuickCheckCard({
+  data,
+  onSendMessage,
+}: {
+  data: unknown;
+  onSendMessage?: (text: string) => void;
+}) {
   const cardData = data as QuickCheckData;
+
+  const handleActionClick = () => {
+    if (cardData.action?.message && onSendMessage) {
+      onSendMessage(cardData.action.message);
+    } else {
+      cardData.action?.onClick?.();
+    }
+  };
 
   return (
     <div className="rounded-[18px] border border-[#e5e7eb] bg-white overflow-hidden">
-      {/* Header */}
       {(cardData.title || cardData.question) && (
         <div className="px-4 py-3.5 border-b border-[#e5e7eb] bg-white">
           <p className="text-[13px] font-semibold text-[#10141a]">
@@ -32,16 +46,14 @@ export default function QuickCheckCard({ data }: { data: unknown }) {
         </div>
       )}
 
-      {/* Content */}
       <div className="px-4 py-4">
         {cardData.description && (
           <p className="text-[13px] text-[#6b7280] mb-4">{cardData.description}</p>
         )}
 
-        {/* Action Button */}
         {cardData.action && (
           <Button
-            onClick={cardData.action.onClick}
+            onClick={handleActionClick}
             className={`w-full sm:w-auto gap-2 ${
               cardData.action.variant === "secondary"
                 ? "bg-white border border-[#e5e7eb] text-[#10141a] hover:bg-[#f9fafb]"
