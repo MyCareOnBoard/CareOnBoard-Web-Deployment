@@ -23,8 +23,13 @@ export default function CustomDatePicker(
     return (
         <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
             <PopoverTrigger asChild>
-                <button type="button" className={cn("w-full focus:outline-none cursor-pointer", className)}>
-                    <InputGroup className="h-11 bg-white border border-[#cccccd] rounded-xl px-4 cursor-pointer">
+                <button type="button" className="w-full cursor-pointer focus:outline-none">
+                    <InputGroup
+                        className={cn(
+                            "h-11 cursor-pointer rounded-xl border border-[#cccccd] bg-white px-4",
+                            className
+                        )}
+                    >
                         <InputGroupInput
                             value={date ? format(date, "MMMM d, yyyy") : ""}
                             placeholder={placeholder}

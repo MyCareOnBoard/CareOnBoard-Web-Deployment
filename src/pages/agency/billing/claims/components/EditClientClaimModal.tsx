@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { CalendarDays, Clock, Minus, Plus, X } from "lucide-react";
+import { Clock, Minus, Plus, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -202,21 +202,18 @@ export default function EditClientClaimModal({
             <div className="space-y-4">
               <div>
                 <FieldLabel>Service date</FieldLabel>
-                <div className="relative">
-                  <CustomDatePicker
-                    key={`claim-service-date-${claim.id}`}
-                    align="start"
-                    date={form.serviceDateIso ? new Date(form.serviceDateIso) : null}
-                    placeholder="Select service date"
-                    setDate={(date) =>
-                      updateForm({
-                        serviceDateIso: date ? format(date, "yyyy-MM-dd") : "",
-                      })
-                    }
-                    className={`${CLAIMS_FIELD_CLASS} pr-12`}
-                  />
-                  <CalendarDays className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#808081]" />
-                </div>
+                <CustomDatePicker
+                  key={`claim-service-date-${claim.id}`}
+                  align="start"
+                  date={form.serviceDateIso ? new Date(form.serviceDateIso) : null}
+                  placeholder="Select service date"
+                  setDate={(date) =>
+                    updateForm({
+                      serviceDateIso: date ? format(date, "yyyy-MM-dd") : "",
+                    })
+                  }
+                  className={CLAIMS_FIELD_CLASS}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
