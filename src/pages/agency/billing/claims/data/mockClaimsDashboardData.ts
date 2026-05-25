@@ -60,6 +60,7 @@ export const RECENT_CLAIMS: RecentClaim[] = [
   {
     id: "1",
     client: "Cameron Williamson",
+    clientAvatarUrl: "/placeholder-avatar.jpg",
     staffId: "43756",
     serviceCode: "LE1 4NR",
     paNumber: "HA9 9HF",

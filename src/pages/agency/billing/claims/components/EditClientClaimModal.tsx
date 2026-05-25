@@ -19,6 +19,7 @@ import {
   time24hToDisplay,
   type ClaimFormState,
 } from "../utils/claimFormUtils";
+import { FieldLabel, SectionLabel } from "./claimsModalShared";
 import {
   CLAIMS_CORNER_MODAL_CLASS,
   CLAIMS_CORNER_MODAL_SHELL_CLASS,
@@ -33,16 +34,6 @@ type EditClientClaimModalProps = {
 };
 
 const timeTriggerClassName = `${CLAIMS_FIELD_CLASS} relative flex cursor-pointer items-center pr-12 transition-colors hover:border-[#00b4b8]`;
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-4 text-[14px] font-semibold text-[#10141a]">{children}</p>
-  );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="mb-2 block text-[14px] font-medium text-[#10141a]">{children}</label>;
-}
 
 type HoursStepperProps = {
   value: number;

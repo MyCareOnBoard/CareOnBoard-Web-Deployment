@@ -17,6 +17,7 @@ type RecentClaimRowProps = {
   claim: RecentClaim;
   variant: RowVariant;
   onEditClaim: (claim: RecentClaim) => void;
+  onGenerateClaim: (claim: RecentClaim) => void;
 };
 
 function DurationRange({ start, end }: { start: string; end: string }) {
@@ -46,10 +47,12 @@ function ClaimActionsMenu({
   claim,
   variant,
   onEditClaim,
+  onGenerateClaim,
 }: {
   claim: RecentClaim;
   variant: RowVariant;
   onEditClaim: (claim: RecentClaim) => void;
+  onGenerateClaim: (claim: RecentClaim) => void;
 }) {
   const isMobile = variant === "mobile";
 
@@ -82,7 +85,10 @@ function ClaimActionsMenu({
           <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-[#e5e5e6]" />
-        <DropdownMenuItem className={menuItemClassName} onSelect={() => undefined}>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() => onGenerateClaim(claim)}
+        >
           Generate claim
           <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
         </DropdownMenuItem>
@@ -91,12 +97,17 @@ function ClaimActionsMenu({
   );
 }
 
-function RecentClaimRow({ claim, variant, onEditClaim }: RecentClaimRowProps) {
+function RecentClaimRow({ claim, variant, onEditClaim, onGenerateClaim }: RecentClaimRowProps) {
   if (variant === "mobile") {
     return (
       <div className="relative rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
         <div className="absolute right-2 top-2">
-          <ClaimActionsMenu claim={claim} variant="mobile" onEditClaim={onEditClaim} />
+          <ClaimActionsMenu
+            claim={claim}
+            variant="mobile"
+            onEditClaim={onEditClaim}
+            onGenerateClaim={onGenerateClaim}
+          />
         </div>
 
         <p className="pr-14 text-[15px] font-semibold text-[#10141a]">{claim.client}</p>
@@ -149,7 +160,12 @@ function RecentClaimRow({ claim, variant, onEditClaim }: RecentClaimRowProps) {
       <span className="text-[13px] text-[#10141a] tabular-nums">{claim.totalHours}</span>
       <span className="text-[13px] text-[#10141a] tabular-nums">{claim.rate}</span>
       <div className="flex justify-end">
-        <ClaimActionsMenu claim={claim} variant="desktop" onEditClaim={onEditClaim} />
+        <ClaimActionsMenu
+          claim={claim}
+          variant="desktop"
+          onEditClaim={onEditClaim}
+          onGenerateClaim={onGenerateClaim}
+        />
       </div>
     </div>
   );

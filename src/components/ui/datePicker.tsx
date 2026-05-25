@@ -4,14 +4,18 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { format } from "date-fns";
 import { CalendarDaysIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
+import Calendar2Icon from "@/assets/icons/calendar-2.svg?react";
 import { cn } from "@/lib/utils";
 
 
 export default function CustomDatePicker(
-    { date, setDate, className, placeholder, startMonth, endMonth, align = "start" }: {
+    { date, setDate, className, inputClassName, iconClassName, iconVariant = "default", placeholder, startMonth, endMonth, align = "start" }: {
         date: Date | null,
         setDate: (date: Date | null) => void;
         className?: string;
+        inputClassName?: string;
+        iconClassName?: string;
+        iconVariant?: "default" | "calendar-2";
         placeholder?: string;
         startMonth?: Date;
         endMonth?: Date;
@@ -20,13 +24,20 @@ export default function CustomDatePicker(
 ) {
     const [isDateOpen, setIsDateOpen] = useState(false);
 
+    const calendarIcon =
+        iconVariant === "calendar-2" ? (
+            <Calendar2Icon className="h-5 w-5 shrink-0" aria-hidden />
+        ) : (
+            <CalendarDaysIcon className={cn("h-5 w-5 text-[#808081]", iconClassName)} />
+        );
+
     return (
         <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
             <PopoverTrigger asChild>
                 <button type="button" className="w-full cursor-pointer focus:outline-none">
                     <InputGroup
                         className={cn(
-                            "h-11 cursor-pointer rounded-xl border border-[#cccccd] bg-white px-4",
+                            "h-[var(--cr-field-height,48px)] min-h-[var(--cr-field-height,48px)] cursor-pointer rounded-xl border border-[#cccccd] bg-white px-4",
                             className
                         )}
                     >
@@ -34,10 +45,13 @@ export default function CustomDatePicker(
                             value={date ? format(date, "MMMM d, yyyy") : ""}
                             placeholder={placeholder}
                             readOnly
-                            className="text-[#10141a] border-0 bg-transparent cursor-pointer"
+                            className={cn(
+                                "border-0 bg-transparent cursor-pointer text-[#10141a]",
+                                inputClassName
+                            )}
                         />
                         <InputGroupAddon align="inline-end">
-                            <CalendarDaysIcon className="h-5 w-5 text-[#808081]" />
+                            {calendarIcon}
                         </InputGroupAddon>
                     </InputGroup>
                 </button>

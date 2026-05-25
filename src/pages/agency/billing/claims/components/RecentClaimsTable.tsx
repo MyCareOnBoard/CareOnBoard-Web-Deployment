@@ -5,12 +5,14 @@ import RecentClaimRow from "./RecentClaimRow";
 import { TABLE_HEADER_CLASS, TABLE_MIN_WIDTH } from "./tableColumns";
 
 const EditClientClaimModal = lazy(() => import("./EditClientClaimModal"));
+const ClaimReportModal = lazy(() => import("./claim-report/ClaimReportModal"));
 
 export default function RecentClaimsTable() {
   const [claims, setClaims] = useState<RecentClaim[]>(() => RECENT_CLAIMS);
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
   const [editingClaim, setEditingClaim] = useState<RecentClaim | null>(null);
+  const [generatingClaim, setGeneratingClaim] = useState<RecentClaim | null>(null);
 
   const filteredClaims = useMemo(() => {
     if (selectedClientName) {
@@ -34,8 +36,16 @@ export default function RecentClaimsTable() {
     setEditingClaim(claim);
   }, []);
 
-  const handleCloseModal = useCallback(() => {
+  const handleGenerateClaim = useCallback((claim: RecentClaim) => {
+    setGeneratingClaim(claim);
+  }, []);
+
+  const handleCloseEditModal = useCallback(() => {
     setEditingClaim(null);
+  }, []);
+
+  const handleCloseReportModal = useCallback(() => {
+    setGeneratingClaim(null);
   }, []);
 
   const handleSaveClaim = useCallback((updated: RecentClaim) => {
@@ -72,6 +82,7 @@ export default function RecentClaimsTable() {
                   variant="desktop"
                   claim={claim}
                   onEditClaim={handleEditClaim}
+                  onGenerateClaim={handleGenerateClaim}
                 />
               ))
             ) : (
@@ -91,6 +102,7 @@ export default function RecentClaimsTable() {
               variant="mobile"
               claim={claim}
               onEditClaim={handleEditClaim}
+              onGenerateClaim={handleGenerateClaim}
             />
           ))
         ) : (
@@ -106,8 +118,18 @@ export default function RecentClaimsTable() {
             key={editingClaim.id}
             open
             claim={editingClaim}
-            onClose={handleCloseModal}
+            onClose={handleCloseEditModal}
             onSave={handleSaveClaim}
+          />
+        </Suspense>
+      )}
+      {generatingClaim && (
+        <Suspense fallback={null}>
+          <ClaimReportModal
+            key={generatingClaim.id}
+            open
+            claim={generatingClaim}
+            onClose={handleCloseReportModal}
           />
         </Suspense>
       )}
