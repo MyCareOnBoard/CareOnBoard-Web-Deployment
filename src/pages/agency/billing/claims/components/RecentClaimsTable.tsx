@@ -1,30 +1,47 @@
-import { useMemo, useState } from "react";
-import { RECENT_CLAIMS } from "../data/mockClaimsDashboardData";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { RECENT_CLAIMS, type RecentClaim } from "../data/mockClaimsDashboardData";
 import ClaimsClientSearch from "./ClaimsClientSearch";
 import RecentClaimRow from "./RecentClaimRow";
 import { TABLE_HEADER_CLASS, TABLE_MIN_WIDTH } from "./tableColumns";
 
+const EditClientClaimModal = lazy(() => import("./EditClientClaimModal"));
+
 export default function RecentClaimsTable() {
+  const [claims, setClaims] = useState<RecentClaim[]>(() => RECENT_CLAIMS);
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
+  const [editingClaim, setEditingClaim] = useState<RecentClaim | null>(null);
 
   const filteredClaims = useMemo(() => {
     if (selectedClientName) {
-      return RECENT_CLAIMS.filter(
+      return claims.filter(
         (claim) => claim.client.toLowerCase() === selectedClientName.toLowerCase()
       );
     }
 
     const query = filterQuery.trim().toLowerCase();
-    if (!query) return RECENT_CLAIMS;
+    if (!query) return claims;
 
-    return RECENT_CLAIMS.filter((claim) => claim.client.toLowerCase().includes(query));
-  }, [filterQuery, selectedClientName]);
+    return claims.filter((claim) => claim.client.toLowerCase().includes(query));
+  }, [claims, filterQuery, selectedClientName]);
 
   const handleFilterChange = (query: string, clientName?: string) => {
     setFilterQuery(query);
     setSelectedClientName(clientName);
   };
+
+  const handleEditClaim = useCallback((claim: RecentClaim) => {
+    setEditingClaim(claim);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setEditingClaim(null);
+  }, []);
+
+  const handleSaveClaim = useCallback((updated: RecentClaim) => {
+    setClaims((prev) => prev.map((claim) => (claim.id === updated.id ? updated : claim)));
+    setEditingClaim(null);
+  }, []);
 
   return (
     <section>
@@ -50,7 +67,12 @@ export default function RecentClaimsTable() {
 
             {filteredClaims.length > 0 ? (
               filteredClaims.map((claim) => (
-                <RecentClaimRow key={claim.id} variant="desktop" claim={claim} />
+                <RecentClaimRow
+                  key={claim.id}
+                  variant="desktop"
+                  claim={claim}
+                  onEditClaim={handleEditClaim}
+                />
               ))
             ) : (
               <div className="px-4 py-10 text-center">
@@ -64,7 +86,12 @@ export default function RecentClaimsTable() {
       <div className="space-y-2 lg:hidden">
         {filteredClaims.length > 0 ? (
           filteredClaims.map((claim) => (
-            <RecentClaimRow key={claim.id} variant="mobile" claim={claim} />
+            <RecentClaimRow
+              key={claim.id}
+              variant="mobile"
+              claim={claim}
+              onEditClaim={handleEditClaim}
+            />
           ))
         ) : (
           <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-10 text-center">
@@ -72,6 +99,18 @@ export default function RecentClaimsTable() {
           </div>
         )}
       </div>
+
+      {editingClaim && (
+        <Suspense fallback={null}>
+          <EditClientClaimModal
+            key={editingClaim.id}
+            open
+            claim={editingClaim}
+            onClose={handleCloseModal}
+            onSave={handleSaveClaim}
+          />
+        </Suspense>
+      )}
     </section>
   );
 }

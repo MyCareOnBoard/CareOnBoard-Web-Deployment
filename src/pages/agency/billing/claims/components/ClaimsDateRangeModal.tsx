@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import CustomDatePicker from "@/components/ui/datePicker";
+import { CLAIMS_CORNER_MODAL_CLASS } from "./claimsModalStyles";
 
 type DateRangeValues = {
   startDate: string;
@@ -71,7 +72,7 @@ export default function ClaimsDateRangeModal({
         if (!value) onClose();
       }}
     >
-      <DialogContent className="fixed !left-auto !right-6 !top-6 !translate-x-0 !translate-y-0 w-[520px] max-w-[calc(100vw-32px)] rounded-[20px] border border-[#e5e5e6] bg-white p-0 shadow-lg sm:!right-6">
+      <DialogContent className={CLAIMS_CORNER_MODAL_CLASS}>
         <DialogHeader className="space-y-0">
           <div className="px-6 py-6">
             <DialogTitle className="text-left text-[24px] font-bold text-[#10141a] md:text-[28px]">

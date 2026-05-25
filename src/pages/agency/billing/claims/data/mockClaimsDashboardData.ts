@@ -15,6 +15,7 @@ export type DonutSegment = {
 export type RecentClaim = {
   id: string;
   client: string;
+  clientAvatarUrl?: string;
   staffId: string;
   serviceCode: string;
   paNumber: string;
