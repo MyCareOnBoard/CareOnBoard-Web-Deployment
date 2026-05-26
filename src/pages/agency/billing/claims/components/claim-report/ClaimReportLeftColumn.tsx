@@ -5,7 +5,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { getInitials } from "@/lib/utils/string-utils";
 import type { ClaimReportFormState } from "../../data/mockClaimReportData";
 import { BioRow, ReportRowLabel, ReportSectionTitle } from "../claimsModalShared";
-import { CLAIM_REPORT_SECTION } from "../claimsModalStyles";
+import {
+  CLAIM_REPORT_CHECKBOX_CLASS,
+  CLAIM_REPORT_RADIO_ITEM_CLASS,
+  CLAIM_REPORT_SECTION,
+} from "../claimsModalStyles";
 
 type ClaimReportLeftColumnProps = {
   form: ClaimReportFormState;
@@ -30,21 +34,18 @@ function ClaimReportLeftColumn({ form, onUpdate }: ClaimReportLeftColumnProps) {
             {getInitials(form.clientName)}
           </AvatarFallback>
         </Avatar>
-        <p className="mt-3 text-[16px] font-bold text-[var(--cr-title)]">{form.clientName}</p>
+        <p className="mt-2 text-[16px] font-bold text-[var(--cr-title)]">{form.clientName}</p>
 
-        <div className="mt-5 space-y-0.5">
+        <div className="mt-3 [&>div]:py-1">
           <BioRow label="Date of birth" value={form.dateOfBirth} />
           <BioRow label="Service code" value={form.serviceCode} />
-          <BioRow
-            label="Patient sex"
-            value={<span className="cr-badge">{form.patientSex}</span>}
-          />
+          <BioRow label="Patient sex" value={form.patientSex} />
         </div>
       </section>
 
       <section className={CLAIM_REPORT_SECTION}>
         <ReportSectionTitle>Patient location</ReportSectionTitle>
-        <div className="space-y-0.5">
+        <div className="[&>div]:py-1">
           <BioRow label="Patient address" value={form.patientAddress} emphasis={false} />
           <BioRow label="City" value={form.city} emphasis={false} />
           <BioRow label="State" value={form.state} emphasis={false} />
@@ -58,6 +59,7 @@ function ClaimReportLeftColumn({ form, onUpdate }: ClaimReportLeftColumnProps) {
           <div className="flex items-center justify-between py-2">
             <ReportRowLabel>Employment</ReportRowLabel>
             <Checkbox
+              className={CLAIM_REPORT_CHECKBOX_CLASS}
               checked={form.conditionEmployment}
               onChange={(event) => onUpdate({ conditionEmployment: event.target.checked })}
               aria-label="Employment"
@@ -66,6 +68,7 @@ function ClaimReportLeftColumn({ form, onUpdate }: ClaimReportLeftColumnProps) {
           <div className="flex items-center justify-between py-2">
             <ReportRowLabel>Auto accident</ReportRowLabel>
             <Checkbox
+              className={CLAIM_REPORT_CHECKBOX_CLASS}
               checked={form.conditionAutoAccident}
               onChange={(event) => onUpdate({ conditionAutoAccident: event.target.checked })}
               aria-label="Auto accident"
@@ -74,6 +77,7 @@ function ClaimReportLeftColumn({ form, onUpdate }: ClaimReportLeftColumnProps) {
           <div className="flex items-center justify-between py-2">
             <ReportRowLabel>Auto Other accident</ReportRowLabel>
             <Checkbox
+              className={CLAIM_REPORT_CHECKBOX_CLASS}
               checked={form.conditionOtherAccident}
               onChange={(event) => onUpdate({ conditionOtherAccident: event.target.checked })}
               aria-label="Auto Other accident"
@@ -91,11 +95,11 @@ function ClaimReportLeftColumn({ form, onUpdate }: ClaimReportLeftColumnProps) {
             className="flex shrink-0 gap-4"
           >
             <label className="flex cursor-pointer items-center gap-2">
-              <RadioGroupItem value="yes" />
+              <RadioGroupItem value="yes" className={CLAIM_REPORT_RADIO_ITEM_CLASS} />
               <span className="text-[13px] font-normal text-[var(--cr-title)]">Yes</span>
             </label>
             <label className="flex cursor-pointer items-center gap-2">
-              <RadioGroupItem value="no" />
+              <RadioGroupItem value="no" className={CLAIM_REPORT_RADIO_ITEM_CLASS} />
               <span className="text-[13px] font-normal text-[var(--cr-title)]">No</span>
             </label>
           </RadioGroup>

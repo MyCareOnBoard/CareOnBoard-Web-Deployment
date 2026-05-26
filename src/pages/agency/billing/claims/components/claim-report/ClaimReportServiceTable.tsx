@@ -33,6 +33,9 @@ type ClaimReportServiceTableProps = {
   serviceLines: ClaimReportServiceLine[];
 };
 
+const PAGINATION_BUTTON_CLASS =
+  "inline-flex h-9 min-w-9 cursor-pointer items-center justify-center rounded-md transition-colors";
+
 function ClaimReportServiceTable({ serviceLines }: ClaimReportServiceTableProps) {
   return (
     <div className="claim-report-print-section mt-6 border-t border-[#e5e5e6] pt-6">
@@ -61,9 +64,9 @@ function ClaimReportServiceTable({ serviceLines }: ClaimReportServiceTableProps)
               <button
                 type="button"
                 aria-label="Previous page"
-                className="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-md text-[#808081] transition-colors hover:bg-[#eef4f5]"
+                className={`${PAGINATION_BUTTON_CLASS} text-[#808081] hover:bg-[#eef4f5]`}
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-3.5 w-3.5" />
               </button>
               {[1, 2, 3].map((page) => (
                 <button
@@ -71,7 +74,7 @@ function ClaimReportServiceTable({ serviceLines }: ClaimReportServiceTableProps)
                   type="button"
                   aria-label={`Page ${page}`}
                   aria-current={page === 1 ? "page" : undefined}
-                  className={`inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-md text-[14px] font-medium transition-colors ${
+                  className={`${PAGINATION_BUTTON_CLASS} text-[13px] font-medium ${
                     page === 1
                       ? "bg-[#00b4b8] text-white hover:bg-[#009da1]"
                       : "text-[#10141a] hover:bg-[#eef4f5]"
@@ -83,9 +86,9 @@ function ClaimReportServiceTable({ serviceLines }: ClaimReportServiceTableProps)
               <button
                 type="button"
                 aria-label="Next page"
-                className="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-md text-[#808081] transition-colors hover:bg-[#eef4f5]"
+                className={`${PAGINATION_BUTTON_CLASS} text-[#808081] hover:bg-[#eef4f5]`}
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>

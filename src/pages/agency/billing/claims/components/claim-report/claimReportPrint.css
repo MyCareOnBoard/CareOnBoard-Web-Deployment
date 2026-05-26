@@ -134,7 +134,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0;
+  padding: 0.25rem 0;
 }
 
 .cr-summary-label {
@@ -151,8 +151,8 @@
 }
 
 .cr-summary-row--total {
-  padding-top: 1rem;
-  margin-top: 0.25rem;
+  padding-top: 0.625rem;
+  margin-top: 0.125rem;
 }
 
 .cr-summary-row--total .cr-summary-label,
@@ -205,6 +205,31 @@
 .claim-report-modal-body::-webkit-scrollbar:horizontal {
   display: none;
   height: 0;
+}
+
+.claim-report-print-root [data-section="condition"] label > span.relative {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 4px;
+}
+
+.claim-report-print-root [data-section="condition"] label > span.relative svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.claim-report-print-root [data-section="outside-lab"] [data-slot="radio-group-item"] {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.claim-report-print-root
+  [data-section="outside-lab"]
+  [data-slot="radio-group-item"]
+  [data-slot="radio-group-indicator"]
+  svg {
+  width: 0.75rem;
+  height: 0.75rem;
 }
 
 @media print {

@@ -46,3 +46,9 @@ export const CLAIM_REPORT_DIVIDER = "border-t border-[#e5e5e6]";
 
 export const CLAIM_REPORT_SECTION =
   "border-t border-[#e5e5e6] pt-5 mt-5";
+
+export const CLAIM_REPORT_CHECKBOX_CLASS =
+  "!size-5 !rounded-[4px] [&>svg]:!size-3";
+
+export const CLAIM_REPORT_RADIO_ITEM_CLASS =
+  "!size-6 [&_[data-slot=radio-group-indicator]_svg]:!size-3";

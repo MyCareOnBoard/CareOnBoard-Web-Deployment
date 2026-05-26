@@ -23,7 +23,7 @@ function applyPdfAlignmentFixes(root: HTMLElement) {
     row.style.display = "grid";
     row.style.gridTemplateColumns = "1fr auto";
     row.style.alignItems = "center";
-    row.querySelector<HTMLElement>(".cr-row-label")?.style.setProperty("line-height", "24px");
+    row.querySelector<HTMLElement>(".cr-row-label")?.style.setProperty("line-height", "20px");
     row.querySelectorAll<HTMLElement>("label").forEach((label) => {
       centerForPdf(label);
       label.querySelectorAll<HTMLElement>("span").forEach((box) => centerForPdf(box));
