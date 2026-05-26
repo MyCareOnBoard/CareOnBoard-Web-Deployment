@@ -113,7 +113,6 @@ function ClaimReportAgreementPanel({
               <Input
                 value={form.diagnosisCodes[letter] ?? ""}
                 onChange={(event) => onUpdateDiagnosis(letter, event.target.value)}
-                placeholder="Code"
                 className={`${CLAIM_REPORT_FIELD_CLASS} h-[40px] text-[13px]`}
               />
             </div>
@@ -176,14 +175,15 @@ function ClaimReportAgreementPanel({
             </div>
           </div>
           <div>
-            <ReportFieldLabel>Prior authorization number</ReportFieldLabel>
-            <CustomDatePicker
-              key={`report-prior-auth-${claimId}`}
-              align="end"
-              date={form.priorAuthDateIso ? new Date(form.priorAuthDateIso) : null}
-              placeholder="Select date"
-              setDate={setDateField("priorAuthDateIso")}
-              {...CLAIM_REPORT_DATE_PICKER_PROPS}
+            <ReportFieldLabel htmlFor={`report-pa-number-${claimId}`}>
+              Prior authorization number
+            </ReportFieldLabel>
+            <Input
+              id={`report-pa-number-${claimId}`}
+              value={form.paNumber}
+              onChange={(event) => onUpdate({ paNumber: event.target.value })}
+              placeholder="Enter PA number"
+              className={CLAIM_REPORT_FIELD_CLASS}
             />
           </div>
         </div>

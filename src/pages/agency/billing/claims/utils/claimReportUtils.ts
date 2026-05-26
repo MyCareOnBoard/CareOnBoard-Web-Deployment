@@ -1,21 +1,31 @@
+import { format } from "date-fns";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import {
-  DEFAULT_CLAIM_REPORT,
+  EMPTY_CLAIM_REPORT,
   type ClaimReportFormState,
 } from "../data/mockClaimReportData";
 import { serviceDateToIso } from "./claimFormUtils";
 
+function normalizeDisplayValue(value: string): string {
+  const trimmed = value.trim();
+  return trimmed === "—" ? "" : trimmed;
+}
+
 export function buildClaimReportFromClaim(claim: RecentClaim): ClaimReportFormState {
   const serviceDateIso = serviceDateToIso(claim.serviceDate);
+  const prefill = claim.reportPrefill;
 
   return {
-    ...DEFAULT_CLAIM_REPORT,
-    clientName: claim.client,
-    clientAvatarUrl: claim.clientAvatarUrl ?? DEFAULT_CLAIM_REPORT.clientAvatarUrl,
-    serviceCode: claim.serviceCode,
+    ...EMPTY_CLAIM_REPORT,
+    ...prefill,
+    clientName: normalizeDisplayValue(claim.client),
+    clientAvatarUrl: claim.clientAvatarUrl,
+    serviceCode: normalizeDisplayValue(claim.serviceCode),
     serviceDateIso,
-    currentIllnessDateIso: serviceDateIso || DEFAULT_CLAIM_REPORT.currentIllnessDateIso,
-    signatureDateIso: serviceDateIso || DEFAULT_CLAIM_REPORT.signatureDateIso,
-    paNumber: claim.paNumber,
+    signatureDateIso: format(new Date(), "yyyy-MM-dd"),
+    paNumber: prefill?.paNumber ?? normalizeDisplayValue(claim.paNumber),
+    serviceLines: prefill?.serviceLines ?? [],
+    summary: prefill?.summary ?? EMPTY_CLAIM_REPORT.summary,
+    diagnosisCodes: prefill?.diagnosisCodes ?? EMPTY_CLAIM_REPORT.diagnosisCodes,
   };
 }

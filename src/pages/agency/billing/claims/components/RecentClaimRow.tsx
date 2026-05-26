@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { Link } from "react-router";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import {
   DropdownMenu,
@@ -8,8 +9,69 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { Routes } from "@/routes/constants";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import { TABLE_ROW_CLASS } from "./tableColumns";
+
+const MISSING_STAFF_ID = "—";
+const STAFF_ID_DISPLAY_LENGTH = 6;
+
+function isStaffIdLinkable(staffId: string): boolean {
+  const trimmed = staffId.trim();
+  return Boolean(trimmed) && trimmed !== MISSING_STAFF_ID;
+}
+
+function formatStaffIdDisplay(staffId: string): string {
+  if (!isStaffIdLinkable(staffId)) {
+    return staffId.trim() || MISSING_STAFF_ID;
+  }
+  return staffId.slice(0, STAFF_ID_DISPLAY_LENGTH);
+}
+
+function StaffIdLink({ staffId }: { staffId: string }) {
+  const displayId = formatStaffIdDisplay(staffId);
+
+  if (!isStaffIdLinkable(staffId)) {
+    return <span className="text-[13px] text-[#808081]">{displayId}</span>;
+  }
+
+  return (
+    <Link
+      to={Routes.agency.dspProfile.replace(":dspId", staffId.trim())}
+      className="text-[13px] font-medium text-[#10141a] transition-colors hover:text-[#00b4b8] hover:underline"
+    >
+      {displayId}
+    </Link>
+  );
+}
+
+function ClientNameLink({
+  name,
+  clientId,
+  className,
+}: {
+  name: string;
+  clientId?: string;
+  className?: string;
+}) {
+  const trimmedClientId = clientId?.trim();
+
+  if (!trimmedClientId) {
+    return <span className={className}>{name}</span>;
+  }
+
+  return (
+    <Link
+      to={Routes.agency.clientDetails.replace(":clientId", trimmedClientId)}
+      className={cn(
+        "truncate transition-colors hover:text-[#00b4b8] hover:underline",
+        className,
+      )}
+    >
+      {name}
+    </Link>
+  );
+}
 
 type RowVariant = "mobile" | "desktop";
 
@@ -110,12 +172,16 @@ function RecentClaimRow({ claim, variant, onEditClaim, onGenerateClaim }: Recent
           />
         </div>
 
-        <p className="pr-14 text-[15px] font-semibold text-[#10141a]">{claim.client}</p>
+        <ClientNameLink
+          name={claim.client}
+          clientId={claim.clientId}
+          className="pr-14 text-[15px] font-semibold text-[#10141a]"
+        />
 
         <div className="mt-4 space-y-3">
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">Staff ID</span>
-            <span className="text-[13px] font-medium text-[#808081]">ID: {claim.staffId}</span>
+            <StaffIdLink staffId={claim.staffId} />
           </div>
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">Service date</span>
@@ -151,8 +217,12 @@ function RecentClaimRow({ claim, variant, onEditClaim, onGenerateClaim }: Recent
 
   return (
     <div className={TABLE_ROW_CLASS}>
-      <span className="truncate text-[14px] font-medium text-[#10141a]">{claim.client}</span>
-      <span className="text-[13px] text-[#808081]">ID: {claim.staffId}</span>
+      <ClientNameLink
+        name={claim.client}
+        clientId={claim.clientId}
+        className="text-[14px] font-medium text-[#10141a]"
+      />
+      <StaffIdLink staffId={claim.staffId} />
       <span className="text-[13px] text-[#10141a]">{claim.serviceCode}</span>
       <span className="text-[13px] text-[#10141a]">{claim.paNumber}</span>
       <span className="text-[13px] text-[#10141a]">{claim.serviceDate}</span>
