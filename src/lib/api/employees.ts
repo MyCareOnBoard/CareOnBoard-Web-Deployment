@@ -376,6 +376,7 @@ export interface CreateActivityLogRequest {
     description?: string;
     metadata?: {
         individual?: string;
+        clientId?: string;
         serviceYear?: number;
         serviceCode?: string;
         ISPOutcome?: string;

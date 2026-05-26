@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { format, subDays } from "date-fns";
-import { CalendarDays } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import CustomDatePicker from "@/components/ui/datePicker";
+import { CLAIMS_CORNER_MODAL_CLASS, CLAIMS_FIELD_CLASS } from "./claimsModalStyles";
 
 type DateRangeValues = {
   startDate: string;
@@ -71,7 +71,7 @@ export default function ClaimsDateRangeModal({
         if (!value) onClose();
       }}
     >
-      <DialogContent className="fixed !left-auto !right-6 !top-6 !translate-x-0 !translate-y-0 w-[520px] max-w-[calc(100vw-32px)] rounded-[20px] border border-[#e5e5e6] bg-white p-0 shadow-lg sm:!right-6">
+      <DialogContent className={CLAIMS_CORNER_MODAL_CLASS}>
         <DialogHeader className="space-y-0">
           <div className="px-6 py-6">
             <DialogTitle className="text-left text-[24px] font-bold text-[#10141a] md:text-[28px]">
@@ -106,34 +106,28 @@ export default function ClaimsDateRangeModal({
 
           <div>
             <label className="mb-3 block text-[14px] font-medium text-[#10141a]">Start date</label>
-            <div className="relative">
-              <CustomDatePicker
-                key="claims-start-picker"
-                align="start"
-                date={values.startDate ? new Date(values.startDate) : null}
-                placeholder="Select start date"
-                endMonth={new Date()}
-                setDate={(date) => updateDate("startDate", date)}
-                className="h-[48px] rounded-xl border-[#e5e5e6] bg-white pr-12 text-[14px] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
-              />
-              <CalendarDays className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#808081]" />
-            </div>
+            <CustomDatePicker
+              key="claims-start-picker"
+              align="start"
+              date={values.startDate ? new Date(values.startDate) : null}
+              placeholder="Select start date"
+              endMonth={new Date()}
+              setDate={(date) => updateDate("startDate", date)}
+              className={CLAIMS_FIELD_CLASS}
+            />
           </div>
 
           <div>
             <label className="mb-3 block text-[14px] font-medium text-[#10141a]">End date</label>
-            <div className="relative">
-              <CustomDatePicker
-                key="claims-end-picker"
-                align="end"
-                date={values.endDate ? new Date(values.endDate) : null}
-                placeholder="Select end date"
-                endMonth={new Date()}
-                setDate={(date) => updateDate("endDate", date)}
-                className="h-[48px] rounded-xl border-[#e5e5e6] bg-white pr-12 text-[14px] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
-              />
-              <CalendarDays className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#808081]" />
-            </div>
+            <CustomDatePicker
+              key="claims-end-picker"
+              align="end"
+              date={values.endDate ? new Date(values.endDate) : null}
+              placeholder="Select end date"
+              endMonth={new Date()}
+              setDate={(date) => updateDate("endDate", date)}
+              className={CLAIMS_FIELD_CLASS}
+            />
           </div>
 
           {error && (

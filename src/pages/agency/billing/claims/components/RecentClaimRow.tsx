@@ -16,6 +16,8 @@ type RowVariant = "mobile" | "desktop";
 type RecentClaimRowProps = {
   claim: RecentClaim;
   variant: RowVariant;
+  onEditClaim: (claim: RecentClaim) => void;
+  onGenerateClaim: (claim: RecentClaim) => void;
 };
 
 function DurationRange({ start, end }: { start: string; end: string }) {
@@ -41,7 +43,17 @@ function DotGridIcon() {
 const menuItemClassName =
   "flex min-h-[44px] w-full cursor-pointer items-center justify-between rounded-none px-4 py-3 text-[14px] font-medium text-[#10141a] hover:bg-[#eef4f5] focus:bg-[#eef4f5]";
 
-function ClaimActionsMenu({ variant }: { variant: RowVariant }) {
+function ClaimActionsMenu({
+  claim,
+  variant,
+  onEditClaim,
+  onGenerateClaim,
+}: {
+  claim: RecentClaim;
+  variant: RowVariant;
+  onEditClaim: (claim: RecentClaim) => void;
+  onGenerateClaim: (claim: RecentClaim) => void;
+}) {
   const isMobile = variant === "mobile";
 
   return (
@@ -51,7 +63,7 @@ function ClaimActionsMenu({ variant }: { variant: RowVariant }) {
           type="button"
           aria-label="Claim actions"
           className={cn(
-            "inline-flex items-center justify-center rounded-md bg-[#eef4f5] transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]",
+            "inline-flex cursor-pointer items-center justify-center rounded-md bg-[#eef4f5] transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]",
             isMobile ? "h-11 w-11" : "h-8 w-8"
           )}
         >
@@ -65,12 +77,18 @@ function ClaimActionsMenu({ variant }: { variant: RowVariant }) {
         collisionPadding={16}
         className="z-[100] w-[220px] rounded-xl border border-[#e5e5e6] bg-white p-0 shadow-lg"
       >
-        <DropdownMenuItem className={menuItemClassName} onSelect={() => undefined}>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() => onEditClaim(claim)}
+        >
           Edit client claim
           <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-[#e5e5e6]" />
-        <DropdownMenuItem className={menuItemClassName} onSelect={() => undefined}>
+        <DropdownMenuItem
+          className={menuItemClassName}
+          onSelect={() => onGenerateClaim(claim)}
+        >
           Generate claim
           <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
         </DropdownMenuItem>
@@ -79,12 +97,17 @@ function ClaimActionsMenu({ variant }: { variant: RowVariant }) {
   );
 }
 
-function RecentClaimRow({ claim, variant }: RecentClaimRowProps) {
+function RecentClaimRow({ claim, variant, onEditClaim, onGenerateClaim }: RecentClaimRowProps) {
   if (variant === "mobile") {
     return (
       <div className="relative rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
         <div className="absolute right-2 top-2">
-          <ClaimActionsMenu variant="mobile" />
+          <ClaimActionsMenu
+            claim={claim}
+            variant="mobile"
+            onEditClaim={onEditClaim}
+            onGenerateClaim={onGenerateClaim}
+          />
         </div>
 
         <p className="pr-14 text-[15px] font-semibold text-[#10141a]">{claim.client}</p>
@@ -137,7 +160,12 @@ function RecentClaimRow({ claim, variant }: RecentClaimRowProps) {
       <span className="text-[13px] text-[#10141a] tabular-nums">{claim.totalHours}</span>
       <span className="text-[13px] text-[#10141a] tabular-nums">{claim.rate}</span>
       <div className="flex justify-end">
-        <ClaimActionsMenu variant="desktop" />
+        <ClaimActionsMenu
+          claim={claim}
+          variant="desktop"
+          onEditClaim={onEditClaim}
+          onGenerateClaim={onGenerateClaim}
+        />
       </div>
     </div>
   );

@@ -57,9 +57,10 @@ export default function ClaimsDashboardHeader({
 
           <button
             type="button"
+            onClick={() => undefined}
             className="inline-flex h-11 min-h-[44px] w-full cursor-pointer items-center justify-between gap-3 rounded-full bg-[#00b4b8] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#009da1] active:bg-[#009199] sm:w-auto sm:min-w-[160px]"
           >
-            Add claim
+            Export Report
             <DocumentDownloadIcon className="h-5 w-5 shrink-0" aria-hidden />
           </button>
         </div>

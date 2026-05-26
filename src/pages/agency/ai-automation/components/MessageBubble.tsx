@@ -55,9 +55,11 @@ function DSPCard({ suggestion, onAssign }: { suggestion: DSPSuggestion; onAssign
 export function MessageBubble({
   msg,
   onAssignDSP,
+  onSendMessage,
 }: {
   msg: LocalMessage;
   onAssignDSP?: (suggestion: DSPSuggestion, message: LocalMessage) => void;
+  onSendMessage?: (text: string) => void;
 }) {
   if (msg.role === "user") {
     return (
@@ -105,57 +107,71 @@ export function MessageBubble({
         <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#00b4b8]" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="rounded-[18px] sm:rounded-[24px] rounded-tl-[4px] sm:rounded-tl-[6px] bg-[#f3f4f6] px-4 sm:px-5 py-3 sm:py-4 text-[13px] sm:text-[14px] leading-relaxed text-[#10141a]">
-          {msg.isLoading ? (
+        {/* Loading state */}
+        {msg.isLoading && (
+          <div className="rounded-[18px] border border-[#e5e7eb] bg-white px-4 sm:px-5 py-3 sm:py-4">
             <div className="flex items-center gap-1.5 sm:gap-2">
               <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-bounce rounded-full bg-[#00b4b8]" />
               <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-bounce rounded-full bg-[#00b4b8] delay-150" />
               <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-bounce rounded-full bg-[#00b4b8] delay-300" />
             </div>
-          ) : (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                table: ({ children }) => (
-                  <div className="mt-1 overflow-x-auto">
-                    <table className="w-full text-[12px] border-collapse">{children}</table>
-                  </div>
-                ),
-                thead: ({ children }) => <thead>{children}</thead>,
-                th: ({ children }) => (
-                  <th className="border border-[#e5e7eb] bg-[#f9fafb] px-3 py-1.5 text-left font-semibold text-[#374151]">
-                    {children}
-                  </th>
-                ),
-                td: ({ children }) => (
-                  <td className="border border-[#e5e7eb] px-3 py-1.5 text-[#374151]">{children}</td>
-                ),
-                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                ul: ({ children }) => (
-                  <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>
-                ),
-                ol: ({ children }) => (
-                  <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>
-                ),
-                strong: ({ children }) => (
-                  <strong className="font-semibold text-[#10141a]">{children}</strong>
-                ),
-                code: ({ children }) => (
-                  <code className="rounded bg-[#e5e7eb] px-1 py-0.5 text-[11px] font-mono">
-                    {children}
-                  </code>
-                ),
-              }}
-            >
-              {msg.content}
-            </ReactMarkdown>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Text content card */}
+        {!msg.isLoading && msg.content && (
+          <div className="rounded-[18px] border border-[#e5e7eb] bg-white overflow-hidden">
+            <div className="px-4 sm:px-5 py-3 sm:py-4 text-[13px] sm:text-[14px] leading-relaxed text-[#10141a]">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  table: ({ children }) => (
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="w-full text-[12px] border-collapse">{children}</table>
+                    </div>
+                  ),
+                  thead: ({ children }) => <thead>{children}</thead>,
+                  th: ({ children }) => (
+                    <th className="border border-[#e5e7eb] bg-[#f9fafb] px-3 py-1.5 text-left font-semibold text-[#374151]">
+                      {children}
+                    </th>
+                  ),
+                  td: ({ children }) => (
+                    <td className="border border-[#e5e7eb] px-3 py-1.5 text-[#374151]">{children}</td>
+                  ),
+                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                  ul: ({ children }) => (
+                    <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="font-semibold text-[#10141a]">{children}</strong>
+                  ),
+                  em: ({ children }) => <em className="italic text-[#6b7280]">{children}</em>,
+                  code: ({ children }) => (
+                    <code className="rounded bg-[#f3f4f6] px-1.5 py-0.5 text-[11px] font-mono text-[#d97706]">
+                      {children}
+                    </code>
+                  ),
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-4 border-[#00b4b8] pl-3 py-2 text-[#6b7280] italic my-2">
+                      {children}
+                    </blockquote>
+                  ),
+                }}
+              >
+                {msg.content}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
 
         {!msg.isLoading && msg.components && msg.components.length > 0 && (
           <div className="mt-3 space-y-3">
             {msg.components.map((comp, i) => (
-              <ComponentRenderer key={i} component={comp} />
+              <ComponentRenderer key={i} component={comp} onSendMessage={onSendMessage} />
             ))}
           </div>
         )}

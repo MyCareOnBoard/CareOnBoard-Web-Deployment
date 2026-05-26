@@ -1624,6 +1624,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 metadata: {
                   employee: formData.assignedDsp,
                   individual: clientName,
+                  clientId: formData.clientId || "",
                   agency: user?.fullName || "",
                   serviceYear: shiftDate.getFullYear(),
                   serviceCode: formData.serviceCode || "",
