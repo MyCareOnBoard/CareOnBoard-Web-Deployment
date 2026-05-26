@@ -18,6 +18,7 @@ import UserRoadsideIcon from "@/assets/icons/user-roadside.svg?react";
 import BellIcon from "@/assets/icons/bell.svg?react";
 import SupportIcon from "@/assets/icons/support.svg?react";
 import CommunityInclusionIcon from "@/assets/icons/community-inclusion.svg?react";
+import { Sun } from "lucide-react";
 
 const navItems: NavItem[] = [
   { label: "Dashboard", path: Routes.userPanel.dashboard, icon: HomeIcon },
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
     path: Routes.userPanel.communityInclusion,
     icon: CommunityInclusionIcon
   },
+  { label: "Day Program", path: Routes.userPanel.dayProgram, icon: Sun },
   {
     label: "Help Center",
     path: Routes.userPanel.helpCenter,
