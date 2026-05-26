@@ -54,7 +54,7 @@ function ClaimReportLeftColumn({ form, onUpdate }: ClaimReportLeftColumnProps) {
       </section>
 
       <section className={CLAIM_REPORT_SECTION} data-section="condition">
-        <ReportSectionTitle>Is patient condition related</ReportSectionTitle>
+        <ReportSectionTitle>Is patient condition related to</ReportSectionTitle>
         <div>
           <div className="flex items-center justify-between py-2">
             <ReportRowLabel>Employment</ReportRowLabel>
@@ -75,12 +75,12 @@ function ClaimReportLeftColumn({ form, onUpdate }: ClaimReportLeftColumnProps) {
             />
           </div>
           <div className="flex items-center justify-between py-2">
-            <ReportRowLabel>Auto Other accident</ReportRowLabel>
+            <ReportRowLabel>Other accident</ReportRowLabel>
             <Checkbox
               className={CLAIM_REPORT_CHECKBOX_CLASS}
               checked={form.conditionOtherAccident}
               onChange={(event) => onUpdate({ conditionOtherAccident: event.target.checked })}
-              aria-label="Auto Other accident"
+              aria-label="Other accident"
             />
           </div>
         </div>
