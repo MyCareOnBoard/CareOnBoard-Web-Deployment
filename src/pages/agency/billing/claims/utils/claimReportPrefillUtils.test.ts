@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  alexClientFixture,
-  alexMatchedServiceFixture,
-  alexShiftTimingFixture,
-} from "./alexClientFixture";
+import type { Client, ClientService } from "@/lib/api/clients";
 import {
   buildClaimReportPrefill,
   buildDiagnosisCodesMap,
@@ -17,7 +13,9 @@ import {
 
 describe("claimReportPrefillUtils", () => {
   it("formats Firestore DOB for display", () => {
-    expect(formatClientDateOfBirth(alexClientFixture.dateOfBirth)).toBe("6 JANUARY 2004");
+    expect(
+      formatClientDateOfBirth({ _seconds: 1073347200, _nanoseconds: 0 }),
+    ).toBe("6 JANUARY 2004");
   });
 
   it("extracts diagnosis code from single-line primary diagnosis", () => {
@@ -61,7 +59,16 @@ describe("claimReportPrefillUtils", () => {
   });
 
   it("resolves patient location from primaryAddress", () => {
-    expect(resolveClientAddressFields(alexClientFixture)).toEqual({
+    const client: Client = {
+      id: "client-1",
+      primaryAddress: {
+        address: "AP-7, 8, 46680 Algemesí, Valencia, Spain",
+        countyState: "Valencia / Comunidad Valenciana",
+        zipCode: "46680",
+      },
+    };
+
+    expect(resolveClientAddressFields(client)).toEqual({
       patientAddress: "AP-7, 8, 46680 Algemesí, Valencia, Spain",
       city: "Valencia / Comunidad Valenciana",
       state: "",
@@ -69,14 +76,37 @@ describe("claimReportPrefillUtils", () => {
     });
   });
 
-  it("builds Alex claim report prefill snapshot", () => {
-    const prefill = buildClaimReportPrefill(
-      alexClientFixture,
-      alexMatchedServiceFixture,
-      alexShiftTimingFixture,
-    );
+  it("builds claim report prefill snapshot", () => {
+    const client: Client = {
+      id: "client-1",
+      gender: "male",
+      medicaidId: "112081536401",
+      primaryDiagnosis: "F84.0 - Autism Spectrum Disorder",
+    };
+    const matchedService: ClientService = {
+      id: "service-1",
+      name: "Community Based Supports",
+      code: "H2021HI",
+      location: "Community",
+      clientRate: "$9.61",
+      clientPayType: "15-min",
+      totalApprovedHours: "75.75",
+      sdrPriorAuthorization: {
+        paNumber: "1553253313",
+      },
+    };
+    const timing = {
+      serviceDate: "June 7, 2026",
+      durationStart: "9:00 AM",
+      durationEnd: "2:45 PM",
+      totalHours: "5.75",
+      serviceCode: "H2021HI",
+      paNumber: "1553253313",
+    };
 
-    expect(getClientDiagnosisLines(alexClientFixture)).toEqual([
+    const prefill = buildClaimReportPrefill(client, matchedService, timing);
+
+    expect(getClientDiagnosisLines(client)).toEqual([
       "F84.0 - Autism Spectrum Disorder",
     ]);
     expect(prefill.diagnosisCodes.A).toBe("F84.0");

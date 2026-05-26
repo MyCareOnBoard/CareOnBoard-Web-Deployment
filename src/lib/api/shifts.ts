@@ -69,6 +69,7 @@ export const formatShiftLocation = (location?: ShiftLocation | string | null): s
 export interface Shift {
     id: string;
     employeeId?: string;
+    clientId?: string;
     client?: Client;
     date: string;
     location?: ShiftLocation;
