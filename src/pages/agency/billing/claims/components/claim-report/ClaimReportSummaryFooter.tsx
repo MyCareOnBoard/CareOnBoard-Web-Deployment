@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import DocumentDownloadIcon from "@/assets/icons/document-download.svg?react";
 import CustomDatePicker from "@/components/ui/datePicker";
+import ClaimReportSignatureField from "./ClaimReportSignatureField";
 import type { ClaimReportFormState } from "../../data/mockClaimReportData";
 import { ReportFieldLabel, ReportSectionTitle } from "../claimsModalShared";
 import { CLAIM_REPORT_SIGNATURE_DATE_PICKER_PROPS } from "../claimsModalStyles";
@@ -14,6 +15,8 @@ type ClaimReportSummaryFooterProps = {
   onUpdate: (patch: Partial<ClaimReportFormState>) => void;
   onDownload: () => void;
   onSend: () => void;
+  onOpenPhysicianSignature: () => void;
+  onClearPhysicianSignature: () => void;
 };
 
 function SummaryRow({
@@ -40,6 +43,8 @@ function ClaimReportSummaryFooter({
   onUpdate,
   onDownload,
   onSend,
+  onOpenPhysicianSignature,
+  onClearPhysicianSignature,
 }: ClaimReportSummaryFooterProps) {
   const signatureInputId = `report-physician-signature-${claimId}`;
 
@@ -50,16 +55,12 @@ function ClaimReportSummaryFooter({
           <ReportFieldLabel htmlFor={signatureInputId} className="cr-signature-label">
             Signature of physician or supplier
           </ReportFieldLabel>
-          <div className="cr-signature-field">
-            <input
-              id={signatureInputId}
-              type="text"
-              value={form.physicianSignature}
-              onChange={(event) => onUpdate({ physicianSignature: event.target.value })}
-              className="cr-signature-input"
-            />
-            <div className="cr-signature-line" aria-hidden="true" />
-          </div>
+          <ClaimReportSignatureField
+            id={signatureInputId}
+            value={form.physicianSignature}
+            onOpen={onOpenPhysicianSignature}
+            onClear={onClearPhysicianSignature}
+          />
         </div>
         <div className="cr-signature-date-column">
           <ReportFieldLabel className="cr-signature-label">Signature date</ReportFieldLabel>

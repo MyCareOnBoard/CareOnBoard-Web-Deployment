@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/ui/file-upload";
+import { cn } from "@/lib/utils";
 import { useSignDocumentMutation } from "@/pages/applicant/application/api";
 
 type SignaturePayload = {
@@ -18,6 +20,8 @@ interface DigitalSignatureModalProps {
   skipBackend?: boolean;
   mode?: 'create' | 'view';
   existingSignature?: SignaturePayload | null;
+  nested?: boolean;
+  portalClassName?: string;
 }
 
 const DigitalSignatureModal = ({
@@ -29,6 +33,8 @@ const DigitalSignatureModal = ({
   skipBackend = false,
   mode = 'create',
   existingSignature,
+  nested = false,
+  portalClassName,
 }: DigitalSignatureModalProps) => {
   const [activeTab, setActiveTab] = useState('type');
   const [typedSignature, setTypedSignature] = useState('');
@@ -178,17 +184,23 @@ const DigitalSignatureModal = ({
     setIsOpen(false);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
-  return (
-    <>
+  return createPortal(
+    <div
+      data-signature-modal
+      className={cn(
+        "fixed inset-0 z-40 flex items-center justify-center p-4",
+        "bg-black/20 backdrop-blur-sm pointer-events-auto",
+        nested && "z-[100]",
+        portalClassName
+      )}
+      onClick={() => setIsOpen(false)}
+    >
       <div
-        className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur z-40"
-        onClick={() => setIsOpen(false)}
-      />
-      {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl relative animate-fadeIn p-6">
+        className="relative w-full max-w-2xl animate-fadeIn rounded-lg bg-white p-6 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xl font-semibold text-gray-900">Digital Signature</h2>
@@ -371,9 +383,9 @@ const DigitalSignatureModal = ({
               </div>
             </>
           )}
-        </div>
       </div>
-    </>
+    </div>,
+    document.body
   );
 };
 

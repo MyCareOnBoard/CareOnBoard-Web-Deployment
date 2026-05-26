@@ -18,6 +18,11 @@ export type ClaimReportSummary = {
   totalClaimAmount: string;
 };
 
+export type ClaimSignaturePayload = {
+  signatureType: "type" | "draw" | "upload";
+  signatureData: string;
+};
+
 export type ClaimReportFormState = {
   clientName: string;
   clientAvatarUrl?: string;
@@ -33,7 +38,7 @@ export type ClaimReportFormState = {
   conditionOtherAccident: boolean;
   outsideLab: "yes" | "no";
   serviceDateIso: string;
-  signed: string;
+  signedSignature: ClaimSignaturePayload | null;
   currentIllnessDateIso: string;
   qualCode: string;
   diagnosisCodes: Record<string, string>;
@@ -42,7 +47,7 @@ export type ClaimReportFormState = {
   chargesCurrency: string;
   chargesAmount: string;
   priorAuthDateIso: string;
-  physicianSignature: string;
+  physicianSignature: ClaimSignaturePayload | null;
   signatureDateIso: string;
   paNumber: string;
   serviceLines: ClaimReportServiceLine[];
@@ -144,7 +149,7 @@ export const DEFAULT_CLAIM_REPORT: ClaimReportFormState = {
   conditionOtherAccident: false,
   outsideLab: "yes",
   serviceDateIso: "2026-04-07",
-  signed: "",
+  signedSignature: null,
   currentIllnessDateIso: "2026-04-07",
   qualCode: "",
   diagnosisCodes: { ...DEFAULT_DIAGNOSIS_CODES },
@@ -153,7 +158,7 @@ export const DEFAULT_CLAIM_REPORT: ClaimReportFormState = {
   chargesCurrency: "USD",
   chargesAmount: "0.00",
   priorAuthDateIso: "2026-04-30",
-  physicianSignature: "",
+  physicianSignature: null,
   signatureDateIso: "2026-04-07",
   paNumber: "HA9 9HF",
   serviceLines: DEFAULT_SERVICE_LINES,

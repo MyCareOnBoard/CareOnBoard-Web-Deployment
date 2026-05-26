@@ -174,18 +174,38 @@
   background: #fff;
 }
 
-.cr-signature-input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
+.cr-signature-field--empty {
+  color: var(--cr-placeholder);
+}
+
+.cr-signature-preview {
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   padding: 0 1rem 0.875rem;
+}
+
+.cr-signature-placeholder {
   font-size: 14px;
+  color: var(--cr-placeholder);
+}
+
+.cr-signature-preview--typed {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 22px;
+  line-height: 1;
   color: var(--cr-input-value);
-  outline: none;
+}
+
+.cr-signature-preview-image {
+  max-height: 36px;
+  width: auto;
+  object-fit: contain;
 }
 
 .cr-signature-line {

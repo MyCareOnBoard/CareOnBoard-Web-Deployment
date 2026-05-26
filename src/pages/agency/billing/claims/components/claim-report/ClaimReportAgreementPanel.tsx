@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import CustomDatePicker from "@/components/ui/datePicker";
+import ClaimReportSignatureField from "./ClaimReportSignatureField";
 import {
   CLAIM_REPORT_AGREEMENT_TEXT,
   DIAGNOSIS_CODE_LETTERS,
@@ -26,6 +27,8 @@ type ClaimReportAgreementPanelProps = {
   claimId: string;
   onUpdate: (patch: Partial<ClaimReportFormState>) => void;
   onUpdateDiagnosis: (letter: string, value: string) => void;
+  onOpenSignedSignature: () => void;
+  onClearSignedSignature: () => void;
 };
 
 function ClaimReportAgreementPanel({
@@ -33,6 +36,8 @@ function ClaimReportAgreementPanel({
   claimId,
   onUpdate,
   onUpdateDiagnosis,
+  onOpenSignedSignature,
+  onClearSignedSignature,
 }: ClaimReportAgreementPanelProps) {
   const setDateField =
     (field: keyof ClaimReportFormState) => (date: Date | null) => {
@@ -60,11 +65,12 @@ function ClaimReportAgreementPanel({
             />
           </div>
           <div>
-            <ReportFieldLabel>Signed</ReportFieldLabel>
-            <Input
-              value={form.signed}
-              onChange={(event) => onUpdate({ signed: event.target.value })}
-              className={CLAIM_REPORT_FIELD_CLASS}
+            <ReportFieldLabel htmlFor={`report-signed-${claimId}`}>Signed</ReportFieldLabel>
+            <ClaimReportSignatureField
+              id={`report-signed-${claimId}`}
+              value={form.signedSignature}
+              onOpen={onOpenSignedSignature}
+              onClear={onClearSignedSignature}
             />
           </div>
         </div>
