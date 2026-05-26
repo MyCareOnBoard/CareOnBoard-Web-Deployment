@@ -30,7 +30,7 @@ function AiInsightsButton() {
 
 export default function ClaimsByStatusChart() {
   return (
-    <div className="rounded-[20px] border border-[#e5e5e6] bg-white p-6 shadow-sm">
+    <div className="rounded-[8px] border border-[#e5e5e6] bg-white p-6 shadow-sm">
       <div className="mb-6 flex items-center justify-between">
         <h3 className="text-[18px] font-semibold text-[#10141a]">Claims by status</h3>
         <AiInsightsButton />

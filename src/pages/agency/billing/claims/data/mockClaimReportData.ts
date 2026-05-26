@@ -8,7 +8,6 @@ export type ClaimReportServiceLine = {
   charges: string;
   epsotFamilyPlan: string;
   idQual1: string;
-  idQual2: string;
 };
 
 export type ClaimReportSummary = {
@@ -46,7 +45,6 @@ export type ClaimReportFormState = {
   hospitalizationEndIso: string;
   chargesCurrency: string;
   chargesAmount: string;
-  priorAuthDateIso: string;
   physicianSignature: ClaimSignaturePayload | null;
   signatureDateIso: string;
   paNumber: string;
@@ -87,7 +85,6 @@ export const DEFAULT_SERVICE_LINES: ClaimReportServiceLine[] = [
     charges: "$650",
     epsotFamilyPlan: "-",
     idQual1: "NPI",
-    idQual2: "826",
   },
   {
     duration: "04/21/2026 → 04/21/2026",
@@ -99,7 +96,6 @@ export const DEFAULT_SERVICE_LINES: ClaimReportServiceLine[] = [
     charges: "$650",
     epsotFamilyPlan: "-",
     idQual1: "NPI",
-    idQual2: "826",
   },
   {
     duration: "04/22/2026 → 04/22/2026",
@@ -111,7 +107,6 @@ export const DEFAULT_SERVICE_LINES: ClaimReportServiceLine[] = [
     charges: "$650",
     epsotFamilyPlan: "-",
     idQual1: "NPI",
-    idQual2: "826",
   },
   {
     duration: "04/23/2026 → 04/23/2026",
@@ -123,7 +118,6 @@ export const DEFAULT_SERVICE_LINES: ClaimReportServiceLine[] = [
     charges: "$650",
     epsotFamilyPlan: "-",
     idQual1: "NPI",
-    idQual2: "826",
   },
 ];
 
@@ -132,6 +126,42 @@ export const DEFAULT_CLAIM_REPORT_SUMMARY: ClaimReportSummary = {
   totalUnitsBilled: "4,820",
   totalAuthorizedHours: "5,000 hrs",
   totalClaimAmount: "$216,700",
+};
+
+const EMPTY_CLAIM_REPORT_SUMMARY: ClaimReportSummary = {
+  totalClaimsProcessed: 0,
+  totalUnitsBilled: "0",
+  totalAuthorizedHours: "",
+  totalClaimAmount: "$0.00",
+};
+
+export const EMPTY_CLAIM_REPORT: ClaimReportFormState = {
+  clientName: "",
+  dateOfBirth: "",
+  serviceCode: "",
+  patientSex: "",
+  patientAddress: "",
+  city: "",
+  state: "",
+  zipCode: "",
+  conditionEmployment: false,
+  conditionAutoAccident: false,
+  conditionOtherAccident: false,
+  outsideLab: "no",
+  serviceDateIso: "",
+  signedSignature: null,
+  currentIllnessDateIso: "",
+  qualCode: "",
+  diagnosisCodes: { ...DEFAULT_DIAGNOSIS_CODES },
+  hospitalizationInitialIso: "",
+  hospitalizationEndIso: "",
+  chargesCurrency: "USD",
+  chargesAmount: "0.00",
+  physicianSignature: null,
+  signatureDateIso: "",
+  paNumber: "",
+  serviceLines: [],
+  summary: EMPTY_CLAIM_REPORT_SUMMARY,
 };
 
 export const DEFAULT_CLAIM_REPORT: ClaimReportFormState = {
@@ -157,7 +187,6 @@ export const DEFAULT_CLAIM_REPORT: ClaimReportFormState = {
   hospitalizationEndIso: "2026-04-30",
   chargesCurrency: "USD",
   chargesAmount: "0.00",
-  priorAuthDateIso: "2026-04-30",
   physicianSignature: null,
   signatureDateIso: "2026-04-07",
   paNumber: "HA9 9HF",
@@ -175,8 +204,7 @@ export const CLAIM_REPORT_TABLE_COLUMNS = [
   "Charges",
   "EPSOT family plan",
   "ID QUAL",
-  "ID QUAL",
 ] as const;
 
 export const CLAIM_REPORT_TABLE_GRID =
-  "grid grid-cols-[minmax(140px,1.4fr)_minmax(60px,0.7fr)_minmax(40px,0.5fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(80px,0.9fr)_minmax(50px,0.6fr)_minmax(50px,0.6fr)] items-center gap-2";
+  "grid grid-cols-[minmax(140px,1.4fr)_minmax(60px,0.7fr)_minmax(40px,0.5fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(80px,0.9fr)_minmax(50px,0.6fr)] items-center gap-2";
