@@ -61,7 +61,7 @@ export function ClientFormWizard({
 
   const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
   const [savedClientName, setSavedClientName] = React.useState<string | undefined>(undefined);
-  const pendingSuccessClientIdRef = useRef<string | undefined>();
+  const pendingSuccessClientIdRef = useRef<string | undefined>(undefined);
 
   const handleSave = useCallback(async () => {
     const result = await saveClient(
