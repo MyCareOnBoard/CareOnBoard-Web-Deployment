@@ -112,6 +112,7 @@ export const Routes = {
         settings: "/user-panel/settings",
         profile: "/user-panel/profile",
         communityInclusion: "/user-panel/community-inclusion",
+        dayProgram: "/user-panel/day-program",
         goalsAndDocuments: {
             index: "/user-panel/goals-and-documents",
             naturalSupportsTraining: "/user-panel/goals-and-documents/natural-supports-training",
