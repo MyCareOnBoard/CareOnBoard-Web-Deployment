@@ -77,8 +77,7 @@ export interface Client {
   behaviorSupportPlan?: string;
   communicationNeeds?: string[];
   emergencyProtocols?: string;
-  primaryDiagnosis?: string;
-  secondaryDiagnosis?: string;
+  diagnosis?: string;
   healthHazards?: string;
   nutritionNotes?: string;
   selfCareNeeds?: ClientAdlSupportNeed[];
@@ -247,8 +246,7 @@ export interface ClientHealthcareSafety {
   behaviorSupportPlan?: string;
   communicationNeeds?: string[];
   emergencyProtocols?: string;
-  primaryDiagnosis?: string;
-  secondaryDiagnosis?: string;
+  diagnosis?: string;
   healthHazards?: string;
   nutritionNotes?: string;
   selfCareNeeds?: ClientAdlSupportNeed[];
@@ -518,8 +516,7 @@ export interface CreateClientRequest {
   communicationNeeds?: string[];
   emergencyProtocols?: string;
 
-  primaryDiagnosis?: string;
-  secondaryDiagnosis?: string;
+  diagnosis?: string;
   healthHazards?: string;
   nutritionNotes?: string;
   selfCareNeeds?: ClientAdlSupportNeed[];
@@ -631,8 +628,7 @@ export interface UpdateClientRequest {
   behaviorSupportPlan?: string | null;
   communicationNeeds?: string[] | null;
   emergencyProtocols?: string | null;
-  primaryDiagnosis?: string | null;
-  secondaryDiagnosis?: string | null;
+  diagnosis?: string | null;
   healthHazards?: string | null;
   nutritionNotes?: string | null;
   selfCareNeeds?: ClientAdlSupportNeed[] | null;

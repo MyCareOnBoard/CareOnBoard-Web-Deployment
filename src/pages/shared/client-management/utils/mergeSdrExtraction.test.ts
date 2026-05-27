@@ -719,29 +719,65 @@ describe("mergeSdrExtraction", () => {
     expect(prev.needsReview.some((r) => r.reason.includes("Multiple SDR periods"))).toBe(true);
   });
 
-  it("writes extracted diagnosis codes into Stage 3 when applying SDR import", () => {
-    const outcomes = [
+  it("bootstraps preview and apply when Stage 2 has no anchor services", () => {
+    const ext = extractionFrom([
       {
-        id: "o1",
-        statement: "Goal",
-        services: [{ ...createEmptyServiceAuthorization(), id: "s1", code: "X", name: "Svc" }],
+        statement: "Independence",
+        rows: [
+          {
+            code: "H2012",
+            name: "Habilitation",
+            totalUnits: "100",
+            sdrStartDate: "01/01/2026",
+            sdrEndDate: "12/31/2026",
+            sdrDetails: { deliveryMethods: ["Community"], supportTasks: ["Self-care"] },
+          },
+        ],
       },
-    ];
-    const ext = extractionFrom([{ statement: "Goal", rows: [{ code: "X", name: "Svc" }] }]);
-    ext.draft.stage3 = {
-      primaryDiagnosisEntry: { diagnosisCode: "F84.0", diagnosisDescription: "Autism Spectrum Disorder" },
-      secondaryDiagnosisEntry: {},
-    };
-    const prev = buildSdrImportPreview(ext, outcomes, { overwrite: true });
-    expect(prev.matched).toHaveLength(1);
+    ]);
+    const prev = buildSdrImportPreview(ext, [], { overwrite: true });
+    expect(prev.matched.length).toBeGreaterThan(0);
+    expect(prev.skipped.length).toBe(0);
 
-    const fd = baseForm(outcomes);
-    const { formData: next } = applySdrImportToWizard(fd, prev, {
+    const fd = baseForm([]);
+    const { formData: next, appliedCount } = applySdrImportToWizard(fd, prev, {
       overwrite: true,
       file: null,
       extraction: ext,
     });
-    expect(next.stage3.primaryDiagnosis).toBe("F84.0 - Autism Spectrum Disorder");
+    expect(appliedCount).toBe(1);
+    expect(next.stage2.outcomes).toHaveLength(1);
+    expect(next.stage2.outcomes[0].services[0].code).toBe("H2012");
+    expect(next.stage2.outcomes[0].services[0].sdrDetails?.deliveryMethods).toContain("Community");
+  });
+
+  it("bootstraps weekly distribution rows from extraction", () => {
+    const ext = extractionFrom([
+      {
+        statement: "Independence",
+        rows: [
+          {
+            code: "H2012",
+            name: "Habilitation",
+            weeklyDistribution: {
+              standardLine: "40 @ 15 Min / Weekly",
+              rows: [{ weekRange: "5/11/2025 - 5/17/2025", units: "40", hours: "10.00 hours" }],
+            },
+          },
+        ],
+      },
+    ]);
+    const prev = buildSdrImportPreview(ext, [], { overwrite: true });
+    expect(prev.matched).toHaveLength(1);
+
+    const { formData: next } = applySdrImportToWizard(baseForm([]), prev, {
+      overwrite: true,
+      file: null,
+      extraction: ext,
+    });
+    const svc = next.stage2.outcomes[0].services[0];
+    expect(svc.sdrWeeklyDistribution?.standardLine).toContain("40 @ 15");
+    expect(svc.sdrWeeklyDistribution?.rows?.[0]?.weekRange).toBe("5/11/2025 - 5/17/2025");
   });
 });
 
@@ -811,5 +847,35 @@ describe("weekly distribution derivation vs persist cap", () => {
     expect(
       deriveAuthorizedHoursPerWeek(weeklyDistributionForDerivation(parts!)),
     ).toBe("99");
+  });
+});
+
+describe("applySdrImportToWizard client identity guard", () => {
+  it("does not apply when clientIdentityCheck is mismatch", () => {
+    const fd = baseForm([
+      {
+        id: "o1",
+        statement: "Goal",
+        services: [{ ...createEmptyServiceAuthorization(), id: "s1", code: "C1" }],
+      },
+    ]);
+    const prev = buildSdrImportPreview(
+      extractionFrom([{ statement: "Goal", rows: [{ code: "C1" }] }]),
+      fd.stage2.outcomes,
+      { overwrite: true },
+    );
+    const { formData: next, appliedCount, localWarnings } = applySdrImportToWizard(fd, prev, {
+      overwrite: true,
+      extraction: {
+        detectedDocumentType: "sdr",
+        draft: { stage2: { outcomes: [] } },
+        fieldConfidences: [],
+        warnings: [],
+        clientIdentityCheck: { status: "mismatch", mismatches: [{ field: "dddId", expected: "1", extracted: "2" }] },
+      },
+    });
+    expect(appliedCount).toBe(0);
+    expect(localWarnings[0]).toMatch(/different client/i);
+    expect(next.stage2.outcomes[0].services[0].code).toBe("C1");
   });
 });

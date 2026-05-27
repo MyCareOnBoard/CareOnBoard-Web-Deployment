@@ -1,8 +1,9 @@
-import React, { useMemo, useCallback, Suspense, lazy } from "react";
+import React, { useMemo, useCallback, Suspense, lazy, useRef } from "react";
 import { AddClientFormData } from "./types/formData";
 import { ClientFormConfig } from "./types/config";
 import { useClientForm } from "./hooks/useClientForm";
 import { useClientSave } from "./hooks/useClientSave";
+import { useToast } from "@/hooks/use-toast";
 import { StageFooter } from "./components/StageFooter";
 import { SaveClientSuccessModal } from "./components/SaveClientSuccessModal";
 import { SaveClientErrorModal } from "./components/SaveClientErrorModal";
@@ -56,8 +57,11 @@ export function ClientFormWizard({
     setErrorMessage,
   } = useClientSave();
 
+  const { toast } = useToast();
+
   const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
   const [savedClientName, setSavedClientName] = React.useState<string | undefined>(undefined);
+  const pendingSuccessClientIdRef = useRef<string | undefined>();
 
   const handleSave = useCallback(async () => {
     const result = await saveClient(
@@ -69,18 +73,39 @@ export function ClientFormWizard({
       isLast
     );
 
-    if (result.success) {
-      const isProgressive = !isLast;
-      if (isProgressive && onSuccess && result.clientId) {
+    if (!result.success) return;
+
+    const isProgressive = !isLast;
+
+    if (isProgressive) {
+      toast({
+        title: isEditMode ? "Client updated" : "Progress saved",
+        description: isEditMode
+          ? "Your changes have been saved."
+          : "You can continue on the next stage.",
+        variant: "success",
+      });
+      if (onSuccess && result.clientId) {
         onSuccess(result.clientId, true);
-      } else {
-        setSavedClientName(result.clientName);
-        setShowSaveSuccess(true);
-        if (onSuccess) {
-          onSuccess(result.clientId);
-        }
       }
+      return;
     }
+
+    if (isEditMode) {
+      toast({
+        title: "Client updated",
+        description: result.clientName
+          ? `${result.clientName} has been updated successfully.`
+          : "Client has been updated successfully.",
+        variant: "success",
+      });
+      onSuccess?.(result.clientId);
+      return;
+    }
+
+    pendingSuccessClientIdRef.current = result.clientId;
+    setSavedClientName(result.clientName);
+    setShowSaveSuccess(true);
   }, [
     formData,
     isEditMode,
@@ -89,13 +114,12 @@ export function ClientFormWizard({
     isLast,
     onSuccess,
     saveClient,
+    toast,
   ]);
 
   const handleSuccessClose = useCallback(() => {
     setShowSaveSuccess(false);
-    if (onSuccess) {
-      onSuccess();
-    }
+    onSuccess?.(pendingSuccessClientIdRef.current);
   }, [onSuccess]);
 
   const handleErrorClose = useCallback((open: boolean) => {

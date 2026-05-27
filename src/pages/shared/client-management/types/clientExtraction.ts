@@ -94,7 +94,7 @@ export type ExtractionSdrDetails = Partial<{
   source: ExtractionSdrDetailsSource;
 }>;
 
-/** Structured diagnosis from SDR (code before hyphen, description after). */
+/** @deprecated Legacy extraction shape; ISP import uses draft.stage3.diagnosis. */
 export type ExtractionDiagnosisEntry = Partial<{
   diagnosisCode: string;
   diagnosisDescription: string;
@@ -222,10 +222,7 @@ export type ClientExtractionDraft = {
     emergencyProtocols: string;
     preferredHospital: string;
     primaryCarePhysician: string;
-    primaryDiagnosis: string;
-    secondaryDiagnosis: string;
-    primaryDiagnosisEntry?: ExtractionDiagnosisEntry;
-    secondaryDiagnosisEntry?: ExtractionDiagnosisEntry;
+    diagnosis: string;
     healthHazards: string;
     nutritionNotes: string;
     selfCareNeeds: ExtractionAdlSupportNeed[];
@@ -293,11 +290,34 @@ export type ClientExtractionDraft = {
   }>;
 };
 
+export type SdrClientIdentity = Partial<{
+  firstName: string;
+  lastName: string;
+  medicaidId: string;
+  dddId: string;
+}>;
+
+export type SdrClientIdentityMismatch = {
+  field: string;
+  expected: string;
+  extracted: string;
+};
+
+export type SdrClientIdentityCheck = {
+  status: "match" | "partial_mismatch" | "mismatch" | "skipped" | "inconclusive";
+  expected?: SdrClientIdentity;
+  extracted?: SdrClientIdentity;
+  matches?: SdrClientIdentityMismatch[];
+  mismatches?: SdrClientIdentityMismatch[];
+};
+
 export type ClientExtractionResponse = {
   detectedDocumentType: DetectedDocumentType;
   draft: ClientExtractionDraft;
   fieldConfidences: FieldConfidence[];
   warnings: ExtractionWarning[];
+  clientIdentity?: SdrClientIdentity;
+  clientIdentityCheck?: SdrClientIdentityCheck;
   /** Present on older extractions; omitted when using the slim Gemini response schema. */
   unmappedText?: string[];
   extractionJobId?: string;

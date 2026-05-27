@@ -33,6 +33,7 @@ const ClientsAndServicesPage = lazy(() => import("@/pages/userPanel/clientsAndSe
 const PlanOfCarePage = lazy(() => import("@/pages/userPanel/planOfCare"));
 const CommunityBasedPage = lazy(() => import("@/pages/userPanel/notes/community-based"));
 const CommunityInclusionPage = lazy(() => import("@/pages/userPanel/notes/community-inclusion"));
+const UserDayProgramPage = lazy(() => import("@/pages/userPanel/day-program"));
 const DayHabilitationPage = lazy(() => import("@/pages/userPanel/notes/day-habilitation"));
 const PrevocationalTrainingPage = lazy(() => import("@/pages/userPanel/notes/prevocational-training"));
 const RespiteLogPage = lazy(() => import("@/pages/userPanel/notes/respite-log"));
@@ -562,6 +563,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.userPanel.notes.respiteLog,
                 Component: RespiteLogPage,
+            },
+            {
+                path: Routes.userPanel.dayProgram,
+                Component: UserDayProgramPage,
             },
             {
                 path: Routes.userPanel.notes.supportedEmploymentIntervention,

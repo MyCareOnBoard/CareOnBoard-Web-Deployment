@@ -353,19 +353,12 @@ function buildMedicationsSection(client: Client): ProfileSection | null {
 }
 
 function buildClinicalSection(client: Client): ProfileSection | null {
-  const primary =
-    trimOrEmpty(client.healthcareSafety?.primaryDiagnosis) ||
-    trimOrEmpty(client.primaryDiagnosis);
-  const secondary =
-    trimOrEmpty(client.healthcareSafety?.secondaryDiagnosis) ||
-    trimOrEmpty(client.secondaryDiagnosis);
+  const diagnosis =
+    trimOrEmpty(client.healthcareSafety?.diagnosis) || trimOrEmpty(client.diagnosis);
 
   const fields: ProfileField[] = [];
-  if (primary) {
-    fields.push(field("Primary diagnosis", primary, { multiline: true }));
-  }
-  if (secondary) {
-    fields.push(field("Secondary diagnosis", secondary, { multiline: true }));
+  if (diagnosis) {
+    fields.push(field("Diagnosis", diagnosis, { multiline: true }));
   }
 
   if (fields.length === 0) return null;

@@ -1087,16 +1087,8 @@ export function mergeExtractionDraft(
       overwrite,
     );
 
-    next.stage3.primaryDiagnosis = mergeString(
-      next.stage3.primaryDiagnosis ?? "",
-      s3.primaryDiagnosis,
-      overwrite,
-    ) || undefined;
-    next.stage3.secondaryDiagnosis = mergeString(
-      next.stage3.secondaryDiagnosis ?? "",
-      s3.secondaryDiagnosis,
-      overwrite,
-    ) || undefined;
+    next.stage3.diagnosis =
+      mergeString(next.stage3.diagnosis ?? "", s3.diagnosis, overwrite) || undefined;
     next.stage3.healthHazards = mergeString(
       next.stage3.healthHazards ?? "",
       s3.healthHazards,

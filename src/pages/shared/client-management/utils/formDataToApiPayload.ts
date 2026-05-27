@@ -151,8 +151,7 @@ export function formDataToApiPayload(
     behaviorSupportPlan: s3.behaviorSupportPlan || undefined,
     communicationNeeds: s3.communicationNeeds?.length ? s3.communicationNeeds : undefined,
     emergencyProtocols: s3.emergencyProtocols || undefined,
-    primaryDiagnosis: s3.primaryDiagnosis?.trim() || undefined,
-    secondaryDiagnosis: s3.secondaryDiagnosis?.trim() || undefined,
+    diagnosis: s3.diagnosis?.trim() || undefined,
     healthHazards: s3.healthHazards?.trim() || undefined,
     nutritionNotes: s3.nutritionNotes?.trim() || undefined,
     selfCareNeeds:

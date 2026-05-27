@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import axios from "axios";
 import { FileUp, Info, Loader2 } from "lucide-react";
 import { extractClientIspViaApi } from "@/lib/api/gemini";
 import type { ClientExtractionResponse, FieldConfidence } from "../types/clientExtraction";
 import type { AddClientFormData } from "../types/formData";
 import { mergeExtractionDraft } from "../utils/mergeExtractionDraft";
+import { formatGeminiExtractError } from "../utils/formatGeminiExtractError";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -174,16 +174,7 @@ export default function ClientImportFromFilePanel({
       setExtraction(res);
       setModalStep("review");
     } catch (e: unknown) {
-      let msg: string | null = null;
-      if (axios.isAxiosError(e)) {
-        const data = e.response?.data as { message?: string; error?: string } | undefined;
-        msg =
-          (typeof data?.message === "string" && data.message) ||
-          (typeof data?.error === "string" && data.error) ||
-          e.message;
-      } else if (e instanceof Error) {
-        msg = e.message;
-      }
+      const msg = formatGeminiExtractError(e);
       setError(msg || "We couldn't read that file. Try again or pick a different document.");
     } finally {
       setBusy(false);
@@ -284,8 +275,8 @@ export default function ClientImportFromFilePanel({
             {modalStep === "pick" ? (
               <div className="flex items-start gap-2">
                 <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-muted-foreground">
-                  Upload an ISP or Plan of Care (PDF, JPEG, PNG, or WebP, up to 10 MB). We&apos;ll extract
-                  what we can; you approve before anything is saved.
+                  Upload an ISP (PDF, JPEG, PNG, or WebP, up to 10 MB). Review the extracted fields
+                  before saving.
                 </p>
                 <Popover>
                   <PopoverTrigger asChild>

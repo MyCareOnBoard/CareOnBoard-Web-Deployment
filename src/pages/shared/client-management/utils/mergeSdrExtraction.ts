@@ -9,6 +9,11 @@ import type {
 import { isDocKeyForImport } from "../types/clientExtraction";
 import { trimWizardSdrDetailsForApi } from "./outcomeServices";
 import {
+  buildOutcomesFromSdrExtraction,
+  mapExtractionRowToWizardService,
+} from "./mapExtractionSdrFields";
+import { wizardHasAnchorServices } from "./sdrImportAvailableServices";
+import {
   capPersistAndDerive,
   sanitizeWeeklyPartsFromUnknown,
   WEEKLY_DIST_DISPLAY_CAP,
@@ -127,19 +132,59 @@ export function formatDiagnosisEntryLine(entry?: {
   return c || d;
 }
 
-function mergeSdrDiagnosisIntoStage3(
-  stage3: AddClientFormData["stage3"],
-  extraction: ClientExtractionResponse,
-  overwrite: boolean,
-): AddClientFormData["stage3"] {
-  const p = formatDiagnosisEntryLine(extraction.draft.stage3?.primaryDiagnosisEntry);
-  const sec = formatDiagnosisEntryLine(extraction.draft.stage3?.secondaryDiagnosisEntry);
-  const next = { ...stage3 };
-  const pExisting = String(next.primaryDiagnosis ?? "").trim();
-  const sExisting = String(next.secondaryDiagnosis ?? "").trim();
-  if (p && (overwrite || !pExisting)) next.primaryDiagnosis = p;
-  if (sec && (overwrite || !sExisting)) next.secondaryDiagnosis = sec;
-  return next;
+function buildBootstrapSdrImportPreview(
+  extraction: ClientExtractionResponse | null | undefined,
+): SdrImportPreviewRow {
+  const matched: SdrMatchedPreviewLine[] = [];
+  const warnings: string[] = [];
+  let weeklyTruncationWarned = false;
+
+  for (const { row, parentOutcomeStmt } of flattenExtractionOutcomeServices(extraction)) {
+    if (
+      !weeklyTruncationWarned &&
+      row.weeklyDistribution &&
+      typeof row.weeklyDistribution === "object"
+    ) {
+      const wdRaw = row.weeklyDistribution as Record<string, unknown>;
+      const rowsRaw = Array.isArray(wdRaw.rows) ? wdRaw.rows : [];
+      if (rowsRaw.length > WEEKLY_DIST_DISPLAY_CAP) {
+        warnings.push(
+          `Weekly distribution exceeds ${WEEKLY_DIST_DISPLAY_CAP} rows; only the first ${WEEKLY_DIST_DISPLAY_CAP} will be stored.`,
+        );
+        weeklyTruncationWarned = true;
+      }
+    }
+
+    const codeNorm = (row.code ?? "").trim().toLowerCase();
+    const nameNorm = normalizeNameToken(row.name);
+    const svc = mapExtractionRowToWizardService(row);
+    const hasPayload =
+      !!codeNorm ||
+      !!nameNorm ||
+      !!(row.procedureName ?? "").trim() ||
+      !!(row.sdrComputedTotalHours ?? "").trim() ||
+      !!(row.totalUnits ?? "").trim() ||
+      substantiveWizardSdr(svc) ||
+      hasSdrAuthorizationDetails(svc);
+
+    if (!hasPayload) continue;
+
+    matched.push({
+      extractOutcomeSnippet: parentOutcomeStmt || "(none)",
+      extractCode: row.code ?? "",
+      extractName: row.name ?? "",
+      wizardOutcomeIndex: -1,
+      wizardOutcomeId: "",
+      wizardServiceId: svc.id,
+      wizardOutcomeLabel: parentOutcomeStmt || "From SDR",
+      wizardServiceCode: svc.code ?? "",
+      wizardServiceName: svc.name ?? "",
+      matchReason: "code_unique_global",
+      patchDraft: { ...svc },
+    });
+  }
+
+  return { matched, needsReview: [], skipped: [], keptExisting: [], warnings };
 }
 
 function sanitizePriorAuth(raw: unknown): Service["sdrPriorAuthorization"] | undefined {
@@ -469,6 +514,10 @@ export function buildSdrImportPreview(
   outcomes: Outcome[],
   options?: { overwrite?: boolean },
 ): SdrImportPreviewRow {
+  if (!wizardHasAnchorServices(outcomes)) {
+    return buildBootstrapSdrImportPreview(extraction);
+  }
+
   const overwrite = options?.overwrite !== false;
   const warnings: string[] = [];
   const matched: SdrMatchedPreviewLine[] = [];
@@ -751,13 +800,42 @@ export function applySdrImportToWizard(
     extraction?: ClientExtractionResponse | null;
   },
 ): { formData: AddClientFormData; appliedCount: number; keptExistingCount: number; localWarnings: string[] } {
+  if (options.extraction?.clientIdentityCheck?.status === "mismatch") {
+    return {
+      formData,
+      appliedCount: 0,
+      keptExistingCount: 0,
+      localWarnings: ["This SDR is for a different client."],
+    };
+  }
+
   const localWarnings = [...(preview.warnings ?? [])];
   let appliedCount = 0;
   const keptExistingCount = preview.keptExisting?.length ?? 0;
 
-  const diagStage3 = options.extraction
-    ? mergeSdrDiagnosisIntoStage3(formData.stage3, options.extraction, options.overwrite)
-    : formData.stage3;
+  let stage3Docs = formData.stage3.docs;
+  if (options.file) {
+    stage3Docs = attachSdrFileToWizardDocs(stage3Docs, options.file);
+  }
+
+  if (!wizardHasAnchorServices(formData.stage2.outcomes)) {
+    const importedIso = new Date().toISOString();
+    const bootstrapped = buildOutcomesFromSdrExtraction(options.extraction).map((o) => ({
+      ...o,
+      services: o.services.map((s) => {
+        if (!s.sdrDetails) return s;
+        const td = trimWizardSdrDetailsForApi({ ...s.sdrDetails, importedAt: importedIso });
+        return td ? { ...s, sdrDetails: td } : s;
+      }),
+    }));
+    appliedCount = bootstrapped.reduce((n, o) => n + (o.services?.length ?? 0), 0);
+    const nextForm: AddClientFormData = {
+      ...formData,
+      stage2: { ...formData.stage2, outcomes: bootstrapped },
+      stage3: { ...formData.stage3, docs: stage3Docs },
+    };
+    return { formData: nextForm, appliedCount, keptExistingCount, localWarnings };
+  }
 
   const outcomes = formData.stage2.outcomes.map((o) => ({
     ...o,
@@ -816,15 +894,10 @@ export function applySdrImportToWizard(
     if (assignPatchToService(svc, patch, false)) appliedCount += 1;
   }
 
-  let stage3Docs = formData.stage3.docs;
-  if (options.file) {
-    stage3Docs = attachSdrFileToWizardDocs(stage3Docs, options.file);
-  }
-
   const nextForm: AddClientFormData = {
     ...formData,
     stage2: { ...formData.stage2, outcomes },
-    stage3: { ...diagStage3, docs: stage3Docs },
+    stage3: { ...formData.stage3, docs: stage3Docs },
   };
 
   return { formData: nextForm, appliedCount, keptExistingCount, localWarnings };

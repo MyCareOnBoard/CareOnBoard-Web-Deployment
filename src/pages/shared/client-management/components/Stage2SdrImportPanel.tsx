@@ -1,19 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isAxiosError } from "axios";
 import { FileUp, Info, Loader2 } from "lucide-react";
 import { extractSdrDocumentViaApi } from "@/lib/api/gemini";
 import type { ClientExtractionResponse } from "../types/clientExtraction";
 import type { AddClientFormData } from "../types/formData";
+import { formatGeminiExtractError } from "../utils/formatGeminiExtractError";
 import {
   applySdrImportToWizard,
   buildSdrImportPreview,
-  formatDiagnosisEntryLine,
   formatSdrPatchSummary,
 } from "../utils/mergeSdrExtraction";
 import {
-  buildCompactSdrAvailableServicesContext,
-  serializeSdrAvailableServicesContext,
+  buildSdrExtractionContext,
+  wizardHasAnchorServices,
 } from "../utils/sdrImportAvailableServices";
+import {
+  buildExpectedClientIdentityJson,
+  hasClientIdentityAnchors,
+} from "../utils/sdrExpectedClientIdentity";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -46,6 +49,26 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   consents: "Consents and Releases",
   unknown: "Not detected",
 };
+
+const IDENTITY_FIELD_LABELS: Record<string, string> = {
+  dddId: "DDD ID",
+  medicaidId: "Medicaid ID",
+  name: "Name",
+};
+
+const IDENTITY_WARNING_CODES = new Set([
+  "SDR_CLIENT_IDENTITY_MISMATCH",
+  "SDR_CLIENT_IDENTITY_PARTIAL_MISMATCH",
+  "SDR_CLIENT_IDENTITY_INCONCLUSIVE",
+]);
+
+function formatIdentityFieldLabel(field: string): string {
+  return IDENTITY_FIELD_LABELS[field] ?? field;
+}
+
+function findIdentityWarning(extraction: ClientExtractionResponse | null, code: string) {
+  return extraction?.warnings?.find((w) => w.code === code);
+}
 
 type ModalStep = "pick" | "review";
 
@@ -96,16 +119,27 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
     [extraction, overwrite, formData.stage2.outcomes],
   );
 
-  const availableServicesJson = useMemo(() => {
-    const compact = buildCompactSdrAvailableServicesContext(formData.stage2.outcomes);
-    const valid = compact.some((o) =>
-      (o.services ?? []).some((s) => String(s.serviceId ?? "").trim()),
-    );
-    if (!valid) return "";
-    return serializeSdrAvailableServicesContext(compact).trim();
-  }, [formData.stage2.outcomes]);
+  const availableServicesJson = useMemo(
+    () => buildSdrExtractionContext(formData.stage2.outcomes),
+    [formData.stage2.outcomes],
+  );
 
-  const hasStage2AuthorizationContext = Boolean(availableServicesJson);
+  const expectedClientIdentityJson = useMemo(
+    () => buildExpectedClientIdentityJson(formData.stage1),
+    [
+      formData.stage1.firstName,
+      formData.stage1.lastName,
+      formData.stage1.medicaidId,
+      formData.stage1.dddId,
+    ],
+  );
+
+  const stage1HasIdentityAnchors = useMemo(
+    () => hasClientIdentityAnchors(formData.stage1),
+    [formData.stage1],
+  );
+
+  const bootstrapMode = !wizardHasAnchorServices(formData.stage2.outcomes);
 
   const resetPickState = useCallback(() => {
     abortRef.current?.abort();
@@ -136,12 +170,6 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
       setError(err);
       return;
     }
-    if (!hasStage2AuthorizationContext) {
-      setError(
-        "Add at least one outcome with at least one service authorization row in Stage 2 before importing an SDR.",
-      );
-      return;
-    }
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -152,26 +180,15 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
     try {
       const res = await extractSdrDocumentViaApi(selected, {
         signal: ac.signal,
-        availableServicesJson,
+        ...(availableServicesJson ? { availableServicesJson } : {}),
+        ...(expectedClientIdentityJson ? { expectedClientIdentityJson } : {}),
       });
       setExtraction(res);
       setModalStep("review");
     } catch (e: unknown) {
-      if (isAxiosError(e) && (e.code === "ERR_CANCELED" || e.message === "canceled")) {
-        setError(null);
-      } else if (isAxiosError(e)) {
-        const data = e.response?.data as { message?: string; error?: string } | undefined;
-        setError(
-          (typeof data?.message === "string" && data.message) ||
-            (typeof data?.error === "string" && data.error) ||
-            e.message ||
-            "We couldn't read that file. Try again or pick a different document.",
-        );
-      } else if (e instanceof Error) {
-        setError(e.message);
-      } else {
-        setError("We couldn't read that file. Try again or pick a different document.");
-      }
+      const msg = formatGeminiExtractError(e);
+      if (msg) setError(msg);
+      else setError(null);
     } finally {
       setLoading(false);
     }
@@ -180,13 +197,13 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!loading && modalStep === "pick" && hasStage2AuthorizationContext) setIsDragActive(true);
+    if (!loading && modalStep === "pick") setIsDragActive(true);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!loading && modalStep === "pick" && hasStage2AuthorizationContext) setIsDragActive(true);
+    if (!loading && modalStep === "pick") setIsDragActive(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -203,7 +220,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
     e.preventDefault();
     e.stopPropagation();
     setIsDragActive(false);
-    if (loading || modalStep !== "pick" || !hasStage2AuthorizationContext) return;
+    if (loading || modalStep !== "pick") return;
     const dropped = e.dataTransfer.files?.[0];
     if (dropped) void handleExtract(dropped);
   };
@@ -228,6 +245,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
 
   function handleApply() {
     if (!preview || !extraction) return;
+    if (extraction.clientIdentityCheck?.status === "mismatch") return;
 
     setFormData((prev) => {
       const applied = applySdrImportToWizard(prev, preview, {
@@ -287,7 +305,21 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
     extraction.detectedDocumentType !== "sdr" &&
     extraction.detectedDocumentType !== "unknown";
 
-  const canApply = !loading && !!extraction && !!preview;
+  const identityStatus = extraction?.clientIdentityCheck?.status;
+  const identityBlocked =
+    identityStatus === "mismatch" ||
+    Boolean(findIdentityWarning(extraction, "SDR_CLIENT_IDENTITY_MISMATCH"));
+  const canApply = !loading && !!extraction && !!preview && !identityBlocked;
+
+  const partialIdentityWarning = findIdentityWarning(
+    extraction,
+    "SDR_CLIENT_IDENTITY_PARTIAL_MISMATCH",
+  );
+  const fullIdentityWarning = findIdentityWarning(extraction, "SDR_CLIENT_IDENTITY_MISMATCH");
+  const inconclusiveIdentityWarning = findIdentityWarning(
+    extraction,
+    "SDR_CLIENT_IDENTITY_INCONCLUSIVE",
+  );
 
   const anyPreviewRows =
     !!preview &&
@@ -301,7 +333,10 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
       ? DOCUMENT_TYPE_LABELS[extraction.detectedDocumentType] ?? extraction.detectedDocumentType
       : "—";
 
-  const reviewWarnings = extraction?.warnings?.map((w) => w.message) ?? [];
+  const reviewWarnings =
+    extraction?.warnings
+      ?.filter((w) => !w.code || !IDENTITY_WARNING_CODES.has(w.code))
+      .map((w) => w.message) ?? [];
 
   function handleMainOpenChange(next: boolean) {
     if (!next) {
@@ -322,8 +357,9 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
           {modalStep === "pick" ? (
             <div className="flex items-start gap-2">
               <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-muted-foreground">
-                Upload one Service Delivery Report (PDF, JPEG, PNG, or WebP, up to 10 MB). We match
-                delivery details to your Stage 2 service rows; you apply before saving.
+                Upload an SDR (PDF, JPEG, PNG, or WebP, up to 10 MB). Review matches, then apply
+                before saving.
+                {stage1HasIdentityAnchors ? " The file must match the client on Stage 1." : null}
               </p>
               <Popover>
                 <PopoverTrigger asChild>
@@ -342,7 +378,8 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                 >
                   <p className="mb-1 font-semibold">How SDR import works</p>
                   <ul className="list-disc space-y-1 pl-4 text-[#5c6368]">
-                    <li>Uses the services already listed in Stage 2 to anchor matches.</li>
+                    <li>When Stage 2 already has services, we match to those rows; otherwise outcomes are created from the SDR.</li>
+                    <li>Weekly distribution table rows are imported when the PDF includes them.</li>
                     <li>Only updates SDR-related fields per service row (not guardians or demographics).</li>
                     <li>The same file attaches to the SDR documentation slot in step 3.</li>
                     <li>Nothing is saved until you finish the wizard and save the client.</li>
@@ -365,15 +402,6 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           {modalStep === "pick" ? (
             <div className="space-y-4">
-              {!hasStage2AuthorizationContext ? (
-                <div
-                  role="alert"
-                  className="rounded-md border border-amber-200 bg-amber-50/90 px-3 py-3 text-[12px] text-amber-950"
-                >
-                  Add at least one outcome with a service authorization row in Stage 2. SDR import
-                  requires Stage 2 service IDs to match lines from the report.
-                </div>
-              ) : null}
               <div
                 className={cn(
                   "group relative overflow-hidden rounded-2xl border transition-all duration-200",
@@ -401,7 +429,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                   htmlFor="stage2-sdr-import-file"
                   className={cn(
                     "relative flex w-full flex-col items-center gap-4 px-5 py-10 text-center transition-colors outline-none focus-within:ring-2 focus-within:ring-[#00b4b8]/35 focus-within:ring-offset-2",
-                    !loading && hasStage2AuthorizationContext ? "cursor-pointer" : "cursor-not-allowed opacity-75",
+                    !loading ? "cursor-pointer" : "cursor-not-allowed opacity-75",
                   )}
                 >
                   <input
@@ -410,7 +438,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                     type="file"
                     accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
                     className="sr-only"
-                    disabled={loading || !hasStage2AuthorizationContext}
+                    disabled={loading}
                     onChange={onPickFile}
                   />
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00b4b8]/12 text-[#00b4b8] ring-1 ring-[#00b4b8]/15">
@@ -424,7 +452,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                     <p className="text-[16px] font-semibold text-[#10141a]">Drop file here</p>
                     <p className="text-[13px] leading-snug text-[#5c6368]">
                       or browse from your device
-                      {loading ? ". Reading SDR details…" : ""}
+                      {loading ? ". Reading service authorizations and weekly tables…" : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-2">
@@ -451,7 +479,8 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
               <div className="space-y-1" aria-live="polite">
                 {loading && file ? (
                   <p className="text-[12px] text-[#5c6368]">
-                    Reading SDR details... this can take up to a minute. {file.name} —{" "}
+                    Reading service authorizations and weekly tables… this can take 1–3 minutes.{" "}
+                    {file.name} —{" "}
                     {formatFileSize(file.size)}
                   </p>
                 ) : null}
@@ -478,36 +507,77 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                 />
               </div>
 
-              {extraction ? (
-                (() => {
-                  const primaryLine = formatDiagnosisEntryLine(
-                    extraction.draft.stage3?.primaryDiagnosisEntry,
-                  );
-                  const secondaryLine = formatDiagnosisEntryLine(
-                    extraction.draft.stage3?.secondaryDiagnosisEntry,
-                  );
-                  if (!primaryLine && !secondaryLine) return null;
-                  return (
-                    <div>
-                      <p className="mb-1 text-[12px] font-semibold">Diagnosis (from this SDR)</p>
-                      <div className="rounded-md border border-[#e6e7e8] p-2 text-[12px] text-[#10141a]">
-                        {primaryLine ? <p>Primary: {primaryLine}</p> : null}
-                        {secondaryLine ? (
-                          <p className={primaryLine ? "mt-1" : ""}>Secondary: {secondaryLine}</p>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Writes to Stage 3 diagnosis fields only when overwrite is on or those fields are
-                        blank.
-                      </p>
-                    </div>
-                  );
-                })()
-              ) : null}
-
               {docMismatch ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
                   This file doesn&apos;t look like an SDR. Review the matches before applying.
+                </div>
+              ) : null}
+
+              {identityStatus === "match" ? (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-[12px] text-emerald-950">
+                  This SDR matches the client you&apos;re adding.
+                </div>
+              ) : null}
+
+              {identityStatus === "skipped" ? (
+                <div className="rounded-md border border-[#e6e7e8] bg-[#f8f9fa] px-3 py-2 text-[12px] text-[#50565e]">
+                  No client ID on file yet — confirm this SDR belongs to this client before you
+                  apply.
+                </div>
+              ) : null}
+
+              {identityStatus === "partial_mismatch" || partialIdentityWarning ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
+                  <p>{partialIdentityWarning?.message ?? "Some client details don't match."}</p>
+                  {(extraction?.clientIdentityCheck?.mismatches ?? []).length > 0 ? (
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {extraction?.clientIdentityCheck?.mismatches?.map((m) => (
+                        <li key={m.field}>
+                          {formatIdentityFieldLabel(m.field)} — on file: {m.expected || "—"}, on
+                          this SDR: {m.extracted || "—"}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {identityStatus === "inconclusive" || inconclusiveIdentityWarning ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
+                  {inconclusiveIdentityWarning?.message ??
+                    "We couldn't read the client name or ID from this SDR. Check that it belongs to the client you're adding before you apply."}
+                  {!stage1HasIdentityAnchors && !bootstrapMode ? (
+                    <p className="mt-1">
+                      Stage 2 has services but client IDs aren&apos;t complete — verify manually
+                      before applying.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {identityBlocked ? (
+                <div
+                  className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-950"
+                  role="alert"
+                >
+                  <p className="font-semibold">
+                    {fullIdentityWarning?.message ??
+                      "This SDR is for a different client. Upload the correct client's SDR to continue."}
+                  </p>
+                  {(extraction?.clientIdentityCheck?.mismatches ?? []).length > 0 ? (
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4 font-normal">
+                      {extraction?.clientIdentityCheck?.mismatches?.map((m) => (
+                        <li key={m.field}>
+                          {formatIdentityFieldLabel(m.field)} — on file: {m.expected || "—"}, on
+                          this SDR: {m.extracted || "—"}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 font-normal">
+                      Apply is disabled until you upload the correct client&apos;s SDR.
+                    </p>
+                  )}
                 </div>
               ) : null}
 
@@ -539,9 +609,13 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
 
               {(preview.matched ?? []).length > 0 ? (
                 <div>
-                  <p className="mb-1 text-[12px] font-semibold text-[#10141a]">Matched</p>
+                  <p className="mb-1 text-[12px] font-semibold text-[#10141a]">
+                    {bootstrapMode ? "Will add from SDR" : "Matched"}
+                  </p>
                   <p className="mb-2 text-[12px] text-muted-foreground">
-                    These SDR details are ready to apply.
+                    {bootstrapMode
+                      ? "These outcomes and services will be added to Stage 2."
+                      : "These SDR details are ready to apply."}
                   </p>
                   <div className="max-h-[120px] overflow-y-auto rounded-md border border-[#e6e7e8] p-2">
                     <ul className="list-disc space-y-1 pl-4 text-[12px]">

@@ -83,11 +83,9 @@ export function extractDiagnosisCode(line: string): string {
 }
 
 export function getClientDiagnosisLines(client?: Client): string[] {
-  const primary =
-    client?.healthcareSafety?.primaryDiagnosis ?? client?.primaryDiagnosis ?? "";
-  const secondary =
-    client?.healthcareSafety?.secondaryDiagnosis ?? client?.secondaryDiagnosis ?? "";
-  return [...splitDiagnosisTextLines(primary), ...splitDiagnosisTextLines(secondary)];
+  const diagnosis =
+    client?.healthcareSafety?.diagnosis ?? client?.diagnosis ?? "";
+  return splitDiagnosisTextLines(diagnosis);
 }
 
 export function buildDiagnosisCodesMap(lines: string[]): Record<string, string> {
