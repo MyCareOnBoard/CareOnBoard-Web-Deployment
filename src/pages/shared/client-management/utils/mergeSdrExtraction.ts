@@ -800,6 +800,15 @@ export function applySdrImportToWizard(
     extraction?: ClientExtractionResponse | null;
   },
 ): { formData: AddClientFormData; appliedCount: number; keptExistingCount: number; localWarnings: string[] } {
+  if (options.extraction?.clientIdentityCheck?.status === "mismatch") {
+    return {
+      formData,
+      appliedCount: 0,
+      keptExistingCount: 0,
+      localWarnings: ["This SDR is for a different client."],
+    };
+  }
+
   const localWarnings = [...(preview.warnings ?? [])];
   let appliedCount = 0;
   const keptExistingCount = preview.keptExisting?.length ?? 0;

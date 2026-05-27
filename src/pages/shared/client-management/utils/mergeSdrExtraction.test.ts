@@ -750,6 +750,35 @@ describe("mergeSdrExtraction", () => {
     expect(next.stage2.outcomes[0].services[0].code).toBe("H2012");
     expect(next.stage2.outcomes[0].services[0].sdrDetails?.deliveryMethods).toContain("Community");
   });
+
+  it("bootstraps weekly distribution rows from extraction", () => {
+    const ext = extractionFrom([
+      {
+        statement: "Independence",
+        rows: [
+          {
+            code: "H2012",
+            name: "Habilitation",
+            weeklyDistribution: {
+              standardLine: "40 @ 15 Min / Weekly",
+              rows: [{ weekRange: "5/11/2025 - 5/17/2025", units: "40", hours: "10.00 hours" }],
+            },
+          },
+        ],
+      },
+    ]);
+    const prev = buildSdrImportPreview(ext, [], { overwrite: true });
+    expect(prev.matched).toHaveLength(1);
+
+    const { formData: next } = applySdrImportToWizard(baseForm([]), prev, {
+      overwrite: true,
+      file: null,
+      extraction: ext,
+    });
+    const svc = next.stage2.outcomes[0].services[0];
+    expect(svc.sdrWeeklyDistribution?.standardLine).toContain("40 @ 15");
+    expect(svc.sdrWeeklyDistribution?.rows?.[0]?.weekRange).toBe("5/11/2025 - 5/17/2025");
+  });
 });
 
 describe("formData sdrDetails round-trip to API payload", () => {
@@ -818,5 +847,35 @@ describe("weekly distribution derivation vs persist cap", () => {
     expect(
       deriveAuthorizedHoursPerWeek(weeklyDistributionForDerivation(parts!)),
     ).toBe("99");
+  });
+});
+
+describe("applySdrImportToWizard client identity guard", () => {
+  it("does not apply when clientIdentityCheck is mismatch", () => {
+    const fd = baseForm([
+      {
+        id: "o1",
+        statement: "Goal",
+        services: [{ ...createEmptyServiceAuthorization(), id: "s1", code: "C1" }],
+      },
+    ]);
+    const prev = buildSdrImportPreview(
+      extractionFrom([{ statement: "Goal", rows: [{ code: "C1" }] }]),
+      fd.stage2.outcomes,
+      { overwrite: true },
+    );
+    const { formData: next, appliedCount, localWarnings } = applySdrImportToWizard(fd, prev, {
+      overwrite: true,
+      extraction: {
+        detectedDocumentType: "sdr",
+        draft: { stage2: { outcomes: [] } },
+        fieldConfidences: [],
+        warnings: [],
+        clientIdentityCheck: { status: "mismatch", mismatches: [{ field: "dddId", expected: "1", extracted: "2" }] },
+      },
+    });
+    expect(appliedCount).toBe(0);
+    expect(localWarnings[0]).toMatch(/different client/i);
+    expect(next.stage2.outcomes[0].services[0].code).toBe("C1");
   });
 });

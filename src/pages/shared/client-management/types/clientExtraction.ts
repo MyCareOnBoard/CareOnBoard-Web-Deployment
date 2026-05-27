@@ -290,11 +290,34 @@ export type ClientExtractionDraft = {
   }>;
 };
 
+export type SdrClientIdentity = Partial<{
+  firstName: string;
+  lastName: string;
+  medicaidId: string;
+  dddId: string;
+}>;
+
+export type SdrClientIdentityMismatch = {
+  field: string;
+  expected: string;
+  extracted: string;
+};
+
+export type SdrClientIdentityCheck = {
+  status: "match" | "partial_mismatch" | "mismatch" | "skipped" | "inconclusive";
+  expected?: SdrClientIdentity;
+  extracted?: SdrClientIdentity;
+  matches?: SdrClientIdentityMismatch[];
+  mismatches?: SdrClientIdentityMismatch[];
+};
+
 export type ClientExtractionResponse = {
   detectedDocumentType: DetectedDocumentType;
   draft: ClientExtractionDraft;
   fieldConfidences: FieldConfidence[];
   warnings: ExtractionWarning[];
+  clientIdentity?: SdrClientIdentity;
+  clientIdentityCheck?: SdrClientIdentityCheck;
   /** Present on older extractions; omitted when using the slim Gemini response schema. */
   unmappedText?: string[];
   extractionJobId?: string;

@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isAxiosError } from "axios";
 import { FileUp, Info, Loader2 } from "lucide-react";
 import { extractSdrDocumentViaApi } from "@/lib/api/gemini";
 import type { ClientExtractionResponse } from "../types/clientExtraction";
 import type { AddClientFormData } from "../types/formData";
+import { formatGeminiExtractError } from "../utils/formatGeminiExtractError";
 import {
   applySdrImportToWizard,
   buildSdrImportPreview,
@@ -13,6 +13,10 @@ import {
   buildSdrExtractionContext,
   wizardHasAnchorServices,
 } from "../utils/sdrImportAvailableServices";
+import {
+  buildExpectedClientIdentityJson,
+  hasClientIdentityAnchors,
+} from "../utils/sdrExpectedClientIdentity";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -45,6 +49,26 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   consents: "Consents and Releases",
   unknown: "Not detected",
 };
+
+const IDENTITY_FIELD_LABELS: Record<string, string> = {
+  dddId: "DDD ID",
+  medicaidId: "Medicaid ID",
+  name: "Name",
+};
+
+const IDENTITY_WARNING_CODES = new Set([
+  "SDR_CLIENT_IDENTITY_MISMATCH",
+  "SDR_CLIENT_IDENTITY_PARTIAL_MISMATCH",
+  "SDR_CLIENT_IDENTITY_INCONCLUSIVE",
+]);
+
+function formatIdentityFieldLabel(field: string): string {
+  return IDENTITY_FIELD_LABELS[field] ?? field;
+}
+
+function findIdentityWarning(extraction: ClientExtractionResponse | null, code: string) {
+  return extraction?.warnings?.find((w) => w.code === code);
+}
 
 type ModalStep = "pick" | "review";
 
@@ -100,6 +124,21 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
     [formData.stage2.outcomes],
   );
 
+  const expectedClientIdentityJson = useMemo(
+    () => buildExpectedClientIdentityJson(formData.stage1),
+    [
+      formData.stage1.firstName,
+      formData.stage1.lastName,
+      formData.stage1.medicaidId,
+      formData.stage1.dddId,
+    ],
+  );
+
+  const stage1HasIdentityAnchors = useMemo(
+    () => hasClientIdentityAnchors(formData.stage1),
+    [formData.stage1],
+  );
+
   const bootstrapMode = !wizardHasAnchorServices(formData.stage2.outcomes);
 
   const resetPickState = useCallback(() => {
@@ -142,25 +181,14 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
       const res = await extractSdrDocumentViaApi(selected, {
         signal: ac.signal,
         ...(availableServicesJson ? { availableServicesJson } : {}),
+        ...(expectedClientIdentityJson ? { expectedClientIdentityJson } : {}),
       });
       setExtraction(res);
       setModalStep("review");
     } catch (e: unknown) {
-      if (isAxiosError(e) && (e.code === "ERR_CANCELED" || e.message === "canceled")) {
-        setError(null);
-      } else if (isAxiosError(e)) {
-        const data = e.response?.data as { message?: string; error?: string } | undefined;
-        setError(
-          (typeof data?.message === "string" && data.message) ||
-            (typeof data?.error === "string" && data.error) ||
-            e.message ||
-            "We couldn't read that file. Try again or pick a different document.",
-        );
-      } else if (e instanceof Error) {
-        setError(e.message);
-      } else {
-        setError("We couldn't read that file. Try again or pick a different document.");
-      }
+      const msg = formatGeminiExtractError(e);
+      if (msg) setError(msg);
+      else setError(null);
     } finally {
       setLoading(false);
     }
@@ -217,6 +245,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
 
   function handleApply() {
     if (!preview || !extraction) return;
+    if (extraction.clientIdentityCheck?.status === "mismatch") return;
 
     setFormData((prev) => {
       const applied = applySdrImportToWizard(prev, preview, {
@@ -276,7 +305,21 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
     extraction.detectedDocumentType !== "sdr" &&
     extraction.detectedDocumentType !== "unknown";
 
-  const canApply = !loading && !!extraction && !!preview;
+  const identityStatus = extraction?.clientIdentityCheck?.status;
+  const identityBlocked =
+    identityStatus === "mismatch" ||
+    Boolean(findIdentityWarning(extraction, "SDR_CLIENT_IDENTITY_MISMATCH"));
+  const canApply = !loading && !!extraction && !!preview && !identityBlocked;
+
+  const partialIdentityWarning = findIdentityWarning(
+    extraction,
+    "SDR_CLIENT_IDENTITY_PARTIAL_MISMATCH",
+  );
+  const fullIdentityWarning = findIdentityWarning(extraction, "SDR_CLIENT_IDENTITY_MISMATCH");
+  const inconclusiveIdentityWarning = findIdentityWarning(
+    extraction,
+    "SDR_CLIENT_IDENTITY_INCONCLUSIVE",
+  );
 
   const anyPreviewRows =
     !!preview &&
@@ -290,7 +333,10 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
       ? DOCUMENT_TYPE_LABELS[extraction.detectedDocumentType] ?? extraction.detectedDocumentType
       : "—";
 
-  const reviewWarnings = extraction?.warnings?.map((w) => w.message) ?? [];
+  const reviewWarnings =
+    extraction?.warnings
+      ?.filter((w) => !w.code || !IDENTITY_WARNING_CODES.has(w.code))
+      .map((w) => w.message) ?? [];
 
   function handleMainOpenChange(next: boolean) {
     if (!next) {
@@ -311,9 +357,9 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
           {modalStep === "pick" ? (
             <div className="flex items-start gap-2">
               <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-muted-foreground">
-                Upload one Service Delivery Report (PDF, JPEG, PNG, or WebP, up to 10 MB). We match
-                delivery details to Stage 2 service rows when present, or create outcomes from the
-                SDR; you apply before saving.
+                Upload an SDR (PDF, JPEG, PNG, or WebP, up to 10 MB). Review matches, then apply
+                before saving.
+                {stage1HasIdentityAnchors ? " The file must match the client on Stage 1." : null}
               </p>
               <Popover>
                 <PopoverTrigger asChild>
@@ -333,6 +379,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                   <p className="mb-1 font-semibold">How SDR import works</p>
                   <ul className="list-disc space-y-1 pl-4 text-[#5c6368]">
                     <li>When Stage 2 already has services, we match to those rows; otherwise outcomes are created from the SDR.</li>
+                    <li>Weekly distribution table rows are imported when the PDF includes them.</li>
                     <li>Only updates SDR-related fields per service row (not guardians or demographics).</li>
                     <li>The same file attaches to the SDR documentation slot in step 3.</li>
                     <li>Nothing is saved until you finish the wizard and save the client.</li>
@@ -405,7 +452,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                     <p className="text-[16px] font-semibold text-[#10141a]">Drop file here</p>
                     <p className="text-[13px] leading-snug text-[#5c6368]">
                       or browse from your device
-                      {loading ? ". Reading SDR details…" : ""}
+                      {loading ? ". Reading service authorizations and weekly tables…" : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-2">
@@ -432,7 +479,8 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
               <div className="space-y-1" aria-live="polite">
                 {loading && file ? (
                   <p className="text-[12px] text-[#5c6368]">
-                    Reading SDR details... this can take up to a minute. {file.name} —{" "}
+                    Reading service authorizations and weekly tables… this can take 1–3 minutes.{" "}
+                    {file.name} —{" "}
                     {formatFileSize(file.size)}
                   </p>
                 ) : null}
@@ -462,6 +510,74 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
               {docMismatch ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
                   This file doesn&apos;t look like an SDR. Review the matches before applying.
+                </div>
+              ) : null}
+
+              {identityStatus === "match" ? (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-[12px] text-emerald-950">
+                  This SDR matches the client you&apos;re adding.
+                </div>
+              ) : null}
+
+              {identityStatus === "skipped" ? (
+                <div className="rounded-md border border-[#e6e7e8] bg-[#f8f9fa] px-3 py-2 text-[12px] text-[#50565e]">
+                  No client ID on file yet — confirm this SDR belongs to this client before you
+                  apply.
+                </div>
+              ) : null}
+
+              {identityStatus === "partial_mismatch" || partialIdentityWarning ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
+                  <p>{partialIdentityWarning?.message ?? "Some client details don't match."}</p>
+                  {(extraction?.clientIdentityCheck?.mismatches ?? []).length > 0 ? (
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {extraction?.clientIdentityCheck?.mismatches?.map((m) => (
+                        <li key={m.field}>
+                          {formatIdentityFieldLabel(m.field)} — on file: {m.expected || "—"}, on
+                          this SDR: {m.extracted || "—"}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {identityStatus === "inconclusive" || inconclusiveIdentityWarning ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
+                  {inconclusiveIdentityWarning?.message ??
+                    "We couldn't read the client name or ID from this SDR. Check that it belongs to the client you're adding before you apply."}
+                  {!stage1HasIdentityAnchors && !bootstrapMode ? (
+                    <p className="mt-1">
+                      Stage 2 has services but client IDs aren&apos;t complete — verify manually
+                      before applying.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {identityBlocked ? (
+                <div
+                  className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-950"
+                  role="alert"
+                >
+                  <p className="font-semibold">
+                    {fullIdentityWarning?.message ??
+                      "This SDR is for a different client. Upload the correct client's SDR to continue."}
+                  </p>
+                  {(extraction?.clientIdentityCheck?.mismatches ?? []).length > 0 ? (
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4 font-normal">
+                      {extraction?.clientIdentityCheck?.mismatches?.map((m) => (
+                        <li key={m.field}>
+                          {formatIdentityFieldLabel(m.field)} — on file: {m.expected || "—"}, on
+                          this SDR: {m.extracted || "—"}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 font-normal">
+                      Apply is disabled until you upload the correct client&apos;s SDR.
+                    </p>
+                  )}
                 </div>
               ) : null}
 
