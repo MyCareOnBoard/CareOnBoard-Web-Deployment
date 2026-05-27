@@ -265,8 +265,7 @@ describe("mergeExtractionDraft", () => {
           ],
         },
         stage3: {
-          primaryDiagnosis: "F84.0",
-          secondaryDiagnosis: "R56.9",
+          diagnosis: "F84.0\nR56.9",
           selfCareNeeds: [
             { domain: "Bathing", levelOfSupport: "Full physical assist", notes: "Tub transfer" },
           ],
@@ -277,7 +276,7 @@ describe("mergeExtractionDraft", () => {
     expect(formData.stage2.guardians).toHaveLength(2);
     expect(formData.stage2.guardians?.[0].relationship).toBe("mother");
     expect(formData.stage2.careTeam?.[0].role).toBe("Primary Care Physician");
-    expect(formData.stage3.primaryDiagnosis).toBe("F84.0");
+    expect(formData.stage3.diagnosis).toBe("F84.0\nR56.9");
     expect(formData.stage3.selfCareNeeds).toHaveLength(1);
     expect(formData.stage3.selfCareNeeds?.[0].domain).toBe("Bathing");
   });

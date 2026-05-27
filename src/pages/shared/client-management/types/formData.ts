@@ -259,8 +259,7 @@ export type Stage3HealthcareAndDocumentsData = {
     communicationNeeds: string[];
     emergencyProtocols: string;
     docs: DocState[];
-    primaryDiagnosis?: string;
-    secondaryDiagnosis?: string;
+    diagnosis?: string;
     healthHazards?: string;
     nutritionNotes?: string;
     selfCareNeeds?: AdlSupportNeed[];
@@ -553,8 +552,7 @@ export function createInitialAddClientFormData(): AddClientFormData {
             communicationNeeds: [],
             emergencyProtocols: "",
             docs: createInitialDocs(),
-            primaryDiagnosis: undefined,
-            secondaryDiagnosis: undefined,
+            diagnosis: undefined,
             healthHazards: undefined,
             nutritionNotes: undefined,
             selfCareNeeds: [],

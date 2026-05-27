@@ -369,13 +369,9 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                 return Array.isArray(v) ? v : [];
             })(),
             emergencyProtocols: client.healthcareSafety?.emergencyProtocols ?? client.emergencyProtocols ?? "",
-            primaryDiagnosis:
-                client.healthcareSafety?.primaryDiagnosis ??
-                (client as any).primaryDiagnosis ??
-                undefined,
-            secondaryDiagnosis:
-                client.healthcareSafety?.secondaryDiagnosis ??
-                (client as any).secondaryDiagnosis ??
+            diagnosis:
+                client.healthcareSafety?.diagnosis ??
+                (client as any).diagnosis ??
                 undefined,
             healthHazards:
                 client.healthcareSafety?.healthHazards ?? (client as any).healthHazards ?? undefined,

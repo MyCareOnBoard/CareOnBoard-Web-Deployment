@@ -28,6 +28,23 @@ export function serializeSdrAvailableServicesContext(list: SdrImportAvailableSer
  * Compact wizard Stage 2 context for SDR extraction.
  * Includes every authorization row inside each outcome slice so serviceIndex stays aligned with the UI grid.
  */
+/** True when Stage 2 has at least one service row with a non-empty id (anchor for match mode). */
+export function wizardHasAnchorServices(outcomes: Outcome[]): boolean {
+  return outcomes.some((o) =>
+    (o.services ?? []).some((s) => String(s.id ?? "").trim()),
+  );
+}
+
+/** JSON for extract-client-sdr matching context, or "" when bootstrapping from the SDR alone. */
+export function buildSdrExtractionContext(outcomes: Outcome[]): string {
+  if (!wizardHasAnchorServices(outcomes)) return "";
+  const compact = buildCompactSdrAvailableServicesContext(outcomes);
+  const valid = compact.some((o) =>
+    (o.services ?? []).some((s) => String(s.serviceId ?? "").trim()),
+  );
+  return valid ? serializeSdrAvailableServicesContext(compact).trim() : "";
+}
+
 export function buildCompactSdrAvailableServicesContext(outcomes: Outcome[]): SdrImportAvailableServicePayload[] {
   return outcomes.slice(0, MAX_CTX_OUTCOMES).map((o, outcomeIndex) => {
     const services = (o.services ?? []).slice(0, MAX_CTX_SERVICES_PER_OUTCOME).map((s, serviceIndex) => {

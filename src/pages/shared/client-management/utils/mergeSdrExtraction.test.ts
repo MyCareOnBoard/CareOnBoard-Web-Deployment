@@ -719,29 +719,36 @@ describe("mergeSdrExtraction", () => {
     expect(prev.needsReview.some((r) => r.reason.includes("Multiple SDR periods"))).toBe(true);
   });
 
-  it("writes extracted diagnosis codes into Stage 3 when applying SDR import", () => {
-    const outcomes = [
+  it("bootstraps preview and apply when Stage 2 has no anchor services", () => {
+    const ext = extractionFrom([
       {
-        id: "o1",
-        statement: "Goal",
-        services: [{ ...createEmptyServiceAuthorization(), id: "s1", code: "X", name: "Svc" }],
+        statement: "Independence",
+        rows: [
+          {
+            code: "H2012",
+            name: "Habilitation",
+            totalUnits: "100",
+            sdrStartDate: "01/01/2026",
+            sdrEndDate: "12/31/2026",
+            sdrDetails: { deliveryMethods: ["Community"], supportTasks: ["Self-care"] },
+          },
+        ],
       },
-    ];
-    const ext = extractionFrom([{ statement: "Goal", rows: [{ code: "X", name: "Svc" }] }]);
-    ext.draft.stage3 = {
-      primaryDiagnosisEntry: { diagnosisCode: "F84.0", diagnosisDescription: "Autism Spectrum Disorder" },
-      secondaryDiagnosisEntry: {},
-    };
-    const prev = buildSdrImportPreview(ext, outcomes, { overwrite: true });
-    expect(prev.matched).toHaveLength(1);
+    ]);
+    const prev = buildSdrImportPreview(ext, [], { overwrite: true });
+    expect(prev.matched.length).toBeGreaterThan(0);
+    expect(prev.skipped.length).toBe(0);
 
-    const fd = baseForm(outcomes);
-    const { formData: next } = applySdrImportToWizard(fd, prev, {
+    const fd = baseForm([]);
+    const { formData: next, appliedCount } = applySdrImportToWizard(fd, prev, {
       overwrite: true,
       file: null,
       extraction: ext,
     });
-    expect(next.stage3.primaryDiagnosis).toBe("F84.0 - Autism Spectrum Disorder");
+    expect(appliedCount).toBe(1);
+    expect(next.stage2.outcomes).toHaveLength(1);
+    expect(next.stage2.outcomes[0].services[0].code).toBe("H2012");
+    expect(next.stage2.outcomes[0].services[0].sdrDetails?.deliveryMethods).toContain("Community");
   });
 });
 

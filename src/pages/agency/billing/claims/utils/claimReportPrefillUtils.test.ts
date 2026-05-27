@@ -81,7 +81,7 @@ describe("claimReportPrefillUtils", () => {
       id: "client-1",
       gender: "male",
       medicaidId: "112081536401",
-      primaryDiagnosis: "F84.0 - Autism Spectrum Disorder",
+      diagnosis: "F84.0 - Autism Spectrum Disorder",
     };
     const matchedService: ClientService = {
       id: "service-1",

@@ -306,22 +306,13 @@ export function Stage3HealthcareAndDocuments({
               </p>
             </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-normal text-[#10141a]">Primary diagnosis</label>
-                <Input
-                  value={stage3.primaryDiagnosis ?? ""}
-                  onChange={(e) => updateStage3({ primaryDiagnosis: e.target.value })}
-                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                  placeholder="As documented"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-normal text-[#10141a]">Secondary diagnosis</label>
-                <Input
-                  value={stage3.secondaryDiagnosis ?? ""}
-                  onChange={(e) => updateStage3({ secondaryDiagnosis: e.target.value })}
-                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                  placeholder="If applicable"
+              <div className="flex flex-col gap-1 md:col-span-2">
+                <label className="text-[12px] font-normal text-[#10141a]">Diagnosis</label>
+                <Textarea
+                  value={stage3.diagnosis ?? ""}
+                  onChange={(e) => updateStage3({ diagnosis: e.target.value })}
+                  className="min-h-[88px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="As documented on the ISP (one line per diagnosis)"
                 />
               </div>
               <div className="flex flex-col gap-1 md:col-span-2">

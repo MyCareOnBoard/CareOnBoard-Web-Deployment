@@ -7,12 +7,11 @@ import type { AddClientFormData } from "../types/formData";
 import {
   applySdrImportToWizard,
   buildSdrImportPreview,
-  formatDiagnosisEntryLine,
   formatSdrPatchSummary,
 } from "../utils/mergeSdrExtraction";
 import {
-  buildCompactSdrAvailableServicesContext,
-  serializeSdrAvailableServicesContext,
+  buildSdrExtractionContext,
+  wizardHasAnchorServices,
 } from "../utils/sdrImportAvailableServices";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -96,16 +95,12 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
     [extraction, overwrite, formData.stage2.outcomes],
   );
 
-  const availableServicesJson = useMemo(() => {
-    const compact = buildCompactSdrAvailableServicesContext(formData.stage2.outcomes);
-    const valid = compact.some((o) =>
-      (o.services ?? []).some((s) => String(s.serviceId ?? "").trim()),
-    );
-    if (!valid) return "";
-    return serializeSdrAvailableServicesContext(compact).trim();
-  }, [formData.stage2.outcomes]);
+  const availableServicesJson = useMemo(
+    () => buildSdrExtractionContext(formData.stage2.outcomes),
+    [formData.stage2.outcomes],
+  );
 
-  const hasStage2AuthorizationContext = Boolean(availableServicesJson);
+  const bootstrapMode = !wizardHasAnchorServices(formData.stage2.outcomes);
 
   const resetPickState = useCallback(() => {
     abortRef.current?.abort();
@@ -136,12 +131,6 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
       setError(err);
       return;
     }
-    if (!hasStage2AuthorizationContext) {
-      setError(
-        "Add at least one outcome with at least one service authorization row in Stage 2 before importing an SDR.",
-      );
-      return;
-    }
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -152,7 +141,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
     try {
       const res = await extractSdrDocumentViaApi(selected, {
         signal: ac.signal,
-        availableServicesJson,
+        ...(availableServicesJson ? { availableServicesJson } : {}),
       });
       setExtraction(res);
       setModalStep("review");
@@ -180,13 +169,13 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!loading && modalStep === "pick" && hasStage2AuthorizationContext) setIsDragActive(true);
+    if (!loading && modalStep === "pick") setIsDragActive(true);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!loading && modalStep === "pick" && hasStage2AuthorizationContext) setIsDragActive(true);
+    if (!loading && modalStep === "pick") setIsDragActive(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -203,7 +192,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
     e.preventDefault();
     e.stopPropagation();
     setIsDragActive(false);
-    if (loading || modalStep !== "pick" || !hasStage2AuthorizationContext) return;
+    if (loading || modalStep !== "pick") return;
     const dropped = e.dataTransfer.files?.[0];
     if (dropped) void handleExtract(dropped);
   };
@@ -323,7 +312,8 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
             <div className="flex items-start gap-2">
               <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-muted-foreground">
                 Upload one Service Delivery Report (PDF, JPEG, PNG, or WebP, up to 10 MB). We match
-                delivery details to your Stage 2 service rows; you apply before saving.
+                delivery details to Stage 2 service rows when present, or create outcomes from the
+                SDR; you apply before saving.
               </p>
               <Popover>
                 <PopoverTrigger asChild>
@@ -342,7 +332,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                 >
                   <p className="mb-1 font-semibold">How SDR import works</p>
                   <ul className="list-disc space-y-1 pl-4 text-[#5c6368]">
-                    <li>Uses the services already listed in Stage 2 to anchor matches.</li>
+                    <li>When Stage 2 already has services, we match to those rows; otherwise outcomes are created from the SDR.</li>
                     <li>Only updates SDR-related fields per service row (not guardians or demographics).</li>
                     <li>The same file attaches to the SDR documentation slot in step 3.</li>
                     <li>Nothing is saved until you finish the wizard and save the client.</li>
@@ -365,15 +355,6 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           {modalStep === "pick" ? (
             <div className="space-y-4">
-              {!hasStage2AuthorizationContext ? (
-                <div
-                  role="alert"
-                  className="rounded-md border border-amber-200 bg-amber-50/90 px-3 py-3 text-[12px] text-amber-950"
-                >
-                  Add at least one outcome with a service authorization row in Stage 2. SDR import
-                  requires Stage 2 service IDs to match lines from the report.
-                </div>
-              ) : null}
               <div
                 className={cn(
                   "group relative overflow-hidden rounded-2xl border transition-all duration-200",
@@ -401,7 +382,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                   htmlFor="stage2-sdr-import-file"
                   className={cn(
                     "relative flex w-full flex-col items-center gap-4 px-5 py-10 text-center transition-colors outline-none focus-within:ring-2 focus-within:ring-[#00b4b8]/35 focus-within:ring-offset-2",
-                    !loading && hasStage2AuthorizationContext ? "cursor-pointer" : "cursor-not-allowed opacity-75",
+                    !loading ? "cursor-pointer" : "cursor-not-allowed opacity-75",
                   )}
                 >
                   <input
@@ -410,7 +391,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                     type="file"
                     accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
                     className="sr-only"
-                    disabled={loading || !hasStage2AuthorizationContext}
+                    disabled={loading}
                     onChange={onPickFile}
                   />
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00b4b8]/12 text-[#00b4b8] ring-1 ring-[#00b4b8]/15">
@@ -478,33 +459,6 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                 />
               </div>
 
-              {extraction ? (
-                (() => {
-                  const primaryLine = formatDiagnosisEntryLine(
-                    extraction.draft.stage3?.primaryDiagnosisEntry,
-                  );
-                  const secondaryLine = formatDiagnosisEntryLine(
-                    extraction.draft.stage3?.secondaryDiagnosisEntry,
-                  );
-                  if (!primaryLine && !secondaryLine) return null;
-                  return (
-                    <div>
-                      <p className="mb-1 text-[12px] font-semibold">Diagnosis (from this SDR)</p>
-                      <div className="rounded-md border border-[#e6e7e8] p-2 text-[12px] text-[#10141a]">
-                        {primaryLine ? <p>Primary: {primaryLine}</p> : null}
-                        {secondaryLine ? (
-                          <p className={primaryLine ? "mt-1" : ""}>Secondary: {secondaryLine}</p>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Writes to Stage 3 diagnosis fields only when overwrite is on or those fields are
-                        blank.
-                      </p>
-                    </div>
-                  );
-                })()
-              ) : null}
-
               {docMismatch ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-950">
                   This file doesn&apos;t look like an SDR. Review the matches before applying.
@@ -539,9 +493,13 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
 
               {(preview.matched ?? []).length > 0 ? (
                 <div>
-                  <p className="mb-1 text-[12px] font-semibold text-[#10141a]">Matched</p>
+                  <p className="mb-1 text-[12px] font-semibold text-[#10141a]">
+                    {bootstrapMode ? "Will add from SDR" : "Matched"}
+                  </p>
                   <p className="mb-2 text-[12px] text-muted-foreground">
-                    These SDR details are ready to apply.
+                    {bootstrapMode
+                      ? "These outcomes and services will be added to Stage 2."
+                      : "These SDR details are ready to apply."}
                   </p>
                   <div className="max-h-[120px] overflow-y-auto rounded-md border border-[#e6e7e8] p-2">
                     <ul className="list-disc space-y-1 pl-4 text-[12px]">

@@ -94,7 +94,7 @@ export type ExtractionSdrDetails = Partial<{
   source: ExtractionSdrDetailsSource;
 }>;
 
-/** Structured diagnosis from SDR (code before hyphen, description after). */
+/** @deprecated Legacy extraction shape; ISP import uses draft.stage3.diagnosis. */
 export type ExtractionDiagnosisEntry = Partial<{
   diagnosisCode: string;
   diagnosisDescription: string;
@@ -222,10 +222,7 @@ export type ClientExtractionDraft = {
     emergencyProtocols: string;
     preferredHospital: string;
     primaryCarePhysician: string;
-    primaryDiagnosis: string;
-    secondaryDiagnosis: string;
-    primaryDiagnosisEntry?: ExtractionDiagnosisEntry;
-    secondaryDiagnosisEntry?: ExtractionDiagnosisEntry;
+    diagnosis: string;
     healthHazards: string;
     nutritionNotes: string;
     selfCareNeeds: ExtractionAdlSupportNeed[];

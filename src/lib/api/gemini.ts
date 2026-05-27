@@ -55,21 +55,22 @@ export async function extractClientIspViaApi(
 }
 
 /**
- * Service Delivery Report (SDR) extraction — requires Stage 2 authorizations JSON.
+ * Service Delivery Report (SDR) extraction — optional Stage 2 authorizations JSON for matching.
  */
 export async function extractSdrDocumentViaApi(
   file: File,
-  options: { availableServicesJson: string; signal?: AbortSignal },
+  options?: { availableServicesJson?: string; signal?: AbortSignal },
 ): Promise<ClientExtractionResponse> {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("availableServices", options.availableServicesJson.trim());
+  const ctx = options?.availableServicesJson?.trim();
+  if (ctx) formData.append("availableServices", ctx);
 
   const response = await axiosClient.post<ClientExtractionResponse>(
     "/gemini/extract-client-sdr",
     formData,
     {
-      signal: options.signal,
+      signal: options?.signal,
       transformRequest: [
         (data, headers) => {
           if (data instanceof FormData) {
