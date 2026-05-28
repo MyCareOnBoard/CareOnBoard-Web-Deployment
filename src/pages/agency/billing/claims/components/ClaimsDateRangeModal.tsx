@@ -7,13 +7,12 @@ type ClaimsDateRangeModalProps = {
   values: BillingDateRangeValues;
   onChange: (values: BillingDateRangeValues) => void;
   onApply: (values: BillingDateRangeValues) => void;
+  description?: string;
 };
 
-export default function ClaimsDateRangeModal(props: ClaimsDateRangeModalProps) {
-  return (
-    <BillingDateRangeModal
-      {...props}
-      description="Choose a date range to filter your claims dashboard"
-    />
-  );
+export default function ClaimsDateRangeModal({
+  description = "Choose a date range to filter your claims dashboard",
+  ...rest
+}: ClaimsDateRangeModalProps) {
+  return <BillingDateRangeModal {...rest} description={description} />;
 }
