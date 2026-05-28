@@ -1,16 +1,21 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import Calendar2Icon from "@/assets/icons/calendar-2.svg?react";
-import DocumentDownloadIcon from "@/assets/icons/document-download.svg?react";
 import BillingDateRangeModal from "./BillingDateRangeModal";
 import type { BillingDateRangeValues } from "./types";
+
+type PrimaryAction = {
+  label: string;
+  onClick: () => void;
+  loading?: boolean;
+};
 
 type BillingDashboardHeaderProps = {
   title: string;
   subtitle: string;
   dateRange: BillingDateRangeValues;
   onDateRangeChange: (values: BillingDateRangeValues) => void;
-  showExportButton?: boolean;
+  primaryAction?: PrimaryAction;
   dateRangeModalTitle?: string;
   dateRangeModalDescription?: string;
 };
@@ -28,7 +33,7 @@ export default function BillingDashboardHeader({
   subtitle,
   dateRange,
   onDateRangeChange,
-  showExportButton = false,
+  primaryAction,
   dateRangeModalTitle,
   dateRangeModalDescription,
 }: BillingDashboardHeaderProps) {
@@ -59,14 +64,14 @@ export default function BillingDashboardHeader({
             <Calendar2Icon className="h-5 w-5 shrink-0" aria-hidden />
           </button>
 
-          {showExportButton && (
+          {primaryAction && (
             <button
               type="button"
-              onClick={() => undefined}
-              className="inline-flex h-11 min-h-[44px] w-full cursor-pointer items-center justify-between gap-3 rounded-full bg-[#00b4b8] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#009da1] active:bg-[#009199] sm:w-auto sm:min-w-[160px]"
+              onClick={primaryAction.onClick}
+              disabled={primaryAction.loading}
+              className="inline-flex h-11 min-h-[44px] w-full cursor-pointer items-center justify-center rounded-full bg-[#00b4b8] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#009da1] active:bg-[#009199] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[160px]"
             >
-              Export Report
-              <DocumentDownloadIcon className="h-5 w-5 shrink-0" aria-hidden />
+              {primaryAction.loading ? "Loading…" : primaryAction.label}
             </button>
           )}
         </div>

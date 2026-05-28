@@ -84,7 +84,7 @@ function ClaimReportSummaryFooter({
           value={String(form.summary.totalClaimsProcessed)}
         />
         <SummaryRow label="Total Units Billed" value={form.summary.totalUnitsBilled} />
-        <SummaryRow label="Total authorized hours" value={form.summary.totalAuthorizedHours} />
+        <SummaryRow label="Total billed hours" value={form.summary.totalBilledHours} />
         <SummaryRow
           label="Total Claim Amount"
           value={form.summary.totalClaimAmount}

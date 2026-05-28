@@ -3,6 +3,12 @@ export const CLAIMS_CORNER_MODAL_CLASS =
 
 export const CLAIMS_CORNER_MODAL_SHELL_CLASS = "flex max-h-[90dvh] flex-col gap-0 overflow-hidden";
 
+export const CLAIMS_WIZARD_MODAL_CLASS =
+  "fixed !left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2 w-[calc(100vw-32px)] max-w-[720px] rounded-[20px] border border-[#e5e5e6] bg-white p-0 shadow-lg data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100";
+
+export const CLAIMS_WIZARD_MODAL_SHELL_CLASS =
+  "flex max-h-[90dvh] flex-col gap-0 overflow-hidden";
+
 export const CLAIMS_FIELD_CLASS =
   "h-[48px] rounded-[10px] border border-[#e5e5e6] bg-white px-4 text-[14px] text-[#10141a] focus:border-[#00b4b8] focus:ring-[#00b4b8]";
 

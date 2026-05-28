@@ -78,6 +78,7 @@ type RecentClaimRowProps = {
   claim: RecentClaim;
   variant: RowVariant;
   onGenerateClaim: (claim: RecentClaim) => void;
+  generateDisabled?: boolean;
 };
 
 function DurationRange({ start, end }: { start: string; end: string }) {
@@ -107,10 +108,12 @@ function ClaimActionsMenu({
   claim,
   variant,
   onGenerateClaim,
+  generateDisabled = false,
 }: {
   claim: RecentClaim;
   variant: RowVariant;
   onGenerateClaim: (claim: RecentClaim) => void;
+  generateDisabled?: boolean;
 }) {
   const isMobile = variant === "mobile";
 
@@ -137,6 +140,7 @@ function ClaimActionsMenu({
       >
         <DropdownMenuItem
           className={menuItemClassName}
+          disabled={generateDisabled}
           onSelect={() => onGenerateClaim(claim)}
         >
           Generate claim
@@ -147,7 +151,12 @@ function ClaimActionsMenu({
   );
 }
 
-function RecentClaimRow({ claim, variant, onGenerateClaim }: RecentClaimRowProps) {
+function RecentClaimRow({
+  claim,
+  variant,
+  onGenerateClaim,
+  generateDisabled = false,
+}: RecentClaimRowProps) {
   if (variant === "mobile") {
     return (
       <div className="relative rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
@@ -156,6 +165,7 @@ function RecentClaimRow({ claim, variant, onGenerateClaim }: RecentClaimRowProps
             claim={claim}
             variant="mobile"
             onGenerateClaim={onGenerateClaim}
+            generateDisabled={generateDisabled}
           />
         </div>
 
@@ -221,6 +231,7 @@ function RecentClaimRow({ claim, variant, onGenerateClaim }: RecentClaimRowProps
           claim={claim}
           variant="desktop"
           onGenerateClaim={onGenerateClaim}
+          generateDisabled={generateDisabled}
         />
       </div>
     </div>
