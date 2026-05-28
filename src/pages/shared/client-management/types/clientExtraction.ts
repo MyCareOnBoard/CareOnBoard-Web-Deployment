@@ -326,7 +326,6 @@ export type ClientExtractionResponse = {
     mimeType: string;
     fileSize: number;
     model?: string;
-    cached?: boolean;
   };
 };
 
