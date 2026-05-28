@@ -23,6 +23,12 @@ function statusClasses(color?: string) {
   }
 }
 
+function str(v: unknown): string {
+  if (v == null) return "—";
+  if (typeof v === "string") return v;
+  return String(v);
+}
+
 export default function GenericListCard({ data }: { data: unknown }) {
   const d = data as GenericListData;
   const rows = Array.isArray(d?.rows) ? d.rows : [];
@@ -44,9 +50,9 @@ export default function GenericListCard({ data }: { data: unknown }) {
           {rows.map((row, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-2.5">
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-[#10141a] truncate">{row.primary}</p>
-                {row.secondary && (
-                  <p className="text-[11px] text-[#6b7280] truncate mt-0.5">{row.secondary}</p>
+                <p className="text-[13px] font-medium text-[#10141a] truncate">{str(row.primary)}</p>
+                {row.secondary != null && (
+                  <p className="text-[11px] text-[#6b7280] truncate mt-0.5">{str(row.secondary)}</p>
                 )}
               </div>
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
