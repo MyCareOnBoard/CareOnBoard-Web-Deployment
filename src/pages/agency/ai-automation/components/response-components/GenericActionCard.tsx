@@ -12,6 +12,12 @@ interface GenericActionData {
   details?: GenericActionDetail[];
 }
 
+function str(v: unknown): string {
+  if (v == null) return "—";
+  if (typeof v === "string") return v;
+  return String(v);
+}
+
 export default function GenericActionCard({ data }: { data: unknown }) {
   const d = data as GenericActionData;
   const isSuccess = d?.status !== "error";
@@ -39,8 +45,8 @@ export default function GenericActionCard({ data }: { data: unknown }) {
             <div className="space-y-1 mt-1">
               {d.details.map((detail, i) => (
                 <div key={i} className="flex items-baseline gap-2">
-                  <span className="text-[11px] text-[#9ca3af] shrink-0 min-w-[64px]">{detail.label}</span>
-                  <span className="text-[12px] text-[#374151]">{detail.value}</span>
+                  <span className="text-[11px] text-[#9ca3af] shrink-0 min-w-[64px]">{str(detail.label)}</span>
+                  <span className="text-[12px] text-[#374151]">{str(detail.value)}</span>
                 </div>
               ))}
             </div>

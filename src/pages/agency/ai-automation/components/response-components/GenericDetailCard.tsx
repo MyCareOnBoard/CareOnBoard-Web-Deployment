@@ -1,3 +1,9 @@
+function str(v: unknown): string {
+  if (v == null) return "—";
+  if (typeof v === "string") return v;
+  return String(v);
+}
+
 interface GenericDetailField {
   label: string;
   value: string;
@@ -47,18 +53,21 @@ export default function GenericDetailCard({ data }: { data: unknown }) {
             </div>
           )}
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-3">
-            {section.fields.map((field, fi) => (
+            {section.fields.map((field, fi) => {
+              const display = str(field.value);
+              return (
               <div key={fi} className="min-w-0">
                 <p className="text-[11px] text-[#9ca3af] mb-0.5">{field.label}</p>
                 {field.badge ? (
-                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize ${badgeClasses(field.value)}`}>
-                    {field.value || "—"}
+                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize ${badgeClasses(display)}`}>
+                    {display || "—"}
                   </span>
                 ) : (
-                  <p className="text-[12px] text-[#374151] break-words">{field.value || "—"}</p>
+                  <p className="text-[12px] text-[#374151] break-words">{display || "—"}</p>
                 )}
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       ))}
