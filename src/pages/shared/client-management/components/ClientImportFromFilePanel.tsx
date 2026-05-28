@@ -319,9 +319,6 @@ export default function ClientImportFromFilePanel({
                   Detected document:{" "}
                   <span className="font-medium text-foreground">{detectedLabel}</span>
                 </p>
-                {extraction?.sourceDocument?.cached ? (
-                  <p className="text-[11px] text-muted-foreground">Reused a recent extraction</p>
-                ) : null}
               </>
             ) : null}
           </DialogHeader>
