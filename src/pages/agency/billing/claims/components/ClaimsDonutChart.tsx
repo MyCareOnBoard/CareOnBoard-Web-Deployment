@@ -19,6 +19,7 @@ type ClaimsDonutChartProps = {
   showPercentageInLegend?: boolean;
   legendData?: DonutSegment[];
   interactive?: boolean;
+  onLegendItemClick?: (segment: DonutSegment) => void;
 };
 
 function buildSegments(data: DonutSegment[], progress: number): BuiltSegment[] {
@@ -119,6 +120,7 @@ function InteractiveDonutChart({
   data,
   showPercentageInLegend = false,
   legendData,
+  onLegendItemClick,
 }: ClaimsDonutChartProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [animatedProgress, setAnimatedProgress] = useState(0);
@@ -182,6 +184,7 @@ function InteractiveDonutChart({
               type="button"
               onMouseEnter={() => setActiveIndex(index)}
               onMouseLeave={() => setActiveIndex(null)}
+              onClick={() => onLegendItemClick?.(item)}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-colors ${
                 activeIndex === index ? "bg-[#eef4f5]" : "bg-transparent"
               }`}
