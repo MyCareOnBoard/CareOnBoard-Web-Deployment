@@ -7,6 +7,73 @@ import {
 } from "./sdrWeeklyDistribution";
 import { applySdrAuthorizationOverride } from "./normalizeExtractedServiceAuthorization";
 
+/** Best display name for wizard `Service.name` from an extracted SDR/ISP row. */
+export function resolveExtractedServiceDisplayName(
+  row: Pick<ExtractionServiceRow, "name" | "sdrDetails">,
+): string | undefined {
+  const direct = String(row.name ?? "").trim();
+  if (direct) return direct;
+  const fromSource = String(row.sdrDetails?.source?.serviceName ?? "").trim();
+  return fromSource || undefined;
+}
+
+/** Frequency for the Stage 2 SDR breakdown UI (`service.sdrDetails.frequency`). */
+export function resolveExtractedSdrFrequency(
+  row: Pick<ExtractionServiceRow, "frequency" | "sdrDetails">,
+): string | undefined {
+  const fromDetails = String(row.sdrDetails?.frequency ?? "").trim();
+  if (fromDetails) return fromDetails;
+  return String(row.frequency ?? "").trim() || undefined;
+}
+
+const SDR_DETAILS_SCALAR_KEYS = ["frequency", "duration", "setting", "staffing"] as const;
+
+/** Merge SDR breakdown scalars into existing wizard `sdrDetails` when empty (or when overwrite). */
+export function mergeSdrDetailsScalarFields(
+  existing: ServiceSdrDetails | undefined,
+  incoming: ServiceSdrDetails | undefined,
+  overwrite: boolean,
+): Partial<ServiceSdrDetails> | undefined {
+  if (!incoming) return undefined;
+  const patch: Partial<ServiceSdrDetails> = {};
+  for (const key of SDR_DETAILS_SCALAR_KEYS) {
+    const inc = incoming[key]?.trim();
+    if (!inc) continue;
+    const cur = existing?.[key]?.trim();
+    if (overwrite || !cur) patch[key] = inc;
+  }
+  return Object.keys(patch).length ? patch : undefined;
+}
+
+export function applySdrDetailsScalarPatch(
+  svc: Service,
+  scalarPatch: Partial<ServiceSdrDetails> | undefined,
+): boolean {
+  if (!scalarPatch || !Object.keys(scalarPatch).length) return false;
+  const prev = svc.sdrDetails ?? {};
+  svc.sdrDetails = {
+    ...prev,
+    ...scalarPatch,
+    importedAt: prev.importedAt ?? new Date().toISOString(),
+  };
+  return true;
+}
+
+/** Copy top-level ISP `frequency` into `sdrDetails.frequency` when the breakdown field is empty. */
+export function seedTopLevelFrequencyIntoSdrDetails(service: Service): Service {
+  const top = String(service.frequency ?? "").trim();
+  if (!top || String(service.sdrDetails?.frequency ?? "").trim()) return service;
+  const prev = service.sdrDetails ?? {};
+  return {
+    ...service,
+    sdrDetails: {
+      ...prev,
+      frequency: top,
+      importedAt: prev.importedAt ?? new Date().toISOString(),
+    },
+  };
+}
+
 function dedupeCapStrings(items: unknown[] | undefined): string[] {
   if (!Array.isArray(items) || !items.length) return [];
   const seen = new Set<string>();
@@ -143,15 +210,23 @@ export function applySdrEnrichmentFromExtractionRow(
 
   next = { ...next, ...applySdrAuthorizationOverride(row, { weeklyDerivedTotalHours }) };
 
-  const sdrDraft = extractionSdrToWizardDraft(row.sdrDetails ?? {}, {
-    providerLine: row.provider,
-    claimsSourceLine: row.claimsSource,
-  });
-  if (sdrDraft) next.sdrDetails = sdrDraft;
-
-  if (String(row.frequency ?? "").trim() && !String(next.frequency ?? "").trim()) {
-    next.frequency = String(row.frequency).trim();
+  if (!String(next.name ?? "").trim()) {
+    const displayName = resolveExtractedServiceDisplayName(row);
+    if (displayName) next.name = displayName;
   }
+
+  const resolvedFrequency = resolveExtractedSdrFrequency(row);
+  const sdrDraft = extractionSdrToWizardDraft(
+    {
+      ...(row.sdrDetails ?? {}),
+      ...(resolvedFrequency ? { frequency: resolvedFrequency } : {}),
+    },
+    {
+      providerLine: row.provider,
+      claimsSourceLine: row.claimsSource,
+    },
+  );
+  if (sdrDraft) next.sdrDetails = sdrDraft;
 
   const procedureName = String(row.procedureName ?? "").trim();
   if (procedureName) next.procedureName = procedureName;
@@ -175,7 +250,7 @@ export function mapExtractionRowToWizardService(row: ExtractionServiceRow): Serv
     (svc as Record<string, unknown>)[key as string] = s;
   };
   setStr("code", row.code);
-  setStr("name", row.name);
+  setStr("name", resolveExtractedServiceDisplayName(row));
   setStr("claimsSource", row.claimsSource);
   const sStart = parseIsoOrUsDate(row.sdrStartDate);
   const sEnd = parseIsoOrUsDate(row.sdrEndDate);

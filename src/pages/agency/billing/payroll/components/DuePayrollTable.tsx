@@ -17,7 +17,6 @@ export default function DuePayrollTable() {
     );
   }, [filterQuery]);
 
-  const handleEditDetails = useCallback((_entry: DuePayrollEntry) => undefined, []);
   const handleGenerateInvoice = useCallback((_entry: DuePayrollEntry) => undefined, []);
 
   const emptyMessage = useMemo(() => {
@@ -51,7 +50,6 @@ export default function DuePayrollTable() {
                   key={entry.id}
                   variant="desktop"
                   entry={entry}
-                  onEditDetails={handleEditDetails}
                   onGenerateInvoice={handleGenerateInvoice}
                 />
               ))
@@ -71,7 +69,6 @@ export default function DuePayrollTable() {
               key={entry.id}
               variant="mobile"
               entry={entry}
-              onEditDetails={handleEditDetails}
               onGenerateInvoice={handleGenerateInvoice}
             />
           ))

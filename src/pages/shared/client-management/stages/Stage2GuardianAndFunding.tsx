@@ -289,12 +289,14 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
         <div className="flex flex-col gap-1">
           <label className="text-[12px] font-normal text-[#10141a]">Frequency</label>
           <Input
-            value={service.sdrDetails?.frequency ?? ""}
-            onChange={(e) =>
-              patchSdrDetails({
-                frequency: e.target.value.trim() || undefined,
-              })
-            }
+            value={service.sdrDetails?.frequency ?? service.frequency ?? ""}
+            onChange={(e) => {
+              const frequency = e.target.value.trim() || undefined;
+              patchSdrDetails({ frequency });
+              if (service.frequency) {
+                update({ frequency: undefined });
+              }
+            }}
             className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
           />
         </div>
@@ -328,6 +330,19 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
             onChange={(e) => update({ unitType: e.target.value || undefined })}
             className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
             placeholder="e.g. 15 Min"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[12px] font-normal text-[#10141a]">Total units</label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={service.totalUnits ?? ""}
+            onChange={(e) => update({ totalUnits: e.target.value || undefined })}
+            className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+            placeholder="Units for the period"
           />
         </div>
 

@@ -155,6 +155,25 @@ describe("mergeExtractionDraft", () => {
     expect(formData.stage2.outcomes[0].services[0].staffRate).toBe("");
   });
 
+  it("seeds sdrDetails.frequency from ISP top-level frequency on import", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: {
+        stage2: {
+          outcomes: [
+            {
+              statement: "Authorization",
+              services: [{ name: "Day Hab", code: "DH001", frequency: "Weekly" }],
+            },
+          ],
+        },
+      },
+    });
+    const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: false });
+    expect(formData.stage2.outcomes[0].services[0].frequency).toBe("Weekly");
+    expect(formData.stage2.outcomes[0].services[0].sdrDetails?.frequency).toBe("Weekly");
+  });
+
   it("maps ISP authorization scalars including totalHours and totalCost", () => {
     const initial = createInitialAddClientFormData();
     const extraction = makeExtraction({

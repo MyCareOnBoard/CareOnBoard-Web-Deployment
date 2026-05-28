@@ -5,7 +5,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -71,12 +70,10 @@ const menuItemClassName =
 function PayrollActionsMenu({
   entry,
   variant,
-  onEditDetails,
   onGenerateInvoice,
 }: {
   entry: DuePayrollEntry;
   variant: "mobile" | "desktop";
-  onEditDetails: (entry: DuePayrollEntry) => void;
   onGenerateInvoice: (entry: DuePayrollEntry) => void;
 }) {
   const isMobile = variant === "mobile";
@@ -104,14 +101,6 @@ function PayrollActionsMenu({
       >
         <DropdownMenuItem
           className={menuItemClassName}
-          onSelect={() => onEditDetails(entry)}
-        >
-          Edit details
-          <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
-        </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-[#e5e5e6]" />
-        <DropdownMenuItem
-          className={menuItemClassName}
           onSelect={() => onGenerateInvoice(entry)}
         >
           Generate invoice
@@ -125,11 +114,10 @@ function PayrollActionsMenu({
 type DuePayrollRowProps = {
   entry: DuePayrollEntry;
   variant: "mobile" | "desktop";
-  onEditDetails: (entry: DuePayrollEntry) => void;
   onGenerateInvoice: (entry: DuePayrollEntry) => void;
 };
 
-function DuePayrollRow({ entry, variant, onEditDetails, onGenerateInvoice }: DuePayrollRowProps) {
+function DuePayrollRow({ entry, variant, onGenerateInvoice }: DuePayrollRowProps) {
   if (variant === "mobile") {
     return (
       <div className="relative rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
@@ -137,7 +125,6 @@ function DuePayrollRow({ entry, variant, onEditDetails, onGenerateInvoice }: Due
           <PayrollActionsMenu
             entry={entry}
             variant="mobile"
-            onEditDetails={onEditDetails}
             onGenerateInvoice={onGenerateInvoice}
           />
         </div>
@@ -187,7 +174,6 @@ function DuePayrollRow({ entry, variant, onEditDetails, onGenerateInvoice }: Due
         <PayrollActionsMenu
           entry={entry}
           variant="desktop"
-          onEditDetails={onEditDetails}
           onGenerateInvoice={onGenerateInvoice}
         />
       </div>

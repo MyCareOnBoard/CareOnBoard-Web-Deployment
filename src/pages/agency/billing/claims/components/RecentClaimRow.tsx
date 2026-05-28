@@ -5,7 +5,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -78,7 +77,6 @@ type RowVariant = "mobile" | "desktop";
 type RecentClaimRowProps = {
   claim: RecentClaim;
   variant: RowVariant;
-  onEditClaim: (claim: RecentClaim) => void;
   onGenerateClaim: (claim: RecentClaim) => void;
 };
 
@@ -108,12 +106,10 @@ const menuItemClassName =
 function ClaimActionsMenu({
   claim,
   variant,
-  onEditClaim,
   onGenerateClaim,
 }: {
   claim: RecentClaim;
   variant: RowVariant;
-  onEditClaim: (claim: RecentClaim) => void;
   onGenerateClaim: (claim: RecentClaim) => void;
 }) {
   const isMobile = variant === "mobile";
@@ -141,14 +137,6 @@ function ClaimActionsMenu({
       >
         <DropdownMenuItem
           className={menuItemClassName}
-          onSelect={() => onEditClaim(claim)}
-        >
-          Edit client claim
-          <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
-        </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-[#e5e5e6]" />
-        <DropdownMenuItem
-          className={menuItemClassName}
           onSelect={() => onGenerateClaim(claim)}
         >
           Generate claim
@@ -159,7 +147,7 @@ function ClaimActionsMenu({
   );
 }
 
-function RecentClaimRow({ claim, variant, onEditClaim, onGenerateClaim }: RecentClaimRowProps) {
+function RecentClaimRow({ claim, variant, onGenerateClaim }: RecentClaimRowProps) {
   if (variant === "mobile") {
     return (
       <div className="relative rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
@@ -167,7 +155,6 @@ function RecentClaimRow({ claim, variant, onEditClaim, onGenerateClaim }: Recent
           <ClaimActionsMenu
             claim={claim}
             variant="mobile"
-            onEditClaim={onEditClaim}
             onGenerateClaim={onGenerateClaim}
           />
         </div>
@@ -233,7 +220,6 @@ function RecentClaimRow({ claim, variant, onEditClaim, onGenerateClaim }: Recent
         <ClaimActionsMenu
           claim={claim}
           variant="desktop"
-          onEditClaim={onEditClaim}
           onGenerateClaim={onGenerateClaim}
         />
       </div>
