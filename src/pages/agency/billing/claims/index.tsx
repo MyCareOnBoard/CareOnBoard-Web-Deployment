@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { Shift } from "@/lib/api/shifts";
 import { getCreateBillingClaimErrorMessage } from "@/lib/api/claims";
 import { useToast } from "@/hooks/use-toast";
@@ -8,10 +8,11 @@ import ClaimsOverviewCards from "./components/ClaimsOverviewCards";
 import ClaimsByStatusChart from "./components/ClaimsByStatusChart";
 import TopRejectionReasonsChart from "./components/TopRejectionReasonsChart";
 import RecentClaimsTable from "./components/RecentClaimsTable";
-import { DEFAULT_DATE_RANGE } from "./data/mockClaimsDashboardData";
 import type { RecentClaim } from "./data/mockClaimsDashboardData";
 import type { SavedBillingClaim } from "@/lib/api/claims";
 import { saveGeneratedClaim } from "./utils/saveGeneratedClaim";
+import { useClaimsDashboard } from "./hooks/useClaimsDashboard";
+import { getCurrentWeekDateRange } from "./utils/claimsDashboardUtils";
 
 const GenerateClaimModal = lazy(() => import("./components/GenerateClaimModal"));
 const ClaimReportModal = lazy(() => import("./components/claim-report/ClaimReportModal"));
@@ -19,7 +20,9 @@ const ClaimReportModal = lazy(() => import("./components/claim-report/ClaimRepor
 export default function ClaimsDashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [dateRange, setDateRange] = useState(DEFAULT_DATE_RANGE);
+  const [dateRange, setDateRange] = useState(getCurrentWeekDateRange);
+  const dashboard = useClaimsDashboard(dateRange);
+  const { refetch: refetchDashboard } = dashboard;
   const [generateOpen, setGenerateOpen] = useState(false);
   const [savingClaim, setSavingClaim] = useState(false);
   const [claimedShiftIds, setClaimedShiftIds] = useState<string[]>([]);
@@ -28,6 +31,18 @@ export default function ClaimsDashboardPage() {
     selectedShifts: Shift[];
     savedClaim: SavedBillingClaim;
   } | null>(null);
+
+  useEffect(() => {
+    if (!dashboard.error) {
+      return;
+    }
+
+    toast({
+      title: "Couldn't load claims dashboard",
+      description: dashboard.error,
+      variant: "destructive",
+    });
+  }, [dashboard.error, toast]);
 
   const handleGenerateClaim = useCallback(
     async (
@@ -56,6 +71,8 @@ export default function ClaimsDashboardPage() {
         });
         setGenerateOpen(false);
 
+        await refetchDashboard();
+
         toast({
           title: `Claim ${savedClaim.claimNumber} saved.`,
           description: "Opening report…",
@@ -71,7 +88,7 @@ export default function ClaimsDashboardPage() {
         setSavingClaim(false);
       }
     },
-    [toast, user?.agencyId],
+    [refetchDashboard, toast, user?.agencyId],
   );
 
   const handleTableGenerateClaim = useCallback(
@@ -96,11 +113,11 @@ export default function ClaimsDashboardPage() {
         onGenerateClaimClick={() => setGenerateOpen(true)}
         generateClaimLoading={savingClaim}
       />
-      <ClaimsOverviewCards />
+      <ClaimsOverviewCards stats={dashboard.overviewStats} loading={dashboard.loading} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ClaimsByStatusChart />
-        <TopRejectionReasonsChart />
+        <ClaimsByStatusChart chart={dashboard.statusChart} loading={dashboard.loading} />
+        <TopRejectionReasonsChart chart={dashboard.rejectionChart} loading={dashboard.loading} />
       </div>
 
       <RecentClaimsTable
