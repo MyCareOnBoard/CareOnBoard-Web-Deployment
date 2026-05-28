@@ -1,8 +1,4 @@
-function str(v: unknown): string {
-  if (v == null) return "—";
-  if (typeof v === "string") return v;
-  return String(v);
-}
+import { str } from "./strValue";
 
 interface GenericDetailField {
   label: string;

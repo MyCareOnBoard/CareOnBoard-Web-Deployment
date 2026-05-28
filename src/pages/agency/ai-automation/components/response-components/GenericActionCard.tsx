@@ -12,11 +12,7 @@ interface GenericActionData {
   details?: GenericActionDetail[];
 }
 
-function str(v: unknown): string {
-  if (v == null) return "—";
-  if (typeof v === "string") return v;
-  return String(v);
-}
+import { str } from "./strValue";
 
 export default function GenericActionCard({ data }: { data: unknown }) {
   const d = data as GenericActionData;
