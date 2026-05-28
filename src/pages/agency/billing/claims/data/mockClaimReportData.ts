@@ -1,19 +1,18 @@
 export type ClaimReportServiceLine = {
   duration: string;
   placeOfService: string;
-  emg: string;
   cptHcpcs: string;
   modifier: string;
   diagnosisPointer: string;
-  charges: string;
-  epsotFamilyPlan: string;
-  idQual1: string;
+  totalCharges: string;
+  nipId: string;
+  providerId: string;
 };
 
 export type ClaimReportSummary = {
   totalClaimsProcessed: number;
   totalUnitsBilled: string;
-  totalAuthorizedHours: string;
+  totalBilledHours: string;
   totalClaimAmount: string;
 };
 
@@ -76,62 +75,58 @@ const DEFAULT_DIAGNOSIS_CODES: Record<string, string> = Object.fromEntries(
 
 export const DEFAULT_SERVICE_LINES: ClaimReportServiceLine[] = [
   {
-    duration: "04/21/2026 → 04/21/2026",
+    duration: "4/21/2026 -> 4/21/2026",
     placeOfService: "99",
-    emg: "-",
     cptHcpcs: "H2016",
     modifier: "HI",
     diagnosisPointer: "A",
-    charges: "$650",
-    epsotFamilyPlan: "-",
-    idQual1: "NPI",
+    totalCharges: "$650",
+    nipId: "1234567890",
+    providerId: "DDD123456",
   },
   {
-    duration: "04/21/2026 → 04/21/2026",
+    duration: "4/21/2026 -> 4/21/2026",
     placeOfService: "99",
-    emg: "-",
     cptHcpcs: "H2016",
     modifier: "HI",
     diagnosisPointer: "A",
-    charges: "$650",
-    epsotFamilyPlan: "-",
-    idQual1: "NPI",
+    totalCharges: "$650",
+    nipId: "1234567890",
+    providerId: "DDD123456",
   },
   {
-    duration: "04/22/2026 → 04/22/2026",
+    duration: "4/22/2026 -> 4/22/2026",
     placeOfService: "99",
-    emg: "-",
     cptHcpcs: "H2016",
     modifier: "HI",
     diagnosisPointer: "A",
-    charges: "$650",
-    epsotFamilyPlan: "-",
-    idQual1: "NPI",
+    totalCharges: "$650",
+    nipId: "1234567890",
+    providerId: "DDD123456",
   },
   {
-    duration: "04/23/2026 → 04/23/2026",
+    duration: "4/23/2026 -> 4/23/2026",
     placeOfService: "99",
-    emg: "-",
     cptHcpcs: "H2016",
     modifier: "HI",
     diagnosisPointer: "A",
-    charges: "$650",
-    epsotFamilyPlan: "-",
-    idQual1: "NPI",
+    totalCharges: "$650",
+    nipId: "1234567890",
+    providerId: "DDD123456",
   },
 ];
 
 export const DEFAULT_CLAIM_REPORT_SUMMARY: ClaimReportSummary = {
   totalClaimsProcessed: 24,
   totalUnitsBilled: "4,820",
-  totalAuthorizedHours: "5,000 hrs",
+  totalBilledHours: "5,000 hrs",
   totalClaimAmount: "$216,700",
 };
 
 const EMPTY_CLAIM_REPORT_SUMMARY: ClaimReportSummary = {
   totalClaimsProcessed: 0,
   totalUnitsBilled: "0",
-  totalAuthorizedHours: "",
+  totalBilledHours: "",
   totalClaimAmount: "$0.00",
 };
 
@@ -147,7 +142,7 @@ export const EMPTY_CLAIM_REPORT: ClaimReportFormState = {
   conditionEmployment: false,
   conditionAutoAccident: false,
   conditionOtherAccident: false,
-  outsideLab: "no",
+  outsideLab: "yes",
   serviceDateIso: "",
   signedSignature: null,
   currentIllnessDateIso: "",
@@ -156,7 +151,7 @@ export const EMPTY_CLAIM_REPORT: ClaimReportFormState = {
   hospitalizationInitialIso: "",
   hospitalizationEndIso: "",
   chargesCurrency: "USD",
-  chargesAmount: "0.00",
+  chargesAmount: "",
   physicianSignature: null,
   signatureDateIso: "",
   paNumber: "",
@@ -197,14 +192,13 @@ export const DEFAULT_CLAIM_REPORT: ClaimReportFormState = {
 export const CLAIM_REPORT_TABLE_COLUMNS = [
   "Duration of service",
   "Place of service",
-  "EMG",
   "CPT/HCPCS",
   "MODIFIER",
   "Diagnosis pointer",
-  "Charges",
-  "EPSOT family plan",
-  "ID QUAL",
+  "Total Charges",
+  "NIP ID",
+  "Provider ID",
 ] as const;
 
 export const CLAIM_REPORT_TABLE_GRID =
-  "grid grid-cols-[minmax(140px,1.4fr)_minmax(60px,0.7fr)_minmax(40px,0.5fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(80px,0.9fr)_minmax(50px,0.6fr)] items-center gap-2";
+  "grid grid-cols-[minmax(140px,1.4fr)_minmax(50px,0.6fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(70px,0.8fr)_minmax(80px,0.9fr)_minmax(80px,0.9fr)_minmax(90px,1fr)] items-center gap-2";

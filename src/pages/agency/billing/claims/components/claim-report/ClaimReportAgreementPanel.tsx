@@ -77,34 +77,6 @@ function ClaimReportAgreementPanel({
       </section>
 
       <section className={CLAIM_REPORT_SECTION}>
-        <ReportSectionTitle>Nature of diagnosis</ReportSectionTitle>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <ReportFieldLabel>
-              Date of current illness, injury or pregnancy(LMP)
-            </ReportFieldLabel>
-            <CustomDatePicker
-              key={`report-illness-date-${claimId}`}
-              align="start"
-              date={form.currentIllnessDateIso ? new Date(form.currentIllnessDateIso) : null}
-              placeholder="Select date"
-              setDate={setDateField("currentIllnessDateIso")}
-              {...CLAIM_REPORT_DATE_PICKER_PROPS}
-            />
-          </div>
-          <div>
-            <ReportFieldLabel>QUAL</ReportFieldLabel>
-            <Input
-              value={form.qualCode}
-              onChange={(event) => onUpdate({ qualCode: event.target.value })}
-              placeholder="Enter Qual Code here"
-              className={CLAIM_REPORT_FIELD_CLASS}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className={CLAIM_REPORT_SECTION}>
         <ReportSectionTitle>Diagnosis of illness</ReportSectionTitle>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
           {DIAGNOSIS_CODE_LETTERS.map((letter) => (

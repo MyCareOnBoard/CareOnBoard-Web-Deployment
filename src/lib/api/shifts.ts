@@ -63,6 +63,12 @@ export const formatShiftLocation = (location?: ShiftLocation | string | null): s
     return location.address || "";
 };
 
+export type ShiftBillingClaimSummary = {
+    id: string;
+    claimNumber: string;
+    status: "pending" | "paid" | "rejected";
+};
+
 /**
  * Shift interface
  */
@@ -87,6 +93,9 @@ export interface Shift {
     approved?: boolean; // Whether the shift is approved
     /** When true, shift appears as Approved in Billing & Approvals */
     approvedForClaim?: boolean;
+    /** Set when shift is included on a saved billing claim */
+    claimId?: string;
+    billingClaim?: ShiftBillingClaimSummary | null;
     timeRemaining?: number; // minutes remaining
     sessionDuration?: string; // e.g., "2 hour session"
     serviceCode?: string;
@@ -240,6 +249,10 @@ export interface ListShiftsParams {
     client?: boolean; // Populate client data
     employee?: boolean; // Populate employee data
     agency?: boolean; // Populate agency data
+    /** When true, return only shifts approved for billing/claim */
+    approvedForClaim?: boolean;
+    /** When true, attach billing claim summary for shifts with claimId */
+    billingClaim?: boolean;
 }
 
 /**

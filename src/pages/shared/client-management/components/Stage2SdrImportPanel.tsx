@@ -392,9 +392,6 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
               <p className="text-[12px] text-muted-foreground">
                 Detected document: <span className="font-medium text-foreground">{detectedLabel}</span>
               </p>
-              {extraction?.sourceDocument?.cached ? (
-                <p className="text-[11px] text-muted-foreground">Reused a recent extraction</p>
-              ) : null}
             </>
           )}
         </DialogHeader>

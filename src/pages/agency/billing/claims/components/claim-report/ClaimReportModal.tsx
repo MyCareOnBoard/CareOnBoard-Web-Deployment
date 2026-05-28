@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
   Dialog,
@@ -6,11 +6,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { getAgencyById } from "@/lib/api/agencies";
+import type { Shift } from "@/lib/api/shifts";
 import type { RecentClaim } from "../../data/mockClaimsDashboardData";
 import type { ClaimReportFormState, ClaimSignaturePayload } from "../../data/mockClaimReportData";
 import { buildClaimReportFromClaim } from "../../utils/claimReportUtils";
+import type { ClaimReportPrefillSnapshot } from "../../utils/claimReportPrefillUtils";
 import { downloadClaimReportPdf } from "../../utils/claimReportPrintUtils";
 import { normalizeSignaturePayload } from "../../utils/claimReportSignatureUtils";
+import { useAuth } from "@/utils/auth";
 import {
   CLAIM_REPORT_PRINT_ROOT_CLASS,
   CLAIMS_REPORT_MODAL_CLASS,
@@ -31,18 +35,68 @@ type SignatureTarget = "signed" | "physician";
 type ClaimReportModalProps = {
   open: boolean;
   claim: RecentClaim;
+  selectedShifts: Shift[];
+  savedClaimId?: string;
+  claimNumber?: string;
+  initialPrefill: ClaimReportPrefillSnapshot;
   onClose: () => void;
 };
 
-export default function ClaimReportModal({ open, claim, onClose }: ClaimReportModalProps) {
+export default function ClaimReportModal({
+  open,
+  claim,
+  selectedShifts,
+  savedClaimId,
+  claimNumber,
+  initialPrefill,
+  onClose,
+}: ClaimReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
-  const [form, setForm] = useState<ClaimReportFormState>(() => buildClaimReportFromClaim(claim));
+  const { user } = useAuth();
+  const [form, setForm] = useState<ClaimReportFormState>(() =>
+    buildClaimReportFromClaim(claim, initialPrefill),
+  );
   const [signatureTarget, setSignatureTarget] = useState<SignatureTarget | null>(null);
   const [signatureModalEverOpened, setSignatureModalEverOpened] = useState(false);
 
   const updateForm = useCallback((patch: Partial<ClaimReportFormState>) => {
     setForm((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const agencyId = user?.agencyId;
+    if (!agencyId) return;
+
+    let cancelled = false;
+
+    getAgencyById(agencyId)
+      .then((agency) => {
+        if (cancelled) return;
+
+        const nipId = agency.npi?.trim() ?? "";
+        const providerId = agency.medicaidProviderId?.trim() ?? "";
+
+        setForm((prev) => ({
+          ...prev,
+          serviceLines: prev.serviceLines.map((line) => ({
+            ...line,
+            nipId,
+            providerId,
+          })),
+        }));
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Failed to load agency for claim report:", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, user?.agencyId]);
 
   const updateDiagnosis = useCallback((letter: string, value: string) => {
     setForm((prev) => ({
@@ -136,6 +190,11 @@ export default function ClaimReportModal({ open, claim, onClose }: ClaimReportMo
                 <DialogTitle className="text-left text-[20px] font-bold text-[#10141a] sm:text-[24px]">
                   Claim report
                 </DialogTitle>
+                {claimNumber ? (
+                  <p className="mt-1 text-[14px] font-medium text-[#808081]">
+                    {claimNumber} · Pending
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   aria-label="Close"
@@ -157,7 +216,7 @@ export default function ClaimReportModal({ open, claim, onClose }: ClaimReportMo
                 <div className="mt-6 lg:mt-0 lg:pl-8">
                   <ClaimReportAgreementPanel
                     form={form}
-                    claimId={claim.id}
+                    claimId={savedClaimId ?? claim.id}
                     onUpdate={updateForm}
                     onUpdateDiagnosis={updateDiagnosis}
                     onOpenSignedSignature={openSignedSignature}
@@ -170,7 +229,7 @@ export default function ClaimReportModal({ open, claim, onClose }: ClaimReportMo
 
               <ClaimReportSummaryFooter
                 form={form}
-                claimId={claim.id}
+                claimId={savedClaimId ?? claim.id}
                 isDownloading={isDownloading}
                 onUpdate={updateForm}
                 onDownload={handleDownload}

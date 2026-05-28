@@ -27,6 +27,7 @@ export interface Agency {
     // Business details
     taxId?: string;
     npi?: string;
+    medicaidProviderId?: string;
     licenseNumber?: string;
     primaryColor?: string;
 

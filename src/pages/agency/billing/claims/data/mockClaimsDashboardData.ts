@@ -1,4 +1,3 @@
-import type { ClaimReportPrefillSnapshot } from "../utils/claimReportPrefillUtils";
 import type { DonutSegment } from "../../shared/types";
 
 export type { DonutSegment };
@@ -24,7 +23,6 @@ export type RecentClaim = {
   durationEnd: string;
   totalHours: string;
   rate: string;
-  reportPrefill?: ClaimReportPrefillSnapshot;
 };
 export const OVERVIEW_STATS: OverviewStat[] = [
   { id: "submitted", value: "$124,820", label: "Claim submitted", count: 86 },
