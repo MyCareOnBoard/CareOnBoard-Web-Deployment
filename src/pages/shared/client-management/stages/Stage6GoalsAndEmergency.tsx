@@ -456,18 +456,6 @@ export function Stage6GoalsAndEmergency({
             <Plus className="mr-2 h-4 w-4" />
             Add medication
           </Button>
-
-          <div className="mt-6 flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">
-              Medication list (free text, if allowed)
-            </label>
-            <Input
-              value={stage6.medicationList}
-              onChange={(e) => updateStage6({ medicationList: e.target.value })}
-              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-              placeholder="Optional short list or pharmacy notes"
-            />
-          </div>
         </div>
 
         <div className="mt-10">

@@ -302,7 +302,7 @@ export function Stage3HealthcareAndDocuments({
                 Clinical details
               </p>
               <p className="text-[13px] font-medium leading-[1.4] text-[#808081] mt-1">
-                Diagnoses and clinical notes from the ISP or physician.
+                Diagnoses from the SDR (primary) or ISP when no SDR is on file.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
@@ -312,7 +312,7 @@ export function Stage3HealthcareAndDocuments({
                   value={stage3.diagnosis ?? ""}
                   onChange={(e) => updateStage3({ diagnosis: e.target.value })}
                   className="min-h-[88px] rounded-[12px] border-[#cccccd] bg-white"
-                  placeholder="As documented on the ISP (one line per diagnosis)"
+                  placeholder="CODE - Description, one line per diagnosis (from SDR or ISP)"
                 />
               </div>
               <div className="flex flex-col gap-1 md:col-span-2">

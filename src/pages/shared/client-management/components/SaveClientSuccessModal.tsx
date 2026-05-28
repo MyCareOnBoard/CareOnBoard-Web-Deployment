@@ -20,7 +20,7 @@ export function SaveClientSuccessModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="w-[min(90vw,426px)] gap-6 p-5"
+        className="flex w-[min(90vw,426px)] flex-col items-center gap-6 p-5"
       >
         <div className="relative inline-grid h-[100px] w-[100px] shrink-0">
           <div className="absolute inset-0 rounded-full bg-[#f0faf4]" />

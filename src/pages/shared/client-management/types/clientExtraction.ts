@@ -147,6 +147,8 @@ export type ExtractionServiceRow = Partial<{
   procedureName?: string;
   priorAuthorization?: ExtractionSdrPriorAuthorization;
   weeklyDistribution?: ExtractionSdrWeeklyDistribution;
+  diagnosisCode?: string;
+  diagnosisDescription?: string;
   /** Model-suggested wizard row (SDR import); validated client-side before apply. */
   matchedOutcomeId?: string;
   matchedServiceId?: string;
