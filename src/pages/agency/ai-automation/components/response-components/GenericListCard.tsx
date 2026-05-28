@@ -23,11 +23,7 @@ function statusClasses(color?: string) {
   }
 }
 
-function str(v: unknown): string {
-  if (v == null) return "—";
-  if (typeof v === "string") return v;
-  return String(v);
-}
+import { str } from "./strValue";
 
 export default function GenericListCard({ data }: { data: unknown }) {
   const d = data as GenericListData;
