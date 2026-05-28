@@ -5,6 +5,7 @@ import {
   capPersistAndDerive,
   sanitizeWeeklyPartsFromUnknown,
 } from "./sdrWeeklyDistribution";
+import { applySdrAuthorizationOverride } from "./normalizeExtractedServiceAuthorization";
 
 function dedupeCapStrings(items: unknown[] | undefined): string[] {
   if (!Array.isArray(items) || !items.length) return [];
@@ -115,20 +116,8 @@ export function applySdrEnrichmentFromExtractionRow(
   base: Service,
   row: ExtractionServiceRow,
 ): Service {
-  const next: Service = { ...base };
+  let next: Service = { ...base };
 
-  const setStr = (key: keyof Service, val: unknown) => {
-    if (val === undefined || val === null) return;
-    const s = typeof val === "string" ? val.trim() : String(val).trim();
-    if (!s) return;
-    (next as Record<string, unknown>)[key as string] = s;
-  };
-
-  setStr("procedureName", row.procedureName);
-  setStr("sdrComputedTotalHours", row.sdrComputedTotalHours);
-  setStr("totalUnits", row.totalUnits);
-  setStr("totalCost", row.totalCost);
-  setStr("unitType", row.unitType);
   if (!String(next.hours ?? "").trim() && String(row.hours ?? "").trim()) {
     next.hours = String(row.hours).trim();
   }
@@ -143,15 +132,16 @@ export function applySdrEnrichmentFromExtractionRow(
     if (paMeta) next.sdrPriorAuthorization = paMeta;
   }
 
+  let weeklyDerivedTotalHours: string | undefined;
   const wdParts = sanitizeWeeklyPartsFromUnknown(row.weeklyDistribution);
   if (wdParts) {
-    const { persisted, hours, totalApprovedHours } = capPersistAndDerive(wdParts);
+    const { persisted, hours, totalHours } = capPersistAndDerive(wdParts);
     if (persisted) next.sdrWeeklyDistribution = persisted;
     if (!String(next.hours ?? "").trim() && hours) next.hours = hours;
-    if (!String(next.totalApprovedHours ?? "").trim() && totalApprovedHours) {
-      next.totalApprovedHours = totalApprovedHours;
-    }
+    weeklyDerivedTotalHours = totalHours;
   }
+
+  next = { ...next, ...applySdrAuthorizationOverride(row, { weeklyDerivedTotalHours }) };
 
   const sdrDraft = extractionSdrToWizardDraft(row.sdrDetails ?? {}, {
     providerLine: row.provider,
@@ -162,6 +152,9 @@ export function applySdrEnrichmentFromExtractionRow(
   if (String(row.frequency ?? "").trim() && !String(next.frequency ?? "").trim()) {
     next.frequency = String(row.frequency).trim();
   }
+
+  const procedureName = String(row.procedureName ?? "").trim();
+  if (procedureName) next.procedureName = procedureName;
 
   return next;
 }

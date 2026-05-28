@@ -259,7 +259,7 @@ describe("mergeSdrExtraction", () => {
             totalUnits: "100",
             totalCost: "$2911.83",
             procedureName: "CBS",
-            sdrComputedTotalHours: "75.75",
+            totalHours: "75.75",
             priorAuthorization: { paNumber: "1553253313", startDate: "05/07/2025" },
             weeklyDistribution: {
               standardLine: "40 @ 15 Min / Weekly",
@@ -281,9 +281,9 @@ describe("mergeSdrExtraction", () => {
     const svc = next.stage2.outcomes[0].services[0];
     expect(svc.sdrDetails?.deliveryMethods).toEqual(["KeepMe"]);
     expect(svc.totalUnits).toBe("100");
-    expect(svc.totalCost).toBe("$2911.83");
+    expect(svc.totalCost).toBe("2911.83");
     expect(svc.procedureName).toBe("CBS");
-    expect(svc.sdrComputedTotalHours).toBe("75.75");
+    expect(svc.totalHours).toBe("75.75");
     expect(svc.sdrPriorAuthorization?.paNumber).toBe("1553253313");
     expect(svc.sdrPriorAuthorization?.startDate).toBeUndefined();
     expect(svc.sdrPriorAuthorization?.endDate).toBeUndefined();
@@ -294,7 +294,107 @@ describe("mergeSdrExtraction", () => {
 
     const apiRow = wizardServiceToClientService(svc);
     expect(apiRow.totalUnits).toBe("100");
-    expect(apiRow.totalCost).toBe("$2911.83");
+    expect(apiRow.totalCost).toBe("2911.83");
+  });
+
+  it("SDR authorization scalars replace ISP values when overwrite is off", () => {
+    const outcomes = [
+      {
+        id: "o1",
+        statement: "G",
+        services: [
+          {
+            ...createEmptyServiceAuthorization(),
+            id: "s1",
+            code: "C1",
+            clientRate: "30",
+            totalHours: "50",
+            unitType: "Hourly",
+            sdrDetails: {
+              deliveryMethods: ["KeepMe"],
+              importedAt: "2020-01-01T00:00:00.000Z",
+            },
+          },
+        ],
+      },
+    ];
+    const fd = baseForm(outcomes);
+    const ext = extractionFrom([
+      {
+        statement: "G",
+        rows: [
+          {
+            code: "C1",
+            clientRate: "$45.00",
+            clientPayType: "15-min",
+            totalHours: "75.75",
+            unitType: "15 Min",
+            totalCost: "$100.00",
+            sdrDetails: { deliveryMethods: ["ReplaceAttempt"] },
+          },
+        ],
+      },
+    ]);
+    const prev = buildSdrImportPreview(ext, outcomes, { overwrite: false });
+    expect(prev.keptExisting).toHaveLength(1);
+
+    const { formData: next } = applySdrImportToWizard(fd, prev, { overwrite: false, file: null });
+    const svc = next.stage2.outcomes[0].services[0];
+    expect(svc.sdrDetails?.deliveryMethods).toEqual(["KeepMe"]);
+    expect(svc.clientRate).toBe("45.00");
+    expect(svc.clientPayType).toBe("15-min");
+    expect(svc.totalHours).toBe("75.75");
+    expect(svc.unitType).toBe("15 Min");
+    expect(svc.totalCost).toBe("100.00");
+  });
+
+  it("does not apply weekly-derived totalHours when overwrite is off and wizard already has weekly distribution", () => {
+    const outcomes = [
+      {
+        id: "o1",
+        statement: "G",
+        services: [
+          {
+            ...createEmptyServiceAuthorization(),
+            id: "s1",
+            code: "C1",
+            totalHours: "100",
+            sdrDetails: {
+              deliveryMethods: ["KeepMe"],
+              importedAt: "2020-01-01T00:00:00.000Z",
+            },
+            sdrWeeklyDistribution: {
+              standardLine: "40 @ 15 Min / Weekly",
+              rows: [{ weekRange: "5/11/2025 - 5/17/2025", units: "40", hours: "10.00 hours" }],
+            },
+          },
+        ],
+      },
+    ];
+    const fd = baseForm(outcomes);
+    const ext = extractionFrom([
+      {
+        statement: "G",
+        rows: [
+          {
+            code: "C1",
+            weeklyDistribution: {
+              standardLine: "20 @ 15 Min / Weekly",
+              rows: [{ weekRange: "6/1/2025 - 6/7/2025", units: "20", hours: "5.00 hours" }],
+            },
+            sdrDetails: { deliveryMethods: ["ReplaceAttempt"] },
+          },
+        ],
+      },
+    ]);
+    const prev = buildSdrImportPreview(ext, outcomes, { overwrite: false });
+    expect(prev.keptExisting).toHaveLength(1);
+
+    const { formData: next } = applySdrImportToWizard(fd, prev, { overwrite: false, file: null });
+    const svc = next.stage2.outcomes[0].services[0];
+    expect(svc.sdrDetails?.deliveryMethods).toEqual(["KeepMe"]);
+    expect(svc.totalHours).toBe("100");
+    expect(svc.sdrWeeklyDistribution?.standardLine).toContain("40 @ 15");
   });
 
   it("dedupes and caps deliveryMethods at 50 on apply", () => {
@@ -645,7 +745,7 @@ describe("mergeSdrExtraction", () => {
           {
             code: "H2021HI",
             procedureName: "CBS",
-            sdrComputedTotalHours: "75.75",
+            totalHours: "75.75",
             totalUnits: "40",
             totalCost: "$99.00",
             claimsSource: "Medicaid",
@@ -664,14 +764,14 @@ describe("mergeSdrExtraction", () => {
     const prev = buildSdrImportPreview(ext, outcomes, { overwrite: true });
     expect(prev.matched).toHaveLength(1);
     expect(prev.matched[0].patchDraft.procedureName).toBe("CBS");
-    expect(prev.matched[0].patchDraft.sdrComputedTotalHours).toBe("75.75");
+    expect(prev.matched[0].patchDraft.totalHours).toBe("75.75");
     expect(prev.matched[0].patchDraft.sdrPriorAuthorization?.paNumber).toBe("1553253313");
     expect(prev.matched[0].patchDraft.sdrPriorAuthorization?.startDate).toBeUndefined();
     expect(prev.matched[0].patchDraft.startAuthDate).toBeInstanceOf(Date);
     expect(prev.matched[0].patchDraft.sdrWeeklyDistribution?.standardLine).toContain("40 @ 15");
     expect(prev.matched[0].patchDraft.sdrWeeklyDistribution?.rows?.[0]?.units).toBe("40");
     expect(prev.matched[0].patchDraft.totalUnits).toBe("40");
-    expect(prev.matched[0].patchDraft.totalCost).toBe("$99.00");
+    expect(prev.matched[0].patchDraft.totalCost).toBe("99.00");
     expect(prev.matched[0].patchDraft.hours).toBe("10");
     expect(formatSdrPatchSummary(prev.matched[0].patchDraft)).toMatch(/Units:/);
     expect(formatSdrPatchSummary(prev.matched[0].patchDraft)).toMatch(/Cost:/);
@@ -682,7 +782,7 @@ describe("mergeSdrExtraction", () => {
     expect(next.stage2.outcomes[0].services[0].procedureName).toBe("CBS");
     expect(next.stage2.outcomes[0].services[0].sdrDetails?.source?.claimsSource).toBe("Medicaid");
     expect(next.stage2.outcomes[0].services[0].totalUnits).toBe("40");
-    expect(next.stage2.outcomes[0].services[0].totalCost).toBe("$99.00");
+    expect(next.stage2.outcomes[0].services[0].totalCost).toBe("99.00");
   });
 
   it("routes second SDR extraction row targeting the same wizard service to needs review", () => {
@@ -702,14 +802,14 @@ describe("mergeSdrExtraction", () => {
             matchedOutcomeId: "o1",
             matchedServiceId: "svc-a",
             totalUnits: "10",
-            sdrComputedTotalHours: "1",
+            totalHours: "1",
           },
           {
             code: "X1",
             matchedOutcomeId: "o1",
             matchedServiceId: "svc-a",
             totalUnits: "20",
-            sdrComputedTotalHours: "2",
+            totalHours: "2",
           },
         ],
       },

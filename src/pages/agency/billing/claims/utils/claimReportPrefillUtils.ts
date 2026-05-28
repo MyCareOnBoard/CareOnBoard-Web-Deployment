@@ -195,10 +195,7 @@ function buildDurationLabel(timing: ClaimReportShiftTiming): string {
 }
 
 function resolveAuthorizedHoursLabel(matchedService?: ClientService): string {
-  const raw =
-    matchedService?.totalApprovedHours?.trim() ||
-    matchedService?.sdrComputedTotalHours?.trim() ||
-    "";
+  const raw = matchedService?.totalHours?.trim() ?? "";
   if (!raw) return "";
   return raw.toLowerCase().includes("hr") ? raw : `${raw} hrs`;
 }

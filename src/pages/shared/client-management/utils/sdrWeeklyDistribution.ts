@@ -87,7 +87,7 @@ export type ClientServiceWeeklyDist =
 export type CapPersistAndDeriveResult = {
   persisted: ClientServiceWeeklyDist;
   hours: string;
-  totalApprovedHours: string;
+  totalHours: string;
   truncatedRowCount: number;
 };
 
@@ -117,7 +117,7 @@ export function capPersistAndDerive(
   return {
     persisted,
     hours: scalars.hoursPerWeek ?? "",
-    totalApprovedHours: scalars.totalApprovedHours ?? "",
+    totalHours: scalars.totalHours ?? "",
     truncatedRowCount,
   };
 }
@@ -145,11 +145,11 @@ export function cloneWeeklyDistributionForPersist(
 export type WeeklyDistributionScalarsUpdate = {
   sdrWeeklyDistribution?: ClientServiceWeeklyDist;
   hours: string;
-  totalApprovedHours: string;
+  totalHours: string;
   truncatedRowCount?: number;
 };
 
-/** Normalize WD patch, persist-cap rows, and derive hours + totalApprovedHours scalars. */
+/** Normalize WD patch, persist-cap rows, and derive hours + totalHours scalars. */
 export function normalizeWeeklyDistributionUpdate(
   prevWd: ClientServiceWeeklyDist | undefined,
   patchWd: Partial<{ standardLine?: string; rows?: SanitizedWeeklyRow[] }>,
@@ -157,13 +157,13 @@ export function normalizeWeeklyDistributionUpdate(
   const merged = { ...(prevWd ?? {}), ...patchWd };
   const parts = sanitizeWeeklyPartsFromUnknown(merged);
   if (!parts) {
-    return { sdrWeeklyDistribution: undefined, hours: "", totalApprovedHours: "" };
+    return { sdrWeeklyDistribution: undefined, hours: "", totalHours: "" };
   }
-  const { persisted, hours, totalApprovedHours, truncatedRowCount } = capPersistAndDerive(parts);
+  const { persisted, hours, totalHours, truncatedRowCount } = capPersistAndDerive(parts);
   return {
     sdrWeeklyDistribution: persisted ?? undefined,
     hours,
-    totalApprovedHours,
+    totalHours,
     ...(truncatedRowCount > 0 ? { truncatedRowCount } : {}),
   };
 }

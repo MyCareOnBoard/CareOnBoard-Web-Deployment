@@ -58,13 +58,13 @@ export function formatHoursStored(n: number): string {
 
 export type WeeklyDistributionScalars = {
   hoursPerWeek?: string;
-  totalApprovedHours?: string;
+  totalHours?: string;
 };
 
 /**
  * Derive weekly authorization scalars in one pass over rows.
  * `hoursPerWeek`: first parsable row hours, else `@ N Min` from standard line.
- * `totalApprovedHours`: sum of all parsable row hours.
+ * `totalHours`: sum of all parsable row hours.
  */
 export function deriveWeeklyDistributionScalars(wd: WeeklyDistLike): WeeklyDistributionScalars {
   if (!wd || typeof wd !== "object") return {};
@@ -88,15 +88,15 @@ export function deriveWeeklyDistributionScalars(wd: WeeklyDistLike): WeeklyDistr
 
   return {
     ...(hoursPerWeek !== undefined ? { hoursPerWeek } : {}),
-    ...(hasTotal ? { totalApprovedHours: formatHoursStored(totalSum) } : {}),
+    ...(hasTotal ? { totalHours: formatHoursStored(totalSum) } : {}),
   };
 }
 
 /** Sum of parsable hours across all weekly distribution rows. */
-export function deriveTotalApprovedHoursFromWeeklyDistribution(
+export function deriveTotalHoursFromWeeklyDistribution(
   wd: WeeklyDistLike,
 ): string | undefined {
-  return deriveWeeklyDistributionScalars(wd).totalApprovedHours;
+  return deriveWeeklyDistributionScalars(wd).totalHours;
 }
 
 /**

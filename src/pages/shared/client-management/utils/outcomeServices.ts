@@ -187,7 +187,7 @@ function mergeClientServicesForDedupe(a: ClientService, b: ClientService): Clien
     name: pickStr(a.name, b.name),
     code: pickStr(a.code, b.code),
     hours: pickStr(a.hours, b.hours),
-    totalApprovedHours: pickStr(a.totalApprovedHours, b.totalApprovedHours),
+    totalHours: pickStr(a.totalHours, b.totalHours),
     staffRate: pickStr(a.staffRate, b.staffRate),
     payType: a.payType ?? b.payType,
     clientRate: pickStr(a.clientRate, b.clientRate),
@@ -231,7 +231,7 @@ export function wizardServiceToClientService(
     name: svc.name || "",
     code: svc.code || "",
     hours: svc.hours || "",
-    totalApprovedHours: svc.totalApprovedHours || "",
+    totalHours: svc.totalHours || "",
     staffRate: svc.staffRate || "",
     payType: svc.payType,
     clientRate: svc.clientRate || "",
@@ -253,7 +253,6 @@ export function wizardServiceToClientService(
     evvDescription: svc.evvDescription?.trim() || undefined,
     narrative: svc.narrative?.trim() || undefined,
     procedureName: svc.procedureName?.trim() || undefined,
-    sdrComputedTotalHours: svc.sdrComputedTotalHours?.trim() || undefined,
     ...((): Partial<Pick<ClientService, "sdrPriorAuthorization">> => {
       const pa = svc.sdrPriorAuthorization;
       if (!pa) return {};

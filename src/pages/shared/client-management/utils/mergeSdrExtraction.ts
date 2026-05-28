@@ -18,6 +18,7 @@ import {
   sanitizeWeeklyPartsFromUnknown,
   WEEKLY_DIST_DISPLAY_CAP,
 } from "./sdrWeeklyDistribution";
+import { applySdrAuthorizationOverride } from "./normalizeExtractedServiceAuthorization";
 
 function normalizeOutcomeKey(s: string | undefined): string {
   return String(s ?? "")
@@ -52,7 +53,7 @@ export function deriveSdrBreakdownSummary(d?: ServiceSdrDetails): string {
 export function formatSdrPatchSummary(patch: Partial<Service>): string {
   const parts: string[] = [];
   if (patch.procedureName?.trim()) parts.push(`Procedure: ${patch.procedureName.trim()}`);
-  if (patch.sdrComputedTotalHours?.trim()) parts.push(`SDR hrs: ${patch.sdrComputedTotalHours.trim()}`);
+  if (patch.totalHours?.trim()) parts.push(`SDR hrs: ${patch.totalHours.trim()}`);
   if (patch.totalUnits?.trim()) parts.push(`Units: ${patch.totalUnits.trim()}`);
   if (patch.totalCost?.trim()) parts.push(`Cost: ${patch.totalCost.trim()}`);
   const src = patch.sdrDetails?.source;
@@ -84,7 +85,7 @@ export function formatSdrPatchSummary(patch: Partial<Service>): string {
 
 /** True when any structured SDR authorization field is present on the service row (for Stage 2 UI). */
 export function hasSdrAuthorizationDetails(service: Service): boolean {
-  if ((service.sdrComputedTotalHours ?? "").trim()) return true;
+  if ((service.totalHours ?? "").trim()) return true;
   if ((service.totalUnits ?? "").trim()) return true;
   if ((service.totalCost ?? "").trim()) return true;
   if ((service.procedureName ?? "").trim()) return true;
@@ -162,7 +163,7 @@ function buildBootstrapSdrImportPreview(
       !!codeNorm ||
       !!nameNorm ||
       !!(row.procedureName ?? "").trim() ||
-      !!(row.sdrComputedTotalHours ?? "").trim() ||
+      !!(row.totalHours ?? "").trim() ||
       !!(row.totalUnits ?? "").trim() ||
       substantiveWizardSdr(svc) ||
       hasSdrAuthorizationDetails(svc);
@@ -240,10 +241,6 @@ function buildSdrEnrichmentPatch(row: ExtractionServiceRow, wizardSvc: Service, 
   }
 
   mergeScalar("procedureName", row.procedureName);
-  mergeScalar("sdrComputedTotalHours", row.sdrComputedTotalHours);
-  mergeScalar("totalUnits", row.totalUnits);
-  mergeScalar("totalCost", row.totalCost);
-  mergeScalar("unitType", row.unitType);
   /** Top-level extractor `hours` may fill empty wizard scalar; superseded later when WD derivation yields hours. */
   mergeScalar("hours", row.hours);
 
@@ -268,21 +265,21 @@ function buildSdrEnrichmentPatch(row: ExtractionServiceRow, wizardSvc: Service, 
     }
   }
 
+  let weeklyDerivedTotalHours: string | undefined;
   const wdParts = sanitizeWeeklyPartsFromUnknown(row.weeklyDistribution);
   if (wdParts) {
-    const { persisted, hours, totalApprovedHours } = capPersistAndDerive(wdParts);
+    const { persisted, hours, totalHours } = capPersistAndDerive(wdParts);
     if (persisted && (overwrite || !wizardHasWeekly(wizardSvc.sdrWeeklyDistribution))) {
       patch.sdrWeeklyDistribution = persisted;
       const wizardHoursEmpty = !String(wizardSvc.hours ?? "").trim();
       if (overwrite || wizardHoursEmpty) {
         patch.hours = hours;
       }
-      const wizardTotalEmpty = !String(wizardSvc.totalApprovedHours ?? "").trim();
-      if (overwrite || wizardTotalEmpty) {
-        patch.totalApprovedHours = totalApprovedHours;
-      }
+      weeklyDerivedTotalHours = totalHours;
     }
   }
+
+  Object.assign(patch, applySdrAuthorizationOverride(row, { weeklyDerivedTotalHours }));
 
   return patch;
 }
@@ -564,7 +561,7 @@ export function buildSdrImportPreview(
 
     const rowHasStructured =
       !!(row.procedureName ?? "").trim() ||
-      !!(row.sdrComputedTotalHours ?? "").trim() ||
+      !!(row.totalHours ?? "").trim() ||
       !!(row.claimsSource ?? "").trim() ||
       !!(row.totalUnits ?? "").trim() ||
       !!(row.totalCost ?? "").trim() ||
@@ -850,7 +847,6 @@ export function applySdrImportToWizard(
     delete patch.sdrDetails;
     delete patch.frequency;
     delete patch.claimsSource;
-    delete patch.unitType;
   }
 
   function assignPatchToService(svc: Service, patchSrc: Partial<Service>, skipBlob: boolean) {
@@ -890,7 +886,6 @@ export function applySdrImportToWizard(
     delete patch.sdrDetails;
     delete patch.frequency;
     delete patch.claimsSource;
-    delete patch.unitType;
     if (assignPatchToService(svc, patch, false)) appliedCount += 1;
   }
 

@@ -90,7 +90,7 @@ describe("claimReportPrefillUtils", () => {
       location: "Community",
       clientRate: "$9.61",
       clientPayType: "15-min",
-      totalApprovedHours: "75.75",
+      totalHours: "75.75",
       sdrPriorAuthorization: {
         paNumber: "1553253313",
       },

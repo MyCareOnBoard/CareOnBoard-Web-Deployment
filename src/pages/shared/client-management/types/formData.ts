@@ -126,7 +126,7 @@ export type Service = {
     name?: string;
     code?: string;
     hours?: string;
-    totalApprovedHours?: string;
+    totalHours?: string;
     staffRate?: string;
     payType?: ServicePayType;
     clientRate?: string;
@@ -147,8 +147,6 @@ export type Service = {
     totalCost?: string;
     /** Procedure label when separate from procedural code on SDRs (e.g. "CBS"). */
     procedureName?: string;
-    /** Total hours interpreted from Total Units × unit type (SDR excerpt). */
-    sdrComputedTotalHours?: string;
     sdrPriorAuthorization?: Partial<{
         /** @deprecated Extraction-only; canonical auth dates use `startAuthDate` / `endAuthDate`. */
         startDate: string;
@@ -411,7 +409,7 @@ export function createEmptyServiceAuthorization(): Service {
         name: undefined,
         code: undefined,
         hours: "",
-        totalApprovedHours: "",
+        totalHours: "",
         staffRate: "",
         payType: undefined,
         clientRate: "",

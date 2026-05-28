@@ -55,7 +55,7 @@ type EditableServiceRow = {
   name: string;
   code: string;
   hours?: string;
-  totalApprovedHours?: string;
+  totalHours?: string;
   totalUnits?: string;
   staffRate?: string;
   payType?: ClientService["payType"];
@@ -74,8 +74,6 @@ type EditableServiceRow = {
   frequency?: string;
   totalCost?: string;
   procedureName?: string;
-  sdrComputedTotalHours?: string;
-  /** Canonical PA metadata only; auth dates live on startAuthDate/endAuthDate */
   sdrPriorAuthorization?: {
     paNumber?: string;
     approvedUnitsTillDate?: string;
@@ -190,7 +188,7 @@ function emptyEditableServiceRow(): EditableServiceRow {
     name: "",
     code: "",
     hours: "",
-    totalApprovedHours: "",
+    totalHours: "",
     totalUnits: "",
     staffRate: "",
     payType: undefined,
@@ -209,7 +207,6 @@ function emptyEditableServiceRow(): EditableServiceRow {
     frequency: "",
     totalCost: "",
     procedureName: "",
-    sdrComputedTotalHours: "",
     sdrPriorAuthorization: undefined,
     sdrWeeklyDistribution: undefined,
     sdrDetails: undefined,
@@ -250,7 +247,7 @@ function mapClientServicesToEditable(services?: ClientService[]): EditableServic
     name: svc.name,
     code: svc.code,
     hours: svc.hours,
-    totalApprovedHours: svc.totalApprovedHours,
+    totalHours: svc.totalHours,
     totalUnits: svc.totalUnits,
     staffRate: svc.staffRate,
     payType: svc.payType,
@@ -269,7 +266,6 @@ function mapClientServicesToEditable(services?: ClientService[]): EditableServic
     frequency: svc.frequency ?? "",
     totalCost: svc.totalCost ?? "",
     procedureName: svc.procedureName ?? "",
-    sdrComputedTotalHours: svc.sdrComputedTotalHours ?? "",
     sdrPriorAuthorization: priorAuthMetadataFromApi(svc.sdrPriorAuthorization),
     sdrWeeklyDistribution: cloneWeeklyDist(svc.sdrWeeklyDistribution),
     sdrDetails: cloneSdrDetails(svc.sdrDetails),
@@ -283,7 +279,7 @@ function mapEditableToClientServices(services: EditableServiceRow[]): ClientServ
     name: svc.name,
     code: svc.code,
     hours: emptish(svc.hours),
-    totalApprovedHours: emptish(svc.totalApprovedHours),
+    totalHours: emptish(svc.totalHours),
     totalUnits: emptish(svc.totalUnits),
     staffRate: emptish(svc.staffRate),
     payType: svc.payType,
@@ -308,7 +304,6 @@ function mapEditableToClientServices(services: EditableServiceRow[]): ClientServ
     frequency: emptish(svc.frequency),
     totalCost: emptish(svc.totalCost),
     procedureName: emptish(svc.procedureName),
-    sdrComputedTotalHours: emptish(svc.sdrComputedTotalHours),
     sdrPriorAuthorization: priorAuthMetadataToApi(svc.sdrPriorAuthorization),
     sdrWeeklyDistribution: cloneWeeklyDist(svc.sdrWeeklyDistribution),
     sdrDetails: cloneSdrDetails(svc.sdrDetails),
@@ -378,8 +373,8 @@ function ServiceRow({
   const hoursDerivedFromWeeklyDistribution =
     hasWd && derivedWdScalars.hoursPerWeek !== undefined;
 
-  const totalApprovedHoursDerivedFromWeeklyDistribution =
-    hasWd && derivedWdScalars.totalApprovedHours !== undefined;
+  const totalHoursDerivedFromWeeklyDistribution =
+    hasWd && derivedWdScalars.totalHours !== undefined;
 
   const weeklyDistInlineModel = useMemo((): WeeklyDistributionData | undefined => {
     return cloneWeeklyDist(service.sdrWeeklyDistribution);
@@ -389,9 +384,9 @@ function ServiceRow({
     ? (derivedWdScalars.hoursPerWeek ?? "")
     : (service.hours?.trim() ?? "");
 
-  const displayTotalApprovedHours = hasWd
-    ? (derivedWdScalars.totalApprovedHours ?? "")
-    : (service.totalApprovedHours?.trim() ?? "");
+  const displayTotalHours = hasWd
+    ? (derivedWdScalars.totalHours ?? "")
+    : (service.totalHours?.trim() ?? "");
 
   const displayDate = (value?: Date | null) =>
     value ? format(value, "MMM d, yyyy") : "";
@@ -480,9 +475,9 @@ function ServiceRow({
               )}
             </div>
 
-            {/* Total approved hours */}
+            {/* Total hours */}
             <div className="flex flex-col gap-1">
-              <p className="text-[12px] font-normal text-[#10141a]">Total approved hours</p>
+              <p className="text-[12px] font-normal text-[#10141a]">Total hours</p>
               {isEditing ? (
                 <>
                   <Input
@@ -490,28 +485,28 @@ function ServiceRow({
                     inputMode="decimal"
                     min={0}
                     step={0.01}
-                    readOnly={totalApprovedHoursDerivedFromWeeklyDistribution}
+                    readOnly={totalHoursDerivedFromWeeklyDistribution}
                     title={
-                      totalApprovedHoursDerivedFromWeeklyDistribution
+                      totalHoursDerivedFromWeeklyDistribution
                         ? "Sum of weekly distribution row hours."
                         : undefined
                     }
                     value={
-                      totalApprovedHoursDerivedFromWeeklyDistribution
-                        ? (derivedWdScalars.totalApprovedHours ?? "")
-                        : (service.totalApprovedHours || "")
+                      totalHoursDerivedFromWeeklyDistribution
+                        ? (derivedWdScalars.totalHours ?? "")
+                        : (service.totalHours || "")
                     }
-                    onChange={(e) => handleFieldChange("totalApprovedHours", e.target.value)}
+                    onChange={(e) => handleFieldChange("totalHours", e.target.value)}
                     className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                     placeholder="Total hours for authorization period"
                   />
-                  {totalApprovedHoursDerivedFromWeeklyDistribution ? (
+                  {totalHoursDerivedFromWeeklyDistribution ? (
                     <p className="text-[11px] text-[#808081]">Sum of weekly distribution hours</p>
                   ) : null}
                 </>
               ) : (
                 <p className="text-[14px] font-semibold text-[#10141a]">
-                  {displayTotalApprovedHours || "-"}
+                  {displayTotalHours || "-"}
                 </p>
               )}
             </div>
@@ -695,25 +690,6 @@ function ServiceRow({
               />
             ) : (
               <p className="text-[14px] font-semibold text-[#10141a]">{textOrDash(service.unitType)}</p>
-            )}
-          </div>
-          <div className="flex flex-col gap-1">
-            <p className="text-[12px] font-normal text-[#10141a]">Total computed hours (SDR)</p>
-            {isEditing ? (
-              <Input
-                type="number"
-                inputMode="decimal"
-                step="any"
-                min={0}
-                value={service.sdrComputedTotalHours ?? ""}
-                onChange={(e) => handleFieldChange("sdrComputedTotalHours", e.target.value)}
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                placeholder="Hours from SDR"
-              />
-            ) : (
-              <p className="text-[14px] font-semibold text-[#10141a]">
-                {textOrDash(service.sdrComputedTotalHours)}
-              </p>
             )}
           </div>
           <div className="flex flex-col gap-1">

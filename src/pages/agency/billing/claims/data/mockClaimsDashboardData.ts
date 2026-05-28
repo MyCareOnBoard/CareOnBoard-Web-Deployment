@@ -1,17 +1,14 @@
 import type { ClaimReportPrefillSnapshot } from "../utils/claimReportPrefillUtils";
+import type { DonutSegment } from "../../shared/types";
+
+export type { DonutSegment };
+export { DEFAULT_DATE_RANGE } from "../../shared/types";
 
 export type OverviewStat = {
   id: string;
   value: string;
   label: string;
   count: number;
-};
-
-export type DonutSegment = {
-  label: string;
-  value: number;
-  color: string;
-  description?: string;
 };
 
 export type RecentClaim = {
@@ -29,11 +26,6 @@ export type RecentClaim = {
   rate: string;
   reportPrefill?: ClaimReportPrefillSnapshot;
 };
-export const DEFAULT_DATE_RANGE = {
-  startDate: "2026-04-07",
-  endDate: "2026-04-10",
-};
-
 export const OVERVIEW_STATS: OverviewStat[] = [
   { id: "submitted", value: "$124,820", label: "Claim submitted", count: 86 },
   { id: "pending", value: "$11,230", label: "Pending claims", count: 10 },

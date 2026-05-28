@@ -7,6 +7,7 @@ import type {
   ExtractionInsuranceDetail,
   ExtractionMedication,
   ExtractionOutcomeRow,
+  ExtractionServiceRow,
   ExtractionTeamMember,
 } from "../types/clientExtraction";
 import { isDocKeyForImport } from "../types/clientExtraction";
@@ -29,6 +30,7 @@ import type {
   YesNo,
 } from "../types/formData";
 import { groupLoadedServicesIntoOutcomes, type ServiceLoadRow } from "./outcomeServices";
+import { applyExtractedAuthorizationFields } from "./normalizeExtractedServiceAuthorization";
 import { EMERGENCY_CONTACT_RELATIONSHIP_VALUES, GUARDIAN_RELATIONSHIP_VALUES } from "../types/formData";
 
 export type MergeExtractionOptions = {
@@ -212,30 +214,6 @@ function applyYesNo(current: YesNo, incoming: string | undefined, overwrite: boo
   return current;
 }
 
-function normalizeClientPayType(raw: string | undefined): ServicePayType | undefined {
-  if (!raw?.trim() || isExtractedNoDataToken(raw)) return undefined;
-  const orig = String(raw).trim();
-  const t = orig.toLowerCase();
-
-  if (t === "service(s)" || t === "services" || t === "service") return "hourly";
-  if (/^service\s*\(?s\)?$/i.test(orig.trim())) return "hourly";
-
-  if (t === "hourly" || t === "15-min" || t === "daily" || t === "mile") {
-    return t as ServicePayType;
-  }
-  if (t.includes("15") && t.includes("min")) return "15-min";
-  if (t.includes("mile") || t === "mi" || t.includes("per mile")) return "mile";
-  if (t.includes("hour") || t === "hr" || (t.includes("unit") && t.includes("hour")))
-    return "hourly";
-  if (t.includes("day")) return "daily";
-  return undefined;
-}
-
-function isLikelyTransportationService(name?: string, code?: string): boolean {
-  const blob = `${name ?? ""} ${code ?? ""}`.toLowerCase();
-  return /\btransport(ation)?\b|\bmileage\b|\bnemt\b/i.test(blob);
-}
-
 function newOutcomeId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? `outcome-${crypto.randomUUID()}`
@@ -256,45 +234,23 @@ function parseExtractedOutcomeStrings(row: Record<string, unknown>): string[] {
     .filter((s) => Boolean(s) && !isExtractedNoDataToken(s));
 }
 
-function resolveExtractedClientRate(row: Record<string, string | undefined>): string {
-  const strOrUndef = (x: string | undefined) => {
-    const v = x?.trim();
-    if (!v || isExtractedNoDataToken(x)) return undefined;
-    return v;
-  };
-  const cRaw = strOrUndef(row.clientRate);
-  const sRaw = strOrUndef(row.rate);
-  return mergeString("", cRaw ?? sRaw ?? "", true);
-}
-
 function mapRowToService(row: Record<string, unknown>): Service {
-  const r = row as Record<string, string | undefined>;
+  const r = row as ExtractionServiceRow;
   const strOrUndef = (x: string | undefined) => {
     const v = x?.trim();
     if (!v || isExtractedNoDataToken(x)) return undefined;
     return v;
   };
-
-  const clientRate = resolveExtractedClientRate(r);
-
-  let clientPayType =
-    normalizeClientPayType(r.clientPayType) ?? normalizeClientPayType(r.unitType);
-  if (!clientPayType && isLikelyTransportationService(strOrUndef(r.name), strOrUndef(r.code))) {
-    clientPayType = "mile";
-  }
+  const authPatch = applyExtractedAuthorizationFields(r);
 
   return {
     id: newServiceId(),
     name: strOrUndef(r.name),
     code: strOrUndef(r.code),
     hours: mergeString("", r.hours, true),
-    /** ISP extraction uses total units; do not map totalApprovedHours from documents. */
-    totalApprovedHours: "",
     staffRate: "",
     /** Staff pay type is agency-defined; do not map from document extraction. */
     payType: undefined,
-    clientRate,
-    clientPayType,
     ispEffectiveDate: parseIsoOrUsDate(r.ispEffectiveDate),
     startAuthDate: parseIsoOrUsDate(r.startAuthDate),
     endAuthDate: parseIsoOrUsDate(r.endAuthDate),
@@ -304,13 +260,11 @@ function mapRowToService(row: Record<string, unknown>): Service {
     provider: strOrUndef(r.provider),
     location: strOrUndef(r.location),
     claimsSource: strOrUndef(r.claimsSource),
-    unitType: strOrUndef(r.unitType),
     frequency: strOrUndef(r.frequency),
-    totalUnits: strOrUndef(r.totalUnits),
-    totalCost: strOrUndef(r.totalCost),
     evvStatus: strOrUndef(r.evvStatus),
     evvDescription: strOrUndef(r.evvDescription),
     narrative: strOrUndef(r.narrative),
+    ...authPatch,
   };
 }
 
@@ -403,9 +357,9 @@ function mergeServiceIntoExisting(
     name: str(existing.name, incoming.name),
     code: str(existing.code, incoming.code),
     hours: mergeString(existing.hours ?? "", incoming.hours ?? "", overwrite),
-    totalApprovedHours: mergeString(
-      existing.totalApprovedHours ?? "",
-      incoming.totalApprovedHours ?? "",
+    totalHours: mergeString(
+      existing.totalHours ?? "",
+      incoming.totalHours ?? "",
       overwrite,
     ),
     staffRate: mergeString(existing.staffRate ?? "", incoming.staffRate ?? "", overwrite),

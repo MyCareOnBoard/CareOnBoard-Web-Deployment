@@ -66,7 +66,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
         name: svc.name || "",
         code: svc.code || "",
         hours: svc.hours || "",
-        totalApprovedHours: svc.totalApprovedHours || "",
+        totalHours: svc.totalHours || "",
         staffRate: svc.staffRate || "",
         payType: svc.payType,
         clientRate: svc.clientRate || "",
@@ -88,7 +88,6 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
         evvDescription: svc.evvDescription,
         narrative: svc.narrative,
         procedureName: svc.procedureName,
-        sdrComputedTotalHours: svc.sdrComputedTotalHours,
         sdrPriorAuthorization:
           svc.sdrPriorAuthorization &&
           typeof svc.sdrPriorAuthorization === "object"

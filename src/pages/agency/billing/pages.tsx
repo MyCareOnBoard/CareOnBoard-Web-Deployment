@@ -1,5 +1,6 @@
 import BillingPlaceholderPage from "./BillingPlaceholderPage";
 import ClaimsDashboardPage from "./claims";
+import PayrollDashboardPage from "./payroll";
 
 export function FinancialOverview() {
   return (
@@ -11,12 +12,7 @@ export function FinancialOverview() {
 }
 
 export function PayrollManagement() {
-  return (
-    <BillingPlaceholderPage
-      title="Payroll Management"
-      subtitle="Manage payroll and compensation for your agency"
-    />
-  );
+  return <PayrollDashboardPage />;
 }
 
 export function ClaimsDashboard() {

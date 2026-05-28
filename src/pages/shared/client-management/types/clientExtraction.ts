@@ -122,7 +122,7 @@ export type ExtractionServiceRow = Partial<{
   name: string;
   code: string;
   hours: string;
-  totalApprovedHours: string;
+  totalHours: string;
   rate: string;
   payType: string;
   clientRate: string;
@@ -145,8 +145,6 @@ export type ExtractionServiceRow = Partial<{
   sdrEndDate: string;
   sdrDetails?: ExtractionSdrDetails;
   procedureName?: string;
-  /** Total hours derived from units / unit type (SDR detail). */
-  sdrComputedTotalHours?: string;
   priorAuthorization?: ExtractionSdrPriorAuthorization;
   weeklyDistribution?: ExtractionSdrWeeklyDistribution;
   /** Model-suggested wizard row (SDR import); validated client-side before apply. */

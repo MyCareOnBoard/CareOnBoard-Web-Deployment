@@ -56,9 +56,7 @@ const BillingAndApprovalsPage = lazy(() => import("@/pages/agency/billing-and-ap
 const BillingFinancialOverviewPage = lazy(() =>
     import("@/pages/agency/billing/pages").then((module) => ({ default: module.FinancialOverview }))
 );
-const BillingPayrollManagementPage = lazy(() =>
-    import("@/pages/agency/billing/pages").then((module) => ({ default: module.PayrollManagement }))
-);
+const BillingPayrollManagementPage = lazy(() => import("@/pages/agency/billing/payroll"));
 const BillingClaimsDashboardPage = lazy(() =>
     import("@/pages/agency/billing/pages").then((module) => ({ default: module.ClaimsDashboard }))
 );

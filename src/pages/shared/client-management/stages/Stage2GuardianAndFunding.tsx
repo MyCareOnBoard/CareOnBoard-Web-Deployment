@@ -30,6 +30,7 @@ import { Stage2SdrImportPanel } from "@/pages/shared/client-management/component
 import { WeeklyDistributionInline } from "@/pages/shared/client-management/components/WeeklyDistributionInline";
 import { ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
 import { deriveAuthorizedHoursPerWeek } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
+import { stripExtractedMoney } from "@/pages/shared/client-management/utils/normalizeExtractedServiceAuthorization";
 import { weeklyDistributionFingerprintFromWd, normalizeWeeklyDistributionUpdate } from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
 const RATE_INPUT_CLASS = "h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SELECT_TRIGGER_CLASS = "w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white";
@@ -270,15 +271,15 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[12px] font-normal text-[#10141a]">Total Computed Hours</label>
+          <label className="text-[12px] font-normal text-[#10141a]">Total hours</label>
           <Input
             type="number"
             inputMode="decimal"
             step="any"
             min={0}
-            value={service.sdrComputedTotalHours ?? ""}
+            value={service.totalHours ?? ""}
             onChange={(e) =>
-              update({ sdrComputedTotalHours: e.target.value || undefined })
+              update({ totalHours: e.target.value || undefined })
             }
             className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
             placeholder="Computed from SDR"
@@ -349,7 +350,7 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
 
         <RatePayTypeField
           label="Client Rate / Pay Type"
-          rate={service.clientRate ?? ""}
+          rate={stripExtractedMoney(service.clientRate ?? "")}
           payType={service.clientPayType}
           includeMile
           onRateChange={(v) => update({ clientRate: v })}

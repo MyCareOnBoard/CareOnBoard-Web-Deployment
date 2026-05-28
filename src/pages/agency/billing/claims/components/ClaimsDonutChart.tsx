@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState } from "react";
-import type { DonutSegment } from "../data/mockClaimsDashboardData";
+import type { DonutSegment } from "../../shared/types";
 
 const SIZE = 190;
 const STROKE = 26;

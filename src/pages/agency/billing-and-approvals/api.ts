@@ -81,7 +81,7 @@ export interface ClientServiceDefinition {
   clientRate?: string;
   clientPayType?: "hourly" | "15-min" | "daily" | "mile";
   hours?: string;
-  totalApprovedHours?: string;
+  totalHours?: string;
 }
 
 export interface ServiceLog {

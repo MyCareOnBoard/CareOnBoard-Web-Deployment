@@ -129,7 +129,7 @@ export interface ClientService {
   name: string;
   code: string;
   hours?: string;
-  totalApprovedHours?: string;
+  totalHours?: string;
   staffRate?: string;
   payType?: "hourly" | "15-min" | "daily" | "mile";
   clientRate?: string;
@@ -151,7 +151,6 @@ export interface ClientService {
   evvDescription?: string;
   narrative?: string;
   procedureName?: string;
-  sdrComputedTotalHours?: string;
   sdrPriorAuthorization?: Partial<{
     startDate: string;
     endDate: string;

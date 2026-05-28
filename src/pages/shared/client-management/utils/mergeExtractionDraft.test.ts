@@ -94,7 +94,7 @@ describe("mergeExtractionDraft", () => {
             name: "Day Hab",
             code: "DH001",
             hours: "",
-            totalApprovedHours: "",
+            totalHours: "",
             staffRate: "",
             payType: undefined,
             clientRate: "",
@@ -153,6 +153,40 @@ describe("mergeExtractionDraft", () => {
     const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: false });
     expect(formData.stage2.outcomes[0].services[0].clientRate).toBe("45");
     expect(formData.stage2.outcomes[0].services[0].staffRate).toBe("");
+  });
+
+  it("maps ISP authorization scalars including totalHours and totalCost", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: {
+        stage2: {
+          outcomes: [
+            {
+              statement: "Authorization",
+              services: [
+                {
+                  name: "Day Hab",
+                  code: "DH001",
+                  totalHours: "120",
+                  totalUnits: "480",
+                  totalCost: "$1,200.50",
+                  unitType: "15 min",
+                  clientRate: "$45.00",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: true });
+    const svc = formData.stage2.outcomes[0].services[0];
+    expect(svc.totalHours).toBe("120");
+    expect(svc.totalUnits).toBe("480");
+    expect(svc.totalCost).toBe("1200.50");
+    expect(svc.clientRate).toBe("45.00");
+    expect(svc.clientPayType).toBe("15-min");
+    expect(svc.unitType).toBe("15 min");
   });
 
   it("maps unitType to clientPayType, not staff payType", () => {
