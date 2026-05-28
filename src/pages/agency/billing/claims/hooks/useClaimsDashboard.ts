@@ -17,7 +17,7 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
 
-  const fetchDashboard = useCallback(async () => {
+  const refetch = useCallback(async () => {
     if (!hasCompleteDateRange(dateRange)) {
       setRawData(null);
       setLoading(false);
@@ -48,9 +48,7 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
 
       setRawData(null);
       setError(
-        fetchError instanceof Error
-          ? fetchError.message
-          : "Failed to load claims dashboard",
+        fetchError instanceof Error ? fetchError.message : "Failed to load claims dashboard",
       );
     } finally {
       if (requestIdRef.current === requestId) {
@@ -60,17 +58,14 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
   }, [dateRange.endDate, dateRange.startDate]);
 
   useEffect(() => {
-    void fetchDashboard();
-  }, [fetchDashboard]);
+    void refetch();
+  }, [refetch]);
 
   const overviewStats = useMemo(
     () => mapDashboardToOverviewStats(rawData),
     [rawData],
   );
-  const statusChart = useMemo(
-    () => mapDashboardToStatusChart(rawData),
-    [rawData],
-  );
+  const statusChart = useMemo(() => mapDashboardToStatusChart(rawData), [rawData]);
   const rejectionChart = useMemo(
     () => mapDashboardToRejectionChart(rawData),
     [rawData],
@@ -82,6 +77,6 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
     rejectionChart,
     loading,
     error,
-    refetch: fetchDashboard,
+    refetch,
   };
 }

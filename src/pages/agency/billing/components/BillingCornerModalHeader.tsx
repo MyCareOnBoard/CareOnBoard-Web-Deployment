@@ -20,9 +20,9 @@ export default function BillingCornerModalHeader({
   closeDisabled = false,
 }: BillingCornerModalHeaderProps) {
   return (
-    <DialogHeader className="shrink-0 space-y-0">
+    <DialogHeader className="w-full shrink-0 items-stretch space-y-0 text-left">
       <div className="flex items-start justify-between gap-4 px-6 py-6">
-        <div>
+        <div className="min-w-0 flex-1">
           <DialogTitle className={BILLING_MODAL_TITLE_CLASS}>{title}</DialogTitle>
           <p className={BILLING_MODAL_DESCRIPTION_CLASS}>{description}</p>
         </div>

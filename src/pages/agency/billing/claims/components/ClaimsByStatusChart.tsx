@@ -5,6 +5,7 @@ import type { ClaimsStatusChartData } from "../utils/claimsDashboardUtils";
 type ClaimsByStatusChartProps = {
   chart: ClaimsStatusChartData;
   loading?: boolean;
+  onStatusSegmentClick?: (segmentLabel: string) => void;
 };
 
 function ChartSkeleton() {
@@ -15,7 +16,11 @@ function ChartSkeleton() {
   );
 }
 
-export default function ClaimsByStatusChart({ chart, loading = false }: ClaimsByStatusChartProps) {
+export default function ClaimsByStatusChart({
+  chart,
+  loading = false,
+  onStatusSegmentClick,
+}: ClaimsByStatusChartProps) {
   return (
     <div className="rounded-[8px] border border-[#e5e5e6] bg-white p-6 shadow-sm">
       <div className="mb-6 flex items-center justify-between">
@@ -30,7 +35,11 @@ export default function ClaimsByStatusChart({ chart, loading = false }: ClaimsBy
           centerLabel={chart.centerLabel}
           data={chart.data}
           legendData={chart.legendData}
-          interactive={false}
+          onLegendItemClick={
+            onStatusSegmentClick
+              ? (segment) => onStatusSegmentClick(segment.label)
+              : undefined
+          }
         />
       )}
     </div>

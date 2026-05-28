@@ -1,6 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import type { Shift } from "@/lib/api/shifts";
-import { getCreateBillingClaimErrorMessage } from "@/lib/api/claims";
+import {
+  getBillingClaimById,
+  getBillingClaimMutationErrorMessage,
+  getCreateBillingClaimErrorMessage,
+  type BillingClaimListItem,
+  type BillingClaimStatus,
+  type SavedBillingClaim,
+} from "@/lib/api/claims";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import ClaimsDashboardHeader from "./components/ClaimsDashboardHeader";
@@ -8,11 +15,20 @@ import ClaimsOverviewCards from "./components/ClaimsOverviewCards";
 import ClaimsByStatusChart from "./components/ClaimsByStatusChart";
 import TopRejectionReasonsChart from "./components/TopRejectionReasonsChart";
 import RecentClaimsTable from "./components/RecentClaimsTable";
+import SavedClaimsTable from "./components/SavedClaimsTable";
+import ClaimsWorkspaceTabs, { type ClaimsWorkspaceTab } from "./components/ClaimsWorkspaceTabs";
+import UpdateClaimStatusModal from "./components/UpdateClaimStatusModal";
+import CancelClaimDialog from "./components/CancelClaimDialog";
 import type { RecentClaim } from "./data/mockClaimsDashboardData";
-import type { SavedBillingClaim } from "@/lib/api/claims";
 import { saveGeneratedClaim } from "./utils/saveGeneratedClaim";
 import { useClaimsDashboard } from "./hooks/useClaimsDashboard";
+import { useGeneratedClaims } from "./hooks/useGeneratedClaims";
+import { useShiftsToClaim } from "./hooks/useShiftsToClaim";
 import { getCurrentWeekDateRange } from "./utils/claimsDashboardUtils";
+import {
+  buildRecentClaimFromSavedClaim,
+  STATUS_LABEL_TO_FILTER,
+} from "./utils/savedClaimUtils";
 
 const GenerateClaimModal = lazy(() => import("./components/GenerateClaimModal"));
 const ClaimReportModal = lazy(() => import("./components/claim-report/ClaimReportModal"));
@@ -21,11 +37,26 @@ export default function ClaimsDashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState(getCurrentWeekDateRange);
+  const [activeTab, setActiveTab] = useState<ClaimsWorkspaceTab>("shifts");
+  const [statusFilter, setStatusFilter] = useState<BillingClaimStatus | "all">("all");
+  const [clientSearch, setClientSearch] = useState("");
+  const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
   const dashboard = useClaimsDashboard(dateRange);
-  const { refetch: refetchDashboard } = dashboard;
+  const generatedClaims = useGeneratedClaims(dateRange, {
+    enabled: activeTab === "saved",
+    statusFilter,
+    clientSearch,
+    selectedClientName,
+  });
+  const shiftsToClaim = useShiftsToClaim({
+    enabled: activeTab === "shifts",
+    agencyId: user?.agencyId,
+  });
   const [generateOpen, setGenerateOpen] = useState(false);
   const [savingClaim, setSavingClaim] = useState(false);
-  const [claimedShiftIds, setClaimedShiftIds] = useState<string[]>([]);
+  const [mutationSaving, setMutationSaving] = useState(false);
+  const [statusModalClaim, setStatusModalClaim] = useState<BillingClaimListItem | null>(null);
+  const [cancelModalClaim, setCancelModalClaim] = useState<BillingClaimListItem | null>(null);
   const [claimReport, setClaimReport] = useState<{
     claim: RecentClaim;
     selectedShifts: Shift[];
@@ -44,6 +75,42 @@ export default function ClaimsDashboardPage() {
     });
   }, [dashboard.error, toast]);
 
+  useEffect(() => {
+    if (!generatedClaims.error) {
+      return;
+    }
+
+    toast({
+      title: "Couldn't load generated claims",
+      description: generatedClaims.error,
+      variant: "destructive",
+    });
+  }, [generatedClaims.error, toast]);
+
+  useEffect(() => {
+    if (!shiftsToClaim.error) {
+      return;
+    }
+
+    toast({
+      title: "Couldn't load shifts ready to claim",
+      description: shiftsToClaim.error,
+      variant: "destructive",
+    });
+  }, [shiftsToClaim.error, toast]);
+
+  const refreshAfterCreateOrCancel = useCallback(async () => {
+    await Promise.all([
+      dashboard.refetch(),
+      generatedClaims.refetch({ force: true }),
+      shiftsToClaim.refetch({ force: true }),
+    ]);
+  }, [dashboard, generatedClaims, shiftsToClaim]);
+
+  const refreshAfterStatusUpdate = useCallback(async () => {
+    await Promise.all([dashboard.refetch(), generatedClaims.refetch()]);
+  }, [dashboard, generatedClaims]);
+
   const handleGenerateClaim = useCallback(
     async (
       selectedShifts: Shift[],
@@ -60,18 +127,15 @@ export default function ClaimsDashboardPage() {
           weekRange: context.weekRange,
         });
 
-        setClaimedShiftIds((previous) => [
-          ...previous,
-          ...savedClaim.shiftIds.filter((id) => !previous.includes(id)),
-        ]);
         setClaimReport({
           claim: anchorClaim,
           selectedShifts,
           savedClaim,
         });
         setGenerateOpen(false);
+        setActiveTab("saved");
 
-        await refetchDashboard();
+        await refreshAfterCreateOrCancel();
 
         toast({
           title: `Claim ${savedClaim.claimNumber} saved.`,
@@ -88,7 +152,7 @@ export default function ClaimsDashboardPage() {
         setSavingClaim(false);
       }
     },
-    [refetchDashboard, toast, user?.agencyId],
+    [refreshAfterCreateOrCancel, toast, user?.agencyId],
   );
 
   const handleTableGenerateClaim = useCallback(
@@ -103,7 +167,103 @@ export default function ClaimsDashboardPage() {
     setClaimReport(null);
   }, []);
 
-  const excludeShiftIds = useMemo(() => new Set(claimedShiftIds), [claimedShiftIds]);
+  const handleViewReport = useCallback(
+    async (claim: BillingClaimListItem) => {
+      try {
+        const detail = await getBillingClaimById(claim.id);
+        const anchorShift = detail.shifts[0];
+        if (!anchorShift) {
+          throw new Error("This claim has no linked shifts.");
+        }
+
+        setClaimReport({
+          claim: buildRecentClaimFromSavedClaim(detail, anchorShift),
+          selectedShifts: detail.shifts,
+          savedClaim: {
+            id: detail.id,
+            claimNumber: detail.claimNumber,
+            status: detail.status,
+            rejectionReason: detail.rejectionReason,
+            amount: detail.amount,
+            clientId: detail.clientId,
+            shiftIds: detail.shiftIds,
+            reportPrefill: detail.reportPrefill,
+          },
+        });
+      } catch (error) {
+        toast({
+          title: "Couldn't open claim report",
+          description: getBillingClaimMutationErrorMessage(error),
+          variant: "destructive",
+        });
+      }
+    },
+    [toast],
+  );
+
+  const handleConfirmStatusUpdate = useCallback(
+    async (payload: { status: Exclude<BillingClaimStatus, "pending">; rejectionReason?: string }) => {
+      if (!statusModalClaim) return;
+
+      setMutationSaving(true);
+      try {
+        await generatedClaims.updateClaimStatus(statusModalClaim.id, payload);
+        setStatusModalClaim(null);
+        await refreshAfterStatusUpdate();
+        toast({
+          title: "Claim status updated",
+          description: `${statusModalClaim.claimNumber} is now ${payload.status}.`,
+        });
+      } catch (error) {
+        toast({
+          title: "Couldn't update claim status",
+          description: getBillingClaimMutationErrorMessage(error),
+          variant: "destructive",
+        });
+      } finally {
+        setMutationSaving(false);
+      }
+    },
+    [generatedClaims, refreshAfterStatusUpdate, statusModalClaim, toast],
+  );
+
+  const handleConfirmCancelClaim = useCallback(async () => {
+    if (!cancelModalClaim) return;
+
+    setMutationSaving(true);
+    try {
+      await generatedClaims.cancelClaim(cancelModalClaim.id);
+      setCancelModalClaim(null);
+      await refreshAfterCreateOrCancel();
+      toast({
+        title: "Claim cancelled",
+        description: `${cancelModalClaim.claimNumber} was removed and its shifts are claimable again.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Couldn't cancel claim",
+        description: getBillingClaimMutationErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setMutationSaving(false);
+    }
+  }, [cancelModalClaim, generatedClaims, refreshAfterCreateOrCancel, toast]);
+
+  const handleStatusSegmentClick = useCallback((segmentLabel: string) => {
+    const nextFilter = STATUS_LABEL_TO_FILTER[segmentLabel];
+    if (!nextFilter) {
+      return;
+    }
+
+    setActiveTab("saved");
+    setStatusFilter(nextFilter);
+  }, []);
+
+  const handleClientSearchChange = useCallback((query: string, clientName?: string) => {
+    setClientSearch(query);
+    setSelectedClientName(clientName);
+  }, []);
 
   return (
     <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
@@ -116,15 +276,37 @@ export default function ClaimsDashboardPage() {
       <ClaimsOverviewCards stats={dashboard.overviewStats} loading={dashboard.loading} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ClaimsByStatusChart chart={dashboard.statusChart} loading={dashboard.loading} />
+        <ClaimsByStatusChart
+          chart={dashboard.statusChart}
+          loading={dashboard.loading}
+          onStatusSegmentClick={handleStatusSegmentClick}
+        />
         <TopRejectionReasonsChart chart={dashboard.rejectionChart} loading={dashboard.loading} />
       </div>
 
-      <RecentClaimsTable
-        excludeShiftIds={excludeShiftIds}
-        onGenerateClaim={handleTableGenerateClaim}
-        generateDisabled={savingClaim}
-      />
+      <ClaimsWorkspaceTabs activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {activeTab === "shifts" ? (
+        <RecentClaimsTable
+          shifts={shiftsToClaim.shifts}
+          loading={shiftsToClaim.loading}
+          onGenerateClaim={handleTableGenerateClaim}
+          generateDisabled={savingClaim}
+        />
+      ) : (
+        <SavedClaimsTable
+          claims={generatedClaims.claims}
+          totalCount={generatedClaims.totalCount}
+          loading={generatedClaims.loading}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          onClientSearchChange={handleClientSearchChange}
+          onViewReport={(claim) => void handleViewReport(claim)}
+          onUpdateStatus={setStatusModalClaim}
+          onCancelClaim={setCancelModalClaim}
+          actionsDisabled={mutationSaving}
+        />
+      )}
 
       {generateOpen && (
         <Suspense fallback={null}>
@@ -151,6 +333,22 @@ export default function ClaimsDashboardPage() {
           />
         </Suspense>
       )}
+
+      <UpdateClaimStatusModal
+        open={Boolean(statusModalClaim)}
+        claim={statusModalClaim}
+        saving={mutationSaving}
+        onClose={() => !mutationSaving && setStatusModalClaim(null)}
+        onConfirm={handleConfirmStatusUpdate}
+      />
+
+      <CancelClaimDialog
+        open={Boolean(cancelModalClaim)}
+        claim={cancelModalClaim}
+        saving={mutationSaving}
+        onClose={() => !mutationSaving && setCancelModalClaim(null)}
+        onConfirm={handleConfirmCancelClaim}
+      />
     </div>
   );
 }

@@ -56,9 +56,9 @@ export type ClaimsStatusChartData = {
 };
 
 const STATUS_LABELS: Record<BillingClaimStatus, string> = {
-  pending: "Pending claims",
-  paid: "Paid claims",
-  rejected: "Rejected claims",
+  pending: "Pending",
+  paid: "Paid",
+  rejected: "Rejected",
 };
 
 export function mapDashboardToStatusChart(

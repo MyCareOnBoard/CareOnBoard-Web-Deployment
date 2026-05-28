@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Routes } from "@/routes/constants";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
+import ClientNameLink from "./ClientNameLink";
 import { TABLE_ROW_CLASS } from "./tableColumns";
 
 const MISSING_STAFF_ID = "—";
@@ -40,34 +41,6 @@ function StaffIdLink({ staffId }: { staffId: string }) {
       className="text-[13px] font-medium text-[#10141a] transition-colors hover:text-[#00b4b8] hover:underline"
     >
       {displayId}
-    </Link>
-  );
-}
-
-function ClientNameLink({
-  name,
-  clientId,
-  className,
-}: {
-  name: string;
-  clientId?: string;
-  className?: string;
-}) {
-  const trimmedClientId = clientId?.trim();
-
-  if (!trimmedClientId) {
-    return <span className={className}>{name}</span>;
-  }
-
-  return (
-    <Link
-      to={Routes.agency.clientDetails.replace(":clientId", trimmedClientId)}
-      className={cn(
-        "truncate transition-colors hover:text-[#00b4b8] hover:underline",
-        className,
-      )}
-    >
-      {name}
     </Link>
   );
 }
