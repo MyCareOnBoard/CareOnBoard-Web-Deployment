@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Loader2, Trash2 } from "lucide-react";
+import { CheckCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { Client, updateClient, deleteClient } from "@/lib/api/clients";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router";
@@ -9,11 +10,28 @@ import { cn } from "@/lib/utils";
 import { ProfileSectionCard } from "@/pages/shared/client-details/components/ProfileSectionCard";
 import { buildProfileSections, type ProfileSection } from "./profileTabViewModel";
 
+type PendingConfirmAction = "deactivate" | "delete";
+
+const CLIENT_CONFIRM_CONFIG: Record<
+  PendingConfirmAction,
+  { title: string; message: string; confirmText: string }
+> = {
+  deactivate: {
+    title: "Deactivate client",
+    message:
+      "Are you sure you want to deactivate this client? This action will mark the client as inactive and may affect their access to services.",
+    confirmText: "Deactivate",
+  },
+  delete: {
+    title: "Delete client",
+    message:
+      "Are you sure you want to delete this client? This action cannot be undone and will permanently remove all client data from the system.",
+    confirmText: "Delete",
+  },
+};
+
 const profileActionBtn =
   "h-9 min-h-9 rounded-lg px-3.5 text-[13px] font-medium shadow-none transition-colors focus-visible:ring-offset-0";
-
-const profileModalBtn =
-  "h-9 min-h-9 rounded-lg px-4 text-[13px] font-medium shadow-none focus-visible:ring-offset-0";
 
 const ProfileTabSections = memo(function ProfileTabSections({
   sections,
@@ -139,8 +157,7 @@ export function ProfileTab({
 }: ProfileTabProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingConfirmAction | null>(null);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -162,7 +179,7 @@ export function ProfileTab({
         description: "The client has been successfully deactivated.",
       });
 
-      setShowConfirmModal(false);
+      setPendingAction(null);
       onClientUpdated?.();
     } catch (error: unknown) {
       const message =
@@ -225,7 +242,7 @@ export function ProfileTab({
         description: "The client has been successfully deleted.",
       });
 
-      setShowDeleteModal(false);
+      setPendingAction(null);
       navigate(afterDeleteRoute);
     } catch (error: unknown) {
       const message =
@@ -241,10 +258,18 @@ export function ProfileTab({
     }
   }, [afterDeleteRoute, client.agencyId, clientId, navigate, toast]);
 
-  const openDeactivateModal = useCallback(() => setShowConfirmModal(true), []);
-  const closeDeactivateModal = useCallback(() => setShowConfirmModal(false), []);
-  const openDeleteModal = useCallback(() => setShowDeleteModal(true), []);
-  const closeDeleteModal = useCallback(() => setShowDeleteModal(false), []);
+  const openDeactivateModal = useCallback(() => setPendingAction("deactivate"), []);
+  const openDeleteModal = useCallback(() => setPendingAction("delete"), []);
+  const closeConfirmModal = useCallback(() => setPendingAction(null), []);
+
+  const handleConfirm = useCallback(() => {
+    if (pendingAction === "delete") void handleDelete();
+    else if (pendingAction === "deactivate") void handleDeactivate();
+  }, [handleDeactivate, handleDelete, pendingAction]);
+
+  const confirmConfig = pendingAction ? CLIENT_CONFIRM_CONFIG[pendingAction] : null;
+  const isConfirmBusy =
+    pendingAction === "deactivate" ? isDeactivating : pendingAction === "delete" ? isDeleting : false;
 
   const isInactive = client.status === "inactive" || client.status === "archived";
 
@@ -264,89 +289,18 @@ export function ProfileTab({
         <ProfileTabSections sections={sections} />
       </div>
 
-      {showConfirmModal ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-          <div className="flex w-full max-w-[calc(100vw-2rem)] flex-col items-center gap-4 rounded-2xl bg-white p-6 text-center shadow-lg sm:max-w-md">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
-              <AlertCircle className="h-7 w-7 text-red-500" />
-            </div>
-            <p className="text-[18px] font-semibold text-[#10141a]">Deactivate client</p>
-            <p className="text-[14px] text-[#4b4b4c]">
-              Are you sure you want to deactivate this client? This action will mark the client as
-              inactive and may affect their access to services.
-            </p>
-            <div className="mt-2 flex w-full flex-col justify-center gap-2 sm:flex-row sm:justify-center">
-              <Button
-                type="button"
-                variant="ghost"
-                className={cn(
-                  profileModalBtn,
-                  "border border-[#e8eaed] bg-white text-[#525253] hover:bg-[#f5f6f7]",
-                )}
-                onClick={closeDeactivateModal}
-                disabled={isDeactivating}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className={cn(
-                  profileModalBtn,
-                  "gap-1.5 border border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
-                )}
-                onClick={handleDeactivate}
-                disabled={isDeactivating}
-              >
-                {isDeactivating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                Deactivate
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showDeleteModal ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-          <div className="flex w-full max-w-[calc(100vw-2rem)] flex-col items-center gap-4 rounded-2xl bg-white p-6 text-center shadow-lg sm:max-w-md">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
-              <AlertCircle className="h-7 w-7 text-red-500" />
-            </div>
-            <p className="text-[18px] font-semibold text-[#10141a]">Delete client</p>
-            <p className="text-[14px] text-[#4b4b4c]">
-              Are you sure you want to delete this client? This action cannot be undone and will
-              permanently remove all client data from the system.
-            </p>
-            <div className="mt-2 flex w-full flex-col justify-center gap-2 sm:flex-row sm:justify-center">
-              <Button
-                type="button"
-                variant="ghost"
-                className={cn(
-                  profileModalBtn,
-                  "border border-[#e8eaed] bg-white text-[#525253] hover:bg-[#f5f6f7]",
-                )}
-                onClick={closeDeleteModal}
-                disabled={isDeleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className={cn(
-                  profileModalBtn,
-                  "gap-1.5 border border-red-200 bg-red-600 text-white hover:bg-red-700 hover:text-white",
-                )}
-                onClick={handleDelete}
-                disabled={isDeleting}
-              >
-                {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <DeleteConfirmationModal
+        isOpen={pendingAction !== null}
+        onClose={() => {
+          if (!isConfirmBusy) closeConfirmModal();
+        }}
+        onConfirm={handleConfirm}
+        isDeleting={isConfirmBusy}
+        title={confirmConfig?.title ?? ""}
+        message={confirmConfig?.message ?? ""}
+        confirmText={confirmConfig?.confirmText ?? "Confirm"}
+        cancelText="Cancel"
+      />
     </>
   );
 }
