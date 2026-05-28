@@ -297,6 +297,156 @@ describe("mergeSdrExtraction", () => {
     expect(apiRow.totalCost).toBe("2911.83");
   });
 
+  it("fills empty wizard service name from SDR row.name when matched by code", () => {
+    const outcomes = [
+      {
+        id: "o1",
+        statement: "G",
+        services: [
+          {
+            ...createEmptyServiceAuthorization(),
+            id: "s1",
+            code: "H2021HI",
+          },
+        ],
+      },
+    ];
+    const fd = baseForm(outcomes);
+    const ext = extractionFrom([
+      {
+        statement: "G",
+        rows: [
+          {
+            code: "H2021HI",
+            name: "Home and Community Habilitation",
+            procedureName: "HCS",
+          },
+        ],
+      },
+    ]);
+    const prev = buildSdrImportPreview(ext, outcomes, { overwrite: false });
+    expect(prev.matched).toHaveLength(1);
+    expect(prev.matched[0].patchDraft.name).toBe("Home and Community Habilitation");
+
+    const { formData: next } = applySdrImportToWizard(fd, prev, { overwrite: false, file: null });
+    expect(next.stage2.outcomes[0].services[0].name).toBe("Home and Community Habilitation");
+    expect(next.stage2.outcomes[0].services[0].procedureName).toBe("HCS");
+  });
+
+  it("fills empty wizard service name from sdrDetails.source.serviceName when row.name is missing", () => {
+    const outcomes = [
+      {
+        id: "o1",
+        statement: "G",
+        services: [
+          {
+            ...createEmptyServiceAuthorization(),
+            id: "s1",
+            code: "H2021HI",
+          },
+        ],
+      },
+    ];
+    const fd = baseForm(outcomes);
+    const ext = extractionFrom([
+      {
+        statement: "G",
+        rows: [
+          {
+            code: "H2021HI",
+            sdrDetails: {
+              source: { serviceName: "Home and Community Habilitation" },
+            },
+          },
+        ],
+      },
+    ]);
+    const prev = buildSdrImportPreview(ext, outcomes, { overwrite: false });
+    expect(prev.matched[0].patchDraft.name).toBe("Home and Community Habilitation");
+
+    const { formData: next } = applySdrImportToWizard(fd, prev, { overwrite: false, file: null });
+    expect(next.stage2.outcomes[0].services[0].name).toBe("Home and Community Habilitation");
+  });
+
+  it("fills empty sdrDetails.frequency on keptExisting services when overwrite is off", () => {
+    const outcomes = [
+      {
+        id: "o1",
+        statement: "G",
+        services: [
+          {
+            ...createEmptyServiceAuthorization(),
+            id: "s1",
+            code: "H2021HI",
+            totalHours: "75.75",
+            sdrDetails: {
+              deliveryMethods: ["KeepMe"],
+              importedAt: "2020-01-01T00:00:00.000Z",
+            },
+          },
+        ],
+      },
+    ];
+    const fd = baseForm(outcomes);
+    const ext = extractionFrom([
+      {
+        statement: "G",
+        rows: [
+          {
+            code: "H2021HI",
+            totalHours: "75.75",
+            sdrDetails: { frequency: "3x/week", deliveryMethods: ["ReplaceAttempt"] },
+          },
+        ],
+      },
+    ]);
+    const prev = buildSdrImportPreview(ext, outcomes, { overwrite: false });
+    expect(prev.keptExisting).toHaveLength(1);
+    expect(prev.matched).toHaveLength(0);
+
+    const { formData: next } = applySdrImportToWizard(fd, prev, { overwrite: false, file: null });
+    const svc = next.stage2.outcomes[0].services[0];
+    expect(svc.sdrDetails?.frequency).toBe("3x/week");
+    expect(svc.sdrDetails?.deliveryMethods).toEqual(["KeepMe"]);
+  });
+
+  it("replaces sdrDetails deliveryMethods when overwrite is on", () => {
+    const outcomes = [
+      {
+        id: "o1",
+        statement: "G",
+        services: [
+          {
+            ...createEmptyServiceAuthorization(),
+            id: "s1",
+            code: "C1",
+            sdrDetails: {
+              deliveryMethods: ["Old"],
+              importedAt: "2020-01-01T00:00:00.000Z",
+            },
+          },
+        ],
+      },
+    ];
+    const fd = baseForm(outcomes);
+    const ext = extractionFrom([
+      {
+        statement: "G",
+        rows: [
+          {
+            code: "C1",
+            sdrDetails: { deliveryMethods: ["New"] },
+          },
+        ],
+      },
+    ]);
+    const prev = buildSdrImportPreview(ext, outcomes, { overwrite: true });
+    expect(prev.matched).toHaveLength(1);
+
+    const { formData: next } = applySdrImportToWizard(fd, prev, { overwrite: true, file: null });
+    expect(next.stage2.outcomes[0].services[0].sdrDetails?.deliveryMethods).toEqual(["New"]);
+  });
+
   it("SDR authorization scalars replace ISP values when overwrite is off", () => {
     const outcomes = [
       {

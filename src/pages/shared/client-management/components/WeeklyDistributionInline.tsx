@@ -7,7 +7,10 @@ import type { ClientService } from "@/lib/api/clients";
 
 import {
   WEEKLY_DIST_DISPLAY_CAP,
+  draftFromWd,
+  wdFromDraft,
   weeklyDistributionFingerprintFromWd,
+  type WeeklyDistributionDraftRow,
 } from "../utils/sdrWeeklyDistribution";
 
 export type WeeklyDistributionData = NonNullable<ClientService["sdrWeeklyDistribution"]>;
@@ -15,8 +18,6 @@ export type WeeklyDistributionData = NonNullable<ClientService["sdrWeeklyDistrib
 export { WEEKLY_DIST_DISPLAY_CAP };
 
 type WeeklyRowData = { weekRange?: string; units?: string; hours?: string };
-
-type DraftRow = WeeklyRowData & { rowKey: string };
 
 type WeeklyDistributionInlineProps = {
   wd: WeeklyDistributionData;
@@ -31,29 +32,6 @@ function newRowKey(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : String(Math.random());
-}
-
-function draftFromWd(wd: WeeklyDistributionData): DraftRow[] {
-  return (wd.rows ?? []).slice(0, WEEKLY_DIST_DISPLAY_CAP).map((r, i) => ({
-    rowKey: `${i}-${newRowKey()}`,
-    weekRange: r.weekRange ?? "",
-    units: r.units ?? "",
-    hours: r.hours ?? "",
-  }));
-}
-
-function wdFromDraft(standardLine: string, rows: DraftRow[]): WeeklyDistributionData {
-  const sanitized = rows
-    .map((r) => ({
-      weekRange: (r.weekRange ?? "").trim(),
-      units: (r.units ?? "").trim(),
-      hours: (r.hours ?? "").trim(),
-    }))
-    .filter((r) => r.weekRange || r.units || r.hours);
-  return {
-    ...(standardLine.trim() ? { standardLine: standardLine.trim() } : {}),
-    ...(sanitized.length ? { rows: sanitized } : {}),
-  };
 }
 
 function WeeklyDistributionTruncationWarning({ droppedCount }: { droppedCount: number }) {
@@ -76,7 +54,7 @@ const WeeklyDistributionRowInput = React.memo(function WeeklyDistributionRowInpu
   onRemove,
   onCommit,
 }: {
-  row: DraftRow;
+  row: WeeklyDistributionDraftRow;
   onChange: (rowKey: string, patch: Partial<WeeklyRowData>) => void;
   onRemove: (rowKey: string) => void;
   onCommit: () => void;
@@ -139,9 +117,8 @@ function WeeklyDistributionInlineEditor({
 }) {
   const fingerprint = useMemo(() => weeklyDistributionFingerprintFromWd(wd), [wd]);
   const [standardLineDraft, setStandardLineDraft] = useState(wd.standardLine ?? "");
-  const [rowsDraft, setRowsDraft] = useState<DraftRow[]>(() => draftFromWd(wd));
+  const [rowsDraft, setRowsDraft] = useState<WeeklyDistributionDraftRow[]>(() => draftFromWd(wd));
   const droppedCount = useMemo(() => weeklyDistributionDroppedCount(wd), [fingerprint]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onChangeRef = useRef(onChange);
   const standardLineRef = useRef(standardLineDraft);
   const rowsDraftRef = useRef(rowsDraft);
@@ -149,7 +126,7 @@ function WeeklyDistributionInlineEditor({
   standardLineRef.current = standardLineDraft;
   rowsDraftRef.current = rowsDraft;
 
-  const commitDraft = useCallback((line: string, rows: DraftRow[]) => {
+  const commitDraft = useCallback((line: string, rows: WeeklyDistributionDraftRow[]) => {
     onChangeRef.current(wdFromDraft(line, rows));
   }, []);
 
@@ -160,33 +137,17 @@ function WeeklyDistributionInlineEditor({
 
   useEffect(() => {
     return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-        debounceRef.current = null;
-      }
       commitDraft(standardLineRef.current, rowsDraftRef.current);
     };
   }, [commitDraft]);
 
-  const scheduleCommit = useCallback(
-    (line: string, rows: DraftRow[]) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => commitDraft(line, rows), 300);
-    },
-    [commitDraft],
-  );
-
-  const patchRow = useCallback(
-    (rowKey: string, patch: Partial<WeeklyRowData>) => {
-      setRowsDraft((prev) => {
-        const next = prev.map((r) => (r.rowKey === rowKey ? { ...r, ...patch } : r));
-        rowsDraftRef.current = next;
-        scheduleCommit(standardLineRef.current, next);
-        return next;
-      });
-    },
-    [scheduleCommit],
-  );
+  const patchRow = useCallback((rowKey: string, patch: Partial<WeeklyRowData>) => {
+    setRowsDraft((prev) => {
+      const next = prev.map((r) => (r.rowKey === rowKey ? { ...r, ...patch } : r));
+      rowsDraftRef.current = next;
+      return next;
+    });
+  }, []);
 
   const removeRow = useCallback(
     (rowKey: string) => {
@@ -208,6 +169,7 @@ function WeeklyDistributionInlineEditor({
     setRowsDraft((prev) => {
       if (prev.length >= WEEKLY_DIST_DISPLAY_CAP) return prev;
       const next = [...prev, { rowKey: newRowKey(), weekRange: "", units: "", hours: "" }];
+      rowsDraftRef.current = next;
       return next;
     });
   }, []);
@@ -237,7 +199,6 @@ function WeeklyDistributionInlineEditor({
               const v = e.target.value;
               setStandardLineDraft(v);
               standardLineRef.current = v;
-              scheduleCommit(v, rowsDraftRef.current);
             }}
             onBlur={flushCommit}
             className="h-[44px] rounded-[12px] border-[#cccccd] bg-white text-[13px]"

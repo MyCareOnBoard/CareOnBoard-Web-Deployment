@@ -8,7 +8,6 @@ import ClaimsClientSearch from "./ClaimsClientSearch";
 import RecentClaimRow from "./RecentClaimRow";
 import { TABLE_HEADER_CLASS, TABLE_MIN_WIDTH, TABLE_ROW_CLASS } from "./tableColumns";
 
-const EditClientClaimModal = lazy(() => import("./EditClientClaimModal"));
 const ClaimReportModal = lazy(() => import("./claim-report/ClaimReportModal"));
 
 const SKELETON_ROW_COUNT = 10;
@@ -43,11 +42,9 @@ export default function RecentClaimsTable() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [shifts, setShifts] = useState<Shift[]>([]);
-  const [claimOverrides, setClaimOverrides] = useState<Record<string, RecentClaim>>({});
   const [loading, setLoading] = useState(true);
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
-  const [editingClaim, setEditingClaim] = useState<RecentClaim | null>(null);
   const [generatingClaim, setGeneratingClaim] = useState<RecentClaim | null>(null);
 
   useEffect(() => {
@@ -95,11 +92,7 @@ export default function RecentClaimsTable() {
     };
   }, [toast, user?.agencyId]);
 
-  const claims = useMemo(() => {
-    return mapShiftsToRecentClaims(shifts).map(
-      (claim) => claimOverrides[claim.id] ?? claim,
-    );
-  }, [claimOverrides, shifts]);
+  const claims = useMemo(() => mapShiftsToRecentClaims(shifts), [shifts]);
 
   const filteredClaims = useMemo(() => {
     if (selectedClientName) {
@@ -119,25 +112,12 @@ export default function RecentClaimsTable() {
     setSelectedClientName(clientName);
   };
 
-  const handleEditClaim = useCallback((claim: RecentClaim) => {
-    setEditingClaim(claim);
-  }, []);
-
   const handleGenerateClaim = useCallback((claim: RecentClaim) => {
     setGeneratingClaim(claim);
   }, []);
 
-  const handleCloseEditModal = useCallback(() => {
-    setEditingClaim(null);
-  }, []);
-
   const handleCloseReportModal = useCallback(() => {
     setGeneratingClaim(null);
-  }, []);
-
-  const handleSaveClaim = useCallback((updated: RecentClaim) => {
-    setClaimOverrides((prev) => ({ ...prev, [updated.id]: updated }));
-    setEditingClaim(null);
   }, []);
 
   const emptyMessage = useMemo(() => {
@@ -178,7 +158,6 @@ export default function RecentClaimsTable() {
                   key={claim.id}
                   variant="desktop"
                   claim={claim}
-                  onEditClaim={handleEditClaim}
                   onGenerateClaim={handleGenerateClaim}
                 />
               ))
@@ -202,7 +181,6 @@ export default function RecentClaimsTable() {
               key={claim.id}
               variant="mobile"
               claim={claim}
-              onEditClaim={handleEditClaim}
               onGenerateClaim={handleGenerateClaim}
             />
           ))
@@ -213,17 +191,6 @@ export default function RecentClaimsTable() {
         )}
       </div>
 
-      {editingClaim && (
-        <Suspense fallback={null}>
-          <EditClientClaimModal
-            key={editingClaim.id}
-            open
-            claim={editingClaim}
-            onClose={handleCloseEditModal}
-            onSave={handleSaveClaim}
-          />
-        </Suspense>
-      )}
       {generatingClaim && (
         <Suspense fallback={null}>
           <ClaimReportModal

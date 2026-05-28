@@ -9,8 +9,13 @@ import type {
 import { isDocKeyForImport } from "../types/clientExtraction";
 import { trimWizardSdrDetailsForApi } from "./outcomeServices";
 import {
+  applySdrDetailsScalarPatch,
   buildOutcomesFromSdrExtraction,
+  extractionSdrToWizardDraft,
   mapExtractionRowToWizardService,
+  mergeSdrDetailsScalarFields,
+  resolveExtractedServiceDisplayName,
+  resolveExtractedSdrFrequency,
 } from "./mapExtractionSdrFields";
 import { wizardHasAnchorServices } from "./sdrImportAvailableServices";
 import {
@@ -241,6 +246,7 @@ function buildSdrEnrichmentPatch(row: ExtractionServiceRow, wizardSvc: Service, 
   }
 
   mergeScalar("procedureName", row.procedureName);
+  mergeScalar("name", resolveExtractedServiceDisplayName(row));
   /** Top-level extractor `hours` may fill empty wizard scalar; superseded later when WD derivation yields hours. */
   mergeScalar("hours", row.hours);
 
@@ -294,73 +300,6 @@ export function parseIsoOrUsDate(raw: string | undefined): Date | undefined {
     if (!Number.isNaN(d.getTime())) return d;
   }
   return undefined;
-}
-
-function dedupeCapStrings(items: unknown[] | undefined): string[] {
-  if (!Array.isArray(items) || !items.length) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const x of items) {
-    const t = String(x ?? "").trim();
-    if (!t || seen.has(t) || out.length >= SDR_DETAILS_LIST_MAX) continue;
-    seen.add(t);
-    out.push(t);
-  }
-  return out;
-}
-
-/** Build wizard `ServiceSdrDetails` from extracted row (excluding importedAt until apply time). */
-function extractionSdrToWizardDraft(
-  d: NonNullable<ExtractionServiceRow["sdrDetails"]>,
-  augment?: { providerLine?: string; claimsSourceLine?: string },
-): ServiceSdrDetails | undefined {
-  const dm = dedupeCapStrings(d.deliveryMethods);
-  const st = dedupeCapStrings(d.supportTasks);
-  const src = d.source;
-  const providerLine =
-    augment?.providerLine?.trim() || (typeof src?.provider === "string" ? src.provider.trim() : "") || "";
-  const claimsLine =
-    augment?.claimsSourceLine?.trim() ||
-    (typeof src?.claimsSource === "string" ? src.claimsSource.trim() : "") ||
-    "";
-
-  const hasSourceBits = !!(
-    src?.outcomeStatement?.trim() ||
-    src?.serviceName?.trim() ||
-    src?.serviceCode?.trim() ||
-    providerLine ||
-    claimsLine
-  );
-
-  const source = hasSourceBits
-    ? {
-        outcomeStatement: src?.outcomeStatement?.trim() || undefined,
-        serviceName: src?.serviceName?.trim() || undefined,
-        serviceCode: src?.serviceCode?.trim() || undefined,
-        ...(providerLine ? { provider: providerLine } : {}),
-        ...(claimsLine ? { claimsSource: claimsLine } : {}),
-      }
-    : undefined;
-
-  const out: ServiceSdrDetails = {
-    deliveryMethods: dm.length ? dm : undefined,
-    supportTasks: st.length ? st : undefined,
-    frequency: d.frequency?.trim() || undefined,
-    duration: d.duration?.trim() || undefined,
-    setting: d.setting?.trim() || undefined,
-    staffing: d.staffing?.trim() || undefined,
-    source,
-  };
-
-  const empty =
-    !out.deliveryMethods?.length &&
-    !out.supportTasks?.length &&
-    !out.frequency &&
-    !out.duration &&
-    !out.setting &&
-    !out.staffing &&
-    !source;
-  return empty ? undefined : out;
 }
 
 type WizardSvcRef = {
@@ -549,10 +488,17 @@ export function buildSdrImportPreview(
     const codeNorm = (row.code ?? "").trim().toLowerCase();
     const nameNorm = normalizeNameToken(row.name);
     const extProv = row.provider?.trim();
-    const sdrDraft = extractionSdrToWizardDraft(row.sdrDetails ?? {}, {
-      providerLine: extProv,
-      claimsSourceLine: row.claimsSource?.trim(),
-    });
+    const resolvedFrequency = resolveExtractedSdrFrequency(row);
+    const sdrDraft = extractionSdrToWizardDraft(
+      {
+        ...(row.sdrDetails ?? {}),
+        ...(resolvedFrequency ? { frequency: resolvedFrequency } : {}),
+      },
+      {
+        providerLine: extProv,
+        claimsSourceLine: row.claimsSource?.trim(),
+      },
+    );
     const provDatePatch: Partial<Service> = {};
     const sStart = parseIsoOrUsDate(row.sdrStartDate);
     const sEnd = parseIsoOrUsDate(row.sdrEndDate);
@@ -728,14 +674,20 @@ export function buildSdrImportPreview(
 
     const patchDraft: Partial<Service> = { ...provDatePatch };
     Object.assign(patchDraft, enrichPatch);
-    if (sdrDraft)
-      patchDraft.sdrDetails = {
-        ...sdrDraft,
-        importedAt: undefined,
-      };
-
-    if ((row.frequency ?? "").trim() && !chosen.service.frequency?.trim()) {
-      patchDraft.frequency = row.frequency!.trim();
+    if (sdrDraft) {
+      const scalarPatch = mergeSdrDetailsScalarFields(
+        chosen.service.sdrDetails,
+        { ...sdrDraft, importedAt: undefined },
+        overwrite,
+      );
+      patchDraft.sdrDetails = overwrite
+        ? { ...sdrDraft, importedAt: undefined }
+        : {
+            ...(chosen.service.sdrDetails ?? {}),
+            ...sdrDraft,
+            ...(scalarPatch ?? {}),
+            importedAt: undefined,
+          };
     }
 
     const line: SdrMatchedPreviewLine = {
@@ -845,16 +797,31 @@ export function applySdrImportToWizard(
   function stripSkippedSdrBlobFromPatch(patch: Partial<Service>, skipBlob: boolean) {
     if (!skipBlob) return;
     delete patch.sdrDetails;
-    delete patch.frequency;
     delete patch.claimsSource;
   }
 
-  function assignPatchToService(svc: Service, patchSrc: Partial<Service>, skipBlob: boolean) {
+  function assignPatchToService(
+    svc: Service,
+    patchSrc: Partial<Service>,
+    options: { skipBlob: boolean; overwrite: boolean },
+  ): boolean {
     const patch = { ...patchSrc };
-    stripSkippedSdrBlobFromPatch(patch, skipBlob);
+    let changed = false;
+
+    if (patch.sdrDetails) {
+      const scalarPatch = mergeSdrDetailsScalarFields(
+        svc.sdrDetails,
+        patch.sdrDetails,
+        options.overwrite,
+      );
+      if (applySdrDetailsScalarPatch(svc, scalarPatch)) changed = true;
+    }
+
+    stripSkippedSdrBlobFromPatch(patch, options.skipBlob);
+    delete patch.frequency;
 
     const keysLeft = Object.keys(patch).filter((k) => patch[k as keyof Service] !== undefined);
-    if (!keysLeft.length) return false;
+    if (!keysLeft.length) return changed;
 
     const importedIso = new Date().toISOString();
     const nextPartial: Partial<Service> = { ...patch };
@@ -876,17 +843,27 @@ export function applySdrImportToWizard(
     if (!svc) continue;
 
     const skipBlob = !options.overwrite && substantiveWizardSdr(svc);
-    if (assignPatchToService(svc, m.patchDraft, skipBlob)) appliedCount += 1;
+    if (
+      assignPatchToService(svc, m.patchDraft, {
+        skipBlob,
+        overwrite: options.overwrite,
+      })
+    ) {
+      appliedCount += 1;
+    }
   }
 
   for (const m of preview.keptExisting ?? []) {
     const svc = findService(m.wizardOutcomeIndex, m.wizardServiceId);
     if (!svc) continue;
-    const patch = { ...m.patchDraft };
-    delete patch.sdrDetails;
-    delete patch.frequency;
-    delete patch.claimsSource;
-    if (assignPatchToService(svc, patch, false)) appliedCount += 1;
+    if (
+      assignPatchToService(svc, m.patchDraft, {
+        skipBlob: true,
+        overwrite: options.overwrite,
+      })
+    ) {
+      appliedCount += 1;
+    }
   }
 
   const nextForm: AddClientFormData = {

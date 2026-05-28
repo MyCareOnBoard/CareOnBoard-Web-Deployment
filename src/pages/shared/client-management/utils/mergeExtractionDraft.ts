@@ -31,6 +31,7 @@ import type {
 } from "../types/formData";
 import { groupLoadedServicesIntoOutcomes, type ServiceLoadRow } from "./outcomeServices";
 import { applyExtractedAuthorizationFields } from "./normalizeExtractedServiceAuthorization";
+import { seedTopLevelFrequencyIntoSdrDetails } from "./mapExtractionSdrFields";
 import { EMERGENCY_CONTACT_RELATIONSHIP_VALUES, GUARDIAN_RELATIONSHIP_VALUES } from "../types/formData";
 
 export type MergeExtractionOptions = {
@@ -243,7 +244,7 @@ function mapRowToService(row: Record<string, unknown>): Service {
   };
   const authPatch = applyExtractedAuthorizationFields(r);
 
-  return {
+  return seedTopLevelFrequencyIntoSdrDetails({
     id: newServiceId(),
     name: strOrUndef(r.name),
     code: strOrUndef(r.code),
@@ -265,7 +266,7 @@ function mapRowToService(row: Record<string, unknown>): Service {
     evvDescription: strOrUndef(r.evvDescription),
     narrative: strOrUndef(r.narrative),
     ...authPatch,
-  };
+  });
 }
 
 function normalizeGenderForForm(
@@ -351,7 +352,7 @@ function mergeServiceIntoExisting(
     return merged || undefined;
   };
 
-  return {
+  return seedTopLevelFrequencyIntoSdrDetails({
     ...existing,
     id: existing.id,
     name: str(existing.name, incoming.name),
@@ -386,7 +387,7 @@ function mergeServiceIntoExisting(
       incoming.assignedDsps !== undefined && incoming.assignedDsps.length > 0
         ? [...incoming.assignedDsps]
         : [...(existing.assignedDsps ?? [])],
-  };
+  });
 }
 
 function applyImportedServices(

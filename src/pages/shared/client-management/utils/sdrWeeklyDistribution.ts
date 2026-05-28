@@ -12,6 +12,38 @@ export const WEEKLY_DIST_DERIVE_SCAN_MAX = 2000;
 
 export type SanitizedWeeklyRow = { weekRange?: string; units?: string; hours?: string };
 
+export type WeeklyDistributionDraftRow = SanitizedWeeklyRow & { rowKey: string };
+
+/** Build stable-index editor rows from persisted weekly distribution (for inline edit UI). */
+export function draftFromWd(wd: {
+  rows?: ReadonlyArray<Partial<SanitizedWeeklyRow>>;
+}): WeeklyDistributionDraftRow[] {
+  return (wd.rows ?? []).slice(0, WEEKLY_DIST_DISPLAY_CAP).map((r, i) => ({
+    rowKey: `wd-row-${i}`,
+    weekRange: r.weekRange ?? "",
+    units: r.units ?? "",
+    hours: r.hours ?? "",
+  }));
+}
+
+/** Serialize editor draft back to persisted weekly distribution shape. */
+export function wdFromDraft(
+  standardLine: string,
+  rows: WeeklyDistributionDraftRow[],
+): { standardLine?: string; rows?: SanitizedWeeklyRow[] } {
+  const sanitized = rows
+    .map((r) => ({
+      weekRange: (r.weekRange ?? "").trim(),
+      units: (r.units ?? "").trim(),
+      hours: (r.hours ?? "").trim(),
+    }))
+    .filter((r) => r.weekRange || r.units || r.hours);
+  return {
+    ...(standardLine.trim() ? { standardLine: standardLine.trim() } : {}),
+    ...(sanitized.length ? { rows: sanitized } : {}),
+  };
+}
+
 /** Fingerprint keyed on WD content only (immutable spread updates assumed). */
 export function weeklyDistributionFingerprintFromWd(wd: {
   standardLine?: string;
