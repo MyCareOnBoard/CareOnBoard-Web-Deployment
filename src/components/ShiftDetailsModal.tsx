@@ -186,6 +186,7 @@ export default function ShiftDetailsModal({
   const [draftClockOut, setDraftClockOut] = useState("");
   const [draftResolveLateClockIn, setDraftResolveLateClockIn] = useState(false);
   const [draftCompleted, setDraftCompleted] = useState(false);
+  const [draftApprovedForClaim, setDraftApprovedForClaim] = useState(false);
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -193,7 +194,7 @@ export default function ShiftDetailsModal({
   shiftRef.current = shift;
 
   const shiftResetKey = shift
-    ? `${shift.id}|${String(shift.clockedInAt)}|${String(shift.clockedOutAt)}|${shift.status}`
+    ? `${shift.id}|${String(shift.clockedInAt)}|${String(shift.clockedOutAt)}|${shift.status}|${String(shift.approvedForClaim)}`
     : "";
 
   const resolvedShift = useMemo(() => {
@@ -206,6 +207,7 @@ export default function ShiftDetailsModal({
     setDraftClockOut(clockedAtToHHmm(s.clockedOutAt));
     setDraftResolveLateClockIn(false);
     setDraftCompleted(s.status === ShiftStatus.COMPLETED);
+    setDraftApprovedForClaim(Boolean(s.approvedForClaim));
   }, []);
 
   useEffect(() => {
@@ -265,6 +267,7 @@ export default function ShiftDetailsModal({
   const callout = resolvedShift ? getStatusCallout(resolvedShift, anomalyCodes) : null;
   const showResolveLateClockIn =
     Boolean(resolvedShift?.estimatedEndTime) || anomalyCodes.includes("late_clock_in");
+  const showApproveForBilling = resolvedShift?.status === ShiftStatus.COMPLETED;
 
   const handleUpdateChanges = async () => {
     if (!resolvedShift || !reason.trim()) {
@@ -282,6 +285,7 @@ export default function ShiftDetailsModal({
     const inNorm = draftClockIn.trim();
     const outNorm = draftClockOut.trim();
     const serverCompleted = resolvedShift.status === ShiftStatus.COMPLETED;
+    const serverApprovedForClaim = Boolean(resolvedShift.approvedForClaim);
 
     const payload: Parameters<typeof updateShift>[1] = {
       maintenanceReason,
@@ -313,15 +317,20 @@ export default function ShiftDetailsModal({
       payload.estimatedEndTime = null;
     }
 
+    if (draftApprovedForClaim !== serverApprovedForClaim) {
+      payload.approvedForClaim = draftApprovedForClaim;
+    }
+
     const hasMeaningfulChange =
       inNorm !== serverIn ||
       outNorm !== serverOut ||
       draftCompleted !== serverCompleted ||
-      shouldResolveLateClockIn;
+      shouldResolveLateClockIn ||
+      draftApprovedForClaim !== serverApprovedForClaim;
     if (!hasMeaningfulChange && Object.keys(payload).length === 1) {
       toast({
         title: "Nothing to update",
-        description: "Change the clock times, completion status, or late clock-in resolution, or close the window.",
+        description: "Change clock times, completion status, billing approval, or late clock-in resolution—or close.",
         variant: "warning",
       });
       return;
@@ -491,6 +500,21 @@ export default function ShiftDetailsModal({
                   aria-label="Mark shift as completed"
                 />
               </div>
+              {showApproveForBilling ? (
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-[rgba(0,0,0,0.06)] pt-3">
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-semibold text-[#10141a]">Approve for billing</p>
+                    <p className="text-[11px] text-[#808081]">
+                      Shows as Approved in Billing &amp; Approvals when you save.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={draftApprovedForClaim}
+                    onCheckedChange={setDraftApprovedForClaim}
+                    aria-label="Approve for billing"
+                  />
+                </div>
+              ) : null}
             </div>
 
             {callout ? (

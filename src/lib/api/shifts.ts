@@ -85,6 +85,8 @@ export interface Shift {
     type?: ShiftType; // Default: automatic
     submissionStatus?: SubmissionStatus; // Default: draft
     approved?: boolean; // Whether the shift is approved
+    /** When true, shift appears as Approved in Billing & Approvals */
+    approvedForClaim?: boolean;
     timeRemaining?: number; // minutes remaining
     sessionDuration?: string; // e.g., "2 hour session"
     serviceCode?: string;
@@ -185,6 +187,8 @@ export interface UpdateShiftRequest {
     employeeId?: string;
     clientId?: string;
     approved?: boolean;
+    /** When true, shift appears as Approved in Billing & Approvals */
+    approvedForClaim?: boolean;
     maintenanceReason?: string;
     serviceAuthorizationId?: string;
     serviceAuthStartDate?: string;
