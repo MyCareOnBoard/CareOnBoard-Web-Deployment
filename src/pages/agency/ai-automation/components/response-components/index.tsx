@@ -6,12 +6,18 @@ import NoCaregiversCard from "./NoCaregiversCard";
 import QuickQuestionCard from "./QuickQuestionCard";
 import QuickCheckCard from "./QuickCheckCard";
 import TextContentCard from "./TextContentCard";
+import GenericListCard from "./GenericListCard";
+import GenericDetailCard from "./GenericDetailCard";
+import GenericActionCard from "./GenericActionCard";
 
 const STATIC_REGISTRY: Record<string, React.FC<{ data: unknown }>> = {
   "shift-list": ShiftListCard,
   "risk-summary": RiskSummaryCard,
   "no-caregivers": NoCaregiversCard,
   "text-content": TextContentCard,
+  "generic-list": GenericListCard,
+  "generic-detail": GenericDetailCard,
+  "generic-action": GenericActionCard,
 };
 
 const INTERACTIVE_REGISTRY = {
@@ -32,5 +38,5 @@ export function ComponentRenderer({
   const InteractiveComp = INTERACTIVE_REGISTRY[component.type as keyof typeof INTERACTIVE_REGISTRY];
   if (InteractiveComp) return <InteractiveComp data={component.data} onSendMessage={onSendMessage} />;
 
-  return null;
+  return <TextContentCard data={{ title: "Result", content: `\`\`\`json\n${JSON.stringify(component.data, null, 2)}\n\`\`\`` }} />;
 }
