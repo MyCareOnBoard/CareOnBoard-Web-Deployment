@@ -152,7 +152,6 @@ function formatRate(
 ): string {
   const raw =
     matchedService?.clientRate?.trim() ||
-    matchedService?.rate?.trim() ||
     client?.billingRate?.trim() ||
     "";
 

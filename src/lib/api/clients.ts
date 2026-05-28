@@ -130,7 +130,7 @@ export interface ClientService {
   code: string;
   hours?: string;
   totalApprovedHours?: string;
-  rate?: string;
+  staffRate?: string;
   payType?: "hourly" | "15-min" | "daily" | "mile";
   clientRate?: string;
   clientPayType?: "hourly" | "15-min" | "daily" | "mile";

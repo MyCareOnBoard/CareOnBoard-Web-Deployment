@@ -57,7 +57,7 @@ type EditableServiceRow = {
   hours?: string;
   totalApprovedHours?: string;
   totalUnits?: string;
-  rate?: string;
+  staffRate?: string;
   payType?: ClientService["payType"];
   clientRate?: string;
   clientPayType?: ClientService["payType"];
@@ -192,7 +192,7 @@ function emptyEditableServiceRow(): EditableServiceRow {
     hours: "",
     totalApprovedHours: "",
     totalUnits: "",
-    rate: "",
+    staffRate: "",
     payType: undefined,
     clientRate: "",
     clientPayType: undefined,
@@ -252,7 +252,7 @@ function mapClientServicesToEditable(services?: ClientService[]): EditableServic
     hours: svc.hours,
     totalApprovedHours: svc.totalApprovedHours,
     totalUnits: svc.totalUnits,
-    rate: svc.rate,
+    staffRate: svc.staffRate,
     payType: svc.payType,
     clientRate: svc.clientRate,
     clientPayType: svc.clientPayType,
@@ -285,7 +285,7 @@ function mapEditableToClientServices(services: EditableServiceRow[]): ClientServ
     hours: emptish(svc.hours),
     totalApprovedHours: emptish(svc.totalApprovedHours),
     totalUnits: emptish(svc.totalUnits),
-    rate: emptish(svc.rate),
+    staffRate: emptish(svc.staffRate),
     payType: svc.payType,
     clientRate: emptish(svc.clientRate),
     clientPayType: svc.clientPayType,
@@ -569,8 +569,8 @@ function ServiceRow({
                   inputMode="decimal"
                   min={0}
                   step={0.01}
-                  value={service.rate || ""}
-                  onChange={(e) => handleFieldChange("rate", e.target.value)}
+                  value={service.staffRate || ""}
+                  onChange={(e) => handleFieldChange("staffRate", e.target.value)}
                   className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                   placeholder="Enter rate"
                 />
@@ -591,8 +591,8 @@ function ServiceRow({
               </>
             ) : (
               <p className="text-[14px] font-semibold text-[#10141a]">
-                {service.rate
-                  ? `$${service.rate} ${
+                {service.staffRate
+                  ? `$${service.staffRate} ${
                       service.payType === "15-min"
                         ? "/ 15 mins"
                         : service.payType === "daily"

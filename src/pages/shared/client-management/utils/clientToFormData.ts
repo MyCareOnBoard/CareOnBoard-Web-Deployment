@@ -67,7 +67,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
         code: svc.code || "",
         hours: svc.hours || "",
         totalApprovedHours: svc.totalApprovedHours || "",
-        rate: svc.rate || "",
+        staffRate: svc.staffRate || "",
         payType: svc.payType,
         clientRate: svc.clientRate || "",
         clientPayType: svc.clientPayType,

@@ -95,7 +95,7 @@ describe("mergeExtractionDraft", () => {
             code: "DH001",
             hours: "",
             totalApprovedHours: "",
-            rate: "",
+            staffRate: "",
             payType: undefined,
             clientRate: "",
             clientPayType: undefined,
@@ -126,7 +126,33 @@ describe("mergeExtractionDraft", () => {
     expect(formData.stage2.outcomes[0].services.length).toBe(1);
     expect(formData.stage2.outcomes[0].services[0].hours).toBe("12");
     expect(formData.stage2.outcomes[0].services[0].clientRate).toBe("45");
-    expect(formData.stage2.outcomes[0].services[0].rate).toBe("");
+    expect(formData.stage2.outcomes[0].services[0].staffRate).toBe("");
+  });
+
+  it("prefers clientRate when both rate and clientRate are extracted", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: {
+        stage2: {
+          outcomes: [
+            {
+              statement: "Authorization",
+              services: [
+                {
+                  name: "Day Hab",
+                  code: "DH001",
+                  rate: "30",
+                  clientRate: "45",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: false });
+    expect(formData.stage2.outcomes[0].services[0].clientRate).toBe("45");
+    expect(formData.stage2.outcomes[0].services[0].staffRate).toBe("");
   });
 
   it("maps unitType to clientPayType, not staff payType", () => {

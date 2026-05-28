@@ -358,10 +358,10 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
 
         <RatePayTypeField
           label="Staff Rate / Pay Type"
-          rate={service.rate ?? ""}
+          rate={service.staffRate ?? ""}
           payType={service.payType}
           includeMile
-          onRateChange={(v) => update({ rate: v })}
+          onRateChange={(v) => update({ staffRate: v })}
           onPayTypeChange={(v) => update({ payType: v })}
         />
 

@@ -256,6 +256,17 @@ function parseExtractedOutcomeStrings(row: Record<string, unknown>): string[] {
     .filter((s) => Boolean(s) && !isExtractedNoDataToken(s));
 }
 
+function resolveExtractedClientRate(row: Record<string, string | undefined>): string {
+  const strOrUndef = (x: string | undefined) => {
+    const v = x?.trim();
+    if (!v || isExtractedNoDataToken(x)) return undefined;
+    return v;
+  };
+  const cRaw = strOrUndef(row.clientRate);
+  const sRaw = strOrUndef(row.rate);
+  return mergeString("", cRaw ?? sRaw ?? "", true);
+}
+
 function mapRowToService(row: Record<string, unknown>): Service {
   const r = row as Record<string, string | undefined>;
   const strOrUndef = (x: string | undefined) => {
@@ -264,20 +275,7 @@ function mapRowToService(row: Record<string, unknown>): Service {
     return v;
   };
 
-  const cRaw = strOrUndef(r.clientRate);
-  const sRaw = strOrUndef(r.rate);
-  let clientRate = "";
-  let rate = "";
-  if (cRaw && sRaw) {
-    clientRate = mergeString("", cRaw, true);
-    rate = mergeString("", sRaw, true);
-  } else if (cRaw) {
-    clientRate = mergeString("", cRaw, true);
-    rate = "";
-  } else if (sRaw) {
-    clientRate = mergeString("", sRaw, true);
-    rate = "";
-  }
+  const clientRate = resolveExtractedClientRate(r);
 
   let clientPayType =
     normalizeClientPayType(r.clientPayType) ?? normalizeClientPayType(r.unitType);
@@ -292,7 +290,7 @@ function mapRowToService(row: Record<string, unknown>): Service {
     hours: mergeString("", r.hours, true),
     /** ISP extraction uses total units; do not map totalApprovedHours from documents. */
     totalApprovedHours: "",
-    rate,
+    staffRate: "",
     /** Staff pay type is agency-defined; do not map from document extraction. */
     payType: undefined,
     clientRate,
@@ -367,7 +365,7 @@ function isServiceRowEmpty(s: Service): boolean {
     !String(s.name ?? "").trim() &&
     !String(s.code ?? "").trim() &&
     !String(s.hours ?? "").trim() &&
-    !String(s.rate ?? "").trim() &&
+    !String(s.staffRate ?? "").trim() &&
     !String(s.clientRate ?? "").trim()
   );
 }
@@ -410,7 +408,7 @@ function mergeServiceIntoExisting(
       incoming.totalApprovedHours ?? "",
       overwrite,
     ),
-    rate: mergeString(existing.rate ?? "", incoming.rate ?? "", overwrite),
+    staffRate: mergeString(existing.staffRate ?? "", incoming.staffRate ?? "", overwrite),
     payType: pay(existing.payType, incoming.payType),
     clientRate: mergeString(existing.clientRate ?? "", incoming.clientRate ?? "", overwrite),
     clientPayType: pay(existing.clientPayType, incoming.clientPayType),

@@ -846,7 +846,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         ...prev,
         serviceAuthorizationId: value,
         serviceCode: service?.code || "",
-        billingRate: service?.rate || "",
+        billingRate: service?.clientRate || "",
         ispOutcome: ispOutcomesToDisplayText(outcomes),
         assignedDsp: "",
         assignedDspId: "",
@@ -1923,20 +1923,20 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                       Authorization: {formatServiceAuthorizationDatesSummary(selectedService)}
                     </span>
                   ) : null}
-                  {selectedService && (selectedService.rate || selectedService.payType) && (
+                  {selectedService && (selectedService.clientRate || selectedService.clientPayType) && (
                     <span className="text-[12px] font-normal text-[#808081]">
-                      Service rate:{" "}
-                      {selectedService.rate ? `$${selectedService.rate}` : "Not set"}
-                      {selectedService.payType &&
-                        ` • ${selectedService.payType === "hourly"
+                      Client billing rate:{" "}
+                      {selectedService.clientRate ? `$${selectedService.clientRate}` : "Not set"}
+                      {selectedService.clientPayType &&
+                        ` • ${selectedService.clientPayType === "hourly"
                           ? "Hourly"
-                          : selectedService.payType === "15-min"
+                          : selectedService.clientPayType === "15-min"
                             ? "15 minutes"
-                            : selectedService.payType === "daily"
+                            : selectedService.clientPayType === "daily"
                               ? "Daily"
-                              : selectedService.payType === "mile"
+                              : selectedService.clientPayType === "mile"
                                 ? "Mile"
-                                : selectedService.payType
+                                : selectedService.clientPayType
                         }`}
                     </span>
                   )}

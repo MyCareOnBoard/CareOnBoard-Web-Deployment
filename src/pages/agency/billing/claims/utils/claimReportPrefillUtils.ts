@@ -218,7 +218,6 @@ export function buildClaimReportPrefill(
   const hours = parseFloat(timing.totalHours);
   const rate =
     parseRateToNumber(matchedService?.clientRate) ??
-    parseRateToNumber(matchedService?.rate) ??
     parseRateToNumber(client?.billingRate);
   const payType = matchedService?.clientPayType ?? matchedService?.payType;
   const { units, charge } = computeClaimBilling(hours, rate ?? 0, payType);

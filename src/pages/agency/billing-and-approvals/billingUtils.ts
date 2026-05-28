@@ -15,7 +15,7 @@ export function getClientRate(service: ClientServiceDefinition | undefined): {
   payType: ClientBillingPayType;
 } {
   if (!service) return { rate: 0, payType: "hourly" };
-  const rate = parseFloat(service.clientRate ?? service.rate) || 0;
+  const rate = parseFloat(service.clientRate ?? "") || 0;
   const payType = (service.clientPayType ??
     service.payType ??
     "hourly") as ClientBillingPayType;
@@ -27,7 +27,7 @@ export function getStaffRate(service: ClientServiceDefinition | undefined): {
   payType: StaffBillingPayType;
 } {
   if (!service) return { rate: 0, payType: "hourly" };
-  const rate = parseFloat(service.rate) || 0;
+  const rate = parseFloat(service.staffRate ?? "") || 0;
   const raw = (service.payType ?? "hourly") as string;
   const payType: StaffBillingPayType =
     raw === "hourly" || raw === "15-min" || raw === "daily" || raw === "mile"
@@ -56,7 +56,7 @@ export function formatRateLabel(rate: number, payType: string): string {
 }
 
 export function buildServiceByCodeMap(
-  services: ClientServiceDefinition[] | Array<{ code?: string; rate?: string; clientRate?: string; payType?: string; clientPayType?: string }> | undefined
+  services: ClientServiceDefinition[] | Array<{ code?: string; staffRate?: string; clientRate?: string; payType?: string; clientPayType?: string }> | undefined
 ): Map<string, ClientServiceDefinition> {
   const map = new Map<string, ClientServiceDefinition>();
   (services || []).forEach((s) => {

@@ -127,7 +127,7 @@ export type Service = {
     code?: string;
     hours?: string;
     totalApprovedHours?: string;
-    rate?: string;
+    staffRate?: string;
     payType?: ServicePayType;
     clientRate?: string;
     clientPayType?: ServicePayType;
@@ -412,7 +412,7 @@ export function createEmptyServiceAuthorization(): Service {
         code: undefined,
         hours: "",
         totalApprovedHours: "",
-        rate: "",
+        staffRate: "",
         payType: undefined,
         clientRate: "",
         clientPayType: undefined,
