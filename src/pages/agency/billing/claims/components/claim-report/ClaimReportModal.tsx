@@ -12,7 +12,6 @@ import type { RecentClaim } from "../../data/mockClaimsDashboardData";
 import type { ClaimReportFormState, ClaimSignaturePayload } from "../../data/mockClaimReportData";
 import { buildClaimReportFromClaim } from "../../utils/claimReportUtils";
 import type { ClaimReportPrefillSnapshot } from "../../utils/claimReportPrefillUtils";
-import { buildClaimReportPrefillFromShifts } from "../../utils/claimReportPrefillUtils";
 import { downloadClaimReportPdf } from "../../utils/claimReportPrintUtils";
 import { normalizeSignaturePayload } from "../../utils/claimReportSignatureUtils";
 import { useAuth } from "@/utils/auth";
@@ -39,7 +38,7 @@ type ClaimReportModalProps = {
   selectedShifts: Shift[];
   savedClaimId?: string;
   claimNumber?: string;
-  initialPrefill?: ClaimReportPrefillSnapshot;
+  initialPrefill: ClaimReportPrefillSnapshot;
   onClose: () => void;
 };
 
@@ -54,22 +53,15 @@ export default function ClaimReportModal({
 }: ClaimReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
-  const [form, setForm] = useState<ClaimReportFormState>(() => buildClaimReportFromClaim(claim));
+  const [form, setForm] = useState<ClaimReportFormState>(() =>
+    buildClaimReportFromClaim(claim, initialPrefill),
+  );
   const [signatureTarget, setSignatureTarget] = useState<SignatureTarget | null>(null);
   const [signatureModalEverOpened, setSignatureModalEverOpened] = useState(false);
 
   const updateForm = useCallback((patch: Partial<ClaimReportFormState>) => {
     setForm((prev) => ({ ...prev, ...patch }));
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const prefill =
-      initialPrefill ??
-      (selectedShifts.length > 0 ? buildClaimReportPrefillFromShifts(selectedShifts) : undefined);
-    setForm(buildClaimReportFromClaim(claim, prefill));
-  }, [open, claim, selectedShifts, initialPrefill]);
 
   useEffect(() => {
     if (!open) return;

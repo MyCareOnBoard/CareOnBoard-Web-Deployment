@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
+import type { LucideIcon } from "lucide-react";
 import Calendar2Icon from "@/assets/icons/calendar-2.svg?react";
 import BillingDateRangeModal from "./BillingDateRangeModal";
 import type { BillingDateRangeValues } from "./types";
@@ -8,6 +9,7 @@ type PrimaryAction = {
   label: string;
   onClick: () => void;
   loading?: boolean;
+  icon?: LucideIcon;
 };
 
 type BillingDashboardHeaderProps = {
@@ -69,8 +71,11 @@ export default function BillingDashboardHeader({
               type="button"
               onClick={primaryAction.onClick}
               disabled={primaryAction.loading}
-              className="inline-flex h-11 min-h-[44px] w-full cursor-pointer items-center justify-center rounded-full bg-[#00b4b8] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#009da1] active:bg-[#009199] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[160px]"
+              className="inline-flex h-11 min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#00b4b8] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#009da1] active:bg-[#009199] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[160px]"
             >
+              {!primaryAction.loading && primaryAction.icon ? (
+                <primaryAction.icon className="h-4 w-4 shrink-0" aria-hidden />
+              ) : null}
               {primaryAction.loading ? "Loading…" : primaryAction.label}
             </button>
           )}

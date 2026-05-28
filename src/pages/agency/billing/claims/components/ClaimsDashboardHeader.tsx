@@ -1,3 +1,4 @@
+import { Receipt } from "lucide-react";
 import BillingDashboardHeader from "../../components/BillingDashboardHeader";
 import type { BillingDateRangeValues } from "../../components/types";
 
@@ -24,6 +25,7 @@ export default function ClaimsDashboardHeader({
         label: "Generate claim",
         onClick: onGenerateClaimClick,
         loading: generateClaimLoading,
+        icon: Receipt,
       }}
       dateRangeModalDescription="Choose a date range to filter your claims dashboard"
     />

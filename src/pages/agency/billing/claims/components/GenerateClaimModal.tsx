@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -19,6 +16,15 @@ import {
 import { getClientById, searchClients, type Client, type ClientService } from "@/lib/api/clients";
 import { listShifts, ShiftStatus, formatShiftLocation, type Shift } from "@/lib/api/shifts";
 import { formatWeeklyDistributionDropdownLabel } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
+import BillingCornerModalHeader from "@/pages/agency/billing/components/BillingCornerModalHeader";
+import {
+  BILLING_CORNER_MODAL_SHELL_CLASS,
+  BILLING_CORNER_MODAL_TALL_CLASS,
+  BILLING_FIELD_CLASS,
+  BILLING_FIELD_LABEL_CLASS,
+  BILLING_PRIMARY_BUTTON_CLASS,
+  BILLING_SECONDARY_BUTTON_CLASS,
+} from "@/pages/agency/billing/components/billingModalStyles";
 import { useAuth } from "@/utils/auth";
 import { computeTotalHours } from "../utils/claimShiftBillingUtils";
 import {
@@ -30,16 +36,8 @@ import {
   resolveServiceCode,
   resolveWeekRangeIsoBounds,
 } from "../utils/claimSelectionUtils";
-import { FieldLabel, SectionLabel } from "./claimsModalShared";
-import {
-  CLAIM_REPORT_CHECKBOX_CLASS,
-  CLAIMS_FIELD_CLASS,
-  CLAIMS_WIZARD_MODAL_CLASS,
-  CLAIMS_WIZARD_MODAL_SHELL_CLASS,
-} from "./claimsModalStyles";
-
-const WIZARD_TABLE_GRID =
-  "grid grid-cols-[40px_minmax(110px,1fr)_minmax(90px,1fr)_minmax(150px,1.2fr)_minmax(70px,0.8fr)] items-center gap-3 px-4";
+import { SectionLabel } from "./claimsModalShared";
+import { CLAIM_REPORT_CHECKBOX_CLASS } from "./claimsModalStyles";
 
 type GenerateClaimModalProps = {
   open: boolean;
@@ -64,6 +62,14 @@ function formatShiftServiceDate(shift: Shift): string {
   } catch {
     return shift.date;
   }
+}
+
+function getShiftEmployeeLabel(shift: Shift): string {
+  return shift.employee?.fullName?.trim() || shift.employeeId || "—";
+}
+
+function isShiftClaimed(shift: Shift): boolean {
+  return Boolean(shift.claimId);
 }
 
 export default function GenerateClaimModal({
@@ -108,6 +114,11 @@ export default function GenerateClaimModal({
   const filteredShifts = useMemo(
     () => filterShiftsForClaimSelection(shifts, serviceCode, weekBounds),
     [shifts, serviceCode, weekBounds],
+  );
+
+  const selectableShifts = useMemo(
+    () => filteredShifts.filter((shift) => !isShiftClaimed(shift)),
+    [filteredShifts],
   );
 
   const resetWizard = useCallback(() => {
@@ -206,10 +217,12 @@ export default function GenerateClaimModal({
   useEffect(() => {
     if (!open || !selectedClient?.id || !user?.agencyId || !weekBounds) {
       setShifts([]);
+      setSelectedShiftIds(new Set());
       return;
     }
 
     const controller = new AbortController();
+    const activeServiceCode = serviceCode;
 
     const fetchShifts = async () => {
       try {
@@ -221,17 +234,27 @@ export default function GenerateClaimModal({
             endDate: weekBounds.end,
             status: ShiftStatus.COMPLETED,
             approvedForClaim: true,
-            client: true,
+            employee: true,
+            billingClaim: true,
             agencyId: user.agencyId,
             limit: 200,
           },
           { signal: controller.signal },
         );
-        setShifts(response.shifts ?? []);
+        const nextShifts = response.shifts ?? [];
+        const nextFilteredShifts = filterShiftsForClaimSelection(
+          nextShifts,
+          activeServiceCode,
+          weekBounds,
+        );
+        const nextSelectableShifts = nextFilteredShifts.filter((shift) => !isShiftClaimed(shift));
+        setShifts(nextShifts);
+        setSelectedShiftIds(new Set(nextSelectableShifts.map((shift) => shift.id)));
       } catch (error) {
         if (controller.signal.aborted) return;
         console.error("Failed to fetch shifts for claim wizard:", error);
         setShifts([]);
+        setSelectedShiftIds(new Set());
       } finally {
         if (!controller.signal.aborted) {
           setLoadingShifts(false);
@@ -244,24 +267,26 @@ export default function GenerateClaimModal({
     return () => {
       controller.abort();
     };
-  }, [open, selectedClient?.id, user?.agencyId, weekBounds?.start, weekBounds?.end]);
-
-  useEffect(() => {
-    setSelectedShiftIds(new Set(filteredShifts.map((shift) => shift.id)));
-  }, [filteredShifts]);
+  }, [open, selectedClient?.id, user?.agencyId, weekBounds, serviceCode]);
 
   const allSelected =
-    filteredShifts.length > 0 && filteredShifts.every((shift) => selectedShiftIds.has(shift.id));
+    selectableShifts.length > 0 &&
+    selectableShifts.every((shift) => selectedShiftIds.has(shift.id));
 
   const toggleAllShifts = () => {
     if (allSelected) {
       setSelectedShiftIds(new Set());
       return;
     }
-    setSelectedShiftIds(new Set(filteredShifts.map((shift) => shift.id)));
+    setSelectedShiftIds(new Set(selectableShifts.map((shift) => shift.id)));
   };
 
   const toggleShift = (shiftId: string) => {
+    const shift = filteredShifts.find((item) => item.id === shiftId);
+    if (shift && isShiftClaimed(shift)) {
+      return;
+    }
+
     setSelectedShiftIds((previous) => {
       const next = new Set(previous);
       if (next.has(shiftId)) {
@@ -280,7 +305,7 @@ export default function GenerateClaimModal({
     setSelectedWeekIndex(pickDefaultWeekRowIndex(rows));
   };
 
-  const selectedShifts = filteredShifts.filter((shift) => selectedShiftIds.has(shift.id));
+  const selectedShifts = selectableShifts.filter((shift) => selectedShiftIds.has(shift.id));
   const canConfirm = selectedShifts.length > 0 && !saving && !loadingShifts && !loadingClient;
 
   const handleConfirm = () => {
@@ -295,34 +320,18 @@ export default function GenerateClaimModal({
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className={`${CLAIMS_WIZARD_MODAL_CLASS} ${CLAIMS_WIZARD_MODAL_SHELL_CLASS}`}
+        className={`${BILLING_CORNER_MODAL_TALL_CLASS} ${BILLING_CORNER_MODAL_SHELL_CLASS}`}
       >
-        <DialogHeader className="shrink-0 space-y-0 border-b border-[#e5e5e6] px-6 pb-4 pt-6 text-left">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <DialogTitle className="text-[20px] font-bold text-[#10141a]">
-                Generate claim
-              </DialogTitle>
-              <p className="mt-1 text-[14px] text-[#808081]">
-                Choose a client, service, and week, then review approved shifts.
-              </p>
-            </div>
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={onClose}
-              disabled={saving}
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-[#e5e5e6] bg-[#f5f5f5] text-[#808081] hover:bg-[#eef4f5]"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </DialogHeader>
+        <BillingCornerModalHeader
+          title="Generate claim"
+          description="Search for a client, pick a service and week, then choose which approved shifts to bill."
+          onClose={onClose}
+          closeDisabled={saving}
+        />
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="space-y-5 overflow-y-auto px-6 py-5">
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pt-6">
             <div>
-              <FieldLabel>Client</FieldLabel>
+              <label className={BILLING_FIELD_LABEL_CLASS}>Client</label>
               <div className="relative">
                 <input
                   type="text"
@@ -335,7 +344,7 @@ export default function GenerateClaimModal({
                     handleClientSearch(value);
                   }}
                   placeholder="Search client name..."
-                  className={`${CLAIMS_FIELD_CLASS} w-full pr-10`}
+                  className={`${BILLING_FIELD_CLASS} w-full pr-10`}
                 />
                 {(isSearchingClients || loadingClient) && (
                   <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#808081]" />
@@ -359,14 +368,14 @@ export default function GenerateClaimModal({
 
             {selectedClient && (
               <>
-                <div>
-                  <FieldLabel>Service</FieldLabel>
+                <div className="w-full">
+                  <label className={BILLING_FIELD_LABEL_CLASS}>Service</label>
                   <Select
                     value={selectedServiceId}
                     onValueChange={handleServiceChange}
                     disabled={services.length === 0}
                   >
-                    <SelectTrigger className={CLAIMS_FIELD_CLASS}>
+                    <SelectTrigger className={`${BILLING_FIELD_CLASS} w-full`}>
                       <SelectValue placeholder="Select service" />
                     </SelectTrigger>
                     <SelectContent>
@@ -379,14 +388,14 @@ export default function GenerateClaimModal({
                   </Select>
                 </div>
 
-                <div>
-                  <FieldLabel>Week range</FieldLabel>
+                <div className="w-full">
+                  <label className={BILLING_FIELD_LABEL_CLASS}>Week range</label>
                   <Select
                     value={String(selectedWeekIndex)}
                     onValueChange={(value) => setSelectedWeekIndex(Number(value))}
                     disabled={weekRows.length === 0}
                   >
-                    <SelectTrigger className={CLAIMS_FIELD_CLASS}>
+                    <SelectTrigger className={`${BILLING_FIELD_CLASS} w-full`}>
                       <SelectValue placeholder="Select week range" />
                     </SelectTrigger>
                     <SelectContent>
@@ -400,104 +409,109 @@ export default function GenerateClaimModal({
                 </div>
 
                 <div>
-                  <SectionLabel>Approved shifts</SectionLabel>
+                  <SectionLabel>Shifts to include</SectionLabel>
 
                   {loadingShifts ? (
                     <div className="flex items-center gap-2 py-8 text-[14px] text-[#808081]">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading shifts…
+                      Loading approved shifts…
                     </div>
                   ) : filteredShifts.length === 0 ? (
                     <p className="rounded-[12px] border border-[#e5e5e6] bg-[#fafafa] px-4 py-6 text-[14px] text-[#808081]">
-                      No approved shifts in this week. Try another week range or approve shifts in
-                      Billing.
+                      No approved shifts for this week. Choose a different week range, or approve
+                      shifts in Billing first.
                     </p>
                   ) : (
                     <>
-                      <div className="hidden overflow-hidden rounded-[12px] border border-[#e5e5e6] lg:block">
-                        <div className={`${WIZARD_TABLE_GRID} border-b border-[#e5e5e6] py-3 text-[13px] font-semibold text-[#10141a]`}>
-                          <Checkbox
-                            checked={allSelected}
-                            onCheckedChange={toggleAllShifts}
-                            className={CLAIM_REPORT_CHECKBOX_CLASS}
-                            aria-label="Select all shifts"
-                          />
-                          <span>Service date</span>
-                          <span>Staff ID</span>
-                          <span>Duration</span>
-                          <span>Hours</span>
-                        </div>
-                        {filteredShifts.map((shift) => (
-                          <label
-                            key={shift.id}
-                            className={`${WIZARD_TABLE_GRID} cursor-pointer border-b border-[#e5e5e6] py-3 text-[13px] last:border-b-0 hover:bg-[#fafafa]`}
-                          >
-                            <Checkbox
-                              checked={selectedShiftIds.has(shift.id)}
-                              onCheckedChange={() => toggleShift(shift.id)}
-                              className={CLAIM_REPORT_CHECKBOX_CLASS}
-                            />
-                            <span>{formatShiftServiceDate(shift)}</span>
-                            <span className="truncate">{shift.employeeId ?? "—"}</span>
-                            <span>{formatShiftDurationLabel(shift)}</span>
-                            <span>{computeTotalHours(shift)}</span>
-                          </label>
-                        ))}
+                      <div className="mb-3 flex items-center gap-3">
+                        <Checkbox
+                          checked={allSelected}
+                          onChange={toggleAllShifts}
+                          disabled={selectableShifts.length === 0}
+                          className={CLAIM_REPORT_CHECKBOX_CLASS}
+                          aria-label="Select all available shifts"
+                        />
+                        <span className="text-[14px] font-medium text-[#10141a]">
+                          Select all available ({selectableShifts.length})
+                        </span>
                       </div>
 
-                      <div className="space-y-2 lg:hidden">
-                        {filteredShifts.map((shift) => (
-                          <label
+                      <div className="space-y-2">
+                        {filteredShifts.map((shift) => {
+                          const claimed = isShiftClaimed(shift);
+                          const employeeName = getShiftEmployeeLabel(shift);
+                          const visitLocation = formatShiftLocation(shift.location);
+                          const shiftDateLabel = formatShiftServiceDate(shift);
+                          const durationLabel = formatShiftDurationLabel(shift);
+
+                          return (
+                          <div
                             key={shift.id}
-                            className="flex cursor-pointer gap-3 rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4"
+                            className={`flex gap-3 rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4 ${
+                              claimed ? "opacity-60" : ""
+                            }`}
                           >
                             <Checkbox
-                              checked={selectedShiftIds.has(shift.id)}
-                              onCheckedChange={() => toggleShift(shift.id)}
+                              checked={!claimed && selectedShiftIds.has(shift.id)}
+                              onChange={() => toggleShift(shift.id)}
+                              disabled={claimed}
                               className={`${CLAIM_REPORT_CHECKBOX_CLASS} mt-0.5`}
+                              aria-label={
+                                claimed
+                                  ? `Shift on ${shiftDateLabel} is already on a claim and cannot be added`
+                                  : `Include shift on ${shiftDateLabel} in this claim`
+                              }
                             />
                             <div className="min-w-0 flex-1 space-y-1">
                               <p className="text-[14px] font-medium text-[#10141a]">
-                                {formatShiftServiceDate(shift)}
+                                {serviceCode} · {shiftDateLabel} · {durationLabel} ·{" "}
+                                {computeTotalHours(shift)} hrs
                               </p>
                               <p className="text-[13px] text-[#808081]">
-                                Staff {shift.employeeId ?? "—"} · {formatShiftDurationLabel(shift)}
+                                Staff: {employeeName}
                               </p>
-                              <p className="text-[13px] text-[#808081]">
-                                {computeTotalHours(shift)} hrs · {serviceCode}
-                              </p>
-                              <p className="truncate text-[12px] text-[#808081]">
-                                {formatShiftLocation(shift.location)}
-                              </p>
+                              {claimed && shift.billingClaim?.claimNumber ? (
+                                <p className="text-[12px] font-medium text-[#808081]">
+                                  Already on claim {shift.billingClaim.claimNumber}
+                                </p>
+                              ) : null}
+                              {visitLocation ? (
+                                <p
+                                  className="truncate text-[12px] text-[#808081]"
+                                  title={visitLocation}
+                                >
+                                  Visit location: {visitLocation}
+                                </p>
+                              ) : null}
                             </div>
-                          </label>
-                        ))}
+                          </div>
+                          );
+                        })}
                       </div>
                     </>
                   )}
                 </div>
               </>
             )}
-          </div>
+        </div>
 
-          <DialogFooter className="shrink-0 border-t border-[#e5e5e6] px-6 py-4 sm:flex-row sm:justify-end sm:space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-full border border-[#e5e5e6] bg-white px-5 text-[14px] font-medium text-[#10141a] hover:bg-[#eef4f5] sm:w-auto"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={!canConfirm}
-              className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-full bg-[#00b4b8] px-5 text-[14px] font-medium text-white hover:bg-[#009da1] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-            >
-              {saving ? "Creating claim…" : "Create claim"}
-            </button>
-          </DialogFooter>
+        <div className="flex shrink-0 items-center justify-between gap-3 px-6 pb-8 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className={BILLING_SECONDARY_BUTTON_CLASS}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+            className={BILLING_PRIMARY_BUTTON_CLASS}
+          >
+            {saving ? "Creating claim…" : "Create claim"}
+          </button>
         </div>
       </DialogContent>
     </Dialog>
