@@ -70,23 +70,27 @@ const menuItemClassName =
 function PayrollActionsMenu({
   entry,
   variant,
+  disabled,
   onGenerateInvoice,
 }: {
   entry: DuePayrollEntry;
   variant: "mobile" | "desktop";
+  disabled?: boolean;
   onGenerateInvoice: (entry: DuePayrollEntry) => void;
 }) {
   const isMobile = variant === "mobile";
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger asChild disabled={disabled}>
         <button
           type="button"
           aria-label="Payroll actions"
+          disabled={disabled}
           className={cn(
-            "inline-flex cursor-pointer items-center justify-center rounded-md bg-[#eef4f5] transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]",
+            "inline-flex items-center justify-center rounded-md bg-[#eef4f5] transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]",
             isMobile ? "h-11 w-11" : "h-8 w-8",
+            disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
           )}
         >
           <DotGridIcon />
@@ -114,10 +118,16 @@ function PayrollActionsMenu({
 type DuePayrollRowProps = {
   entry: DuePayrollEntry;
   variant: "mobile" | "desktop";
+  actionsDisabled?: boolean;
   onGenerateInvoice: (entry: DuePayrollEntry) => void;
 };
 
-function DuePayrollRow({ entry, variant, onGenerateInvoice }: DuePayrollRowProps) {
+function DuePayrollRow({
+  entry,
+  variant,
+  actionsDisabled = false,
+  onGenerateInvoice,
+}: DuePayrollRowProps) {
   if (variant === "mobile") {
     return (
       <div className="relative rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
@@ -125,6 +135,7 @@ function DuePayrollRow({ entry, variant, onGenerateInvoice }: DuePayrollRowProps
           <PayrollActionsMenu
             entry={entry}
             variant="mobile"
+            disabled={actionsDisabled}
             onGenerateInvoice={onGenerateInvoice}
           />
         </div>
@@ -147,7 +158,7 @@ function DuePayrollRow({ entry, variant, onGenerateInvoice }: DuePayrollRowProps
             <DateRange start={entry.dateRangeStart} end={entry.dateRangeEnd} />
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-[13px] text-[#808081]">PA Rate</span>
+            <span className="text-[13px] text-[#808081]">Authorized rate</span>
             <span className="text-[13px] font-medium tabular-nums text-[#10141a]">
               {entry.paRate}
             </span>
@@ -174,6 +185,7 @@ function DuePayrollRow({ entry, variant, onGenerateInvoice }: DuePayrollRowProps
         <PayrollActionsMenu
           entry={entry}
           variant="desktop"
+          disabled={actionsDisabled}
           onGenerateInvoice={onGenerateInvoice}
         />
       </div>

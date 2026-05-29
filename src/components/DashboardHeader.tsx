@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import BellIcon from "@/assets/icons/bell.svg?react";
 import CogIcon from "@/assets/icons/cog.svg?react";
-import LogoNameIcon from "@/assets/icons/green-black-logo.svg?react";
+import LogoNameIcon from "@/assets/icons/green-green-logo.svg?react";
 import { ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserType } from "@/utils/auth/types/user.types";

@@ -1,44 +1,11 @@
 import { format } from "date-fns";
 
-export function buildClaimReportFilename(clientName: string) {
-  const safe = clientName.trim().replace(/\s+/g, "_").replace(/[^\w-]/g, "") || "client";
-  return `${safe}_claim_report_${format(new Date(), "yyyy-MM-dd")}.pdf`;
+export function buildPayrollInvoiceFilename(staffName: string) {
+  const safe = staffName.trim().replace(/\s+/g, "_").replace(/[^\w-]/g, "") || "staff";
+  return `${safe}_payroll_invoice_${format(new Date(), "yyyy-MM-dd")}.pdf`;
 }
 
-function centerForPdf(el: HTMLElement, display: "grid" | "inline-grid" = "grid") {
-  el.style.display = display;
-  el.style.placeItems = "center";
-  el.style.lineHeight = "1";
-}
-
-function applyPdfAlignmentFixes(root: HTMLElement) {
-  root.querySelectorAll<HTMLElement>(".cr-badge").forEach((el) => centerForPdf(el, "inline-grid"));
-
-  root.querySelectorAll<HTMLElement>(".h-14.w-14.rounded-full").forEach((avatar) => {
-    centerForPdf(avatar);
-    avatar.querySelectorAll<HTMLElement>("span").forEach((span) => centerForPdf(span));
-  });
-
-  root.querySelectorAll<HTMLElement>('[data-section="condition"] .flex').forEach((row) => {
-    row.style.display = "grid";
-    row.style.gridTemplateColumns = "1fr auto";
-    row.style.alignItems = "center";
-    row.querySelector<HTMLElement>(".cr-row-label")?.style.setProperty("line-height", "20px");
-    row.querySelectorAll<HTMLElement>("label").forEach((label) => {
-      centerForPdf(label);
-      label.querySelectorAll<HTMLElement>("span").forEach((box) => centerForPdf(box));
-    });
-  });
-
-  root.querySelectorAll<HTMLElement>('[data-section="outside-lab"] label').forEach((label) => {
-    centerForPdf(label);
-  });
-  root
-    .querySelectorAll<HTMLElement>('[data-section="outside-lab"] [data-slot="radio-group-item"]')
-    .forEach((item) => centerForPdf(item));
-}
-
-export async function downloadClaimReportPdf(root: HTMLElement, clientName: string) {
+export async function downloadPayrollInvoicePdf(root: HTMLElement, staffName: string) {
   const offscreen = document.createElement("div");
   offscreen.setAttribute("aria-hidden", "true");
   offscreen.style.cssText = "position:fixed;left:-10000px;top:0;background:#fff;";
@@ -47,16 +14,14 @@ export async function downloadClaimReportPdf(root: HTMLElement, clientName: stri
   clone.style.overflow = "visible";
   clone.style.maxHeight = "none";
 
-  clone.querySelectorAll(".claim-report-no-print").forEach((el) => el.remove());
+  clone.querySelectorAll(".payroll-invoice-no-print").forEach((el) => el.remove());
 
-  const scrollBody = clone.querySelector(".claim-report-modal-body") as HTMLElement | null;
+  const scrollBody = clone.querySelector(".payroll-invoice-modal-body") as HTMLElement | null;
   if (scrollBody) {
     scrollBody.style.overflow = "visible";
     scrollBody.style.maxHeight = "none";
     scrollBody.style.height = "auto";
   }
-
-  applyPdfAlignmentFixes(clone);
 
   offscreen.style.width = `${root.offsetWidth}px`;
   offscreen.appendChild(clone);
@@ -105,7 +70,7 @@ export async function downloadClaimReportPdf(root: HTMLElement, clientName: stri
       heightLeft -= usableHeight;
     }
 
-    pdf.save(buildClaimReportFilename(clientName));
+    pdf.save(buildPayrollInvoiceFilename(staffName));
   } finally {
     offscreen.remove();
   }

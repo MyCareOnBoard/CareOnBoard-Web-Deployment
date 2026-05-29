@@ -1,0 +1,58 @@
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+.payroll-invoice-print-root {
+  --pi-title: #10141a;
+  --pi-muted: #808081;
+  --pi-border: #e5e5e6;
+  --pi-section-bg: #f3f4f6;
+}
+
+@media print {
+  body {
+    background: #fff !important;
+  }
+
+  .payroll-invoice-no-print {
+    display: none !important;
+  }
+
+  .payroll-invoice-print-root {
+    max-width: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  .payroll-invoice-print-root svg {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .payroll-invoice-modal-body {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  [data-slot="dialog-overlay"],
+  [data-radix-dialog-overlay] {
+    display: none !important;
+  }
+
+  [data-slot="dialog-content"],
+  [role="dialog"] {
+    position: static !important;
+    transform: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+}
