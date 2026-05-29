@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, ChangeEvent } from "react";
 import { useForm, useFormState, useWatch } from "react-hook-form";
-import { AlertCircle, Info, Loader2, Upload } from "lucide-react";
+import { AlertCircle, Info, Upload } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -26,9 +26,25 @@ import {
 import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types";
-import SettingsSectionRow from "./SettingsSectionRow";
+import SettingsFormFieldRow from "./SettingsFormFieldRow";
 import SettingsTabActions from "./SettingsTabActions";
-import SuccessModal from "./SuccessModal";
+import SettingsTabSkeleton from "./SettingsTabSkeleton";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import {
+  settingsAlertErrorClass,
+  settingsAlertInfoClass,
+  settingsCardShellClass,
+  settingsCardSubtitleClass,
+} from "./settingsCardStyles";
+import {
+  AGENCY_LOGO_ACCEPT,
+  createBrandingPreview,
+  isAllowedLogoMime,
+  isLetterheadImagePreviewUrl,
+  resolveBrandingPreviewSrc,
+  revokeBrandingPreview,
+} from "./branding-utils";
 
 const PREDEFINED_COLORS = ["#D53411", "#D5B111", "#0EAF52", "#115CD5", "#11CBD5"];
 
@@ -134,19 +150,15 @@ function formValuesToUpdatePayload(values: AgencyProfileFormValues): UpdateAgenc
   };
 }
 
-interface AgencyInfoTabProps {
-  onSaved?: () => void;
-}
-
-export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
+export default function AgencyInfoTab() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const agencyId = user?.agencyId || "";
   const readOnly = user?.userType === UserType.AGENCY_STAFF;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [isModalVisible, setIsModalVisible] = useState(false);
   const [initialValues, setInitialValues] = useState<AgencyProfileFormValues>(EMPTY_VALUES);
   const [initialLogo, setInitialLogo] = useState("");
   const [initialLetterhead, setInitialLetterhead] = useState("");
@@ -195,8 +207,8 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
       setLogoFile(null);
       setLetterheadFile(null);
       form.reset(values, { keepDefaultValues: false });
-    } catch (e: any) {
-      setError(e.message || "Couldn't load agency information. Check your connection and try again.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Couldn't load agency information. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -216,10 +228,14 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [setShowSuggestions]);
 
-  const isLetterheadImagePreview =
-    letterheadPreview &&
-    (letterheadPreview.startsWith("data:image") ||
-      (letterheadPreview.startsWith("http") && !/\.pdf(\?|$)/i.test(letterheadPreview)));
+  useEffect(() => {
+    return () => {
+      revokeBrandingPreview(logoPreview);
+      revokeBrandingPreview(letterheadPreview);
+    };
+  }, [logoPreview, letterheadPreview]);
+
+  const isLetterheadImagePreview = isLetterheadImagePreviewUrl(letterheadPreview);
 
   const handleSelectAddressSuggestion = async (placeId: string) => {
     const details = await selectSuggestion(placeId);
@@ -241,29 +257,38 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be under 5MB.");
+      setError("File must be under 5MB.");
       return;
     }
 
-    if (field === "letterhead" && file.type === "application/pdf") {
+    if (field === "logo") {
+      if (!isAllowedLogoMime(file.type)) {
+        setError("Only JPEG, PNG, GIF, or WEBP images are allowed for the logo.");
+        return;
+      }
+      revokeBrandingPreview(logoPreview);
+      setLogoFile(file);
+      setLogoPreview(createBrandingPreview(file));
+      setError("");
+      return;
+    }
+
+    if (file.type === "application/pdf") {
+      revokeBrandingPreview(letterheadPreview);
       setLetterheadFile(file);
       setLetterheadPreview(file.name);
       setError("");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const preview = reader.result as string;
-      if (field === "logo") {
-        setLogoFile(file);
-        setLogoPreview(preview);
-      } else {
-        setLetterheadFile(file);
-        setLetterheadPreview(preview);
-      }
-    };
-    reader.readAsDataURL(file);
+    if (!isAllowedLogoMime(file.type)) {
+      setError("Letterhead must be a PDF or image (JPEG, PNG, GIF, WEBP).");
+      return;
+    }
+
+    revokeBrandingPreview(letterheadPreview);
+    setLetterheadFile(file);
+    setLetterheadPreview(createBrandingPreview(file));
     setError("");
   };
 
@@ -271,9 +296,25 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
     form.reset(initialValues, { keepDefaultValues: false });
     setLogoFile(null);
     setLetterheadFile(null);
+    revokeBrandingPreview(logoPreview);
+    revokeBrandingPreview(letterheadPreview);
     setLogoPreview(initialLogo || null);
     setLetterheadPreview(initialLetterhead || null);
     setError("");
+  };
+
+  const applyAgencyState = (updated: Agency) => {
+    const nextValues = agencyToFormValues(updated);
+    setInitialValues(nextValues);
+    setInitialLogo(updated.logo || "");
+    setInitialLetterhead(updated.letterhead || "");
+    revokeBrandingPreview(logoPreview);
+    revokeBrandingPreview(letterheadPreview);
+    setLogoPreview(updated.logo || null);
+    setLetterheadPreview(updated.letterhead || null);
+    setLogoFile(null);
+    setLetterheadFile(null);
+    form.reset(nextValues, { keepDefaultValues: false });
   };
 
   const handleSave = async (values: AgencyProfileFormValues) => {
@@ -287,40 +328,61 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
     setSaving(true);
     setError("");
 
+    const hasTextChanges = isDirty;
+    const hasFileChanges = !!logoFile || !!letterheadFile;
+    let updated: Agency | null = null;
+    let textSaved = false;
+
     try {
-      let logoUrl = initialLogo;
-      let letterheadUrl = initialLetterhead;
+      if (hasTextChanges) {
+        updated = await updateAgency(agencyId, formValuesToUpdatePayload(values));
+        textSaved = true;
+      }
 
-      const [logoResult, letterheadResult] = await Promise.all([
-        logoFile ? uploadAgencyFile(agencyId, logoFile, "logo") : Promise.resolve(null),
-        letterheadFile ? uploadAgencyFile(agencyId, letterheadFile, "letterhead") : Promise.resolve(null),
-      ]);
+      if (hasFileChanges) {
+        try {
+          const [logoResult, letterheadResult] = await Promise.all([
+            logoFile ? uploadAgencyFile(agencyId, logoFile, "logo") : Promise.resolve(null),
+            letterheadFile
+              ? uploadAgencyFile(agencyId, letterheadFile, "letterhead")
+              : Promise.resolve(null),
+          ]);
 
-      if (logoResult) logoUrl = logoResult.url;
-      if (letterheadResult) letterheadUrl = letterheadResult.url;
+          const brandingPayload: UpdateAgencyProfileRequest = {};
+          if (logoResult) brandingPayload.logo = logoResult.url;
+          if (letterheadResult) brandingPayload.letterhead = letterheadResult.url;
 
-      const payload: UpdateAgencyProfileRequest = {
-        ...formValuesToUpdatePayload(values),
-        logo: logoUrl || null,
-        letterhead: letterheadUrl || null,
-      };
+          if (Object.keys(brandingPayload).length > 0) {
+            updated = await updateAgency(agencyId, brandingPayload);
+          }
+        } catch (uploadErr: unknown) {
+          const uploadMessage =
+            uploadErr instanceof Error ? uploadErr.message : "Failed to upload branding files.";
 
-      const updated = await updateAgency(agencyId, payload);
-      const nextValues = agencyToFormValues(updated);
+          if (textSaved && updated) {
+            applyAgencyState(updated);
+            setError(uploadMessage);
+            toast({
+              title: "Partial save",
+              description: "Your text changes were saved, but branding upload failed. Please try again.",
+              variant: "destructive",
+            });
+            return;
+          }
 
-      setInitialValues(nextValues);
-      setInitialLogo(updated.logo || "");
-      setInitialLetterhead(updated.letterhead || "");
-      setLogoPreview(updated.logo || null);
-      setLetterheadPreview(updated.letterhead || null);
-      setLogoFile(null);
-      setLetterheadFile(null);
-      form.reset(nextValues, { keepDefaultValues: false });
+          throw uploadErr;
+        }
+      }
 
-      onSaved?.();
-      setIsModalVisible(true);
-    } catch (e: any) {
-      setError(e.message || "Failed to save agency information.");
+      if (updated) {
+        applyAgencyState(updated);
+        toast({
+          title: "Agency information updated",
+          description: "Updates will appear on claims and reports that use this data.",
+        });
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save agency information.");
     } finally {
       setSaving(false);
     }
@@ -330,28 +392,16 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
   const disabled = saving || readOnly;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-12 bg-white border rounded-lg">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-[#00b3ad]" />
-          <p className="text-sm text-gray-500">Loading agency information...</p>
-        </div>
-      </div>
-    );
+    return <SettingsTabSkeleton variant="accordion" cardCount={4} />;
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="mb-2">
-        <h4 className="text-[20px] font-bold text-[#10141a] leading-[1.3]">Agency Information</h4>
-        <p className="text-[#4f4f4f]">
-          View and manage your agency&apos;s public profile, branding, and billing details.
-        </p>
-      </div>
+  const accordionItemClass = cn(settingsCardShellClass, "border-b-0 px-0");
 
+  return (
+    <div className="flex flex-col gap-4">
       {readOnly && (
-        <div className="flex items-start gap-2 p-3 text-sm text-[#10141a] rounded-lg bg-[#e8fafa] border border-[#00b4b8]/20">
-          <Info className="w-4 h-4 mt-0.5 shrink-0 text-[#00b4b8]" />
+        <div className={settingsAlertInfoClass}>
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#00b4b8]" />
           <span>
             You&apos;re viewing agency information in read-only mode. Ask your agency owner to make changes.
           </span>
@@ -359,19 +409,26 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
       )}
 
       {error && (
-        <div className="flex items-start gap-2 p-3 text-sm text-red-600 rounded-lg bg-red-50">
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+        <div className={settingsAlertErrorClass}>
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSave)}>
-          <Accordion type="multiple" defaultValue={["identity"]} className="w-full">
-            <AccordionItem value="identity">
-              <AccordionTrigger>Identity &amp; Registration</AccordionTrigger>
-              <AccordionContent className="pb-2">
-                <SettingsSectionRow
+          <Accordion type="multiple" defaultValue={["identity"]} className="flex flex-col gap-4">
+            <AccordionItem value="identity" className={accordionItemClass}>
+              <AccordionTrigger className="px-5 py-4 sm:px-6 hover:no-underline">
+                <div className="text-left">
+                  <span className="text-[17px] font-semibold text-[#10141a]">Identity &amp; Registration</span>
+                  <p className={cn(settingsCardSubtitleClass, "font-normal normal-case")}>
+                    Legal identity, provider IDs, and registration details.
+                  </p>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5 sm:px-6">
+                <SettingsFormFieldRow
                   title={
                     <>
                       Agency Name <span className="text-red-500">*</span>
@@ -392,9 +449,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="Legal Business Name" description="Use if different from your agency name.">
+                <SettingsFormFieldRow title="Legal Business Name" description="Use if different from your agency name.">
                   <FormField
                     control={form.control}
                     name="legalBusinessName"
@@ -407,9 +464,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="DBA" description="Doing Business As, if applicable.">
+                <SettingsFormFieldRow title="DBA" description="Doing Business As, if applicable.">
                   <FormField
                     control={form.control}
                     name="dba"
@@ -422,9 +479,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="Agency Type" description="How your agency is classified.">
+                <SettingsFormFieldRow title="Agency Type" description="How your agency is classified.">
                   <FormField
                     control={form.control}
                     name="agencyType"
@@ -446,9 +503,11 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow
+                {!readOnly && (
+                  <>
+                <SettingsFormFieldRow
                   title="EIN"
                   description="Your 9-digit Employer Identification Number (format: XX-XXXXXXX)."
                 >
@@ -464,9 +523,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow
+                <SettingsFormFieldRow
                   title="NPI"
                   description="National Provider Identifier — 10 digits, no dashes."
                 >
@@ -482,9 +541,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow
+                <SettingsFormFieldRow
                   title="Provider ID"
                   description="Used to prefill billing claims. Enter your state's provider or DDD identifier."
                 >
@@ -500,9 +559,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow
+                <SettingsFormFieldRow
                   title="Medicaid / CDD Provider ID"
                   description="Optional. Use if your Medicaid ID differs from your general provider ID."
                 >
@@ -518,14 +577,23 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
+                  </>
+                )}
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="contact">
-              <AccordionTrigger>Contact &amp; Location</AccordionTrigger>
-              <AccordionContent className="pb-2">
-                <SettingsSectionRow title="Email" description="Primary contact email for your agency.">
+            <AccordionItem value="contact" className={accordionItemClass}>
+              <AccordionTrigger className="px-5 py-4 sm:px-6 hover:no-underline">
+                <div className="text-left">
+                  <span className="text-[17px] font-semibold text-[#10141a]">Contact &amp; Location</span>
+                  <p className={cn(settingsCardSubtitleClass, "font-normal normal-case")}>
+                    Email, phone, and primary business address.
+                  </p>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5 sm:px-6">
+                <SettingsFormFieldRow title="Email" description="Primary contact email for your agency.">
                   <FormField
                     control={form.control}
                     name="email"
@@ -539,9 +607,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="Phone" description="Main phone number for your agency.">
+                <SettingsFormFieldRow title="Phone" description="Main phone number for your agency.">
                   <FormField
                     control={form.control}
                     name="phone"
@@ -554,9 +622,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="Primary Address" description="Your agency's main business address.">
+                <SettingsFormFieldRow title="Primary Address" description="Your agency's main business address.">
                   <FormField
                     control={form.control}
                     name="address"
@@ -608,9 +676,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="County" description="County where your agency operates.">
+                <SettingsFormFieldRow title="County" description="County where your agency operates.">
                   <FormField
                     control={form.control}
                     name="county"
@@ -623,9 +691,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="City" description="City for your primary address.">
+                <SettingsFormFieldRow title="City" description="City for your primary address.">
                   <FormField
                     control={form.control}
                     name="city"
@@ -638,9 +706,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="State" description="State for your primary address.">
+                <SettingsFormFieldRow title="State" description="State for your primary address.">
                   <FormField
                     control={form.control}
                     name="state"
@@ -653,9 +721,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="Zip Code" description="Postal code for your primary address.">
+                <SettingsFormFieldRow title="Zip Code" description="Postal code for your primary address.">
                   <FormField
                     control={form.control}
                     name="zipCode"
@@ -668,9 +736,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="Website" description="Your agency website, including https://">
+                <SettingsFormFieldRow title="Website" description="Your agency website, including https://">
                   <FormField
                     control={form.control}
                     name="website"
@@ -683,33 +751,46 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="branding">
-              <AccordionTrigger>Branding</AccordionTrigger>
-              <AccordionContent className="pb-2">
-                <SettingsSectionRow title="Logo" description="Upload your agency logo. JPG/PNG, max 5MB.">
+            <AccordionItem value="branding" className={accordionItemClass}>
+              <AccordionTrigger className="px-5 py-4 sm:px-6 hover:no-underline">
+                <div className="text-left">
+                  <span className="text-[17px] font-semibold text-[#10141a]">Branding</span>
+                  <p className={cn(settingsCardSubtitleClass, "font-normal normal-case")}>
+                    Logo, colors, and letterhead for reports.
+                  </p>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5 sm:px-6">
+                <SettingsFormFieldRow title="Logo" description="Upload your agency logo. JPG/PNG, max 5MB.">
                   <div className="space-y-3">
                     <label className="flex items-center justify-center gap-2 w-full min-h-11 px-4 py-3 bg-[#00b3ad] hover:bg-[#00a39f] text-white font-medium rounded-full transition cursor-pointer sm:w-auto sm:inline-flex">
                       <Upload className="w-4 h-4" />
                       {logoPreview ? "Change logo" : "Upload logo"}
                       <input
                         type="file"
-                        accept="image/*"
+                        accept={AGENCY_LOGO_ACCEPT}
                         className="hidden"
                         disabled={disabled}
                         onChange={(e) => handleBrandingFileChange("logo", e)}
                       />
                     </label>
-                    {logoPreview && (
-                      <img src={logoPreview} alt="Logo preview" className="h-16 object-contain" />
+                    {resolveBrandingPreviewSrc(logoPreview) && (
+                      <div className="flex h-16 items-center">
+                        <img
+                          src={resolveBrandingPreviewSrc(logoPreview)!}
+                          alt="Logo preview"
+                          className="max-h-16 object-contain"
+                        />
+                      </div>
                     )}
                   </div>
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="Primary Color" description="Choose a brand color for your agency.">
+                <SettingsFormFieldRow title="Primary Color" description="Choose a brand color for your agency.">
                   <div className="space-y-3">
                     <div className="flex flex-wrap gap-2">
                       {PREDEFINED_COLORS.map((color) => (
@@ -748,9 +829,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       )}
                     />
                   </div>
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow
+                <SettingsFormFieldRow
                   title="Letterhead"
                   description="Upload letterhead for reports. JPG/PNG/PDF, max 5MB."
                 >
@@ -766,21 +847,35 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                         onChange={(e) => handleBrandingFileChange("letterhead", e)}
                       />
                     </label>
-                    {isLetterheadImagePreview && (
-                      <img src={letterheadPreview} alt="Letterhead preview" className="h-16 object-contain" />
+                    {isLetterheadImagePreview && resolveBrandingPreviewSrc(letterheadPreview) && (
+                      <div className="flex h-16 items-center">
+                        <img
+                          src={resolveBrandingPreviewSrc(letterheadPreview)!}
+                          alt="Letterhead preview"
+                          className="max-h-16 object-contain"
+                        />
+                      </div>
                     )}
                     {letterheadPreview && !isLetterheadImagePreview && (
                       <p className="text-sm text-[#4f4f4f]">PDF letterhead selected.</p>
                     )}
                   </div>
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="billing">
-              <AccordionTrigger>Billing Configuration</AccordionTrigger>
-              <AccordionContent className="pb-2">
-                <SettingsSectionRow
+            {!readOnly && (
+            <AccordionItem value="billing" className={accordionItemClass}>
+              <AccordionTrigger className="px-5 py-4 sm:px-6 hover:no-underline">
+                <div className="text-left">
+                  <span className="text-[17px] font-semibold text-[#10141a]">Billing Configuration</span>
+                  <p className={cn(settingsCardSubtitleClass, "font-normal normal-case")}>
+                    Billing format and invoice contact details.
+                  </p>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5 sm:px-6">
+                <SettingsFormFieldRow
                   title="Preferred Billing Agency"
                   description="Your preferred billing agency or format."
                 >
@@ -796,9 +891,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow
+                <SettingsFormFieldRow
                   title="Invoice Contact Name"
                   description="Name of the person who handles billing questions."
                 >
@@ -814,9 +909,9 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
 
-                <SettingsSectionRow title="Invoice Contact Email" description="Email for billing and invoice correspondence.">
+                <SettingsFormFieldRow title="Invoice Contact Email" description="Email for billing and invoice correspondence.">
                   <FormField
                     control={form.control}
                     name="invoiceEmail"
@@ -829,9 +924,10 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
                       </FormItem>
                     )}
                   />
-                </SettingsSectionRow>
+                </SettingsFormFieldRow>
               </AccordionContent>
             </AccordionItem>
+            )}
           </Accordion>
 
           {!readOnly && (
@@ -843,13 +939,6 @@ export default function AgencyInfoTab({ onSaved }: AgencyInfoTabProps) {
           )}
         </form>
       </Form>
-
-      <SuccessModal
-        isVisible={isModalVisible}
-        onClose={() => setIsModalVisible(false)}
-        title="Agency Information Updated"
-        message="Agency information saved. Updates will appear on claims and reports that use this data."
-      />
     </div>
   );
 }
