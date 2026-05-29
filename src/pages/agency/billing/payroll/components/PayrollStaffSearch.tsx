@@ -34,7 +34,7 @@ export default function PayrollStaffSearch({ onFilterChange }: PayrollStaffSearc
               onFilterChange(value);
             }, 300);
           }}
-          placeholder="Search client name here"
+          placeholder="Search staff name"
           className="flex-1 bg-transparent text-[14px] font-normal text-black outline-none placeholder:text-[#b2b2b3]"
         />
       </div>

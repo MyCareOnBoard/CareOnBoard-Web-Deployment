@@ -32,7 +32,8 @@ type UpdateClaimStatusModalProps = {
   }) => Promise<void>;
 };
 
-const REJECTION_TEXTAREA_CLASS = `${BILLING_FIELD_CLASS} min-h-[120px] h-auto resize-none py-3`;
+const REJECTION_TEXTAREA_CLASS =
+  "w-full min-h-[120px] rounded-[10px] border border-[#e5e5e6] bg-white px-4 py-3 text-[14px] text-[#10141a] resize-none focus:border-[#00b4b8] focus:ring-[#00b4b8]";
 
 export default function UpdateClaimStatusModal({
   open,
@@ -105,8 +106,11 @@ export default function UpdateClaimStatusModal({
 
             {status === "rejected" && (
               <div>
-                <label className={BILLING_FIELD_LABEL_CLASS}>Rejection reason</label>
+                <label htmlFor="claim-rejection-reason" className={BILLING_FIELD_LABEL_CLASS}>
+                  Rejection reason
+                </label>
                 <textarea
+                  id="claim-rejection-reason"
                   value={rejectionReason}
                   onChange={(event) => setRejectionReason(event.target.value)}
                   rows={4}

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Shift } from "@/lib/api/shifts";
 import {
   getBillingClaimById,
@@ -19,6 +19,9 @@ import SavedClaimsTable from "./components/SavedClaimsTable";
 import ClaimsWorkspaceTabs, { type ClaimsWorkspaceTab } from "./components/ClaimsWorkspaceTabs";
 import UpdateClaimStatusModal from "./components/UpdateClaimStatusModal";
 import CancelClaimDialog from "./components/CancelClaimDialog";
+import ClaimsActionLoadingOverlay, {
+  getClaimsActionLoadingCopy,
+} from "./components/ClaimsActionLoadingOverlay";
 import type { RecentClaim } from "./data/mockClaimsDashboardData";
 import { saveGeneratedClaim } from "./utils/saveGeneratedClaim";
 import { useClaimsDashboard } from "./hooks/useClaimsDashboard";
@@ -54,6 +57,8 @@ export default function ClaimsDashboardPage() {
   });
   const [generateOpen, setGenerateOpen] = useState(false);
   const [savingClaim, setSavingClaim] = useState(false);
+  const [openingReport, setOpeningReport] = useState<{ claimNumber: string } | null>(null);
+  const openingReportRequestIdRef = useRef(0);
   const [mutationSaving, setMutationSaving] = useState(false);
   const [statusModalClaim, setStatusModalClaim] = useState<BillingClaimListItem | null>(null);
   const [cancelModalClaim, setCancelModalClaim] = useState<BillingClaimListItem | null>(null);
@@ -169,8 +174,17 @@ export default function ClaimsDashboardPage() {
 
   const handleViewReport = useCallback(
     async (claim: BillingClaimListItem) => {
+      const requestId = openingReportRequestIdRef.current + 1;
+      openingReportRequestIdRef.current = requestId;
+      setOpeningReport({ claimNumber: claim.claimNumber });
+
       try {
         const detail = await getBillingClaimById(claim.id);
+
+        if (openingReportRequestIdRef.current !== requestId) {
+          return;
+        }
+
         const anchorShift = detail.shifts[0];
         if (!anchorShift) {
           throw new Error("This claim has no linked shifts.");
@@ -191,11 +205,19 @@ export default function ClaimsDashboardPage() {
           },
         });
       } catch (error) {
+        if (openingReportRequestIdRef.current !== requestId) {
+          return;
+        }
+
         toast({
           title: "Couldn't open claim report",
           description: getBillingClaimMutationErrorMessage(error),
           variant: "destructive",
         });
+      } finally {
+        if (openingReportRequestIdRef.current === requestId) {
+          setOpeningReport(null);
+        }
       }
     },
     [toast],
@@ -265,13 +287,19 @@ export default function ClaimsDashboardPage() {
     setSelectedClientName(clientName);
   }, []);
 
+  const claimsActionOverlay = openingReport
+    ? getClaimsActionLoadingCopy("openReport", openingReport.claimNumber)
+    : savingClaim && !generateOpen
+      ? getClaimsActionLoadingCopy("createClaim")
+      : null;
+
   return (
     <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
       <ClaimsDashboardHeader
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
         onGenerateClaimClick={() => setGenerateOpen(true)}
-        generateClaimLoading={savingClaim}
+        generateClaimLoading={savingClaim && generateOpen}
       />
       <ClaimsOverviewCards stats={dashboard.overviewStats} loading={dashboard.loading} />
 
@@ -291,7 +319,7 @@ export default function ClaimsDashboardPage() {
           shifts={shiftsToClaim.shifts}
           loading={shiftsToClaim.loading}
           onGenerateClaim={handleTableGenerateClaim}
-          generateDisabled={savingClaim}
+          generateDisabled={savingClaim || openingReport !== null}
         />
       ) : (
         <SavedClaimsTable
@@ -304,7 +332,7 @@ export default function ClaimsDashboardPage() {
           onViewReport={(claim) => void handleViewReport(claim)}
           onUpdateStatus={setStatusModalClaim}
           onCancelClaim={setCancelModalClaim}
-          actionsDisabled={mutationSaving}
+          actionsDisabled={mutationSaving || openingReport !== null}
         />
       )}
 
@@ -349,6 +377,13 @@ export default function ClaimsDashboardPage() {
         onClose={() => !mutationSaving && setCancelModalClaim(null)}
         onConfirm={handleConfirmCancelClaim}
       />
+
+      {claimsActionOverlay && (
+        <ClaimsActionLoadingOverlay
+          title={claimsActionOverlay.title}
+          description={claimsActionOverlay.description}
+        />
+      )}
     </div>
   );
 }

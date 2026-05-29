@@ -1,11 +1,19 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { DuePayrollEntry } from "../data/mockPayrollDashboardData";
 import { DUE_PAYROLL_ENTRIES } from "../data/mockPayrollDashboardData";
 import DuePayrollRow from "./DuePayrollRow";
 import PayrollStaffSearch from "./PayrollStaffSearch";
 import { TABLE_HEADER_CLASS, TABLE_MIN_WIDTH, TABLE_ROW_CLASS } from "./tableColumns";
 
-export default function DuePayrollTable() {
+type DuePayrollTableProps = {
+  onGenerateInvoice: (entry: DuePayrollEntry) => void;
+  actionsDisabled?: boolean;
+};
+
+export default function DuePayrollTable({
+  onGenerateInvoice,
+  actionsDisabled = false,
+}: DuePayrollTableProps) {
   const [filterQuery, setFilterQuery] = useState("");
 
   const filteredEntries = useMemo(() => {
@@ -16,8 +24,6 @@ export default function DuePayrollTable() {
       entry.staffName.toLowerCase().includes(query),
     );
   }, [filterQuery]);
-
-  const handleGenerateInvoice = useCallback((_entry: DuePayrollEntry) => undefined, []);
 
   const emptyMessage = useMemo(() => {
     if (DUE_PAYROLL_ENTRIES.length === 0) return "No payroll entries found.";
@@ -40,7 +46,7 @@ export default function DuePayrollTable() {
               <span>Hours worked</span>
               <span>Date range</span>
               <span>Payment details</span>
-              <span>PA Rate</span>
+              <span>Authorized rate</span>
               <span className="text-right">Action</span>
             </div>
 
@@ -50,7 +56,8 @@ export default function DuePayrollTable() {
                   key={entry.id}
                   variant="desktop"
                   entry={entry}
-                  onGenerateInvoice={handleGenerateInvoice}
+                  onGenerateInvoice={onGenerateInvoice}
+                  actionsDisabled={actionsDisabled}
                 />
               ))
             ) : (
@@ -69,7 +76,8 @@ export default function DuePayrollTable() {
               key={entry.id}
               variant="mobile"
               entry={entry}
-              onGenerateInvoice={handleGenerateInvoice}
+              onGenerateInvoice={onGenerateInvoice}
+              actionsDisabled={actionsDisabled}
             />
           ))
         ) : (
