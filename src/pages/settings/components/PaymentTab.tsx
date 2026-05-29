@@ -1,15 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router";
-import { AlertCircle, Info, Loader2, MapPin } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertCircle, Info, MapPin } from "lucide-react";
 import {
   Form,
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -22,11 +20,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Routes } from "@/routes/constants";
+import { useToast } from "@/hooks/use-toast";
+import SettingsFormFieldRow from "@/pages/shared/settings/SettingsFormFieldRow";
+import SettingsSectionCard from "@/pages/shared/settings/SettingsSectionCard";
+import SettingsTabActions from "@/pages/shared/settings/SettingsTabActions";
+import SettingsTabSkeleton from "@/pages/shared/settings/SettingsTabSkeleton";
+import {
+  settingsAlertErrorClass,
+  settingsAlertInfoClass,
+} from "@/pages/shared/settings/settingsCardStyles";
 import {
   arePaymentFormValuesDirty,
   buildUpdatePayload,
   CARD_BRAND_OPTIONS,
   createPaymentFormSchema,
+  extractPaymentDetailsApiError,
   extractPaymentDetailsValidationErrors,
   getAccountNumberLast4,
   getDspPaymentDetails,
@@ -35,7 +43,6 @@ import {
   type PaymentFormValues,
   updateDspPaymentDetails,
 } from "@/lib/api/paymentDetails";
-import SuccessModal from "./SuccessModal";
 
 const DEFAULT_FORM_VALUES: PaymentFormValues = {
   paymentMethod: "direct_deposit",
@@ -53,10 +60,11 @@ interface PaymentTabProps {
 }
 
 export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabProps) {
+  const { toast } = useToast();
+  const hasSelfFetchedRef = useRef(false);
   const [loading, setLoading] = useState(!cachedDetails);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [isModalVisible, setIsModalVisible] = useState(false);
   const [savedDetails, setSavedDetails] = useState<DspPaymentDetails | null>(cachedDetails);
   const [initialValues, setInitialValues] = useState<PaymentFormValues>(
     cachedDetails ? mapPaymentDetailsToFormValues(cachedDetails) : DEFAULT_FORM_VALUES,
@@ -71,9 +79,14 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
     cachedDetails?.mailingAddressPreview ?? null,
   );
 
+  const initialPaymentMethod = savedDetails?.paymentMethod ?? null;
+
   const resolver = useMemo(
-    () => zodResolver(createPaymentFormSchema(hasExistingRouting, hasExistingAccount)),
-    [hasExistingRouting, hasExistingAccount],
+    () =>
+      zodResolver(
+        createPaymentFormSchema(hasExistingRouting, hasExistingAccount, initialPaymentMethod),
+      ),
+    [hasExistingRouting, hasExistingAccount, initialPaymentMethod],
   );
 
   const form = useForm<PaymentFormValues>({
@@ -83,8 +96,48 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
     defaultValues: initialValues,
   });
 
-  const paymentMethod = useWatch({ control: form.control, name: "paymentMethod" });
-  const watchedValues = useWatch({ control: form.control });
+  const [
+    paymentMethod,
+    bankName,
+    accountHolderName,
+    routingNumber,
+    accountNumber,
+    cardBrand,
+    cardLast4,
+  ] = useWatch({
+    control: form.control,
+    name: [
+      "paymentMethod",
+      "bankName",
+      "accountHolderName",
+      "routingNumber",
+      "accountNumber",
+      "cardBrand",
+      "cardLast4",
+    ],
+  });
+
+  const watchedValues = useMemo(
+    (): PaymentFormValues => ({
+      paymentMethod: paymentMethod ?? initialValues.paymentMethod,
+      bankName: bankName ?? "",
+      accountHolderName: accountHolderName ?? "",
+      routingNumber: routingNumber ?? "",
+      accountNumber: accountNumber ?? "",
+      cardBrand: cardBrand ?? "",
+      cardLast4: cardLast4 ?? "",
+    }),
+    [
+      paymentMethod,
+      bankName,
+      accountHolderName,
+      routingNumber,
+      accountNumber,
+      cardBrand,
+      cardLast4,
+      initialValues.paymentMethod,
+    ],
+  );
 
   const applyDetails = useCallback(
     (details: DspPaymentDetails) => {
@@ -102,8 +155,10 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
 
   useEffect(() => {
     if (cachedDetails) {
-      applyDetails(cachedDetails);
-      setLoading(false);
+      if (!hasSelfFetchedRef.current) {
+        applyDetails(cachedDetails);
+        setLoading(false);
+      }
       return;
     }
 
@@ -115,8 +170,8 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
         const details = await getDspPaymentDetails();
         if (!mounted) return;
         applyDetails(details);
-      } catch (loadError) {
-        console.error(loadError);
+        hasSelfFetchedRef.current = true;
+      } catch {
         if (mounted) {
           setError("We couldn't load your payroll details. Try again in a moment.");
         }
@@ -135,9 +190,8 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
   }, [paymentMethod, form]);
 
   const hasChanges = useMemo(() => {
-    if (!watchedValues) return false;
     return arePaymentFormValuesDirty(
-      watchedValues as PaymentFormValues,
+      watchedValues,
       initialValues,
       hasExistingRouting,
       hasExistingAccount,
@@ -159,18 +213,31 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
         mailingAddressPreview:
           updated.mailingAddressPreview ?? mailingAddressPreview ?? null,
       });
-      setIsModalVisible(true);
+      hasSelfFetchedRef.current = true;
+      toast({
+        title: "Payroll details saved",
+        description: "Your payout preference is updated.",
+      });
     } catch (saveError) {
-      console.error(saveError);
-      const validationErrors = extractPaymentDetailsValidationErrors(saveError);
-      if (validationErrors.length > 0) {
-        validationErrors.forEach(({ field, message }) => {
-          if (field in DEFAULT_FORM_VALUES) {
-            form.setError(field as keyof PaymentFormValues, { message });
-          }
+      const methodError = extractPaymentDetailsApiError(saveError);
+      if (methodError) {
+        setError(methodError);
+        toast({
+          title: "Couldn't save payroll details",
+          description: methodError,
+          variant: "destructive",
         });
       } else {
-        setError("We couldn't save your changes. Check your entries and try again.");
+        const validationErrors = extractPaymentDetailsValidationErrors(saveError);
+        if (validationErrors.length > 0) {
+          validationErrors.forEach(({ field, message }) => {
+            if (field in DEFAULT_FORM_VALUES) {
+              form.setError(field as keyof PaymentFormValues, { message });
+            }
+          });
+        } else {
+          setError("We couldn't save your changes. Check your entries and try again.");
+        }
       }
     } finally {
       setSaving(false);
@@ -184,54 +251,34 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-12 bg-white border rounded-lg">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-[#00b3ad]" />
-          <p className="text-sm text-gray-500">Loading payroll details...</p>
-        </div>
-      </div>
-    );
+    return <SettingsTabSkeleton variant="form" cardCount={2} />;
   }
 
   return (
-    <div className="space-y-6">
-      <div className="mb-6">
-        <h4 className="text-[20px] font-bold text-[#10141a] leading-[1.3]">
-          How you get paid
-        </h4>
-        <p className="text-[#4f4f4f]">
-          Choose where your agency sends your paycheck.
-        </p>
-      </div>
-
+    <div className="flex flex-col gap-4">
       {!savedDetails?.paymentMethod && (
-        <div className="flex items-start gap-2 p-3 text-sm text-[#4f4f4f] rounded-lg bg-gray-100">
-          <Info className="w-4 h-4 mt-0.5 shrink-0" />
+        <div className={settingsAlertInfoClass}>
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#00b4b8]" />
           <span>
-            You haven&apos;t set up a payout method yet. Choose one below so your
-            agency knows where to send your pay.
+            You haven&apos;t set up a payout method yet. Choose one below so your agency knows
+            where to send your pay.
           </span>
         </div>
       )}
 
       {error && (
-        <div className="flex items-start gap-2 p-3 text-sm text-red-600 rounded-lg bg-red-50">
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+        <div className={settingsAlertErrorClass}>
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSave)} className="space-y-6">
-          <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
-            <div>
-              <h2 className="font-semibold text-lg text-[#10141a]">Payout method</h2>
-              <p className="text-sm text-[#4f4f4f]">
-                Select how you&apos;d like to receive pay. You can change this anytime.
-              </p>
-            </div>
-
+        <form onSubmit={form.handleSubmit(handleSave)} className="flex flex-col gap-4">
+          <SettingsSectionCard
+            title="Payout method"
+            subtitle="Select how you'd like to receive pay. You can change this anytime."
+          >
             <FormField
               control={form.control}
               name="paymentMethod"
@@ -241,20 +288,20 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
                     <RadioGroup
                       value={field.value}
                       onValueChange={field.onChange}
-                      className="space-y-3"
+                      className="flex flex-wrap items-center gap-x-8 gap-y-3"
                       disabled={saving}
                     >
-                      <label className="flex items-center gap-3 cursor-pointer">
+                      <label className="flex cursor-pointer items-center gap-3">
                         <RadioGroupItem value="direct_deposit" />
                         <span className="text-sm text-[#10141a]">Direct deposit</span>
                       </label>
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <RadioGroupItem value="check" />
-                        <span className="text-sm text-[#10141a]">Paper check</span>
+                      <label className="flex cursor-not-allowed items-center gap-3 opacity-50">
+                        <RadioGroupItem value="check" disabled />
+                        <span className="text-sm text-[#808081]">Paper check</span>
                       </label>
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <RadioGroupItem value="debit_card" />
-                        <span className="text-sm text-[#10141a]">Debit card</span>
+                      <label className="flex cursor-not-allowed items-center gap-3 opacity-50">
+                        <RadioGroupItem value="debit_card" disabled />
+                        <span className="text-sm text-[#808081]">Debit card</span>
                       </label>
                     </RadioGroup>
                   </FormControl>
@@ -262,24 +309,19 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
                 </FormItem>
               )}
             />
-          </div>
+          </SettingsSectionCard>
 
           {paymentMethod === "direct_deposit" && (
-            <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
-              <div>
-                <h2 className="font-semibold text-lg text-[#10141a]">Bank details</h2>
-                <p className="text-sm text-[#4f4f4f]">
-                  Your bank details are encrypted and used only for payroll.
-                </p>
-              </div>
-
-              <div className="space-y-4">
+            <SettingsSectionCard
+              title="Bank details"
+              subtitle="Your bank details are encrypted and used only for payroll."
+            >
+              <SettingsFormFieldRow title="Bank name">
                 <FormField
                   control={form.control}
                   name="bankName"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bank name</FormLabel>
+                    <FormItem className="w-full">
                       <FormControl>
                         <Input {...field} disabled={saving} autoComplete="organization" />
                       </FormControl>
@@ -287,13 +329,14 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
                     </FormItem>
                   )}
                 />
+              </SettingsFormFieldRow>
 
+              <SettingsFormFieldRow title="Name on account">
                 <FormField
                   control={form.control}
                   name="accountHolderName"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name on account</FormLabel>
+                    <FormItem className="w-full">
                       <FormControl>
                         <Input {...field} disabled={saving} autoComplete="name" />
                       </FormControl>
@@ -301,13 +344,21 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
                     </FormItem>
                   )}
                 />
+              </SettingsFormFieldRow>
 
+              <SettingsFormFieldRow
+                title="Routing number"
+                description={
+                  hasExistingRouting
+                    ? "Leave blank to keep your current number on file."
+                    : "9-digit number from your check or banking app."
+                }
+              >
                 <FormField
                   control={form.control}
                   name="routingNumber"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Routing number</FormLabel>
+                    <FormItem className="w-full">
                       <FormControl>
                         <Input
                           {...field}
@@ -322,20 +373,27 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
                           }
                         />
                       </FormControl>
-                      <p className="text-xs text-[#4f4f4f]">
-                        9-digit number from your check or banking app.
-                      </p>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              </SettingsFormFieldRow>
 
+              <SettingsFormFieldRow
+                title="Account number"
+                description={
+                  hasExistingAccount
+                    ? "Leave blank to keep your current number on file."
+                    : accountNumberLast4
+                      ? `On file ending in ${accountNumberLast4}. Enter a new number only if you want to update it.`
+                      : undefined
+                }
+              >
                 <FormField
                   control={form.control}
                   name="accountNumber"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Account number</FormLabel>
+                    <FormItem className="w-full">
                       <FormControl>
                         <Input
                           {...field}
@@ -350,37 +408,25 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
                           }
                         />
                       </FormControl>
-                      {accountNumberLast4 && (
-                        <p className="text-xs text-[#4f4f4f]">
-                          Leave blank to keep your account ending in{" "}
-                          <strong>{accountNumberLast4}</strong>. Enter a new number only
-                          if you want to update it.
-                        </p>
-                      )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-            </div>
+              </SettingsFormFieldRow>
+            </SettingsSectionCard>
           )}
 
           {paymentMethod === "debit_card" && (
-            <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
-              <div>
-                <h2 className="font-semibold text-lg text-[#10141a]">Debit card</h2>
-                <p className="text-sm text-[#4f4f4f]">
-                  We only store your card type and last 4 digits for payroll.
-                </p>
-              </div>
-
-              <div className="space-y-4">
+            <SettingsSectionCard
+              title="Debit card"
+              subtitle="We only store your card type and last 4 digits for payroll."
+            >
+              <SettingsFormFieldRow title="Card type">
                 <FormField
                   control={form.control}
                   name="cardBrand"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Card type</FormLabel>
+                    <FormItem className="w-full">
                       <Select
                         value={field.value}
                         onValueChange={field.onChange}
@@ -403,13 +449,14 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
                     </FormItem>
                   )}
                 />
+              </SettingsFormFieldRow>
 
+              <SettingsFormFieldRow title="Last 4 digits">
                 <FormField
                   control={form.control}
                   name="cardLast4"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last 4 digits</FormLabel>
+                    <FormItem className="w-full">
                       <FormControl>
                         <Input
                           {...field}
@@ -424,73 +471,42 @@ export default function PaymentTab({ cachedDetails, onCacheUpdate }: PaymentTabP
                     </FormItem>
                   )}
                 />
-              </div>
-            </div>
+              </SettingsFormFieldRow>
+            </SettingsSectionCard>
           )}
 
           {paymentMethod === "check" && (
-            <div className="grid gap-6 py-4 border-t border-gray-200 sm:grid-cols-2">
-              <div>
-                <h2 className="font-semibold text-lg text-[#10141a]">Mailing address</h2>
-                <p className="text-sm text-[#4f4f4f]">
-                  Your paycheck will be mailed to the address on your profile.
-                </p>
-              </div>
-
-              <div className="flex items-start gap-2 p-3 text-sm text-[#4f4f4f] rounded-lg bg-gray-100">
-                <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
+            <SettingsSectionCard
+              title="Mailing address"
+              subtitle="Payroll checks mail to the address on your profile."
+            >
+              <div className={settingsAlertInfoClass}>
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#00b4b8]" />
                 <div className="space-y-2">
                   <p>
-                    Your paycheck will be mailed to:{" "}
-                    <strong>{mailingAddressPreview || "No address on file yet."}</strong>
+                    {mailingAddressPreview
+                      ? `Checks will be mailed to: ${mailingAddressPreview}`
+                      : "No address on file yet."}
                   </p>
                   <Link
                     to={Routes.userPanel.profile}
-                    className="text-[#00b3ad] underline underline-offset-2"
+                    className="text-[#00b4b8] underline underline-offset-2"
                   >
-                    Update your address
-                  </Link>{" "}
-                  if this is wrong.
+                    Update profile address
+                  </Link>
                 </div>
               </div>
-            </div>
+            </SettingsSectionCard>
           )}
 
-          <div className="flex flex-col justify-end gap-3 pt-6 border-t border-gray-200 sm:flex-row">
-            <Button
-              type="button"
-              variant="outline"
-              className="border-[#00b3ad] text-[#00b3ad] hover:bg-[#00b3ad]/10 rounded-full"
-              onClick={handleCancel}
-              disabled={saving || !hasChanges}
-            >
-              Cancel
-            </Button>
-
-            <Button
-              type="submit"
-              className="bg-[#00b3ad] text-white font-medium rounded-full hover:bg-[#00a39f] transition disabled:opacity-50"
-              disabled={saving || !hasChanges}
-            >
-              {saving ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving...
-                </span>
-              ) : (
-                "Save changes"
-              )}
-            </Button>
-          </div>
+          <SettingsTabActions
+            hasChanges={hasChanges}
+            saving={saving}
+            onCancel={handleCancel}
+            saveLabel="Save changes"
+          />
         </form>
       </Form>
-
-      <SuccessModal
-        isVisible={isModalVisible}
-        onClose={() => setIsModalVisible(false)}
-        title="Payroll details saved"
-        message="Your payout method is updated. Future paychecks will use these details."
-      />
     </div>
   );
 }

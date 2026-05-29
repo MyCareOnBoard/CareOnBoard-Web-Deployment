@@ -46,6 +46,39 @@ export const CARD_BRAND_OPTIONS: { value: CardBrand; label: string }[] = [
   { value: "discover", label: "Discover" },
 ];
 
+const DISABLED_NEW_METHODS: PaymentMethod[] = ["check", "debit_card"];
+
+/** Keep in sync with payment-details.schema.js assertAllowedPaymentMethodChange */
+export function assertAllowedPaymentMethodChange(
+  existingMethod: PaymentMethod | null,
+  newMethod: PaymentMethod,
+): { ok: true } | { ok: false; message: string } {
+  const existing = existingMethod ?? null;
+
+  if (!existing) {
+    if (newMethod !== "direct_deposit") {
+      return {
+        ok: false,
+        message: "Only direct deposit is available for new payroll setup.",
+      };
+    }
+    return { ok: true };
+  }
+
+  if (existing === newMethod) {
+    return { ok: true };
+  }
+
+  if (DISABLED_NEW_METHODS.includes(newMethod)) {
+    return {
+      ok: false,
+      message: "This payout method is not available.",
+    };
+  }
+
+  return { ok: true };
+}
+
 /** ABA mod-10 routing checksum (mirrors backend payment-details.schema.js) */
 export function isValidAbaRoutingNumber(digits: string): boolean {
   if (!/^\d{9}$/.test(digits)) {
@@ -77,6 +110,7 @@ export const dspPaymentDetailsResponseSchema = z.object({
 export function createPaymentFormSchema(
   hasExistingRouting: boolean,
   hasExistingAccount: boolean,
+  initialPaymentMethod: PaymentMethod | null = null,
 ) {
   return z
     .object({
@@ -92,6 +126,18 @@ export function createPaymentFormSchema(
       cardLast4: z.string(),
     })
     .superRefine((data, ctx) => {
+      const methodCheck = assertAllowedPaymentMethodChange(
+        initialPaymentMethod,
+        data.paymentMethod,
+      );
+      if (!methodCheck.ok) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["paymentMethod"],
+          message: methodCheck.message,
+        });
+      }
+
       if (data.paymentMethod === "direct_deposit") {
         if (!data.bankName.trim()) {
           ctx.addIssue({
@@ -230,8 +276,6 @@ export function arePaymentFormValuesDirty(
       normalizedCurrent.accountHolderName !== normalizedInitial.accountHolderName ||
       Boolean(normalizedCurrent.routingNumber) ||
       Boolean(normalizedCurrent.accountNumber) ||
-      current.bankName !== initial.bankName ||
-      current.accountHolderName !== initial.accountHolderName ||
       (!hasExistingRouting && current.routingNumber !== initial.routingNumber) ||
       (!hasExistingAccount && current.accountNumber !== initial.accountNumber)
     );
@@ -284,4 +328,15 @@ export function extractPaymentDetailsValidationErrors(
     (item): item is PaymentDetailsValidationError =>
       typeof item?.field === "string" && typeof item?.message === "string",
   );
+}
+
+export function extractPaymentDetailsApiError(error: unknown): string | null {
+  const data = (error as { response?: { data?: { error?: string; message?: string } } })?.response
+    ?.data;
+
+  if (data?.error === "PAYMENT_METHOD_UNAVAILABLE") {
+    return data.message || "This payout method is not available.";
+  }
+
+  return null;
 }

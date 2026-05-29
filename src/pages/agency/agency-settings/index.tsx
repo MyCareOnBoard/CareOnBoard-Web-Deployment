@@ -1,72 +1,15 @@
-import { useState, useEffect, lazy, Suspense, useMemo, useCallback, type ReactNode } from "react";
-
+import { useState, useEffect, lazy, Suspense, useMemo, useCallback } from "react";
 import { useLocation } from "react-router";
-
 import AccountTab from "./components/AccountTab";
-
 import SettingsTabNav, { SettingsTabId, SettingsTabItem } from "./components/SettingsTabNav";
-
 import SettingsTabSkeleton from "./components/SettingsTabSkeleton";
-
+import { TabPanel } from "@/pages/shared/settings";
 import { useAuth } from "@/utils/auth";
-
 import { UserType } from "@/utils/auth/types";
 
-import { cn } from "@/lib/utils";
-
-
-
 const AgencyInfoTab = lazy(() => import("./components/AgencyInfoTab"));
-
 const NotificationsTab = lazy(() => import("./components/NotificationTab"));
-
 const UserLevelsTab = lazy(() => import("./components/UserLevelsTab"));
-
-
-
-function TabPanel({
-
-  tabId,
-
-  activeTab,
-
-  children,
-
-  className,
-
-}: {
-
-  tabId: SettingsTabId;
-
-  activeTab: SettingsTabId;
-
-  children: ReactNode;
-
-  className?: string;
-
-}) {
-
-  const isActive = activeTab === tabId;
-
-  return (
-
-    <div
-
-      className={cn(!isActive && "hidden", className)}
-
-      aria-hidden={!isActive}
-
-      hidden={!isActive}
-
-    >
-
-      {children}
-
-    </div>
-
-  );
-
-}
 
 
 
