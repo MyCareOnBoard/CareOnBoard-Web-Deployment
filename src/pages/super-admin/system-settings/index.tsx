@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import NotificationsTab from "@/pages/settings/components/NotificationTab";
+import NotificationPreferencesTab from "@/pages/shared/settings/NotificationPreferencesTab";
 import { getAccountInfo, updateAccountInfo } from "@/lib/api/settings";
 import { deleteAccount } from "@/lib/api/profile";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
@@ -424,7 +424,7 @@ function AccountSettingsPanel() {
 function NotificationPanel() {
   return (
     <div className="space-y-4">
-      <NotificationsTab />
+      <NotificationPreferencesTab />
     </div>
   );
 }

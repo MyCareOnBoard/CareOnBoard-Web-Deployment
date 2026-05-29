@@ -18,6 +18,7 @@ export interface CreateAgencyWithUserPayloadAgency {
   agencyType?: string;
   ein?: string;
   npi?: string;
+  providerId?: string;
   medicaidProviderId?: string;
   // Step 2: Contact Information
   email: string;

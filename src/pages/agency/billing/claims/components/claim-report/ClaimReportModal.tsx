@@ -76,7 +76,8 @@ export default function ClaimReportModal({
         if (cancelled) return;
 
         const nipId = agency.npi?.trim() ?? "";
-        const providerId = agency.medicaidProviderId?.trim() ?? "";
+        const providerId =
+          agency.providerId?.trim() ?? agency.medicaidProviderId?.trim() ?? "";
 
         setForm((prev) => ({
           ...prev,

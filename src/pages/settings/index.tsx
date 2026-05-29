@@ -1,67 +1,103 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
-import AccountTab from "./components/AccountTab";
-import NotificationsTab from "./components/NotificationTab";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/utils/auth";
+import { UserType } from "@/utils/auth/types";
+import type { DspPaymentDetails } from "@/lib/api/paymentDetails";
+import {
+  AccountSettingsTab,
+  SettingsTabNav,
+  SettingsTabSkeleton,
+  TabPanel,
+  type SettingsTabItem,
+} from "@/pages/shared/settings";
+
+const NotificationPreferencesTab = lazy(
+  () => import("@/pages/shared/settings/NotificationPreferencesTab"),
+);
+const PaymentTab = lazy(() => import("./components/PaymentTab"));
+
+type UserSettingsTabId = "account" | "notification" | "payroll";
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<"account" | "notification">("account");
-  const [showSuccess, setShowSuccess] = useState(false);
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<UserSettingsTabId>("account");
+  const [visitedTabs, setVisitedTabs] = useState<Set<UserSettingsTabId>>(
+    () => new Set(["account"]),
+  );
+  const [payrollCache, setPayrollCache] = useState<DspPaymentDetails | null>(null);
 
-  const handleSave = () => {
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 2000);
-  };
+  const isEmployee = user?.userType === UserType.EMPLOYEE;
+
+  const tabs = useMemo(() => {
+    const items: SettingsTabItem<UserSettingsTabId>[] = [
+      { id: "account", label: "Account" },
+      { id: "notification", label: "Notifications" },
+    ];
+    if (user && isEmployee) {
+      items.push({ id: "payroll", label: "Payroll" });
+    }
+    return items;
+  }, [user, isEmployee]);
+
+  const subtitle =
+    user && isEmployee
+      ? "Manage your account, notifications, and payroll."
+      : "Manage your account and notifications.";
+
+  const handleTabChange = useCallback((tabId: UserSettingsTabId) => {
+    setActiveTab(tabId);
+    setVisitedTabs((prev) => new Set(prev).add(tabId));
+  }, []);
+
+  const handlePayrollCacheUpdate = useCallback((details: DspPaymentDetails) => {
+    setPayrollCache(details);
+  }, []);
+
+  useEffect(() => {
+    if (!isEmployee && activeTab === "payroll") {
+      setActiveTab("account");
+      setVisitedTabs((prev) => {
+        const next = new Set(prev);
+        next.delete("payroll");
+        return next;
+      });
+    }
+  }, [isEmployee, activeTab]);
 
   return (
-    <div>
-      {/* Page Header */}
-      <h1 className="mb-4 text-[40px] font-bold leading-[1.4] text-[#10141a]">Settings</h1>
-
-      {/* Tabs */}
-      <div className="flex gap-3 mb-8">
-        <button
-          onClick={() => setActiveTab("account")}
-          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${
-            activeTab === "account"
-              ? "bg-[#00B4B8] text-white"
-              : "outline-2 outline-offset-2 outline-solid outline-gray-300 bg-gray-200 text-gray-500"
-          }`}
-        >
-          Account
-        </button>
-        <button
-          onClick={() => setActiveTab("notification")}
-          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${
-            activeTab === "notification"
-              ? "bg-[#00B4B8] text-white"
-              : "outline-2 outline-offset-2 outline-solid outline-gray-300 bg-gray-200 text-gray-500"
-          }`}
-        >
-          Notification
-        </button>
+    <div className="min-w-0">
+      <div className="mb-6">
+        <h1 className="text-[40px] font-semibold leading-[1.4] text-[#10141a]">Settings</h1>
+        <p className="mt-1 text-[14px] text-[#808081]">{subtitle}</p>
       </div>
 
-      {/* Tab Content */}
-      <div className="p-4 bg-[#f7f7f7] rounded-2xl">
-        {activeTab === "account" ? (
-          <AccountTab onSaved={handleSave} />
-        ) : (
-          <NotificationsTab />
+      <SettingsTabNav
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={handleTabChange}
+        className="mb-6"
+      />
+
+      <div className="mt-6 flex min-w-0 flex-col gap-4">
+        <TabPanel tabId="account" activeTab={activeTab}>
+          <AccountSettingsTab />
+        </TabPanel>
+
+        {visitedTabs.has("notification") && (
+          <TabPanel tabId="notification" activeTab={activeTab}>
+            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={1} />}>
+              <NotificationPreferencesTab />
+            </Suspense>
+          </TabPanel>
+        )}
+
+        {user && isEmployee && visitedTabs.has("payroll") && (
+          <TabPanel tabId="payroll" activeTab={activeTab}>
+            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={2} />}>
+              <PaymentTab cachedDetails={payrollCache} onCacheUpdate={handlePayrollCacheUpdate} />
+            </Suspense>
+          </TabPanel>
         )}
       </div>
-
-      {/* Success Popup */}
-      {showSuccess && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="fixed flex items-center gap-2 px-5 py-3 bg-white border shadow-lg top-8 right-8 rounded-xl"
-        >
-          <CheckCircle2 className="w-6 h-6 text-[#00b4b8]" />
-          <span className="font-medium text-gray-800">Changes saved successfully!</span>
-        </motion.div>
-      )}
     </div>
   );
 }

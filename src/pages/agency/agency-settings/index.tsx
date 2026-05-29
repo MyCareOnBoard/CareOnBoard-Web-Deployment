@@ -1,91 +1,172 @@
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
+import { useState, useEffect, lazy, Suspense, useMemo, useCallback } from "react";
 import { useLocation } from "react-router";
 import AccountTab from "./components/AccountTab";
-import NotificationsTab from "./components/NotificationTab";
-import UserLevelsTab from "./components/UserLevelsTab";
+import SettingsTabNav, { SettingsTabId, SettingsTabItem } from "./components/SettingsTabNav";
+import SettingsTabSkeleton from "./components/SettingsTabSkeleton";
+import { TabPanel } from "@/pages/shared/settings";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types";
 
+const AgencyInfoTab = lazy(() => import("./components/AgencyInfoTab"));
+const NotificationsTab = lazy(() => import("./components/NotificationTab"));
+const UserLevelsTab = lazy(() => import("./components/UserLevelsTab"));
+
+
+
 export default function AgencySettingsPage() {
+
   const { user } = useAuth();
+
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<"account" | "notification" | "userLevels">("account");
-  const [showSuccess, setShowSuccess] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<SettingsTabId>("account");
+
+  const [visitedTabs, setVisitedTabs] = useState<Set<SettingsTabId>>(() => new Set(["account"]));
+
+
 
   useEffect(() => {
-    // Check if we need to activate User Levels tab from navigation state
+
     if (location.state?.activeTab === "userLevels") {
+
       setActiveTab("userLevels");
+
+      setVisitedTabs((prev) => new Set(prev).add("userLevels"));
+
     }
+
   }, [location.state]);
 
-  const handleSave = () => {
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 2000);
-  };
+
+
+  const showTeamTab =
+
+    (user?.userType === UserType.AGENCY_STAFF &&
+
+      user?.profile?.accessList?.includes("User Levels")) ||
+
+    user?.userType === UserType.AGENCY;
+
+
+
+  const tabs = useMemo(() => {
+
+    const items: SettingsTabItem[] = [
+
+      { id: "account", label: "Account" },
+
+      { id: "agencyInfo", label: "Agency Information" },
+
+      { id: "notification", label: "Notifications" },
+
+    ];
+
+    if (showTeamTab) {
+
+      items.push({ id: "userLevels", label: "Team" });
+
+    }
+
+    return items;
+
+  }, [showTeamTab]);
+
+
+
+  const handleTabChange = useCallback((tabId: SettingsTabId) => {
+
+    setActiveTab(tabId);
+
+    setVisitedTabs((prev) => new Set(prev).add(tabId));
+
+  }, []);
+
+
 
   return (
-    <div>
-      {/* Page Header */}
-      <h1 className="mb-4 text-[40px] font-bold leading-[1.4] text-[#10141a]">Settings</h1>
 
-      {/* Tabs */}
-      <div className="flex gap-3 mb-8">
-        <button
-          onClick={() => setActiveTab("account")}
-          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${activeTab === "account"
-              ? "bg-[#00B4B8] text-white"
-              : "outline-2 outline-offset-2 outline-solid outline-gray-300 bg-gray-200 text-gray-500"
-            }`}
-        >
-          Account
-        </button>
-        <button
-          onClick={() => setActiveTab("notification")}
-          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${activeTab === "notification"
-              ? "bg-[#00B4B8] text-white"
-              : "outline-2 outline-offset-2 outline-solid outline-gray-300 bg-gray-200 text-gray-500"
-            }`}
-        >
-          Notification
-        </button>
-        {(user?.userType === UserType.AGENCY_STAFF && user?.profile?.accessList?.includes("User Levels") || user?.userType === UserType.AGENCY) && (
-        <button
-          onClick={() => setActiveTab("userLevels")}
-          className={`px-4 py-2 rounded-full cursor-pointer font-medium ${activeTab === "userLevels"
-              ? "bg-[#00B4B8] text-white"
-              : "outline-2 outline-offset-2 outline-solid outline-gray-300 bg-gray-200 text-gray-500"
-            }`}
-        >
-            Team
-          </button>
-        )}
+    <div className="min-w-0">
+
+      <div className="mb-6">
+
+        <h1 className="text-[40px] font-semibold leading-[1.4] text-[#10141a]">Settings</h1>
+
+        <p className="mt-1 text-[14px] text-[#808081]">
+
+          Manage your account, agency profile, notifications, and team access.
+
+        </p>
+
       </div>
 
-      {/* Tab Content */}
-      <div className="min-w-0 overflow-x-hidden rounded-2xl bg-[#f7f7f7] p-4">
-        {activeTab === "account" ? (
-          <AccountTab onSaved={handleSave} />
-        ) : activeTab === "notification" ? (
-          <NotificationsTab />
-        ) : (
-          <UserLevelsTab />
+
+
+      <SettingsTabNav tabs={tabs} activeTab={activeTab} onChange={handleTabChange} className="mb-6" />
+
+
+
+      <div className="mt-6 flex min-w-0 flex-col gap-4">
+
+        <TabPanel tabId="account" activeTab={activeTab}>
+
+          <AccountTab />
+
+        </TabPanel>
+
+
+
+        {visitedTabs.has("agencyInfo") && (
+
+          <TabPanel tabId="agencyInfo" activeTab={activeTab}>
+
+            <Suspense fallback={<SettingsTabSkeleton variant="accordion" cardCount={4} />}>
+
+              <AgencyInfoTab />
+
+            </Suspense>
+
+          </TabPanel>
+
         )}
+
+
+
+        {visitedTabs.has("notification") && (
+
+          <TabPanel tabId="notification" activeTab={activeTab}>
+
+            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={1} />}>
+
+              <NotificationsTab />
+
+            </Suspense>
+
+          </TabPanel>
+
+        )}
+
+
+
+        {showTeamTab && visitedTabs.has("userLevels") && (
+
+          <TabPanel tabId="userLevels" activeTab={activeTab}>
+
+            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={2} />}>
+
+              <UserLevelsTab />
+
+            </Suspense>
+
+          </TabPanel>
+
+        )}
+
       </div>
 
-      {/* Success Popup */}
-      {showSuccess && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="fixed flex items-center gap-2 px-5 py-3 bg-white border shadow-lg top-8 right-8 rounded-xl"
-        >
-          <CheckCircle2 className="w-6 h-6 text-[#00b4b8]" />
-          <span className="font-medium text-gray-800">Changes saved successfully!</span>
-        </motion.div>
-      )}
     </div>
+
   );
+
 }
+
+

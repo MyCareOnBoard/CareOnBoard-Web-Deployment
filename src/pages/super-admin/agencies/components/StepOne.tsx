@@ -157,6 +157,20 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
                     />
                 </div>
 
+                {/* Provider ID */}
+                <div>
+                    <Label htmlFor="providerId" className="mb-2 text-[14px] font-medium text-[#10141a]">
+                        Provider ID
+                    </Label>
+                    <Input
+                        id="providerId"
+                        value={formData.providerId}
+                        onChange={(e) => onChange("providerId", e.target.value)}
+                        placeholder="Enter provider ID"
+                        className="h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]"
+                    />
+                </div>
+
                 {/* Medicaid/CDD Provider ID */}
                 <div>
                     <Label htmlFor="medicaidProviderId" className="mb-2 text-[14px] font-medium text-[#10141a]">
