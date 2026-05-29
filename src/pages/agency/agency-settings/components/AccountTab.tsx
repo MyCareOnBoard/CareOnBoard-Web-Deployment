@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import SuccessModal from "./SuccessModal"
+import SettingsTabActions from "./SettingsTabActions"
 import { getAuth } from "firebase/auth"
 import { Trash2, Loader2, User, AlertCircle, MapPin } from "lucide-react"
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal"
@@ -499,32 +500,11 @@ export default function AccountTab({ onSaved }: AccountTabProps) {
           </div>
 
           {/* Save / Cancel Buttons */}
-          <div className="flex flex-col justify-end gap-3 pt-6 border-t border-gray-200 sm:flex-row">
-            <Button
-              type="button"
-              variant="outline"
-              className="border-[#00b3ad] text-[#00b3ad] hover:bg-[#00b3ad]/10 rounded-full"
-              onClick={handleCancel}
-              disabled={saving || !hasChanges}
-            >
-              Cancel
-            </Button>
-
-            <Button
-              type="submit"
-              className="bg-[#00b3ad] text-white font-medium rounded-full hover:bg-[#00a39f] transition disabled:opacity-50"
-              disabled={saving || !hasChanges}
-            >
-              {saving ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving...
-                </span>
-              ) : (
-                "Save Changes"
-              )}
-            </Button>
-          </div>
+          <SettingsTabActions
+            hasChanges={hasChanges}
+            saving={saving}
+            onCancel={handleCancel}
+          />
         </form>
       </Form>
 

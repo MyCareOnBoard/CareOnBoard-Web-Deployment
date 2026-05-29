@@ -12,32 +12,50 @@ import { User } from '@/utils/auth/types/user.types';
  */
 export interface Agency {
     id: string;
-    uid: string; // Links to the user account who created/manages the agency
+    uid: string;
     name: string;
     email: string;
+    // Identity
+    legalBusinessName?: string;
+    dba?: string;
+    agencyType?: string;
+    ein?: string;
+    npi?: string;
+    providerId?: string;
+    medicaidProviderId?: string;
+    // Contact
     phone?: string;
     address?: string;
+    county?: string;
     city?: string;
     state?: string;
     zipCode?: string;
-    logo?: string;
     website?: string;
     description?: string;
-
-    // Business details
-    taxId?: string;
-    npi?: string;
-    medicaidProviderId?: string;
-    licenseNumber?: string;
+    // Branding
+    logo?: string;
+    themeColor?: string;
+    letterhead?: string;
     primaryColor?: string;
-
-    // Status and timestamps
+    // Billing
+    billingFormat?: string;
+    dddFormat?: string;
+    hhaExchangeFormat?: string;
+    allowCustomReport?: boolean;
+    invoiceName?: string;
+    invoiceEmail?: string;
+    invoiceFax?: string;
+    payrollSystemIntegration?: string;
+    quickBooks?: string;
+    adp?: string;
+    paycheck?: string;
+    // Legacy
+    taxId?: string;
+    licenseNumber?: string;
     status: 'active' | 'inactive' | 'pending' | 'suspended';
     isVerified: boolean;
     createdAt: string;
     updatedAt: string;
-
-    // Optional owner profile
     owner?: User;
 }
 
@@ -90,21 +108,58 @@ export interface CreateAgencyRequest {
 }
 
 /**
+ * Update Agency Profile Request (agency settings tab)
+ */
+export interface UpdateAgencyProfileRequest {
+    name?: string;
+    legalBusinessName?: string | null;
+    dba?: string | null;
+    agencyType?: string | null;
+    ein?: string | null;
+    npi?: string | null;
+    providerId?: string | null;
+    medicaidProviderId?: string | null;
+    email?: string;
+    phone?: string | null;
+    address?: string | null;
+    county?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zipCode?: string | null;
+    website?: string | null;
+    description?: string | null;
+    logo?: string | null;
+    themeColor?: string | null;
+    letterhead?: string | null;
+    primaryColor?: string | null;
+    billingFormat?: string | null;
+    dddFormat?: string | null;
+    hhaExchangeFormat?: string | null;
+    allowCustomReport?: boolean | null;
+    invoiceName?: string | null;
+    invoiceEmail?: string | null;
+    invoiceFax?: string | null;
+    payrollSystemIntegration?: string | null;
+    quickBooks?: string | null;
+    adp?: string | null;
+    paycheck?: string | null;
+    taxId?: string | null;
+    licenseNumber?: string | null;
+}
+
+/**
  * Update Agency Request
  */
-export interface UpdateAgencyRequest {
-    name?: string;
-    phone?: string;
-    address?: string;
-    city?: string;
-    state?: string;
-    zipCode?: string;
-    website?: string;
-    description?: string;
-    taxId?: string;
-    npi?: string;
-    licenseNumber?: string;
+export interface UpdateAgencyRequest extends UpdateAgencyProfileRequest {
     status?: 'active' | 'inactive' | 'pending' | 'suspended';
+}
+
+export interface UploadAgencyFileResponse {
+    success: boolean;
+    message: string;
+    url: string;
+    fileName: string;
+    fileType: string;
 }
 
 // ==================== API Functions ====================
@@ -153,7 +208,7 @@ export async function getAgencyById(agencyId: string): Promise<Agency> {
  * ✅ Update agency
  * Endpoint: PUT /agencies/:id
  */
-export async function updateAgency(agencyId: string, data: UpdateAgencyRequest): Promise<Agency> {
+export async function updateAgency(agencyId: string, data: UpdateAgencyProfileRequest): Promise<Agency> {
     try {
         const response = await axiosClient.put<AgencyResponse>(`/agencies/${agencyId}`, data);
 
@@ -164,7 +219,45 @@ export async function updateAgency(agencyId: string, data: UpdateAgencyRequest):
         return response.data.agency;
     } catch (err: any) {
         console.error('updateAgency error:', err);
-        throw new Error(err.message || 'Failed to update agency');
+        const message =
+            err.response?.data?.error ||
+            err.response?.data?.message ||
+            err.message ||
+            'Failed to update agency';
+        throw new Error(message);
+    }
+}
+
+export async function uploadAgencyFile(
+    agencyId: string,
+    file: File,
+    fileType: 'logo' | 'letterhead',
+): Promise<UploadAgencyFileResponse> {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const endpoint = fileType === 'logo' ? '/uploads/agency-logo' : '/uploads/agency-letterhead';
+        const response = await axiosClient.post<UploadAgencyFileResponse>(endpoint, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+                'x-agency-id': agencyId,
+            },
+        });
+
+        if (!response.data.success) {
+            throw new Error('Failed to upload file');
+        }
+
+        return response.data;
+    } catch (err: any) {
+        console.error('uploadAgencyFile error:', err);
+        const message =
+            err.response?.data?.error ||
+            err.response?.data?.message ||
+            err.message ||
+            'Failed to upload file';
+        throw new Error(message);
     }
 }
 
