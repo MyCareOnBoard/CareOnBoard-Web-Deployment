@@ -2,10 +2,12 @@ import React from "react";
 
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { toast } from "sonner";
 import { Clock3, WandSparkles, UserRoundCog } from "lucide-react";
 
 import OperationReportHeader from "./components/AnalyticsReportHeader";
 import AnalyticsDateRangeModal from "./components/AnalyticsDateRangeModal";
+import ShareReportModal from "./components/ShareReportModal";
 import OverviewCards from "./components/OverviewCards";
 import ComplianceInsights from "./components/ComplianceInsights";
 import RiskTrends from "./components/RiskTrends";
@@ -50,6 +52,7 @@ function buildOperationalMetrics(data: AnalyticsSummaryData["operationalEfficien
 export default function AnalyticsPage() {
   const [dateRange, setDateRange] = React.useState({ startDate: "", endDate: "" });
   const [showDateModal, setShowDateModal] = React.useState(false);
+  const [showShareModal, setShowShareModal] = React.useState(false);
 
   const { data: analyticsResponse, isLoading, isFetching } = useGetAnalyticsSummaryQuery(
     {
@@ -65,15 +68,31 @@ export default function AnalyticsPage() {
     const element = document.getElementById("analytics-report");
     if (!element) return;
 
-    const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-    const image = canvas.toDataURL("image/png");
+    const loadingToast = toast.loading("Generating PDF…");
 
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    try {
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+      const image = canvas.toDataURL("image/png");
 
-    pdf.addImage(image, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`analytics-report-${Date.now()}.pdf`);
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfPageHeight = pdf.internal.pageSize.getHeight();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      const totalPages = Math.ceil(pdfHeight / pdfPageHeight);
+      for (let i = 0; i < totalPages; i++) {
+        if (i > 0) pdf.addPage();
+        pdf.addImage(image, "PNG", 0, -i * pdfPageHeight, pdfWidth, pdfHeight);
+      }
+
+      pdf.save(`analytics-report-${Date.now()}.pdf`);
+      toast.dismiss(loadingToast);
+      toast.success("Report downloaded successfully");
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.dismiss(loadingToast);
+      toast.error("Failed to download report. Please try again.");
+    }
   };
 
   return (
@@ -89,7 +108,7 @@ export default function AnalyticsPage() {
                 downloadPDF();
                 break;
               case "Share report":
-                console.log("share report");
+                setShowShareModal(true);
                 break;
               default:
                 break;
@@ -146,6 +165,12 @@ export default function AnalyticsPage() {
         onApply={(values) => {
           setDateRange(values);
         }}
+      />
+
+      {/* Share modal */}
+      <ShareReportModal
+        open={showShareModal}
+        onClose={() => setShowShareModal(false)}
       />
     </div>
   );
