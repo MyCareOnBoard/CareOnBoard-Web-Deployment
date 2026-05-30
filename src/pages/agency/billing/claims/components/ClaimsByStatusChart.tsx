@@ -1,35 +1,47 @@
 import BillingAiInsightsButton from "../../components/BillingAiInsightsButton";
 import ClaimsDonutChart from "./ClaimsDonutChart";
-import type { DonutSegment } from "../data/mockClaimsDashboardData";
-import { CLAIMS_BY_STATUS_TOTAL } from "../data/mockClaimsDashboardData";
+import type { ClaimsStatusChartData } from "../utils/claimsDashboardUtils";
 
-const STATUS_CHART_SEGMENTS: DonutSegment[] = [
-  { label: "Other clients", value: 86, color: "#22c55e" },
-  { label: "Pending claims", value: 10, color: "#f97316" },
-  { label: "Paid claims", value: 72, color: "#3b82f6" },
-  { label: "Rejected claims", value: 4, color: "#ef4444" },
-];
+type ClaimsByStatusChartProps = {
+  chart: ClaimsStatusChartData;
+  loading?: boolean;
+  onStatusSegmentClick?: (segmentLabel: string) => void;
+};
 
-const STATUS_LEGEND_ITEMS: DonutSegment[] = [
-  { label: "Paid claims", value: 72, color: "#3b82f6" },
-  { label: "rejected claims", value: 4, color: "#ef4444" },
-  { label: "Pending claims", value: 10, color: "#f97316" },
-];
+function ChartSkeleton() {
+  return (
+    <div className="flex min-h-[280px] items-center justify-center">
+      <div className="h-[190px] w-[190px] animate-pulse rounded-full bg-[#eef4f5]" />
+    </div>
+  );
+}
 
-export default function ClaimsByStatusChart() {
+export default function ClaimsByStatusChart({
+  chart,
+  loading = false,
+  onStatusSegmentClick,
+}: ClaimsByStatusChartProps) {
   return (
     <div className="rounded-[8px] border border-[#e5e5e6] bg-white p-6 shadow-sm">
       <div className="mb-6 flex items-center justify-between">
         <h3 className="text-[18px] font-semibold text-[#10141a]">Claims by status</h3>
         <BillingAiInsightsButton />
       </div>
-      <ClaimsDonutChart
-        total={CLAIMS_BY_STATUS_TOTAL}
-        centerLabel="Total clients"
-        data={STATUS_CHART_SEGMENTS}
-        legendData={STATUS_LEGEND_ITEMS}
-        interactive={false}
-      />
+      {loading ? (
+        <ChartSkeleton />
+      ) : (
+        <ClaimsDonutChart
+          total={chart.total}
+          centerLabel={chart.centerLabel}
+          data={chart.data}
+          legendData={chart.legendData}
+          onLegendItemClick={
+            onStatusSegmentClick
+              ? (segment) => onStatusSegmentClick(segment.label)
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }

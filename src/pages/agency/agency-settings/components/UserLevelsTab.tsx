@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { getInitials } from "@/lib/utils/string-utils";
 import { validateImageUrl } from "@/lib/utils/string-utils";
+import SettingsSectionCard from "./SettingsSectionCard";
 
 export default function InternalUsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -192,20 +193,14 @@ export default function InternalUsersPage() {
   const isEmpty = !isLoading && filteredUsers.length === 0;
 
   return (
-    <div className="min-w-0 space-y-6">
-      <div className="min-w-0 overflow-hidden rounded-[16px] bg-[#f7f7f7] p-4 shadow-sm sm:p-5">
-        {/* Header with Search and New User Button */}
-        <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-x-6">
-          <div className="min-w-0 flex-1 space-y-1 sm:min-w-[200px]">
-            <h2 className="text-[24px] font-semibold leading-[1.3] text-[#10141a]">
-              Team members
-            </h2>
-            <p className="max-w-xl text-[12px] text-[#808081]">
-              Add and manage staff who can access the agency dashboard. Assign access levels to control what each person can see and do.
-            </p>
-          </div>
-
-          <div className="flex min-w-0 flex-shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
+    <div className="min-w-0">
+      <SettingsSectionCard
+        title="Team members"
+        subtitle="Add and manage staff who can access the agency dashboard. Assign access levels to control what each person can see and do."
+        bodyClassName="pt-0 sm:pt-0"
+      >
+        <div className="flex min-w-0 flex-col gap-4 border-b border-[#eef0f2] pb-5 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-x-6">
+          <div className="flex min-w-0 flex-shrink-0 flex-col gap-3 sm:ml-auto sm:flex-row sm:items-center sm:gap-3 sm:w-full sm:justify-end">
             <div className="relative w-full min-w-0 sm:w-[200px] sm:min-w-[160px] md:w-[240px] lg:w-[280px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a0a0a1]" />
               <Input
@@ -386,7 +381,7 @@ export default function InternalUsersPage() {
               </div>
             ))}
         </div>
-      </div>
+      </SettingsSectionCard>
 
       {/* Add/Edit User Modal */}
       <AddNewUserModal

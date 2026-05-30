@@ -7,6 +7,24 @@ import { getAuth } from 'firebase/auth'
 
 // Mock dependencies
 vi.mock('@/lib/api/settings')
+
+const mockToast = vi.fn()
+vi.mock('@/hooks/use-toast', () => ({
+  useToast: () => ({ toast: mockToast }),
+}))
+vi.mock('@/components/modals/DeleteConfirmationModal', () => ({
+  DeleteConfirmationModal: ({ isOpen, title, message }: { isOpen: boolean; title?: string; message?: string }) =>
+    isOpen ? (
+      <div data-testid="delete-confirmation-modal">
+        <h2>{title}</h2>
+        <p>{message}</p>
+      </div>
+    ) : null,
+}))
+vi.mock('@/components/ui/loader', () => ({
+  ButtonLoader: () => null,
+  PageLoader: () => null,
+}))
 vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(() => ({
     currentUser: {
@@ -18,17 +36,6 @@ vi.mock('firebase/auth', () => ({
   })),
 }))
 
-vi.mock('../components/SuccessModal', () => ({
-  default: ({ isVisible, onClose, title, message }: any) =>
-    isVisible ? (
-      <div data-testid="success-modal">
-        <h2>{title}</h2>
-        <p>{message}</p>
-        <button onClick={onClose}>Close</button>
-      </div>
-    ) : null,
-}))
-
 describe('AccountTab', () => {
   const mockAccountInfo = {
     email: 'test@example.com',
@@ -38,6 +45,7 @@ describe('AccountTab', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockToast.mockClear()
     vi.mocked(settingsApi.getAccountInfo).mockResolvedValue(mockAccountInfo)
   })
 
@@ -46,14 +54,14 @@ describe('AccountTab', () => {
   })
 
   describe('Loading State', () => {
-    it('should show loading spinner while fetching account info', () => {
+    it('should show loading skeleton while fetching account info', () => {
       vi.mocked(settingsApi.getAccountInfo).mockImplementation(
         () => new Promise(() => {}) // Never resolves
       )
 
       render(<AccountTab />)
 
-      expect(screen.getByText(/loading account information/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/loading settings/i)).toBeInTheDocument()
     })
   })
 
@@ -108,14 +116,13 @@ describe('AccountTab', () => {
       })
     })
 
-    it('should mark full name and profile picture as required', async () => {
+    it('should mark full name as required', async () => {
       render(<AccountTab />)
 
       await waitFor(() => {
-        expect(screen.getByText(/Profile Picture/)).toBeInTheDocument()
-        expect(screen.getByText(/Full Name/)).toBeInTheDocument()
-        const asterisks = screen.getAllByText('*')
-        expect(asterisks.length).toBeGreaterThanOrEqual(2)
+        expect(screen.getByText(/profile picture/i)).toBeInTheDocument()
+        expect(screen.getByText(/full name/i)).toBeInTheDocument()
+        expect(screen.getByText('*')).toBeInTheDocument()
       })
     })
   })
@@ -146,10 +153,15 @@ describe('AccountTab', () => {
       expect(saveButton).not.toBeDisabled()
     })
 
-    it('should show error when trying to save without profile picture', async () => {
+    it('should allow saving full name without profile picture', async () => {
       vi.mocked(settingsApi.getAccountInfo).mockResolvedValue({
         ...mockAccountInfo,
         profilePicture: '',
+      })
+      vi.mocked(settingsApi.updateAccountInfo).mockResolvedValue({
+        ...mockAccountInfo,
+        profilePicture: '',
+        fullName: 'New Name',
       })
 
       const user = userEvent.setup()
@@ -167,7 +179,10 @@ describe('AccountTab', () => {
       await user.click(saveButton)
 
       await waitFor(() => {
-        expect(screen.getByText(/profile picture is required/i)).toBeInTheDocument()
+        expect(settingsApi.updateAccountInfo).toHaveBeenCalledWith({
+          fullName: 'New Name',
+          profilePictureFile: undefined,
+        })
       })
     })
 
@@ -337,8 +352,7 @@ describe('AccountTab', () => {
       const mockUpdated = { ...mockAccountInfo, fullName: 'Updated Name' }
       vi.mocked(settingsApi.updateAccountInfo).mockResolvedValue(mockUpdated)
 
-      const onSaved = vi.fn()
-      render(<AccountTab onSaved={onSaved} />)
+      render(<AccountTab />)
 
       await waitFor(() => {
         expect(screen.getByDisplayValue('Test User')).toBeInTheDocument()
@@ -364,10 +378,12 @@ describe('AccountTab', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByTestId('success-modal')).toBeInTheDocument()
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: 'Account updated',
+          }),
+        )
       })
-
-      expect(onSaved).toHaveBeenCalledWith(mockUpdated)
     })
 
     it('should successfully upload profile picture', async () => {
@@ -526,7 +542,6 @@ describe('AccountTab', () => {
   describe('Delete Account', () => {
     it('should show confirmation dialog when delete is clicked', async () => {
       const user = userEvent.setup()
-      global.confirm = vi.fn(() => false)
 
       render(<AccountTab />)
 
@@ -537,9 +552,8 @@ describe('AccountTab', () => {
       const deleteButton = screen.getByRole('button', { name: /delete account/i })
       await user.click(deleteButton)
 
-      expect(global.confirm).toHaveBeenCalledWith(
-        expect.stringContaining('permanently delete')
-      )
+      expect(screen.getByTestId('delete-confirmation-modal')).toBeInTheDocument()
+      expect(screen.getByText(/Delete Account\?/)).toBeInTheDocument()
     })
   })
 })

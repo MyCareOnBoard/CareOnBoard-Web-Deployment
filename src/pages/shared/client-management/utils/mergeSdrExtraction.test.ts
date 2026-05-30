@@ -10,6 +10,8 @@ import {
   attachSdrFileToWizardDocs,
   buildSdrImportPreview,
   formatSdrPatchSummary,
+  mergeDiagnosisLines,
+  resolveSdrDiagnosis,
 } from "./mergeSdrExtraction";
 import { wizardServiceToClientService } from "./outcomeServices";
 import { deriveAuthorizedHoursPerWeek } from "./deriveAuthorizedHoursPerWeek";
@@ -1097,6 +1099,130 @@ describe("weekly distribution derivation vs persist cap", () => {
     expect(
       deriveAuthorizedHoursPerWeek(weeklyDistributionForDerivation(parts!)),
     ).toBe("99");
+  });
+});
+
+describe("SDR diagnosis merge", () => {
+  const normalizedDiagnosisExtraction = (
+    rows: Array<Record<string, unknown>>,
+    diagnosis = "F84.0 - Autism Spectrum Disorder",
+  ) => {
+    const ext = extractionFrom([{ statement: "Goal", rows }]);
+    ext.draft.stage3 = { diagnosis };
+    return ext;
+  };
+
+  it("resolveSdrDiagnosis prefers normalized draft.stage3.diagnosis", () => {
+    const extraction = extractionFrom([
+      {
+        statement: "Goal",
+        rows: [{ code: "C1", diagnosisCode: "F84.0", diagnosisDescription: "Autism" }],
+      },
+    ]);
+    extraction.draft.stage3 = { diagnosis: "F84.0 - Autism Spectrum Disorder" };
+    expect(resolveSdrDiagnosis(extraction)).toBe("F84.0 - Autism Spectrum Disorder");
+  });
+
+  it("resolveSdrDiagnosis falls back to per-service rows for v12 cache", () => {
+    const extraction = extractionFrom([
+      {
+        statement: "Goal",
+        rows: [
+          { code: "C1", diagnosisCode: "F84.0", diagnosisDescription: "Autism Spectrum Disorder" },
+          { code: "C2", diagnosisCode: "F84.0", diagnosisDescription: "Autism Spectrum Disorder" },
+        ],
+      },
+    ]);
+    expect(resolveSdrDiagnosis(extraction)).toBe("F84.0 - Autism Spectrum Disorder");
+  });
+
+  it("mergeDiagnosisLines appends without overwrite", () => {
+    expect(mergeDiagnosisLines("F84.0 - Autism", "R56.9 - Seizures", false)).toBe(
+      "F84.0 - Autism\nR56.9 - Seizures",
+    );
+  });
+
+  it("mergeDiagnosisLines replaces with overwrite", () => {
+    expect(mergeDiagnosisLines("Old line", "F84.0 - Autism", true)).toBe("F84.0 - Autism");
+  });
+
+  it("applySdrImportToWizard bootstrap sets stage3.diagnosis from normalized extraction", () => {
+    const extraction = extractionFrom([
+      {
+        statement: "Goal",
+        rows: [{ code: "H2021", diagnosisCode: "F84.0", diagnosisDescription: "Autism" }],
+      },
+    ]);
+    extraction.draft.stage3 = { diagnosis: "F84.0 - Autism Spectrum Disorder" };
+    const fd = baseForm([]);
+    const prev = buildSdrImportPreview(extraction, fd.stage2.outcomes, { overwrite: true });
+    const { formData: next } = applySdrImportToWizard(fd, prev, {
+      overwrite: true,
+      extraction,
+    });
+    expect(next.stage3.diagnosis).toBe("F84.0 - Autism Spectrum Disorder");
+  });
+
+  it("applySdrImportToWizard patch path sets stage3.diagnosis and patches service", () => {
+    const outcomes = [
+      {
+        id: "o1",
+        statement: "G",
+        services: [
+          {
+            ...createEmptyServiceAuthorization(),
+            id: "s1",
+            code: "C1",
+          },
+        ],
+      },
+    ];
+    const fd = baseForm(outcomes);
+    const extraction = normalizedDiagnosisExtraction([
+      { code: "C1", sdrDetails: { deliveryMethods: ["New"] } },
+    ]);
+    const prev = buildSdrImportPreview(extraction, outcomes, { overwrite: true });
+    const { formData: next } = applySdrImportToWizard(fd, prev, {
+      overwrite: true,
+      extraction,
+    });
+    expect(next.stage3.diagnosis).toBe("F84.0 - Autism Spectrum Disorder");
+    expect(next.stage2.outcomes[0].services[0].sdrDetails?.deliveryMethods).toEqual(["New"]);
+  });
+
+  it("applySdrImportToWizard appends diagnosis when keptExisting and overwrite false", () => {
+    const outcomes = [
+      {
+        id: "o1",
+        statement: "G",
+        services: [
+          {
+            ...createEmptyServiceAuthorization(),
+            id: "s1",
+            code: "C1",
+            sdrDetails: {
+              deliveryMethods: ["KeepMe"],
+              importedAt: "2020-01-01T00:00:00.000Z",
+            },
+          },
+        ],
+      },
+    ];
+    const fd = baseForm(outcomes);
+    fd.stage3.diagnosis = "ISP line";
+    const extraction = normalizedDiagnosisExtraction(
+      [{ code: "C1", sdrDetails: { deliveryMethods: ["Other"] } }],
+      "F84.0 - Autism Spectrum Disorder",
+    );
+    const prev = buildSdrImportPreview(extraction, outcomes, { overwrite: false });
+    expect(prev.keptExisting).toHaveLength(1);
+    const { formData: next, appliedCount } = applySdrImportToWizard(fd, prev, {
+      overwrite: false,
+      extraction,
+    });
+    expect(appliedCount).toBe(0);
+    expect(next.stage3.diagnosis).toBe("ISP line\nF84.0 - Autism Spectrum Disorder");
+    expect(next.stage2.outcomes[0].services[0].sdrDetails?.deliveryMethods).toEqual(["KeepMe"]);
   });
 });
 

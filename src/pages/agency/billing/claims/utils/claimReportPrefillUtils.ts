@@ -1,15 +1,23 @@
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import type { Client, ClientService } from "@/lib/api/clients";
+import type { Shift } from "@/lib/api/shifts";
+import { parseSdrWeekRange } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
 import {
-  DIAGNOSIS_CODE_LETTERS,
   type ClaimReportFormState,
   type ClaimReportServiceLine,
   type ClaimReportSummary,
+  DIAGNOSIS_CODE_LETTERS,
 } from "../data/mockClaimReportData";
 import { formatGender } from "@/pages/shared/client-details/tabs/profileTabViewModel";
+import {
+  computeTotalHours,
+  findMatchingClientService,
+  resolvePaNumber,
+} from "./claimShiftBillingUtils";
 
 export type ClaimReportShiftTiming = {
   serviceDate: string;
+  serviceDateIso?: string;
   durationStart: string;
   durationEnd: string;
   totalHours: string;
@@ -26,14 +34,55 @@ export type ClaimReportPrefillSnapshot = Pick<
   | "state"
   | "zipCode"
   | "diagnosisCodes"
-  | "chargesAmount"
   | "paNumber"
 > & {
-  serviceLines: [ClaimReportServiceLine];
+  serviceLines: ClaimReportServiceLine[];
   summary: ClaimReportSummary;
 };
 
 type FirestoreTimestamp = { _seconds?: number; _nanoseconds?: number };
+
+const EMPTY_PREFILL_SUMMARY: ClaimReportSummary = {
+  totalClaimsProcessed: 0,
+  totalUnitsBilled: "0",
+  totalBilledHours: "",
+  totalClaimAmount: "$0.00",
+};
+
+function formatWeekRangeLabel(start: Date, end: Date): string {
+  return `${format(start, "M/d/yyyy")} -> ${format(end, "M/d/yyyy")}`;
+}
+
+export function resolveSdrWeekRangeDurationLabel(
+  shiftDateIso: string | undefined,
+  service?: ClientService,
+): string {
+  const rows = service?.sdrWeeklyDistribution?.rows ?? [];
+  if (shiftDateIso && rows.length > 0) {
+    for (const row of rows) {
+      const bounds = parseSdrWeekRange(row.weekRange);
+      if (!bounds) continue;
+      const start = format(bounds.start, "yyyy-MM-dd");
+      const end = format(bounds.end, "yyyy-MM-dd");
+      if (shiftDateIso >= start && shiftDateIso <= end) {
+        return formatWeekRangeLabel(bounds.start, bounds.end);
+      }
+    }
+  }
+
+  if (shiftDateIso) {
+    try {
+      const day = parseISO(shiftDateIso);
+      if (!Number.isNaN(day.getTime())) {
+        return formatWeekRangeLabel(day, day);
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  return "—";
+}
 
 export function parseClientDate(
   dateValue?: string | FirestoreTimestamp | Date,
@@ -184,61 +233,99 @@ function normalizePaNumber(paNumber?: string): string {
   return trimmed === "—" ? "" : trimmed;
 }
 
-function buildDurationLabel(timing: ClaimReportShiftTiming): string {
-  const start = timing.durationStart.trim();
-  const end = timing.durationEnd.trim();
-  if (start && end && start !== "—" && end !== "—") {
-    return `${start}–${end}`;
+function parseShiftHours(totalHours: string): number {
+  if (!totalHours.trim() || totalHours.trim() === "—") return 0;
+  const value = parseFloat(totalHours);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+export function formatBilledHoursLabel(totalHours: number): string {
+  if (!Number.isFinite(totalHours) || totalHours <= 0) return "";
+  const rounded = Math.round(totalHours * 100) / 100;
+  return `${rounded} hrs`;
+}
+
+function buildEmptyPrefillSnapshot(): ClaimReportPrefillSnapshot {
+  const emptyDiagnosis = Object.fromEntries(
+    DIAGNOSIS_CODE_LETTERS.map((letter) => [letter, ""]),
+  );
+
+  return {
+    dateOfBirth: "",
+    patientSex: "",
+    patientAddress: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    diagnosisCodes: emptyDiagnosis,
+    paNumber: "",
+    serviceLines: [],
+    summary: EMPTY_PREFILL_SUMMARY,
+  };
+}
+
+export function buildClaimReportPrefillFromShifts(
+  shifts: Shift[],
+): ClaimReportPrefillSnapshot {
+  if (shifts.length === 0) {
+    return buildEmptyPrefillSnapshot();
   }
 
-  return timing.serviceDate.trim() || "—";
-}
-
-function resolveAuthorizedHoursLabel(matchedService?: ClientService): string {
-  const raw = matchedService?.totalHours?.trim() ?? "";
-  if (!raw) return "";
-  return raw.toLowerCase().includes("hr") ? raw : `${raw} hrs`;
-}
-
-export function buildClaimReportPrefill(
-  client: Client | undefined,
-  matchedService: ClientService | undefined,
-  timing: ClaimReportShiftTiming,
-): ClaimReportPrefillSnapshot {
+  const anchorShift = shifts[0];
+  const client = anchorShift.client;
+  const matchedService = findMatchingClientService(client, anchorShift);
   const address = resolveClientAddressFields(client);
   const diagnosisCodes = buildDiagnosisCodesMap(getClientDiagnosisLines(client));
-  const hasDiagnosis = DIAGNOSIS_CODE_LETTERS.some((letter) => diagnosisCodes[letter]?.trim());
 
-  const serviceCode = matchedService?.code?.trim() || timing.serviceCode.trim();
+  const serviceCode =
+    matchedService?.code?.trim() || anchorShift.serviceCode?.trim() || "";
   const { cptHcpcs, modifier } = splitServiceCode(serviceCode);
 
-  const hours = parseFloat(timing.totalHours);
   const rate =
     parseRateToNumber(matchedService?.clientRate) ??
     parseRateToNumber(client?.billingRate);
   const payType = matchedService?.clientPayType ?? matchedService?.payType;
-  const { units, charge } = computeClaimBilling(hours, rate ?? 0, payType);
 
-  const chargeFormatted = charge > 0 ? formatClaimCharge(charge) : "$0.00";
-  const chargeAmount = charge > 0 ? charge.toFixed(2) : "0.00";
-  const paNumber = normalizePaNumber(timing.paNumber);
+  let totalHoursSum = 0;
+  let totalUnits = 0;
+  let totalCharge = 0;
+
+  for (const shift of shifts) {
+    const shiftService = findMatchingClientService(shift.client, shift) ?? matchedService;
+    const shiftRate =
+      parseRateToNumber(shiftService?.clientRate) ??
+      parseRateToNumber(shift.client?.billingRate) ??
+      rate;
+    const shiftPayType = shiftService?.clientPayType ?? shiftService?.payType ?? payType;
+    const hours = parseShiftHours(computeTotalHours(shift));
+    const { units, charge } = computeClaimBilling(hours, shiftRate ?? 0, shiftPayType);
+
+    totalHoursSum += hours;
+    totalUnits += units;
+    totalCharge += charge;
+  }
+
+  const chargeFormatted =
+    totalCharge > 0 ? formatClaimCharge(totalCharge) : "$0.00";
+  const paNumber = normalizePaNumber(
+    resolvePaNumber(client, anchorShift, matchedService),
+  );
 
   const serviceLine: ClaimReportServiceLine = {
-    duration: buildDurationLabel(timing),
-    placeOfService: matchedService?.location?.trim() || "99",
-    emg: "-",
+    duration: resolveSdrWeekRangeDurationLabel(anchorShift.date, matchedService),
+    placeOfService: "99",
     cptHcpcs: cptHcpcs || serviceCode,
     modifier,
-    diagnosisPointer: hasDiagnosis ? "A" : "",
-    charges: chargeFormatted,
-    epsotFamilyPlan: "-",
-    idQual1: client?.medicaidId?.trim() ?? "",
+    diagnosisPointer: "A",
+    totalCharges: chargeFormatted,
+    nipId: "",
+    providerId: "",
   };
 
   const summary: ClaimReportSummary = {
-    totalClaimsProcessed: 1,
-    totalUnitsBilled: units > 0 ? String(units) : "0",
-    totalAuthorizedHours: resolveAuthorizedHoursLabel(matchedService),
+    totalClaimsProcessed: shifts.length,
+    totalUnitsBilled: totalUnits > 0 ? String(totalUnits) : "0",
+    totalBilledHours: formatBilledHoursLabel(totalHoursSum),
     totalClaimAmount: chargeFormatted,
   };
 
@@ -250,7 +337,59 @@ export function buildClaimReportPrefill(
     state: address.state,
     zipCode: address.zipCode,
     diagnosisCodes,
-    chargesAmount: chargeAmount,
+    paNumber,
+    serviceLines: [serviceLine],
+    summary,
+  };
+}
+
+export function buildClaimReportPrefill(
+  client: Client | undefined,
+  matchedService: ClientService | undefined,
+  timing: ClaimReportShiftTiming,
+): ClaimReportPrefillSnapshot {
+  const address = resolveClientAddressFields(client);
+  const diagnosisCodes = buildDiagnosisCodesMap(getClientDiagnosisLines(client));
+
+  const serviceCode = matchedService?.code?.trim() || timing.serviceCode.trim();
+  const { cptHcpcs, modifier } = splitServiceCode(serviceCode);
+
+  const hours = parseShiftHours(timing.totalHours);
+  const rate =
+    parseRateToNumber(matchedService?.clientRate) ??
+    parseRateToNumber(client?.billingRate);
+  const payType = matchedService?.clientPayType ?? matchedService?.payType;
+  const { units, charge } = computeClaimBilling(hours, rate ?? 0, payType);
+
+  const chargeFormatted = charge > 0 ? formatClaimCharge(charge) : "$0.00";
+  const paNumber = normalizePaNumber(timing.paNumber);
+
+  const serviceLine: ClaimReportServiceLine = {
+    duration: resolveSdrWeekRangeDurationLabel(timing.serviceDateIso, matchedService),
+    placeOfService: "99",
+    cptHcpcs: cptHcpcs || serviceCode,
+    modifier,
+    diagnosisPointer: "A",
+    totalCharges: chargeFormatted,
+    nipId: "",
+    providerId: "",
+  };
+
+  const summary: ClaimReportSummary = {
+    totalClaimsProcessed: 1,
+    totalUnitsBilled: units > 0 ? String(units) : "0",
+    totalBilledHours: formatBilledHoursLabel(hours),
+    totalClaimAmount: chargeFormatted,
+  };
+
+  return {
+    dateOfBirth: formatClientDateOfBirth(client?.dateOfBirth),
+    patientSex: formatPatientSex(client?.gender),
+    patientAddress: address.patientAddress,
+    city: address.city,
+    state: address.state,
+    zipCode: address.zipCode,
+    diagnosisCodes,
     paNumber,
     serviceLines: [serviceLine],
     summary,

@@ -16,13 +16,12 @@ const ServiceTableRow = memo(function ServiceTableRow({ line }: ServiceTableRowP
     <div className={`claim-report-print-table-row ${CLAIM_REPORT_TABLE_GRID} border-b border-[#e5e5e6] px-2 py-3 text-[12px] text-[#10141a] last:border-b-0`}>
       <span className="sticky left-0 bg-white pr-2">{line.duration}</span>
       <span>{line.placeOfService}</span>
-      <span>{line.emg}</span>
       <span>{line.cptHcpcs}</span>
       <span>{line.modifier}</span>
       <span>{line.diagnosisPointer}</span>
-      <span>{line.charges}</span>
-      <span>{line.epsotFamilyPlan}</span>
-      <span>{line.idQual1}</span>
+      <span>{line.totalCharges}</span>
+      <span>{line.nipId}</span>
+      <span>{line.providerId}</span>
     </div>
   );
 });

@@ -29,6 +29,7 @@ interface AgencyFormData {
     agencyType: string;
     ein: string;
     npi: string;
+    providerId: string;
     medicaidProviderId: string;
 
     // Step 2: Contact Information
@@ -247,6 +248,7 @@ export default function AddAgencyWizard() {
         agencyType: "",
         ein: "",
         npi: "",
+        providerId: "",
         medicaidProviderId: "",
         primaryAddress: "",
         county_or_state: "",
@@ -325,6 +327,7 @@ export default function AddAgencyWizard() {
             agencyType: responseData.agencyData?.agencyType || "",
             ein: responseData.agencyData?.ein || "",
             npi: responseData.agencyData?.npi || "",
+            providerId: responseData.agencyData?.providerId ?? "",
             medicaidProviderId: responseData.agencyData?.medicaidProviderId || "",
             // Step 2: Contact Information
             supportEmail: responseData.agencyData?.email || "",
@@ -458,6 +461,7 @@ export default function AddAgencyWizard() {
                     agencyType: formData.agencyType,
                     ein: formData.ein,
                     npi: formData.npi,
+                    providerId: formData.providerId,
                     medicaidProviderId: formData.medicaidProviderId,
                     email: formData.supportEmail,
                     phone: formData.mainPhone,
@@ -670,6 +674,7 @@ export default function AddAgencyWizard() {
                     agencyType: formData.agencyType,
                     ein: formData.ein,
                     npi: formData.npi,
+                    providerId: formData.providerId,
                     medicaidProviderId: formData.medicaidProviderId,
                     email: formData.supportEmail,
                     phone: formData.mainPhone,

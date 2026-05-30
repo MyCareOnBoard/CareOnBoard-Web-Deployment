@@ -1,16 +1,19 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { listShifts, ShiftStatus, type Shift } from "@/lib/api/shifts";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/utils/auth";
+import { useCallback, useMemo, useState } from "react";
+import type { Shift } from "@/lib/api/shifts";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import { mapShiftsToRecentClaims } from "../utils/shiftToRecentClaim";
 import ClaimsClientSearch from "./ClaimsClientSearch";
 import RecentClaimRow from "./RecentClaimRow";
 import { TABLE_HEADER_CLASS, TABLE_MIN_WIDTH, TABLE_ROW_CLASS } from "./tableColumns";
 
-const ClaimReportModal = lazy(() => import("./claim-report/ClaimReportModal"));
-
 const SKELETON_ROW_COUNT = 10;
+
+type RecentClaimsTableProps = {
+  shifts: Shift[];
+  loading?: boolean;
+  onGenerateClaim?: (claim: RecentClaim, anchorShift: Shift) => void;
+  generateDisabled?: boolean;
+};
 
 function RecentClaimSkeletonRow() {
   return (
@@ -38,61 +41,21 @@ function RecentClaimMobileSkeletonCard() {
   );
 }
 
-export default function RecentClaimsTable() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function RecentClaimsTable({
+  shifts,
+  loading = false,
+  onGenerateClaim,
+  generateDisabled = false,
+}: RecentClaimsTableProps) {
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
-  const [generatingClaim, setGeneratingClaim] = useState<RecentClaim | null>(null);
 
-  useEffect(() => {
-    if (!user?.agencyId) {
-      setShifts([]);
-      setLoading(false);
-      return;
-    }
+  const visibleShifts = useMemo(
+    () => shifts.filter((shift) => !shift.claimId),
+    [shifts],
+  );
 
-    const controller = new AbortController();
-
-    const fetchShifts = async () => {
-      try {
-        setLoading(true);
-        const response = await listShifts(
-          {
-            status: ShiftStatus.COMPLETED,
-            limit: 10,
-            agencyId: user.agencyId,
-            client: true,
-          },
-          { signal: controller.signal },
-        );
-        setShifts(response.shifts ?? []);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        console.error("Failed to fetch completed shifts:", error);
-        setShifts([]);
-        toast({
-          title: "Error",
-          description: "Failed to load shifts ready to claim. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void fetchShifts();
-
-    return () => {
-      controller.abort();
-    };
-  }, [toast, user?.agencyId]);
-
-  const claims = useMemo(() => mapShiftsToRecentClaims(shifts), [shifts]);
+  const claims = useMemo(() => mapShiftsToRecentClaims(visibleShifts), [visibleShifts]);
 
   const filteredClaims = useMemo(() => {
     if (selectedClientName) {
@@ -112,17 +75,18 @@ export default function RecentClaimsTable() {
     setSelectedClientName(clientName);
   };
 
-  const handleGenerateClaim = useCallback((claim: RecentClaim) => {
-    setGeneratingClaim(claim);
-  }, []);
-
-  const handleCloseReportModal = useCallback(() => {
-    setGeneratingClaim(null);
-  }, []);
+  const handleGenerateClaim = useCallback(
+    (claim: RecentClaim) => {
+      const anchorShift = visibleShifts.find((shift) => shift.id === claim.id);
+      if (!anchorShift || !onGenerateClaim) return;
+      onGenerateClaim(claim, anchorShift);
+    },
+    [onGenerateClaim, visibleShifts],
+  );
 
   const emptyMessage = useMemo(() => {
     if (loading) return "";
-    if (claims.length === 0) return "No completed shifts found.";
+    if (claims.length === 0) return "No shifts approved for claim found.";
     return "No shifts match your search.";
   }, [claims.length, loading]);
 
@@ -159,6 +123,7 @@ export default function RecentClaimsTable() {
                   variant="desktop"
                   claim={claim}
                   onGenerateClaim={handleGenerateClaim}
+                  generateDisabled={generateDisabled}
                 />
               ))
             ) : (
@@ -182,6 +147,7 @@ export default function RecentClaimsTable() {
               variant="mobile"
               claim={claim}
               onGenerateClaim={handleGenerateClaim}
+              generateDisabled={generateDisabled}
             />
           ))
         ) : (
@@ -190,17 +156,6 @@ export default function RecentClaimsTable() {
           </div>
         )}
       </div>
-
-      {generatingClaim && (
-        <Suspense fallback={null}>
-          <ClaimReportModal
-            key={generatingClaim.id}
-            open
-            claim={generatingClaim}
-            onClose={handleCloseReportModal}
-          />
-        </Suspense>
-      )}
     </section>
   );
 }

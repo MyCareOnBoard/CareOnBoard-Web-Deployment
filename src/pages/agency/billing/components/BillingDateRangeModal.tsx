@@ -3,11 +3,10 @@ import { format, subDays } from "date-fns";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import CustomDatePicker from "@/components/ui/datePicker";
-import { BILLING_CORNER_MODAL_CLASS, BILLING_FIELD_CLASS } from "./billingModalStyles";
+import BillingCornerModalHeader from "./BillingCornerModalHeader";
+import { BILLING_CORNER_MODAL_CLASS, BILLING_FIELD_CLASS, BILLING_FIELD_LABEL_CLASS } from "./billingModalStyles";
 import type { BillingDateRangeValues } from "./types";
 
 type BillingDateRangeModalProps = {
@@ -72,15 +71,7 @@ export default function BillingDateRangeModal({
       }}
     >
       <DialogContent className={BILLING_CORNER_MODAL_CLASS}>
-        <DialogHeader className="space-y-0">
-          <div className="px-6 py-6">
-            <DialogTitle className="text-left text-[24px] font-bold text-[#10141a] md:text-[28px]">
-              {title}
-            </DialogTitle>
-            <p className="mt-2 text-[14px] text-[#808081]">{description}</p>
-          </div>
-          <div className="h-px w-full bg-[#00b4b8]" />
-        </DialogHeader>
+        <BillingCornerModalHeader title={title} description={description} />
 
         <div className="space-y-6 px-6 pb-8 pt-6">
           <div className="text-[14px] font-medium text-[#00b4b8]">{formattedRangeLabel}</div>
@@ -103,7 +94,7 @@ export default function BillingDateRangeModal({
           </div>
 
           <div>
-            <label className="mb-3 block text-[14px] font-medium text-[#10141a]">Start date</label>
+            <label className={BILLING_FIELD_LABEL_CLASS}>Start date</label>
             <CustomDatePicker
               key="billing-start-picker"
               align="start"
@@ -116,7 +107,7 @@ export default function BillingDateRangeModal({
           </div>
 
           <div>
-            <label className="mb-3 block text-[14px] font-medium text-[#10141a]">End date</label>
+            <label className={BILLING_FIELD_LABEL_CLASS}>End date</label>
             <CustomDatePicker
               key="billing-end-picker"
               align="end"

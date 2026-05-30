@@ -99,7 +99,7 @@ export async function downloadClaimReportPdf(root: HTMLElement, clientName: stri
     heightLeft -= usableHeight;
 
     while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
+      position -= usableHeight;
       pdf.addPage();
       pdf.addImage(imageData, "JPEG", PDF_MARGIN_MM, position, imgWidth, imgHeight);
       heightLeft -= usableHeight;

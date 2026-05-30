@@ -138,6 +138,72 @@ export function formatDiagnosisEntryLine(entry?: {
   return c || d;
 }
 
+function buildDiagnosisFromSdrExtraction(
+  extraction: ClientExtractionResponse | null | undefined,
+): string | undefined {
+  const lines: string[] = [];
+  const seen = new Set<string>();
+  for (const { row } of flattenExtractionOutcomeServices(extraction)) {
+    const line = formatDiagnosisEntryLine(row);
+    if (!line) continue;
+    const key = line.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    lines.push(line);
+  }
+  return lines.length > 0 ? lines.join("\n") : undefined;
+}
+
+export function resolveSdrDiagnosis(
+  extraction: ClientExtractionResponse | null | undefined,
+): string | undefined {
+  const normalized = extraction?.draft?.stage3?.diagnosis?.trim();
+  if (normalized) return normalized;
+  return buildDiagnosisFromSdrExtraction(extraction);
+}
+
+export function mergeDiagnosisLines(
+  existing: string | undefined,
+  incoming: string,
+  overwrite: boolean,
+): string | undefined {
+  const incomingTrimmed = incoming.trim();
+  if (!incomingTrimmed) return existing?.trim() || undefined;
+  if (overwrite) return incomingTrimmed;
+
+  const merged: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of (existing ?? "").split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const key = line.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(line);
+  }
+  for (const raw of incomingTrimmed.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const key = line.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(line);
+  }
+  return merged.length > 0 ? merged.join("\n") : undefined;
+}
+
+function applySdrDiagnosisToForm(
+  form: AddClientFormData,
+  extraction: ClientExtractionResponse | null | undefined,
+  overwrite: boolean,
+): AddClientFormData {
+  const incoming = resolveSdrDiagnosis(extraction);
+  if (!incoming) return form;
+  const diagnosis = mergeDiagnosisLines(form.stage3.diagnosis, incoming, overwrite);
+  if (diagnosis === form.stage3.diagnosis) return form;
+  return { ...form, stage3: { ...form.stage3, diagnosis } };
+}
+
 function buildBootstrapSdrImportPreview(
   extraction: ClientExtractionResponse | null | undefined,
 ): SdrImportPreviewRow {
@@ -778,11 +844,15 @@ export function applySdrImportToWizard(
       }),
     }));
     appliedCount = bootstrapped.reduce((n, o) => n + (o.services?.length ?? 0), 0);
-    const nextForm: AddClientFormData = {
-      ...formData,
-      stage2: { ...formData.stage2, outcomes: bootstrapped },
-      stage3: { ...formData.stage3, docs: stage3Docs },
-    };
+    const nextForm = applySdrDiagnosisToForm(
+      {
+        ...formData,
+        stage2: { ...formData.stage2, outcomes: bootstrapped },
+        stage3: { ...formData.stage3, docs: stage3Docs },
+      },
+      options.extraction,
+      options.overwrite,
+    );
     return { formData: nextForm, appliedCount, keptExistingCount, localWarnings };
   }
 
@@ -866,11 +936,15 @@ export function applySdrImportToWizard(
     }
   }
 
-  const nextForm: AddClientFormData = {
-    ...formData,
-    stage2: { ...formData.stage2, outcomes },
-    stage3: { ...formData.stage3, docs: stage3Docs },
-  };
+  const nextForm = applySdrDiagnosisToForm(
+    {
+      ...formData,
+      stage2: { ...formData.stage2, outcomes },
+      stage3: { ...formData.stage3, docs: stage3Docs },
+    },
+    options.extraction,
+    options.overwrite,
+  );
 
   return { formData: nextForm, appliedCount, keptExistingCount, localWarnings };
 }
