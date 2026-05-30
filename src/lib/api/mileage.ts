@@ -138,7 +138,7 @@ export interface RideActionResponse {
   };
 }
 
-const buildQuery = (params?: Record<string, string | number | undefined>) => {
+const buildQuery = (params?: Record<string, string | number | boolean | undefined>) => {
   if (!params) return "";
   const entries = Object.entries(params).filter(([, value]) => value !== undefined && value !== null);
   if (!entries.length) return "";
@@ -161,6 +161,7 @@ export const mileageApi = {
     clientId?: string;
     startDate?: string;
     endDate?: string;
+    isManual?: boolean;
   }) => {
     const response = await axiosClient.get<AgencyMileageListResponse>(`/agencyMileage${buildQuery(params)}`);
     return response.data;
