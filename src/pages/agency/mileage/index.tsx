@@ -12,17 +12,20 @@ import {
   ChevronRight,
   RefreshCw,
   Navigation,
+  CalendarDays,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import AddMileageModal from "./components/AddMileageModal";
 import RideDetailModal from "./components/RideDetailModal";
 import AddManualMileageModal from "../../userPanel/mileage/components/AddManualMileageModal";
+import BillingDateRangeModal from "@/pages/agency/billing/components/BillingDateRangeModal";
 import { mileageApi, MileageRide } from "@/lib/api/mileage";
 
 const LIMIT = 10;
 
 type StatusFilter = "all" | "active" | "missed" | "completed" | "cancelled";
+type ManualFilter = "all" | "manual" | "tracked";
 
 const getInitials = (name: string) =>
   name
@@ -63,12 +66,21 @@ export default function MileagePage() {
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [manualFilter, setManualFilter] = useState<ManualFilter>("all");
+  const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
+  const [showDateModal, setShowDateModal] = useState(false);
 
   const fetchRides = useCallback(async (currentOffset: number) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await mileageApi.listAgency({ limit: LIMIT, offset: currentOffset });
+      const res = await mileageApi.listAgency({
+        limit: LIMIT,
+        offset: currentOffset,
+        startDate: dateRange.startDate || undefined,
+        endDate: dateRange.endDate || undefined,
+        isManual: manualFilter === "manual" ? true : manualFilter === "tracked" ? false : undefined,
+      });
       setRides(res.data ?? []);
       setTotalCount(res.pagination?.count ?? 0);
     } catch (e) {
@@ -77,11 +89,16 @@ export default function MileagePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dateRange, manualFilter]);
 
   useEffect(() => {
     fetchRides(offset);
   }, [fetchRides, offset]);
+
+  // Reset to first page when server-side filters change
+  useEffect(() => {
+    setOffset(0);
+  }, [dateRange, manualFilter]);
 
   const handleMileageCreated = () => {
     fetchRides(offset);
@@ -141,10 +158,6 @@ export default function MileagePage() {
     const d = parseScheduledDate(r.scheduledStartTime);
     return d !== null && d < now;
   }).length;
-  const totalDistanceKm = rides
-    .filter((r) => r.status === "completed" && r.actualDistance != null)
-    .reduce((sum, r) => sum + (r.actualDistance ?? 0), 0);
-
   const totalPages = Math.max(1, Math.ceil(totalCount / LIMIT));
   const currentPage = Math.floor(offset / LIMIT) + 1;
 
@@ -233,9 +246,9 @@ export default function MileagePage() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6">
             {loading ? (
-              [["#22c55e", "Active"], ["#00b4b8", "Completed"], ["#f59e0b", "Missed"], ["#ef4444", "Cancelled"], ["#9ca3af", "Total km"]].map(
+              [["#22c55e", "Active"], ["#00b4b8", "Completed"], ["#f59e0b", "Missed"], ["#ef4444", "Cancelled"]].map(
                 ([color, label]) => (
                   <div key={label} className="text-center">
                     <Skeleton className="h-10 sm:h-12 w-14 mx-auto mb-2" />
@@ -276,15 +289,6 @@ export default function MileagePage() {
                     <span className="text-[12px] sm:text-[13px] text-[#6b7280]">Cancelled</span>
                   </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-[28px] sm:text-[36px] lg:text-[44px] font-bold text-[#10141a] mb-1">
-                    {totalDistanceKm % 1 === 0 ? totalDistanceKm : totalDistanceKm.toFixed(1)}
-                  </div>
-                  <div className="flex items-center justify-center gap-1.5">
-                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#9ca3af]" />
-                    <span className="text-[12px] sm:text-[13px] text-[#6b7280]">Total km</span>
-                  </div>
-                </div>
               </>
             )}
           </div>
@@ -322,6 +326,49 @@ export default function MileagePage() {
             </button>
           ))}
         </div>
+
+        {/* Manual / Tracked filter pills */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {(["all", "manual", "tracked"] as ManualFilter[]).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => { setManualFilter(v); setOffset(0); }}
+              className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors border capitalize ${
+                manualFilter === v
+                  ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+                  : "bg-white text-[#10141a] border-[#e5e5e6] hover:border-[#00b4b8]"
+              }`}
+            >
+              {v === "all" ? "All types" : v === "manual" ? "Manual" : "Tracked"}
+            </button>
+          ))}
+        </div>
+
+        {/* Date range button */}
+        <button
+          type="button"
+          onClick={() => setShowDateModal(true)}
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors border ${
+            dateRange.startDate
+              ? "bg-[#00b4b8] text-white border-[#00b4b8]"
+              : "bg-white text-[#10141a] border-[#e5e5e6] hover:border-[#00b4b8]"
+          }`}
+        >
+          <CalendarDays className="w-3.5 h-3.5" />
+          {dateRange.startDate
+            ? `${dateRange.startDate} – ${dateRange.endDate}`
+            : "Date range"}
+        </button>
+        {dateRange.startDate && (
+          <button
+            type="button"
+            onClick={() => { setDateRange({ startDate: "", endDate: "" }); setOffset(0); }}
+            className="px-3 py-1.5 rounded-full text-[13px] font-medium bg-white text-[#ef4444] border border-[#e5e5e6] hover:border-[#ef4444] transition-colors"
+          >
+            Clear date
+          </button>
+        )}
       </div>
 
       {/* Mileage History */}
@@ -547,8 +594,8 @@ export default function MileagePage() {
             <div className="py-12 text-center">
               <Navigation className="w-10 h-10 text-[#d1d5db] mx-auto mb-3" />
               <p className="text-[#9ca3af] text-[14px] font-medium">
-                {searchTerm || statusFilter !== "all"
-                  ? "No rides match your search or filter"
+                {searchTerm || statusFilter !== "all" || manualFilter !== "all" || dateRange.startDate
+                  ? "No rides match your filters"
                   : "No mileage history yet"}
               </p>
             </div>
@@ -633,6 +680,17 @@ export default function MileagePage() {
         message="Are you sure you want to cancel this ride? The ride will be marked as cancelled."
         confirmText="Cancel ride"
         cancelText="Keep"
+      />
+
+      {/* Date range filter modal */}
+      <BillingDateRangeModal
+        open={showDateModal}
+        onClose={() => setShowDateModal(false)}
+        values={dateRange}
+        onChange={setDateRange}
+        onApply={(v) => { setDateRange(v); setOffset(0); setShowDateModal(false); }}
+        title="Filter by date range"
+        description="Show mileage records within a date range"
       />
     </div>
   );
