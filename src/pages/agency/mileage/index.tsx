@@ -22,7 +22,7 @@ import { mileageApi, MileageRide } from "@/lib/api/mileage";
 
 const LIMIT = 10;
 
-type StatusFilter = "all" | "active" | "completed" | "cancelled";
+type StatusFilter = "all" | "active" | "missed" | "completed" | "cancelled";
 
 const getInitials = (name: string) =>
   name
@@ -126,9 +126,14 @@ export default function MileagePage() {
 
   const now = new Date();
 
-  const activeCount = rides.filter(
-    (r) => r.status === "in_progress" || r.status === "paused"
-  ).length;
+  const activeCount = rides.filter((r) => {
+    if (r.status === "in_progress" || r.status === "paused") return true;
+    if (r.status === "scheduled") {
+      const d = parseScheduledDate(r.scheduledStartTime);
+      return d === null || d >= now;
+    }
+    return false;
+  }).length;
   const completedCount = rides.filter((r) => r.status === "completed").length;
   const cancelledCount = rides.filter((r) => r.status === "cancelled").length;
   const missedCount = rides.filter((r) => {
@@ -147,9 +152,20 @@ export default function MileagePage() {
     let list = rides;
 
     if (statusFilter === "active") {
-      list = list.filter(
-        (r) => r.status === "scheduled" || r.status === "in_progress" || r.status === "paused"
-      );
+      list = list.filter((r) => {
+        if (r.status === "in_progress" || r.status === "paused") return true;
+        if (r.status === "scheduled") {
+          const d = parseScheduledDate(r.scheduledStartTime);
+          return d === null || d >= now;
+        }
+        return false;
+      });
+    } else if (statusFilter === "missed") {
+      list = list.filter((r) => {
+        if (r.status !== "scheduled") return false;
+        const d = parseScheduledDate(r.scheduledStartTime);
+        return d !== null && d < now;
+      });
     } else if (statusFilter === "completed") {
       list = list.filter((r) => r.status === "completed");
     } else if (statusFilter === "cancelled") {
@@ -179,6 +195,7 @@ export default function MileagePage() {
   const filterPills: { label: string; value: StatusFilter }[] = [
     { label: "All", value: "all" },
     { label: "Active", value: "active" },
+    { label: "Missed", value: "missed" },
     { label: "Completed", value: "completed" },
     { label: "Cancelled", value: "cancelled" },
   ];
@@ -390,9 +407,9 @@ export default function MileagePage() {
                   >
                     <div className="flex items-center gap-6">
                       {/* Client/Purpose & DSP */}
-                      <div className="flex items-center gap-4 min-w-[260px]">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar className="w-[52px] h-[60px] rounded-[8px] shrink-0">
+                      <div className="flex items-center gap-3 w-[280px] shrink-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <Avatar className="w-[44px] h-[52px] rounded-[8px] shrink-0">
                             {entry.clientId && entry.clientAvatarUrl && (
                               <AvatarImage
                                 src={entry.clientAvatarUrl}
@@ -400,25 +417,26 @@ export default function MileagePage() {
                                 className="w-full h-full object-cover aspect-auto rounded-[8px]"
                               />
                             )}
-                            <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                            <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium flex items-center justify-center">
                               {entry.clientId
                                 ? getInitials(entry.clientName || "Client")
-                                : <Navigation className="w-4 h-4" />}
+                                : <Navigation className="w-3.5 h-3.5" />}
                             </AvatarFallback>
                           </Avatar>
-                          <div>
-                            <div className="font-semibold text-[14px] text-[#10141a]">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-[13px] text-[#10141a] truncate">
                               {entry.clientId
                                 ? (entry.clientName || "—")
                                 : (entry.purpose || "Manual mileage")}
                             </div>
-                            <div className="text-[12px] text-[#9ca3af]">
+                            <div className="text-[11px] text-[#9ca3af]">
                               {entry.clientId ? "Client" : "Purpose"}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2.5">
-                          <Avatar className="w-[52px] h-[60px] rounded-[8px] shrink-0">
+                        <div className="w-px h-8 bg-[#e5e7eb] shrink-0" />
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <Avatar className="w-[44px] h-[52px] rounded-[8px] shrink-0">
                             {entry.caregiverAvatarUrl && (
                               <AvatarImage
                                 src={entry.caregiverAvatarUrl}
@@ -430,11 +448,11 @@ export default function MileagePage() {
                               {getInitials(entry.caregiverName || "DSP")}
                             </AvatarFallback>
                           </Avatar>
-                          <div>
-                            <div className="font-semibold text-[14px] text-[#10141a]">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-[13px] text-[#10141a] truncate">
                               {entry.caregiverName || "—"}
                             </div>
-                            <div className="text-[12px] text-[#9ca3af]">DSP</div>
+                            <div className="text-[11px] text-[#9ca3af]">DSP</div>
                           </div>
                         </div>
                       </div>
