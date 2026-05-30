@@ -197,7 +197,7 @@ export default function AddMileageModal({
 
   useEffect(() => {
     if (isOpen && mode === "create") {
-      setFormData(initialFormData);
+      setFormData({ ...initialFormData, selectDate: new Date() });
     }
   }, [isOpen, mode]);
 
