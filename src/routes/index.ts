@@ -65,6 +65,7 @@ const ClientClaimsPage = lazy(() => import("@/pages/agency/billing-and-approvals
 const SchedulingPage = lazy(() => import("@/pages/agency/scheduling"));
 const SupportPage = lazy(() => import("@/pages/agency/support"));
 const AnalyticsPage = lazy(() => import("@/pages/agency/analytics"));
+const AnalyticsPrintPage = lazy(() => import("@/pages/agency/analytics/print"));
 const ApplicantDirectoryPage = lazy(() => import("@/pages/agency/applicant-directory"));
 const AllApplicants = lazy(() => import("@/pages/agency/applicant-directory/AllApplicants"));
 const ClearanceHiring = lazy(() => import("@/pages/agency/applicant-directory/ClearanceHiring"));
@@ -150,6 +151,10 @@ export const router = createBrowserRouter([
     {
         path: Routes.mobileAppRedirect,
         Component: MobileAppRedirect,
+    },
+    {
+        path: Routes.agency.analyticsPrint,
+        Component: AnalyticsPrintPage,
     },
     {
         Component: OnboardingLayout,

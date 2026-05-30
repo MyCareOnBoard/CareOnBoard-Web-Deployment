@@ -1,9 +1,7 @@
 import React from "react";
 
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
-import { toast } from "sonner";
 import { Clock3, WandSparkles, UserRoundCog } from "lucide-react";
+import { Routes } from "@/routes/constants";
 
 import OperationReportHeader from "./components/AnalyticsReportHeader";
 import AnalyticsDateRangeModal from "./components/AnalyticsDateRangeModal";
@@ -64,35 +62,8 @@ export default function AnalyticsPage() {
 
   const summary = analyticsResponse?.data;
 
-  const downloadPDF = async () => {
-    const element = document.getElementById("analytics-report");
-    if (!element) return;
-
-    const loadingToast = toast.loading("Generating PDF…");
-
-    try {
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-      const image = canvas.toDataURL("image/png");
-
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfPageHeight = pdf.internal.pageSize.getHeight();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      const totalPages = Math.ceil(pdfHeight / pdfPageHeight);
-      for (let i = 0; i < totalPages; i++) {
-        if (i > 0) pdf.addPage();
-        pdf.addImage(image, "PNG", 0, -i * pdfPageHeight, pdfWidth, pdfHeight);
-      }
-
-      pdf.save(`analytics-report-${Date.now()}.pdf`);
-      toast.dismiss(loadingToast);
-      toast.success("Report downloaded successfully");
-    } catch (error) {
-      console.error("PDF generation failed:", error);
-      toast.dismiss(loadingToast);
-      toast.error("Failed to download report. Please try again.");
-    }
+  const downloadPDF = () => {
+    window.open(Routes.agency.analyticsPrint, "_blank", "noopener,noreferrer");
   };
 
   return (
