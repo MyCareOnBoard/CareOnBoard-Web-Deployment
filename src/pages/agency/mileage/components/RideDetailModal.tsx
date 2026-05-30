@@ -124,7 +124,7 @@ export default function RideDetailModal({ ride, isOpen, onClose }: RideDetailMod
               </Avatar>
               <div>
                 <p className="text-[14px] font-semibold text-[#10141a]">{displayName}</p>
-                <p className="text-[12px] text-[#9ca3af]">{ride.clientName ? "Client" : "Purpose"}</p>
+                <p className="text-[12px] text-[#9ca3af]">{ride.clientId ? "Client" : "Purpose"}</p>
               </div>
             </div>
 
