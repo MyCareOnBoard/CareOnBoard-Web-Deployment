@@ -594,7 +594,7 @@ export default function AddMileageModal({
             disabled={isSubmitting}
             className="flex-1 h-11 bg-transparent hover:bg-[#f3f4f6] text-[#6b7280] hover:text-[#374151] border border-[#e5e7eb] rounded-xl text-[14px] font-medium transition-colors shadow-none"
           >
-            Save
+            Cancel
           </Button>
           <Button
             onClick={handleSchedule}
