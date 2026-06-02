@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Link } from "react-router";
-import { ArrowRight, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,21 +10,27 @@ import {
 import { cn } from "@/lib/utils";
 import { Routes } from "@/routes/constants";
 import type { DuePayrollEntry } from "@/lib/api/payroll";
+import { formatPayrollDateRangeLabel } from "../utils/payrollDashboardUtils";
 import { TABLE_ROW_CLASS } from "./tableColumns";
 
 const MISSING_STAFF_ID = "—";
 const STAFF_ID_DISPLAY_LENGTH = 6;
 
+function normalizeStaffId(staffId: string): string {
+  return staffId.trim().replace(/^ID:\s*/i, "");
+}
+
 function isStaffIdLinkable(staffId: string): boolean {
-  const trimmed = staffId.trim();
-  return Boolean(trimmed) && trimmed !== MISSING_STAFF_ID;
+  const normalized = normalizeStaffId(staffId);
+  return Boolean(normalized) && normalized !== MISSING_STAFF_ID;
 }
 
 function formatStaffIdDisplay(staffId: string): string {
-  if (!isStaffIdLinkable(staffId)) {
-    return staffId.trim() || MISSING_STAFF_ID;
+  const normalized = normalizeStaffId(staffId);
+  if (!isStaffIdLinkable(normalized)) {
+    return normalized || MISSING_STAFF_ID;
   }
-  return `ID: ${staffId.slice(0, STAFF_ID_DISPLAY_LENGTH)}`;
+  return normalized.slice(0, STAFF_ID_DISPLAY_LENGTH);
 }
 
 function StaffIdLink({ staffId, employeeId }: { staffId: string; employeeId: string }) {
@@ -45,11 +51,14 @@ function StaffIdLink({ staffId, employeeId }: { staffId: string; employeeId: str
 }
 
 function DateRange({ start, end }: { start: string; end: string }) {
+  const label = formatPayrollDateRangeLabel(start, end);
+
   return (
-    <span className="inline-flex items-center gap-1.5 text-[13px] text-[#10141a]">
-      <span>{start}</span>
-      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#808081]" aria-hidden="true" />
-      <span>{end}</span>
+    <span
+      className="block truncate whitespace-nowrap text-[13px] tabular-nums text-[#10141a]"
+      title={label}
+    >
+      {label}
     </span>
   );
 }

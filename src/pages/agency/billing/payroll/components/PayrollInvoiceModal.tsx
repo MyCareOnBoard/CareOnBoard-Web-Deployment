@@ -273,7 +273,7 @@ export default function PayrollInvoiceModal({
                   aria-label="CareOnboard"
                 />
                 <DialogTitle className={cn("mt-3 text-left font-bold", INVOICE_TEXT_CLASS)}>
-                  Payroll invoice
+                  Paystub Invoice
                 </DialogTitle>
                 <p className={cn("mt-1 font-medium", INVOICE_TEXT_MUTED_CLASS)}>
                   {staffName} · {invoice.dateRangeLabel}

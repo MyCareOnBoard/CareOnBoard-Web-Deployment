@@ -23,12 +23,6 @@ const sampleDashboard: PayrollDashboardSummary = {
     ],
   },
   overtimeAlerts: [],
-  duePayroll: {
-    total: 1,
-    page: 1,
-    limit: 10,
-    entries: [],
-  },
 };
 
 describe("payrollDashboardUtils", () => {

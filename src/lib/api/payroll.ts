@@ -40,12 +40,13 @@ export type PayrollDashboardSummary = {
     staffName: string;
     overtimeHours: string;
   }>;
-  duePayroll: {
-    entries: DuePayrollEntry[];
-    total: number;
-    page: number;
-    limit: number;
-  };
+};
+
+export type StaffToPaySummary = {
+  entries: DuePayrollEntry[];
+  total: number;
+  page: number;
+  limit: number;
 };
 
 export type PayrollInvoiceListItem = {
@@ -114,9 +115,13 @@ export type PayrollInvoiceDetail = {
 export type PayrollDashboardQuery = {
   startDate: string;
   endDate: string;
+};
+
+export type StaffToPayQuery = {
+  startDate: string;
+  endDate: string;
   duePage?: number;
   dueLimit?: number;
-  search?: string;
 };
 
 export type PayrollInvoicesListQuery = {
@@ -138,6 +143,12 @@ export type CreatePayrollInvoicePayload = {
 type PayrollDashboardResponse = {
   success: boolean;
   data: PayrollDashboardSummary;
+  message?: string;
+};
+
+type StaffToPayResponse = {
+  success: boolean;
+  data: StaffToPaySummary;
   message?: string;
 };
 
@@ -178,6 +189,18 @@ export async function getPayrollDashboard(
 
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || "Failed to fetch payroll dashboard");
+  }
+
+  return response.data.data;
+}
+
+export async function getStaffToPay(query: StaffToPayQuery): Promise<StaffToPaySummary> {
+  const response = await axiosClient.get<StaffToPayResponse>("/billing/payroll/due", {
+    params: query,
+  });
+
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to fetch staff to pay");
   }
 
   return response.data.data;
@@ -254,6 +277,9 @@ export function getCreatePayrollInvoiceErrorMessage(error: unknown): string {
   }
   if (response?.error === "NO_ELIGIBLE_SHIFTS") {
     return "No eligible shifts found for this pay period.";
+  }
+  if (response?.error === "SHIFT_NOT_APPROVED_FOR_CLAIM") {
+    return "Shifts must be approved for claim before creating a payroll invoice.";
   }
   if (response?.message) {
     return response.message;

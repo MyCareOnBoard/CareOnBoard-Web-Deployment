@@ -43,6 +43,9 @@ import PayrollWorkspaceTabs, {
 import SavedPayrollTable from "./components/SavedPayrollTable";
 
 import CancelPayrollInvoiceDialog from "./components/CancelPayrollInvoiceDialog";
+import MarkPayrollInvoicePaidDialog, {
+  type MarkPayrollInvoicePaidTarget,
+} from "./components/MarkPayrollInvoicePaidDialog";
 
 import PayrollActionLoadingOverlay, {
 
@@ -55,6 +58,8 @@ import type { DuePayrollEntry } from "@/lib/api/payroll";
 import type { PayrollInvoiceDocument } from "./types";
 
 import { usePayrollDashboard } from "./hooks/usePayrollDashboard";
+
+import { useStaffToPay } from "./hooks/useStaffToPay";
 
 import { usePayrollInvoices } from "./hooks/usePayrollInvoices";
 
@@ -100,6 +105,9 @@ export default function PayrollDashboardPage() {
 
   const [cancelModalInvoice, setCancelModalInvoice] = useState<PayrollInvoiceListItem | null>(null);
 
+  const [markPaidConfirmTarget, setMarkPaidConfirmTarget] =
+    useState<MarkPayrollInvoicePaidTarget | null>(null);
+
   const [cancellingInvoice, setCancellingInvoice] = useState(false);
 
   const [markingPaid, setMarkingPaid] = useState(false);
@@ -109,6 +117,8 @@ export default function PayrollDashboardPage() {
   const lastDashboardErrorRef = useRef<string | null>(null);
 
   const lastGeneratedErrorRef = useRef<string | null>(null);
+
+  const lastStaffToPayErrorRef = useRef<string | null>(null);
 
 
 
@@ -120,10 +130,6 @@ export default function PayrollDashboardPage() {
 
     overtimeAlerts,
 
-    dueEntries,
-
-    dueTotal,
-
     loading: dashboardLoading,
 
     isRefetching: dashboardRefetching,
@@ -132,7 +138,33 @@ export default function PayrollDashboardPage() {
 
     refetch: refetchDashboard,
 
-  } = usePayrollDashboard(dateRange, { duePage: 1, dueLimit: 100 });
+  } = usePayrollDashboard(dateRange);
+
+
+
+  const {
+
+    entries: staffToPayEntries,
+
+    total: staffToPayTotal,
+
+    loading: staffToPayLoading,
+
+    isRefetching: staffToPayRefetching,
+
+    error: staffToPayError,
+
+    refetch: refetchStaffToPay,
+
+  } = useStaffToPay(dateRange, {
+
+    enabled: activeTab === "staff",
+
+    duePage: 1,
+
+    dueLimit: 100,
+
+  });
 
 
 
@@ -232,19 +264,52 @@ export default function PayrollDashboardPage() {
 
 
 
-  const refreshAfterCreateOrCancel = useCallback(async () => {
+  useEffect(() => {
 
-    await Promise.all([refetchDashboard(), refetchGeneratedInvoices({ force: true })]);
+    if (!staffToPayError) {
 
-  }, [refetchDashboard, refetchGeneratedInvoices]);
+      lastStaffToPayErrorRef.current = null;
+
+      return;
+
+    }
 
 
 
-  const refreshAfterStatusUpdate = useCallback(async () => {
+    if (lastStaffToPayErrorRef.current === staffToPayError) {
 
-    await Promise.all([refetchDashboard(), refetchGeneratedInvoices({ force: true })]);
+      return;
 
-  }, [refetchDashboard, refetchGeneratedInvoices]);
+    }
+
+
+
+    lastStaffToPayErrorRef.current = staffToPayError;
+
+    toast({
+
+      title: "Couldn't load staff to pay",
+
+      description: getPayrollListErrorMessage(staffToPayError),
+
+      variant: "destructive",
+
+    });
+
+  }, [staffToPayError, toast]);
+
+
+
+  const refreshPayrollWorkspace = useCallback(
+    async ({ refreshStaff = false }: { refreshStaff?: boolean } = {}) => {
+      const tasks = [refetchDashboard(), refetchGeneratedInvoices({ force: true })];
+      if (refreshStaff || activeTab === "staff") {
+        tasks.push(refetchStaffToPay({ force: true }));
+      }
+      await Promise.all(tasks);
+    },
+    [activeTab, refetchDashboard, refetchGeneratedInvoices, refetchStaffToPay],
+  );
 
 
 
@@ -352,7 +417,7 @@ export default function PayrollDashboardPage() {
 
         setActiveTab("generated");
 
-        await refreshAfterCreateOrCancel();
+        await refreshPayrollWorkspace({ refreshStaff: true });
 
         toast({
 
@@ -394,7 +459,7 @@ export default function PayrollDashboardPage() {
 
     },
 
-    [fetchAgencyFallbackIfNeeded, openInvoiceDetail, refreshAfterCreateOrCancel, toast, user?.agencyId],
+    [fetchAgencyFallbackIfNeeded, openInvoiceDetail, refreshPayrollWorkspace, toast, user?.agencyId],
 
   );
 
@@ -460,95 +525,58 @@ export default function PayrollDashboardPage() {
 
 
 
-  const handleMarkPaidFromModal = useCallback(async () => {
-
+  const handleRequestMarkPaidFromModal = useCallback(() => {
     if (!invoiceModal?.invoiceId) {
-
       return;
-
     }
 
+    setMarkPaidConfirmTarget({
+      id: invoiceModal.invoiceId,
+      invoiceNumber: invoiceModal.invoice.invoiceNumber ?? invoiceModal.invoiceId,
+      employeeName: invoiceModal.staffName,
+    });
+  }, [invoiceModal]);
 
+  const handleRequestMarkPaidFromTable = useCallback((invoice: PayrollInvoiceListItem) => {
+    setMarkPaidConfirmTarget({
+      id: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      employeeName: invoice.employeeName,
+    });
+  }, []);
+
+  const handleConfirmMarkPaid = useCallback(async () => {
+    if (!markPaidConfirmTarget) {
+      return;
+    }
 
     setMarkingPaid(true);
 
     try {
+      await markPaid(markPaidConfirmTarget.id);
+      await refreshPayrollWorkspace();
 
-      await markPaid(invoiceModal.invoiceId);
+      const staffLabel = markPaidConfirmTarget.employeeName ?? "staff";
+      setMarkPaidConfirmTarget(null);
 
-      await refreshAfterStatusUpdate();
-
-      setInvoiceModal(null);
-
-      toast({
-
-        title: "Invoice marked as paid",
-
-        description: "This records that payroll was sent.",
-
-      });
-
-    } catch (error) {
-
-      toast({
-
-        title: "Couldn't mark invoice as paid",
-
-        description: getPayrollInvoiceMutationErrorMessage(error),
-
-        variant: "destructive",
-
-      });
-
-    } finally {
-
-      setMarkingPaid(false);
-
-    }
-
-  }, [invoiceModal?.invoiceId, markPaid, refreshAfterStatusUpdate, toast]);
-
-
-
-  const handleMarkPaidFromTable = useCallback(
-
-    async (invoice: PayrollInvoiceListItem) => {
-
-      try {
-
-        await markPaid(invoice.id);
-
-        await refreshAfterStatusUpdate();
-
-        toast({
-
-          title: "Invoice marked as paid",
-
-          description: `Payroll for ${invoice.employeeName ?? "staff"} was marked as paid.`,
-
-        });
-
-      } catch (error) {
-
-        toast({
-
-          title: "Couldn't mark invoice as paid",
-
-          description: getPayrollInvoiceMutationErrorMessage(error),
-
-          variant: "destructive",
-
-        });
-
+      if (invoiceModal?.invoiceId === markPaidConfirmTarget.id) {
+        setInvoiceModal(null);
       }
 
-    },
-
-    [markPaid, refreshAfterStatusUpdate, toast],
-
-  );
-
-
+      toast({
+        title: "Invoice marked as paid",
+        description: `Payroll for ${staffLabel} was marked as paid.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Couldn't mark invoice as paid",
+        description: getPayrollInvoiceMutationErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setMarkingPaid(false);
+    }
+  }, [invoiceModal?.invoiceId, markPaid, markPaidConfirmTarget, refreshPayrollWorkspace, toast]);
 
   const handleConfirmCancelInvoice = useCallback(async () => {
 
@@ -566,7 +594,7 @@ export default function PayrollDashboardPage() {
 
       await cancelInvoice(cancelModalInvoice.id);
 
-      await refreshAfterCreateOrCancel();
+      await refreshPayrollWorkspace({ refreshStaff: true });
 
       setCancelModalInvoice(null);
 
@@ -596,7 +624,7 @@ export default function PayrollDashboardPage() {
 
     }
 
-  }, [cancelInvoice, cancelModalInvoice, refreshAfterCreateOrCancel, toast]);
+  }, [cancelInvoice, cancelModalInvoice, refreshPayrollWorkspace, toast]);
 
 
 
@@ -658,15 +686,17 @@ export default function PayrollDashboardPage() {
 
           <DuePayrollTable
 
-            entries={dueEntries}
+            entries={staffToPayEntries}
 
-            dueTotal={dueTotal}
+            dueTotal={staffToPayTotal}
 
-            loading={dashboardLoading}
+            loading={staffToPayLoading}
+
+            isRefetching={staffToPayRefetching}
 
             onGenerateInvoice={handleGenerateInvoice}
 
-            actionsDisabled={openingInvoice !== null || generatedMutating}
+            actionsDisabled={openingInvoice !== null || generatedMutating || markingPaid}
 
           />
 
@@ -680,11 +710,11 @@ export default function PayrollDashboardPage() {
 
             onViewInvoice={handleViewInvoice}
 
-            onMarkPaid={handleMarkPaidFromTable}
+            onMarkPaid={handleRequestMarkPaidFromTable}
 
             onCancel={setCancelModalInvoice}
 
-            actionsDisabled={openingInvoice !== null || generatedMutating}
+            actionsDisabled={openingInvoice !== null || generatedMutating || markingPaid}
 
           />
 
@@ -711,11 +741,8 @@ export default function PayrollDashboardPage() {
             onClose={() => setInvoiceModal(null)}
 
             onMarkPaid={
-
-              invoiceModal.invoice.status === "pending" ? handleMarkPaidFromModal : undefined
-
+              invoiceModal.invoice.status === "pending" ? handleRequestMarkPaidFromModal : undefined
             }
-
             markingPaid={markingPaid}
 
           />
@@ -725,6 +752,14 @@ export default function PayrollDashboardPage() {
       )}
 
 
+
+      <MarkPayrollInvoicePaidDialog
+        open={Boolean(markPaidConfirmTarget)}
+        invoice={markPaidConfirmTarget}
+        saving={markingPaid}
+        onClose={() => setMarkPaidConfirmTarget(null)}
+        onConfirm={handleConfirmMarkPaid}
+      />
 
       <CancelPayrollInvoiceDialog
 

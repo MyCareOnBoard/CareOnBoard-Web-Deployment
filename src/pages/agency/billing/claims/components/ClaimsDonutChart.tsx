@@ -70,7 +70,7 @@ function StaticDonutChart({
   const legendItems = legendData ?? data;
 
   return (
-    <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex w-full min-w-0 flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-between">
       <div className="relative flex shrink-0 items-center justify-center">
         <svg width={SIZE} height={SIZE} className="-rotate-90" aria-hidden="true">
           {segments.map((segment) => (
@@ -91,21 +91,23 @@ function StaticDonutChart({
         <DonutCenter total={total} centerLabel={centerLabel} shadow={false} />
       </div>
 
-      <div className="min-w-[160px] shrink-0 space-y-4">
+      <div className="w-full min-w-0 space-y-4 sm:flex-1">
         {legendItems.map((item) => {
           const percentage = total > 0 ? Math.round((item.value / total) * 100) : 0;
           const valueLabel = showPercentageInLegend ? `${percentage}%` : item.value;
 
           return (
-            <div key={item.label} className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
+            <div key={item.label} className="flex min-w-0 items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
                 <div
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: item.color }}
                 />
-                <span className="whitespace-nowrap text-[14px] text-[#10141a]">{item.label}</span>
+                <span className="truncate text-[14px] text-[#10141a]">{item.label}</span>
               </div>
-              <span className="text-[14px] font-bold tabular-nums text-[#10141a]">{valueLabel}</span>
+              <span className="shrink-0 text-[14px] font-bold tabular-nums text-[#10141a]">
+                {valueLabel}
+              </span>
             </div>
           );
         })}
@@ -141,7 +143,7 @@ function InteractiveDonutChart({
   const legendItems = legendData ?? data;
 
   return (
-    <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex w-full min-w-0 flex-col items-center gap-6 lg:flex-row lg:items-center lg:justify-between">
       <div className="relative flex shrink-0 items-center justify-center">
         <svg width={SIZE} height={SIZE} className="-rotate-90" aria-hidden="true">
           <circle
@@ -173,7 +175,7 @@ function InteractiveDonutChart({
         <DonutCenter total={total} centerLabel={centerLabel} shadow />
       </div>
 
-      <div className="w-full max-w-[280px] space-y-3">
+      <div className="w-full min-w-0 max-w-[280px] space-y-3 lg:max-w-none lg:flex-1">
         {legendItems.map((item, index) => {
           const percentage = total > 0 ? Math.round((item.value / total) * 100) : 0;
           const valueLabel = showPercentageInLegend ? `${percentage}%` : item.value;
@@ -185,15 +187,17 @@ function InteractiveDonutChart({
               onMouseEnter={() => setActiveIndex(index)}
               onMouseLeave={() => setActiveIndex(null)}
               onClick={() => onLegendItemClick?.(item)}
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-colors ${
+              className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
                 activeIndex === index ? "bg-[#eef4f5]" : "bg-transparent"
               }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <div className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="text-[13px] text-[#10141a]">{item.label}</span>
+                <span className="truncate text-[13px] text-[#10141a]">{item.label}</span>
               </div>
-              <span className="text-[13px] font-semibold tabular-nums text-[#10141a]">{valueLabel}</span>
+              <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[#10141a]">
+                {valueLabel}
+              </span>
             </button>
           );
         })}

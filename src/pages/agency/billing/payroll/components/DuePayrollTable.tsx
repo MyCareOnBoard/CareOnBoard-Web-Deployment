@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import type { DuePayrollEntry } from "@/lib/api/payroll";
 import DuePayrollRow from "./DuePayrollRow";
@@ -10,6 +11,7 @@ type DuePayrollTableProps = {
   entries: DuePayrollEntry[];
   dueTotal?: number;
   loading?: boolean;
+  isRefetching?: boolean;
   onGenerateInvoice: (entry: DuePayrollEntry) => void;
   actionsDisabled?: boolean;
 };
@@ -44,6 +46,7 @@ export default function DuePayrollTable({
   entries,
   dueTotal = 0,
   loading = false,
+  isRefetching = false,
   onGenerateInvoice,
   actionsDisabled = false,
 }: DuePayrollTableProps) {
@@ -71,6 +74,8 @@ export default function DuePayrollTable({
 
   const showTruncationBanner = !loading && dueTotal > entries.length;
 
+  const showRefetchingState = isRefetching && !loading;
+
   return (
     <section>
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -78,12 +83,22 @@ export default function DuePayrollTable({
         <PayrollStaffSearch onFilterChange={setFilterQuery} />
       </div>
 
+      {showRefetchingState && (
+        <p className="mb-4 text-[13px] text-[#808081]">Updating staff to pay…</p>
+      )}
+
       {showTruncationBanner && (
         <p className="mb-4 rounded-[10px] border border-[#e5e5e6] bg-[#fafafa] px-4 py-3 text-[13px] text-[#808081]">
           Showing first {entries.length} of {dueTotal} staff. Narrow the date range to see more.
         </p>
       )}
 
+      <div
+        className={cn(
+          "transition-opacity duration-200",
+          showRefetchingState && "opacity-60",
+        )}
+      >
       <div className="hidden overflow-hidden rounded-[16px] border border-[#e5e5e6] bg-white lg:block">
         <div className="overflow-x-auto">
           <div className={TABLE_MIN_WIDTH}>
@@ -140,6 +155,7 @@ export default function DuePayrollTable({
             <p className="text-[14px] font-medium text-[#808081]">{emptyMessage}</p>
           </div>
         )}
+      </div>
       </div>
     </section>
   );
