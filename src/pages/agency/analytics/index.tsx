@@ -101,11 +101,18 @@ export default function AnalyticsPage() {
               total={summary?.complianceInsights.total}
               data={summary?.complianceInsights.breakdown}
               isLoading={isLoading || isFetching}
+              startDate={dateRange.startDate || undefined}
+              endDate={dateRange.endDate || undefined}
             />
           </div>
 
           <div className="print-card">
-            <RiskTrends data={summary?.riskTrends} isLoading={isLoading || isFetching} />
+            <RiskTrends
+              data={summary?.riskTrends}
+              isLoading={isLoading || isFetching}
+              startDate={dateRange.startDate || undefined}
+              endDate={dateRange.endDate || undefined}
+            />
           </div>
         </div>
 
@@ -114,6 +121,8 @@ export default function AnalyticsPage() {
             <OperationalEfficiency
               metrics={summary ? buildOperationalMetrics(summary.operationalEfficiency) : undefined}
               isLoading={isLoading || isFetching}
+              startDate={dateRange.startDate || undefined}
+              endDate={dateRange.endDate || undefined}
             />
           </div>
 
@@ -122,6 +131,8 @@ export default function AnalyticsPage() {
               total={summary?.billingSummary.total}
               data={summary?.billingSummary.breakdown}
               isLoading={isLoading || isFetching}
+              startDate={dateRange.startDate || undefined}
+              endDate={dateRange.endDate || undefined}
             />
           </div>
         </div>
