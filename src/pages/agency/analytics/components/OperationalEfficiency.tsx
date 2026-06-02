@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -13,6 +13,9 @@ import {
   UserRoundCog,
   WandSparkles,
 } from "lucide-react";
+
+import AIInsightsCard from "./AIInsightsCard";
+import { useLazyGetAnalyticsInsightsQuery } from "@/lib/api/reports";
 
 type MetricPoint = {
   value: number;
@@ -31,6 +34,8 @@ export type OperationalMetric = {
 interface OperationalEfficiencyProps {
   metrics?: OperationalMetric[];
   isLoading?: boolean;
+  startDate?: string;
+  endDate?: string;
 }
 
 const FALLBACK_METRICS: OperationalMetric[] = [
@@ -138,7 +143,29 @@ function Sparkline({
 export default function OperationalEfficiency({
   metrics = FALLBACK_METRICS,
   isLoading,
+  startDate,
+  endDate,
 }: OperationalEfficiencyProps) {
+  const [showInsights, setShowInsights] = useState(false);
+  const insightsBtnRef = useRef<HTMLDivElement>(null);
+  const [fetchInsights, { data: insightsData, isLoading: insightsLoading }] = useLazyGetAnalyticsInsightsQuery();
+
+  useEffect(() => {
+    if (!showInsights) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (insightsBtnRef.current && !insightsBtnRef.current.contains(e.target as Node)) {
+        setShowInsights(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showInsights]);
+
+  const handleInsightsClick = () => {
+    if (!showInsights) fetchInsights({ startDate, endDate });
+    setShowInsights((p) => !p);
+  };
+
   if (isLoading) {
     return (
       <div className="rounded-[32px] border border-[#E8ECEF] bg-[#FFFFFF66] p-6 animate-pulse">
@@ -177,18 +204,28 @@ export default function OperationalEfficiency({
           Operational efficiency
         </h3>
 
-        <button
-          className="
-            inline-flex items-center gap-2
-            rounded-full border border-[#EEF2F4]
-            bg-white
-            px-4 py-3
-            text-[15px] font-medium text-[#111827]
-          "
-        >
-          <Sparkles className="h-4 w-4 text-[#12B5B0]" />
-          AI insights
-        </button>
+        <div ref={insightsBtnRef} className="relative">
+          <button
+            onClick={handleInsightsClick}
+            className="
+              inline-flex items-center gap-2
+              rounded-full border border-[#EEF2F4]
+              bg-white
+              px-4 py-3
+              text-[15px] font-medium text-[#111827]
+            "
+          >
+            <Sparkles className="h-4 w-4 text-[#12B5B0]" />
+            AI insights
+          </button>
+          {showInsights && (
+            <AIInsightsCard
+              isLoading={insightsLoading}
+              insight={insightsData?.data.efficiency.insight ?? ""}
+              recommendation={insightsData?.data.efficiency.recommendation ?? ""}
+            />
+          )}
+        </div>
       </div>
 
       <div className="space-y-4">

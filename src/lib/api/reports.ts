@@ -268,6 +268,18 @@ export interface AnalyticsFilters {
     endDate?: string;
 }
 
+export interface AnalyticsInsightSection {
+    insight: string;
+    recommendation: string;
+}
+
+export interface AnalyticsInsights {
+    compliance: AnalyticsInsightSection;
+    risk: AnalyticsInsightSection;
+    efficiency: AnalyticsInsightSection;
+    billing: AnalyticsInsightSection;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const reportsApi = createApi({
@@ -652,6 +664,21 @@ export const reportsApi = createApi({
             providesTags: ["AnalyticsReport"],
             keepUnusedDataFor: 120,
         }),
+
+        // Analytics AI Insights
+        getAnalyticsInsights: builder.query<
+            { success: boolean; data: AnalyticsInsights },
+            AnalyticsFilters
+        >({
+            query: (filters) => ({
+                url: "/reports/analytics/insights",
+                method: "GET",
+                params: filters,
+                requiresAuth: true,
+            }),
+            providesTags: ["AnalyticsReport"],
+            keepUnusedDataFor: 300,
+        }),
     }),
 });
 
@@ -686,4 +713,5 @@ export const {
     useGetSuperAdminIncidentReportQuery,
     useGetSuperAdminCommunityInclusionReportQuery,
     useGetAnalyticsSummaryQuery,
+    useLazyGetAnalyticsInsightsQuery,
 } = reportsApi;

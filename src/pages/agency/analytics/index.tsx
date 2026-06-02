@@ -1,11 +1,11 @@
 import React from "react";
 
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import { Clock3, WandSparkles, UserRoundCog } from "lucide-react";
+import { Routes } from "@/routes/constants";
 
 import OperationReportHeader from "./components/AnalyticsReportHeader";
 import AnalyticsDateRangeModal from "./components/AnalyticsDateRangeModal";
+import ShareReportModal from "./components/ShareReportModal";
 import OverviewCards from "./components/OverviewCards";
 import ComplianceInsights from "./components/ComplianceInsights";
 import RiskTrends from "./components/RiskTrends";
@@ -50,6 +50,7 @@ function buildOperationalMetrics(data: AnalyticsSummaryData["operationalEfficien
 export default function AnalyticsPage() {
   const [dateRange, setDateRange] = React.useState({ startDate: "", endDate: "" });
   const [showDateModal, setShowDateModal] = React.useState(false);
+  const [showShareModal, setShowShareModal] = React.useState(false);
 
   const { data: analyticsResponse, isLoading, isFetching } = useGetAnalyticsSummaryQuery(
     {
@@ -61,19 +62,8 @@ export default function AnalyticsPage() {
 
   const summary = analyticsResponse?.data;
 
-  const downloadPDF = async () => {
-    const element = document.getElementById("analytics-report");
-    if (!element) return;
-
-    const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-    const image = canvas.toDataURL("image/png");
-
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    pdf.addImage(image, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`analytics-report-${Date.now()}.pdf`);
+  const downloadPDF = () => {
+    window.open(Routes.agency.analyticsPrint, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -89,7 +79,7 @@ export default function AnalyticsPage() {
                 downloadPDF();
                 break;
               case "Share report":
-                console.log("share report");
+                setShowShareModal(true);
                 break;
               default:
                 break;
@@ -111,11 +101,18 @@ export default function AnalyticsPage() {
               total={summary?.complianceInsights.total}
               data={summary?.complianceInsights.breakdown}
               isLoading={isLoading || isFetching}
+              startDate={dateRange.startDate || undefined}
+              endDate={dateRange.endDate || undefined}
             />
           </div>
 
           <div className="print-card">
-            <RiskTrends data={summary?.riskTrends} isLoading={isLoading || isFetching} />
+            <RiskTrends
+              data={summary?.riskTrends}
+              isLoading={isLoading || isFetching}
+              startDate={dateRange.startDate || undefined}
+              endDate={dateRange.endDate || undefined}
+            />
           </div>
         </div>
 
@@ -124,6 +121,8 @@ export default function AnalyticsPage() {
             <OperationalEfficiency
               metrics={summary ? buildOperationalMetrics(summary.operationalEfficiency) : undefined}
               isLoading={isLoading || isFetching}
+              startDate={dateRange.startDate || undefined}
+              endDate={dateRange.endDate || undefined}
             />
           </div>
 
@@ -132,6 +131,8 @@ export default function AnalyticsPage() {
               total={summary?.billingSummary.total}
               data={summary?.billingSummary.breakdown}
               isLoading={isLoading || isFetching}
+              startDate={dateRange.startDate || undefined}
+              endDate={dateRange.endDate || undefined}
             />
           </div>
         </div>
@@ -146,6 +147,12 @@ export default function AnalyticsPage() {
         onApply={(values) => {
           setDateRange(values);
         }}
+      />
+
+      {/* Share modal */}
+      <ShareReportModal
+        open={showShareModal}
+        onClose={() => setShowShareModal(false)}
       />
     </div>
   );

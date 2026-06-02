@@ -39,6 +39,7 @@ export const Routes = {
         support: "/agency/support",
         supportConversation: "/agency/support/:conversationId",
         analytics: "/agency/analytics",
+        analyticsPrint: "/agency/analytics/print",
         applicantDirectory: "/agency/applicant-directory",
         applicantAllApplicants: "/agency/applicant-directory/all-applicants",
         applicantClearanceHiring: "/agency/applicant-directory/clearance-hiring",
