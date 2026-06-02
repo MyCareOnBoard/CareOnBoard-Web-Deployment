@@ -1,9 +1,29 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { InlineLoader } from "@/components/ui/loader";
-import { X } from "lucide-react";
-import ServicesAvatar from "@/assets/icons/services-avatar.png";
+import { memo } from "react";
+import { format, isValid, parseISO } from "date-fns";
+import { ExternalLink, FileText, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { PlanOfCare } from "../types";
-import { getInitials } from "../utils";
+import { PlanOfCareClientAvatar } from "./PlanOfCareClientAvatar";
+import { isAllowedStorageUrl } from "../utils/storageUrl";
+import {
+  MODAL_BODY,
+  MODAL_HEADER,
+  MODAL_HEADER_ACTIONS,
+  MODAL_HEADER_ICON_BTN,
+  MODAL_HEADER_ICON_BTN_CLOSE,
+  MODAL_MAX_WIDTH,
+  MODAL_META_CARD,
+  MODAL_PDF_FRAME,
+  MODAL_SHELL,
+  MODAL_SKELETON,
+  MODAL_TITLE,
+  SECTION_SUBTITLE,
+} from "../planOfCareStyles";
 
 interface PlanOfCareModalProps {
   open: boolean;
@@ -12,100 +32,161 @@ interface PlanOfCareModalProps {
   onClose: () => void;
 }
 
-export function PlanOfCareModal({
+function formatDisplayDate(value: string | null | undefined): string | null {
+  if (!value?.trim()) return null;
+  const trimmed = value.trim();
+  const isoParsed = parseISO(trimmed);
+  if (isValid(isoParsed)) {
+    return format(isoParsed, "MMM d, yyyy");
+  }
+  const fallback = new Date(trimmed);
+  if (isValid(fallback)) {
+    return format(fallback, "MMM d, yyyy");
+  }
+  return trimmed;
+}
+
+function PlanOfCareModalSkeleton() {
+  return (
+    <div className="space-y-4" aria-hidden>
+      <div className={`${MODAL_SKELETON} ${MODAL_PDF_FRAME} rounded-xl`} />
+      <p className="text-[14px] font-medium text-[#808081] text-center">
+        Loading document…
+      </p>
+    </div>
+  );
+}
+
+function PlanOfCareModalInner({
   open,
   isLoading,
   plan,
   onClose,
 }: PlanOfCareModalProps) {
-  if (!open) {
-    return null;
-  }
-
-  console.log(plan)
-
   const displayName = plan?.clientName || "Client";
+  const docTitle = plan?.planOfCare?.title?.trim() || "Plan of care";
+  const expiryLabel = formatDisplayDate(plan?.planOfCare?.expiryDate);
+
+  const pdfUrl = plan?.planOfCare?.url;
+  const safePdfUrl =
+    pdfUrl && isAllowedStorageUrl(pdfUrl) ? pdfUrl : undefined;
+  const showPdfEmbed =
+    open && !isLoading && Boolean(safePdfUrl) && Boolean(plan);
+
+  const handleOpenInNewTab = () => {
+    if (!safePdfUrl) return;
+    window.open(safePdfUrl, "_blank", "noopener,noreferrer");
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-900">Plan of care</h3>
-            <p className="text-sm text-gray-600 mt-0.5">
-              Here is a plan o care you can read
-            </p>
-          </div>
-          <div className="flex items-center gap-4 ml-4">
-            <div className="flex items-center text-right gap-3">
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">
-                  {displayName}
-                </p>
-                <p className="text-xs text-gray-500">Client</p>
-              </div>
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={ServicesAvatar} alt={displayName} />
-                <AvatarFallback className="bg-gray-200 text-gray-700 text-sm font-medium">
-                  {getInitials(displayName)}
-                </AvatarFallback>
-              </Avatar>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className={`${MODAL_SHELL} ${MODAL_MAX_WIDTH}`}
+      >
+        <div className={MODAL_HEADER}>
+          <div className="flex items-start gap-4 min-w-0 flex-1">
+            {plan && (
+              <PlanOfCareClientAvatar
+                name={displayName}
+                imageUrl={plan.clientImage}
+                size="modal"
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              <DialogTitle className={MODAL_TITLE}>{docTitle}</DialogTitle>
+              <p className={`${SECTION_SUBTITLE} mt-0.5 truncate`}>
+                {displayName}
+                {expiryLabel && (
+                  <>
+                    <span className="text-[#808081]"> · </span>
+                    <span>Expires {expiryLabel}</span>
+                  </>
+                )}
+              </p>
+              <DialogDescription className="sr-only">
+                Plan of care document for {displayName}
+                {expiryLabel ? `, expires ${expiryLabel}` : ""}
+              </DialogDescription>
             </div>
+          </div>
+          <div className={MODAL_HEADER_ACTIONS}>
+            {safePdfUrl && (
+              <button
+                type="button"
+                aria-label="Open plan of care in new tab"
+                onClick={handleOpenInNewTab}
+                className={MODAL_HEADER_ICON_BTN}
+              >
+                <ExternalLink className="h-[18px] w-[18px] stroke-[1.75]" />
+              </button>
+            )}
+            <button
+              type="button"
+              aria-label="Close plan of care"
+              onClick={onClose}
+              className={MODAL_HEADER_ICON_BTN_CLOSE}
+            >
+              <X className="h-[18px] w-[18px] stroke-[1.75]" />
+            </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          {isLoading && <InlineLoader text="Loading plan of care..." />}
+        <div className={MODAL_BODY}>
+          {isLoading && <PlanOfCareModalSkeleton />}
 
           {!isLoading && plan && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Date</p>
-                  <p className="text-sm text-gray-900">{plan.date || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Location</p>
-                  <p className="text-sm text-gray-900">{plan.location || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Service</p>
-                  <p className="text-sm text-gray-900">{plan.service || plan.serviceCode}</p>
-                </div>
-              </div>
-              {plan.planOfCare?.url ? (
-                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+            <div className="flex flex-1 flex-col min-h-0">
+              {showPdfEmbed ? (
+                <div className="flex flex-1 min-h-0 overflow-hidden border border-[#e5e5e6] bg-white">
                   <iframe
-                    src={plan.planOfCare.url}
-                    title={plan.planOfCare.title || "Plan of Care PDF"}
-                    className="w-full h-[60vh] border-0"
+                    key={safePdfUrl ?? `plan-${plan.clientId}`}
+                    src={safePdfUrl}
+                    title={plan.planOfCare!.title || "Plan of Care PDF"}
+                    className={`${MODAL_PDF_FRAME} border-0`}
+                    referrerPolicy="no-referrer"
+                    aria-label={
+                      plan.planOfCare!.title || "Plan of Care PDF"
+                    }
                   />
                 </div>
               ) : (
-                <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
-                  <p className="text-sm text-gray-900 whitespace-pre-wrap">
-                    {plan.content || "No plan of care content available."}
-                  </p>
+                <div
+                  className={`${MODAL_META_CARD} flex flex-col items-center text-center gap-3 py-10 px-4`}
+                >
+                  <FileText
+                    className="w-10 h-10 text-[#808081]"
+                    aria-hidden
+                  />
+                  <div>
+                    <p className="text-[16px] font-semibold text-[#10141a]">
+                      No document uploaded
+                    </p>
+                    <p className={`${SECTION_SUBTITLE} mt-2 max-w-md`}>
+                      Your agency hasn&apos;t added a plan of care PDF for this
+                      client yet. Contact your supervisor if you need one.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
           {!isLoading && !plan && (
-            <p className="text-sm text-gray-600">No plan of care details available.</p>
+            <p className="text-[14px] font-medium text-[#808081] text-center py-8">
+              Couldn&apos;t load this plan of care. Try closing and opening
+              again.
+            </p>
           )}
         </div>
-
-        <div className="flex items-center justify-center px-6 py-4 border-t border-gray-100">
-          <button
-            onClick={onClose}
-            className="flex items-center gap-2 px-6 py-2 bg-gray-400 text-white text-sm rounded-full hover:bg-gray-500 transition-colors"
-          >
-            <X className="w-4 h-4" />
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
+
+export const PlanOfCareModal = memo(PlanOfCareModalInner);
