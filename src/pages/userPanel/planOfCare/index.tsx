@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { useGetPlanOfCareByIdQuery, useGetPlanOfCareListQuery } from "./api";
 import type { PlanOfCare } from "./types";
 import { PlanOfCareList } from "./components/PlanOfCareList";
@@ -20,19 +19,26 @@ export default function PlanOfCarePage() {
     [page, pageSize, plans]
   );
 
+  const needsDetailFetch = Boolean(
+    selectedPlanId && !selectedPlan?.planOfCare?.url
+  );
+
+  const { data: selectedPlanResponse, isLoading: isPlanLoading } =
+    useGetPlanOfCareByIdQuery(selectedPlanId ?? "", {
+      skip: !needsDetailFetch,
+    });
+
+  const displayPlan = selectedPlanResponse?.data ?? selectedPlan;
+
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
   }, [page, totalPages]);
 
-  const { data: selectedPlanResponse, isLoading: isPlanLoading } = useGetPlanOfCareByIdQuery(
-    selectedPlanId ?? "",
-    { skip: !selectedPlanId }
-  );
-
   const handleViewPlanOfCare = (plan: PlanOfCare) => {
-    setSelectedPlan(plan)
+    setSelectedPlan(plan);
+    setSelectedPlanId(plan.clientId);
     setShowModal(true);
   };
 
@@ -57,14 +63,12 @@ export default function PlanOfCarePage() {
   return (
     <div className="min-h-screen">
       <div className="mx-auto p-6 space-y-6">
-        {/* Header Section */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Plan of Care</h1>
           </div>
         </div>
 
-        {/* Plan of Care List */}
         <div className="bg-[#edf1f2] rounded-2xl shadow-sm overflow-hidden">
           <div className="px-6 py-4">
             <h2 className="text-xl font-bold text-gray-900">Plan of care</h2>
@@ -80,7 +84,6 @@ export default function PlanOfCarePage() {
             onViewPlan={handleViewPlanOfCare}
           />
 
-          {/* Pagination */}
           <PlanOfCarePagination
             page={page}
             totalPages={totalPages}
@@ -91,11 +94,10 @@ export default function PlanOfCarePage() {
         </div>
       </div>
 
-      {/* Plan of Care Modal */}
       <PlanOfCareModal
-        open={showModal && !!selectedPlan?.id}
-        isLoading={isPlanLoading}
-        plan={selectedPlan}
+        open={showModal && !!displayPlan?.id}
+        isLoading={needsDetailFetch && isPlanLoading}
+        plan={displayPlan}
         onClose={handleCloseModal}
       />
     </div>

@@ -22,8 +22,6 @@ export function PlanOfCareModal({
     return null;
   }
 
-  console.log(plan)
-
   const displayName = plan?.clientName || "Client";
 
   return (
@@ -70,7 +68,9 @@ export function PlanOfCareModal({
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Service</p>
-                  <p className="text-sm text-gray-900">{plan.service || plan.serviceCode}</p>
+                  <p className="text-sm text-gray-900">
+                    {plan.serviceName || plan.service || plan.serviceCode || "—"}
+                  </p>
                 </div>
               </div>
               {plan.planOfCare?.url ? (
@@ -79,6 +79,7 @@ export function PlanOfCareModal({
                     src={plan.planOfCare.url}
                     title={plan.planOfCare.title || "Plan of Care PDF"}
                     className="w-full h-[60vh] border-0"
+                    loading="lazy"
                   />
                 </div>
               ) : (

@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InlineLoader } from "@/components/ui/loader";
@@ -28,10 +27,6 @@ interface PlanOfCareListProps {
 
 export function PlanOfCareList({ plans, isLoading, isError, onViewPlan }: PlanOfCareListProps) {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    console.log("Plan of care response:", plans);
-  }, [plans]);
 
   return (
     <div className="divide-y divide-gray-100">
