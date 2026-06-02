@@ -1,6 +1,7 @@
 import React, {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -8,6 +9,9 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
+
+import AIInsightsCard from "./AIInsightsCard";
+import { useLazyGetAnalyticsInsightsQuery } from "@/lib/api/reports";
 
 export type BillingSegment = {
   label: string;
@@ -20,6 +24,8 @@ interface BillingSummaryProps {
   total?: number;
   data?: BillingSegment[];
   isLoading?: boolean;
+  startDate?: string;
+  endDate?: string;
 }
 
 const FALLBACK_DATA: BillingSegment[] = [
@@ -55,7 +61,10 @@ export default function BillingSummary({
   total = 40,
   data = FALLBACK_DATA,
   isLoading,
+  startDate,
+  endDate,
 }: BillingSummaryProps) {
+  const [fetchInsights, { data: insightsData, isLoading: insightsLoading }] = useLazyGetAnalyticsInsightsQuery();
   if (isLoading) {
     return (
       <div className="rounded-[32px] border border-[#E6EAEC] bg-[#FFFFFF66] p-6 animate-pulse">
@@ -77,20 +86,33 @@ export default function BillingSummary({
       </div>
     );
   }
-  const [activeIndex, setActiveIndex] = useState<number | null>(
-    null
-  );
-
-  const [animatedProgress, setAnimatedProgress] =
-    useState(0);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [animatedProgress, setAnimatedProgress] = useState(0);
+  const [showInsights, setShowInsights] = useState(false);
+  const insightsBtnRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
       setAnimatedProgress(1);
     }, 150);
-
     return () => clearTimeout(timeout);
   }, []);
+
+  useEffect(() => {
+    if (!showInsights) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (insightsBtnRef.current && !insightsBtnRef.current.contains(e.target as Node)) {
+        setShowInsights(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showInsights]);
+
+  const handleInsightsClick = () => {
+    if (!showInsights) fetchInsights({ startDate, endDate });
+    setShowInsights((p) => !p);
+  };
 
   const segments = useMemo(() => {
     let accumulatedLength = 0;
@@ -134,18 +156,28 @@ export default function BillingSummary({
           Billing summary
         </h3>
 
-        <button
-          className="
-            inline-flex items-center gap-2
-            rounded-full border border-white
-            bg-[#FFFFFF66]
-            px-4 py-3
-            text-[15px] font-medium text-[#111827]
-          "
-        >
-          <Sparkles className="h-4 w-4 text-[#12B5B0]" />
-          AI insights
-        </button>
+        <div ref={insightsBtnRef} className="relative">
+          <button
+            onClick={handleInsightsClick}
+            className="
+              inline-flex items-center gap-2
+              rounded-full border border-white
+              bg-[#FFFFFF66]
+              px-4 py-3
+              text-[15px] font-medium text-[#111827]
+            "
+          >
+            <Sparkles className="h-4 w-4 text-[#12B5B0]" />
+            AI insights
+          </button>
+          {showInsights && (
+            <AIInsightsCard
+              isLoading={insightsLoading}
+              insight={insightsData?.data.billing.insight ?? ""}
+              recommendation={insightsData?.data.billing.recommendation ?? ""}
+            />
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col items-center justify-between gap-10 xl:flex-row">
