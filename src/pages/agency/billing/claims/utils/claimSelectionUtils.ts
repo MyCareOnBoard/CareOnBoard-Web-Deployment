@@ -54,7 +54,7 @@ export function filterShiftsForClaimSelection(
   return shifts.filter(
     (shift) =>
       shift.status === "completed" &&
-      shift.approvedForClaim === true &&
+      shift.approved === true &&
       !shift.claimId &&
       shiftMatchesClaimSelection(shift, serviceCode, bounds),
   );

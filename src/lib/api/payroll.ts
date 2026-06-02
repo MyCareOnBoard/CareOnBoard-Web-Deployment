@@ -122,6 +122,8 @@ export type StaffToPayQuery = {
   endDate: string;
   duePage?: number;
   dueLimit?: number;
+  /** Server returns only staff with approved, uninvoiced completed shifts. */
+  approved?: true;
 };
 
 export type PayrollInvoicesListQuery = {
@@ -278,8 +280,8 @@ export function getCreatePayrollInvoiceErrorMessage(error: unknown): string {
   if (response?.error === "NO_ELIGIBLE_SHIFTS") {
     return "No eligible shifts found for this pay period.";
   }
-  if (response?.error === "SHIFT_NOT_APPROVED_FOR_CLAIM") {
-    return "Shifts must be approved for claim before creating a payroll invoice.";
+  if (response?.error === "SHIFT_NOT_APPROVED") {
+    return "Shifts must be approved before creating a payroll invoice.";
   }
   if (response?.message) {
     return response.message;

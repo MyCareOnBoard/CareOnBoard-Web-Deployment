@@ -90,9 +90,7 @@ export interface Shift {
     actionStatus?: ShiftActionStatus;
     type?: ShiftType; // Default: automatic
     submissionStatus?: SubmissionStatus; // Default: draft
-    approved?: boolean; // Whether the shift is approved
-    /** When true, shift appears as Approved in Billing & Approvals */
-    approvedForClaim?: boolean;
+    approved?: boolean; // Whether the shift is approved for scheduling and billing
     /** Set when shift is included on a saved billing claim */
     claimId?: string;
     billingClaim?: ShiftBillingClaimSummary | null;
@@ -196,8 +194,6 @@ export interface UpdateShiftRequest {
     employeeId?: string;
     clientId?: string;
     approved?: boolean;
-    /** When true, shift appears as Approved in Billing & Approvals */
-    approvedForClaim?: boolean;
     maintenanceReason?: string;
     serviceAuthorizationId?: string;
     serviceAuthStartDate?: string;
@@ -249,8 +245,8 @@ export interface ListShiftsParams {
     client?: boolean; // Populate client data
     employee?: boolean; // Populate employee data
     agency?: boolean; // Populate agency data
-    /** When true, return only shifts approved for billing/claim */
-    approvedForClaim?: boolean;
+    /** When true, return only approved shifts */
+    approved?: boolean;
     /** When true, attach billing claim summary for shifts with claimId */
     billingClaim?: boolean;
 }

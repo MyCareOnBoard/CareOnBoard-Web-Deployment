@@ -49,14 +49,14 @@ describe("claimSelectionUtils", () => {
       {
         id: "ok",
         status: "completed",
-        approvedForClaim: true,
+        approved: true,
         serviceCode: "H2021HI",
         date: "2025-04-08",
       },
       {
         id: "claimed",
         status: "completed",
-        approvedForClaim: true,
+        approved: true,
         claimId: "claim-1",
         serviceCode: "H2021HI",
         date: "2025-04-08",
@@ -64,7 +64,7 @@ describe("claimSelectionUtils", () => {
       {
         id: "wrong-week",
         status: "completed",
-        approvedForClaim: true,
+        approved: true,
         serviceCode: "H2021HI",
         date: "2025-04-20",
       },

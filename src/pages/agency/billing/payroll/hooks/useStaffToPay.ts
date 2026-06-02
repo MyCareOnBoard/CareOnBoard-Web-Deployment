@@ -60,6 +60,7 @@ export function useStaffToPay(
           endDate: dateRange.endDate,
           duePage,
           dueLimit,
+          approved: true,
         });
 
         if (requestIdRef.current !== requestId) {
