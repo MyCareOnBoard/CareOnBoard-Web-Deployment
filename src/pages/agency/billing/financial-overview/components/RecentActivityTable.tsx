@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from "react";
 import type { RecentActivity } from "../../shared/types";
-import { RECENT_ACTIVITY } from "../data/mockFinancialOverviewData";
+import BillingStatusBadge from "../../components/BillingStatusBadge";
 import {
   ACTIVITY_TABLE_HEADER_CLASS,
   ACTIVITY_TABLE_MIN_WIDTH,
@@ -13,6 +13,19 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
 });
+
+function ActivityStatusBadge({ activity }: { activity: RecentActivity }) {
+  if (activity.module === "Payroll") {
+    return (
+      <BillingStatusBadge
+        domain="payroll"
+        status={activity.status === "paid" ? "paid" : "pending"}
+      />
+    );
+  }
+
+  return <BillingStatusBadge domain="claim" status={activity.status} />;
+}
 
 type RecentActivityRowProps = {
   activity: RecentActivity;
@@ -42,6 +55,12 @@ const RecentActivityRow = memo(function RecentActivityRow({
             <dt className="text-[#808081]">Amount</dt>
             <dd className="font-semibold tabular-nums text-[#10141a]">{formattedAmount}</dd>
           </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="text-[#808081]">Status</dt>
+            <dd>
+              <ActivityStatusBadge activity={activity} />
+            </dd>
+          </div>
         </dl>
       </div>
     );
@@ -55,28 +74,65 @@ const RecentActivityRow = memo(function RecentActivityRow({
       <span className="text-[13px] font-semibold tabular-nums text-[#10141a]">
         {formattedAmount}
       </span>
+      <div className="justify-self-start">
+        <ActivityStatusBadge activity={activity} />
+      </div>
     </div>
   );
 });
 
-export default function RecentActivityTable() {
+function ActivityRowSkeleton({ variant }: { variant: "desktop" | "mobile" }) {
+  if (variant === "mobile") {
+    return (
+      <div className="animate-pulse rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
+        <div className="h-4 w-32 rounded bg-[#eef4f5]" />
+        <div className="mt-3 space-y-2">
+          <div className="h-3 w-full rounded bg-[#eef4f5]" />
+          <div className="h-3 w-3/4 rounded bg-[#eef4f5]" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${ACTIVITY_TABLE_ROW_CLASS} animate-pulse`}>
+      <span className="h-3 rounded bg-[#eef4f5]" />
+      <span className="h-3 rounded bg-[#eef4f5]" />
+      <span className="h-3 rounded bg-[#eef4f5]" />
+      <span className="h-3 w-16 rounded bg-[#eef4f5]" />
+      <span className="h-6 w-[72px] justify-self-start rounded-full bg-[#eef4f5]" />
+    </div>
+  );
+}
+
+type RecentActivityTableProps = {
+  activity: RecentActivity[];
+  loading?: boolean;
+};
+
+export default function RecentActivityTable({
+  activity,
+  loading = false,
+}: RecentActivityTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredActivity = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return RECENT_ACTIVITY;
+    if (!query) return activity;
 
-    return RECENT_ACTIVITY.filter(
+    return activity.filter(
       (row) =>
         row.description.toLowerCase().includes(query) ||
         row.module.toLowerCase().includes(query) ||
-        row.date.toLowerCase().includes(query),
+        row.date.toLowerCase().includes(query) ||
+        row.status.toLowerCase().includes(query),
     );
-  }, [searchQuery]);
+  }, [activity, searchQuery]);
 
-  const emptyMessage =
-    RECENT_ACTIVITY.length === 0
-      ? "No recent activity."
+  const emptyMessage = loading
+    ? ""
+    : activity.length === 0
+      ? "No recent activity in this date range."
       : "No activity matches your search.";
 
   return (
@@ -87,8 +143,9 @@ export default function RecentActivityTable() {
           type="search"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Search client name here"
-          className="h-11 w-full min-h-[44px] rounded-[12px] border border-[#e5e5e6] bg-white px-4 text-[14px] font-medium text-[#10141a] placeholder:text-[#808081] focus:border-[#00b4b8] focus:outline-none focus:ring-1 focus:ring-[#00b4b8] lg:max-w-[280px]"
+          placeholder="Search activity"
+          disabled={loading}
+          className="h-11 w-full min-h-[44px] rounded-[12px] border border-[#e5e5e6] bg-white px-4 text-[14px] font-medium text-[#10141a] placeholder:text-[#808081] focus:border-[#00b4b8] focus:outline-none focus:ring-1 focus:ring-[#00b4b8] disabled:cursor-not-allowed disabled:opacity-60 lg:max-w-[280px]"
           aria-label="Search recent activity"
         />
       </div>
@@ -101,11 +158,16 @@ export default function RecentActivityTable() {
               <span>Module</span>
               <span>Description</span>
               <span>Amount</span>
+              <span>Status</span>
             </div>
 
-            {filteredActivity.length > 0 ? (
-              filteredActivity.map((activity) => (
-                <RecentActivityRow key={activity.id} activity={activity} variant="desktop" />
+            {loading ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <ActivityRowSkeleton key={index} variant="desktop" />
+              ))
+            ) : filteredActivity.length > 0 ? (
+              filteredActivity.map((row) => (
+                <RecentActivityRow key={row.id} activity={row} variant="desktop" />
               ))
             ) : (
               <div className="px-4 py-8 text-center text-[14px] text-[#808081]">{emptyMessage}</div>
@@ -115,9 +177,13 @@ export default function RecentActivityTable() {
       </div>
 
       <div className="space-y-3 lg:hidden">
-        {filteredActivity.length > 0 ? (
-          filteredActivity.map((activity) => (
-            <RecentActivityRow key={activity.id} activity={activity} variant="mobile" />
+        {loading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <ActivityRowSkeleton key={index} variant="mobile" />
+          ))
+        ) : filteredActivity.length > 0 ? (
+          filteredActivity.map((row) => (
+            <RecentActivityRow key={row.id} activity={row} variant="mobile" />
           ))
         ) : (
           <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-8 text-center text-[14px] text-[#808081]">

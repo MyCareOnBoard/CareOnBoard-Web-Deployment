@@ -29,6 +29,10 @@ export default function ClaimsByStatusChart({
       </div>
       {loading ? (
         <ChartSkeleton />
+      ) : chart.total === 0 ? (
+        <div className="flex min-h-[280px] items-center justify-center px-4 text-center text-[14px] text-[#808081]">
+          No claims in this date range yet.
+        </div>
       ) : (
         <ClaimsDonutChart
           total={chart.total}

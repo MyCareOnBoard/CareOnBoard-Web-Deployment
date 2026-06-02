@@ -4,8 +4,8 @@ import { Loader } from "@/components/ui/loader";
 
 export function getPayrollInvoiceLoadingCopy(staffName: string) {
   return {
-    title: "Generating payroll invoice",
-    description: `Preparing invoice for ${staffName}…`,
+    title: "Creating payroll invoice",
+    description: `Creating payroll invoice for ${staffName}…`,
   };
 }
 

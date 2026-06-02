@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Link } from "react-router";
-import { ArrowRight, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,25 +9,31 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/routes/constants";
-import type { DuePayrollEntry } from "../data/mockPayrollDashboardData";
+import type { DuePayrollEntry } from "@/lib/api/payroll";
+import { formatPayrollDateRangeLabel } from "../utils/payrollDashboardUtils";
 import { TABLE_ROW_CLASS } from "./tableColumns";
 
 const MISSING_STAFF_ID = "—";
 const STAFF_ID_DISPLAY_LENGTH = 6;
 
+function normalizeStaffId(staffId: string): string {
+  return staffId.trim().replace(/^ID:\s*/i, "");
+}
+
 function isStaffIdLinkable(staffId: string): boolean {
-  const trimmed = staffId.trim();
-  return Boolean(trimmed) && trimmed !== MISSING_STAFF_ID;
+  const normalized = normalizeStaffId(staffId);
+  return Boolean(normalized) && normalized !== MISSING_STAFF_ID;
 }
 
 function formatStaffIdDisplay(staffId: string): string {
-  if (!isStaffIdLinkable(staffId)) {
-    return staffId.trim() || MISSING_STAFF_ID;
+  const normalized = normalizeStaffId(staffId);
+  if (!isStaffIdLinkable(normalized)) {
+    return normalized || MISSING_STAFF_ID;
   }
-  return `ID: ${staffId.slice(0, STAFF_ID_DISPLAY_LENGTH)}`;
+  return normalized.slice(0, STAFF_ID_DISPLAY_LENGTH);
 }
 
-function StaffIdLink({ staffId }: { staffId: string }) {
+function StaffIdLink({ staffId, employeeId }: { staffId: string; employeeId: string }) {
   const displayId = formatStaffIdDisplay(staffId);
 
   if (!isStaffIdLinkable(staffId)) {
@@ -36,7 +42,7 @@ function StaffIdLink({ staffId }: { staffId: string }) {
 
   return (
     <Link
-      to={Routes.agency.dspProfile.replace(":dspId", staffId.trim())}
+      to={Routes.agency.dspProfile.replace(":dspId", employeeId.trim())}
       className="text-[13px] font-medium text-[#10141a] transition-colors hover:text-[#00b4b8] hover:underline"
     >
       {displayId}
@@ -45,11 +51,14 @@ function StaffIdLink({ staffId }: { staffId: string }) {
 }
 
 function DateRange({ start, end }: { start: string; end: string }) {
+  const label = formatPayrollDateRangeLabel(start, end);
+
   return (
-    <span className="inline-flex items-center gap-1.5 text-[13px] text-[#10141a]">
-      <span>{start}</span>
-      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#808081]" aria-hidden="true" />
-      <span>{end}</span>
+    <span
+      className="block truncate whitespace-nowrap text-[13px] tabular-nums text-[#10141a]"
+      title={label}
+    >
+      {label}
     </span>
   );
 }
@@ -107,7 +116,7 @@ function PayrollActionsMenu({
           className={menuItemClassName}
           onSelect={() => onGenerateInvoice(entry)}
         >
-          Generate invoice
+          Create payroll invoice
           <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -145,7 +154,7 @@ function DuePayrollRow({
         <div className="mt-4 space-y-3">
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">Staff ID</span>
-            <StaffIdLink staffId={entry.staffId} />
+            <StaffIdLink staffId={entry.staffId} employeeId={entry.employeeId} />
           </div>
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">Hours worked</span>
@@ -158,7 +167,7 @@ function DuePayrollRow({
             <DateRange start={entry.dateRangeStart} end={entry.dateRangeEnd} />
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-[13px] text-[#808081]">Authorized rate</span>
+            <span className="text-[13px] text-[#808081]">Pay rate</span>
             <span className="text-[13px] font-medium tabular-nums text-[#10141a]">
               {entry.paRate}
             </span>
@@ -176,7 +185,7 @@ function DuePayrollRow({
   return (
     <div className={TABLE_ROW_CLASS}>
       <span className="truncate text-[14px] font-medium text-[#10141a]">{entry.staffName}</span>
-      <StaffIdLink staffId={entry.staffId} />
+      <StaffIdLink staffId={entry.staffId} employeeId={entry.employeeId} />
       <span className="text-[13px] tabular-nums text-[#10141a]">{entry.hoursWorked}</span>
       <DateRange start={entry.dateRangeStart} end={entry.dateRangeEnd} />
       <span className="truncate text-[13px] text-[#10141a]">{entry.paymentDetails}</span>

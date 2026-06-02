@@ -233,7 +233,7 @@ export default function GenerateClaimModal({
             startDate: weekBounds.start,
             endDate: weekBounds.end,
             status: ShiftStatus.COMPLETED,
-            approvedForClaim: true,
+            approved: true,
             employee: true,
             billingClaim: true,
             agencyId: user.agencyId,

@@ -86,7 +86,7 @@ export default function RecentClaimsTable({
 
   const emptyMessage = useMemo(() => {
     if (loading) return "";
-    if (claims.length === 0) return "No shifts approved for claim found.";
+    if (claims.length === 0) return "No approved shifts found.";
     return "No shifts match your search.";
   }, [claims.length, loading]);
 

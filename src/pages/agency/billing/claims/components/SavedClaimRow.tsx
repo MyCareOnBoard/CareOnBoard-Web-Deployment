@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import type { BillingClaimListItem } from "@/lib/api/claims";
-import { getClaimStatusColor, getClaimStatusLabel } from "../utils/savedClaimUtils";
+import BillingStatusBadge from "../../components/BillingStatusBadge";
 import ClientNameLink from "./ClientNameLink";
 import { SAVED_CLAIMS_TABLE_ROW_CLASS } from "./tableColumns";
 
@@ -38,17 +38,7 @@ function formatCreatedDate(value: string) {
 }
 
 function StatusBadge({ status }: { status: BillingClaimListItem["status"] }) {
-  return (
-    <span
-      className="inline-flex rounded-full px-2.5 py-1 text-[12px] font-medium capitalize"
-      style={{
-        color: getClaimStatusColor(status),
-        backgroundColor: `${getClaimStatusColor(status)}1a`,
-      }}
-    >
-      {getClaimStatusLabel(status)}
-    </span>
-  );
+  return <BillingStatusBadge domain="claim" status={status} />;
 }
 
 function SavedClaimActions({

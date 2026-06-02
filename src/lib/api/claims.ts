@@ -217,6 +217,9 @@ export function getCreateBillingClaimErrorMessage(error: unknown): string {
   if (response?.error === "SHIFT_ALREADY_CLAIMED") {
     return "One or more shifts are already on a claim. Refresh and try again.";
   }
+  if (response?.error === "SHIFT_NOT_APPROVED") {
+    return "Shifts must be approved before creating a claim.";
+  }
   if (response?.message) {
     return response.message;
   }

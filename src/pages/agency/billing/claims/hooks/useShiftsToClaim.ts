@@ -34,7 +34,7 @@ export function useShiftsToClaim({ enabled = true, agencyId }: UseShiftsToClaimO
       try {
         const response = await listShifts({
           status: ShiftStatus.COMPLETED,
-          approvedForClaim: true,
+          approved: true,
           limit: 10,
           agencyId,
           client: true,

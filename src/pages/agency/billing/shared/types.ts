@@ -29,4 +29,5 @@ export type RecentActivity = {
   module: string;
   description: string;
   amount: number;
+  status: "pending" | "paid" | "rejected";
 };

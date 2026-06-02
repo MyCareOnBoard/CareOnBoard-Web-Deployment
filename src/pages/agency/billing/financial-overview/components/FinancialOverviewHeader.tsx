@@ -1,12 +1,8 @@
-import { lazy, Suspense, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import Calendar2Icon from "@/assets/icons/calendar-2.svg?react";
-import DocumentDownloadIcon from "@/assets/icons/document-download.svg?react";
+import BillingDateRangeModal from "../../components/BillingDateRangeModal";
 import type { DateRangeValues } from "../../shared/types";
-
-const ClaimsDateRangeModal = lazy(
-  () => import("../../claims/components/ClaimsDateRangeModal"),
-);
 
 const FINANCIAL_DATE_RANGE_DESCRIPTION =
   "Choose a date range to filter your financial overview";
@@ -56,30 +52,17 @@ export default function FinancialOverviewHeader({
             <span className="min-w-0 truncate">{formatDateRangeLabel(dateRange)}</span>
             <Calendar2Icon className="h-5 w-5 shrink-0" aria-hidden />
           </button>
-
-          <button
-            type="button"
-            onClick={() => undefined}
-            className="inline-flex h-11 min-h-[44px] w-full cursor-pointer items-center justify-between gap-3 rounded-full bg-[#00b4b8] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#009da1] active:bg-[#009199] sm:w-auto sm:min-w-[160px]"
-          >
-            Export report
-            <DocumentDownloadIcon className="h-5 w-5 shrink-0" aria-hidden />
-          </button>
         </div>
       </div>
 
-      {showDateModal && (
-        <Suspense fallback={null}>
-          <ClaimsDateRangeModal
-            open={showDateModal}
-            onClose={() => setShowDateModal(false)}
-            values={draftRange}
-            onChange={setDraftRange}
-            onApply={onDateRangeChange}
-            description={FINANCIAL_DATE_RANGE_DESCRIPTION}
-          />
-        </Suspense>
-      )}
+      <BillingDateRangeModal
+        open={showDateModal}
+        onClose={() => setShowDateModal(false)}
+        values={draftRange}
+        onChange={setDraftRange}
+        onApply={onDateRangeChange}
+        description={FINANCIAL_DATE_RANGE_DESCRIPTION}
+      />
     </>
   );
 }

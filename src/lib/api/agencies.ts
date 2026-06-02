@@ -46,6 +46,10 @@ export interface Agency {
     invoiceEmail?: string;
     invoiceFax?: string;
     payrollSystemIntegration?: string;
+    payrollSchedule?: {
+        frequency?: "weekly" | "biweekly" | "monthly";
+        nextPayoutDate?: string | null;
+    };
     quickBooks?: string;
     adp?: string;
     paycheck?: string;
@@ -140,6 +144,10 @@ export interface UpdateAgencyProfileRequest {
     invoiceEmail?: string | null;
     invoiceFax?: string | null;
     payrollSystemIntegration?: string | null;
+    payrollSchedule?: {
+        frequency?: "weekly" | "biweekly" | "monthly" | null;
+        nextPayoutDate?: string | null;
+    } | null;
     quickBooks?: string | null;
     adp?: string | null;
     paycheck?: string | null;

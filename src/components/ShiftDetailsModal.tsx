@@ -186,7 +186,7 @@ export default function ShiftDetailsModal({
   const [draftClockOut, setDraftClockOut] = useState("");
   const [draftResolveLateClockIn, setDraftResolveLateClockIn] = useState(false);
   const [draftCompleted, setDraftCompleted] = useState(false);
-  const [draftApprovedForClaim, setDraftApprovedForClaim] = useState(false);
+  const [draftApproved, setDraftApproved] = useState(false);
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -194,7 +194,7 @@ export default function ShiftDetailsModal({
   shiftRef.current = shift;
 
   const shiftResetKey = shift
-    ? `${shift.id}|${String(shift.clockedInAt)}|${String(shift.clockedOutAt)}|${shift.status}|${String(shift.approvedForClaim)}`
+    ? `${shift.id}|${String(shift.clockedInAt)}|${String(shift.clockedOutAt)}|${shift.status}|${String(shift.approved)}`
     : "";
 
   const resolvedShift = useMemo(() => {
@@ -207,7 +207,7 @@ export default function ShiftDetailsModal({
     setDraftClockOut(clockedAtToHHmm(s.clockedOutAt));
     setDraftResolveLateClockIn(false);
     setDraftCompleted(s.status === ShiftStatus.COMPLETED);
-    setDraftApprovedForClaim(Boolean(s.approvedForClaim));
+    setDraftApproved(Boolean(s.approved));
   }, []);
 
   useEffect(() => {
@@ -285,7 +285,7 @@ export default function ShiftDetailsModal({
     const inNorm = draftClockIn.trim();
     const outNorm = draftClockOut.trim();
     const serverCompleted = resolvedShift.status === ShiftStatus.COMPLETED;
-    const serverApprovedForClaim = Boolean(resolvedShift.approvedForClaim);
+    const serverApproved = Boolean(resolvedShift.approved);
 
     const payload: Parameters<typeof updateShift>[1] = {
       maintenanceReason,
@@ -317,8 +317,8 @@ export default function ShiftDetailsModal({
       payload.estimatedEndTime = null;
     }
 
-    if (draftApprovedForClaim !== serverApprovedForClaim) {
-      payload.approvedForClaim = draftApprovedForClaim;
+    if (draftApproved !== serverApproved) {
+      payload.approved = draftApproved;
     }
 
     const hasMeaningfulChange =
@@ -326,7 +326,7 @@ export default function ShiftDetailsModal({
       outNorm !== serverOut ||
       draftCompleted !== serverCompleted ||
       shouldResolveLateClockIn ||
-      draftApprovedForClaim !== serverApprovedForClaim;
+      draftApproved !== serverApproved;
     if (!hasMeaningfulChange && Object.keys(payload).length === 1) {
       toast({
         title: "Nothing to update",
@@ -509,8 +509,8 @@ export default function ShiftDetailsModal({
                     </p>
                   </div>
                   <Switch
-                    checked={draftApprovedForClaim}
-                    onCheckedChange={setDraftApprovedForClaim}
+                    checked={draftApproved}
+                    onCheckedChange={setDraftApproved}
                     aria-label="Approve for billing"
                   />
                 </div>

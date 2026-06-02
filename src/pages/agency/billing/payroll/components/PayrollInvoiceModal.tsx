@@ -15,13 +15,11 @@ import {
   BILLING_PRIMARY_BUTTON_CLASS,
   BILLING_SECONDARY_BUTTON_CLASS,
 } from "../../components/billingModalStyles";
-import type { DuePayrollEntry } from "../data/mockPayrollDashboardData";
-import {
-  buildPayrollInvoiceFromEntry,
-  type PayrollInvoiceDocument,
-  type PayrollInvoiceEarningLine,
-  type PayrollInvoiceParty,
-} from "../data/mockPayrollInvoiceData";
+import type {
+  PayrollInvoiceDocument,
+  PayrollInvoiceEarningLine,
+  PayrollInvoiceParty,
+} from "../types";
 import { downloadPayrollInvoicePdf } from "../utils/payrollInvoicePrintUtils";
 import "../utils/payrollInvoicePrint.css";
 
@@ -30,8 +28,11 @@ const PAYROLL_INVOICE_MODAL_CLASS =
 
 type PayrollInvoiceModalProps = {
   open: boolean;
-  entry: DuePayrollEntry;
+  staffName: string;
+  invoice: PayrollInvoiceDocument;
   onClose: () => void;
+  onMarkPaid?: () => void;
+  markingPaid?: boolean;
 };
 
 const INVOICE_TEXT_CLASS = "text-[13px] text-[#10141a]";
@@ -156,8 +157,8 @@ const InvoiceDocument = memo(function InvoiceDocument({
             </tr>
           </thead>
           <tbody>
-            {invoice.earnings.map((line) => (
-              <EarningsTableRow key={line.description} line={line} />
+            {invoice.earnings.map((line, index) => (
+              <EarningsTableRow key={`${line.description}-${index}`} line={line} />
             ))}
           </tbody>
         </table>
@@ -167,8 +168,10 @@ const InvoiceDocument = memo(function InvoiceDocument({
         <p className={cn("mb-2 font-bold", INVOICE_TEXT_CLASS)}>Total earnings</p>
         <div className="space-y-0">
           <SummaryRow label="Total hours" value={invoice.totals.totalHours} />
-          <SummaryRow label="Total" value={invoice.totals.grossPay} />
-          <SummaryRow label="Tax" value={invoice.totals.taxWithheld} />
+          <SummaryRow label="Gross pay" value={invoice.totals.grossPay} />
+          {invoice.totals.taxWithheld != null ? (
+            <SummaryRow label="Tax" value={invoice.totals.taxWithheld} />
+          ) : null}
           <SummaryRow label="Net total" value={invoice.totals.netPay} emphasis />
         </div>
       </div>
@@ -177,22 +180,16 @@ const InvoiceDocument = memo(function InvoiceDocument({
         <div className="min-w-0 flex-1">
           <p className={cn("mb-3 font-bold", INVOICE_TEXT_CLASS)}>Payment info:</p>
           <div className="w-fit">
-            <PaymentInfoRow label="Bank name" value={invoice.payment.bankName} />
+            {invoice.payment.bankName ? (
+              <PaymentInfoRow label="Bank name" value={invoice.payment.bankName} />
+            ) : null}
             <PaymentInfoRow label="Account name" value={invoice.payment.accountName} />
-            <PaymentInfoRow label="Account number" value={invoice.payment.accountNumberMasked} />
+            <PaymentInfoRow label="Payment method" value={invoice.payment.accountNumberMasked} />
           </div>
         </div>
         <div className="max-w-[220px] shrink-0">
           <p className={cn("mb-3 font-bold", INVOICE_TEXT_CLASS)}>Terms and conditions</p>
-          <p className={cn("leading-relaxed", INVOICE_TEXT_CLASS)}>
-            {invoice.termsSnippet}{" "}
-            <button
-              type="button"
-              className="cursor-pointer font-normal text-[#00b4b8] hover:underline"
-            >
-              Read more
-            </button>
-          </p>
+          <p className={cn("leading-relaxed", INVOICE_TEXT_CLASS)}>{invoice.termsSnippet}</p>
         </div>
       </div>
 
@@ -223,12 +220,17 @@ const InvoiceDocument = memo(function InvoiceDocument({
   );
 });
 
-export default function PayrollInvoiceModal({ open, entry, onClose }: PayrollInvoiceModalProps) {
+export default function PayrollInvoiceModal({
+  open,
+  staffName,
+  invoice,
+  onClose,
+  onMarkPaid,
+  markingPaid = false,
+}: PayrollInvoiceModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
-
-  const invoice = buildPayrollInvoiceFromEntry(entry);
 
   const handlePrint = useCallback(async () => {
     await document.fonts.ready;
@@ -240,7 +242,7 @@ export default function PayrollInvoiceModal({ open, entry, onClose }: PayrollInv
 
     setIsDownloading(true);
     try {
-      await downloadPayrollInvoicePdf(printRef.current, entry.staffName);
+      await downloadPayrollInvoicePdf(printRef.current, staffName);
     } catch (error) {
       console.error("Error generating payroll invoice PDF:", error);
       toast({
@@ -250,7 +252,7 @@ export default function PayrollInvoiceModal({ open, entry, onClose }: PayrollInv
     } finally {
       setIsDownloading(false);
     }
-  }, [entry.staffName, isDownloading, toast]);
+  }, [staffName, isDownloading, toast]);
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
@@ -271,10 +273,10 @@ export default function PayrollInvoiceModal({ open, entry, onClose }: PayrollInv
                   aria-label="CareOnboard"
                 />
                 <DialogTitle className={cn("mt-3 text-left font-bold", INVOICE_TEXT_CLASS)}>
-                  Payroll invoice
+                  Paystub Invoice
                 </DialogTitle>
                 <p className={cn("mt-1 font-medium", INVOICE_TEXT_MUTED_CLASS)}>
-                  {entry.staffName} · {invoice.dateRangeLabel}
+                  {staffName} · {invoice.dateRangeLabel}
                 </p>
               </div>
               <button
@@ -295,6 +297,19 @@ export default function PayrollInvoiceModal({ open, entry, onClose }: PayrollInv
           </div>
 
           <div className="payroll-invoice-no-print flex shrink-0 flex-col gap-3 border-t border-[#e5e5e6] pb-2 pt-4 sm:flex-row sm:justify-end">
+            {invoice.status === "pending" && onMarkPaid && (
+              <button
+                type="button"
+                disabled={markingPaid}
+                onClick={() => onMarkPaid()}
+                className={cn(
+                  BILLING_SECONDARY_BUTTON_CLASS,
+                  "w-full rounded-[10px] text-[14px] sm:mr-auto sm:w-auto",
+                )}
+              >
+                {markingPaid ? "Marking as paid…" : "Mark as paid"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void handlePrint()}
