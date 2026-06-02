@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/routes/constants";
-import type { DuePayrollEntry } from "../data/mockPayrollDashboardData";
+import type { DuePayrollEntry } from "@/lib/api/payroll";
 import { TABLE_ROW_CLASS } from "./tableColumns";
 
 const MISSING_STAFF_ID = "—";
@@ -27,7 +27,7 @@ function formatStaffIdDisplay(staffId: string): string {
   return `ID: ${staffId.slice(0, STAFF_ID_DISPLAY_LENGTH)}`;
 }
 
-function StaffIdLink({ staffId }: { staffId: string }) {
+function StaffIdLink({ staffId, employeeId }: { staffId: string; employeeId: string }) {
   const displayId = formatStaffIdDisplay(staffId);
 
   if (!isStaffIdLinkable(staffId)) {
@@ -36,7 +36,7 @@ function StaffIdLink({ staffId }: { staffId: string }) {
 
   return (
     <Link
-      to={Routes.agency.dspProfile.replace(":dspId", staffId.trim())}
+      to={Routes.agency.dspProfile.replace(":dspId", employeeId.trim())}
       className="text-[13px] font-medium text-[#10141a] transition-colors hover:text-[#00b4b8] hover:underline"
     >
       {displayId}
@@ -107,7 +107,7 @@ function PayrollActionsMenu({
           className={menuItemClassName}
           onSelect={() => onGenerateInvoice(entry)}
         >
-          Generate invoice
+          Create payroll invoice
           <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -145,7 +145,7 @@ function DuePayrollRow({
         <div className="mt-4 space-y-3">
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">Staff ID</span>
-            <StaffIdLink staffId={entry.staffId} />
+            <StaffIdLink staffId={entry.staffId} employeeId={entry.employeeId} />
           </div>
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">Hours worked</span>
@@ -158,7 +158,7 @@ function DuePayrollRow({
             <DateRange start={entry.dateRangeStart} end={entry.dateRangeEnd} />
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-[13px] text-[#808081]">Authorized rate</span>
+            <span className="text-[13px] text-[#808081]">Pay rate</span>
             <span className="text-[13px] font-medium tabular-nums text-[#10141a]">
               {entry.paRate}
             </span>
@@ -176,7 +176,7 @@ function DuePayrollRow({
   return (
     <div className={TABLE_ROW_CLASS}>
       <span className="truncate text-[14px] font-medium text-[#10141a]">{entry.staffName}</span>
-      <StaffIdLink staffId={entry.staffId} />
+      <StaffIdLink staffId={entry.staffId} employeeId={entry.employeeId} />
       <span className="text-[13px] tabular-nums text-[#10141a]">{entry.hoursWorked}</span>
       <DateRange start={entry.dateRangeStart} end={entry.dateRangeEnd} />
       <span className="truncate text-[13px] text-[#10141a]">{entry.paymentDetails}</span>

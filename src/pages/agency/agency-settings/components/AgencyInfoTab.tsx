@@ -69,6 +69,8 @@ export type AgencyProfileFormValues = {
   billingFormat: string;
   invoiceName: string;
   invoiceEmail: string;
+  payrollScheduleFrequency: string;
+  payrollScheduleNextPayoutDate: string;
 };
 
 const EMPTY_VALUES: AgencyProfileFormValues = {
@@ -92,6 +94,8 @@ const EMPTY_VALUES: AgencyProfileFormValues = {
   billingFormat: "",
   invoiceName: "",
   invoiceEmail: "",
+  payrollScheduleFrequency: "biweekly",
+  payrollScheduleNextPayoutDate: "",
 };
 
 function agencyToFormValues(agency: Agency): AgencyProfileFormValues {
@@ -116,17 +120,29 @@ function agencyToFormValues(agency: Agency): AgencyProfileFormValues {
     billingFormat: agency.billingFormat ?? "",
     invoiceName: agency.invoiceName ?? "",
     invoiceEmail: agency.invoiceEmail ?? "",
+    payrollScheduleFrequency: agency.payrollSchedule?.frequency ?? "biweekly",
+    payrollScheduleNextPayoutDate: agency.payrollSchedule?.nextPayoutDate ?? "",
   };
 }
 
-function formValuesToUpdatePayload(values: AgencyProfileFormValues): UpdateAgencyProfileRequest {
+function parsePayrollFrequency(value: string): "weekly" | "biweekly" | "monthly" {
+  if (value === "weekly" || value === "biweekly" || value === "monthly") {
+    return value;
+  }
+  return "biweekly";
+}
+
+function formValuesToUpdatePayload(
+  values: AgencyProfileFormValues,
+  dirtyFields?: Partial<Record<keyof AgencyProfileFormValues, boolean>>,
+): UpdateAgencyProfileRequest {
   const trim = (value: string) => value.trim();
   const nullable = (value: string) => {
     const trimmed = trim(value);
     return trimmed === "" ? null : trimmed;
   };
 
-  return {
+  const payload: UpdateAgencyProfileRequest = {
     name: trim(values.name),
     legalBusinessName: nullable(values.legalBusinessName),
     dba: nullable(values.dba),
@@ -148,6 +164,15 @@ function formValuesToUpdatePayload(values: AgencyProfileFormValues): UpdateAgenc
     invoiceName: nullable(values.invoiceName),
     invoiceEmail: nullable(values.invoiceEmail),
   };
+
+  if (dirtyFields?.payrollScheduleFrequency || dirtyFields?.payrollScheduleNextPayoutDate) {
+    payload.payrollSchedule = {
+      frequency: parsePayrollFrequency(values.payrollScheduleFrequency),
+      nextPayoutDate: nullable(values.payrollScheduleNextPayoutDate),
+    };
+  }
+
+  return payload;
 }
 
 export default function AgencyInfoTab() {
@@ -335,7 +360,7 @@ export default function AgencyInfoTab() {
 
     try {
       if (hasTextChanges) {
-        updated = await updateAgency(agencyId, formValuesToUpdatePayload(values));
+        updated = await updateAgency(agencyId, formValuesToUpdatePayload(values, form.formState.dirtyFields));
         textSaved = true;
       }
 
@@ -919,6 +944,51 @@ export default function AgencyInfoTab() {
                       <FormItem>
                         <FormControl>
                           <Input type="email" placeholder="Enter invoice email" {...field} disabled={disabled} className={inputClassName} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </SettingsFormFieldRow>
+
+                <SettingsFormFieldRow
+                  title="Payroll frequency"
+                  description="How often your agency runs payroll. Used for the upcoming payout date on the payroll dashboard."
+                >
+                  <FormField
+                    control={form.control}
+                    name="payrollScheduleFrequency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <Select value={field.value} onValueChange={field.onChange} disabled={disabled}>
+                          <FormControl>
+                            <SelectTrigger className={inputClassName}>
+                              <SelectValue placeholder="Select frequency" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="biweekly">Biweekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </SettingsFormFieldRow>
+
+                <SettingsFormFieldRow
+                  title="Next payout date"
+                  description="The next scheduled payroll payout date shown on your dashboard."
+                >
+                  <FormField
+                    control={form.control}
+                    name="payrollScheduleNextPayoutDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input type="date" {...field} disabled={disabled} className={inputClassName} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
