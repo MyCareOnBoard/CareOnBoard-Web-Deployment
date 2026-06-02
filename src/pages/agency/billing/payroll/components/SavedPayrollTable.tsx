@@ -1,5 +1,6 @@
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
-import type { PayrollInvoiceListItem, PayrollInvoiceStatus } from "@/lib/api/payroll";
+import type { PayrollInvoiceListItem } from "@/lib/api/payroll";
+import BillingStatusBadge from "../../components/BillingStatusBadge";
 import { cn } from "@/lib/utils";
 import { formatPayrollDateRangeLabel } from "../utils/payrollDashboardUtils";
 import {
@@ -9,11 +10,6 @@ import {
 } from "./tableColumns";
 
 const SKELETON_ROW_COUNT = 8;
-
-const STATUS_LABELS: Record<PayrollInvoiceStatus, string> = {
-  pending: "Pending",
-  paid: "Paid",
-};
 
 const SAVED_PAYROLL_ACTION_BUTTON_BASE =
   "cursor-pointer whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-60";
@@ -83,7 +79,9 @@ function SavedPayrollRow({
       <span className="text-[14px] tabular-nums text-[#10141a]">
         {formatCurrency(invoice.grossAmount)}
       </span>
-      <span className="text-[14px] text-[#10141a]">{STATUS_LABELS[invoice.status]}</span>
+      <span>
+        <BillingStatusBadge domain="payroll" status={invoice.status} />
+      </span>
       <div className="flex shrink-0 justify-end gap-2">
         <button
           type="button"

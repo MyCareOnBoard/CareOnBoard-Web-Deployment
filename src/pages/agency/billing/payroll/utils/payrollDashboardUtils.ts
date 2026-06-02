@@ -102,6 +102,10 @@ const STATUS_LABELS: Record<PayrollInvoiceStatus, string> = {
   pending: "Pending",
 };
 
+export function getPayrollStatusLabel(status: PayrollInvoiceStatus): string {
+  return STATUS_LABELS[status];
+}
+
 export function mapDashboardToStatusChart(
   data: PayrollDashboardSummary | null,
 ): PayrollStatusChartData {

@@ -9,7 +9,7 @@ type PayrollWorkspaceTabsProps = {
 
 const tabs: Array<{ id: PayrollWorkspaceTab; label: string }> = [
   { id: "staff", label: "Staff to pay" },
-  { id: "generated", label: "Generated payroll" },
+  { id: "generated", label: "Generated Payrolls" },
 ];
 
 export default function PayrollWorkspaceTabs({

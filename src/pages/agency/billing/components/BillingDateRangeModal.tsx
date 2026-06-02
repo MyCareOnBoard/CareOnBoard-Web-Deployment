@@ -7,6 +7,7 @@ import {
 import CustomDatePicker from "@/components/ui/datePicker";
 import BillingCornerModalHeader from "./BillingCornerModalHeader";
 import { BILLING_CORNER_MODAL_CLASS, BILLING_FIELD_CLASS, BILLING_FIELD_LABEL_CLASS } from "./billingModalStyles";
+import { assertValidDateRange } from "@/pages/agency/billing/financial-overview/utils/financialOverviewUtils";
 import type { BillingDateRangeValues } from "./types";
 
 type BillingDateRangeModalProps = {
@@ -133,8 +134,9 @@ export default function BillingDateRangeModal({
                 return;
               }
 
-              if (new Date(values.startDate) > new Date(values.endDate)) {
-                setError("Start date cannot be after end date");
+              const rangeError = assertValidDateRange(values);
+              if (rangeError) {
+                setError(rangeError);
                 return;
               }
 
