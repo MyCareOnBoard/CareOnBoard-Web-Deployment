@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { getClientById, searchClients, type Client, type ClientService } from "@/lib/api/clients";
 import { listShifts, ShiftStatus, formatShiftLocation, type Shift } from "@/lib/api/shifts";
+import { mileageApi, type MileageRide } from "@/lib/api/mileage";
 import { formatWeeklyDistributionDropdownLabel } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
 import BillingCornerModalHeader from "@/pages/agency/billing/components/BillingCornerModalHeader";
 import {
@@ -29,8 +30,10 @@ import { useAuth } from "@/utils/auth";
 import { computeTotalHours } from "../utils/claimShiftBillingUtils";
 import {
   filterShiftsForClaimSelection,
+  filterRidesForClaimSelection,
   flattenClientServices,
   formatShiftDurationLabel,
+  isTransportationServiceForClaims,
   pickDefaultServiceWithWeekRows,
   pickDefaultWeekRowIndex,
   resolveServiceCode,
@@ -44,7 +47,7 @@ type GenerateClaimModalProps = {
   saving?: boolean;
   onClose: () => void;
   onConfirm: (
-    selectedShifts: Shift[],
+    selection: { shifts: Shift[]; rides: MileageRide[] },
     context: { serviceCode: string; weekRange?: string },
   ) => void;
 };
@@ -61,6 +64,16 @@ function formatShiftServiceDate(shift: Shift): string {
     return format(parseISO(shift.date), "MMM d, yyyy");
   } catch {
     return shift.date;
+  }
+}
+
+function formatRideCompletedDate(ride: MileageRide): string {
+  const raw = ride.completedAt ?? ride.scheduledStartTime;
+  if (!raw) return "—";
+  try {
+    return format(parseISO(String(raw).slice(0, 10)), "MMM d, yyyy");
+  } catch {
+    return String(raw).slice(0, 10);
   }
 }
 
@@ -88,8 +101,10 @@ export default function GenerateClaimModal({
   const [selectedServiceId, setSelectedServiceId] = useState("");
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [rides, setRides] = useState<MileageRide[]>([]);
   const [loadingShifts, setLoadingShifts] = useState(false);
   const [selectedShiftIds, setSelectedShiftIds] = useState<Set<string>>(new Set());
+  const [selectedRideIds, setSelectedRideIds] = useState<Set<string>>(new Set());
   const clientSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const services = useMemo(
@@ -110,6 +125,7 @@ export default function GenerateClaimModal({
   );
 
   const serviceCode = resolveServiceCode(selectedService);
+  const useRideMode = isTransportationServiceForClaims(selectedService);
 
   const filteredShifts = useMemo(
     () => filterShiftsForClaimSelection(shifts, serviceCode, weekBounds),
@@ -121,6 +137,16 @@ export default function GenerateClaimModal({
     [filteredShifts],
   );
 
+  const filteredRides = useMemo(
+    () => filterRidesForClaimSelection(rides, serviceCode, weekBounds),
+    [rides, serviceCode, weekBounds],
+  );
+
+  const selectableRides = useMemo(
+    () => filteredRides.filter((ride) => !ride.claimId),
+    [filteredRides],
+  );
+
   const resetWizard = useCallback(() => {
     setClientQuery("");
     setClientSearchResults([]);
@@ -129,7 +155,9 @@ export default function GenerateClaimModal({
     setSelectedServiceId("");
     setSelectedWeekIndex(0);
     setShifts([]);
+    setRides([]);
     setSelectedShiftIds(new Set());
+    setSelectedRideIds(new Set());
   }, []);
 
   useEffect(() => {
@@ -189,9 +217,11 @@ export default function GenerateClaimModal({
         const fullClient = await getClientById(client.id, user.agencyId);
         setSelectedClient(fullClient);
 
-        const defaultService = pickDefaultServiceWithWeekRows(fullClient);
         const nextServices = flattenClientServices(fullClient);
+        const transportService = nextServices.find(isTransportationServiceForClaims);
+        const defaultService = pickDefaultServiceWithWeekRows(fullClient);
         const service =
+          transportService ??
           defaultService ??
           nextServices.find((item) => (item.sdrWeeklyDistribution?.rows?.length ?? 0) > 0) ??
           nextServices[0];
@@ -215,9 +245,66 @@ export default function GenerateClaimModal({
   );
 
   useEffect(() => {
-    if (!open || !selectedClient?.id || !user?.agencyId || !weekBounds) {
+    if (!open || !selectedClient?.id || !user?.agencyId || !serviceCode) {
       setShifts([]);
+      setRides([]);
       setSelectedShiftIds(new Set());
+      setSelectedRideIds(new Set());
+      return;
+    }
+
+    if (useRideMode) {
+      const controller = new AbortController();
+      const fetchRides = async () => {
+        try {
+          setLoadingShifts(true);
+          const response = await mileageApi.listAgency(
+            {
+              clientId: selectedClient.id,
+              status: "completed",
+              approved: true,
+              unclaimed: true,
+              limit: 100,
+              skipEnrichment: true,
+              ...(weekBounds
+                ? {
+                    startDate: `${weekBounds.start}T00:00:00.000Z`,
+                    endDate: `${weekBounds.end}T23:59:59.999Z`,
+                  }
+                : {}),
+            },
+            { signal: controller.signal },
+          );
+          const nextRides = response.data ?? [];
+          const nextFiltered = filterRidesForClaimSelection(
+            nextRides,
+            serviceCode,
+            weekBounds,
+          );
+          setRides(nextRides);
+          setSelectedRideIds(new Set(nextFiltered.map((ride) => ride.id)));
+          setShifts([]);
+          setSelectedShiftIds(new Set());
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          console.error("Failed to fetch rides for claim wizard:", error);
+          setRides([]);
+          setSelectedRideIds(new Set());
+        } finally {
+          if (!controller.signal.aborted) {
+            setLoadingShifts(false);
+          }
+        }
+      };
+      void fetchRides();
+      return () => controller.abort();
+    }
+
+    if (!weekBounds) {
+      setShifts([]);
+      setRides([]);
+      setSelectedShiftIds(new Set());
+      setSelectedRideIds(new Set());
       return;
     }
 
@@ -249,7 +336,9 @@ export default function GenerateClaimModal({
         );
         const nextSelectableShifts = nextFilteredShifts.filter((shift) => !isShiftClaimed(shift));
         setShifts(nextShifts);
+        setRides([]);
         setSelectedShiftIds(new Set(nextSelectableShifts.map((shift) => shift.id)));
+        setSelectedRideIds(new Set());
       } catch (error) {
         if (controller.signal.aborted) return;
         console.error("Failed to fetch shifts for claim wizard:", error);
@@ -267,15 +356,22 @@ export default function GenerateClaimModal({
     return () => {
       controller.abort();
     };
-  }, [open, selectedClient?.id, user?.agencyId, weekBounds, serviceCode]);
+  }, [open, selectedClient?.id, user?.agencyId, weekBounds, serviceCode, useRideMode]);
 
-  const allSelected =
-    selectableShifts.length > 0 &&
-    selectableShifts.every((shift) => selectedShiftIds.has(shift.id));
+  const allSelected = useRideMode
+    ? selectableRides.length > 0 &&
+      selectableRides.every((ride) => selectedRideIds.has(ride.id))
+    : selectableShifts.length > 0 &&
+      selectableShifts.every((shift) => selectedShiftIds.has(shift.id));
 
   const toggleAllShifts = () => {
     if (allSelected) {
       setSelectedShiftIds(new Set());
+      setSelectedRideIds(new Set());
+      return;
+    }
+    if (useRideMode) {
+      setSelectedRideIds(new Set(selectableRides.map((ride) => ride.id)));
       return;
     }
     setSelectedShiftIds(new Set(selectableShifts.map((shift) => shift.id)));
@@ -306,14 +402,24 @@ export default function GenerateClaimModal({
   };
 
   const selectedShifts = selectableShifts.filter((shift) => selectedShiftIds.has(shift.id));
-  const canConfirm = selectedShifts.length > 0 && !saving && !loadingShifts && !loadingClient;
+  const selectedRides = selectableRides.filter((ride) => selectedRideIds.has(ride.id));
+  const canConfirm =
+    (useRideMode ? selectedRides.length > 0 : selectedShifts.length > 0) &&
+    !saving &&
+    !loadingShifts &&
+    !loadingClient;
 
   const handleConfirm = () => {
     if (!canConfirm) return;
-    onConfirm(selectedShifts, {
-      serviceCode,
-      weekRange: selectedWeekRow?.weekRange,
-    });
+    onConfirm(
+      useRideMode
+        ? { shifts: [], rides: selectedRides }
+        : { shifts: selectedShifts, rides: [] },
+      {
+        serviceCode,
+        weekRange: selectedWeekRow?.weekRange,
+      },
+    );
   };
 
   return (
@@ -324,7 +430,11 @@ export default function GenerateClaimModal({
       >
         <BillingCornerModalHeader
           title="Generate claim"
-          description="Search for a client, pick a service and week, then choose which approved shifts to bill."
+          description={
+            useRideMode
+              ? "Search for a client, pick a transportation service, then choose approved completed rides to bill."
+              : "Search for a client, pick a service and week, then choose which approved shifts to bill."
+          }
           onClose={onClose}
           closeDisabled={saving}
         />
@@ -388,34 +498,103 @@ export default function GenerateClaimModal({
                   </Select>
                 </div>
 
-                <div className="w-full">
-                  <label className={BILLING_FIELD_LABEL_CLASS}>Week range</label>
-                  <Select
-                    value={String(selectedWeekIndex)}
-                    onValueChange={(value) => setSelectedWeekIndex(Number(value))}
-                    disabled={weekRows.length === 0}
-                  >
-                    <SelectTrigger className={`${BILLING_FIELD_CLASS} w-full`}>
-                      <SelectValue placeholder="Select week range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {weekRows.map((row, index) => (
-                        <SelectItem key={`${row.weekRange}-${index}`} value={String(index)}>
-                          {formatWeeklyDistributionDropdownLabel(row)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!useRideMode && (
+                  <div className="w-full">
+                    <label className={BILLING_FIELD_LABEL_CLASS}>Week range</label>
+                    <Select
+                      value={String(selectedWeekIndex)}
+                      onValueChange={(value) => setSelectedWeekIndex(Number(value))}
+                      disabled={weekRows.length === 0}
+                    >
+                      <SelectTrigger className={`${BILLING_FIELD_CLASS} w-full`}>
+                        <SelectValue placeholder="Select week range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {weekRows.map((row, index) => (
+                          <SelectItem key={`${row.weekRange}-${index}`} value={String(index)}>
+                            {formatWeeklyDistributionDropdownLabel(row)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <div>
-                  <SectionLabel>Shifts to include</SectionLabel>
+                  <SectionLabel>
+                    {useRideMode ? "Rides to include" : "Shifts to include"}
+                  </SectionLabel>
 
                   {loadingShifts ? (
                     <div className="flex items-center gap-2 py-8 text-[14px] text-[#808081]">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading approved shifts…
+                      {useRideMode
+                        ? "Loading approved rides…"
+                        : "Loading approved shifts…"}
                     </div>
+                  ) : useRideMode ? (
+                    filteredRides.length === 0 ? (
+                      <p className="rounded-[12px] border border-[#e5e5e6] bg-[#fafafa] px-4 py-6 text-[14px] text-[#808081]">
+                        No approved completed rides for this service. Approve rides in Mileage
+                        first.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="mb-3 flex items-center gap-3">
+                          <Checkbox
+                            checked={allSelected}
+                            onChange={toggleAllShifts}
+                            disabled={selectableRides.length === 0}
+                            className={CLAIM_REPORT_CHECKBOX_CLASS}
+                            aria-label="Select all available rides"
+                          />
+                          <span className="text-[14px] font-medium text-[#10141a]">
+                            Select all available ({selectableRides.length})
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          {filteredRides.map((ride) => {
+                            const claimed = Boolean(ride.claimId);
+                            const checked = selectedRideIds.has(ride.id);
+                            return (
+                              <label
+                                key={ride.id}
+                                className={`flex cursor-pointer items-center gap-3 rounded-[12px] border px-4 py-3 ${
+                                  claimed
+                                    ? "border-[#e5e5e6] bg-[#fafafa] opacity-60"
+                                    : "border-[#e5e5e6] bg-white"
+                                }`}
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onChange={() => {
+                                    setSelectedRideIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(ride.id)) next.delete(ride.id);
+                                      else next.add(ride.id);
+                                      return next;
+                                    });
+                                  }}
+                                  disabled={claimed}
+                                  className={CLAIM_REPORT_CHECKBOX_CLASS}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[14px] font-medium text-[#10141a]">
+                                    {formatRideCompletedDate(ride)}
+                                  </p>
+                                  <p className="text-[12px] text-[#808081]">
+                                    {ride.caregiverName ?? ride.caregiverId} ·{" "}
+                                    {ride.actualDistance != null
+                                      ? `${ride.actualDistance} km`
+                                      : "—"}
+                                  </p>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )
                   ) : filteredShifts.length === 0 ? (
                     <p className="rounded-[12px] border border-[#e5e5e6] bg-[#fafafa] px-4 py-6 text-[14px] text-[#808081]">
                       No approved shifts for this week. Choose a different week range, or approve

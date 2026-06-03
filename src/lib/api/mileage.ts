@@ -28,6 +28,14 @@ export interface MileageRide {
   segmentCount?: number;
   isRecurring?: boolean;
   status: RideStatus;
+  serviceCode?: string | null;
+  serviceAuthorizationId?: string | null;
+  serviceAuthStartDate?: string | null;
+  serviceAuthEndDate?: string | null;
+  assignedDsp?: string | null;
+  claimId?: string | null;
+  payrollInvoiceId?: string | null;
+  approved?: boolean;
   startLocation?: Coordinates | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -92,6 +100,14 @@ export interface CancelRidePayload {
 
 export type RecurringFrequency = "daily" | "weekly" | "monthly";
 
+export interface MileageServiceFields {
+  serviceCode: string;
+  serviceAuthorizationId?: string;
+  serviceAuthStartDate?: string;
+  serviceAuthEndDate?: string;
+  assignedDsp?: string;
+}
+
 export interface CreateMileageRideBase {
   clientId: string;
   caregiverId: string;
@@ -102,13 +118,18 @@ export interface UpdateAgencyRideRequest {
   caregiverId?: string;
   scheduledStartTime?: string;
   notes?: string;
+  approved?: boolean;
 }
 
-export interface CreateOneTimeMileageRideRequest extends CreateMileageRideBase {
+export interface CreateOneTimeMileageRideRequest
+  extends CreateMileageRideBase,
+    MileageServiceFields {
   scheduledStartTime: string;
 }
 
-export interface CreateRecurringMileageRideRequest extends CreateMileageRideBase {
+export interface CreateRecurringMileageRideRequest
+  extends CreateMileageRideBase,
+    MileageServiceFields {
   frequency: RecurringFrequency;
   daysOfWeek?: number[];
   dayOfMonth?: number;
@@ -153,17 +174,25 @@ export const mileageApi = {
     return response.data;
   },
 
-  listAgency: async (params?: {
-    limit?: number;
-    offset?: number;
-    status?: RideStatus;
-    caregiverId?: string;
-    clientId?: string;
-    startDate?: string;
-    endDate?: string;
-    isManual?: boolean;
-  }) => {
-    const response = await axiosClient.get<AgencyMileageListResponse>(`/agencyMileage${buildQuery(params)}`);
+  listAgency: async (
+    params?: {
+      limit?: number;
+      offset?: number;
+      status?: RideStatus;
+      caregiverId?: string;
+      clientId?: string;
+      startDate?: string;
+      endDate?: string;
+      isManual?: boolean;
+      approved?: boolean;
+      unclaimed?: boolean;
+      skipEnrichment?: boolean;
+    },
+    options?: { signal?: AbortSignal },
+  ) => {
+    const response = await axiosClient.get<AgencyMileageListResponse>(`/agencyMileage${buildQuery(params)}`, {
+      signal: options?.signal,
+    });
     return response.data;
   },
 

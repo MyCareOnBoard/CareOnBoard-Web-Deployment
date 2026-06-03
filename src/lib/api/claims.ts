@@ -1,6 +1,7 @@
 import axiosClient from "../axios";
 import type { ClaimReportPrefillSnapshot } from "@/pages/agency/billing/claims/utils/claimReportPrefillUtils";
 import type { Shift } from "@/lib/api/shifts";
+import type { MileageRide } from "@/lib/api/mileage";
 
 export type BillingClaimStatus = "pending" | "paid" | "rejected";
 
@@ -19,6 +20,7 @@ export type BillingClaimListItem = {
   serviceCode: string;
   serviceDate: string | null;
   shiftCount: number;
+  rideCount?: number;
   createdAt: string;
   rejectionReason: string | null;
 };
@@ -63,11 +65,15 @@ export type BillingClaimDetail = {
   weekRange: string | null;
   serviceDate: string | null;
   shiftIds: string[];
+  rideIds?: string[];
+  shiftCount?: number;
+  rideCount?: number;
   rejectionReason: string | null;
   reportPrefill: ClaimReportPrefillSnapshot;
   createdAt: string;
   updatedAt: string;
   shifts: Shift[];
+  rides?: MileageRide[];
 };
 
 type ClaimsDashboardResponse = {
@@ -96,13 +102,15 @@ export type SavedBillingClaim = {
   amount: number;
   clientId: string;
   shiftIds: string[];
+  rideIds?: string[];
   reportPrefill: ClaimReportPrefillSnapshot;
 };
 
 export type CreateBillingClaimPayload = {
   agencyId: string;
   clientId: string;
-  shiftIds: string[];
+  shiftIds?: string[];
+  rideIds?: string[];
   serviceCode: string;
   weekRange?: string;
 };
@@ -219,6 +227,12 @@ export function getCreateBillingClaimErrorMessage(error: unknown): string {
   }
   if (response?.error === "SHIFT_NOT_APPROVED") {
     return "Shifts must be approved before creating a claim.";
+  }
+  if (response?.error === "RIDE_ALREADY_CLAIMED") {
+    return "One or more rides are already on a claim. Refresh and try again.";
+  }
+  if (response?.error === "RIDE_NOT_APPROVED") {
+    return "Rides must be approved before creating a claim.";
   }
   if (response?.message) {
     return response.message;
