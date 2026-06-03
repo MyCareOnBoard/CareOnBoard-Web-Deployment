@@ -33,9 +33,17 @@ export interface ApplicantDocumentFileUploadedInfo {
 const files = [
   {
     id: "photo-id",
-    label: "Upload Photo ID (Driver’s License, State ID, Passport)",
+    label: "Upload Photo ID (State ID, Passport)",
     placeholder: "Upload your photo ID",
-    requiresExpiry: true
+    requiresExpiry: true,
+    optional: false,
+  },
+  {
+    id: "driver-license",
+    label: "Upload Driver’s License (optional)",
+    placeholder: "Upload your driver’s license",
+    requiresExpiry: true,
+    optional: true,
   },
   {
     id: "social-security-card",
@@ -186,6 +194,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
       const response = await submitDocumentUploadAndEligibilityVerification({
         data: {
           photoIdUrl: fileUploads.find((item) => item.fileType === "photo-id"),
+          driverLicenseUrl: fileUploads.find((item) => item.fileType === "driver-license"),
           socialSecurityCardUrl: fileUploads.find((item) => item.fileType === "social-security-card"),
           diplomaUrl: fileUploads.find((item) => item.fileType === "diploma"),
           certificationsUrl: fileUploads.find((item) => item.fileType === "certifications"),
@@ -216,6 +225,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
 
       const fileFieldToType: Record<string, string> = {
         photoIdUrl: "photo-id",
+        driverLicenseUrl: "driver-license",
         socialSecurityCardUrl: "social-security-card",
         diplomaUrl: "diploma",
         certificationsUrl: "certifications",

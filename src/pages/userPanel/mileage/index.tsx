@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import CurrentRide from "./components/CurrentRide";
 import UpcomingRides from "./components/UpcomingRides";
 import AddManualMileageModal from "./components/AddManualMileageModal";
 import { mileageApi, MileageRide } from "@/lib/api/mileage";
 import { useToast } from "@/hooks/use-toast";
+import { useGetEmployeeDocumentsQuery } from "@/pages/userPanel/dashboard/api";
 
 type FirebaseTimestampLike = { seconds?: number; _seconds?: number };
 
@@ -30,12 +32,29 @@ const isSameLocalDay = (date: Date, today: Date): boolean =>
   date.toDateString() === today.toDateString();
 
 export default function MileagePage() {
+  const navigate = useNavigate();
   const [totalMileage, setTotalMileage] = useState(0);
   const [rides, setRides] = useState<MileageRide[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [showLicensePrompt, setShowLicensePrompt] = useState(false);
   const { toast } = useToast();
+
+  const { data: employeeDocuments = [] } = useGetEmployeeDocumentsQuery();
+
+  const hasValidDriverLicense = useMemo(() => {
+    const doc = employeeDocuments.find((d) => d.documentType === "driverLicense");
+    return doc?.status === "available" || doc?.status === "expiring-soon";
+  }, [employeeDocuments]);
+
+  const handleTrackMileageClick = () => {
+    if (!hasValidDriverLicense) {
+      setShowLicensePrompt(true);
+    } else {
+      setIsManualModalOpen(true);
+    }
+  };
 
   const fetchRides = async () => {
     setLoading(true);
@@ -178,7 +197,7 @@ export default function MileagePage() {
             <span className="text-lg font-semibold text-[#10141a]">{totalMileage}KM</span>
           </div>
           <Button
-            onClick={() => setIsManualModalOpen(true)}
+            onClick={handleTrackMileageClick}
             className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009ba1] text-white rounded-full px-4 py-2 h-auto text-[14px] font-medium shadow-none"
           >
             <Plus className="w-4 h-4" />
@@ -210,6 +229,52 @@ export default function MileagePage() {
         onClose={() => setIsManualModalOpen(false)}
         onCreated={fetchRides}
       />
+
+      {/* Driver's License Required Prompt */}
+      {showLicensePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setShowLicensePrompt(false)}
+          />
+          <div className="relative bg-white rounded-[24px] w-full max-w-[400px] shadow-xl p-6 flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-[17px] font-semibold text-[#10141a]">
+                  Driver's License Required
+                </h2>
+                <p className="text-[13px] text-[#808081] mt-1 leading-relaxed">
+                  You need a valid driver's license on file before you can track mileage.
+                  Please upload your driver's license in your documents.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowLicensePrompt(false)}
+                className="shrink-0 bg-[#eff2f3] rounded-full p-1.5 hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4 text-[#10141a]" />
+              </button>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <Button
+                onClick={() => setShowLicensePrompt(false)}
+                className="flex-1 h-10 bg-transparent hover:bg-[#f3f4f6] text-[#6b7280] border border-[#e5e7eb] rounded-xl text-[13px] font-medium shadow-none"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowLicensePrompt(false);
+                  navigate("/user-panel/dashboard");
+                }}
+                className="flex-1 h-10 bg-[#00b4b8] hover:bg-[#009ba1] text-white rounded-xl text-[13px] font-medium shadow-none"
+              >
+                Go to Documents
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
