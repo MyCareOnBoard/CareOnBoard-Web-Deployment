@@ -143,7 +143,7 @@ export type CreateMileageRideRequest =
   | CreateRecurringMileageRideRequest;
 
 export interface CreateManualMileageRequest {
-  purpose: string;
+  purpose?: string;
   clientId?: string;
   clientName?: string;
   notes?: string;

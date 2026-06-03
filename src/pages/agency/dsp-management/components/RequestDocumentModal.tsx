@@ -19,7 +19,8 @@ import { requestEmployeeDocument, type EmployeeDocument, isExpiringSoon } from "
 import { useToast } from "@/hooks/use-toast";
 
 const DOCUMENT_TYPES = [
-	{ value: "id", label: "Photo ID (Driver's License, State ID, Passport)" },
+	{ value: "id", label: "Photo ID (State ID, Passport)" },
+	{ value: "driver-license", label: "Driver's License" },
 	{ value: "social-security", label: "Social Security Card" },
 	{ value: "vaccination", label: "Hepatitis B vaccination series documents" },
 	{ value: "immunity", label: "Hepatitis B immunity (titer result)" },

@@ -20,12 +20,13 @@ export interface UploadDocumentResponse {
 
 export type DocumentTypes = "resume"
   | "photo-id"
+  | "driver-license"
   | "social-security-card"
   | "diploma"
   | "certifications"
   | "hepatitis-b-vaccination"
   | "hepatitis-b-immunity"
-  | "tb-tes"
+  | "tb-test"
   | "i9-form"
   | "w4-form"
 
@@ -36,6 +37,7 @@ export interface UploadDocumentPayload {
 
 export interface DocumentUploadAndEligibilityPayload {
   photoIdUrl?: ApplicantDocumentFileUploadedInfo;
+  driverLicenseUrl?: ApplicantDocumentFileUploadedInfo;
   socialSecurityCardUrl?: ApplicantDocumentFileUploadedInfo;
   diplomaUrl?: ApplicantDocumentFileUploadedInfo;
   certificationsUrl?: ApplicantDocumentFileUploadedInfo;

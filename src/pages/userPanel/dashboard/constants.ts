@@ -2,6 +2,7 @@
 export const userPanelDocumentTypes = [
   {label: "Resume", value: "resume"},
   {label: "Photo ID", value: "photoId"},
+  {label: "Driver's License", value: "driverLicense"},
   {label: "Social Security Card", value: "socialSecurityCard"},
   {label: "Diploma", value: "diploma"},
   {label: "Certifications", value: "certifications"},
