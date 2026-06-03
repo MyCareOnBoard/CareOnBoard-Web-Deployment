@@ -7,6 +7,7 @@ import {
   computeTotalHours,
   findMatchingClientService,
   resolvePaNumber,
+  resolveWeekRangeForShift,
 } from "./claimShiftBillingUtils";
 import { isoToServiceDateLabel, time24hToDisplay } from "./claimFormUtils";
 
@@ -90,6 +91,10 @@ export function mapShiftToRecentClaim(shift: Shift): RecentClaim {
 
   return {
     id: shift.id,
+    sourceType: "shift",
+    sourceId: shift.id,
+    weekRange: resolveWeekRangeForShift(client, shift),
+    serviceDateSortKey: shift.date ?? "",
     client: getClientDisplayName(client),
     clientId: shift.clientId ?? client?.id,
     clientAvatarUrl: client?.profileImage ?? undefined,

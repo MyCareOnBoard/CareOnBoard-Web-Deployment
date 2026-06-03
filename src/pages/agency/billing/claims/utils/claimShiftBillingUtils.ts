@@ -46,6 +46,29 @@ export function findMatchingClientService(
   return findCodeAndWeekRangeMatches(client, shift)[0];
 }
 
+export function resolveWeekRangeForShift(
+  client: Client | undefined,
+  shift: Shift,
+): string | null {
+  const matchedService = findMatchingClientService(client, shift);
+  const rows = matchedService?.sdrWeeklyDistribution?.rows ?? [];
+  const shiftDate = shift.date?.trim();
+
+  if (shiftDate && rows.length > 0) {
+    for (const row of rows) {
+      const bounds = parseSdrWeekRange(row.weekRange);
+      if (!bounds) continue;
+      const start = format(bounds.start, "yyyy-MM-dd");
+      const end = format(bounds.end, "yyyy-MM-dd");
+      if (shiftDate >= start && shiftDate <= end) {
+        return row.weekRange?.trim() || null;
+      }
+    }
+  }
+
+  return shiftDate || null;
+}
+
 export function resolvePaNumber(
   client: Client | undefined,
   shift: Shift,

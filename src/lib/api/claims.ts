@@ -115,6 +115,36 @@ export type CreateBillingClaimPayload = {
   weekRange?: string;
 };
 
+export type ReadyToClaimRow = {
+  id: string;
+  sourceType: "shift" | "ride";
+  sourceId: string;
+  clientId: string | null;
+  clientName: string | null;
+  clientAvatarUrl?: string | null;
+  staffId: string | null;
+  serviceCode: string;
+  sortDate: string | null;
+  weekRange: string | null;
+  paNumber?: string | null;
+  shiftDate?: string | null;
+  clockedInAt?: string | null;
+  clockedOutAt?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  clientRate?: string | null;
+  completedAt?: string | null;
+  scheduledStartTime?: string | null;
+  actualDistance?: number | null;
+};
+
+export type ReadyToClaimResponse = {
+  rows: ReadyToClaimRow[];
+  truncated: boolean;
+  shiftCount: number;
+  rideCount: number;
+};
+
 export type UpdateBillingClaimStatusPayload = {
   status: Exclude<BillingClaimStatus, "pending">;
   rejectionReason?: string;
@@ -164,6 +194,27 @@ export async function getClaimsDashboard(
 
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || "Failed to fetch claims dashboard");
+  }
+
+  return response.data.data;
+}
+
+type ReadyToClaimApiResponse = {
+  success: boolean;
+  data: ReadyToClaimResponse;
+  message?: string;
+};
+
+export async function listReadyToClaim(params?: {
+  limit?: number;
+}): Promise<ReadyToClaimResponse> {
+  const response = await axiosClient.get<ReadyToClaimApiResponse>(
+    "/billing/claims/ready-to-claim",
+    { params },
+  );
+
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to fetch ready-to-claim items");
   }
 
   return response.data.data;
@@ -233,6 +284,9 @@ export function getCreateBillingClaimErrorMessage(error: unknown): string {
   }
   if (response?.error === "RIDE_NOT_APPROVED") {
     return "Rides must be approved before creating a claim.";
+  }
+  if (response?.error === "RIDE_NOT_TRANSPORTATION") {
+    return "Only transportation services can be billed as mileage claims.";
   }
   if (response?.message) {
     return response.message;
