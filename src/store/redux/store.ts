@@ -21,6 +21,7 @@ import { agencyDashboardApi } from "@/pages/agency/dashboard/api";
 import { superAdminApi } from "@/pages/super-admin/agencies/api";
 import { superAdminDashboardApi } from "@/pages/super-admin/dashboard/api";
 import { billingApi } from "@/pages/agency/billing-and-approvals/api";
+import { billingExpensesApi } from "@/lib/api/billing-expenses";
 import { employeeTrainingsApi } from "@/pages/agency/trainings/trainingApi";
 import { complianceApi } from "@/pages/super-admin/compliance-monitor/complianceApi";
 import { servicesApi } from "@/lib/api/services";
@@ -45,6 +46,7 @@ const rootReducer = combineReducers({
     [superAdminApi.reducerPath]: superAdminApi.reducer,
     [superAdminDashboardApi.reducerPath]: superAdminDashboardApi.reducer,
     [billingApi.reducerPath]: billingApi.reducer,
+    [billingExpensesApi.reducerPath]: billingExpensesApi.reducer,
     [employeeTrainingsApi.reducerPath]: employeeTrainingsApi.reducer,
     [complianceApi.reducerPath]: complianceApi.reducer,
     [servicesApi.reducerPath]: servicesApi.reducer,
@@ -85,6 +87,7 @@ export const store = configureStore({
             .concat(superAdminDashboardApi.middleware)
             .concat(employeeTrainingsApi.middleware)
             .concat(billingApi.middleware)
+            .concat(billingExpensesApi.middleware)
             .concat(complianceApi.middleware)
             .concat(servicesApi.middleware)
             .concat(billingMonitorApi.middleware)

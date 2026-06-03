@@ -19,7 +19,7 @@ type DuePayrollTableProps = {
 function DuePayrollSkeletonRow() {
   return (
     <div className={`${TABLE_ROW_CLASS} animate-pulse`} aria-hidden="true">
-      {Array.from({ length: 7 }).map((_, index) => (
+      {Array.from({ length: 9 }).map((_, index) => (
         <span key={index} className="h-4 rounded bg-[#eef4f5]" />
       ))}
     </div>
@@ -109,6 +109,8 @@ export default function DuePayrollTable({
               <span>Date range</span>
               <span>Payment details</span>
               <span>Pay rate</span>
+              <span>Reimbursements</span>
+              <span>Gross pay</span>
               <span className="text-right">Action</span>
             </div>
 

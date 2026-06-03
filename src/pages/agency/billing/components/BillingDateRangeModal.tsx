@@ -8,6 +8,7 @@ import CustomDatePicker from "@/components/ui/datePicker";
 import BillingCornerModalHeader from "./BillingCornerModalHeader";
 import { BILLING_CORNER_MODAL_CLASS, BILLING_FIELD_CLASS, BILLING_FIELD_LABEL_CLASS } from "./billingModalStyles";
 import { assertValidDateRange } from "@/pages/agency/billing/financial-overview/utils/financialOverviewUtils";
+import { assertExpensesDateRange } from "@/pages/agency/billing/expenses/utils/expensesDashboardUtils";
 import type { BillingDateRangeValues } from "./types";
 
 type BillingDateRangeModalProps = {
@@ -18,6 +19,10 @@ type BillingDateRangeModalProps = {
   onApply: (values: BillingDateRangeValues) => void;
   title?: string;
   description?: string;
+  /** When false, only start/end order is validated (e.g. DSP expenses). */
+  enforceMaxDateRange?: boolean;
+  /** Custom max span in days (e.g. 366 for DSP expenses). Used when enforceMaxDateRange is false. */
+  maxRangeDays?: number;
 };
 
 export default function BillingDateRangeModal({
@@ -28,6 +33,8 @@ export default function BillingDateRangeModal({
   onApply,
   title = "Select date range",
   description = "Choose a date range to filter your dashboard",
+  enforceMaxDateRange = true,
+  maxRangeDays,
 }: BillingDateRangeModalProps) {
   const [error, setError] = useState("");
 
@@ -71,8 +78,12 @@ export default function BillingDateRangeModal({
         if (!value) onClose();
       }}
     >
-      <DialogContent className={BILLING_CORNER_MODAL_CLASS}>
-        <BillingCornerModalHeader title={title} description={description} />
+      <DialogContent showCloseButton={false} className={BILLING_CORNER_MODAL_CLASS}>
+        <BillingCornerModalHeader
+          title={title}
+          description={description}
+          onClose={onClose}
+        />
 
         <div className="space-y-6 px-6 pb-8 pt-6">
           <div className="text-[14px] font-medium text-[#00b4b8]">{formattedRangeLabel}</div>
@@ -87,7 +98,7 @@ export default function BillingDateRangeModal({
                 key={preset.label}
                 type="button"
                 onClick={() => applyPreset(preset.value)}
-                className="rounded-full border border-[#e5e5e6] bg-white px-4 py-2 text-[14px] font-medium text-[#10141a] transition-colors hover:border-[#00b4b8] hover:bg-[#eef4f5]"
+                className="cursor-pointer rounded-full border border-[#e5e5e6] bg-white px-4 py-2 text-[14px] font-medium text-[#10141a] transition-colors hover:border-[#00b4b8] hover:bg-[#eef4f5]"
               >
                 Last {preset.label}
               </button>
@@ -134,17 +145,32 @@ export default function BillingDateRangeModal({
                 return;
               }
 
-              const rangeError = assertValidDateRange(values);
-              if (rangeError) {
-                setError(rangeError);
-                return;
+              if (enforceMaxDateRange) {
+                const rangeError = assertValidDateRange(values);
+                if (rangeError) {
+                  setError(rangeError);
+                  return;
+                }
+              } else if (maxRangeDays != null) {
+                const rangeError = assertExpensesDateRange(values);
+                if (rangeError) {
+                  setError(rangeError);
+                  return;
+                }
+              } else if (values.startDate && values.endDate) {
+                const start = new Date(values.startDate);
+                const end = new Date(values.endDate);
+                if (start > end) {
+                  setError("Start date cannot be after end date.");
+                  return;
+                }
               }
 
               setError("");
               onApply(values);
               onClose();
             }}
-            className="flex h-[52px] w-full min-h-[44px] items-center justify-center rounded-full bg-[#00b4b8] text-[16px] font-medium text-white transition-colors hover:bg-[#009da1]"
+            className="flex h-[52px] w-full min-h-[44px] cursor-pointer items-center justify-center rounded-full bg-[#00b4b8] text-[16px] font-medium text-white transition-all duration-150 hover:bg-[#009da1] hover:shadow-sm active:scale-[0.98]"
           >
             Use this date range
           </button>

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,7 @@ interface DeleteConfirmationModalProps {
   message?: string
   confirmText?: string
   cancelText?: string
+  confirmButtonClassName?: string
 }
 
 export function DeleteConfirmationModal({
@@ -23,7 +25,20 @@ export function DeleteConfirmationModal({
   message = "Are you sure you want to permanently delete your account? This action cannot be undone and all your data will be lost.",
   confirmText = "Delete",
   cancelText = "Cancel",
+  confirmButtonClassName = "flex-1 bg-[#d93c24] hover:bg-[#c52d16] text-white",
 }: DeleteConfirmationModalProps) {
+  const [confirmReady, setConfirmReady] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) {
+      setConfirmReady(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => setConfirmReady(true), 200)
+    return () => window.clearTimeout(timer)
+  }, [isOpen])
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -32,7 +47,7 @@ export function DeleteConfirmationModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onClose}
+          onMouseDown={onClose}
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -40,7 +55,7 @@ export function DeleteConfirmationModal({
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ duration: 0.25 }}
             className="w-full max-w-md px-8 py-8 mx-4 text-center bg-white shadow-2xl rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex justify-center mb-4">
               <div className="p-3 bg-red-100 rounded-full">
@@ -60,8 +75,8 @@ export function DeleteConfirmationModal({
               </Button>
               <Button
                 onClick={onConfirm}
-                disabled={isDeleting}
-                className="flex-1 bg-[#d93c24] hover:bg-[#c52d16] text-white"
+                disabled={isDeleting || !confirmReady}
+                className={confirmButtonClassName}
               >
                 {isDeleting ? (
                   <span className="flex items-center justify-center gap-2">

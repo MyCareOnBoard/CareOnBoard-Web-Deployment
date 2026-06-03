@@ -23,5 +23,11 @@ export const BILLING_PRIMARY_BUTTON_CLASS =
 export const BILLING_SECONDARY_BUTTON_CLASS =
   "inline-flex h-[52px] min-h-[44px] cursor-pointer items-center justify-center rounded-full border border-[#e5e5e6] bg-white px-6 text-[16px] font-medium text-[#10141a] transition-colors hover:bg-[#eef4f5] disabled:cursor-not-allowed disabled:opacity-60";
 
+export const BILLING_DESTRUCTIVE_BUTTON_CLASS =
+  "inline-flex h-[52px] min-h-[44px] cursor-pointer items-center justify-center rounded-full bg-[#FF6900] px-6 text-[16px] font-medium text-white transition-colors hover:bg-[#e55f00] disabled:cursor-not-allowed disabled:opacity-60";
+
+export const BILLING_TEXTAREA_CLASS =
+  "w-full min-h-[120px] rounded-[10px] border border-[#e5e5e6] bg-white px-4 py-3 text-[14px] text-[#10141a] resize-none focus:border-[#00b4b8] focus:outline-none focus:ring-1 focus:ring-[#00b4b8]";
+
 export const BILLING_FIELD_CLASS =
   "h-[48px] rounded-[10px] border border-[#e5e5e6] bg-white px-4 text-[14px] text-[#10141a] focus:border-[#00b4b8] focus:ring-[#00b4b8]";

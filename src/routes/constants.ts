@@ -32,6 +32,7 @@ export const Routes = {
             financialOverview: "/agency/billing/financial-overview",
             payrollManagement: "/agency/billing/payroll-management",
             claims: "/agency/billing/claims",
+            expenses: "/agency/billing/expenses",
         },
         aiAutomation: "/agency/automations",
         aiAutomationConversation: "/agency/automations/:conversationId",
