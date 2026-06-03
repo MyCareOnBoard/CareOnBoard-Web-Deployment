@@ -32,7 +32,7 @@ export default function BillingCornerModalHeader({
             aria-label="Close"
             onClick={onClose}
             disabled={closeDisabled}
-            className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full text-[#808081] transition-colors hover:bg-[#eef4f5] hover:text-[#10141a] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center rounded-full text-[#808081] transition-colors hover:bg-[#eef4f5] hover:text-[#10141a] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <X className="h-5 w-5" />
           </button>

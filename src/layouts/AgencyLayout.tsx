@@ -73,6 +73,7 @@ const allNavItems: NavItem[] = [
             { label: "Financial overview", path: Routes.agency.billing.financialOverview },
             { label: "Payroll management", path: Routes.agency.billing.payrollManagement },
             { label: "Claims dashboard", path: Routes.agency.billing.claims },
+            { label: "DSP expenses", path: Routes.agency.billing.expenses },
         ],
     },
     { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },

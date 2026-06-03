@@ -19,6 +19,8 @@ export type DuePayrollEntry = {
   dateRangeEnd: string;
   paymentDetails: string;
   paRate: string;
+  shiftPayTotal?: number;
+  expenseTotal?: number;
   grossAmount?: number;
   shiftIds?: string[];
 };

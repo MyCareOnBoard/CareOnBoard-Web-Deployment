@@ -2,12 +2,13 @@ import React, { useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { ArrowLeft, Banknote, CornerDownLeft, Loader2, Download, Eye } from "lucide-react";
 import { useAuth } from "@/utils/auth";
+import { useGetDspClaimsQuery, ClientServiceDefinition } from "./api";
 import {
-  useGetDspClaimsQuery,
   useApproveExpenseMutation,
   useRejectExpenseMutation,
-  ClientServiceDefinition,
-} from "./api";
+} from "@/lib/api/billing-expenses";
+import { Link } from "react-router";
+import { Routes } from "@/routes/constants";
 import {
   formatCurrency,
   getStaffRate,
@@ -15,6 +16,7 @@ import {
   formatRateLabel,
 } from "./billingUtils";
 import { useToast } from "@/hooks/use-toast";
+import { mapExpenseMutationError } from "@/pages/agency/billing/shared/billingErrorCopy";
 
 export default function DSPClaimsPage() {
   const {dsp} = useParams();
@@ -46,40 +48,62 @@ export default function DSPClaimsPage() {
   );
 
   const handleApproveExpense = async (expenseId: string) => {
-    try {
-      await approveExpense({
-        expenseId,
-        agencyId: user?.agencyId || "",
-      }).unwrap();
-      
+    if (!user?.agencyId) {
       toast({
-        title: "Success",
-        description: "Expense approved successfully",
+        title: "Sign in required",
+        description: "Your account isn't linked to an agency.",
+        variant: "destructive",
       });
-    } catch (error: any) {
+      return;
+    }
+
+    try {
+      await approveExpense({ expenseId }).unwrap();
+
       toast({
-        title: "Error",
-        description: error?.data?.message || "Failed to approve expense",
+        title: "Expense approved",
+        description: "Included in this DSP's next payroll for the expense date.",
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "Couldn't update expense",
+        description: mapExpenseMutationError(error),
         variant: "destructive",
       });
     }
   };
 
   const handleRejectExpense = async (expenseId: string) => {
+    const reason = window.prompt(
+      "Reason for declining (the DSP will see this in their notification, at least 10 characters):",
+    );
+    if (reason === null) {
+      return;
+    }
+    const trimmed = reason.trim();
+    if (trimmed.length < 10) {
+      toast({
+        title: "Reason required",
+        description: "Add at least 10 characters so the DSP understands why.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       await rejectExpense({
         expenseId,
-        agencyId: user?.agencyId || "",
+        reviewerNotes: trimmed,
       }).unwrap();
-      
+
       toast({
-        title: "Success",
-        description: "Expense rejected successfully",
+        title: "Expense declined",
+        description: "The DSP will see your reason in their app.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
-        title: "Error",
-        description: error?.data?.message || "Failed to reject expense",
+        title: "Couldn't update expense",
+        description: mapExpenseMutationError(error),
         variant: "destructive",
       });
     }
@@ -319,9 +343,17 @@ export default function DSPClaimsPage() {
         {/* Pending Expenses Section */}
         {pendingExpenses && pendingExpenses.length > 0 && (
           <div className="bg-white rounded-[20px] p-6 mb-6 no-print">
-            <h2 className="text-[14px] font-semibold text-[#808081] mb-4">
-              Expenses awaiting approval ({pendingExpenses.length})
-            </h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-[14px] font-semibold text-[#808081]">
+                Expenses awaiting approval ({pendingExpenses.length})
+              </h2>
+              <Link
+                to={Routes.agency.billing.expenses}
+                className="text-[13px] font-medium text-[#00b4b8] hover:underline"
+              >
+                Review all DSP expenses
+              </Link>
+            </div>
             <div className="space-y-3">
               {pendingExpenses.map((expense) => (
                 <div key={expense.id} className="bg-[#0EAF521A] rounded-lg p-4 flex items-center justify-between">

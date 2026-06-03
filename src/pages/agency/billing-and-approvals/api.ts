@@ -293,22 +293,6 @@ export const billingApi = createApi({
       }),
       providesTags: ['BillingRecords']
     }),
-    approveExpense: builder.mutation<{ success: boolean; message: string; data: { id: string; status: string } }, { expenseId: string; agencyId: string }>({
-      query: ({ expenseId, agencyId }) => ({
-        url: `/billing/expenses/${expenseId}/approve?agencyId=${agencyId}`,
-        method: "POST",
-        requiresAuth: true
-      }),
-      invalidatesTags: ['BillingRecords']
-    }),
-    rejectExpense: builder.mutation<{ success: boolean; message: string; data: { id: string; status: string } }, { expenseId: string; agencyId: string; reviewerNotes?: string }>({
-      query: ({ expenseId, agencyId, reviewerNotes }) => ({
-        url: `/billing/expenses/${expenseId}/reject?agencyId=${agencyId}${reviewerNotes ? `&reviewerNotes=${encodeURIComponent(reviewerNotes)}` : ''}`,
-        method: "POST",
-        requiresAuth: true
-      }),
-      invalidatesTags: ['BillingRecords']
-    })
   }),
 });
 
@@ -317,6 +301,4 @@ export const {
   useGenerateReportMutation,
   useGetClientClaimsQuery,
   useGetDspClaimsQuery,
-  useApproveExpenseMutation,
-  useRejectExpenseMutation,
 } = billingApi;

@@ -20,6 +20,8 @@ type BillingDashboardHeaderProps = {
   primaryAction?: PrimaryAction;
   dateRangeModalTitle?: string;
   dateRangeModalDescription?: string;
+  enforceMaxDateRange?: boolean;
+  maxRangeDays?: number;
 };
 
 function formatDateRangeLabel(values: BillingDateRangeValues) {
@@ -38,6 +40,8 @@ export default function BillingDashboardHeader({
   primaryAction,
   dateRangeModalTitle,
   dateRangeModalDescription,
+  enforceMaxDateRange,
+  maxRangeDays,
 }: BillingDashboardHeaderProps) {
   const [showDateModal, setShowDateModal] = useState(false);
   const [draftRange, setDraftRange] = useState(dateRange);
@@ -90,6 +94,8 @@ export default function BillingDashboardHeader({
         onApply={onDateRangeChange}
         title={dateRangeModalTitle}
         description={dateRangeModalDescription}
+        enforceMaxDateRange={enforceMaxDateRange}
+        maxRangeDays={maxRangeDays}
       />
     </>
   );

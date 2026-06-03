@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DateRangeValues } from "@/pages/agency/billing/shared/types";
+import { subscribePayrollInvalidation } from "@/pages/agency/billing/shared/billingInvalidation";
 import { getStaffToPay, type DuePayrollEntry } from "@/lib/api/payroll";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
@@ -95,6 +96,15 @@ export function useStaffToPay(
   useEffect(() => {
     void refetch();
   }, [refetch]);
+
+  useEffect(() => {
+    return subscribePayrollInvalidation(() => {
+      if (!enabled || !hasLoadedOnceRef.current) {
+        return;
+      }
+      void refetch({ force: true });
+    });
+  }, [enabled, refetch]);
 
   return {
     entries,

@@ -1,7 +1,7 @@
 export const TABLE_MIN_WIDTH = "min-w-[920px]";
 
 export const TABLE_GRID =
-  "grid grid-cols-[minmax(130px,1.4fr)_minmax(90px,1fr)_minmax(100px,1fr)_minmax(118px,1.1fr)_minmax(140px,1.4fr)_minmax(90px,0.9fr)_40px] items-center gap-3 pl-4 pr-8 [&>*]:min-w-0";
+  "grid grid-cols-[minmax(130px,1.3fr)_minmax(90px,0.9fr)_minmax(100px,0.9fr)_minmax(118px,1fr)_minmax(120px,1.2fr)_minmax(90px,0.8fr)_minmax(100px,0.9fr)_minmax(90px,0.9fr)_40px] items-center gap-3 pl-4 pr-8 [&>*]:min-w-0";
 
 export const TABLE_HEADER_CLASS = `${TABLE_GRID} py-3 text-[13px] font-semibold text-[#10141a] border-b border-[#e5e5e6]`;
 

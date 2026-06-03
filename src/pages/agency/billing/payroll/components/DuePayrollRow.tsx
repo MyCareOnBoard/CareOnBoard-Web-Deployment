@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/routes/constants";
+import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import type { DuePayrollEntry } from "@/lib/api/payroll";
 import { formatPayrollDateRangeLabel } from "../utils/payrollDashboardUtils";
 import { TABLE_ROW_CLASS } from "./tableColumns";
@@ -124,6 +125,15 @@ function PayrollActionsMenu({
   );
 }
 
+function grossPayBreakdown(entry: DuePayrollEntry) {
+  const expenseTotal = entry.expenseTotal ?? 0;
+  if (expenseTotal <= 0) {
+    return null;
+  }
+  const shiftPay = entry.shiftPayTotal ?? Math.max((entry.grossAmount ?? 0) - expenseTotal, 0);
+  return `Shift pay ${formatCurrency(shiftPay)} + reimbursements ${formatCurrency(expenseTotal)}`;
+}
+
 type DuePayrollRowProps = {
   entry: DuePayrollEntry;
   variant: "mobile" | "desktop";
@@ -137,6 +147,7 @@ function DuePayrollRow({
   actionsDisabled = false,
   onGenerateInvoice,
 }: DuePayrollRowProps) {
+  const breakdown = grossPayBreakdown(entry);
   if (variant === "mobile") {
     return (
       <div className="relative rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
@@ -178,6 +189,17 @@ function DuePayrollRow({
           <p className="text-[12px] text-[#808081]">Payment details</p>
           <p className="mt-1 text-[13px] font-medium text-[#10141a]">{entry.paymentDetails}</p>
         </div>
+        {(entry.grossAmount ?? 0) > 0 ? (
+          <div className="mt-4 border-t border-[#e5e5e6] pt-4">
+            <p className="text-[12px] text-[#808081]">Gross pay</p>
+            <p className="mt-1 text-[13px] font-semibold tabular-nums text-[#10141a]">
+              {formatCurrency(entry.grossAmount ?? 0)}
+            </p>
+            {breakdown ? (
+              <p className="mt-1 text-[12px] text-[#808081]">{breakdown}</p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -190,6 +212,12 @@ function DuePayrollRow({
       <DateRange start={entry.dateRangeStart} end={entry.dateRangeEnd} />
       <span className="truncate text-[13px] text-[#10141a]">{entry.paymentDetails}</span>
       <span className="text-[13px] tabular-nums text-[#10141a]">{entry.paRate}</span>
+      <span className="text-[13px] tabular-nums text-[#10141a]">
+        {(entry.expenseTotal ?? 0) > 0 ? formatCurrency(entry.expenseTotal ?? 0) : "—"}
+      </span>
+      <span className="text-[13px] font-medium tabular-nums text-[#10141a]" title={breakdown ?? undefined}>
+        {formatCurrency(entry.grossAmount ?? 0)}
+      </span>
       <div className="flex justify-end">
         <PayrollActionsMenu
           entry={entry}
