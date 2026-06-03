@@ -170,7 +170,7 @@ export default function ClaimsDashboardPage() {
   const handleTableGenerateClaim = useCallback(
     (claim: RecentClaim, anchorShift: Shift) => {
       const serviceCode = anchorShift.serviceCode?.trim() || claim.serviceCode.trim();
-      void handleGenerateClaim([anchorShift], { serviceCode });
+      void handleGenerateClaim({ shifts: [anchorShift], rides: [] }, { serviceCode });
     },
     [handleGenerateClaim],
   );
