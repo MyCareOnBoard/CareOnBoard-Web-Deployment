@@ -49,6 +49,42 @@ const initialFormData: MileageFormData = {
   schedulingType: "one-time",
 };
 
+type ScheduleGate = { ok: true } | { ok: false; reason: string; caregiverMismatch?: boolean };
+
+function computeScheduleGate(
+  formData: MileageFormData,
+  transportationService: ClientService | null,
+  loadingClient: boolean,
+): ScheduleGate {
+  if (!formData.clientId) {
+    return { ok: false, reason: "Select a client from search" };
+  }
+  if (loadingClient) {
+    return { ok: false, reason: "Loading transportation service…" };
+  }
+  if (!transportationService?.code) {
+    return { ok: false, reason: "No active transportation service" };
+  }
+  if (!formData.assignDspId) {
+    return { ok: false, reason: "Select an assigned DSP" };
+  }
+  const dspOnService = transportationService.assignedDsps ?? [];
+  if (!dspOnService.some((d) => d.id === formData.assignDspId)) {
+    return {
+      ok: false,
+      reason: "The selected caregiver is not assigned to this transportation service.",
+      caregiverMismatch: true,
+    };
+  }
+  if (!formData.selectDate) {
+    return { ok: false, reason: "Select date" };
+  }
+  if (!formData.selectTime) {
+    return { ok: false, reason: "Select time" };
+  }
+  return { ok: true };
+}
+
 export default function AddMileageModal({
   isOpen,
   onClose,
@@ -124,7 +160,7 @@ export default function AddMileageModal({
         setFormData((prev) => ({
           ...prev,
           assignDsp: dspName,
-          assignDspId: emp.uid || dspId,
+          assignDspId: dspId,
         }));
       } catch {
         if (token !== dspVerifyTokenRef.current) return;
@@ -205,29 +241,11 @@ export default function AddMileageModal({
   };
 
   const dspOnService = transportationService?.assignedDsps ?? [];
-  const caregiverAllowedOnService =
-    !formData.assignDspId ||
-    dspOnService.some((d) => d.id === formData.assignDspId);
 
-  const canSchedule = useMemo(() => {
-    return Boolean(
-      formData.clientId &&
-        transportationService?.code &&
-        formData.assignDspId &&
-        caregiverAllowedOnService &&
-        formData.selectDate &&
-        formData.selectTime &&
-        !loadingClient,
-    );
-  }, [
-    formData.clientId,
-    formData.assignDspId,
-    formData.selectDate,
-    formData.selectTime,
-    transportationService?.code,
-    caregiverAllowedOnService,
-    loadingClient,
-  ]);
+  const scheduleGate = useMemo(
+    () => computeScheduleGate(formData, transportationService, loadingClient),
+    [formData, transportationService, loadingClient],
+  );
 
 
   const handleDateSelect = (date: Date) => {
@@ -318,27 +336,10 @@ export default function AddMileageModal({
   };
 
   const handleSchedule = async () => {
-    const missingFields: string[] = [];
-    if (!formData.clientId) missingFields.push("Client");
-    if (!transportationService) missingFields.push("Service");
-    if (!formData.assignDspId) missingFields.push("Assigned DSP");
-    if (!formData.selectDate) missingFields.push("Date");
-    if (!formData.selectTime) missingFields.push("Time");
-
-    if (missingFields.length > 0) {
+    if (!scheduleGate.ok) {
       toast({
-        title: "Complete required fields",
-        description: missingFields.join(", "),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!caregiverAllowedOnService) {
-      toast({
-        title: "Invalid DSP",
-        description:
-          "The selected caregiver is not assigned to this transportation service.",
+        title: scheduleGate.caregiverMismatch ? "Invalid DSP" : "Complete required fields",
+        description: scheduleGate.reason,
         variant: "destructive",
       });
       return;
@@ -560,11 +561,13 @@ export default function AddMileageModal({
                   client record, then schedule mileage.
                 </p>
               )}
-              {mode === "edit" && formData.assignDspId && !caregiverAllowedOnService && (
-                <p className="text-[11px] text-[#b45309]">
-                  Selected caregiver is not on this service. Choose an assigned DSP.
-                </p>
-              )}
+              {formData.assignDspId &&
+                !scheduleGate.ok &&
+                scheduleGate.caregiverMismatch && (
+                  <p className="text-[11px] text-[#b45309]">
+                    Selected caregiver is not on this service. Choose an assigned DSP.
+                  </p>
+                )}
               {showAssignDspDropdown && dspOnService.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                   {dspOnService.map((dsp) => (
@@ -748,9 +751,9 @@ export default function AddMileageModal({
           </Button>
           <Button
             onClick={handleSchedule}
-            disabled={isSubmitting || !canSchedule}
+            disabled={isSubmitting || !scheduleGate.ok}
             aria-describedby={
-              !canSchedule ? "mileage-service-field mileage-assign-dsp-field" : undefined
+              !scheduleGate.ok ? "mileage-service-field mileage-assign-dsp-field" : undefined
             }
             className="flex-1 h-11 bg-[#00b4b8] hover:bg-[#009ba1] text-white rounded-xl text-[14px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
