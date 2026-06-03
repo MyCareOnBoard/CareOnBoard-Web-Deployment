@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import TimePicker from "@/components/TimePicker";
 import { searchClients, Client, ClientDsp, ClientService, getAgencyClientById } from "@/lib/api/clients";
-import { getEmployeeById } from "@/lib/api/employees";
+import { getEmployeeById, employeeCaregiverUid } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import { mileageApi, CreateMileageRideRequest, MileageRide, UpdateAgencyRideRequest } from "@/lib/api/mileage";
 import {
@@ -49,7 +49,7 @@ const initialFormData: MileageFormData = {
   schedulingType: "one-time",
 };
 
-type ScheduleGate = { ok: true } | { ok: false; reason: string; caregiverMismatch?: boolean };
+type ScheduleGate = { ok: true } | { ok: false; reason: string };
 
 function computeScheduleGate(
   formData: MileageFormData,
@@ -67,14 +67,6 @@ function computeScheduleGate(
   }
   if (!formData.assignDspId) {
     return { ok: false, reason: "Select an assigned DSP" };
-  }
-  const dspOnService = transportationService.assignedDsps ?? [];
-  if (!dspOnService.some((d) => d.id === formData.assignDspId)) {
-    return {
-      ok: false,
-      reason: "The selected caregiver is not assigned to this transportation service.",
-      caregiverMismatch: true,
-    };
   }
   if (!formData.selectDate) {
     return { ok: false, reason: "Select date" };
@@ -160,7 +152,7 @@ export default function AddMileageModal({
         setFormData((prev) => ({
           ...prev,
           assignDsp: dspName,
-          assignDspId: dspId,
+          assignDspId: employeeCaregiverUid(emp),
         }));
       } catch {
         if (token !== dspVerifyTokenRef.current) return;
@@ -176,6 +168,30 @@ export default function AddMileageModal({
     [toast],
   );
 
+  const applyClientForMileage = useCallback(
+    (client: Client) => {
+      const services = clientServicesForMileage(client);
+      const transport = findActiveTransportationService(services);
+      setTransportationService(transport);
+
+      if (!transport) {
+        toast({
+          title: "No transportation service",
+          description:
+            "This client has no active transportation service. Add or renew transportation in Client Management, then try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const assigned = transport.assignedDsps;
+      if (assigned?.length === 1 && assigned[0]?.id) {
+        void verifyAndApplyDsp(assigned[0].id, assigned[0].name ?? "");
+      }
+    },
+    [toast, verifyAndApplyDsp],
+  );
+
   const loadClientForMileage = useCallback(
     async (clientId: string) => {
       latestClientSelectIdRef.current = clientId;
@@ -185,24 +201,7 @@ export default function AddMileageModal({
         const client = await getAgencyClientById(clientId);
         if (latestClientSelectIdRef.current !== clientId) return;
 
-        const services = clientServicesForMileage(client);
-        const transport = findActiveTransportationService(services);
-        setTransportationService(transport);
-
-        if (!transport) {
-          toast({
-            title: "No transportation service",
-            description:
-              "This client has no active transportation service. Add or renew transportation in Client Management, then try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const assigned = transport.assignedDsps;
-        if (assigned?.length === 1 && assigned[0]?.id) {
-          void verifyAndApplyDsp(assigned[0].id, assigned[0].name ?? "");
-        }
+        applyClientForMileage(client);
       } catch {
         if (latestClientSelectIdRef.current !== clientId) return;
         setTransportationService(null);
@@ -217,7 +216,7 @@ export default function AddMileageModal({
         }
       }
     },
-    [resetServiceAndDsp, toast, verifyAndApplyDsp],
+    [resetServiceAndDsp, applyClientForMileage, toast],
   );
 
   const handleClientSelect = (client: Client) => {
@@ -225,6 +224,8 @@ export default function AddMileageModal({
       client.firstName && client.lastName
         ? `${client.firstName} ${client.lastName}`
         : client.id;
+    latestClientSelectIdRef.current = client.id;
+    resetServiceAndDsp();
     setFormData((prev) => ({
       ...prev,
       client: label,
@@ -232,7 +233,7 @@ export default function AddMileageModal({
     }));
     setShowClientDropdown(false);
     setClientSearchResults([]);
-    void loadClientForMileage(client.id);
+    applyClientForMileage(client);
   };
 
   const handleAssignedDspRowSelect = (dsp: ClientDsp) => {
@@ -338,7 +339,7 @@ export default function AddMileageModal({
   const handleSchedule = async () => {
     if (!scheduleGate.ok) {
       toast({
-        title: scheduleGate.caregiverMismatch ? "Invalid DSP" : "Complete required fields",
+        title: "Complete required fields",
         description: scheduleGate.reason,
         variant: "destructive",
       });
@@ -561,13 +562,6 @@ export default function AddMileageModal({
                   client record, then schedule mileage.
                 </p>
               )}
-              {formData.assignDspId &&
-                !scheduleGate.ok &&
-                scheduleGate.caregiverMismatch && (
-                  <p className="text-[11px] text-[#b45309]">
-                    Selected caregiver is not on this service. Choose an assigned DSP.
-                  </p>
-                )}
               {showAssignDspDropdown && dspOnService.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                   {dspOnService.map((dsp) => (
