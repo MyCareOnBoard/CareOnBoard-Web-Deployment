@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { Shift } from "@/lib/api/shifts";
+import type { MileageRide } from "@/lib/api/mileage";
 import {
   getBillingClaimById,
   getBillingClaimMutationErrorMessage,
@@ -118,23 +119,29 @@ export default function ClaimsDashboardPage() {
 
   const handleGenerateClaim = useCallback(
     async (
-      selectedShifts: Shift[],
+      selection: { shifts: Shift[]; rides: MileageRide[] },
       context: { serviceCode: string; weekRange?: string },
     ) => {
-      if (!user?.agencyId || selectedShifts.length === 0) return;
+      if (
+        !user?.agencyId ||
+        (selection.shifts.length === 0 && selection.rides.length === 0)
+      ) {
+        return;
+      }
 
       setSavingClaim(true);
       try {
         const { savedClaim, anchorClaim } = await saveGeneratedClaim({
           agencyId: user.agencyId,
-          selectedShifts,
+          selectedShifts: selection.shifts,
+          selectedRides: selection.rides,
           serviceCode: context.serviceCode,
           weekRange: context.weekRange,
         });
 
         setClaimReport({
           claim: anchorClaim,
-          selectedShifts,
+          selectedShifts: selection.shifts,
           savedClaim,
         });
         setGenerateOpen(false);

@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { X, MapPin, Clock, Navigation } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 import { mileageApi, MileageRide, MileageSegment } from "@/lib/api/mileage";
+import { formatRideServiceLabel } from "@/pages/agency/mileage/utils/transportationClientService";
 
 interface RideDetailModalProps {
   ride: MileageRide | null;
   isOpen: boolean;
   onClose: () => void;
+  onRideUpdated?: (ride: MileageRide) => void;
 }
 
 type FirebaseTimestampLike = { seconds?: number; _seconds?: number };
@@ -72,12 +76,16 @@ const statusStyles: Record<string, string> = {
   cancelled: "bg-red-100 text-red-600",
 };
 
-export default function RideDetailModal({ ride, isOpen, onClose }: RideDetailModalProps) {
+export default function RideDetailModal({ ride, isOpen, onClose, onRideUpdated }: RideDetailModalProps) {
+  const { toast } = useToast();
   const [segments, setSegments] = useState<MileageSegment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [approved, setApproved] = useState(false);
+  const [approvalSaving, setApprovalSaving] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !ride) return;
+    setApproved(Boolean(ride.approved));
     setSegments([]);
     setLoading(true);
     mileageApi
@@ -85,11 +93,46 @@ export default function RideDetailModal({ ride, isOpen, onClose }: RideDetailMod
       .then((res) => setSegments(res.data ?? []))
       .catch(() => setSegments([]))
       .finally(() => setLoading(false));
-  }, [isOpen, ride?.id]);
+  }, [isOpen, ride?.id, ride?.approved]);
 
   if (!isOpen || !ride) return null;
 
   const displayName = ride.clientName ?? ride.purpose ?? "Manual Trip";
+  const showApproveForBilling = ride.status === "completed" && Boolean(ride.serviceCode);
+  const billingLocked = Boolean(ride.claimId || ride.payrollInvoiceId);
+
+  const handleApprovalToggle = async (next: boolean) => {
+    if (billingLocked) {
+      toast({
+        title: next ? "Cannot approve" : "Cannot unapprove",
+        description: ride.claimId
+          ? "This ride is on a billing claim and can't be unapproved here."
+          : "This ride is on a payroll invoice and can't be unapproved here.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setApprovalSaving(true);
+    const previous = approved;
+    setApproved(next);
+    try {
+      await mileageApi.updateAgency(ride.id, { approved: next });
+      onRideUpdated?.({ ...ride, approved: next });
+      toast({
+        title: next ? "Ride approved for billing." : "Ride removed from billing approval.",
+        variant: "success",
+      });
+    } catch {
+      setApproved(previous);
+      toast({
+        title: "Couldn't update billing approval. Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setApprovalSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-end">
@@ -181,6 +224,49 @@ export default function RideDetailModal({ ride, isOpen, onClose }: RideDetailMod
               </div>
             )}
           </div>
+
+          {(ride.serviceCode || ride.claimId || ride.payrollInvoiceId) && (
+            <div className="bg-[#f8f9fa] rounded-xl p-4 space-y-2">
+              {ride.serviceCode && (
+                <div className="flex justify-between gap-2 text-[13px]">
+                  <span className="text-[#9ca3af]">Service</span>
+                  <span className="font-medium text-[#10141a]">{formatRideServiceLabel(ride)}</span>
+                </div>
+              )}
+              {ride.serviceAuthStartDate && (
+                <div className="flex justify-between gap-2 text-[13px]">
+                  <span className="text-[#9ca3af]">Authorization</span>
+                  <span className="text-[#10141a]">
+                    {ride.serviceAuthStartDate}
+                    {ride.serviceAuthEndDate ? ` – ${ride.serviceAuthEndDate}` : ""}
+                  </span>
+                </div>
+              )}
+              {ride.claimId && (
+                <p className="text-[12px] text-[#6b7280]">On claim {ride.claimId}</p>
+              )}
+              {ride.payrollInvoiceId && (
+                <p className="text-[12px] text-[#6b7280]">On payroll invoice {ride.payrollInvoiceId}</p>
+              )}
+            </div>
+          )}
+
+          {showApproveForBilling && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e5e7eb] bg-white p-4">
+              <div className="min-w-0">
+                <p className="text-[14px] font-semibold text-[#10141a]">Approve for billing</p>
+                <p className="text-[11px] text-[#808081]">
+                  Included in Billing &amp; Approvals when turned on.
+                </p>
+              </div>
+              <Switch
+                checked={approved}
+                disabled={approvalSaving || billingLocked}
+                onCheckedChange={handleApprovalToggle}
+                aria-label="Approve for billing"
+              />
+            </div>
+          )}
 
           {/* Notes */}
           {ride.notes && (

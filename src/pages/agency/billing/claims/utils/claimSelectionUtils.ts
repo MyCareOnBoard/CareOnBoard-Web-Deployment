@@ -1,5 +1,7 @@
 import type { Client, ClientService } from "@/lib/api/clients";
 import type { Shift } from "@/lib/api/shifts";
+import type { MileageRide } from "@/lib/api/mileage";
+import { isTransportationClientService } from "@/pages/agency/mileage/utils/transportationClientService";
 import { parseSdrWeekRange } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
 import { format, parseISO } from "date-fns";
 
@@ -86,6 +88,40 @@ export function pickDefaultServiceWithWeekRows(client?: Client): ClientService |
 
 export function resolveServiceCode(service?: ClientService, fallback?: string): string {
   return service?.code?.trim() || fallback?.trim() || "";
+}
+
+export function isTransportationServiceForClaims(service?: ClientService): boolean {
+  if (!service) return false;
+  return isTransportationClientService(service);
+}
+
+function rideDateYmd(ride: MileageRide): string {
+  const raw = ride.completedAt ?? ride.scheduledStartTime;
+  if (!raw) return "";
+  try {
+    return raw.slice(0, 10);
+  } catch {
+    return "";
+  }
+}
+
+export function filterRidesForClaimSelection(
+  rides: MileageRide[],
+  serviceCode: string,
+  bounds: WeekRangeBounds | null,
+): MileageRide[] {
+  return rides.filter((ride) => {
+    if (ride.status !== "completed" || !ride.approved || ride.claimId) {
+      return false;
+    }
+    if (!serviceCodesMatch(ride.serviceCode ?? undefined, serviceCode)) {
+      return false;
+    }
+    if (!bounds) return true;
+    const rideDate = rideDateYmd(ride);
+    if (!rideDate) return false;
+    return rideDate >= bounds.start && rideDate <= bounds.end;
+  });
 }
 
 export function formatShiftDurationLabel(shift: Shift): string {

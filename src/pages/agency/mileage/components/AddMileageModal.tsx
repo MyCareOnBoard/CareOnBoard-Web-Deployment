@@ -1,12 +1,19 @@
-import React, { useState, useRef, useEffect } from "react";
-import { X, Calendar, ChevronLeft, ChevronRight, Clock, Loader2 } from "lucide-react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { X, Calendar, ChevronLeft, ChevronRight, Clock, Loader2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import TimePicker from "@/components/TimePicker";
-import { searchClients, Client } from "@/lib/api/clients";
-import { searchEmployees, Employee } from "@/lib/api/employees";
+import { searchClients, Client, ClientDsp, ClientService, getAgencyClientById } from "@/lib/api/clients";
+import { getEmployeeById } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import { mileageApi, CreateMileageRideRequest, MileageRide, UpdateAgencyRideRequest } from "@/lib/api/mileage";
+import {
+  clientServicesForMileage,
+  findActiveTransportationService,
+  formatServiceAuthorizationDatesSummary,
+  formatServiceDisplay,
+  mileageServiceFieldsForApi,
+} from "@/pages/agency/mileage/utils/transportationClientService";
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
@@ -53,17 +60,19 @@ export default function AddMileageModal({
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<MileageFormData>(initialFormData);
-
-  // --- Client & DSP search/autocomplete states ---
+  const [transportationService, setTransportationService] = useState<ClientService | null>(null);
+  const [loadingClient, setLoadingClient] = useState(false);
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
-  const [dspSearchResults, setDspSearchResults] = useState<Employee[]>([]);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [showDspDropdown, setShowDspDropdown] = useState(false);
+  const [showAssignDspDropdown, setShowAssignDspDropdown] = useState(false);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
-  const [isSearchingDsps, setIsSearchingDsps] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const dspSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const latestClientSelectIdRef = useRef<string | null>(null);
+  const dspVerifyTokenRef = useRef(0);
 
   // --- Client search handler ---
   const handleClientSearch = (query: string) => {
@@ -85,45 +94,140 @@ export default function AddMileageModal({
     }, 300);
   };
 
+  const resetServiceAndDsp = useCallback(() => {
+    dspVerifyTokenRef.current += 1;
+    setTransportationService(null);
+    setFormData((prev) => ({ ...prev, assignDsp: "", assignDspId: "" }));
+    setShowAssignDspDropdown(false);
+  }, []);
+
+  const verifyAndApplyDsp = useCallback(
+    async (dspId: string, dspName: string) => {
+      const token = ++dspVerifyTokenRef.current;
+      if (!dspId) {
+        setFormData((prev) => ({ ...prev, assignDsp: "", assignDspId: "" }));
+        return;
+      }
+      try {
+        const emp = await getEmployeeById(dspId);
+        if (token !== dspVerifyTokenRef.current) return;
+        if (emp.workAvailability !== true) {
+          setFormData((prev) => ({ ...prev, assignDsp: "", assignDspId: "" }));
+          toast({
+            title: "Assigned DSP unavailable",
+            description:
+              "The DSP assigned to this service is currently unavailable, please select another.",
+            variant: "destructive",
+          });
+          return;
+        }
+        setFormData((prev) => ({
+          ...prev,
+          assignDsp: dspName,
+          assignDspId: emp.uid || dspId,
+        }));
+      } catch {
+        if (token !== dspVerifyTokenRef.current) return;
+        setFormData((prev) => ({ ...prev, assignDsp: "", assignDspId: "" }));
+        toast({
+          title: "Could not verify assigned DSP",
+          description:
+            "Choose another DSP from this service's assigned list, or update staff on the client record.",
+          variant: "destructive",
+        });
+      }
+    },
+    [toast],
+  );
+
+  const loadClientForMileage = useCallback(
+    async (clientId: string) => {
+      latestClientSelectIdRef.current = clientId;
+      resetServiceAndDsp();
+      setLoadingClient(true);
+      try {
+        const client = await getAgencyClientById(clientId);
+        if (latestClientSelectIdRef.current !== clientId) return;
+
+        const services = clientServicesForMileage(client);
+        const transport = findActiveTransportationService(services);
+        setTransportationService(transport);
+
+        if (!transport) {
+          toast({
+            title: "No transportation service",
+            description:
+              "This client has no active transportation service. Add or renew transportation in Client Management, then try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const assigned = transport.assignedDsps;
+        if (assigned?.length === 1 && assigned[0]?.id) {
+          void verifyAndApplyDsp(assigned[0].id, assigned[0].name ?? "");
+        }
+      } catch {
+        if (latestClientSelectIdRef.current !== clientId) return;
+        setTransportationService(null);
+        toast({
+          title: "Could not load client",
+          description: "Try selecting the client again.",
+          variant: "destructive",
+        });
+      } finally {
+        if (latestClientSelectIdRef.current === clientId) {
+          setLoadingClient(false);
+        }
+      }
+    },
+    [resetServiceAndDsp, toast, verifyAndApplyDsp],
+  );
+
   const handleClientSelect = (client: Client) => {
-    setFormData(prev => ({
+    const label =
+      client.firstName && client.lastName
+        ? `${client.firstName} ${client.lastName}`
+        : client.id;
+    setFormData((prev) => ({
       ...prev,
-      client: client.firstName && client.lastName ? `${client.firstName} ${client.lastName}` : client.id,
+      client: label,
       clientId: client.id,
     }));
     setShowClientDropdown(false);
     setClientSearchResults([]);
+    void loadClientForMileage(client.id);
   };
 
-  // --- DSP search handler ---
-  const handleDspSearch = (query: string) => {
-    if (dspSearchTimeoutRef.current) clearTimeout(dspSearchTimeoutRef.current);
-    if (query.trim().length < 2) {
-      setDspSearchResults([]);
-      setShowDspDropdown(false);
-      return;
-    }
-    dspSearchTimeoutRef.current = setTimeout(async () => {
-      setIsSearchingDsps(true);
-      try {
-        const results = await searchEmployees(query);
-        setDspSearchResults(results);
-        setShowDspDropdown(results.length > 0);
-      } finally {
-        setIsSearchingDsps(false);
-      }
-    }, 300);
+  const handleAssignedDspRowSelect = (dsp: ClientDsp) => {
+    void verifyAndApplyDsp(dsp.id, dsp.name ?? "");
+    setShowAssignDspDropdown(false);
   };
 
-  const handleDspSelect = (employee: Employee) => {
-    setFormData(prev => ({
-      ...prev,
-      assignDsp: employee.fullName,
-      assignDspId: employee.uid,
-    }));
-    setShowDspDropdown(false);
-    setDspSearchResults([]);
-  };
+  const dspOnService = transportationService?.assignedDsps ?? [];
+  const caregiverAllowedOnService =
+    !formData.assignDspId ||
+    dspOnService.some((d) => d.id === formData.assignDspId);
+
+  const canSchedule = useMemo(() => {
+    return Boolean(
+      formData.clientId &&
+        transportationService?.code &&
+        formData.assignDspId &&
+        caregiverAllowedOnService &&
+        formData.selectDate &&
+        formData.selectTime &&
+        !loadingClient,
+    );
+  }, [
+    formData.clientId,
+    formData.assignDspId,
+    formData.selectDate,
+    formData.selectTime,
+    transportationService?.code,
+    caregiverAllowedOnService,
+    loadingClient,
+  ]);
 
 
   const handleDateSelect = (date: Date) => {
@@ -193,11 +297,17 @@ export default function AddMileageModal({
       selectTime: time12,
       schedulingType: "one-time",
     });
-  }, [isOpen, mode, initialRide]);
+
+    if (initialRide.clientId) {
+      void loadClientForMileage(initialRide.clientId);
+    }
+  }, [isOpen, mode, initialRide, loadClientForMileage]);
 
   useEffect(() => {
     if (isOpen && mode === "create") {
       setFormData({ ...initialFormData, selectDate: new Date() });
+      setTransportationService(null);
+      latestClientSelectIdRef.current = null;
     }
   }, [isOpen, mode]);
 
@@ -209,48 +319,56 @@ export default function AddMileageModal({
 
   const handleSchedule = async () => {
     const missingFields: string[] = [];
-    if (!formData.client || !formData.clientId) missingFields.push("Client");
-    if (!formData.assignDsp || !formData.assignDspId) missingFields.push("Assign DSP");
-    if (!formData.selectDate) missingFields.push("Select Date");
-    if (!formData.selectTime) missingFields.push("Select Time");
-    if (!formData.schedulingType) missingFields.push("Scheduling Type");
+    if (!formData.clientId) missingFields.push("Client");
+    if (!transportationService) missingFields.push("Service");
+    if (!formData.assignDspId) missingFields.push("Assigned DSP");
+    if (!formData.selectDate) missingFields.push("Date");
+    if (!formData.selectTime) missingFields.push("Time");
 
     if (missingFields.length > 0) {
       toast({
-        title: "Missing Required Fields",
-        description: `Please fill in the following required fields: ${missingFields.join(", ")}`,
+        title: "Complete required fields",
+        description: missingFields.join(", "),
         variant: "destructive",
       });
       return;
     }
 
-    const clientId = formData.clientId;
-    const caregiverId = formData.assignDspId;
-    if (!clientId || !caregiverId) {
+    if (!caregiverAllowedOnService) {
       toast({
-        title: "Missing Required Fields",
-        description: "Client and caregiver are required.",
+        title: "Invalid DSP",
+        description:
+          "The selected caregiver is not assigned to this transportation service.",
         variant: "destructive",
       });
       return;
     }
+
+    const clientId = formData.clientId!;
+    const caregiverId = formData.assignDspId!;
+    const serviceFields = mileageServiceFieldsForApi(
+      transportationService!,
+      formData.assignDsp,
+    );
 
     setIsSubmitting(true);
     try {
       const time24 = convertTo24Hour(formData.selectTime);
-      const scheduledStartTime = formData.selectDate && time24
-        ? (() => {
-            const scheduled = new Date(formData.selectDate);
-            const [hours, minutes] = time24.split(":").map(Number);
-            scheduled.setHours(hours, minutes, 0, 0);
-            return scheduled.toISOString();
-          })()
-        : "";
+      const scheduledStartTime =
+        formData.selectDate && time24
+          ? (() => {
+              const scheduled = new Date(formData.selectDate);
+              const [hours, minutes] = time24.split(":").map(Number);
+              scheduled.setHours(hours, minutes, 0, 0);
+              return scheduled.toISOString();
+            })()
+          : "";
 
       const basePayload = {
         clientId,
         caregiverId,
         notes: formData.notes || "",
+        ...serviceFields,
       };
 
       if (mode === "edit" && initialRide?.id) {
@@ -265,7 +383,7 @@ export default function AddMileageModal({
           description: "Mileage updated successfully.",
           variant: "success",
         });
-        if (onMileageUpdated) onMileageUpdated();
+        onMileageUpdated?.();
       } else {
         const payload: CreateMileageRideRequest =
           formData.schedulingType === "recurring"
@@ -278,7 +396,7 @@ export default function AddMileageModal({
               }
             : {
                 ...basePayload,
-                scheduledStartTime: scheduledStartTime,
+                scheduledStartTime,
               };
 
         await mileageApi.create(payload);
@@ -288,12 +406,11 @@ export default function AddMileageModal({
           description: "Mileage scheduled successfully.",
           variant: "success",
         });
-        if (onMileageCreated) {
-          onMileageCreated();
-        }
+        onMileageCreated?.();
       }
 
       setFormData(initialFormData);
+      setTransportationService(null);
       onClose();
     } catch (error) {
       toast({
@@ -306,10 +423,6 @@ export default function AddMileageModal({
       setIsSubmitting(false);
     }
   };
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // Calendar days calculation
   const calendarDays = React.useMemo(() => {
@@ -370,7 +483,7 @@ export default function AddMileageModal({
                   className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
                   autoComplete="off"
                 />
-                {isSearchingClients && (
+                {(isSearchingClients || loadingClient) && (
                   <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
                 )}
               </div>
@@ -393,38 +506,75 @@ export default function AddMileageModal({
               )}
             </div>
 
-            {/* Assign DSP */}
-            <div className="relative flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
-              <div className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center">
-                <input
-                  type="text"
-                  placeholder="Search DSP name..."
-                  value={formData.assignDsp}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, assignDsp: e.target.value }));
-                    handleDspSearch(e.target.value);
-                  }}
-                  onFocus={() => {
-                    if (dspSearchResults.length > 0) setShowDspDropdown(true);
-                  }}
-                  className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent"
-                  autoComplete="off"
-                />
-                {isSearchingDsps && (
-                  <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
-                )}
+            {/* Service (read-only) */}
+            <div className="flex flex-col gap-1" id="mileage-service-field">
+              <label className="text-[12px] font-normal text-[#10141a]">Service</label>
+              <div className="bg-[#f9fafb] border border-[#cccccd] rounded-xl min-h-11 px-4 py-2.5 flex items-center">
+                <span className="text-[14px] text-[#10141a]">
+                  {!formData.clientId
+                    ? "Select a client first"
+                    : loadingClient
+                      ? "Loading service…"
+                      : transportationService
+                        ? formatServiceDisplay(transportationService)
+                        : "—"}
+                </span>
               </div>
-              {showDspDropdown && dspSearchResults.length > 0 && (
+              {formData.clientId && !loadingClient && !transportationService && (
+                <p className="text-[11px] font-medium text-red-700 leading-snug">
+                  This client has no active transportation service. Add or renew transportation in
+                  Client Management, then try again.
+                </p>
+              )}
+              {transportationService && (
+                <p className="text-[11px] text-[#6b7280]">
+                  {formatServiceAuthorizationDatesSummary(transportationService)}
+                </p>
+              )}
+            </div>
+
+            {/* Assign DSP */}
+            <div className="relative flex flex-col gap-1" id="mileage-assign-dsp-field">
+              <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
+              <button
+                type="button"
+                disabled={!transportationService || dspOnService.length === 0}
+                onClick={() => setShowAssignDspDropdown((v) => !v)}
+                className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full text-left"
+              >
+                <span
+                  className={`flex-1 text-[14px] font-normal truncate ${
+                    formData.assignDsp ? "text-black" : "text-[#b2b2b3]"
+                  }`}
+                >
+                  {formData.assignDsp || "Select assigned DSP"}
+                </span>
+                <ChevronDown className="w-4 h-4 text-[#808081] shrink-0" />
+              </button>
+              {!transportationService && formData.clientId && !loadingClient && (
+                <p className="text-[11px] text-[#6b7280]">Resolve transportation service first.</p>
+              )}
+              {transportationService && dspOnService.length === 0 && (
+                <p className="text-[11px] text-[#b45309]" id="mileage-dsp-helper">
+                  No caregiver is assigned to this transportation service. Assign staff on the
+                  client record, then schedule mileage.
+                </p>
+              )}
+              {mode === "edit" && formData.assignDspId && !caregiverAllowedOnService && (
+                <p className="text-[11px] text-[#b45309]">
+                  Selected caregiver is not on this service. Choose an assigned DSP.
+                </p>
+              )}
+              {showAssignDspDropdown && dspOnService.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
-                  {dspSearchResults.map((employee) => (
+                  {dspOnService.map((dsp) => (
                     <button
-                      key={employee.id}
-                      onClick={() => handleDspSelect(employee)}
+                      key={dsp.id}
+                      type="button"
+                      onClick={() => handleAssignedDspRowSelect(dsp)}
                       className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
                     >
-                      <p className="text-[14px] font-normal text-black">{employee.fullName}</p>
-                      <p className="text-[12px] font-normal text-[#808081]">{employee.email}</p>
+                      <p className="text-[14px] font-normal text-black">{dsp.name}</p>
                     </button>
                   ))}
                 </div>
@@ -598,7 +748,10 @@ export default function AddMileageModal({
           </Button>
           <Button
             onClick={handleSchedule}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !canSchedule}
+            aria-describedby={
+              !canSchedule ? "mileage-service-field mileage-assign-dsp-field" : undefined
+            }
             className="flex-1 h-11 bg-[#00b4b8] hover:bg-[#009ba1] text-white rounded-xl text-[14px] font-medium transition-colors shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting

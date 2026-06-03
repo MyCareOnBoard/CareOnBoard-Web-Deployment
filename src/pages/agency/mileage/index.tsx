@@ -21,6 +21,7 @@ import RideDetailModal from "./components/RideDetailModal";
 import AddManualMileageModal from "../../userPanel/mileage/components/AddManualMileageModal";
 import BillingDateRangeModal from "@/pages/agency/billing/components/BillingDateRangeModal";
 import { mileageApi, MileageRide } from "@/lib/api/mileage";
+import { formatRideServiceLabel } from "@/pages/agency/mileage/utils/transportationClientService";
 
 const LIMIT = 10;
 
@@ -190,7 +191,8 @@ export default function MileagePage() {
       list = list.filter(
         (r) =>
           r.clientName?.toLowerCase().includes(q) ||
-          r.caregiverName?.toLowerCase().includes(q)
+          r.caregiverName?.toLowerCase().includes(q) ||
+          r.serviceCode?.toLowerCase().includes(q)
       );
     }
 
@@ -411,8 +413,8 @@ export default function MileagePage() {
                       </div>
                     </div>
                     {/* Info cols */}
-                    <div className="grid flex-1 grid-cols-4 gap-4">
-                      {Array.from({ length: 4 }).map((_, j) => (
+                    <div className="grid flex-1 grid-cols-5 gap-4">
+                      {Array.from({ length: 5 }).map((_, j) => (
                         <div key={j} className="space-y-1.5">
                           <Skeleton className="h-3 w-14" />
                           <Skeleton className="h-4 w-20" />
@@ -505,13 +507,19 @@ export default function MileagePage() {
                       </div>
 
                       {/* Info columns */}
-                      <div className="grid flex-1 grid-cols-4 gap-4">
+                      <div className="grid flex-1 grid-cols-5 gap-4">
                         <div>
                           <div className="text-[12px] text-[#9ca3af] mb-1">Scheduled</div>
                           <div className="text-[14px] text-[#10141a] font-medium">{scheduledDate}</div>
                           {scheduledTime && (
                             <div className="text-[12px] text-[#6b7280]">{scheduledTime}</div>
                           )}
+                        </div>
+                        <div>
+                          <div className="text-[12px] text-[#9ca3af] mb-1">Service</div>
+                          <div className="text-[14px] text-[#10141a] font-medium">
+                            {formatRideServiceLabel(entry)}
+                          </div>
                         </div>
                         <div>
                           <div className="text-[12px] text-[#9ca3af] mb-1">Segments</div>
@@ -538,6 +546,11 @@ export default function MileagePage() {
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#f3f4f6] text-[#6b7280]">
                                 <RefreshCw className="w-2.5 h-2.5" />
                                 Recurring
+                              </span>
+                            )}
+                            {entry.approved && (
+                              <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">
+                                Approved
                               </span>
                             )}
                           </div>
@@ -668,6 +681,10 @@ export default function MileagePage() {
         ride={viewingRide}
         isOpen={!!viewingRide}
         onClose={() => setViewingRide(null)}
+        onRideUpdated={(updated) => {
+          setViewingRide(updated);
+          setRides((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
+        }}
       />
 
       {/* Cancel ride confirmation */}
