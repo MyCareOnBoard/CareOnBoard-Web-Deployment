@@ -38,6 +38,7 @@ import {
   pickDefaultWeekRowIndex,
   resolveServiceCode,
   resolveWeekRangeIsoBounds,
+  rideDateYmd,
 } from "../utils/claimSelectionUtils";
 import { SectionLabel } from "./claimsModalShared";
 import { CLAIM_REPORT_CHECKBOX_CLASS } from "./claimsModalStyles";
@@ -411,13 +412,19 @@ export default function GenerateClaimModal({
 
   const handleConfirm = () => {
     if (!canConfirm) return;
+
+    const rideWeekRange =
+      useRideMode && selectedRides.length > 0
+        ? rideDateYmd(selectedRides[0]) || undefined
+        : undefined;
+
     onConfirm(
       useRideMode
         ? { shifts: [], rides: selectedRides }
         : { shifts: selectedShifts, rides: [] },
       {
         serviceCode,
-        weekRange: selectedWeekRow?.weekRange,
+        weekRange: useRideMode ? rideWeekRange : selectedWeekRow?.weekRange,
       },
     );
   };

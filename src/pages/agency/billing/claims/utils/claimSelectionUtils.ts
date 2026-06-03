@@ -95,7 +95,7 @@ export function isTransportationServiceForClaims(service?: ClientService): boole
   return isTransportationClientService(service);
 }
 
-function rideDateYmd(ride: MileageRide): string {
+export function rideDateYmd(ride: MileageRide): string {
   const raw = ride.completedAt ?? ride.scheduledStartTime;
   if (!raw) return "";
   try {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Shift } from "@/lib/api/shifts";
 import type { MileageRide } from "@/lib/api/mileage";
 import {
@@ -27,7 +27,8 @@ import type { RecentClaim } from "./data/mockClaimsDashboardData";
 import { saveGeneratedClaim } from "./utils/saveGeneratedClaim";
 import { useClaimsDashboard } from "./hooks/useClaimsDashboard";
 import { useGeneratedClaims } from "./hooks/useGeneratedClaims";
-import { useShiftsToClaim } from "./hooks/useShiftsToClaim";
+import { useReadyToClaim } from "./hooks/useReadyToClaim";
+import { mapReadyToClaimRowsToRecentClaims } from "./utils/readyToClaimUtils";
 import { getCurrentWeekDateRange } from "./utils/claimsDashboardUtils";
 import {
   buildRecentClaimFromSavedClaim,
@@ -52,10 +53,13 @@ export default function ClaimsDashboardPage() {
     clientSearch,
     selectedClientName,
   });
-  const shiftsToClaim = useShiftsToClaim({
+  const readyToClaim = useReadyToClaim({
     enabled: activeTab === "shifts",
-    agencyId: user?.agencyId,
   });
+  const readyClaims = useMemo(
+    () => mapReadyToClaimRowsToRecentClaims(readyToClaim.rows),
+    [readyToClaim.rows],
+  );
   const [generateOpen, setGenerateOpen] = useState(false);
   const [savingClaim, setSavingClaim] = useState(false);
   const [openingReport, setOpeningReport] = useState<{ claimNumber: string } | null>(null);
@@ -94,24 +98,24 @@ export default function ClaimsDashboardPage() {
   }, [generatedClaims.error, toast]);
 
   useEffect(() => {
-    if (!shiftsToClaim.error) {
+    if (!readyToClaim.error) {
       return;
     }
 
     toast({
-      title: "Couldn't load shifts ready to claim",
-      description: shiftsToClaim.error,
+      title: "Couldn't load items ready to claim",
+      description: readyToClaim.error,
       variant: "destructive",
     });
-  }, [shiftsToClaim.error, toast]);
+  }, [readyToClaim.error, toast]);
 
   const refreshAfterCreateOrCancel = useCallback(async () => {
     await Promise.all([
       dashboard.refetch(),
       generatedClaims.refetch({ force: true }),
-      shiftsToClaim.refetch({ force: true }),
+      readyToClaim.refetch({ force: true }),
     ]);
-  }, [dashboard, generatedClaims, shiftsToClaim]);
+  }, [dashboard, generatedClaims, readyToClaim]);
 
   const refreshAfterStatusUpdate = useCallback(async () => {
     await Promise.all([dashboard.refetch(), generatedClaims.refetch()]);
@@ -168,11 +172,35 @@ export default function ClaimsDashboardPage() {
   );
 
   const handleTableGenerateClaim = useCallback(
-    (claim: RecentClaim, anchorShift: Shift) => {
-      const serviceCode = anchorShift.serviceCode?.trim() || claim.serviceCode.trim();
-      void handleGenerateClaim({ shifts: [anchorShift], rides: [] }, { serviceCode });
+    (claim: RecentClaim) => {
+      if (!claim.sourceType || !claim.sourceId || !claim.clientId) {
+        console.warn("Ready to claim row missing source metadata", claim.id);
+        toast({
+          title: "Couldn't generate claim",
+          description: "Refresh the list and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const serviceCode = claim.serviceCode.trim();
+      const weekRange = claim.weekRange?.trim() || undefined;
+
+      void handleGenerateClaim(
+        {
+          shifts:
+            claim.sourceType === "shift"
+              ? [{ id: claim.sourceId, clientId: claim.clientId, serviceCode } as Shift]
+              : [],
+          rides:
+            claim.sourceType === "ride"
+              ? [{ id: claim.sourceId, clientId: claim.clientId, serviceCode } as MileageRide]
+              : [],
+        },
+        { serviceCode, weekRange },
+      );
     },
-    [handleGenerateClaim],
+    [handleGenerateClaim, toast],
   );
 
   const handleCloseReportModal = useCallback(() => {
@@ -323,8 +351,9 @@ export default function ClaimsDashboardPage() {
 
       {activeTab === "shifts" ? (
         <RecentClaimsTable
-          shifts={shiftsToClaim.shifts}
-          loading={shiftsToClaim.loading}
+          claims={readyClaims}
+          loading={readyToClaim.loading}
+          truncated={readyToClaim.truncated}
           onGenerateClaim={handleTableGenerateClaim}
           generateDisabled={savingClaim || openingReport !== null}
         />
