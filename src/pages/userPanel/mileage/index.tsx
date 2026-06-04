@@ -59,7 +59,10 @@ export default function MileagePage() {
 
   const hasValidDriverLicense = useMemo(() => {
     const doc = employeeDocuments.find((d) => d.documentType === "driverLicense");
-    return doc?.status === "available" || doc?.status === "expiring-soon";
+    if (!doc) return false;
+    if (doc.status === "expired") return false;
+    if (doc.expiryDate && new Date(doc.expiryDate) < new Date()) return false;
+    return doc.status === "available" || doc.status === "expiring-soon";
   }, [employeeDocuments]);
 
   const handleTrackMileageClick = () => {

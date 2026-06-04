@@ -41,14 +41,6 @@ export interface Employee {
     trainingTotal?: number;
 }
 
-/** Firebase Auth uid used for mileage/shift caregiver references. */
-export function employeeCaregiverUid(
-    emp: Pick<Employee, "uid" | "userId">,
-): string | null {
-    const authUid = emp.uid || emp.userId;
-    return authUid?.trim() ? authUid.trim() : null;
-}
-
 /**
  * Employee Response
  */

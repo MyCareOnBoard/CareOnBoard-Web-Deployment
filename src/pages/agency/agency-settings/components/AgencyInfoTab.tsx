@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, ChangeEvent } from "react";
 import { useForm, useFormState, useWatch } from "react-hook-form";
 import { AlertCircle, Info, Upload } from "lucide-react";
 import {
@@ -45,33 +45,21 @@ import {
   resolveBrandingPreviewSrc,
   revokeBrandingPreview,
 } from "./branding-utils";
+import OperationalSettingsFields from "@/pages/shared/agency/OperationalSettingsFields";
+import {
+  agencyOperationalToForm,
+  OPERATIONAL_FIELD_KEYS,
+  pickOperationalFormValues,
+  type OperationalFormSlice,
+} from "@/lib/agency/operational-settings";
+import {
+  buildAgencyProfileUpdatePayload,
+  type AgencyProfileFormValues,
+} from "@/lib/agency/agency-profile-payload";
+
+export type { AgencyProfileFormValues };
 
 const PREDEFINED_COLORS = ["#D53411", "#D5B111", "#0EAF52", "#115CD5", "#11CBD5"];
-
-export type AgencyProfileFormValues = {
-  name: string;
-  legalBusinessName: string;
-  dba: string;
-  agencyType: string;
-  ein: string;
-  npi: string;
-  providerId: string;
-  medicaidProviderId: string;
-  email: string;
-  phone: string;
-  address: string;
-  county: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  website: string;
-  primaryColor: string;
-  billingFormat: string;
-  invoiceName: string;
-  invoiceEmail: string;
-  payrollScheduleFrequency: string;
-  payrollScheduleNextPayoutDate: string;
-};
 
 const EMPTY_VALUES: AgencyProfileFormValues = {
   name: "",
@@ -96,6 +84,7 @@ const EMPTY_VALUES: AgencyProfileFormValues = {
   invoiceEmail: "",
   payrollScheduleFrequency: "biweekly",
   payrollScheduleNextPayoutDate: "",
+  ...pickOperationalFormValues({}),
 };
 
 function agencyToFormValues(agency: Agency): AgencyProfileFormValues {
@@ -122,57 +111,8 @@ function agencyToFormValues(agency: Agency): AgencyProfileFormValues {
     invoiceEmail: agency.invoiceEmail ?? "",
     payrollScheduleFrequency: agency.payrollSchedule?.frequency ?? "biweekly",
     payrollScheduleNextPayoutDate: agency.payrollSchedule?.nextPayoutDate ?? "",
+    ...agencyOperationalToForm(agency),
   };
-}
-
-function parsePayrollFrequency(value: string): "weekly" | "biweekly" | "monthly" {
-  if (value === "weekly" || value === "biweekly" || value === "monthly") {
-    return value;
-  }
-  return "biweekly";
-}
-
-function formValuesToUpdatePayload(
-  values: AgencyProfileFormValues,
-  dirtyFields?: Partial<Record<keyof AgencyProfileFormValues, boolean>>,
-): UpdateAgencyProfileRequest {
-  const trim = (value: string) => value.trim();
-  const nullable = (value: string) => {
-    const trimmed = trim(value);
-    return trimmed === "" ? null : trimmed;
-  };
-
-  const payload: UpdateAgencyProfileRequest = {
-    name: trim(values.name),
-    legalBusinessName: nullable(values.legalBusinessName),
-    dba: nullable(values.dba),
-    agencyType: nullable(values.agencyType),
-    ein: nullable(values.ein),
-    npi: nullable(values.npi),
-    providerId: nullable(values.providerId),
-    medicaidProviderId: nullable(values.medicaidProviderId),
-    email: trim(values.email),
-    phone: nullable(values.phone),
-    address: nullable(values.address),
-    county: nullable(values.county),
-    city: nullable(values.city),
-    state: nullable(values.state),
-    zipCode: nullable(values.zipCode),
-    website: nullable(values.website),
-    primaryColor: nullable(values.primaryColor),
-    billingFormat: nullable(values.billingFormat),
-    invoiceName: nullable(values.invoiceName),
-    invoiceEmail: nullable(values.invoiceEmail),
-  };
-
-  if (dirtyFields?.payrollScheduleFrequency || dirtyFields?.payrollScheduleNextPayoutDate) {
-    payload.payrollSchedule = {
-      frequency: parsePayrollFrequency(values.payrollScheduleFrequency),
-      nextPayoutDate: nullable(values.payrollScheduleNextPayoutDate),
-    };
-  }
-
-  return payload;
 }
 
 export default function AgencyInfoTab() {
@@ -210,6 +150,19 @@ export default function AgencyInfoTab() {
 
   const { isDirty } = useFormState({ control: form.control });
   const primaryColor = useWatch({ control: form.control, name: "primaryColor" });
+  const watchedOperational = useWatch({
+    control: form.control,
+    name: OPERATIONAL_FIELD_KEYS,
+  });
+  const operationalValues = useMemo(() => {
+    if (!Array.isArray(watchedOperational)) {
+      return pickOperationalFormValues(undefined);
+    }
+    const partial = Object.fromEntries(
+      OPERATIONAL_FIELD_KEYS.map((key, index) => [key, watchedOperational[index]]),
+    ) as Partial<OperationalFormSlice>;
+    return pickOperationalFormValues(partial);
+  }, [watchedOperational]);
   const hasChanges = isDirty || !!logoFile || !!letterheadFile;
 
   const load = useCallback(async () => {
@@ -360,8 +313,11 @@ export default function AgencyInfoTab() {
 
     try {
       if (hasTextChanges) {
-        updated = await updateAgency(agencyId, formValuesToUpdatePayload(values, form.formState.dirtyFields));
-        textSaved = true;
+        const payload = buildAgencyProfileUpdatePayload(values, form.formState.dirtyFields);
+        if (Object.keys(payload).length > 0) {
+          updated = await updateAgency(agencyId, payload);
+          textSaved = true;
+        }
       }
 
       if (hasFileChanges) {
@@ -416,8 +372,15 @@ export default function AgencyInfoTab() {
   const inputClassName = "bg-white";
   const disabled = saving || readOnly;
 
+  const handleOperationalChange = (
+    field: keyof OperationalFormSlice,
+    value: OperationalFormSlice[keyof OperationalFormSlice],
+  ) => {
+    form.setValue(field, value as AgencyProfileFormValues[typeof field], { shouldDirty: true });
+  };
+
   if (loading) {
-    return <SettingsTabSkeleton variant="accordion" cardCount={4} />;
+    return <SettingsTabSkeleton variant="accordion" cardCount={5} />;
   }
 
   const accordionItemClass = cn(settingsCardShellClass, "border-b-0 px-0");
@@ -885,6 +848,30 @@ export default function AgencyInfoTab() {
                       <p className="text-sm text-[#4f4f4f]">PDF letterhead selected.</p>
                     )}
                   </div>
+                </SettingsFormFieldRow>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="operational" className={accordionItemClass}>
+              <AccordionTrigger className="px-5 py-4 sm:px-6 hover:no-underline">
+                <div className="text-left">
+                  <span className="text-[17px] font-semibold text-[#10141a]">Operational Settings</span>
+                  <p className={cn(settingsCardSubtitleClass, "font-normal normal-case")}>
+                    Scheduling, mileage, notifications, and file upload rules.
+                  </p>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5 sm:px-6">
+                <SettingsFormFieldRow
+                  title="Operational preferences"
+                  description="Mileage rate applies to mileage reimbursement and payroll mileage pay. Other options control scheduling and uploads."
+                >
+                  <OperationalSettingsFields
+                    values={operationalValues}
+                    onChange={handleOperationalChange}
+                    disabled={disabled}
+                    variant="stacked"
+                  />
                 </SettingsFormFieldRow>
               </AccordionContent>
             </AccordionItem>
