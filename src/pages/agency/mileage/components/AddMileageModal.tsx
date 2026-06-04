@@ -5,6 +5,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import TimePicker from "@/components/TimePicker";
 import { searchClients, Client, ClientDsp, ClientService, getAgencyClientById } from "@/lib/api/clients";
 import { getEmployeeById, employeeCaregiverUid } from "@/lib/api/employees";
+import { listEmployeeDocuments } from "@/lib/api/employee-documents";
 import { useToast } from "@/hooks/use-toast";
 import { mileageApi, CreateMileageRideRequest, MileageRide, UpdateAgencyRideRequest } from "@/lib/api/mileage";
 import {
@@ -137,7 +138,10 @@ export default function AddMileageModal({
         return;
       }
       try {
-        const emp = await getEmployeeById(dspId);
+        const [emp, documents] = await Promise.all([
+          getEmployeeById(dspId),
+          listEmployeeDocuments(dspId).catch(() => null),
+        ]);
         if (token !== dspVerifyTokenRef.current) return;
         if (emp.workAvailability !== true) {
           setFormData((prev) => ({ ...prev, assignDsp: "", assignDspId: "" }));
@@ -159,6 +163,21 @@ export default function AddMileageModal({
             variant: "destructive",
           });
           return;
+        }
+        if (documents !== null) {
+          const license = documents.find((d) => d.documentType === "driverLicense");
+          const hasValidLicense =
+            license?.status === "available" || license?.status === "expiring-soon";
+          if (!hasValidLicense) {
+            setFormData((prev) => ({ ...prev, assignDsp: "", assignDspId: "" }));
+            toast({
+              title: "No valid driver's license",
+              description:
+                "This DSP does not have a valid driver's license on file. Please select another DSP or ask them to upload their license.",
+              variant: "destructive",
+            });
+            return;
+          }
         }
         setFormData((prev) => ({
           ...prev,
