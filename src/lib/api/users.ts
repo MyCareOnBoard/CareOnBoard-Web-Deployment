@@ -3,6 +3,7 @@ import axiosClient from '../axios';
 import { User } from '@/utils/auth/types/user.types';
 import { Employee } from '@/utils/auth/types/user.types';
 import { UserType } from '@/utils/auth/types/user.types';
+import { resolveEmailVerified } from '@/utils/auth/helpers/resolveEmailVerified';
 
 /**
  * API Response wrapper for user data
@@ -71,7 +72,7 @@ export async function getUser(): Promise<User> {
       uid: backendUser.uid,
       email: backendUser.email,
       fullName: backendUser.fullName,
-      emailVerified: backendUser.emailVerified || false,
+      emailVerified: resolveEmailVerified(),
       userType: backendUser.userType,
       otpVerified: backendUser.otpVerified,
       otpVerifiedAt: backendUser.otpVerifiedAt,

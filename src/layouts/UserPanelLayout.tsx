@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { Outlet, useNavigate } from "react-router";
 import { useAuth } from "@/utils/auth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, { NavItem } from "@/components/DashboardSidebar";
@@ -69,6 +70,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
   }, [user]);
 
   return (
+    <ProtectedRoute>
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
       <DashboardHeader
         userName={user?.fullName}
@@ -82,6 +84,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
         <div className="px-8">{children ?? <Outlet />}</div>
       </main>
     </div>
+    </ProtectedRoute>
   );
 }
 

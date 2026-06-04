@@ -175,3 +175,20 @@ body {
   color: inherit !important;
   border-color: inherit !important;
 }
+
+/* Auth / MFA: invisible reCAPTCHA + badge must not widen the page */
+body.auth-layout-active {
+  overflow-x: hidden;
+}
+
+body.auth-layout-active .grecaptcha-badge {
+  visibility: hidden !important;
+}
+
+body.auth-layout-active .PhoneInput {
+  max-width: 100%;
+}
+
+body.auth-layout-active .PhoneInputInput {
+  min-width: 0;
+}

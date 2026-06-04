@@ -2,6 +2,7 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosE
 import { getIdToken } from '@/utils/auth';
 import { auth } from '@/lib/firebase';
 import { Routes } from "@/routes/constants";
+import { handleMfaApiError } from '@/utils/auth/helpers/handleMfaApiError';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -138,9 +139,14 @@ axiosClient.interceptors.response.use(
           }
           break;
         }
-        case 403:
+        case 403: {
+          const data = error.response.data as { code?: string; error?: string }
+          if (handleMfaApiError(403, data)) {
+            return Promise.reject(error)
+          }
           console.error('Access forbidden:', error.response.data);
           break;
+        }
         case 404:
           console.error('Resource not found:', error.response.data);
           break;

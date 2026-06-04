@@ -42,8 +42,11 @@ export interface Employee {
 }
 
 /** Firebase Auth uid used for mileage/shift caregiver references. */
-export function employeeCaregiverUid(emp: Pick<Employee, "id" | "uid" | "userId">): string {
-    return emp.uid || emp.userId || emp.id;
+export function employeeCaregiverUid(
+    emp: Pick<Employee, "uid" | "userId">,
+): string | null {
+    const authUid = emp.uid || emp.userId;
+    return authUid?.trim() ? authUid.trim() : null;
 }
 
 /**

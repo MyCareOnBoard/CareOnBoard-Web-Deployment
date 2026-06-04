@@ -2,6 +2,7 @@ import type {ReactNode} from "react";
 import {useEffect} from "react";
 import {Outlet, useNavigate} from "react-router";
 import {useAuth} from "@/utils/auth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, {NavItem} from "@/components/DashboardSidebar";
 import {UserType} from "@/utils/auth/types/user.types";
@@ -49,6 +50,7 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
   }, [user]);
 
   return (
+    <ProtectedRoute>
     <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
       <DashboardHeader
         userName={user?.fullName}
@@ -62,6 +64,7 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
         <div className="px-8">{children ?? <Outlet/>}</div>
       </main>
     </div>
+    </ProtectedRoute>
   );
 }
 

@@ -1,13 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
+import { Routes } from "@/routes/constants";
 import CurrentRide from "./components/CurrentRide";
 import UpcomingRides from "./components/UpcomingRides";
 import AddManualMileageModal from "./components/AddManualMileageModal";
+import DriverLicenseRequiredDialog from "./components/DriverLicenseRequiredDialog";
 import { mileageApi, MileageRide } from "@/lib/api/mileage";
 import { useToast } from "@/hooks/use-toast";
 import { useGetEmployeeDocumentsQuery } from "@/pages/userPanel/dashboard/api";
+import {
+  CARD_SURFACE,
+  PAGE_TITLE,
+  SECTION_SUBTITLE,
+  SECTION_TITLE,
+  SUMMARY_COUNT,
+} from "./mileageStyles";
 
 type FirebaseTimestampLike = { seconds?: number; _seconds?: number };
 
@@ -30,6 +39,11 @@ const parseRideDate = (value?: string | Date | FirebaseTimestampLike | null): Da
 
 const isSameLocalDay = (date: Date, today: Date): boolean =>
   date.toDateString() === today.toDateString();
+
+function formatTotalKm(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
 
 export default function MileagePage() {
   const navigate = useNavigate();
@@ -63,8 +77,13 @@ export default function MileagePage() {
       setRides(res.data || []);
       setTotalMileage(res.totalMileage ?? 0);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load rides";
-      toast({ title: "Mileage", variant: "destructive", description: message });
+      const message =
+        error instanceof Error ? error.message : "We couldn't load your rides. Try again.";
+      toast({
+        title: "Couldn't load mileage",
+        variant: "destructive",
+        description: message,
+      });
     } finally {
       setLoading(false);
     }
@@ -75,10 +94,9 @@ export default function MileagePage() {
   }, []);
 
   const currentRide = useMemo(() => {
-    // Active (in_progress or paused) rides take priority
     const active = rides.find((ride) => ride.status === "in_progress" || ride.status === "paused");
     if (active) return active;
-    // Fall back to next scheduled ride
+
     const scheduled = rides
       .filter((ride) => ride.status === "scheduled")
       .sort((a, b) => {
@@ -112,7 +130,6 @@ export default function MileagePage() {
   const handleStart = async (rideId: string) => {
     setActionLoading(true);
     try {
-      // Get current location
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject);
       });
@@ -124,10 +141,11 @@ export default function MileagePage() {
         },
       });
       await fetchRides();
-      toast({ title: "Ride", description: "Ride started" });
+      toast({ title: "Ride started", description: "We're tracking distance from your location." });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to start ride";
-      toast({ title: "Ride", variant: "destructive", description: message });
+      const message =
+        error instanceof Error ? error.message : "We couldn't start this ride. Try again.";
+      toast({ title: "Couldn't start ride", variant: "destructive", description: message });
     } finally {
       setActionLoading(false);
     }
@@ -147,10 +165,14 @@ export default function MileagePage() {
         },
       });
       await fetchRides();
-      toast({ title: "Ride", description: "Ride paused — tap Start to resume" });
+      toast({
+        title: "Ride paused",
+        description: "Tap Resume when you're ready to continue.",
+      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to stop ride";
-      toast({ title: "Ride", variant: "destructive", description: message });
+      const message =
+        error instanceof Error ? error.message : "We couldn't pause this ride. Try again.";
+      toast({ title: "Couldn't pause ride", variant: "destructive", description: message });
     } finally {
       setActionLoading(false);
     }
@@ -161,10 +183,11 @@ export default function MileagePage() {
     try {
       await mileageApi.complete(rideId);
       await fetchRides();
-      toast({ title: "Ride", description: "Ride completed" });
+      toast({ title: "Ride completed", description: "Distance has been saved to your record." });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to complete ride";
-      toast({ title: "Ride", variant: "destructive", description: message });
+      const message =
+        error instanceof Error ? error.message : "We couldn't complete this ride. Try again.";
+      toast({ title: "Couldn't complete ride", variant: "destructive", description: message });
     } finally {
       setActionLoading(false);
     }
@@ -175,40 +198,56 @@ export default function MileagePage() {
     try {
       await mileageApi.cancel(rideId, { cancelReason: "Cancelled by caregiver" });
       await fetchRides();
-      toast({ title: "Ride", description: "Ride cancelled" });
+      toast({ title: "Ride cancelled", description: "This trip was removed from your schedule." });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to cancel ride";
-      toast({ title: "Ride", variant: "destructive", description: message });
+      const message =
+        error instanceof Error ? error.message : "We couldn't cancel this ride. Try again.";
+      toast({ title: "Couldn't cancel ride", variant: "destructive", description: message });
     } finally {
       setActionLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
-          Mileage
-        </h1>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <span className="text-lg font-semibold text-[#808081]">Total Mileage : </span>
-            <span className="text-lg font-semibold text-[#10141a]">{totalMileage}KM</span>
+    <div className="min-h-[calc(100vh-200px)]">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className={PAGE_TITLE}>Mileage</h1>
+        <Button
+          type="button"
+          onClick={handleTrackMileageClick}
+          className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-2 bg-[#00B4B8] hover:bg-[#00A0A4] text-white rounded-full px-5 text-sm font-semibold shadow-none"
+        >
+          <Plus className="w-4 h-4 shrink-0" aria-hidden />
+          Log mileage
+        </Button>
+      </div>
+
+      <div className={`${CARD_SURFACE} mb-4`}>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-1 min-w-0">
+            <p className={SECTION_TITLE}>Overview</p>
+            <p className={SECTION_SUBTITLE}>Total distance you&apos;ve logged</p>
           </div>
-          <Button
-            onClick={handleTrackMileageClick}
-            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009ba1] text-white rounded-full px-4 py-2 h-auto text-[14px] font-medium shadow-none"
-          >
-            <Plus className="w-4 h-4" />
-            Track Mileage
-          </Button>
+          <p className={`${SUMMARY_COUNT} shrink-0 tabular-nums`}>
+            {loading ? (
+              <span className="text-[#808081]">…</span>
+            ) : (
+              <>
+                {formatTotalKm(totalMileage)}
+                <span className="text-[20px] font-medium text-[#808081] ml-1">km</span>
+              </>
+            )}
+          </p>
         </div>
       </div>
 
-      {/* Current Ride Section */}
       {loading ? (
-        <div className="p-6 mb-6 bg-white rounded-2xl text-sm text-[#808081]">Loading rides...</div>
+        <div className={`${CARD_SURFACE} mb-4`}>
+          <div className="py-12 flex flex-col items-center justify-center gap-2 text-center">
+            <Loader2 className="w-6 h-6 animate-spin text-[#808081]" aria-hidden />
+            <p className="text-[14px] font-medium text-[#808081]">Loading your rides…</p>
+          </div>
+        </div>
       ) : (
         <CurrentRide
           ride={currentRide}
@@ -220,61 +259,37 @@ export default function MileagePage() {
         />
       )}
 
-      {/* Upcoming Rides Section */}
-      <UpcomingRides rides={upcomingRides} onCancel={handleCancel} actionLoading={actionLoading} />
+      <div className={CARD_SURFACE}>
+        <div className="mb-6">
+          <h2 className={SECTION_TITLE}>Upcoming rides</h2>
+          <p className={`${SECTION_SUBTITLE} mt-1`}>
+            Scheduled trips after your current or next ride
+          </p>
+        </div>
 
-      {/* Manual Mileage Modal */}
+        {!loading && (
+          <UpcomingRides
+            rides={upcomingRides}
+            onCancel={handleCancel}
+            actionLoading={actionLoading}
+          />
+        )}
+      </div>
+
       <AddManualMileageModal
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
         onCreated={fetchRides}
       />
 
-      {/* Driver's License Required Prompt */}
-      {showLicensePrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-            onClick={() => setShowLicensePrompt(false)}
-          />
-          <div className="relative bg-white rounded-[24px] w-full max-w-[400px] shadow-xl p-6 flex flex-col gap-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-[17px] font-semibold text-[#10141a]">
-                  Driver's License Required
-                </h2>
-                <p className="text-[13px] text-[#808081] mt-1 leading-relaxed">
-                  You need a valid driver's license on file before you can track mileage.
-                  Please upload your driver's license in your documents.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowLicensePrompt(false)}
-                className="shrink-0 bg-[#eff2f3] rounded-full p-1.5 hover:bg-gray-200 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4 text-[#10141a]" />
-              </button>
-            </div>
-            <div className="flex gap-3 pt-1">
-              <Button
-                onClick={() => setShowLicensePrompt(false)}
-                className="flex-1 h-10 bg-transparent hover:bg-[#f3f4f6] text-[#6b7280] border border-[#e5e7eb] rounded-xl text-[13px] font-medium shadow-none"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowLicensePrompt(false);
-                  navigate("/user-panel/dashboard");
-                }}
-                className="flex-1 h-10 bg-[#00b4b8] hover:bg-[#009ba1] text-white rounded-xl text-[13px] font-medium shadow-none"
-              >
-                Go to Documents
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DriverLicenseRequiredDialog
+        open={showLicensePrompt}
+        onOpenChange={setShowLicensePrompt}
+        onGoToDocuments={() => {
+          setShowLicensePrompt(false);
+          navigate(Routes.userPanel.dashboard);
+        }}
+      />
     </div>
   );
 }

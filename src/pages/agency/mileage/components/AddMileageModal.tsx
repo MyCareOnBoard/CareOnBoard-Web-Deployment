@@ -153,6 +153,17 @@ export default function AddMileageModal({
           });
           return;
         }
+        const caregiverUid = employeeCaregiverUid(emp);
+        if (!caregiverUid) {
+          setFormData((prev) => ({ ...prev, assignDsp: "", assignDspId: "" }));
+          toast({
+            title: "DSP account required",
+            description:
+              "This DSP does not have a login account yet. Choose another DSP or finish onboarding first.",
+            variant: "destructive",
+          });
+          return;
+        }
         if (documents !== null) {
           const license = documents.find((d) => d.documentType === "driverLicense");
           const hasValidLicense =
@@ -171,7 +182,7 @@ export default function AddMileageModal({
         setFormData((prev) => ({
           ...prev,
           assignDsp: dspName,
-          assignDspId: employeeCaregiverUid(emp),
+          assignDspId: caregiverUid,
         }));
       } catch {
         if (token !== dspVerifyTokenRef.current) return;

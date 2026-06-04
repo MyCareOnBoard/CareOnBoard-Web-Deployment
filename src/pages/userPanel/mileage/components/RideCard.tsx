@@ -1,7 +1,16 @@
 import { useState } from "react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PlanOfCareClientAvatar } from "@/pages/userPanel/planOfCare/components/PlanOfCareClientAvatar";
 import CancelRideModal from "./modals/CancelRideModal";
+import {
+  CLIENT_NAME,
+  CLIENT_ROLE,
+  META_LABEL,
+  META_VALUE,
+  PRIMARY_ACTION_BTN,
+  ROW_CARD,
+} from "../mileageStyles";
 
 interface RideCardProps {
   id: string;
@@ -35,7 +44,7 @@ export default function RideCard({
     setIsCancelled(true);
   };
 
-  const displayName = clientName ?? purpose ?? "Manual Trip";
+  const displayName = clientName ?? purpose ?? "Manual trip";
   const displayLabel = clientName ? "Client" : "Purpose";
 
   if (isCancelled || status === "cancelled" || status === "completed") {
@@ -44,59 +53,38 @@ export default function RideCard({
 
   return (
     <>
-      <div className="flex flex-col gap-4 p-4 bg-[#f8f9fa] rounded-xl hover:bg-[#f0f1f2] transition-colors md:flex-row md:items-center">
-        <div className="flex items-center gap-4 min-w-0 md:w-[220px]">
+      <div className={ROW_CARD}>
+        <div className="flex items-center gap-4 w-full sm:w-[220px] shrink-0 min-w-0">
           {clientName && (
-            <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-              {clientAvatarUrl && (
-                <AvatarImage
-                  src={clientAvatarUrl}
-                  alt={clientName}
-                  className="w-full h-full object-cover aspect-auto rounded-[8px]"
-                />
-              )}
-              <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-                {clientName
-                  .split(" ")
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((w) => w[0]?.toUpperCase())
-                  .join("")}
-              </AvatarFallback>
-            </Avatar>
+            <PlanOfCareClientAvatar
+              name={clientName}
+              imageUrl={clientAvatarUrl}
+              size="list"
+            />
           )}
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-[#10141a] truncate">{displayName}</h3>
-            <p className="text-xs text-[#808081]">{displayLabel}</p>
+          <div className="min-w-0 flex-1">
+            <p className={CLIENT_NAME}>{displayName}</p>
+            <p className={CLIENT_ROLE}>{displayLabel}</p>
           </div>
         </div>
 
-        <div className="grid flex-1 min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="min-w-0">
-            <p className="text-xs text-[#808081] mb-1 whitespace-nowrap">Scheduled at</p>
-            <p className="text-sm font-medium text-[#10141a]">{time}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 min-w-0">
+          <div>
+            <p className={META_LABEL}>Scheduled for</p>
+            <p className={META_VALUE}>{time}</p>
           </div>
         </div>
-        <div className="flex justify-start sm:justify-end md:ml-4">
+
+        <div className="flex w-full sm:w-auto shrink-0">
           <Button
+            type="button"
+            variant="outline"
             onClick={() => setIsCancelModalOpen(true)}
             disabled={actionLoading}
-            className="bg-[#9ca3af] hover:bg-[#6b7280] text-white rounded-full px-4 py-2 h-auto font-medium text-sm flex items-center gap-2"
+            className={`${PRIMARY_ACTION_BTN} w-full sm:w-auto border-[#808081] text-[#6b7280] hover:bg-[#f3f4f6]`}
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-            Cancel
+            <X className="w-4 h-4" aria-hidden />
+            Cancel ride
           </Button>
         </div>
       </div>
