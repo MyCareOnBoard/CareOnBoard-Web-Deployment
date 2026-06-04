@@ -1,5 +1,6 @@
 import { auth } from '@/lib/firebase';
 import { getAuth } from 'firebase/auth';
+import { handleMfaApiError } from '@/utils/auth/helpers/handleMfaApiError';
 
 // Backend API base URL from environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
@@ -48,7 +49,10 @@ export async function apiRequest<T = any>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `API Error: ${response.status}`);
+      if (handleMfaApiError(response.status, errorData)) {
+        throw new Error(errorData.error || 'MFA required');
+      }
+      throw new Error(errorData.message || errorData.error || `API Error: ${response.status}`);
     }
 
     return await response.json();
@@ -144,7 +148,10 @@ export async function uploadFile(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Upload failed: ${response.status}`);
+    if (handleMfaApiError(response.status, errorData)) {
+      throw new Error(errorData.error || 'MFA required');
+    }
+    throw new Error(errorData.message || errorData.error || `Upload failed: ${response.status}`);
   }
 
   return await response.json();
@@ -172,7 +179,10 @@ export async function createUser(fullName: string, agencyId?: string): Promise<a
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Request failed: ${response.status}`);
+    if (handleMfaApiError(response.status, errorData)) {
+      throw new Error(errorData.error || 'MFA required');
+    }
+    throw new Error(errorData.message || errorData.error || `Request failed: ${response.status}`);
   }
 
   return await response.json();

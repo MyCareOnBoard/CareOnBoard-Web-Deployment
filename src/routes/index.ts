@@ -9,6 +9,8 @@ const LoginPage = lazy(() => import("@/pages/auth/login"));
 const SignUpPage = lazy(() => import("@/pages/auth/signup"));
 const ForgotPasswordPage = lazy(() => import("@/pages/auth/forgot-password"));
 const ResetPasswordPage = lazy(() => import("@/pages/auth/reset-password"));
+const MfaEnrollPage = lazy(() => import("@/pages/auth/mfa-enroll"));
+const MfaChallengePage = lazy(() => import("@/pages/auth/mfa-challenge"));
 const ApplicantDashboardPage = lazy(() => import("@/pages/applicant/dashboard"));
 const DocumentsPage = lazy(() => import("@/pages/applicant/documents"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
@@ -198,6 +200,14 @@ export const router = createBrowserRouter([
             {
                 path: Routes.auth.resetPassword,
                 Component: ResetPasswordPage,
+            },
+            {
+                path: Routes.auth.mfaEnroll,
+                Component: MfaEnrollPage,
+            },
+            {
+                path: Routes.auth.mfaChallenge,
+                Component: MfaChallengePage,
             },
         ],
     },

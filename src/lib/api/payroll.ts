@@ -23,6 +23,7 @@ export type DuePayrollEntry = {
   expenseTotal?: number;
   grossAmount?: number;
   shiftIds?: string[];
+  rideIds?: string[];
 };
 
 export type PayrollDashboardSummary = {

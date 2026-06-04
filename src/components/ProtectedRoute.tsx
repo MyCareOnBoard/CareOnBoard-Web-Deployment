@@ -1,42 +1,34 @@
-import { Navigate } from "react-router"
-import { useAuth } from "@/utils/auth"
-import { useSelector } from "react-redux"
-import type { RootState } from "@/store/redux/store"
-import { PageLoader } from "./ui/loader"
-import { useEffect } from "react"
-import {Routes} from "@/routes/constants";
+import type { ReactNode } from 'react'
+import { Navigate } from 'react-router'
+import { useAuth } from '@/utils/auth'
+import { PageLoader } from './ui/loader'
+import { useRequireMfaEnrolled } from '@/hooks/useRequireMfaEnrolled'
+import { auth } from '@/lib/firebase'
+import { Routes } from '@/routes/constants'
 
 interface ProtectedRouteProps {
-  children: React.ReactNode
+  children: ReactNode
 }
 
 /**
- * ProtectedRoute Component
- * Wraps routes that require authentication
- * Redirects to login if user is not authenticated
+ * Requires Firebase session + enrolled SMS MFA.
+ * Onboarding email OTP (VerifyOTP) is separate and runs after MFA.
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth()
-  const reduxUser = useSelector((state: RootState) => state.auth?.user)
+  const { ready: mfaReady } = useRequireMfaEnrolled()
 
-  useEffect(() => {
-    console.log('[ProtectedRoute] Auth check:', { 
-      user: user?.email, 
-      loading,
-      reduxUser: reduxUser?.email 
-    })
-  }, [user, loading, reduxUser])
-
-  if (loading) {
-    console.log('[ProtectedRoute] Still loading...')
+  if (loading || !mfaReady) {
     return <PageLoader text="Checking authentication..." />
   }
 
-  if (!user) {
-    console.log('[ProtectedRoute] No user, redirecting to login')
+  if (!auth.currentUser) {
     return <Navigate to={Routes.auth.login} replace />
   }
 
-  console.log('[ProtectedRoute] User authenticated, rendering protected content')
+  if (!user) {
+    return <PageLoader text="Loading your profile..." />
+  }
+
   return <>{children}</>
 }

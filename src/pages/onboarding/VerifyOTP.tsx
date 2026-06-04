@@ -1,3 +1,7 @@
+/**
+ * Onboarding email OTP (backend) — not Firebase SMS MFA.
+ * Users complete MFA at /auth/mfa-enroll or /auth/mfa-challenge before reaching this step.
+ */
 import React, { useEffect, useState } from "react"
 import { useLocation, useNavigate } from "react-router"
 import { Input } from "@/components/ui/input"

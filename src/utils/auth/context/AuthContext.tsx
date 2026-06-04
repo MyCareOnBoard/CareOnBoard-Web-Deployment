@@ -10,7 +10,9 @@ import {
   logout as logoutUser,
   getIdToken,
   deleteCurrentUser,
+  type LoginResponse,
 } from "../services/authService"
+import type { LoginResult } from "../types/login.types"
 import { createUser as createBackendUser } from "../api/client"
 import { PageLoader } from "@/components/ui/loader"
 import { auth } from "@/lib/firebase";
@@ -20,7 +22,7 @@ import type { User } from "../types/user.types"
 interface AuthContextType {
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<LoginResult>
   signup: (
     email: string,
     password: string,
@@ -107,16 +109,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /**
    * Login user with email and password
    */
-  const login = async (email: string, password: string) => {
-    const response = await loginWithEmail(email, password)
+  const login = async (email: string, password: string): Promise<LoginResult> => {
+    const response: LoginResponse = await loginWithEmail(email, password)
 
-    if (!response.success || !response.user) {
+    if (response.status === 'error') {
       console.error('[AuthContext] Login failed:', response.error)
       throw new Error(response.error || "Login failed")
     }
 
-    // Update local state
-    setUserState(response.user)
+    if (response.status === 'success') {
+      setUserState(response.user)
+    }
+
+    return response
   }
 
   /**

@@ -26,6 +26,8 @@ import {
   getValidationMessage
 } from "@/utils/auth/helpers/errorMessages"
 import {Routes} from "@/routes/constants";
+import { auth } from "@/lib/firebase";
+import { hasEnrolledMfa } from "@/utils/auth/services/mfaService";
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState("")
@@ -160,6 +162,15 @@ export default function SignUpPage() {
         title: successMsg.title,
         description: successMsg.description,
       })
+
+      await auth.authStateReady?.()
+      const needsMfa =
+        auth.currentUser && !(await hasEnrolledMfa(auth.currentUser))
+      if (needsMfa) {
+        navigate(Routes.auth.mfaEnroll, { replace: true })
+        return
+      }
+
       navigate(Routes.onboarding.index)
     } catch (error: any) {
       const errorMessage = getAuthErrorMessage(error)

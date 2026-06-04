@@ -165,6 +165,8 @@ export const Routes = {
         signup: "/auth/signup",
         forgotPassword: "/auth/forgot-password",
         resetPassword: "/auth/reset-password",
+        mfaEnroll: "/auth/mfa-enroll",
+        mfaChallenge: "/auth/mfa-challenge",
     },
     onboarding: {
         index: "/onboarding",

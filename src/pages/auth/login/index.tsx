@@ -6,19 +6,17 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { setUser, useAuth } from "@/utils/auth"
+import { useAuth } from "@/utils/auth"
 import { useToast } from "@/hooks/use-toast"
 import { ButtonLoader } from "@/components/ui/loader"
 import { Routes } from "@/routes/constants"
-import { getUser } from "@/lib/api/users"
-import { getOnboardingStatus } from "@/lib/api/onboarding"
 import {
   getAuthErrorMessage,
-  getSuccessMessage,
   getValidationMessage
 } from "@/utils/auth/helpers/errorMessages"
-import { UserType } from "@/utils/auth/types/user.types";
-import { useDispatch } from "react-redux";
+import { completePostLogin } from "@/utils/auth/helpers/postLogin"
+import { useDispatch } from "react-redux"
+import type { AppDispatch } from "@/store/redux/store"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -33,12 +31,11 @@ export default function LoginPage() {
 
   const { login } = useAuth()
   const navigate = useNavigate()
-  const dispatch = useDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const { toast } = useToast();
 
   const agencyId = new URLSearchParams(useLocation().search).get('agencyId');
 
-  // Validate email format
   const validateEmail = (email: string) => {
     if (!email) {
       return getValidationMessage('email', 'required')
@@ -50,7 +47,6 @@ export default function LoginPage() {
     return ""
   }
 
-  // Validate password
   const validatePassword = (password: string) => {
     if (!password) {
       return getValidationMessage('password', 'required')
@@ -61,7 +57,6 @@ export default function LoginPage() {
     return ""
   }
 
-  // Real-time validation on blur
   const handleEmailBlur = () => {
     const emailError = validateEmail(email)
     setErrors(prev => ({ ...prev, email: emailError }))
@@ -72,7 +67,6 @@ export default function LoginPage() {
     setErrors(prev => ({ ...prev, password: passwordError }))
   }
 
-  // Clear errors on input
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value)
     if (errors.email) {
@@ -87,18 +81,9 @@ export default function LoginPage() {
     }
   }
 
-  const dashboardRoutes = {
-    [UserType.APPLICANT]: Routes.applicant.dashboard,
-    [UserType.EMPLOYEE]: Routes.userPanel.dashboard,
-    [UserType.AGENCY]: Routes.agency.dashboard,
-    [UserType.AGENCY_STAFF]: Routes.agency.dashboard,
-    [UserType.SUPER_ADMIN]: Routes.superAdmin.dashboard,
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validate all fields
     const emailError = validateEmail(email)
     const passwordError = validatePassword(password)
 
@@ -118,34 +103,20 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      // Login with Firebase
-      await login(email, password)
+      const result = await login(email, password)
 
-      // Check if user has completed onboarding
-      const onboardingStatus = await getOnboardingStatus()
-
-      const successMsg = getSuccessMessage('login')
-      toast({
-        title: successMsg.title,
-        description: successMsg.description,
-      })
-
-      const user = await getUser()
-
-      // Dispatch user with user-specific data
-      dispatch(setUser(user))
-
-      if (user.userType !== UserType.APPLICANT) {
-        navigate(dashboardRoutes[user.userType as UserType], { replace: true })
+      if (result.status === 'mfa_required') {
+        navigate(Routes.auth.mfaChallenge, { replace: true })
         return
       }
-      // Check if onboarding is already completed
-      if (user.onboardingCompleted) {
-        navigate(dashboardRoutes[UserType.APPLICANT], { replace: true })
+
+      if (result.status === 'mfa_enrollment_required') {
+        navigate(Routes.auth.mfaEnroll, { replace: true })
         return
       }
-      navigate(Routes.onboarding.index)
-    } catch (error: any) {
+
+      await completePostLogin(dispatch, navigate, toast)
+    } catch (error: unknown) {
       const errorMessage = getAuthErrorMessage(error)
 
       toast({
@@ -160,15 +131,12 @@ export default function LoginPage() {
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
       <div className="space-y-2">
         <h2 className="text-3xl sm:text-4xl font-semibold text-slate-900 tracking-tight">Login to account</h2>
         <p className="text-sm sm:text-base text-slate-500">Please enter your information to access your account</p>
       </div>
 
-      {/* Login Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Email Field */}
         <div className="space-y-2">
           <Label htmlFor="email" className="text-sm font-medium text-slate-700">
             Email Address
@@ -191,7 +159,6 @@ export default function LoginPage() {
           )}
         </div>
 
-        {/* Password Field with Toggle */}
         <div className="space-y-2">
           <Label htmlFor="password" className="text-sm font-medium text-slate-700">
             Password

@@ -44,6 +44,15 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'auth/quota-exceeded': 'We\'re experiencing high demand. Please try again shortly.',
   'auth/unauthorized-continue-uri': 'There was an issue with the redirect. Please try again.',
   'auth/invalid-continue-uri': 'There was an issue with the redirect. Please try again.',
+
+  // MFA / SMS verification
+  'auth/invalid-verification-code': "That code doesn't match. Check the text message and try again.",
+  'auth/code-expired': 'This code has expired. Tap Send a new code to get another one.',
+  'auth/invalid-phone-number': 'Enter a valid mobile number, including country code (e.g. +1 555 123 4567).',
+  'auth/captcha-check-failed': 'Security check failed. Refresh the page and try again.',
+  'auth/session-expired': 'Your session has expired. Please log in again.',
+  'auth/missing-multi-factor-info': 'Multi-factor verification is required. Please try signing in again.',
+  'auth/second-factor-already-in-use': 'This phone number is already registered for your account.',
 }
 
 /**
