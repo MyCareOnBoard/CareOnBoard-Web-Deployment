@@ -21,26 +21,27 @@ export default function CancelRideModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-8 bg-white shadow-xl sm:max-w-md rounded-3xl">
         <div className="text-center">
-          <DialogTitle className="text-2xl font-bold text-[#10141a] mb-6">
-            Do you want to
-            <br />
-            cancel this ride?
+          <DialogTitle className="text-2xl font-bold text-[#10141a] mb-3">
+            Cancel this ride?
           </DialogTitle>
-            <DialogDescription className="text-sm text-[#808081] mb-6">
-                Are you sure you want to cancel this ride? This action cannot be undone.
-            </DialogDescription>      
+          <DialogDescription className="text-sm font-medium text-[#808081] mb-6">
+            This removes the trip from your schedule. You can&apos;t undo this action.
+          </DialogDescription>
+
           <div className="space-y-3">
             <Button
+              type="button"
               onClick={onConfirm}
               className="w-full bg-[#ef4444] hover:bg-[#dc2626] text-white rounded-full py-3 h-auto font-medium text-base"
             >
-              Yes
+              Cancel ride
             </Button>
             <Button
+              type="button"
               onClick={() => onOpenChange(false)}
               className="w-full bg-[#d1d5db] hover:bg-[#9ca3af] text-[#4b5563] rounded-full py-3 h-auto font-medium text-base"
             >
-              No
+              Keep scheduled
             </Button>
           </div>
         </div>
