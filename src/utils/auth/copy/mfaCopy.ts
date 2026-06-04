@@ -2,33 +2,41 @@ export const MFA_COPY = {
   enroll: {
     title: 'Secure your account',
     subtitle:
-      "For your security, add a mobile number. We'll text you a verification code when you sign in.",
+      'Add a mobile number for two-step sign-in. We will text you a code when you log in.',
     phoneLabel: 'Mobile number',
-    phoneHelp: 'Use a number that can receive text messages. Standard message rates may apply.',
-    sendCode: 'Send verification code',
+    phoneHelp: 'Use a number that can receive text messages. Message and data rates may apply.',
+    sendCode: 'Send code',
     verifyContinue: 'Verify and continue',
-    resend: 'Send a new code',
-    resendCountdown: (seconds: number) => `Send a new code in 0:${String(seconds).padStart(2, '0')}`,
+    resend: 'Send another code',
+    resendCountdown: (seconds: number) =>
+      `Send another code in 0:${String(seconds).padStart(2, '0')}`,
   },
   challenge: {
-    title: 'Check your phone',
-    subtitle: (maskedPhone: string) =>
-      `We sent a 6-digit code to ${maskedPhone}. Enter it below to finish signing in.`,
+    title: 'Enter your sign-in code',
+    codeSent: (maskedPhone: string) =>
+      `Enter the 6-digit code we sent to ${maskedPhone}.`,
+    sendFailed: 'We could not text a code to your phone. Try again below.',
+    sending: (maskedPhone: string) => `Sending a code to ${maskedPhone}…`,
     verifySignIn: 'Verify and sign in',
-    useDifferentAccount: 'Use a different account',
-    autoSending: (maskedPhone: string) => `Sending code to ${maskedPhone}…`,
-    sendCode: 'Send verification code',
-    resend: 'Send a new code',
-    resendCountdown: (seconds: number) => `Send a new code in 0:${String(seconds).padStart(2, '0')}`,
+    useDifferentAccount: 'Sign in with a different account',
+    sendCode: 'Send code',
+    resend: 'Send another code',
+    resendCountdown: (seconds: number) =>
+      `Send another code in 0:${String(seconds).padStart(2, '0')}`,
+  },
+  form: {
+    codeLabel: '6-digit code',
+    codePlaceholder: '000000',
   },
   loading: {
-    sending: 'Sending code to your phone…',
-    verifying: 'Verifying code…',
+    verifying: 'Verifying…',
+    sendingCode: 'Sending code…',
+    resending: 'Sending a new code…',
   },
   errors: {
-    sessionExpired: 'Your sign-in timed out. Please log in again.',
+    sessionExpired: 'This sign-in step timed out. Please log in again.',
     codeRequired: 'Enter the 6-digit code from your text message.',
-    phoneRequired: 'Enter your mobile number.',
+    phoneRequired: 'Enter a valid mobile number with country code.',
   },
 } as const
 

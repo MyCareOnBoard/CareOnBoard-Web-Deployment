@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { ButtonLoader } from '@/components/ui/loader'
 import { useToast } from '@/hooks/use-toast'
 import { Routes } from '@/routes/constants'
 import { useDispatch } from 'react-redux'
@@ -11,6 +10,11 @@ import { MFA_COPY } from '@/utils/auth/copy/mfaCopy'
 import { getAuthErrorMessage } from '@/utils/auth/helpers/errorMessages'
 import { completePostLogin } from '@/utils/auth/helpers/postLogin'
 import MfaCodeForm from '@/pages/auth/components/MfaCodeForm'
+import { RecaptchaAnchor } from '@/pages/auth/components/RecaptchaAnchor'
+import { AuthStepHeader } from '@/pages/auth/components/AuthStepHeader'
+import { AuthStatusBanner } from '@/pages/auth/components/AuthStatusBanner'
+import { AuthLegalFootnote } from '@/pages/auth/components/AuthLegalFootnote'
+import { authPrimaryButtonClass } from '@/pages/auth/components/authFormStyles'
 import {
   clearRecaptchaVerifier,
   completeMfaSignIn,
@@ -24,6 +28,8 @@ import {
 
 const RECAPTCHA_CONTAINER_ID = 'recaptcha-mfa-challenge'
 
+type ChallengePhase = 'sending' | 'enter-code' | 'send-failed'
+
 export default function MfaChallengePage() {
   const navigate = useNavigate()
   const dispatch = useDispatch<AppDispatch>()
@@ -31,7 +37,7 @@ export default function MfaChallengePage() {
   const { logout } = useAuth()
 
   const [verificationId, setVerificationId] = useState<string | null>(null)
-  const [codeSent, setCodeSent] = useState(false)
+  const [phase, setPhase] = useState<ChallengePhase>('sending')
   const [sending, setSending] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState('')
@@ -49,7 +55,7 @@ export default function MfaChallengePage() {
 
     if (!completedRef.current) {
       toast({
-        title: 'Sign-in expired',
+        title: 'Sign-in timed out',
         description: MFA_COPY.errors.sessionExpired,
         variant: 'destructive',
       })
@@ -61,17 +67,20 @@ export default function MfaChallengePage() {
     const session = getMfaResolverSession()
     if (!session) {
       setError(MFA_COPY.errors.sessionExpired)
+      setPhase('send-failed')
       return
     }
     setError('')
     setSending(true)
+    setPhase('sending')
     try {
       const recaptcha = await createRecaptchaVerifier(RECAPTCHA_CONTAINER_ID)
       const id = await startMfaSignInChallenge(session.resolver, recaptcha)
       setVerificationId(id)
-      setCodeSent(true)
+      setPhase('enter-code')
     } catch (e: unknown) {
       setError(getAuthErrorMessage(e))
+      setPhase('send-failed')
     } finally {
       setSending(false)
     }
@@ -112,61 +121,66 @@ export default function MfaChallengePage() {
     return null
   }
 
+  const headerDescription =
+    phase === 'enter-code'
+      ? MFA_COPY.challenge.codeSent(maskedPhone)
+      : phase === 'send-failed'
+        ? MFA_COPY.challenge.sendFailed
+        : undefined
+
   return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <h2 className="text-3xl sm:text-4xl font-semibold text-slate-900 tracking-tight">
-          {MFA_COPY.challenge.title}
-        </h2>
-        <p className="text-sm sm:text-base text-slate-500">
-          {codeSent
-            ? MFA_COPY.challenge.subtitle(maskedPhone)
-            : MFA_COPY.challenge.autoSending(maskedPhone)}
-        </p>
-      </div>
+    <div className="relative flex w-full min-w-0 flex-col gap-8 overflow-x-hidden">
+      <AuthStepHeader title={MFA_COPY.challenge.title} description={headerDescription} />
 
-      <div id={RECAPTCHA_CONTAINER_ID} />
+      <RecaptchaAnchor id={RECAPTCHA_CONTAINER_ID} />
 
-      {!codeSent && sending && (
-        <p className="text-sm text-slate-500 flex items-center gap-2">
-          <ButtonLoader />
-          {MFA_COPY.loading.sending}
-        </p>
+      {phase === 'sending' && (
+        <AuthStatusBanner message={MFA_COPY.challenge.sending(maskedPhone)} />
       )}
 
-      {!codeSent && !sending && error && (
-        <>
+      {phase === 'send-failed' && (
+        <div className="space-y-4">
           <p className="text-sm text-red-600" role="alert" aria-live="polite">
             {error}
           </p>
           <Button
             type="button"
             onClick={() => void sendCode()}
-            className="w-full h-12 bg-[#00B4B8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold"
+            disabled={sending}
+            className={authPrimaryButtonClass}
           >
             {MFA_COPY.challenge.sendCode}
           </Button>
-        </>
+        </div>
       )}
 
-      <MfaCodeForm
-        codeSent={codeSent}
-        onVerify={handleVerify}
-        onResend={sendCode}
-        verifyLabel={MFA_COPY.challenge.verifySignIn}
-        verifying={verifying}
-        sending={sending}
-        error={codeSent ? error : undefined}
-      />
+      {phase === 'enter-code' && (
+        <MfaCodeForm
+          codeSent
+          onVerify={handleVerify}
+          onResend={sendCode}
+          verifyLabel={MFA_COPY.challenge.verifySignIn}
+          verifying={verifying}
+          sending={sending}
+          error={error}
+          resendCopy={{
+            resend: MFA_COPY.challenge.resend,
+            resendCountdown: MFA_COPY.challenge.resendCountdown,
+          }}
+        />
+      )}
 
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={() => void handleDifferentAccount()}
-        className="w-full text-slate-600"
-      >
-        {MFA_COPY.challenge.useDifferentAccount}
-      </Button>
+      <footer className="flex flex-col gap-4 border-t border-[#e5eef5] pt-6">
+        <AuthLegalFootnote />
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => void handleDifferentAccount()}
+          className="w-full text-slate-600 hover:text-slate-900"
+        >
+          {MFA_COPY.challenge.useDifferentAccount}
+        </Button>
+      </footer>
     </div>
   )
 }

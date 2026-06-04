@@ -30,13 +30,13 @@ describe('MfaCodeForm resend cooldown', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: /Send a new code in 60 seconds/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Send another code in 60 seconds/i })).toBeDisabled()
 
     act(() => {
       vi.advanceTimersByTime(RESEND_COOLDOWN_SEC * 1000)
     })
 
-    expect(screen.getByRole('button', { name: /Send a new verification code/i })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /Send another verification code/i })).not.toBeDisabled()
   })
 
   it('renders nothing when code not sent yet', () => {

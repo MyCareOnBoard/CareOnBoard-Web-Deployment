@@ -20,9 +20,11 @@ export async function createRecaptchaVerifier(containerId: string) {
     return activeRecaptchaVerifier
   }
   const { RecaptchaVerifier } = await loadFirebaseAuth()
-  activeRecaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+  const verifier = new RecaptchaVerifier(auth, containerId, {
     size: 'invisible',
   })
+  await verifier.render()
+  activeRecaptchaVerifier = verifier
   return activeRecaptchaVerifier
 }
 

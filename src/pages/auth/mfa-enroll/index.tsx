@@ -12,6 +12,10 @@ import { MFA_COPY } from '@/utils/auth/copy/mfaCopy'
 import { getAuthErrorMessage } from '@/utils/auth/helpers/errorMessages'
 import { completePostLogin } from '@/utils/auth/helpers/postLogin'
 import MfaCodeForm from '@/pages/auth/components/MfaCodeForm'
+import { RecaptchaAnchor } from '@/pages/auth/components/RecaptchaAnchor'
+import { AuthStepHeader } from '@/pages/auth/components/AuthStepHeader'
+import { AuthLegalFootnote } from '@/pages/auth/components/AuthLegalFootnote'
+import { authInputClass, authPrimaryButtonClass } from '@/pages/auth/components/authFormStyles'
 import {
   clearRecaptchaVerifier,
   completeMfaEnrollment,
@@ -81,8 +85,8 @@ export default function MfaEnrollPage() {
     try {
       await completeMfaEnrollment(verificationId, code)
       toast({
-        title: 'Two-step verification enabled',
-        description: 'Your phone number is set up for sign-in.',
+        title: 'Two-step sign-in is on',
+        description: 'We will text you a code when you sign in.',
       })
       await completePostLogin(dispatch, navigate, toast)
     } catch (e: unknown) {
@@ -93,37 +97,41 @@ export default function MfaEnrollPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <h2 className="text-3xl sm:text-4xl font-semibold text-slate-900 tracking-tight">
-          {MFA_COPY.enroll.title}
-        </h2>
-        <p className="text-sm sm:text-base text-slate-500">{MFA_COPY.enroll.subtitle}</p>
-      </div>
+    <div className="relative flex w-full min-w-0 flex-col gap-8 overflow-x-hidden">
+      <AuthStepHeader
+        title={MFA_COPY.enroll.title}
+        description={
+          step === 'phone'
+            ? MFA_COPY.enroll.subtitle
+            : 'Enter the code we sent to your phone to finish setup.'
+        }
+      />
 
-      <div id={RECAPTCHA_CONTAINER_ID} />
+      <RecaptchaAnchor id={RECAPTCHA_CONTAINER_ID} />
 
       {step === 'phone' && (
         <div className="space-y-5">
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label htmlFor="mfa-phone" className="text-sm font-medium text-slate-700">
               {MFA_COPY.enroll.phoneLabel}
             </Label>
-            <Suspense
-              fallback={
-                <div className="h-12 rounded-2xl bg-slate-100 animate-pulse" aria-hidden />
-              }
-            >
-              <PhoneInput
-                id="mfa-phone"
-                international
-                defaultCountry="US"
-                value={phone}
-                onChange={setPhone}
-                className="flex h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 text-base"
-              />
-            </Suspense>
-            <p className="text-xs text-slate-500">{MFA_COPY.enroll.phoneHelp}</p>
+            <div className="max-w-full overflow-hidden">
+              <Suspense
+                fallback={
+                  <div className="h-12 rounded-2xl bg-slate-100 animate-pulse" aria-hidden />
+                }
+              >
+                <PhoneInput
+                  id="mfa-phone"
+                  international
+                  defaultCountry="US"
+                  value={phone}
+                  onChange={setPhone}
+                  className={`PhoneInput flex h-12 w-full max-w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 text-base ${authInputClass}`}
+                />
+              </Suspense>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed">{MFA_COPY.enroll.phoneHelp}</p>
           </div>
 
           {error && (
@@ -136,30 +144,35 @@ export default function MfaEnrollPage() {
             type="button"
             disabled={sending}
             onClick={() => void requestVerificationCode()}
-            className="w-full h-12 bg-[#00B4B8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold"
+            className={authPrimaryButtonClass}
           >
             {sending ? (
               <span className="flex items-center justify-center gap-2">
                 <ButtonLoader />
-                {MFA_COPY.loading.sending}
+                {MFA_COPY.loading.sendingCode}
               </span>
             ) : (
               MFA_COPY.enroll.sendCode
             )}
           </Button>
+
+          <AuthLegalFootnote />
         </div>
       )}
 
       {step === 'code' && (
-        <MfaCodeForm
-          codeSent
-          onVerify={handleVerify}
-          onResend={requestVerificationCode}
-          verifyLabel={MFA_COPY.enroll.verifyContinue}
-          verifying={verifying}
-          sending={sending}
-          error={error}
-        />
+        <>
+          <MfaCodeForm
+            codeSent
+            onVerify={handleVerify}
+            onResend={requestVerificationCode}
+            verifyLabel={MFA_COPY.enroll.verifyContinue}
+            verifying={verifying}
+            sending={sending}
+            error={error}
+          />
+          <AuthLegalFootnote />
+        </>
       )}
     </div>
   )
