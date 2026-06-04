@@ -6,6 +6,7 @@
 
 // Types
 export type { User, AuthState, LoginCredentials, SignupCredentials } from './types'
+export type { LoginResult, LoginResponse } from './types/login.types'
 
 // Store
 export { default as authReducer } from './store/authSlice'
@@ -14,16 +15,23 @@ export * from './store/authSelectors'
 
 // Services
 export * from './services/authService'
-export { 
-  loginWithEmail, 
-  registerWithEmail, 
+export {
+  loginWithEmail,
+  registerWithEmail,
   sendPasswordResetEmail,
   logout,
   getCurrentUser,
   getIdToken,
   saveUserSession,
-  clearUserSession
+  clearUserSession,
 } from './services/firebase-auth'
+export {
+  hasEnrolledMfa,
+  clearRecaptchaVerifier,
+  refreshAuthToken,
+} from './services/mfaService'
+export { MFA_COPY, maskPhoneNumber } from './copy/mfaCopy'
+export { completePostLogin } from './helpers/postLogin'
 
 // Helpers
 export {

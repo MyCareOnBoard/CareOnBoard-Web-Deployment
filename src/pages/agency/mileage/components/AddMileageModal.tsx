@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import TimePicker from "@/components/TimePicker";
 import { searchClients, Client, ClientDsp, ClientService, getAgencyClientById } from "@/lib/api/clients";
-import { getEmployeeById, employeeCaregiverUid } from "@/lib/api/employees";
+import { getEmployeeById } from "@/lib/api/employees";
 import { listEmployeeDocuments } from "@/lib/api/employee-documents";
 import { useToast } from "@/hooks/use-toast";
 import { mileageApi, CreateMileageRideRequest, MileageRide, UpdateAgencyRideRequest } from "@/lib/api/mileage";
@@ -174,7 +174,7 @@ export default function AddMileageModal({
         setFormData((prev) => ({
           ...prev,
           assignDsp: dspName,
-          assignDspId: employeeCaregiverUid(emp),
+          assignDspId: emp.id || dspId,
         }));
       } catch {
         if (token !== dspVerifyTokenRef.current) return;

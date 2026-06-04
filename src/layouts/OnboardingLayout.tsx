@@ -1,11 +1,13 @@
-import {Fragment} from "react";
-import {Outlet} from "react-router";
-
+import { Fragment } from 'react'
+import { Outlet } from 'react-router'
+import { OnboardingRoute } from '@/components/OnboardingRoute'
 
 export default function OnboardingLayout() {
   return (
-    <Fragment>
-      <Outlet />
-    </Fragment>
+    <OnboardingRoute>
+      <Fragment>
+        <Outlet />
+      </Fragment>
+    </OnboardingRoute>
   )
 }

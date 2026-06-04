@@ -49,9 +49,14 @@ export default function AuthLayout() {
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    document.body.classList.add('auth-layout-active')
+    return () => document.body.classList.remove('auth-layout-active')
+  }, [])
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-[#f8fafc] to-white">
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-6 w-full px-4 sm:px-6 lg:px-[30px] py-4 sm:py-6">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-white via-[#f8fafc] to-white">
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-6 w-full max-w-[100vw] px-4 sm:px-6 lg:px-[30px] py-4 sm:py-6 overflow-x-hidden">
       {/* Left Banner - Teal branding section */}
       <div
         className="hidden lg:flex bg-[#00b4b8] flex-col h-[calc(100vh-60px)] justify-between p-[60px] rounded-[20px] w-[528px] relative overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.12)]"
@@ -157,9 +162,9 @@ export default function AuthLayout() {
 
       {/* Right Content - Form area */}
       <div className="flex flex-1 flex-col gap-[10px] min-h-[calc(100vh-32px)] lg:h-[calc(100vh-60px)] items-center justify-center min-w-0 w-full">
-        <div className="w-full max-w-[520px]">
-          <div className="bg-white/90 backdrop-blur-md border border-[#e5eef5] rounded-[24px] shadow-[0_20px_60px_rgba(16,24,40,0.12)] px-6 sm:px-10 py-8 sm:py-10">
-            <div className="flex flex-col gap-[32px] sm:gap-[40px] items-start justify-center">
+        <div className="w-full max-w-[520px] min-w-0">
+          <div className="bg-white/90 backdrop-blur-md border border-[#e5eef5] rounded-[24px] shadow-[0_20px_60px_rgba(16,24,40,0.12)] px-6 sm:px-10 py-8 sm:py-10 overflow-hidden">
+            <div className="flex flex-col gap-[32px] sm:gap-[40px] items-stretch justify-center min-w-0 w-full">
               <Outlet/>
             </div>
           </div>

@@ -119,7 +119,7 @@ export default function AgencySettingsPage() {
 
           <TabPanel tabId="agencyInfo" activeTab={activeTab}>
 
-            <Suspense fallback={<SettingsTabSkeleton variant="accordion" cardCount={4} />}>
+            <Suspense fallback={<SettingsTabSkeleton variant="accordion" cardCount={5} />}>
 
               <AgencyInfoTab />
 

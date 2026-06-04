@@ -6,7 +6,6 @@
 
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit'
 import {
-  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -15,7 +14,7 @@ import {
 } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import type { AuthState, LoginCredentials, SignupCredentials } from '../types'
-import { transformFirebaseUser } from '@/utils/auth'
+import { transformFirebaseUser, loginWithEmail } from '@/utils/auth/services/authService'
 import type { User } from '../types/user.types'
 
 // Initial state
@@ -32,17 +31,17 @@ const initialState: AuthState = {
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: LoginCredentials, { rejectWithValue }) => {
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        credentials.email,
-        credentials.password
-      )
-      const user = transformFirebaseUser(userCredential.user)
-      return user
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Login failed')
+    const result = await loginWithEmail(credentials.email, credentials.password)
+    if (result.status === 'success') {
+      return result.user
     }
+    if (result.status === 'mfa_required') {
+      return rejectWithValue({ code: 'MFA_REQUIRED' })
+    }
+    if (result.status === 'mfa_enrollment_required') {
+      return rejectWithValue({ code: 'MFA_ENROLLMENT_REQUIRED' })
+    }
+    return rejectWithValue(result.error || 'Login failed')
   }
 )
 
@@ -191,7 +190,18 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false
-        state.error = action.payload as string
+        state.isAuthenticated = false
+        const payload = action.payload
+        if (
+          payload &&
+          typeof payload === 'object' &&
+          'code' in payload &&
+          (payload.code === 'MFA_REQUIRED' || payload.code === 'MFA_ENROLLMENT_REQUIRED')
+        ) {
+          state.error = null
+          return
+        }
+        state.error = (payload as string) ?? 'Login failed'
       })
 
     // Signup

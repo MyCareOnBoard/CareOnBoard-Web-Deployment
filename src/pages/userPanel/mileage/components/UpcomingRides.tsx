@@ -11,7 +11,7 @@ interface UpcomingRidesProps {
 type FirebaseTimestampLike = { seconds?: number; _seconds?: number };
 
 const formatTime = (value?: string | Date | FirebaseTimestampLike | null) => {
-  if (!value) return "--";
+  if (!value) return "—";
   let date: Date;
   if (typeof value === "string") {
     date = new Date(value);
@@ -19,41 +19,42 @@ const formatTime = (value?: string | Date | FirebaseTimestampLike | null) => {
     date = value;
   } else if (typeof value === "object") {
     const seconds = value.seconds ?? value._seconds;
-    if (typeof seconds !== "number") return "--";
+    if (typeof seconds !== "number") return "—";
     date = new Date(seconds * 1000);
   } else {
-    return "--";
+    return "—";
   }
-  if (Number.isNaN(date.getTime())) return "--";
+  if (Number.isNaN(date.getTime())) return "—";
   return format(date, "h:mm a");
 };
 
 export default function UpcomingRides({ rides, onCancel, actionLoading }: UpcomingRidesProps) {
-  return (
-    <div className="p-6 bg-white rounded-2xl">
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-[#10141a] mb-1">Upcoming Ride</h2>
-        <p className="text-sm text-[#808081]">These are your Previous clients</p>
+  if (rides.length === 0) {
+    return (
+      <div className="py-12 text-center px-4">
+        <p className="text-[14px] font-medium text-[#10141a]">No upcoming rides</p>
+        <p className="text-[14px] font-medium text-[#808081] mt-1">
+          Scheduled trips will show up here when your agency assigns them.
+        </p>
       </div>
+    );
+  }
 
-      <div className="space-y-3">
-        {rides.length === 0 && (
-          <div className="text-sm text-[#808081] text-center py-4">No upcoming rides.</div>
-        )}
-        {rides.map((ride) => (
-          <RideCard
-            key={ride.id}
-            id={ride.id}
-            clientName={ride.clientName}
-            purpose={ride.purpose}
-            clientAvatarUrl={ride.clientAvatarUrl ?? ""}
-            time={formatTime(ride.scheduledStartTime)}
-            status={ride.status}
-            onCancel={onCancel}
-            actionLoading={actionLoading}
-          />
-        ))}
-      </div>
+  return (
+    <div className="space-y-3">
+      {rides.map((ride) => (
+        <RideCard
+          key={ride.id}
+          id={ride.id}
+          clientName={ride.clientName}
+          purpose={ride.purpose}
+          clientAvatarUrl={ride.clientAvatarUrl ?? ""}
+          time={formatTime(ride.scheduledStartTime)}
+          status={ride.status}
+          onCancel={onCancel}
+          actionLoading={actionLoading}
+        />
+      ))}
     </div>
   );
 }

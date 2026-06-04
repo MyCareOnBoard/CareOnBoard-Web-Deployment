@@ -39,6 +39,8 @@ export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app)
 if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {
   console.log('🔥 Firebase Emulators enabled')
   try {
+    // Allows MFA/phone verification in the Auth emulator without real reCAPTCHA/SMS.
+    auth.settings.appVerificationDisabledForTesting = true
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
     console.log('✅ Connected to Auth Emulator on port 9099')
 

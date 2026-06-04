@@ -160,7 +160,8 @@ export default function SignUpPage() {
         title: successMsg.title,
         description: successMsg.description,
       })
-      navigate(Routes.onboarding.index)
+
+      navigate(Routes.onboarding.index, { replace: true })
     } catch (error: any) {
       const errorMessage = getAuthErrorMessage(error)
       toast({

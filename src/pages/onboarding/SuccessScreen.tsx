@@ -9,8 +9,8 @@ export default function SuccessScreen() {
     <SuccessMessage
       title="Email Verification Complete!"
       // message="Your email has been verified. You can now continue to your dashboard."
-      buttonText="Continue to Dashboard"
-      onButtonClick={() => nav(Routes.applicant.dashboard)}
+      buttonText="Continue"
+      onButtonClick={() => nav(Routes.auth.mfaEnroll, { replace: true })}
     />
   );
 }
