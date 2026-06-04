@@ -22,6 +22,12 @@ import type { LoginResponse } from '../types/login.types'
 import { getAuthErrorMessage } from '../helpers/errorMessages'
 import { hasEnrolledMfa, storeMfaResolver } from '@/utils/auth/services/mfaService'
 import { clearMfaResolverSession } from '@/utils/auth/services/mfaSessionStore'
+import { getUser } from '@/lib/api/users'
+import { UserType } from '../types/user.types'
+import {
+  getLoginProfileErrorMessage,
+  isMissingProfileError,
+} from '@/utils/auth/helpers/loginProfileError'
 
 export interface AuthResponse {
   success: boolean
@@ -60,7 +66,27 @@ export async function loginWithEmail(
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password)
     const firebaseUser = userCredential.user
-    const user = transformFirebaseUser(firebaseUser)
+    let user = transformFirebaseUser(firebaseUser)
+
+    try {
+      const profile = await getUser()
+      user = { ...user, ...profile, uid: profile.uid || user.uid }
+      if (
+        profile.userType === UserType.APPLICANT &&
+        !profile.otpVerified
+      ) {
+        return { status: 'success', user }
+      }
+    } catch (profileError) {
+      if (!isMissingProfileError(profileError)) {
+        console.error('[loginWithEmail] Unexpected profile load failure:', profileError)
+        return {
+          status: 'error',
+          error: getLoginProfileErrorMessage(profileError),
+        }
+      }
+      console.warn('[loginWithEmail] Profile not found, continuing login flow')
+    }
 
     if (!(await hasEnrolledMfa(firebaseUser))) {
       return { status: 'mfa_enrollment_required', user }

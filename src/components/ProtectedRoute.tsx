@@ -12,7 +12,7 @@ interface ProtectedRouteProps {
 
 /**
  * Requires Firebase session + enrolled SMS MFA.
- * Onboarding email OTP (VerifyOTP) is separate and runs after MFA.
+ * Applicants complete onboarding (incl. email OTP) before MFA; other roles require MFA here.
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth()

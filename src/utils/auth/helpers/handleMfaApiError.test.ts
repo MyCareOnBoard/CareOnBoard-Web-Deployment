@@ -35,4 +35,12 @@ describe('handleMfaApiError', () => {
     expect(handleMfaApiError(403, { code: 'FORBIDDEN' })).toBe(false)
     expect(handleMfaApiError(401, { code: 'MFA_ENROLLMENT_REQUIRED' })).toBe(false)
   })
+
+  it('does not redirect on onboarding routes', () => {
+    window.location.pathname = '/onboarding/email'
+    window.location.href = ''
+    const handled = handleMfaApiError(403, { code: 'MFA_ENROLLMENT_REQUIRED' })
+    expect(handled).toBe(false)
+    expect(window.location.href).toBe('')
+  })
 })

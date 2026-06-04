@@ -16,6 +16,7 @@ import type { LoginResult } from "../types/login.types"
 import { createUser as createBackendUser } from "../api/client"
 import { PageLoader } from "@/components/ui/loader"
 import { auth } from "@/lib/firebase";
+import { reload } from "firebase/auth";
 import { clearAuthCache } from "@/lib/axios";
 import type { User } from "../types/user.types"
 
@@ -143,6 +144,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Create user in backend FIRST (before updating state so presence/heartbeat don't run)
     try {
       await createBackendUser(fullName, agencyId)
+      if (auth.currentUser) {
+        await reload(auth.currentUser)
+      }
     } catch (error: any) {
       console.error('[signup] Failed to create user in backend:', error)
       try {

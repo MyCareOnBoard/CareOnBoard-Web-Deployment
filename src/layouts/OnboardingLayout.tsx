@@ -1,13 +1,13 @@
 import { Fragment } from 'react'
 import { Outlet } from 'react-router'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { OnboardingRoute } from '@/components/OnboardingRoute'
 
 export default function OnboardingLayout() {
   return (
-    <ProtectedRoute>
+    <OnboardingRoute>
       <Fragment>
         <Outlet />
       </Fragment>
-    </ProtectedRoute>
+    </OnboardingRoute>
   )
 }

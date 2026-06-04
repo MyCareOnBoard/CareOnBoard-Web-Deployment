@@ -6,13 +6,7 @@ import { getOnboardingStatus } from '@/lib/api/onboarding'
 import { getSuccessMessage } from '@/utils/auth/helpers/errorMessages'
 import { UserType } from '@/utils/auth/types/user.types'
 import { Routes } from '@/routes/constants'
-const dashboardRoutes: Record<UserType, string> = {
-  [UserType.APPLICANT]: Routes.applicant.dashboard,
-  [UserType.EMPLOYEE]: Routes.userPanel.dashboard,
-  [UserType.AGENCY]: Routes.agency.dashboard,
-  [UserType.AGENCY_STAFF]: Routes.agency.dashboard,
-  [UserType.SUPER_ADMIN]: Routes.superAdmin.dashboard,
-}
+import { getDashboardRouteForUserType } from '@/utils/auth/helpers/roleDashboard'
 
 export type PostLoginToast = (opts: {
   title: string
@@ -41,14 +35,14 @@ export async function completePostLogin(
   dispatch(setUser(user))
 
   if (user.userType !== UserType.APPLICANT) {
-    navigate(dashboardRoutes[user.userType as UserType], { replace: true })
+    navigate(getDashboardRouteForUserType(user.userType as UserType), { replace: true })
     return
   }
 
-  if (user.onboardingCompleted) {
-    navigate(dashboardRoutes[UserType.APPLICANT], { replace: true })
+  if (!user.otpVerified) {
+    navigate(Routes.onboarding.index, { replace: true })
     return
   }
 
-  navigate(Routes.onboarding.index, { replace: true })
+  navigate(getDashboardRouteForUserType(UserType.APPLICANT), { replace: true })
 }

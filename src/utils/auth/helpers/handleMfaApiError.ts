@@ -14,6 +14,10 @@ export function handleMfaApiError(status: number, body: MfaErrorBody): boolean {
 
   const path = window.location.pathname
 
+  if (path.startsWith('/onboarding')) {
+    return false
+  }
+
   if (body.code === 'MFA_ENROLLMENT_REQUIRED') {
     if (!path.startsWith(Routes.auth.mfaEnroll)) {
       window.location.href = Routes.auth.mfaEnroll

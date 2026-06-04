@@ -7,6 +7,8 @@ import { checkUserStatus } from "@/lib/api/onboarding"
 import { useAuth } from "@/utils/auth"
 import LogoHeader from "./components/LogoHeader"
 import { Routes } from "@/routes/constants"
+import { auth } from "@/lib/firebase"
+import { hasEnrolledMfa } from "@/utils/auth/services/mfaService"
 
 export default function VerifyEmail() {
   const { user, loading: authLoading } = useAuth()
@@ -35,15 +37,15 @@ export default function VerifyEmail() {
         // Check if user data exists
         const userData = await checkUserStatus()
         
-        if (userData) {
-          // Only redirect if BOTH onboarding is completed AND OTP is verified
-          if (userData.onboardingCompleted && userData.otpVerified) {
-            nav(Routes.applicant.dashboard, { replace: true })
-            return
-          }
-          
-          // If only OTP is verified but onboarding not completed, stay on this page
-          // If neither is verified, stay on this page to verify OTP
+        if (userData?.otpVerified) {
+          await auth.authStateReady?.()
+          const enrolled =
+            auth.currentUser && (await hasEnrolledMfa(auth.currentUser))
+          nav(
+            enrolled ? Routes.applicant.dashboard : Routes.auth.mfaEnroll,
+            { replace: true },
+          )
+          return
         } else {
           // User data doesn't exist yet - user must complete OTP verification first
           // Don't redirect, stay on this page
