@@ -53,6 +53,16 @@ export interface Agency {
     quickBooks?: string;
     adp?: string;
     paycheck?: string;
+    // Operational settings
+    maxShiftPerDay?: number;
+    travelTimeRules?: string;
+    mileageRate?: number;
+    whoReceivesNotifications?: "admin" | "manager" | "supervisor" | string;
+    allowedFileTypes?: string[];
+    allowRecurringSchedules?: boolean;
+    allowOverlappingVisits?: boolean;
+    offerMileageReimbursements?: boolean;
+    realtimeGpsTracking?: boolean;
     // Legacy
     taxId?: string;
     licenseNumber?: string;
@@ -153,6 +163,15 @@ export interface UpdateAgencyProfileRequest {
     paycheck?: string | null;
     taxId?: string | null;
     licenseNumber?: string | null;
+    maxShiftPerDay?: number;
+    travelTimeRules?: string | null;
+    mileageRate?: number;
+    whoReceivesNotifications?: "admin" | "manager" | "supervisor" | string | null;
+    allowedFileTypes?: string[];
+    allowRecurringSchedules?: boolean;
+    allowOverlappingVisits?: boolean;
+    offerMileageReimbursements?: boolean;
+    realtimeGpsTracking?: boolean;
 }
 
 /**

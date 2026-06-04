@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import TimePicker from "@/components/TimePicker";
 import { searchClients, Client, ClientDsp, ClientService, getAgencyClientById } from "@/lib/api/clients";
-import { getEmployeeById, employeeCaregiverUid } from "@/lib/api/employees";
+import { getEmployeeById } from "@/lib/api/employees";
 import { listEmployeeDocuments } from "@/lib/api/employee-documents";
 import { useToast } from "@/hooks/use-toast";
 import { mileageApi, CreateMileageRideRequest, MileageRide, UpdateAgencyRideRequest } from "@/lib/api/mileage";
@@ -153,17 +153,6 @@ export default function AddMileageModal({
           });
           return;
         }
-        const caregiverUid = employeeCaregiverUid(emp);
-        if (!caregiverUid) {
-          setFormData((prev) => ({ ...prev, assignDsp: "", assignDspId: "" }));
-          toast({
-            title: "DSP account required",
-            description:
-              "This DSP does not have a login account yet. Choose another DSP or finish onboarding first.",
-            variant: "destructive",
-          });
-          return;
-        }
         if (documents !== null) {
           const license = documents.find((d) => d.documentType === "driverLicense");
           const hasValidLicense =
@@ -182,7 +171,7 @@ export default function AddMileageModal({
         setFormData((prev) => ({
           ...prev,
           assignDsp: dspName,
-          assignDspId: caregiverUid,
+          assignDspId: emp.id || dspId,
         }));
       } catch {
         if (token !== dspVerifyTokenRef.current) return;
