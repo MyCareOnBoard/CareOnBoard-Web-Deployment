@@ -56,70 +56,7 @@ export async function listEmployeeDocuments(employeeId: string): Promise<Employe
     return response.data.documents;
   } catch (err: any) {
     console.error('listEmployeeDocuments error:', err);
-    
-    // Return mock documents for testing until backend is ready
-    const mockDocuments: EmployeeDocument[] = [
-      {
-        id: '1',
-        employeeId,
-        documentType: 'id',
-        documentName: "Photo ID (Driver's License, State ID, Passport)",
-        status: 'available',
-        uploadedAt: '2024-01-15T10:00:00Z',
-      },
-      {
-        id: '2',
-        employeeId,
-        documentType: 'social-security',
-        documentName: 'Social Security Card',
-        status: 'available',
-        uploadedAt: '2024-01-15T10:00:00Z',
-      },
-      {
-        id: '3',
-        employeeId,
-        documentType: 'vaccination',
-        documentName: 'Hepatitis B vaccination series documents or chest x ray',
-        status: 'available',
-        uploadedAt: '2024-02-01T10:00:00Z',
-      },
-      // {
-      //   id: '4',
-      //   employeeId,
-      //   documentType: 'immunity',
-      //   documentName: 'Hepatitis B immunity (titer result)',
-      //   status: 'available',
-      //   uploadedAt: '2024-02-01T10:00:00Z',
-      // },
-      {
-        id: '5',
-        employeeId,
-        documentType: 'test',
-        documentName: 'Tb test result',
-        status: 'available',
-        uploadedAt: '2024-02-10T10:00:00Z',
-      },
-      {
-        id: '6',
-        employeeId,
-        documentType: 'form',
-        documentName: 'I-9 Form',
-        status: 'expired',
-        uploadedAt: '2023-01-15T10:00:00Z',
-        expiryDate: '2024-01-15T10:00:00Z',
-      },
-      {
-        id: '7',
-        employeeId,
-        documentType: 'tax',
-        documentName: 'W-4 Form',
-        status: 'expiring-soon',
-        uploadedAt: '2024-01-15T10:00:00Z',
-        expiryDate: '2024-12-31T10:00:00Z',
-      },
-    ];
-    
-    return mockDocuments;
+    throw new Error(err.message || 'Failed to list employee documents');
   }
 }
 
