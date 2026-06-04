@@ -9,6 +9,7 @@ import LogoHeader from "./components/LogoHeader"
 import { Routes } from "@/routes/constants"
 import { auth } from "@/lib/firebase"
 import { hasEnrolledMfa } from "@/utils/auth/services/mfaService"
+import { ONBOARDING_EMAIL_COPY } from "./copy/onboardingEmailCopy"
 
 export default function VerifyEmail() {
   const { user, loading: authLoading } = useAuth()
@@ -17,26 +18,23 @@ export default function VerifyEmail() {
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const nav = useNavigate()
+  const copy = ONBOARDING_EMAIL_COPY
 
-  // 🔹 Check profile status and auto-extract email
   useEffect(() => {
     const checkUser = async () => {
-      // Wait for auth to be initialized
       if (authLoading) {
         return
       }
 
       try {
         if (!user?.email) {
-          throw new Error("No authenticated user found")
+          throw new Error(copy.errors.notSignedIn)
         }
 
-        // Auto-populate email from authenticated user
         setEmail(user.email)
 
-        // Check if user data exists
         const userData = await checkUserStatus()
-        
+
         if (userData?.otpVerified) {
           await auth.authStateReady?.()
           const enrolled =
@@ -46,26 +44,23 @@ export default function VerifyEmail() {
             { replace: true },
           )
           return
-        } else {
-          // User data doesn't exist yet - user must complete OTP verification first
-          // Don't redirect, stay on this page
         }
-      } catch (err: any) {
-        // Don't redirect on error - user needs to complete OTP verification
-        setError(err?.message || "Unable to load user data")
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : copy.errors.loadUserFailed
+        setError(message)
       } finally {
         setLoading(false)
       }
     }
 
     checkUser()
-  }, [user, authLoading, nav])
+  }, [user, authLoading, nav, copy.errors])
 
-  // 🔹 Send OTP and navigate to OTP verification
-  const handleVerifyOTP = async () => {
+  const handleSendVerificationCode = async () => {
     const trimmedEmail = email.trim()
     if (!trimmedEmail) {
-      setError("Email is required")
+      setError(copy.emailPage.emailRequired)
       return
     }
 
@@ -74,21 +69,19 @@ export default function VerifyEmail() {
 
     try {
       await sendOtp(trimmedEmail)
-      
-      // Navigate to OTP verification page
       nav(Routes.onboarding.otp, { state: { email: trimmedEmail } })
-    } catch (err: any) {
-      const errorMsg = err?.message || "Failed to send OTP"
-      
-      // Check for specific error types
+    } catch (err: unknown) {
+      const errorMsg =
+        err instanceof Error ? err.message : copy.errors.sendFailed
+
       if (/FAILED_PRECONDITION|requires an index/i.test(errorMsg)) {
-        setError(
-          "Database is being set up. Please wait 2-3 minutes and try again, or contact support."
-        )
+        setError(copy.errors.databaseSetup)
       } else if (/404|not found/i.test(errorMsg)) {
-        setError("OTP service is currently unavailable. Please contact support.")
+        setError(copy.errors.serviceUnavailable)
       } else if (/network/i.test(errorMsg)) {
-        setError("Network error. Please check your connection and try again.")
+        setError(copy.errors.network)
+      } else if (/failed to send/i.test(errorMsg)) {
+        setError(copy.errors.sendFailed)
       } else {
         setError(errorMsg)
       }
@@ -100,35 +93,34 @@ export default function VerifyEmail() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#F5F5F5]">
       <div className="w-full max-w-4xl mx-auto">
-        {/* Progress Badge */}
         <div className="flex justify-center my-3">
           <span className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium bg-[#00B4B8] text-white shadow-sm">
-            OTP Verification
+            {copy.badge}
           </span>
         </div>
 
-        {/* Main Card */}
         <div className="min-h-[420px] flex flex-col items-center justify-center p-12 text-center bg-white shadow-2xl rounded-2xl gap-y-4">
           <LogoHeader />
-          
+
           <h3 className="mb-2 text-2xl font-bold text-[#10141a]">
-            Congratulations! You have completed onboarding session.
+            {copy.emailPage.title}
           </h3>
-          
+
           <p className="mb-4 text-base font-medium text-[#808081]">
-            Email already verified. Now verify your phone number with OTP.
+            {copy.emailPage.description}
           </p>
 
-          {/* Email Display (Read-only) */}
           {authLoading || loading ? (
             <div className="flex items-center justify-center max-w-md py-3 mx-auto">
               <div className="w-5 h-5 border-2 border-gray-300 rounded-full animate-spin border-t-[#00B4B8]"></div>
-              <p className="ml-3 text-sm text-gray-500">Initializing your profile...</p>
+              <p className="ml-3 text-sm text-gray-500">
+                {copy.emailPage.loadingAccount}
+              </p>
             </div>
           ) : (
             <div className="w-full max-w-md mx-auto">
               <label className="block mb-2 text-sm font-medium text-left text-gray-700">
-                Verified Email Address
+                {copy.emailPage.emailLabel}
               </label>
               <Input
                 aria-label="Email Address"
@@ -141,36 +133,36 @@ export default function VerifyEmail() {
             </div>
           )}
 
-          {/* Error Message */}
           {error && (
-            <div className="w-full max-w-md p-3 mx-auto text-sm text-red-600 bg-red-50 rounded-xl" role="alert">
+            <div
+              className="w-full max-w-md p-3 mx-auto text-sm text-red-600 bg-red-50 rounded-xl"
+              role="alert"
+            >
               {error}
             </div>
           )}
 
-          {/* Verify OTP Button */}
           <div className="flex justify-center gap-4 mt-4">
             <Button
-              onClick={handleVerifyOTP}
+              onClick={handleSendVerificationCode}
               disabled={sending || authLoading || loading || !email}
               className="px-8 py-2.5 bg-[#00B4B8] hover:bg-[#009da1] text-white rounded-full font-medium shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {sending ? (
                 <span className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white rounded-full animate-spin border-t-transparent"></div>
-                  Sending OTP...
+                  {copy.emailPage.sendingCode}
                 </span>
               ) : (
-                "Verify OTP"
+                copy.emailPage.sendCode
               )}
             </Button>
           </div>
         </div>
 
-        {/* Back Button */}
         <div className="flex justify-center my-3">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => nav(-1)}
             className="px-6 rounded-full"
           >
