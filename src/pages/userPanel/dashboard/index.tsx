@@ -81,8 +81,12 @@ export default function UserPanelDashboardPage() {
 
         let status = employeeDocument.status
 
-        // get days until expiry
-        const daysUntilExpiry = employeeDocument.expiryDate ? Math.floor((new Date(employeeDocument.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+        // get days until expiry (normalize both dates to midnight to avoid sub-day rounding issues)
+        const daysUntilExpiry = employeeDocument.expiryDate ? (() => {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const expiry = new Date(employeeDocument.expiryDate); expiry.setHours(0, 0, 0, 0);
+            return Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        })() : null;
         if (employeeDocument.expiryDate && (daysUntilExpiry || 0) <= 7 && (daysUntilExpiry || 0) > 0) {
             status = "expiring"
         } else if (employeeDocument.expiryDate && (daysUntilExpiry || 0) <= 0) {
