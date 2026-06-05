@@ -31,3 +31,5 @@ export const BILLING_TEXTAREA_CLASS =
 
 export const BILLING_FIELD_CLASS =
   "h-[48px] rounded-[10px] border border-[#e5e5e6] bg-white px-4 text-[14px] text-[#10141a] focus:border-[#00b4b8] focus:ring-[#00b4b8]";
+
+export const BILLING_CHECKBOX_CLASS = "!size-5 !rounded-[4px] [&>svg]:!size-3";
