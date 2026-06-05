@@ -1,6 +1,9 @@
 import type {
+  CreatePayrollInvoicePayload,
   PayrollInvoiceDetail,
   PayrollInvoicePrefill,
+  PayrollInvoicePreview,
+  PayrollInvoicePreviewItem,
 } from "@/lib/api/payroll";
 import type { DuePayrollEntry } from "@/lib/api/payroll";
 import type {
@@ -84,6 +87,39 @@ export function needsAgencyFallback(prefill: PayrollInvoicePrefill | null | unde
   const hasAddress = Boolean(prefill.support.addressLines?.some((line) => line.trim()));
 
   return !(hasEmail && hasPhone && hasAddress);
+}
+
+export function buildCreatePayloadFromSelection(
+  preview: PayrollInvoicePreview,
+  selectedIds: Set<string>,
+  agencyId: string,
+): CreatePayrollInvoicePayload {
+  const shiftIds: string[] = [];
+  const rideIds: string[] = [];
+  const expenseIds: string[] = [];
+
+  for (const item of preview.items) {
+    if (!selectedIds.has(item.id)) {
+      continue;
+    }
+    if (item.type === "shift") {
+      shiftIds.push(item.id);
+    } else if (item.type === "ride") {
+      rideIds.push(item.id);
+    } else if (item.type === "expense") {
+      expenseIds.push(item.id);
+    }
+  }
+
+  return {
+    agencyId,
+    employeeId: preview.employeeId,
+    periodStart: preview.periodStart,
+    periodEnd: preview.periodEnd,
+    shiftIds,
+    rideIds,
+    expenseIds,
+  };
 }
 
 export function dueEntryToCreatePayload(

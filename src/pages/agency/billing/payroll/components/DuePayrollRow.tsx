@@ -81,12 +81,12 @@ function PayrollActionsMenu({
   entry,
   variant,
   disabled,
-  onGenerateInvoice,
+  onCreateInvoiceClick,
 }: {
   entry: DuePayrollEntry;
   variant: "mobile" | "desktop";
   disabled?: boolean;
-  onGenerateInvoice: (entry: DuePayrollEntry) => void;
+  onCreateInvoiceClick: (entry: DuePayrollEntry) => void;
 }) {
   const isMobile = variant === "mobile";
 
@@ -115,7 +115,7 @@ function PayrollActionsMenu({
       >
         <DropdownMenuItem
           className={menuItemClassName}
-          onSelect={() => onGenerateInvoice(entry)}
+          onSelect={() => onCreateInvoiceClick(entry)}
         >
           Create payroll invoice
           <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
@@ -126,26 +126,40 @@ function PayrollActionsMenu({
 }
 
 function grossPayBreakdown(entry: DuePayrollEntry) {
+  const shiftPayTotal = entry.shiftPayTotal ?? 0;
+  const ridePayTotal = entry.ridePayTotal ?? 0;
   const expenseTotal = entry.expenseTotal ?? 0;
-  if (expenseTotal <= 0) {
+
+  if (shiftPayTotal <= 0 && ridePayTotal <= 0 && expenseTotal <= 0) {
     return null;
   }
-  const shiftPay = entry.shiftPayTotal ?? Math.max((entry.grossAmount ?? 0) - expenseTotal, 0);
-  return `Shift pay ${formatCurrency(shiftPay)} + reimbursements ${formatCurrency(expenseTotal)}`;
+
+  const parts: string[] = [];
+  if (shiftPayTotal > 0) {
+    parts.push(`Shift pay ${formatCurrency(shiftPayTotal)}`);
+  }
+  if (ridePayTotal > 0) {
+    parts.push(`mileage ${formatCurrency(ridePayTotal)}`);
+  }
+  if (expenseTotal > 0) {
+    parts.push(`reimbursements ${formatCurrency(expenseTotal)}`);
+  }
+
+  return parts.join(" + ");
 }
 
 type DuePayrollRowProps = {
   entry: DuePayrollEntry;
   variant: "mobile" | "desktop";
   actionsDisabled?: boolean;
-  onGenerateInvoice: (entry: DuePayrollEntry) => void;
+  onCreateInvoiceClick: (entry: DuePayrollEntry) => void;
 };
 
 function DuePayrollRow({
   entry,
   variant,
   actionsDisabled = false,
-  onGenerateInvoice,
+  onCreateInvoiceClick,
 }: DuePayrollRowProps) {
   const breakdown = grossPayBreakdown(entry);
   if (variant === "mobile") {
@@ -156,7 +170,7 @@ function DuePayrollRow({
             entry={entry}
             variant="mobile"
             disabled={actionsDisabled}
-            onGenerateInvoice={onGenerateInvoice}
+            onCreateInvoiceClick={onCreateInvoiceClick}
           />
         </div>
 
@@ -223,7 +237,7 @@ function DuePayrollRow({
           entry={entry}
           variant="desktop"
           disabled={actionsDisabled}
-          onGenerateInvoice={onGenerateInvoice}
+          onCreateInvoiceClick={onCreateInvoiceClick}
         />
       </div>
     </div>

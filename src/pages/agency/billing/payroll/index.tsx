@@ -22,6 +22,8 @@ import {
 
   type PayrollInvoiceListItem,
 
+  type PayrollInvoicePreview,
+
 } from "@/lib/api/payroll";
 
 import BillingDashboardHeader from "../components/BillingDashboardHeader";
@@ -67,9 +69,9 @@ import { getCurrentWeekDateRange } from "./utils/payrollDashboardUtils";
 
 import {
 
-  buildPayrollInvoiceDocument,
+  buildCreatePayloadFromSelection,
 
-  dueEntryToCreatePayload,
+  buildPayrollInvoiceDocument,
 
   needsAgencyFallback,
 
@@ -78,6 +80,7 @@ import {
 
 
 const PayrollInvoiceModal = lazy(() => import("./components/PayrollInvoiceModal"));
+const CreatePayrollInvoiceModal = lazy(() => import("./components/CreatePayrollInvoiceModal"));
 
 
 
@@ -92,6 +95,10 @@ export default function PayrollDashboardPage() {
   const [activeTab, setActiveTab] = useState<PayrollWorkspaceTab>("staff");
 
   const [openingInvoice, setOpeningInvoice] = useState<{ staffName: string } | null>(null);
+
+  const [createInvoiceEntry, setCreateInvoiceEntry] = useState<DuePayrollEntry | null>(null);
+
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
 
   const [invoiceModal, setInvoiceModal] = useState<{
 
@@ -367,100 +374,63 @@ export default function PayrollDashboardPage() {
 
 
 
-  const handleGenerateInvoice = useCallback(
+  const handleCreateInvoiceClick = useCallback((entry: DuePayrollEntry) => {
+    setCreateInvoiceEntry(entry);
+  }, []);
 
-    async (entry: DuePayrollEntry) => {
-
+  const handleConfirmCreateInvoice = useCallback(
+    async (preview: PayrollInvoicePreview, selectedIds: Set<string>) => {
       if (!user?.agencyId) {
-
         toast({
-
           title: "Agency not found",
-
           description: "Sign in again and retry.",
-
           variant: "destructive",
-
         });
-
         return;
-
       }
-
-
 
       const requestId = openingInvoiceRequestIdRef.current + 1;
-
       openingInvoiceRequestIdRef.current = requestId;
-
-      setOpeningInvoice({ staffName: entry.staffName });
-
-
+      setCreatingInvoice(true);
+      setOpeningInvoice({ staffName: preview.employeeName });
 
       try {
-
-        const created = await createPayrollInvoice(dueEntryToCreatePayload(entry, user.agencyId));
-
-
+        const created = await createPayrollInvoice(
+          buildCreatePayloadFromSelection(preview, selectedIds, user.agencyId),
+        );
 
         if (openingInvoiceRequestIdRef.current !== requestId) {
-
           return;
-
         }
 
-
+        setCreateInvoiceEntry(null);
 
         const agency = await fetchAgencyFallbackIfNeeded(created.invoicePrefill);
-
         await openInvoiceDetail(created, agency);
-
         setActiveTab("generated");
-
         await refreshPayrollWorkspace({ refreshStaff: true });
-
         toast({
-
           title: "Payroll invoice created",
-
           description: `Invoice ${created.invoiceNumber} is ready to review.`,
-
         });
-
       } catch (error) {
-
         if (openingInvoiceRequestIdRef.current !== requestId) {
-
           return;
-
         }
-
-
 
         toast({
-
           title: "Couldn't create payroll invoice",
-
           description: getCreatePayrollInvoiceErrorMessage(error),
-
           variant: "destructive",
-
         });
-
       } finally {
-
         if (openingInvoiceRequestIdRef.current === requestId) {
-
+          setCreatingInvoice(false);
           setOpeningInvoice(null);
-
         }
-
       }
-
     },
-
     [fetchAgencyFallbackIfNeeded, openInvoiceDetail, refreshPayrollWorkspace, toast, user?.agencyId],
-
   );
 
 
@@ -694,9 +664,11 @@ export default function PayrollDashboardPage() {
 
             isRefetching={staffToPayRefetching}
 
-            onGenerateInvoice={handleGenerateInvoice}
+            onCreateInvoiceClick={handleCreateInvoiceClick}
 
-            actionsDisabled={openingInvoice !== null || generatedMutating || markingPaid}
+            actionsDisabled={
+              openingInvoice !== null || creatingInvoice || generatedMutating || markingPaid
+            }
 
           />
 
@@ -723,6 +695,24 @@ export default function PayrollDashboardPage() {
       </div>
 
 
+
+      {createInvoiceEntry && (
+        <Suspense fallback={null}>
+          <CreatePayrollInvoiceModal
+            open
+            entry={createInvoiceEntry}
+            saving={creatingInvoice}
+            onClose={() => {
+              if (!creatingInvoice) {
+                setCreateInvoiceEntry(null);
+              }
+            }}
+            onConfirm={(preview, selectedIds) => {
+              void handleConfirmCreateInvoice(preview, selectedIds);
+            }}
+          />
+        </Suspense>
+      )}
 
       {invoiceModal && !openingInvoice && (
 

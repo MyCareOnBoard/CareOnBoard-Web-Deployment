@@ -20,6 +20,7 @@ export type DuePayrollEntry = {
   paymentDetails: string;
   paRate: string;
   shiftPayTotal?: number;
+  ridePayTotal?: number;
   expenseTotal?: number;
   grossAmount?: number;
   shiftIds?: string[];
@@ -143,6 +144,47 @@ export type CreatePayrollInvoicePayload = {
   periodStart: string;
   periodEnd: string;
   shiftIds?: string[];
+  expenseIds?: string[];
+  rideIds?: string[];
+};
+
+export type PayrollInvoicePreviewItemType = "shift" | "ride" | "expense";
+
+export type PayrollInvoicePreviewItem = {
+  id: string;
+  type: PayrollInvoicePreviewItemType;
+  typeLabel: string;
+  description: string;
+  date: string | null;
+  hoursLabel: string;
+  rateLabel: string;
+  amount: number;
+  amountLabel: string;
+  quantity: number;
+};
+
+export type PayrollInvoicePreview = {
+  employeeId: string;
+  employeeName: string;
+  periodStart: string;
+  periodEnd: string;
+  dateRangeLabel: string;
+  paymentDetails: string;
+  mileageRate: number;
+  items: PayrollInvoicePreviewItem[];
+  totals: {
+    totalHours: number;
+    grossAmount: number;
+    shiftPayTotal: number;
+    ridePayTotal: number;
+    expenseTotal: number;
+  };
+};
+
+export type PayrollInvoicePreviewQuery = {
+  employeeId: string;
+  periodStart: string;
+  periodEnd: string;
 };
 
 type PayrollDashboardResponse = {
@@ -172,6 +214,13 @@ type PayrollInvoiceDetailResponse = {
 type PayrollInvoiceMutationResponse = {
   success: boolean;
   data?: PayrollInvoiceDetail;
+  message?: string;
+  error?: string;
+};
+
+type PayrollInvoicePreviewResponse = {
+  success: boolean;
+  data: PayrollInvoicePreview;
   message?: string;
   error?: string;
 };
@@ -238,6 +287,21 @@ export async function getPayrollInvoiceById(invoiceId: string): Promise<PayrollI
   return response.data.data;
 }
 
+export async function getPayrollInvoicePreview(
+  query: PayrollInvoicePreviewQuery,
+): Promise<PayrollInvoicePreview> {
+  const response = await axiosClient.get<PayrollInvoicePreviewResponse>(
+    "/billing/payroll/invoices/preview",
+    { params: query },
+  );
+
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to fetch payroll invoice preview");
+  }
+
+  return response.data.data;
+}
+
 export async function createPayrollInvoice(
   payload: CreatePayrollInvoicePayload,
 ): Promise<PayrollInvoiceDetail> {
@@ -277,11 +341,17 @@ export async function cancelPayrollInvoice(invoiceId: string): Promise<void> {
 export function getCreatePayrollInvoiceErrorMessage(error: unknown): string {
   const response = getAxiosErrorPayload(error);
 
-  if (response?.error === "SHIFT_ALREADY_INVOICED") {
+  if (response?.error === "SHIFT_ALREADY_INVOICED" || response?.error === "ITEM_ALREADY_INVOICED") {
     return "One or more shifts are already on a payroll invoice. Refresh and try again.";
   }
-  if (response?.error === "NO_ELIGIBLE_SHIFTS") {
-    return "No eligible shifts found for this pay period.";
+  if (response?.error === "NO_ELIGIBLE_SHIFTS" || response?.error === "NO_ELIGIBLE_ITEMS") {
+    return "Select at least one shift, mileage record, or expense for this pay period.";
+  }
+  if (response?.error === "EXPENSE_NOT_FOUND") {
+    return "One or more expenses are no longer eligible. Refresh and try again.";
+  }
+  if (response?.error === "RIDE_NOT_FOUND") {
+    return "One or more mileage records are no longer eligible. Refresh and try again.";
   }
   if (response?.error === "SHIFT_NOT_APPROVED") {
     return "Shifts must be approved before creating a payroll invoice.";
@@ -295,6 +365,20 @@ export function getCreatePayrollInvoiceErrorMessage(error: unknown): string {
   }
 
   return "Couldn't create this payroll invoice. Check your connection and try again.";
+}
+
+export function getPayrollInvoicePreviewErrorMessage(error: unknown): string {
+  const response = getAxiosErrorPayload(error);
+
+  if (response?.message) {
+    return response.message;
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Couldn't load payroll items. Check your connection and try again.";
 }
 
 export function getPayrollInvoiceMutationErrorMessage(error: unknown): string {

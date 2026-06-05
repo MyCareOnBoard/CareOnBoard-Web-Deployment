@@ -12,7 +12,7 @@ type DuePayrollTableProps = {
   dueTotal?: number;
   loading?: boolean;
   isRefetching?: boolean;
-  onGenerateInvoice: (entry: DuePayrollEntry) => void;
+  onCreateInvoiceClick: (entry: DuePayrollEntry) => void;
   actionsDisabled?: boolean;
 };
 
@@ -47,7 +47,7 @@ export default function DuePayrollTable({
   dueTotal = 0,
   loading = false,
   isRefetching = false,
-  onGenerateInvoice,
+  onCreateInvoiceClick,
   actionsDisabled = false,
 }: DuePayrollTableProps) {
   const [filterQuery, setFilterQuery] = useState("");
@@ -124,7 +124,7 @@ export default function DuePayrollTable({
                   key={entry.id}
                   variant="desktop"
                   entry={entry}
-                  onGenerateInvoice={onGenerateInvoice}
+                  onCreateInvoiceClick={onCreateInvoiceClick}
                   actionsDisabled={actionsDisabled}
                 />
               ))
@@ -148,7 +148,7 @@ export default function DuePayrollTable({
               key={entry.id}
               variant="mobile"
               entry={entry}
-              onGenerateInvoice={onGenerateInvoice}
+              onCreateInvoiceClick={onCreateInvoiceClick}
               actionsDisabled={actionsDisabled}
             />
           ))
