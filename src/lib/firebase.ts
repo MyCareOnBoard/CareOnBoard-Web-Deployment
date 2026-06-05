@@ -30,10 +30,38 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 // Export auth instance for use in authentication
 export const auth = getAuth(app)
 
-// Export firestore instance for use in database operations
-// Use custom database name if provided via environment variable, otherwise use default
-const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID
-export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app)
+// Keep Firestore reads aligned with API writes (getDb uses x-environment / VITE_API_ENVIRONMENT).
+// Explicit VITE_FIREBASE_DATABASE_ID overrides auto-selection.
+export const apiEnvironment = import.meta.env.VITE_API_ENVIRONMENT || "staging"
+
+const explicitDatabaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID
+const resolvedDatabaseId =
+  explicitDatabaseId !== undefined && explicitDatabaseId !== ""
+    ? explicitDatabaseId
+    : apiEnvironment === "staging"
+      ? "staging"
+      : undefined
+
+export const firestoreDatabaseId = resolvedDatabaseId
+
+export const db = resolvedDatabaseId
+  ? getFirestore(app, resolvedDatabaseId)
+  : getFirestore(app)
+
+if (import.meta.env.DEV) {
+  const expectedFromApi =
+    apiEnvironment === "staging" ? "staging" : "(default)"
+  const actual = resolvedDatabaseId || "(default)"
+  console.info(
+    `[firebase] API env: ${apiEnvironment}, Firestore DB: ${actual} (expected from API: ${expectedFromApi})`
+  )
+  if (expectedFromApi !== actual) {
+    console.warn(
+      "[firebase] Firestore database may not match API x-environment. " +
+        "Set VITE_FIREBASE_DATABASE_ID or align VITE_API_ENVIRONMENT."
+    )
+  }
+}
 
 // Connect to Firebase Emulators in development mode
 if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {
