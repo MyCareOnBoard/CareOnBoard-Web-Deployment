@@ -2,8 +2,23 @@ import type { BillingClaimDetail, BillingClaimListItem, BillingClaimStatus } fro
 import type { Shift } from "@/lib/api/shifts";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import { isoToServiceDateLabel } from "./claimFormUtils";
+import { mapRideToRecentClaim } from "./rideToRecentClaim";
 import { mapShiftToRecentClaim } from "./shiftToRecentClaim";
 import { CLAIMS_STATUS_COLORS } from "./claimsDashboardUtils";
+
+function mergeBillingDetailOntoRecentClaim(
+  detail: BillingClaimDetail,
+  base: RecentClaim,
+): RecentClaim {
+  return {
+    ...base,
+    client: detail.clientName ?? base.client,
+    clientId: detail.clientId,
+    serviceCode: detail.serviceCode,
+    paNumber: detail.reportPrefill?.paNumber ?? base.paNumber,
+    serviceDate: detail.serviceDate ? isoToServiceDateLabel(detail.serviceDate) : base.serviceDate,
+  };
+}
 
 const STATUS_LABELS: Record<BillingClaimStatus, string> = {
   pending: "Pending",
@@ -71,16 +86,21 @@ export function buildRecentClaimFromSavedClaim(
   detail: BillingClaimDetail,
   anchorShift: Shift,
 ): RecentClaim {
-  const claim = mapShiftToRecentClaim(anchorShift);
+  return mergeBillingDetailOntoRecentClaim(detail, mapShiftToRecentClaim(anchorShift));
+}
 
-  return {
-    ...claim,
-    client: detail.clientName ?? claim.client,
-    clientId: detail.clientId,
-    serviceCode: detail.serviceCode,
-    paNumber: detail.reportPrefill?.paNumber ?? claim.paNumber,
-    serviceDate: detail.serviceDate ? isoToServiceDateLabel(detail.serviceDate) : claim.serviceDate,
-  };
+export function buildRecentClaimFromBillingDetail(detail: BillingClaimDetail): RecentClaim {
+  const anchorShift = detail.shifts[0];
+  if (anchorShift) {
+    return mergeBillingDetailOntoRecentClaim(detail, mapShiftToRecentClaim(anchorShift));
+  }
+
+  const anchorRide = detail.rides?.[0];
+  if (anchorRide) {
+    return mergeBillingDetailOntoRecentClaim(detail, mapRideToRecentClaim(anchorRide));
+  }
+
+  throw new Error("This claim has no linked shifts or rides.");
 }
 
 export const STATUS_FILTER_OPTIONS: Array<{ value: BillingClaimStatus | "all"; label: string }> =
