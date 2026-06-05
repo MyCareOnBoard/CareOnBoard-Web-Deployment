@@ -274,6 +274,7 @@ These helpers live in `functions/utils/notification-helper.js` and are **invoked
 
 | Symptom | Things to check |
 |---------|-----------------|
+| Empty in-app bell / list despite API success | **`VITE_API_ENVIRONMENT`** vs Firestore client DB: API may write to **staging** while the web app listens on **(default)**. Align env vars (see frontend `src/lib/firebase.ts` and README). |
 | No email at all | `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` on the **trigger**; user **`email`**; `emailNotifications` off; `emailByDefault` false for that type. |
 | Email stuck `pending` | Mailgun 5xx/timeout (retryable → may reset to `pending`); no **reconciliation** job to reprocess pending; trigger not deployed. |
 | Duplicate emails | Unusual: claims should prevent double send; check for **multiple documents** with same event. |
@@ -282,6 +283,7 @@ These helpers live in `functions/utils/notification-helper.js` and are **invoked
 | Compliance repeats daily | `lastNotifiedMilestone` not set or not matching path; `complianceUpdatedAt` only for scheduler writes. |
 | Cert key with dots | Must use `FieldPath` updates (see implementation); do not use raw dot strings in `update({ "certifications.foo.bar": ... })` for **dynamic** keys. |
 | `createNotification` always null | No **user** doc; both channels off; **rate limit**; Joi validation error (throws). |
+| Email/push missing on staging only | `notificationDeliveryTrigger` listens on Firestore **(default)**; notifications created in the **staging** DB do not trigger outbound delivery until staging-scoped triggers exist. |
 
 ---
 

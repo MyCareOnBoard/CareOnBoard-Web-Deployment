@@ -233,22 +233,26 @@ The application requires the following environment variables:
 
 ### Required Variables
 
-| Variable               | Description                       | Example                                                |
-| ---------------------- | --------------------------------- | ------------------------------------------------------ |
-| `VITE_API_BASE_URL`    | Backend API base URL              | `https://us-central1-care-on-board.cloudfunctions.net` |
-| `VITE_API_ENVIRONMENT` | Environment name for API requests | `development`, `staging`, or `production`              |
+| Variable                    | Description                                              | Example                                                |
+| --------------------------- | -------------------------------------------------------- | ------------------------------------------------------ |
+| `VITE_API_BASE_URL`         | Backend API base URL                                     | `https://us-central1-care-on-board.cloudfunctions.net` |
+| `VITE_API_ENVIRONMENT`      | Environment name for API requests (`x-environment`)    | `staging` or `production`                              |
+| `VITE_FIREBASE_DATABASE_ID` | Optional Firestore DB override (auto-derived if unset) | `staging` or omit for default                         |
 
 ### Configuration
 
-1. **Development**: Use `VITE_API_ENVIRONMENT=development` for local development
-2. **Staging**: Use `VITE_API_ENVIRONMENT=staging` for staging environment
-3. **Production**: Use `VITE_API_ENVIRONMENT=production` for production builds
+1. **Staging**: Use `VITE_API_ENVIRONMENT=staging`. The frontend auto-connects to the Firestore **staging** database (same DB the backend uses when `x-environment: staging`).
+2. **Production**: Use `VITE_API_ENVIRONMENT=production`. Both API and Firestore use the **(default)** database.
+3. **Development**: `VITE_API_ENVIRONMENT=development` sends API requests to the **(default)** database (backend treats `development` like `production`). Only the literal value `staging` selects the staging DB.
+
+**Important:** Messaging and notifications use Firestore `onSnapshot` on the client and REST writes on the server. If `VITE_API_ENVIRONMENT` and the Firestore database do not match, conversations and notifications will appear to succeed via API but stay empty in the UI.
 
 ### How It Works
 
-- The axios client automatically includes the `x-environment` header in all API requests
-- Authentication tokens are automatically added via the `Authorization: Bearer` header
-- Both variables must be set for the application to communicate with the backend
+- The axios client automatically includes the `x-environment` header in all API requests (defaults to `staging` if unset).
+- [`src/lib/firebase.ts`](src/lib/firebase.ts) selects the Firestore database from `VITE_FIREBASE_DATABASE_ID` or derives it from `VITE_API_ENVIRONMENT`.
+- Authentication tokens are automatically added via the `Authorization: Bearer` header.
+- In dev mode, the browser console logs the resolved API env and Firestore database.
 
 ### Example `.env` File
 
@@ -256,9 +260,14 @@ The application requires the following environment variables:
 # Backend API Configuration
 VITE_API_BASE_URL=https://us-central1-care-on-board.cloudfunctions.net
 
-# API Environment
+# Staging: API + realtime Firestore both use the "staging" database
 VITE_API_ENVIRONMENT=staging
+
+# Production example (omit VITE_FIREBASE_DATABASE_ID):
+# VITE_API_ENVIRONMENT=production
 ```
+
+**Note on email/push notifications:** Outbound delivery triggers run on the Firestore **(default)** database. In-app notifications work on staging once env alignment is correct; email/push for staging DB documents may require separate trigger configuration.
 
 **Note**: Environment variables prefixed with `VITE_` are exposed to the client-side code. Never store sensitive secrets in these variables.
 

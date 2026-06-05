@@ -109,10 +109,17 @@ function parseTimestamp(timestamp: Timestamp | Date | string | null | undefined)
 /**
  * Parse conversation document
  */
-function parseConversationDoc(docId: string, data: DocumentData): Conversation {
-  const unreadCount = typeof data.unreadCount === "object" && data.unreadCount !== null
-    ? (data.unreadCount[docId] || 0)
-    : (data.unreadCount || 0);
+function parseConversationDoc(
+  docId: string,
+  data: DocumentData,
+  currentUserId?: string
+): Conversation {
+  const unreadCount =
+    typeof data.unreadCount === "object" && data.unreadCount !== null
+      ? currentUserId
+        ? (data.unreadCount[currentUserId] || 0)
+        : 0
+      : (data.unreadCount || 0);
 
   return {
     id: docId,
@@ -216,7 +223,7 @@ export function useConversations(
       { includeMetadataChanges: false },
       (snapshot) => {
         const newConversations: Conversation[] = snapshot.docs.map((doc) =>
-          parseConversationDoc(doc.id, doc.data())
+          parseConversationDoc(doc.id, doc.data(), user.uid)
         );
 
         setConversations(newConversations);
@@ -259,7 +266,7 @@ export function useConversations(
 
       const snapshot = await getDocs(q);
       const newConversations: Conversation[] = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) =>
-        parseConversationDoc(doc.id, doc.data())
+        parseConversationDoc(doc.id, doc.data(), user.uid)
       );
 
       setConversations((prev) => [...prev, ...newConversations]);
@@ -419,7 +426,7 @@ export function useConversation(conversationId: string | null): {
       (docSnapshot) => {
         if (docSnapshot.exists()) {
           const data = docSnapshot.data();
-          const parsed = parseConversationDoc(docSnapshot.id, data);
+          const parsed = parseConversationDoc(docSnapshot.id, data, user.uid);
           setConversation(parsed);
         } else {
           setConversation(null);
