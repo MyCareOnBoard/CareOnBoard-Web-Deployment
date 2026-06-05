@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { CalendarDays, ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, ArrowLeft, Plus, Trash2, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
@@ -206,6 +206,58 @@ export function Stage1ClientIdentityAndContact({
     }
   };
 
+  // SSN Hashing
+const [showSSN, setShowSSN] =
+  useState(false);
+
+const formatSSN = (value: string) => {
+  const digits = value.replace(/\D/g, "").slice(0, 9);
+
+  if (digits.length <= 3) {
+    return digits;
+  }
+
+  if (digits.length <= 5) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+};
+
+const handleSSNChange = (value: string) => {
+  const ssn = formatSSN(value);
+  updateStage1({ ssn });
+};
+
+const handleSSNPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+  const clipboardValue = event.clipboardData.getData("text");
+  const ssn = formatSSN(clipboardValue);
+  updateStage1({ ssn });
+  event.preventDefault();
+};
+
+const maskSSN = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+
+  if (!digits) {
+    return "";
+  }
+
+  if (digits.length < 4) {
+    return "*".repeat(digits.length);
+  }
+
+  if (digits.length < 6) {
+    return `***-${"*".repeat(digits.length - 3)}`;
+  }
+
+  if (digits.length < 9) {
+    return `***-**-${"*".repeat(digits.length - 5)}`;
+  }
+
+  return `***-**-${digits.slice(-4)}`;
+};
+
   return (
     <div className="min-h-[calc(100vh-200px)]">
       <div className="mb-10 flex flex-wrap items-center justify-between gap-3 gap-y-2">
@@ -376,13 +428,55 @@ export function Stage1ClientIdentityAndContact({
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Social Security Card number</label>
-            <Input
-              value={stage1.ssn}
-              onChange={(e) => updateStage1({ ssn: e.target.value })}
-              inputMode="numeric"
-              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-              placeholder="Enter social security card"
-            />
+            <div className="relative">
+              <Input
+                type="tel"
+                name="ssn"
+                autoComplete="off"
+                spellCheck={false}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={stage1.ssn}
+                onChange={(e) => handleSSNChange(e.target.value)}
+                onPaste={handleSSNPaste}
+                maxLength={11}
+                className={
+                  `
+                    h-[44px]
+                    rounded-[12px]
+                    border-[#cccccd]
+                    bg-white
+                    pr-10
+                    ${showSSN ? "" : "text-transparent caret-[#10141a]"}
+                  `
+                }
+                style={showSSN ? undefined : { caretColor: "#10141a" }}
+                placeholder="123-45-6789"
+              />
+
+              {!showSSN && stage1.ssn ? (
+                <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-[#10141a]">
+                  {maskSSN(stage1.ssn)}
+                </span>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => setShowSSN((prev) => !prev)}
+                className="
+                  absolute right-3 top-1/2
+                  -translate-y-1/2
+                  text-[#6B7280]
+                  hover:text-[#10141a]
+                "
+              >
+                {showSSN ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1">
