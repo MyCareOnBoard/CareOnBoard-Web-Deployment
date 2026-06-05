@@ -156,7 +156,10 @@ export default function AddMileageModal({
         if (documents !== null) {
           const license = documents.find((d) => d.documentType === "driverLicense");
           const hasValidLicense =
-            license?.status === "available" || license?.status === "expiring-soon";
+            !!license &&
+            license.status !== "expired" &&
+            !(license.expiryDate && new Date(license.expiryDate) < new Date()) &&
+            (license.status === "available" || license.status === "expiring-soon");
           if (!hasValidLicense) {
             setFormData((prev) => ({ ...prev, assignDsp: "", assignDspId: "" }));
             toast({
