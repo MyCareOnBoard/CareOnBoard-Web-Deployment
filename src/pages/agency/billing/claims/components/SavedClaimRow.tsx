@@ -1,5 +1,4 @@
 import { memo } from "react";
-import { MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,9 +7,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import type { BillingClaimListItem } from "@/lib/api/claims";
+import { cn } from "@/lib/utils";
 import BillingStatusBadge from "../../components/BillingStatusBadge";
 import ClientNameLink from "./ClientNameLink";
-import { SAVED_CLAIMS_TABLE_ROW_CLASS } from "./tableColumns";
+import { GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS, SAVED_CLAIMS_TABLE_ROW_CLASS } from "./tableColumns";
+
+function DotGridIcon() {
+  return (
+    <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <span key={index} className="h-[4px] w-[4px] rounded-full bg-[#808081]" />
+      ))}
+    </span>
+  );
+}
 
 const menuItemClassName =
   "cursor-pointer rounded-none px-4 py-2.5 text-[14px] font-medium text-[#10141a] hover:bg-[#eef4f5] focus:bg-[#eef4f5]";
@@ -18,6 +28,7 @@ const menuItemClassName =
 type SavedClaimRowProps = {
   claim: BillingClaimListItem;
   variant: "desktop" | "mobile";
+  showClient?: boolean;
   onViewReport: (claim: BillingClaimListItem) => void;
   onUpdateStatus: (claim: BillingClaimListItem) => void;
   onCancelClaim: (claim: BillingClaimListItem) => void;
@@ -57,10 +68,13 @@ function SavedClaimActions({
         <button
           type="button"
           disabled={actionsDisabled}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#10141a] transition-colors hover:bg-[#eef4f5] disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn(
+            "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-white transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]",
+            actionsDisabled && "cursor-not-allowed opacity-50",
+          )}
           aria-label={`Actions for claim ${claim.claimNumber}`}
         >
-          <MoreHorizontal className="h-4 w-4" />
+          <DotGridIcon />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -92,6 +106,7 @@ function SavedClaimActions({
 function SavedClaimRow({
   claim,
   variant,
+  showClient = true,
   onViewReport,
   onUpdateStatus,
   onCancelClaim,
@@ -105,11 +120,13 @@ function SavedClaimRow({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[15px] font-semibold text-[#10141a]">{claim.claimNumber}</p>
-            <ClientNameLink
-              name={clientDisplayName}
-              clientId={claim.clientId}
-              className="mt-1 block text-[13px] text-[#808081]"
-            />
+            {showClient ? (
+              <ClientNameLink
+                name={clientDisplayName}
+                clientId={claim.clientId}
+                className="mt-1 block text-[13px] text-[#808081]"
+              />
+            ) : null}
           </div>
           <SavedClaimActions
             claim={claim}
@@ -147,13 +164,15 @@ function SavedClaimRow({
   }
 
   return (
-    <div className={SAVED_CLAIMS_TABLE_ROW_CLASS}>
+    <div className={showClient ? SAVED_CLAIMS_TABLE_ROW_CLASS : GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS}>
       <span className="text-[13px] font-medium text-[#10141a]">{claim.claimNumber}</span>
-      <ClientNameLink
-        name={clientDisplayName}
-        clientId={claim.clientId}
-        className="text-[13px] text-[#10141a]"
-      />
+      {showClient ? (
+        <ClientNameLink
+          name={clientDisplayName}
+          clientId={claim.clientId}
+          className="text-[13px] text-[#10141a]"
+        />
+      ) : null}
       <span className="text-[13px] text-[#10141a]">{claim.serviceCode}</span>
       <span className="text-[13px] text-[#10141a]">{claim.serviceDate ?? "—"}</span>
       <span className="text-[13px] font-medium tabular-nums text-[#10141a]">

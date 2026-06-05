@@ -133,6 +133,7 @@ export type ReadyToClaimRow = {
   startTime?: string | null;
   endTime?: string | null;
   clientRate?: string | null;
+  clientPayType?: string | null;
   completedAt?: string | null;
   scheduledStartTime?: string | null;
   actualDistance?: number | null;
@@ -143,6 +144,7 @@ export type ReadyToClaimResponse = {
   truncated: boolean;
   shiftCount: number;
   rideCount: number;
+  mileageRate?: number;
 };
 
 export type UpdateBillingClaimStatusPayload = {

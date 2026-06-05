@@ -1,17 +1,10 @@
 import { memo } from "react";
 import { Link } from "react-router";
-import { ArrowRight, ChevronRight } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
 import { Routes } from "@/routes/constants";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import ClientNameLink from "./ClientNameLink";
-import { TABLE_ROW_CLASS } from "./tableColumns";
+import { GROUPED_TABLE_ROW_CLASS, TABLE_ROW_CLASS } from "./tableColumns";
 
 const MISSING_STAFF_ID = "—";
 const STAFF_ID_DISPLAY_LENGTH = 6;
@@ -50,8 +43,7 @@ type RowVariant = "mobile" | "desktop";
 type RecentClaimRowProps = {
   claim: RecentClaim;
   variant: RowVariant;
-  onGenerateClaim: (claim: RecentClaim) => void;
-  generateDisabled?: boolean;
+  showClient?: boolean;
 };
 
 function DurationRange({ start, end }: { start: string; end: string }) {
@@ -64,91 +56,19 @@ function DurationRange({ start, end }: { start: string; end: string }) {
   );
 }
 
-function DotGridIcon() {
-  return (
-    <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <span key={index} className="h-[4px] w-[4px] rounded-full bg-[#808081]" />
-      ))}
-    </span>
-  );
-}
-
-const menuItemClassName =
-  "flex min-h-[44px] w-full cursor-pointer items-center justify-between rounded-none px-4 py-3 text-[14px] font-medium text-[#10141a] hover:bg-[#eef4f5] focus:bg-[#eef4f5]";
-
-function ClaimActionsMenu({
-  claim,
-  variant,
-  onGenerateClaim,
-  generateDisabled = false,
-}: {
-  claim: RecentClaim;
-  variant: RowVariant;
-  onGenerateClaim: (claim: RecentClaim) => void;
-  generateDisabled?: boolean;
-}) {
-  const isMobile = variant === "mobile";
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label="Claim actions"
-          className={cn(
-            "inline-flex cursor-pointer items-center justify-center rounded-md bg-[#eef4f5] transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]",
-            isMobile ? "h-11 w-11" : "h-8 w-8"
-          )}
-        >
-          <DotGridIcon />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        side="bottom"
-        sideOffset={isMobile ? 4 : 8}
-        collisionPadding={16}
-        className="z-[100] w-[220px] rounded-xl border border-[#e5e5e6] bg-white p-0 shadow-lg"
-      >
-        <DropdownMenuItem
-          className={menuItemClassName}
-          disabled={generateDisabled}
-          onSelect={() => onGenerateClaim(claim)}
-        >
-          Generate claim
-          <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function RecentClaimRow({
-  claim,
-  variant,
-  onGenerateClaim,
-  generateDisabled = false,
-}: RecentClaimRowProps) {
+function RecentClaimRow({ claim, variant, showClient = true }: RecentClaimRowProps) {
   if (variant === "mobile") {
     return (
-      <div className="relative rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
-        <div className="absolute right-2 top-2">
-          <ClaimActionsMenu
-            claim={claim}
-            variant="mobile"
-            onGenerateClaim={onGenerateClaim}
-            generateDisabled={generateDisabled}
+      <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
+        {showClient ? (
+          <ClientNameLink
+            name={claim.client}
+            clientId={claim.clientId}
+            className="text-[15px] font-semibold text-[#10141a]"
           />
-        </div>
+        ) : null}
 
-        <ClientNameLink
-          name={claim.client}
-          clientId={claim.clientId}
-          className="pr-14 text-[15px] font-semibold text-[#10141a]"
-        />
-
-        <div className="mt-4 space-y-3">
+        <div className={showClient ? "mt-4 space-y-3" : "space-y-3"}>
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">Staff ID</span>
             <StaffIdLink staffId={claim.staffId} />
@@ -158,7 +78,7 @@ function RecentClaimRow({
             <span className="text-[13px] font-medium text-[#10141a]">{claim.serviceDate}</span>
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-[13px] text-[#808081]">Duration</span>
+            <span className="text-[13px] text-[#808081]">Duration/Distance</span>
             <DurationRange start={claim.durationStart} end={claim.durationEnd} />
           </div>
           <div className="flex justify-between gap-4">
@@ -177,7 +97,7 @@ function RecentClaimRow({
             <p className="mt-1 text-[13px] font-medium text-[#10141a]">{claim.paNumber}</p>
           </div>
           <div>
-            <p className="text-[12px] text-[#808081]">Total hours</p>
+            <p className="text-[12px] text-[#808081]">Total hours/miles</p>
             <p className="mt-1 text-[13px] font-medium text-[#10141a] tabular-nums">{claim.totalHours}</p>
           </div>
         </div>
@@ -186,12 +106,14 @@ function RecentClaimRow({
   }
 
   return (
-    <div className={TABLE_ROW_CLASS}>
-      <ClientNameLink
-        name={claim.client}
-        clientId={claim.clientId}
-        className="text-[14px] font-medium text-[#10141a]"
-      />
+    <div className={showClient ? TABLE_ROW_CLASS : GROUPED_TABLE_ROW_CLASS}>
+      {showClient ? (
+        <ClientNameLink
+          name={claim.client}
+          clientId={claim.clientId}
+          className="text-[14px] font-medium text-[#10141a]"
+        />
+      ) : null}
       <StaffIdLink staffId={claim.staffId} />
       <span className="text-[13px] text-[#10141a]">{claim.serviceCode}</span>
       <span className="text-[13px] text-[#10141a]">{claim.paNumber}</span>
@@ -199,14 +121,6 @@ function RecentClaimRow({
       <DurationRange start={claim.durationStart} end={claim.durationEnd} />
       <span className="text-[13px] text-[#10141a] tabular-nums">{claim.totalHours}</span>
       <span className="text-[13px] text-[#10141a] tabular-nums">{claim.rate}</span>
-      <div className="flex justify-end">
-        <ClaimActionsMenu
-          claim={claim}
-          variant="desktop"
-          onGenerateClaim={onGenerateClaim}
-          generateDisabled={generateDisabled}
-        />
-      </div>
     </div>
   );
 }

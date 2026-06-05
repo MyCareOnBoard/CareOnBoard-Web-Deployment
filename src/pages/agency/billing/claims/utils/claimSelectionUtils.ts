@@ -1,9 +1,10 @@
 import type { Client, ClientService } from "@/lib/api/clients";
+import type { ReadyToClaimRow } from "@/lib/api/claims";
 import type { Shift } from "@/lib/api/shifts";
 import type { MileageRide } from "@/lib/api/mileage";
 import { isTransportationClientService } from "@/pages/agency/mileage/utils/transportationClientService";
 import { parseSdrWeekRange } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays } from "date-fns";
 
 export type WeekRangeBounds = {
   start: string;
@@ -103,6 +104,129 @@ export function rideDateYmd(ride: MileageRide): string {
   } catch {
     return "";
   }
+}
+
+function shiftMatchesAnyServiceCode(shift: Shift, serviceCodes: string[]): boolean {
+  return serviceCodes.some((code) => serviceCodesMatch(shift.serviceCode, code));
+}
+
+function rideMatchesAnyServiceCode(ride: MileageRide, serviceCodes: string[]): boolean {
+  return serviceCodes.some((code) => serviceCodesMatch(ride.serviceCode ?? undefined, code));
+}
+
+export function filterShiftsForSelectedServices(
+  shifts: Shift[],
+  serviceCodes: string[],
+): Shift[] {
+  if (serviceCodes.length === 0) {
+    return [];
+  }
+
+  return shifts.filter(
+    (shift) =>
+      shift.status === "completed" &&
+      shift.approved === true &&
+      !shift.claimId &&
+      shiftMatchesAnyServiceCode(shift, serviceCodes),
+  );
+}
+
+export function filterRidesForSelectedServices(
+  rides: MileageRide[],
+  serviceCodes: string[],
+): MileageRide[] {
+  if (serviceCodes.length === 0) {
+    return [];
+  }
+
+  return rides.filter(
+    (ride) =>
+      ride.status === "completed" &&
+      Boolean(ride.approved) &&
+      !ride.claimId &&
+      rideMatchesAnyServiceCode(ride, serviceCodes),
+  );
+}
+
+export function computeClaimWizardShiftFetchBounds(client: Client): WeekRangeBounds {
+  const today = format(new Date(), "yyyy-MM-dd");
+  let earliestStart: string | null = null;
+  let latestEnd: string | null = null;
+
+  for (const service of flattenClientServices(client)) {
+    if (isTransportationServiceForClaims(service)) {
+      continue;
+    }
+
+    for (const row of service.sdrWeeklyDistribution?.rows ?? []) {
+      const bounds = resolveWeekRangeIsoBounds(row.weekRange);
+      if (!bounds) continue;
+      if (!earliestStart || bounds.start < earliestStart) {
+        earliestStart = bounds.start;
+      }
+      if (!latestEnd || bounds.end > latestEnd) {
+        latestEnd = bounds.end;
+      }
+    }
+  }
+
+  if (earliestStart && latestEnd) {
+    return {
+      start: earliestStart,
+      end: latestEnd >= today ? latestEnd : today,
+    };
+  }
+
+  return {
+    start: format(subDays(new Date(), 365), "yyyy-MM-dd"),
+    end: today,
+  };
+}
+
+export function resolveServiceIdsFromCodes(
+  services: ClientService[],
+  codes: string[],
+): string[] {
+  const normalizedCodes = new Set(
+    codes.map((code) => code.trim().toLowerCase()).filter(Boolean),
+  );
+
+  if (normalizedCodes.size === 0) {
+    return [];
+  }
+
+  return services
+    .filter((service) => {
+      const serviceId = service.id?.trim();
+      const serviceCode = service.code?.trim().toLowerCase();
+      return Boolean(serviceId && serviceCode && normalizedCodes.has(serviceCode));
+    })
+    .map((service) => service.id as string);
+}
+
+export function getDefaultServiceIdsFromReadyRows(
+  clientId: string,
+  services: ClientService[],
+  readyRows: ReadyToClaimRow[],
+): string[] {
+  const codesInRows = new Set(
+    readyRows
+      .filter((row) => row.clientId === clientId)
+      .map((row) => row.serviceCode?.trim().toLowerCase())
+      .filter((code): code is string => Boolean(code)),
+  );
+
+  if (codesInRows.size === 0) {
+    return [];
+  }
+
+  return services
+    .filter((service) => {
+      const code = service.code?.trim().toLowerCase();
+      return Boolean(code && codesInRows.has(code));
+    })
+    .map((service) => service.id)
+    .filter((id): id is string => Boolean(id));
 }
 
 export function filterRidesForClaimSelection(

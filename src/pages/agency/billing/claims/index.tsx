@@ -1,6 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Shift } from "@/lib/api/shifts";
-import type { MileageRide } from "@/lib/api/mileage";
 import {
   getBillingClaimById,
   getBillingClaimMutationErrorMessage,
@@ -28,10 +26,12 @@ import { saveGeneratedClaim } from "./utils/saveGeneratedClaim";
 import { useClaimsDashboard } from "./hooks/useClaimsDashboard";
 import { useGeneratedClaims } from "./hooks/useGeneratedClaims";
 import { useReadyToClaim } from "./hooks/useReadyToClaim";
+import type { ClaimConfirmSelection } from "./utils/claimBundleUtils";
+import type { RecentClaimClientGroup } from "./utils/groupRecentClaimsByClient";
 import { mapReadyToClaimRowsToRecentClaims } from "./utils/readyToClaimUtils";
 import { getCurrentWeekDateRange } from "./utils/claimsDashboardUtils";
 import {
-  buildRecentClaimFromSavedClaim,
+  buildRecentClaimFromBillingDetail,
   STATUS_LABEL_TO_FILTER,
 } from "./utils/savedClaimUtils";
 
@@ -57,10 +57,11 @@ export default function ClaimsDashboardPage() {
     enabled: activeTab === "shifts",
   });
   const readyClaims = useMemo(
-    () => mapReadyToClaimRowsToRecentClaims(readyToClaim.rows),
-    [readyToClaim.rows],
+    () => mapReadyToClaimRowsToRecentClaims(readyToClaim.rows, readyToClaim.mileageRate),
+    [readyToClaim.mileageRate, readyToClaim.rows],
   );
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [generateInitialGroup, setGenerateInitialGroup] = useState<RecentClaimClientGroup | null>(null);
   const [savingClaim, setSavingClaim] = useState(false);
   const [openingReport, setOpeningReport] = useState<{ claimNumber: string } | null>(null);
   const openingReportRequestIdRef = useRef(0);
@@ -69,7 +70,6 @@ export default function ClaimsDashboardPage() {
   const [cancelModalClaim, setCancelModalClaim] = useState<BillingClaimListItem | null>(null);
   const [claimReport, setClaimReport] = useState<{
     claim: RecentClaim;
-    selectedShifts: Shift[];
     savedClaim: SavedBillingClaim;
   } | null>(null);
 
@@ -121,42 +121,62 @@ export default function ClaimsDashboardPage() {
     await Promise.all([dashboard.refetch(), generatedClaims.refetch()]);
   }, [dashboard, generatedClaims]);
 
-  const handleGenerateClaim = useCallback(
-    async (
-      selection: { shifts: Shift[]; rides: MileageRide[] },
-      context: { serviceCode: string; weekRange?: string },
-    ) => {
-      if (
-        !user?.agencyId ||
-        (selection.shifts.length === 0 && selection.rides.length === 0)
-      ) {
+  const saveClaimBundles = useCallback(
+    async (selections: ClaimConfirmSelection[]) => {
+      if (!user?.agencyId || selections.length === 0) {
         return;
       }
 
       setSavingClaim(true);
       try {
-        const { savedClaim, anchorClaim } = await saveGeneratedClaim({
-          agencyId: user.agencyId,
-          selectedShifts: selection.shifts,
-          selectedRides: selection.rides,
-          serviceCode: context.serviceCode,
-          weekRange: context.weekRange,
-        });
+        const results: Array<{
+          savedClaim: SavedBillingClaim;
+          anchorClaim: RecentClaim;
+        }> = [];
 
-        setClaimReport({
-          claim: anchorClaim,
-          selectedShifts: selection.shifts,
-          savedClaim,
-        });
+        for (const selection of selections) {
+          if (selection.shifts.length === 0 && selection.rides.length === 0) {
+            continue;
+          }
+
+          const result = await saveGeneratedClaim({
+            agencyId: user.agencyId,
+            selectedShifts: selection.shifts,
+            selectedRides: selection.rides,
+            serviceCode: selection.serviceCode,
+            weekRange: selection.weekRange,
+          });
+          results.push({
+            savedClaim: result.savedClaim,
+            anchorClaim: result.anchorClaim,
+          });
+        }
+
+        if (results.length === 0) {
+          return;
+        }
+
         setGenerateOpen(false);
+        setGenerateInitialGroup(null);
         setActiveTab("saved");
-
         await refreshAfterCreateOrCancel();
 
-        toast({
-          title: `Claim ${savedClaim.claimNumber} saved.`,
-          description: "Opening report…",
-        });
+        if (results.length === 1) {
+          const only = results[0];
+          setClaimReport({
+            claim: only.anchorClaim,
+            savedClaim: only.savedClaim,
+          });
+          toast({
+            title: `Claim ${only.savedClaim.claimNumber} saved.`,
+            description: "Opening report…",
+          });
+        } else {
+          toast({
+            title: `${results.length} claims saved.`,
+            description: "View them in Generated claims.",
+          });
+        }
       } catch (error) {
         console.error("Failed to save claim:", error);
         toast({
@@ -171,10 +191,22 @@ export default function ClaimsDashboardPage() {
     [refreshAfterCreateOrCancel, toast, user?.agencyId],
   );
 
-  const handleTableGenerateClaim = useCallback(
-    (claim: RecentClaim) => {
-      if (!claim.sourceType || !claim.sourceId || !claim.clientId) {
-        console.warn("Ready to claim row missing source metadata", claim.id);
+  const closeGenerateModal = useCallback(() => {
+    if (savingClaim) {
+      return;
+    }
+    setGenerateOpen(false);
+    setGenerateInitialGroup(null);
+  }, [savingClaim]);
+
+  const handleClientGroupGenerateClaim = useCallback(
+    (group: RecentClaimClientGroup) => {
+      const hasClaimableEntry = group.claims.some(
+        (claim) => claim.sourceType && claim.sourceId && claim.clientId,
+      );
+
+      if (!hasClaimableEntry) {
+        console.warn("Ready to claim client group missing source metadata", group.clientKey);
         toast({
           title: "Couldn't generate claim",
           description: "Refresh the list and try again.",
@@ -183,24 +215,10 @@ export default function ClaimsDashboardPage() {
         return;
       }
 
-      const serviceCode = claim.serviceCode.trim();
-      const weekRange = claim.weekRange?.trim() || undefined;
-
-      void handleGenerateClaim(
-        {
-          shifts:
-            claim.sourceType === "shift"
-              ? [{ id: claim.sourceId, clientId: claim.clientId, serviceCode } as Shift]
-              : [],
-          rides:
-            claim.sourceType === "ride"
-              ? [{ id: claim.sourceId, clientId: claim.clientId, serviceCode } as MileageRide]
-              : [],
-        },
-        { serviceCode, weekRange },
-      );
+      setGenerateInitialGroup(group);
+      setGenerateOpen(true);
     },
-    [handleGenerateClaim, toast],
+    [toast],
   );
 
   const handleCloseReportModal = useCallback(() => {
@@ -220,14 +238,8 @@ export default function ClaimsDashboardPage() {
           return;
         }
 
-        const anchorShift = detail.shifts[0];
-        if (!anchorShift) {
-          throw new Error("This claim has no linked shifts.");
-        }
-
         setClaimReport({
-          claim: buildRecentClaimFromSavedClaim(detail, anchorShift),
-          selectedShifts: detail.shifts,
+          claim: buildRecentClaimFromBillingDetail(detail),
           savedClaim: {
             id: detail.id,
             claimNumber: detail.claimNumber,
@@ -323,17 +335,18 @@ export default function ClaimsDashboardPage() {
   }, []);
 
   const claimsActionOverlay = openingReport
-    ? getClaimsActionLoadingCopy("openReport", openingReport.claimNumber)
-    : savingClaim && !generateOpen
-      ? getClaimsActionLoadingCopy("createClaim")
-      : null;
+    ? getClaimsActionLoadingCopy(openingReport.claimNumber)
+    : null;
 
   return (
     <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
       <ClaimsDashboardHeader
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
-        onGenerateClaimClick={() => setGenerateOpen(true)}
+        onGenerateClaimClick={() => {
+          setGenerateInitialGroup(null);
+          setGenerateOpen(true);
+        }}
         generateClaimLoading={savingClaim && generateOpen}
       />
       <ClaimsOverviewCards stats={dashboard.overviewStats} loading={dashboard.loading} />
@@ -354,7 +367,7 @@ export default function ClaimsDashboardPage() {
           claims={readyClaims}
           loading={readyToClaim.loading}
           truncated={readyToClaim.truncated}
-          onGenerateClaim={handleTableGenerateClaim}
+          onGenerateClaim={handleClientGroupGenerateClaim}
           generateDisabled={savingClaim || openingReport !== null}
         />
       ) : (
@@ -375,10 +388,13 @@ export default function ClaimsDashboardPage() {
       {generateOpen && (
         <Suspense fallback={null}>
           <GenerateClaimModal
-            open={generateOpen}
+            open
+            initialClientGroup={generateInitialGroup}
             saving={savingClaim}
-            onClose={() => !savingClaim && setGenerateOpen(false)}
-            onConfirm={handleGenerateClaim}
+            readyToClaimRows={readyToClaim.rows}
+            mileageRate={readyToClaim.mileageRate}
+            onClose={closeGenerateModal}
+            onConfirm={saveClaimBundles}
           />
         </Suspense>
       )}
@@ -389,7 +405,6 @@ export default function ClaimsDashboardPage() {
             key={claimReport.savedClaim.id}
             open
             claim={claimReport.claim}
-            selectedShifts={claimReport.selectedShifts}
             savedClaimId={claimReport.savedClaim.id}
             claimNumber={claimReport.savedClaim.claimNumber}
             initialPrefill={claimReport.savedClaim.reportPrefill}

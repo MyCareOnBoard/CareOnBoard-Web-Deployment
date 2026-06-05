@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getAgencyById } from "@/lib/api/agencies";
-import type { Shift } from "@/lib/api/shifts";
 import type { RecentClaim } from "../../data/mockClaimsDashboardData";
 import type { ClaimReportFormState, ClaimSignaturePayload } from "../../data/mockClaimReportData";
 import { buildClaimReportFromClaim } from "../../utils/claimReportUtils";
@@ -35,7 +34,6 @@ type SignatureTarget = "signed" | "physician";
 type ClaimReportModalProps = {
   open: boolean;
   claim: RecentClaim;
-  selectedShifts: Shift[];
   savedClaimId?: string;
   claimNumber?: string;
   initialPrefill: ClaimReportPrefillSnapshot;
@@ -45,7 +43,6 @@ type ClaimReportModalProps = {
 export default function ClaimReportModal({
   open,
   claim,
-  selectedShifts,
   savedClaimId,
   claimNumber,
   initialPrefill,

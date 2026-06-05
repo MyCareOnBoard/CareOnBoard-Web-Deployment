@@ -2,6 +2,7 @@ import { createBillingClaim, type SavedBillingClaim } from "@/lib/api/claims";
 import type { Shift } from "@/lib/api/shifts";
 import type { MileageRide } from "@/lib/api/mileage";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
+import { mapRideToRecentClaim } from "./rideToRecentClaim";
 import { mapShiftToRecentClaim } from "./shiftToRecentClaim";
 
 type SaveGeneratedClaimInput = {
@@ -48,23 +49,10 @@ export async function saveGeneratedClaim({
       weekRange,
     });
 
-    const ride = selectedRides[0];
-    const anchorClaim: RecentClaim = {
-      id: ride.id,
-      client: ride.clientName ?? "Client",
-      clientId: ride.clientId ?? undefined,
-      staffId: ride.caregiverId,
-      serviceCode: normalizedServiceCode,
-      paNumber: "—",
-      serviceDate: (ride.completedAt ?? ride.scheduledStartTime)?.slice(0, 10) ?? "—",
-      durationStart: "—",
-      durationEnd: "—",
-      totalHours:
-        ride.actualDistance != null ? `${ride.actualDistance} mi` : "—",
-      rate: "—",
+    return {
+      savedClaim,
+      anchorClaim: mapRideToRecentClaim(selectedRides[0]),
     };
-
-    return { savedClaim, anchorClaim };
   }
 
   const clientId = selectedShifts[0].clientId ?? selectedShifts[0].client?.id;

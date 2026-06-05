@@ -11,6 +11,7 @@ type UseReadyToClaimOptions = {
 
 export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {}) {
   const [rows, setRows] = useState<ReadyToClaimRow[]>([]);
+  const [mileageRate, setMileageRate] = useState(0);
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +35,7 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
       }
 
       setRows(response.rows);
+      setMileageRate(response.mileageRate ?? 0);
       setTruncated(response.truncated);
     } catch (fetchError) {
       if (requestIdRef.current !== requestId) {
@@ -41,6 +43,7 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
       }
 
       setRows([]);
+      setMileageRate(0);
       setTruncated(false);
       setError(
         fetchError instanceof Error
@@ -60,6 +63,7 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
 
   return {
     rows,
+    mileageRate,
     truncated,
     loading,
     error,
