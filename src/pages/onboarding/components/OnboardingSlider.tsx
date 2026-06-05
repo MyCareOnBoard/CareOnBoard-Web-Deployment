@@ -23,7 +23,9 @@ export default function OnboardingSlider() {
     { id: "s3", comp: <SlideThree />, badge: "Minimum Requirements" },
     {
       id: "s4",
-      comp: <SlideFour onInnerComplete={(done) => setInnerComplete(done)} />,
+      // reference Old Sider Four for inner slider logic
+      // comp: <SlideFour onInnerComplete={(done) => setInnerComplete(done)} />, 
+      comp: <SlideFour />,
       badge: "How the Application Process Works",
     },
   ];
@@ -60,7 +62,7 @@ export default function OnboardingSlider() {
   };
 
   const isLastSlide = idx === slides.length - 1;
-  const isFinishDisabled = isLastSlide && !innerComplete;
+  // const isFinishDisabled = isLastSlide && !innerComplete;
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#F5F5F5]">
@@ -123,7 +125,8 @@ export default function OnboardingSlider() {
 
           <Button
             onClick={next}
-            disabled={isFinishDisabled || completing}
+            // disabled={isFinishDisabled || completing}
+            disabled={completing}
             className="flex items-center gap-2"
           >
             {completing ? (
@@ -136,7 +139,8 @@ export default function OnboardingSlider() {
                 {isLastSlide ? "Finish" : "Next"}
                 <ArrowRight className="w-4 h-4" />
               </>
-            )}
+            )
+            }
           </Button>
         </div>
       </div>
