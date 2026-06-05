@@ -20,6 +20,7 @@ export type DuePayrollEntry = {
   paymentDetails: string;
   paRate: string;
   shiftPayTotal?: number;
+  ridePayTotal?: number;
   expenseTotal?: number;
   grossAmount?: number;
   shiftIds?: string[];

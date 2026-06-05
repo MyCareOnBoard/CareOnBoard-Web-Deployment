@@ -126,12 +126,26 @@ function PayrollActionsMenu({
 }
 
 function grossPayBreakdown(entry: DuePayrollEntry) {
+  const shiftPayTotal = entry.shiftPayTotal ?? 0;
+  const ridePayTotal = entry.ridePayTotal ?? 0;
   const expenseTotal = entry.expenseTotal ?? 0;
-  if (expenseTotal <= 0) {
+
+  if (shiftPayTotal <= 0 && ridePayTotal <= 0 && expenseTotal <= 0) {
     return null;
   }
-  const shiftPay = entry.shiftPayTotal ?? Math.max((entry.grossAmount ?? 0) - expenseTotal, 0);
-  return `Shift pay ${formatCurrency(shiftPay)} + reimbursements ${formatCurrency(expenseTotal)}`;
+
+  const parts: string[] = [];
+  if (shiftPayTotal > 0) {
+    parts.push(`Shift pay ${formatCurrency(shiftPayTotal)}`);
+  }
+  if (ridePayTotal > 0) {
+    parts.push(`mileage ${formatCurrency(ridePayTotal)}`);
+  }
+  if (expenseTotal > 0) {
+    parts.push(`reimbursements ${formatCurrency(expenseTotal)}`);
+  }
+
+  return parts.join(" + ");
 }
 
 type DuePayrollRowProps = {
