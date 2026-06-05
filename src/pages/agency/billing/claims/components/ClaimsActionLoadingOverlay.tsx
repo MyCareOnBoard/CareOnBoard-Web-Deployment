@@ -2,29 +2,13 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Loader } from "@/components/ui/loader";
 
-export type ClaimsActionLoadingKind = "openReport" | "createClaim";
-
-export function getClaimsActionLoadingCopy(
-  kind: "openReport",
-  claimNumber: string,
-): { title: string; description: string };
-export function getClaimsActionLoadingCopy(
-  kind: "createClaim",
-): { title: string; description: string };
-export function getClaimsActionLoadingCopy(
-  kind: ClaimsActionLoadingKind,
-  claimNumber?: string,
-): { title: string; description: string } {
-  if (kind === "openReport") {
-    return {
-      title: "Opening claim report",
-      description: `Loading report for claim ${claimNumber}…`,
-    };
-  }
-
+export function getClaimsActionLoadingCopy(claimNumber: string): {
+  title: string;
+  description: string;
+} {
   return {
-    title: "Creating claim",
-    description: "Saving this shift as a claim…",
+    title: "Opening claim report",
+    description: `Loading report for claim ${claimNumber}…`,
   };
 }
 

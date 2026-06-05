@@ -1,10 +1,13 @@
+import { Fragment, useMemo } from "react";
 import type { BillingClaimListItem, BillingClaimStatus } from "@/lib/api/claims";
 import ClaimsClientSearch from "./ClaimsClientSearch";
 import SavedClaimRow from "./SavedClaimRow";
+import SavedClaimsClientGroupHeader from "./SavedClaimsClientGroupHeader";
 import {
-  SAVED_CLAIMS_TABLE_HEADER_CLASS,
+  GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS,
   SAVED_CLAIMS_TABLE_MIN_WIDTH,
 } from "./tableColumns";
+import { groupSavedClaimsByClient } from "../utils/groupSavedClaimsByClient";
 import { STATUS_FILTER_OPTIONS } from "../utils/savedClaimUtils";
 
 const SKELETON_ROW_COUNT = 8;
@@ -22,13 +25,13 @@ type SavedClaimsTableProps = {
   actionsDisabled?: boolean;
 };
 
-function SavedClaimSkeletonRow() {
+function SavedClaimSkeletonRow({ grouped = false }: { grouped?: boolean }) {
   return (
     <div
-      className={`${SAVED_CLAIMS_TABLE_HEADER_CLASS.replace("font-semibold", "")} animate-pulse`}
+      className={`${GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS.replace("font-semibold", "")} animate-pulse`}
       aria-hidden="true"
     >
-      {Array.from({ length: 8 }).map((_, index) => (
+      {Array.from({ length: grouped ? 7 : 8 }).map((_, index) => (
         <span key={index} className="h-4 rounded bg-[#eef4f5]" />
       ))}
     </div>
@@ -70,6 +73,8 @@ export default function SavedClaimsTable({
         ? "No claims match your filters."
         : "";
 
+  const groupedClaims = useMemo(() => groupSavedClaimsByClient(claims), [claims]);
+
   return (
     <section>
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -98,9 +103,8 @@ export default function SavedClaimsTable({
       <div className="hidden overflow-hidden rounded-[16px] border border-[#e5e5e6] bg-white lg:block">
         <div className="overflow-x-auto">
           <div className={SAVED_CLAIMS_TABLE_MIN_WIDTH}>
-            <div className={SAVED_CLAIMS_TABLE_HEADER_CLASS}>
+            <div className={GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS}>
               <span>Claim #</span>
-              <span>Client</span>
               <span>Service code</span>
               <span>Service date</span>
               <span>Amount</span>
@@ -111,19 +115,25 @@ export default function SavedClaimsTable({
 
             {loading ? (
               Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
-                <SavedClaimSkeletonRow key={`saved-skeleton-desktop-${index}`} />
+                <SavedClaimSkeletonRow key={`saved-skeleton-desktop-${index}`} grouped />
               ))
-            ) : claims.length > 0 ? (
-              claims.map((claim) => (
-                <SavedClaimRow
-                  key={claim.id}
-                  variant="desktop"
-                  claim={claim}
-                  onViewReport={onViewReport}
-                  onUpdateStatus={onUpdateStatus}
-                  onCancelClaim={onCancelClaim}
-                  actionsDisabled={actionsDisabled}
-                />
+            ) : groupedClaims.length > 0 ? (
+              groupedClaims.map((group) => (
+                <Fragment key={group.clientKey}>
+                  <SavedClaimsClientGroupHeader group={group} variant="desktop" />
+                  {group.claims.map((claim) => (
+                    <SavedClaimRow
+                      key={claim.id}
+                      variant="desktop"
+                      showClient={false}
+                      claim={claim}
+                      onViewReport={onViewReport}
+                      onUpdateStatus={onUpdateStatus}
+                      onCancelClaim={onCancelClaim}
+                      actionsDisabled={actionsDisabled}
+                    />
+                  ))}
+                </Fragment>
               ))
             ) : (
               <div className="px-4 py-10 text-center">
@@ -139,17 +149,23 @@ export default function SavedClaimsTable({
           Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
             <SavedClaimMobileSkeletonCard key={`saved-skeleton-mobile-${index}`} />
           ))
-        ) : claims.length > 0 ? (
-          claims.map((claim) => (
-            <SavedClaimRow
-              key={claim.id}
-              variant="mobile"
-              claim={claim}
-              onViewReport={onViewReport}
-              onUpdateStatus={onUpdateStatus}
-              onCancelClaim={onCancelClaim}
-              actionsDisabled={actionsDisabled}
-            />
+        ) : groupedClaims.length > 0 ? (
+          groupedClaims.map((group) => (
+            <div key={group.clientKey} className="space-y-2">
+              <SavedClaimsClientGroupHeader group={group} variant="mobile" />
+              {group.claims.map((claim) => (
+                <SavedClaimRow
+                  key={claim.id}
+                  variant="mobile"
+                  showClient={false}
+                  claim={claim}
+                  onViewReport={onViewReport}
+                  onUpdateStatus={onUpdateStatus}
+                  onCancelClaim={onCancelClaim}
+                  actionsDisabled={actionsDisabled}
+                />
+              ))}
+            </div>
           ))
         ) : (
           <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-10 text-center">

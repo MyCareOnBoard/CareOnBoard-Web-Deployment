@@ -2,8 +2,10 @@ import { format, parseISO } from "date-fns";
 import type { ReadyToClaimRow } from "@/lib/api/claims";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import type { Shift } from "@/lib/api/shifts";
+import { formatRateLabel } from "@/pages/agency/billing-and-approvals/billingUtils";
 import { CLAIM_SHIFT_MISSING_VALUE, computeTotalHours } from "./claimShiftBillingUtils";
 import { isoToServiceDateLabel, time24hToDisplay } from "./claimFormUtils";
+import { parseRateToNumber } from "./claimReportPrefillUtils";
 
 const MISSING_VALUE = CLAIM_SHIFT_MISSING_VALUE;
 
@@ -51,34 +53,49 @@ function resolveShiftDuration(row: ReadyToClaimRow): { start: string; end: strin
   return { start: MISSING_VALUE, end: MISSING_VALUE };
 }
 
-function formatShiftRate(raw?: string | null): string {
-  const trimmed = raw?.trim();
-  if (!trimmed) return MISSING_VALUE;
-  if (trimmed.startsWith("$")) return trimmed.includes("/hr") ? trimmed : `${trimmed}/hr`;
-  return `$${trimmed}/hr`;
+function formatShiftRateForDisplay(raw?: string | null, payType?: string | null): string {
+  const rate = parseRateToNumber(raw ?? undefined);
+  if (!rate) return MISSING_VALUE;
+  return formatRateLabel(rate, payType ?? "hourly");
+}
+
+export function formatAgencyMileageRate(mileageRate?: number | null): string {
+  const rate = Number(mileageRate);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    return MISSING_VALUE;
+  }
+  return `$${rate.toFixed(2)}/mi`;
 }
 
 function rideServiceDateLabel(row: ReadyToClaimRow): string {
   const raw = row.completedAt ?? row.scheduledStartTime;
-  if (!raw) return MISSING_VALUE;
-  try {
-    return format(parseISO(String(raw).slice(0, 10)), "MMM d, yyyy");
-  } catch {
-    return MISSING_VALUE;
+  if (raw) {
+    try {
+      return format(parseISO(String(raw).slice(0, 10)), "MMM d, yyyy");
+    } catch {
+      // fall through to sortDate
+    }
   }
+  if (row.sortDate) {
+    return isoToServiceDateLabel(row.sortDate);
+  }
+  return MISSING_VALUE;
 }
 
 function rideTimeLabel(row: ReadyToClaimRow): string {
   const raw = row.completedAt ?? row.scheduledStartTime;
   if (!raw) return MISSING_VALUE;
   try {
-    return format(parseISO(String(raw).slice(0, 10)), "h:mm a");
+    return format(parseISO(String(raw)), "h:mm a");
   } catch {
     return MISSING_VALUE;
   }
 }
 
-export function mapReadyToClaimRowToRecentClaim(row: ReadyToClaimRow): RecentClaim {
+export function mapReadyToClaimRowToRecentClaim(
+  row: ReadyToClaimRow,
+  mileageRate = 0,
+): RecentClaim {
   if (row.sourceType === "shift") {
     const duration = resolveShiftDuration(row);
     const sortDate = row.sortDate ?? "";
@@ -105,7 +122,7 @@ export function mapReadyToClaimRowToRecentClaim(row: ReadyToClaimRow): RecentCla
         startTime: row.startTime ?? undefined,
         endTime: row.endTime ?? undefined,
       } as Shift),
-      rate: formatShiftRate(row.clientRate),
+      rate: formatShiftRateForDisplay(row.clientRate, row.clientPayType),
     };
   }
 
@@ -130,10 +147,13 @@ export function mapReadyToClaimRowToRecentClaim(row: ReadyToClaimRow): RecentCla
     durationStart: time,
     durationEnd: distance,
     totalHours: distance,
-    rate: "Transportation",
+    rate: formatAgencyMileageRate(mileageRate),
   };
 }
 
-export function mapReadyToClaimRowsToRecentClaims(rows: ReadyToClaimRow[]): RecentClaim[] {
-  return rows.map(mapReadyToClaimRowToRecentClaim);
+export function mapReadyToClaimRowsToRecentClaims(
+  rows: ReadyToClaimRow[],
+  mileageRate = 0,
+): RecentClaim[] {
+  return rows.map((row) => mapReadyToClaimRowToRecentClaim(row, mileageRate));
 }
