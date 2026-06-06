@@ -162,8 +162,8 @@ describe("claimSelectionUtils", () => {
 
   it("getDefaultServiceIdsFromReadyRows selects services present in cache", () => {
     const services = [
-      { id: "s1", code: "H2021HI" },
-      { id: "s2", code: "A0090HI22" },
+      { id: "s1", name: "Service One", code: "H2021HI" },
+      { id: "s2", name: "Service Two", code: "A0090HI22" },
     ];
     const readyRows = [
       {
@@ -189,8 +189,8 @@ describe("claimSelectionUtils", () => {
 
   it("resolveServiceIdsFromCodes maps service codes to client service ids", () => {
     const services = [
-      { id: "s1", code: "H2021HI" },
-      { id: "s2", code: "A0090HI22" },
+      { id: "s1", name: "Service One", code: "H2021HI" },
+      { id: "s2", name: "Service Two", code: "A0090HI22" },
     ];
 
     expect(resolveServiceIdsFromCodes(services, ["H2021HI", "a0090hi22"])).toEqual(["s1", "s2"]);

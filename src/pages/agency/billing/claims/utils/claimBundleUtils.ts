@@ -135,7 +135,7 @@ function formatPreviewCharge(charge: number): string | null {
 function computeShiftPreviewChargeAmount(row: ReadyToClaimRow, claim: RecentClaim): number {
   const hours = parsePreviewHours(claim.totalHours);
   const rate =
-    parseRateToNumber(row.clientRate) ??
+    parseRateToNumber(row.clientRate ?? undefined) ??
     parseRateToNumber(claim.rate);
   if (!hours || !rate) {
     return 0;

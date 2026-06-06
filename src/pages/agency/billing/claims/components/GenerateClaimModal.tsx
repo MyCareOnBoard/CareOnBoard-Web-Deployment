@@ -173,7 +173,8 @@ export default function GenerateClaimModal({
   }, []);
 
   useEffect(() => {
-    if (!open || !initialClientGroup || !user?.agencyId) {
+    const clientId = initialClientGroup?.clientId;
+    if (!open || !clientId || !user?.agencyId) {
       return;
     }
 
@@ -183,7 +184,7 @@ export default function GenerateClaimModal({
     const loadPrefill = async () => {
       setLoadingClient(true);
       try {
-        const fullClient = await getClientById(initialClientGroup.clientId, user.agencyId);
+        const fullClient = await getClientById(clientId, user.agencyId);
         if (prefillRequestIdRef.current !== requestId) {
           return;
         }
