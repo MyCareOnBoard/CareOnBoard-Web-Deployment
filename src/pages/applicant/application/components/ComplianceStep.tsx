@@ -89,14 +89,13 @@ export default function ComplianceStep({
   return (
     <div className="max-w-4xl p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Begin compliance requirements while applicant is "conditionally
-          hired."
+        <h2 className="mb-2 text-2xl font-bold text-gray-900">
+          Toggle all the requirements below to authorize and proceed to the next step for compliance checks to begin.
         </h2>
       </div>
 
       {/* Authorization Toggles */}
-      <div className="space-y-4 mb-8">
+      <div className="mb-8 space-y-4">
         <div className="flex items-center justify-between py-3 border-b border-gray-200">
           <span className="text-gray-900">Authorize Drug test appointment</span>
           <Toggle
@@ -176,7 +175,7 @@ export default function ComplianceStep({
       </div>
 
       {/* Agreement Checkboxes */}
-      <div className="space-y-4 mb-8">
+      <div className="mb-8 space-y-4">
         <div className="flex items-start space-x-3">
           <Checkbox
             id="abuse-awareness"
@@ -185,16 +184,15 @@ export default function ComplianceStep({
           />
           <Label
             htmlFor="abuse-awareness"
-            className="text-sm text-gray-700 cursor-pointer leading-relaxed"
+            className="text-sm leading-relaxed text-gray-700 cursor-pointer"
           >
             I accept the terms and condition for{" "}
-            <a
-              href="#"
-              className="text-blue-600 hover:text-blue-700 underline inline-flex items-center"
+            <span
+              className="inline-flex items-center"
             >
               Abuse, Neglect, and Exploitation Awareness
               <ExternalLink className="w-3 h-3 ml-1" />
-            </a>
+            </span>
           </Label>
         </div>
 
@@ -206,16 +204,15 @@ export default function ComplianceStep({
           />
           <Label
             htmlFor="hipaa"
-            className="text-sm text-gray-700 cursor-pointer leading-relaxed"
+            className="text-sm leading-relaxed text-gray-700 cursor-pointer"
           >
             I accept the terms and condition for{" "}
-            <a
-              href="#"
-              className="text-blue-600 hover:text-blue-700 underline inline-flex items-center"
+            <span
+              className="inline-flex items-center"
             >
               HIPAA & Confidentiality
-              <ExternalLink className="w-3 h-3 ml-1" />
-            </a>
+              {/* <ExternalLink className="w-3 h-3 ml-1" /> */}
+            </span>
           </Label>
         </div>
 
@@ -227,16 +224,15 @@ export default function ComplianceStep({
           />
           <Label
             htmlFor="developmental-disabilities"
-            className="text-sm text-gray-700 cursor-pointer leading-relaxed"
+            className="text-sm leading-relaxed text-gray-700 cursor-pointer"
           >
             I accept the terms and condition for{" "}
-            <a
-              href="#"
-              className="text-blue-600 hover:text-blue-700 underline inline-flex items-center"
+            <span
+              className="inline-flex items-center"
             >
               Overview of Developmental Disabilities
-              <ExternalLink className="w-3 h-3 ml-1" />
-            </a>
+              {/* <ExternalLink className="w-3 h-3 ml-1" /> */}
+            </span>
           </Label>
         </div>
       </div>
@@ -249,7 +245,7 @@ export default function ComplianceStep({
         />
         <Label
           htmlFor="information-correct"
-          className="text-sm text-gray-700 cursor-pointer leading-relaxed"
+          className="text-sm leading-relaxed text-gray-700 cursor-pointer"
         >
           I hereby declared that all the information are correct
         </Label>
@@ -260,7 +256,7 @@ export default function ComplianceStep({
         <Button
           onClick={handleNext}
           disabled={!canProceed || isLoading}
-          className="px-8 bg-teal-500 hover:bg-teal-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="px-8 text-white bg-teal-500 hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
           {isLoading ? "Submitting..." : "Next →"}
         </Button>

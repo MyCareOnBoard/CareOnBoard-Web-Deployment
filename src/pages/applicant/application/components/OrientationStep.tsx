@@ -67,7 +67,7 @@ export default function OrientationStep() {
         } else if (data?.data?.signatureId) {
             return "Complete Official Hire";
         } else {
-            return "Open Signature Module";
+            return "Click here to Open Signature Module";
         }
     }
 
@@ -86,10 +86,10 @@ export default function OrientationStep() {
                 <h1 className={"font-bold text-2xl mt-6 mb-3"}>
                     Congratulations! You are hired officially!
                 </h1>
-                <p className={"text-[#B2B2B3] mb-8 text-lg"}>Sign digitally & take your employee ID & Email!</p>
+                <p className={" mb-8 text-lg"}>Sign digitally & take your employee ID & Email!</p>
                 <Button
                     variant="ghost"
-                    className="font-normal  border border-[#B2B2B3] text-[#B2B2B3] text-lg px-8"
+                    className="font-normal  border hover:border-[#B2B2B3] text-white fill-[#00b4b8] bg-[#00b4b8] hover:bg-[#028c8f] hover:text-white text-lg px-8"
                     onClick={handleModalOpen}
                     disabled={isLoadingSignatureStatus || isLoadingOfficialHireStatus}
                 >
