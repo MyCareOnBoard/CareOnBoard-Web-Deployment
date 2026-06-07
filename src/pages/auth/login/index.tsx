@@ -233,6 +233,12 @@ export default function LoginPage() {
           Sign Up
         </Link>
       </p>
+      <p className="text-sm text-center text-slate-600">
+        Family member?{" "}
+        <Link to={Routes.auth.familyLogin} className="text-[#00B4B8] hover:text-[#148a9c] font-semibold">
+          Sign in with phone
+        </Link>
+      </p>
     </div>
   )
 }

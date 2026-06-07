@@ -13,6 +13,7 @@ export enum UserType {
   AGENCY = "agency",
   AGENCY_STAFF = "agency_staff",
   SUPER_ADMIN = "super_admin",
+  FAMILY_MEMBER = "family_member",
 }
 
 export interface EmergencyContact {
@@ -119,7 +120,10 @@ export interface User {
   workAvailability?: boolean
   tagId?: string
   hireDate?: string | FirebaseTimestamp | Date | null
-  // Agency reference 
+  // Family member fields (only set for userType === "family_member")
+  clientId?: string
+  relationship?: string
+  // Agency reference
   agencyId?: string
   // Some endpoints embed agency details rather than only agencyId
   agency?: UserAgency

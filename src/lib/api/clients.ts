@@ -92,6 +92,9 @@ export interface Client {
   systemAiAndAudit?: ClientSystemAiAndAudit;
   teamMembers?: ClientTeamMember[];
 
+  // Family portal access contacts
+  familyPortalContacts?: FamilyPortalContact[];
+
   // Agency relationship
   agencyId?: string;
   agency?: Agency;
@@ -193,6 +196,12 @@ export interface ClientIspMetadata {
   dddStatus?: string;
   medicaidType?: string;
   insuranceDetails?: ClientInsuranceDetail[];
+}
+
+export interface FamilyPortalContact {
+  name: string;
+  primaryPhone: string;
+  relationship?: string;
 }
 
 export interface ClientGuardianContactRow {
@@ -684,6 +693,7 @@ export interface UpdateClientRequest {
   goalsAndEmergency?: ClientGoalsAndEmergency | null;
   systemAiAndAudit?: ClientSystemAiAndAudit | null;
   status?: 'active' | 'inactive' | 'pending' | 'archived';
+  familyPortalContacts?: FamilyPortalContact[] | null;
 }
 
 /**
