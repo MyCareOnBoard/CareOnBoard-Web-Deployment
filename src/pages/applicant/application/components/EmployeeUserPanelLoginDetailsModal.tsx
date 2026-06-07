@@ -24,25 +24,26 @@ const EmployeeUserPanelLoginDetailsModal = (
   return (
     <>
       <div
-        className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur z-40"
+        className="fixed inset-0 z-40 bg-transparent bg-opacity-40 backdrop-blur"
         onClick={() => setIsOpen(false)}
       />
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl relative animate-fadeIn p-6">
+        <div className="relative w-full max-w-2xl p-6 bg-white rounded-lg shadow-2xl animate-fadeIn">
           {/* Header */}
           <div className="flex justify-between mb-3">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">Employee Details</h2>
-              <p className={"text-sm"}>Congratulations! Here is your employee details. Login to your new user panel soon.</p>
-            </div>
+            <div><h2 className="mb-2 text-xl font-semibold text-gray-900">Congratulations, you have been officially hired.</h2></div>
             <button
               onClick={handleCancel}
-              className="cursor-pointer text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 transition-colors cursor-pointer hover:text-gray-600"
               aria-label="Close modal"
             >
               <X className="w-5 h-5"/>
             </button>
+          </div>
+          <div className={"mb-4"}>
+              <p className={"text-sm"}>Continue with the same login details you used to start the application process to access your staff portal.</p>
+              <p className={"text-sm"}>Click on the <span className="text-[#00b4b8]">"Login to user panel button below"</span> to access your portal.</p>
           </div>
           <div className={"mb-6"}>
             <div className={"mb-6"}>
@@ -57,7 +58,7 @@ const EmployeeUserPanelLoginDetailsModal = (
                 />
                 {/*<button*/}
                 {/*  type="button"*/}
-                {/*  className="cursor-pointer absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"*/}
+                {/*  className="absolute text-gray-500 -translate-y-1/2 cursor-pointer right-3 top-1/2 hover:text-gray-700"*/}
                 {/*  onClick={() => copyToClipboard("nurnabi@torq.agency")}*/}
                 {/*>*/}
                 {/*  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">*/}
@@ -83,7 +84,7 @@ const EmployeeUserPanelLoginDetailsModal = (
                 />
                 {/*<button*/}
                 {/*  type="button"*/}
-                {/*  className="cursor-pointer absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"*/}
+                {/*  className="absolute text-gray-500 -translate-y-1/2 cursor-pointer right-3 top-1/2 hover:text-gray-700"*/}
                 {/*  onClick={() => copyToClipboard("Nurnabi123")}*/}
                 {/*>*/}
                 {/*  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">*/}
@@ -97,11 +98,11 @@ const EmployeeUserPanelLoginDetailsModal = (
                 {/*</button>*/}
               </div>
             </div>
-            <p className={"text-sm"}>These credentials are also sent to your email.</p>
+            <p className={"text-sm"}>Your Staff profile has been automatically created using the same credentials you used during the registration process</p>
           </div>
 
           {/* Footer */}
-          <div className="flex items-center space-x-3 p-3">
+          <div className="flex items-center p-3 space-x-3">
             <Button
               onClick={handleCancel}
               className="px-6 text-white font-medium bg-[#B2B2B3] hover:bg-gray-300 rounded-full transition-colors"
@@ -110,7 +111,7 @@ const EmployeeUserPanelLoginDetailsModal = (
             </Button>
             <Button
               onClick={() => navigate(Routes.userPanel.dashboard)}
-              className="px-6 text-white font-medium bg-teal-500 hover:bg-teal-600 rounded-full transition-colors"
+              className="px-6 font-medium text-white transition-colors bg-teal-500 rounded-full hover:bg-teal-600"
             >
               Login to  user panel
             </Button>

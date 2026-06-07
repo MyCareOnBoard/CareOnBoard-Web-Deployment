@@ -154,9 +154,9 @@ export default function FinalReviewStep({ onSuccess }: FinalReviewStepProps) {
     return (
       <section className="flex flex-col gap-6">
         <header className="space-y-2">
-          <p className="max-w-[620px] text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-            Internal HR and compliance officer review before official hire.
-          </p>
+          <h4 className="max-w-[620px] text-xl font-semibold leading-[1.4] text-[#10141a]">
+            Wait while all your documents and background checks are being reviewed. You will receive notifications as each checks are Confirmed or Rejected.
+          </h4>
         </header>
         <div className="rounded-[24px] border border-[#00b4b8]/20 bg-white/70 p-6 shadow-[0_6px_40px_-12px_rgba(16,20,26,0.16)] backdrop-blur">
           <div className="flex items-center justify-center py-12">
@@ -174,9 +174,9 @@ export default function FinalReviewStep({ onSuccess }: FinalReviewStepProps) {
     return (
       <section className="flex flex-col gap-6">
         <header className="space-y-2">
-          <p className="max-w-[620px] text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-            Internal HR and compliance officer review before official hire.
-          </p>
+          <h4 className="max-w-[620px] text-xl font-semibold leading-[1.4] text-[#10141a]">
+            Wait while all your documents and background checks are being reviewed. You will receive notifications as each checks are Confirmed or Rejected.
+          </h4>
         </header>
         <div className="rounded-[24px] border border-red-200 bg-red-50 p-6 shadow-[0_6px_40px_-12px_rgba(16,20,26,0.16)]">
           <div className="flex items-center gap-3">
@@ -193,9 +193,9 @@ export default function FinalReviewStep({ onSuccess }: FinalReviewStepProps) {
   return (
     <section className="flex flex-col gap-6">
       <header className="space-y-2">
-        <p className="max-w-[620px] text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-          Internal HR and compliance officer review before official hire.
-        </p>
+        <h4 className="max-w-[620px] text-xl font-semibold leading-[1.4] text-[#10141a]">
+          Wait while all your documents and background checks are being reviewed. You will receive notifications as each checks are Confirmed or Rejected.
+        </h4>
       </header>
 
       <div className="rounded-[24px] border border-[#00b4b8]/20 bg-white/70 p-6 shadow-[0_6px_40px_-12px_rgba(16,20,26,0.16)] backdrop-blur">

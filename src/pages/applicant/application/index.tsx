@@ -164,6 +164,40 @@ function ApplicationContent() {
     setShowCancelDialog(false);
   };
 
+  const successDialogMessages = [
+    {
+      title: "Stage 1 Submitted",
+      description:
+        "You have successfully completed Profile & Pre-Screening. Click Next to continue.",
+    },
+    {
+      title: "Stage 2 Submitted",
+      description:
+        "Your documents and eligibility verification information were submitted successfully. Click Next to continue.",
+    },
+    {
+      title: "Stage 3 Submitted",
+      description:
+        "You have successfully been conditionally hired and have activated the compliance check. You will receive a notification with the outcome of the compliance check. Click Next to go to the next stage'",
+    },
+    {
+      title: "Stage 4 Submitted",
+      description:
+        "You have successfully completed Final Agency Review & you are now Conditionally Hired. Click Next to Sign",
+    },
+    {
+      title: "Stage 5 Submitted",
+      description:
+        "You have successfully completed Official Hire & Orientation. Click Next to continue.",
+    },
+  ];
+
+  const currentSuccessDialogMessage =
+    successDialogMessages[activeStep] ?? {
+      title: `Stage ${activeStep + 1} Submitted`,
+      description: `You have successfully completed ${APPLICATION_STEP_TITLES[activeStep] ?? APPLICATION_STEP_TITLES[0]}. Click Next to continue.`,
+    };
+
   if (isLoading) {
     return <ApplicationLoading />;
   }
@@ -179,7 +213,7 @@ function ApplicationContent() {
           onClick={handleCancelClick}
           disabled={!applicationStatus?.hasStarted}
         >
-          <X className="h-5 w-5" />
+          <X className="w-5 h-5" />
           <span>Cancel Application Form</span>
         </Button>
       </div>
@@ -211,8 +245,8 @@ function ApplicationContent() {
       </div>
       <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <SuccessDialogContent
-          title={`Stage ${activeStep + 1} Submitted`}
-          description={`You have successfully completed ${APPLICATION_STEP_TITLES[activeStep] ?? APPLICATION_STEP_TITLES[0]}. Click 'next' to go to the next phase.`}
+          title={currentSuccessDialogMessage.title}
+          description={currentSuccessDialogMessage.description}
           buttonText="Next"
           onButtonClick={handleNext}
         />
