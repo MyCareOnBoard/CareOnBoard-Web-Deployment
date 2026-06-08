@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { Suspense, lazy, useState } from "react";
 import { CalendarDays, Upload, File, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,11 @@ import { MultiSelect, MultiSelectItem } from "@/components/ui/multi-select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AddClientFormData, DocKey, DocState, createInitialDocs } from "@/pages/shared/client-management/types/formData";
+import { canGeneratePoc } from "@/pages/shared/client-management/utils/pocGenerationEligibility";
+
+const GeneratePocPanel = lazy(
+  () => import("@/pages/shared/client-management/components/GeneratePocPanel"),
+);
 
 const OTHER_VALUE = "Other (specify)";
 
@@ -173,11 +178,13 @@ export function Stage3HealthcareAndDocuments({
   formData,
   setFormData,
   pageTitle = "Add client",
+  clientId,
 }: {
   footer: React.ReactNode;
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
   pageTitle?: string;
+  clientId?: string;
 }) {
   const stage3 = formData.stage3;
   const [medicalConditionsOtherText, setMedicalConditionsOtherText] = useState<string | null>(null);
@@ -689,6 +696,16 @@ export function Stage3HealthcareAndDocuments({
                   <p className="text-[12px] font-normal text-[#10141a] mb-2">
                     {doc.title}
                   </p>
+
+                  {doc.key === "poc" && canGeneratePoc(formData) ? (
+                    <Suspense fallback={null}>
+                      <GeneratePocPanel
+                        formData={formData}
+                        setFormData={setFormData}
+                        clientId={clientId}
+                      />
+                    </Suspense>
+                  ) : null}
 
                   <label
                     htmlFor={`doc-upload-${doc.key}`}

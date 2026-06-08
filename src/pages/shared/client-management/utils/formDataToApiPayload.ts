@@ -6,6 +6,12 @@ import {
 
 const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
 
+function sanitizeOptionalEmail(raw: string | undefined): string | undefined {
+  const s = raw?.trim() ?? "";
+  if (!s) return undefined;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : undefined;
+}
+
 export function formDataToApiPayload(
   formData: AddClientFormData,
   includeAgencyId: boolean = false,
@@ -110,7 +116,7 @@ export function formDataToApiPayload(
         ? s2.guardians.map((g) => ({
             name: g.name?.trim() || undefined,
             relationship: g.relationship || undefined,
-            email: g.email?.trim() || undefined,
+            email: sanitizeOptionalEmail(g.email),
             primaryPhone: g.primaryPhone?.trim() || undefined,
             secondaryPhone: g.secondaryPhone?.trim() || undefined,
             address: g.address?.trim() || undefined,
@@ -127,13 +133,15 @@ export function formDataToApiPayload(
             name: c.name?.trim() || undefined,
             agency: c.agency?.trim() || undefined,
             phone: c.phone?.trim() || undefined,
-            email: c.email?.trim() || undefined,
+            email: sanitizeOptionalEmail(c.email),
             address: c.address?.trim() || undefined,
           }))
         : undefined,
     guardianName: (s2.guardians?.[0]?.name?.trim() || s2.guardianName) || undefined,
     guardianRelationship: s2.guardians?.[0]?.relationship || s2.guardianRelationship || undefined,
-    guardianEmail: (s2.guardians?.[0]?.email?.trim() || s2.guardianEmail) || undefined,
+    guardianEmail:
+      sanitizeOptionalEmail(s2.guardians?.[0]?.email) ??
+      sanitizeOptionalEmail(s2.guardianEmail),
     guardianPhone: (s2.guardians?.[0]?.primaryPhone?.trim() || s2.guardianPhone) || undefined,
     guardianAddress: (s2.guardians?.[0]?.address?.trim() || s2.guardianAddress) || undefined,
     supportCoordinatorName:
