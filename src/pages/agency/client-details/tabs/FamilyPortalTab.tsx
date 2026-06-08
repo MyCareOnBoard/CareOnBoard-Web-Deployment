@@ -1,25 +1,12 @@
 import { useState } from "react"
 import { Loader2, Plus, Trash2, Phone, User, Users } from "lucide-react"
+import PhoneInput, { isValidPhoneNumber, formatPhoneNumberIntl } from "react-phone-number-input"
+import "react-phone-number-input/style.css"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { updateClient, type Client, type FamilyPortalContact } from "@/lib/api/clients"
-
-function formatE164(raw: string): string {
-  const digits = raw.replace(/\D/g, "")
-  if (digits.length === 10) return `+1${digits}`
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`
-  return digits.startsWith("+") ? raw : `+${digits}`
-}
-
-function displayPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "")
-  if (digits.length === 11 && digits.startsWith("1")) {
-    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
-  }
-  return phone
-}
 
 type FamilyPortalTabProps = {
   client: Client
@@ -42,9 +29,9 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
   const validate = () => {
     const errors: { name?: string; primaryPhone?: string } = {}
     if (!form.name.trim()) errors.name = "Name is required"
-    if (!form.primaryPhone.trim()) errors.primaryPhone = "Phone number is required"
-    else if (form.primaryPhone.replace(/\D/g, "").length < 10)
-      errors.primaryPhone = "Enter a valid phone number (10 digits)"
+    if (!form.primaryPhone) errors.primaryPhone = "Phone number is required"
+    else if (!isValidPhoneNumber(form.primaryPhone))
+      errors.primaryPhone = "Enter a valid phone number including country code"
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -53,7 +40,7 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
     if (!validate()) return
     const newContact: FamilyPortalContact = {
       name: form.name.trim(),
-      primaryPhone: formatE164(form.primaryPhone),
+      primaryPhone: form.primaryPhone,
       relationship: form.relationship.trim() || undefined,
     }
     const updated = [...contacts, newContact]
@@ -124,7 +111,7 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
                     </p>
                     <div className="flex items-center gap-1 text-[12px] text-[#808081]">
                       <Phone className="h-3 w-3" />
-                      {displayPhone(contact.primaryPhone)}
+                      {formatPhoneNumberIntl(contact.primaryPhone) || contact.primaryPhone}
                     </div>
                   </div>
                 </div>
@@ -176,15 +163,15 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
             <Label className="text-[13px] font-medium text-[#525253]">
               Phone Number <span className="text-red-500">*</span>
             </Label>
-            <Input
-              type="tel"
-              placeholder="e.g. (555) 000-1234"
-              value={form.primaryPhone}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, primaryPhone: e.target.value }))
+            <PhoneInput
+              international
+              defaultCountry="US"
+              value={form.primaryPhone || undefined}
+              onChange={(value) => {
+                setForm((f) => ({ ...f, primaryPhone: value ?? "" }))
                 if (formErrors.primaryPhone) setFormErrors((fe) => ({ ...fe, primaryPhone: undefined }))
               }}
-              className="h-10 rounded-xl border-[#e8eaed] bg-[#f8fafb] text-[14px]"
+              className="phone-input-family"
             />
             {formErrors.primaryPhone && (
               <p className="text-[12px] text-red-600">{formErrors.primaryPhone}</p>
@@ -225,6 +212,43 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
           The phone number entered here will be used to log in to the family portal via SMS verification.
         </p>
       </div>
+
+      <style>{`
+        .phone-input-family {
+          display: flex;
+          align-items: center;
+          height: 2.5rem;
+          border: 1px solid #e8eaed;
+          border-radius: 0.75rem;
+          background: #f8fafb;
+          padding: 0 0.75rem;
+          gap: 0.5rem;
+        }
+        .phone-input-family:focus-within {
+          border-color: #00b4b8;
+          box-shadow: 0 0 0 2px rgba(0, 180, 184, 0.15);
+        }
+        .phone-input-family .PhoneInputCountrySelect {
+          background: transparent;
+          border: none;
+          outline: none;
+          font-size: 0.875rem;
+          color: #10141a;
+          cursor: pointer;
+        }
+        .phone-input-family .PhoneInputInput {
+          flex: 1;
+          border: none;
+          outline: none;
+          background: transparent;
+          font-size: 0.875rem;
+          color: #10141a;
+          min-width: 0;
+        }
+        .phone-input-family .PhoneInputInput::placeholder {
+          color: #b0b3b8;
+        }
+      `}</style>
     </div>
   )
 }
