@@ -149,7 +149,7 @@ export default function ConditionalHireStep({
       {showLetterModal && (
         <>
           <div
-            className="fixed inset-0 bg-white/30 backdrop-blur-sm z-40"
+            className="fixed inset-0 z-40 bg-white/30 backdrop-blur-sm"
             onClick={handleReject}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -161,7 +161,7 @@ export default function ConditionalHireStep({
                 </h2>
                 <button
                   onClick={handleReject}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-gray-400 transition-colors hover:text-gray-600"
                   aria-label="Close modal"
                 >
                   <X className="w-5 h-5" />
@@ -169,21 +169,21 @@ export default function ConditionalHireStep({
               </div>
 
               {/* Letter Content - Scrollable */}
-              <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="flex-1 px-6 py-4 overflow-y-auto">
                 <div className="space-y-4 text-sm">
                   {/* Letter Header */}
                   <div>
-                    <h3 className="text-base font-bold text-gray-900 mb-3">
+                    <h3 className="mb-3 text-base font-bold text-gray-900">
                       CONDITIONAL HIRE & CONSENT LETTER
                     </h3>
-                    <p className="text-green-700 mb-2">
+                    <p className="mb-2 text-green-700">
                       Dear{" "}
                       <span className="border-b border-green-600">
                         {userName}
                       </span>
                       ,
                     </p>
-                    <p className="text-green-700 leading-relaxed">
+                    <p className="leading-relaxed text-green-700">
                       We are pleased to inform you that you have been{" "}
                       <span className="font-semibold text-green-700">
                         conditionally selected for employment
@@ -203,10 +203,10 @@ export default function ConditionalHireStep({
 
                   {/* Conditions Section */}
                   <div>
-                    <h4 className="text-sm font-bold text-gray-900 mb-2">
+                    <h4 className="mb-2 text-sm font-bold text-gray-900">
                       CONDITIONS OF EMPLOYMENT
                     </h4>
-                    <p className="text-green-700 mb-2">
+                    <p className="mb-2 text-green-700">
                       As a condition of your hire, you must complete the
                       following:
                     </p>
@@ -217,7 +217,7 @@ export default function ConditionalHireStep({
                         <p className="font-semibold text-gray-900 mb-1.5">
                           1. Pre-Employment Screening & Background Checks
                         </p>
-                        <ul className="list-none space-y-1 ml-4 text-green-700 text-xs">
+                        <ul className="ml-4 space-y-1 text-xs text-green-700 list-none">
                           <li className="flex items-start">
                             <span className="mr-2">○</span>
                             <span>
@@ -261,7 +261,7 @@ export default function ConditionalHireStep({
                           pre-service trainings prior to working independently.
                           This includes, but is not limited to:
                         </p>
-                        <ul className="list-none space-y-1 ml-4 text-green-700 text-xs">
+                        <ul className="ml-4 space-y-1 text-xs text-green-700 list-none">
                           <li className="flex items-start">
                             <span className="mr-2">○</span>
                             <span>
@@ -293,7 +293,7 @@ export default function ConditionalHireStep({
                         <p className="font-semibold text-gray-900 mb-1.5">
                           3. Documentation & Compliance
                         </p>
-                        <p className="text-green-700 text-xs">
+                        <p className="text-xs text-green-700">
                           All certificates, verifications, and required
                           documentation must be submitted and approved by
                           <span className="font-semibold text-green-700">{agency}</span> before your conditional employment
@@ -305,13 +305,13 @@ export default function ConditionalHireStep({
 
                   {/* Consent Section */}
                   <div>
-                    <h4 className="text-sm font-bold text-gray-900 mb-2">
+                    <h4 className="mb-2 text-sm font-bold text-gray-900">
                       CONSENT FOR PRE-EMPLOYMENT CHECKS
                     </h4>
-                    <p className="text-green-700 mb-2 text-xs">
+                    <p className="mb-2 text-xs text-green-700">
                       By signing this letter, you consent to the following:
                     </p>
-                    <ul className="list-none space-y-1 ml-4 text-green-700 text-xs">
+                    <ul className="ml-4 space-y-1 text-xs text-green-700 list-none">
                       <li className="flex items-start">
                         <span className="mr-2">•</span>
                         <span>
@@ -342,12 +342,12 @@ export default function ConditionalHireStep({
                   </div>
 
                   {/* Warning Section */}
-                  <div className="bg-red-50 border-l-4 border-red-500 p-3">
-                    <p className="font-bold text-red-900 mb-2 text-sm">
+                  <div className="p-3 border-l-4 border-red-500 bg-red-50">
+                    <p className="mb-2 text-sm font-bold text-red-900">
                       You also acknowledge that your employment is at-will and
                       may be rescinded if:
                     </p>
-                    <ul className="list-none space-y-1 ml-4 text-red-800 text-xs">
+                    <ul className="ml-4 space-y-1 text-xs text-red-800 list-none">
                       <li className="flex items-start">
                         <span className="mr-2">•</span>
                         <span>
@@ -374,12 +374,14 @@ export default function ConditionalHireStep({
 
                   {/* Next Steps */}
                   <div>
-                    <p className="text-green-700 leading-relaxed text-xs">
+                    <p className="text-xs leading-relaxed text-green-700">
                       We are excited to have you on our team and look forward to
-                      supporting you in your professional growth as a DSP staff
-                      member.
+                      supporting you in your professional growth as a Staff
+                      member of <span className="font-semibold">
+                        {agency}
+                      </span>
                     </p>
-                    <p className="text-green-700 leading-relaxed mt-2 text-xs">
+                    <p className="mt-2 text-xs leading-relaxed text-green-700">
                       Please indicate your agreement to the above conditions by
                       signing or accepting or rejecting.
                     </p>
@@ -398,7 +400,7 @@ export default function ConditionalHireStep({
                 <Button
                   onClick={handleAccept}
                   disabled={isSubmitting}
-                  className="px-6 bg-teal-500 hover:bg-teal-600 text-white rounded-full"
+                  className="px-6 text-white bg-teal-500 rounded-full hover:bg-teal-600"
                 >
                   {isSubmitting ? "Submitting..." : "Sign Digitally"}
                 </Button>

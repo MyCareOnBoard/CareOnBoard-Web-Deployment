@@ -26,6 +26,12 @@ export function useClientForm(initialFormData?: AddClientFormData) {
     []
   );
 
+  const goToStage = useCallback(
+    (target: number) =>
+      setStage(Math.min(TOTAL_STAGES, Math.max(1, target))),
+    [],
+  );
+
   return {
     formData,
     setFormData,
@@ -38,5 +44,6 @@ export function useClientForm(initialFormData?: AddClientFormData) {
     totalStages: TOTAL_STAGES,
     goToNext,
     goToPrev,
+    goToStage,
   };
 }

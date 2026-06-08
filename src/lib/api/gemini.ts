@@ -4,6 +4,10 @@
 
 import axiosClient from "../axios";
 import type { ClientExtractionResponse } from "@/pages/shared/client-management/types/clientExtraction";
+import type {
+  ClientPocGenerationResponse,
+  GenerateClientPocInput,
+} from "@/pages/shared/client-management/types/clientPocGeneration";
 
 interface TranslateToEnglishResponse {
   translatedText: string;
@@ -84,6 +88,43 @@ export async function extractSdrDocumentViaApi(
     formData,
     {
       timeout: EXTRACT_SDR_TIMEOUT_MS,
+      signal: options?.signal,
+      transformRequest: [
+        (data, headers) => {
+          if (data instanceof FormData) {
+            delete headers["Content-Type"];
+          }
+          return data;
+        },
+      ],
+    },
+  );
+
+  return response.data;
+}
+
+const GENERATE_POC_TIMEOUT_MS = EXTRACT_DOCUMENT_TIMEOUT_MS;
+
+/**
+ * Generate a structured Plan of Care from ISP and/or PCPT sources.
+ */
+export async function generateClientPocViaApi(
+  input: GenerateClientPocInput,
+  options?: { signal?: AbortSignal },
+): Promise<ClientPocGenerationResponse> {
+  const formData = new FormData();
+  if (input.ispFile) formData.append("ispFile", input.ispFile);
+  if (input.pcptFile) formData.append("pcptFile", input.pcptFile);
+  if (input.ispUrl?.trim()) formData.append("ispUrl", input.ispUrl.trim());
+  if (input.pcptUrl?.trim()) formData.append("pcptUrl", input.pcptUrl.trim());
+  if (input.clientId?.trim()) formData.append("clientId", input.clientId.trim());
+  formData.append("formContext", JSON.stringify(input.formContext ?? {}));
+
+  const response = await axiosClient.post<ClientPocGenerationResponse>(
+    "/gemini/generate-client-poc",
+    formData,
+    {
+      timeout: GENERATE_POC_TIMEOUT_MS,
       signal: options?.signal,
       transformRequest: [
         (data, headers) => {

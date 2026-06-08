@@ -46,6 +46,13 @@ export type MergeExtractionResult = {
   localWarnings: string[];
 };
 
+/** Missing or invalid extracted emails normalize to "" for optional guardian/care-team fields. */
+function normalizeExtractedOptionalEmail(raw: string | undefined): string {
+  const s = raw?.trim() ?? "";
+  if (!s) return "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : "";
+}
+
 /** Gemini / OCR often emits these when no value exists; treat as absent (leave field empty). */
 function isExtractedNoDataToken(v: unknown): boolean {
   if (v === undefined || v === null) return false;
@@ -541,7 +548,9 @@ function mergeGuardianContacts(
     .map((g) => ({
       name: mergeString("", g.name ?? "", true).trim() || undefined,
       relationship: mergeGuardianRelationship(undefined, g.relationship, true),
-      email: mergeString("", g.email ?? "", true).trim() || undefined,
+      email: normalizeExtractedOptionalEmail(
+        mergeString("", g.email ?? "", true),
+      ),
       primaryPhone: mergeString("", g.primaryPhone ?? "", true).trim() || undefined,
       secondaryPhone: mergeString("", g.secondaryPhone ?? "", true).trim() || undefined,
       address: mergeString("", g.address ?? "", true).trim() || undefined,
@@ -577,7 +586,9 @@ function mergeCareTeamContacts(
       name: mergeString("", c.name ?? "", true).trim() || undefined,
       agency: mergeString("", c.agency ?? "", true).trim() || undefined,
       phone: mergeString("", c.phone ?? "", true).trim() || undefined,
-      email: mergeString("", c.email ?? "", true).trim() || undefined,
+      email: normalizeExtractedOptionalEmail(
+        mergeString("", c.email ?? "", true),
+      ),
       address: mergeString("", c.address ?? "", true).trim() || undefined,
     }))
     .filter(
@@ -911,10 +922,8 @@ export function mergeExtractionDraft(
       s2.guardianRelationship,
       overwrite,
     );
-    next.stage2.guardianEmail = mergeString(
-      next.stage2.guardianEmail,
-      s2.guardianEmail,
-      overwrite,
+    next.stage2.guardianEmail = normalizeExtractedOptionalEmail(
+      mergeString(next.stage2.guardianEmail, s2.guardianEmail, overwrite),
     );
     next.stage2.guardianPhone = mergeString(
       next.stage2.guardianPhone,
@@ -963,7 +972,7 @@ export function mergeExtractionDraft(
           {
             name: r.guardianName?.trim() || undefined,
             relationship: r.guardianRelationship,
-            email: r.guardianEmail?.trim() || undefined,
+            email: normalizeExtractedOptionalEmail(r.guardianEmail),
             primaryPhone: r.guardianPhone?.trim() || undefined,
             address: r.guardianAddress?.trim() || undefined,
             supportCoordinatorName: r.supportCoordinatorName?.trim() || undefined,
