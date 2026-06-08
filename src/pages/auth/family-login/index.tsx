@@ -3,8 +3,9 @@ import { useNavigate } from "react-router"
 import { signOut } from "firebase/auth"
 import { Loader2 } from "lucide-react"
 import { useDispatch } from "react-redux"
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input"
+import "react-phone-number-input/style.css"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { auth } from "@/lib/firebase"
@@ -30,14 +31,6 @@ const RECAPTCHA_CONTAINER_ID = "recaptcha-family-login"
 const RESEND_COOLDOWN_SEC = 60
 
 type Phase = "enter-phone" | "enter-code"
-
-function formatE164(raw: string): string {
-  const digits = raw.replace(/\D/g, "")
-  if (digits.length === 10) return `+1${digits}`
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`
-  if (raw.startsWith("+")) return raw
-  return `+${digits}`
-}
 
 export default function FamilyLoginPage() {
   const navigate = useNavigate()
@@ -91,19 +84,18 @@ export default function FamilyLoginPage() {
 
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault()
-    const digits = phone.replace(/\D/g, "")
-    if (digits.length < 10) {
-      setPhoneError("Enter a valid phone number (at least 10 digits)")
+    if (!phone || !isValidPhoneNumber(phone)) {
+      setPhoneError("Enter a valid phone number including country code")
       return
     }
     setPhoneError("")
-    await sendCode(formatE164(phone))
+    await sendCode(phone)
   }
 
   const handleResend = async () => {
     if (resendSeconds > 0 || sending) return
     clearRecaptchaVerifier()
-    await sendCode(formatE164(phone))
+    await sendCode(phone)
   }
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -224,18 +216,18 @@ export default function FamilyLoginPage() {
           {phase === "enter-phone" && (
             <form onSubmit={(e) => void handleContinue(e)} className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px] font-semibold text-slate-800">User name</Label>
-                <Input
-                  type="tel"
-                  placeholder="Enter your username here"
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value)
+                <Label className="text-[13px] font-semibold text-slate-800">Phone Number</Label>
+                <PhoneInput
+                  international
+                  defaultCountry="US"
+                  value={phone || undefined}
+                  onChange={(value) => {
+                    setPhone(value ?? "")
                     if (phoneError) setPhoneError("")
                     if (inlineError) setInlineError("")
                   }}
+                  className="phone-input-family-login"
                   autoFocus
-                  className="h-12 rounded-xl border-slate-200 bg-slate-50 text-[14px] placeholder:text-slate-400 focus-visible:border-[#00B4B8] focus-visible:ring-2 focus-visible:ring-[#00B4B8]/20"
                 />
                 {phoneError && <p className="text-xs text-red-600">{phoneError}</p>}
                 {inlineError && <p className="text-xs text-red-600">{inlineError}</p>}
@@ -347,6 +339,43 @@ export default function FamilyLoginPage() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        .phone-input-family-login {
+          display: flex;
+          align-items: center;
+          height: 3rem;
+          border: 1px solid #e2e8f0;
+          border-radius: 0.75rem;
+          background: #f8fafc;
+          padding: 0 0.75rem;
+          gap: 0.5rem;
+        }
+        .phone-input-family-login:focus-within {
+          border-color: #00B4B8;
+          box-shadow: 0 0 0 2px rgba(0, 180, 184, 0.2);
+        }
+        .phone-input-family-login .PhoneInputCountrySelect {
+          background: transparent;
+          border: none;
+          outline: none;
+          font-size: 0.875rem;
+          color: #1e293b;
+          cursor: pointer;
+        }
+        .phone-input-family-login .PhoneInputInput {
+          flex: 1;
+          border: none;
+          outline: none;
+          background: transparent;
+          font-size: 0.875rem;
+          color: #1e293b;
+          min-width: 0;
+        }
+        .phone-input-family-login .PhoneInputInput::placeholder {
+          color: #94a3b8;
+        }
+      `}</style>
     </div>
   )
 }
