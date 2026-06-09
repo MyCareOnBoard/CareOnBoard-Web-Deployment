@@ -77,6 +77,7 @@ const ClearanceHiring = lazy(() => import("@/pages/agency/applicant-directory/Cl
 const PendingApplicants = lazy(() => import("@/pages/agency/applicant-directory/PendingApplicants"));
 const ApplicantProfilePage = lazy(() => import("@/pages/agency/applicant-directory/ApplicantProfilePage"));
 const ComplianceAlertsPage = lazy(() => import("@/pages/agency/compliance-alerts"));
+const ManualStaffOnboardingPage = lazy(() => import("@/pages/agency/dsp-management/ManualStaffOnboarding"));
 const ShiftsPage = lazy(() => import("@/pages/agency/shifts"));
 const ShiftsListPage = lazy(() => import("@/pages/agency/scheduling/shifts"));
 const ApprovalsPage = lazy(() => import("@/pages/agency/scheduling/approvals"));
@@ -382,6 +383,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.applicantProfile,
                 Component: ApplicantProfilePage,
+            },
+            {
+                path: Routes.agency.manualStaffOnboarding,
+                Component: ManualStaffOnboardingPage,
             },
             {
                 path: Routes.agency.complianceAlerts,
