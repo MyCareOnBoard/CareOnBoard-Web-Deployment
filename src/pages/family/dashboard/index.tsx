@@ -1,4 +1,5 @@
 import {useEffect, useState} from "react"
+import {useNavigate} from "react-router"
 import {
     Loader2,
     CalendarDays,
@@ -12,6 +13,7 @@ import {
     MessageCircle,
 } from "lucide-react"
 import axiosClient from "@/lib/axios"
+import {Routes} from "@/routes/constants"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -419,6 +421,7 @@ function UpcomingScheduleCard({schedule}: { schedule: ShiftItem[] }) {
 // ─── Care Team Card ───────────────────────────────────────────────────────────
 
 function CareTeamCard({team}: { team: TeamMember[] }) {
+    const navigate = useNavigate()
     return (
         <div className="rounded-2xl bg-white p-6 border border-[#DBDBDB]">
             <div className="mb-4 flex items-center justify-between">
@@ -469,7 +472,9 @@ function CareTeamCard({team}: { team: TeamMember[] }) {
                                 </button>
                                 <button
                                     type="button"
-                                    className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600 transition-colors"
+                                    onClick={() => navigate(`${Routes.family.messages}?contactId=${member.id}`)}
+                                    title={`Message ${member.fullName}`}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-400 hover:border-[#00B4B8] hover:text-[#00B4B8] transition-colors"
                                 >
                                     <MessageCircle className="h-3.5 w-3.5"/>
                                 </button>

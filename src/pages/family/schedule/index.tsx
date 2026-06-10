@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Search, ChevronLeft, ChevronRight, HelpCircle, Loader2 } from "lucide-react"
+import { useNavigate } from "react-router"
+import { Search, ChevronLeft, ChevronRight, HelpCircle, Loader2, X, Phone, MessageCircle, CheckCircle2, FileText } from "lucide-react"
 import axiosClient from "@/lib/axios"
+import { Routes } from "@/routes/constants"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,30 @@ interface LayoutShift extends ScheduledShift {
 }
 
 type ViewMode = "day" | "week" | "month"
+
+interface ShiftActivity {
+  time: string | null
+  title: string
+  description?: string | null
+  type: "clock_in" | "clock_out" | "note" | "activity" | "event"
+  status: string
+  noteContent?: string | null
+}
+
+interface ShiftDetail {
+  id: string
+  title: string
+  date: string
+  startTime: string | null
+  endTime: string | null
+  status: string
+  serviceCode: string | null
+  dspName: string | null
+  dspAvatar: string | null
+  dspRole: string | null
+  dspId: string | null
+  activities: ShiftActivity[]
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -203,18 +229,194 @@ function borderColor(status: string) {
   return "#94a3b8"
 }
 
+// ─── Shift Detail Modal ───────────────────────────────────────────────────────
+
+function ShiftDetailModal({
+  shiftId,
+  onClose,
+  onMessage,
+}: {
+  shiftId: string
+  onClose: () => void
+  onMessage: (contactId: string) => void
+}) {
+  const [detail, setDetail] = useState<ShiftDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [viewNote, setViewNote] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    axiosClient
+      .get<{ success: boolean; data: ShiftDetail }>(`/familyPortal/schedule/${shiftId}`)
+      .then((res) => setDetail(res.data.data))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [shiftId])
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.35)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="relative flex max-h-[85vh] w-full max-w-[580px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+        {/* Close button */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        {loading ? (
+          <div className="flex flex-1 items-center justify-center py-20">
+            <Loader2 className="h-6 w-6 animate-spin text-[#00B4B8]" />
+          </div>
+        ) : !detail ? (
+          <div className="flex flex-1 items-center justify-center py-20">
+            <p className="text-[13px] text-slate-400">Could not load shift details.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="px-7 pb-5 pt-7">
+              <h2 className="pr-10 text-[20px] font-bold text-slate-900 leading-tight">
+                {detail.title}
+              </h2>
+            </div>
+
+            {/* DSP row */}
+            {detail.dspName && (
+              <div className="flex items-center gap-4 border-b border-slate-100 px-7 pb-5">
+                {detail.dspAvatar ? (
+                  <img
+                    src={detail.dspAvatar}
+                    alt={detail.dspName}
+                    className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#00B4B8]/15 text-[13px] font-bold text-[#00B4B8]">
+                    {detail.dspName.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("")}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-semibold text-slate-900">{detail.dspName}</p>
+                  <p className="text-[13px] capitalize text-slate-400">{detail.dspRole || "Caregiver"}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600 transition-colors"
+                    title="Call"
+                  >
+                    <Phone className="h-4 w-4" />
+                  </button>
+                  {detail.dspId && (
+                    <button
+                      type="button"
+                      onClick={() => { onClose(); onMessage(detail.dspId!) }}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-400 hover:border-[#00B4B8] hover:text-[#00B4B8] transition-colors"
+                      title="Message"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Activities */}
+            <div className="flex-1 overflow-y-auto px-7 py-5">
+              {detail.activities.length > 0 && (
+                <p className="mb-4 text-[14px] font-semibold text-slate-700">Activities</p>
+              )}
+
+              {detail.activities.length === 0 ? (
+                <p className="text-[13px] text-slate-400">No activity recorded for this visit yet.</p>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {detail.activities.map((act, i) => (
+                    <div key={i} className="flex items-start gap-4">
+                      {/* Icon */}
+                      <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-green-50">
+                        {act.type === "note" ? (
+                          <FileText className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                        )}
+                      </div>
+
+                      {/* Time */}
+                      <span className="w-16 flex-shrink-0 pt-0.5 text-[12px] text-slate-400">
+                        {act.time || "—"}
+                      </span>
+
+                      {/* Content */}
+                      <div className="flex flex-1 min-w-0 items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-slate-800">{act.title}</p>
+                          {act.description && (
+                            <p className="mt-0.5 text-[12px] text-slate-500">{act.description}</p>
+                          )}
+                          {viewNote === `${i}` && act.noteContent && (
+                            <p className="mt-2 rounded-xl bg-slate-50 p-3 text-[12px] text-slate-600">
+                              {act.noteContent}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Action */}
+                        {act.type === "note" && act.noteContent ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewNote(viewNote === `${i}` ? null : `${i}`)}
+                            className="flex-shrink-0 rounded-lg border border-slate-200 px-3 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                          >
+                            {viewNote === `${i}` ? "Hide note" : "View note"}
+                          </button>
+                        ) : act.status === "completed" || act.type === "clock_in" || act.type === "clock_out" ? (
+                          <span className="flex-shrink-0 rounded-full bg-green-500 px-3 py-1 text-[11px] font-semibold text-white">
+                            Completed
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Event Card ───────────────────────────────────────────────────────────────
 
 function EventCard({
   shift,
   compact = false,
+  onShiftClick,
 }: {
   shift: ScheduledShift
   compact?: boolean
+  onShiftClick?: (id: string) => void
 }) {
   return (
-    <div
-      className="flex h-full flex-col overflow-hidden rounded-xl bg-white px-3 py-2 shadow-sm"
+    <button
+      type="button"
+      onClick={() => onShiftClick?.(shift.id)}
+      className="flex h-full w-full flex-col overflow-hidden rounded-xl bg-white px-3 py-2 shadow-sm text-left transition-shadow hover:shadow-md"
       style={{ borderLeft: `3px solid ${borderColor(shift.status)}` }}
     >
       <p className={`font-semibold leading-tight text-slate-800 ${compact ? "text-[11px]" : "text-[13px]"}`}>
@@ -229,13 +431,13 @@ function EventCard({
           <span className="truncate text-[11px] text-slate-600">{shift.dspName}</span>
         </div>
       )}
-    </div>
+    </button>
   )
 }
 
 // ─── Day View ─────────────────────────────────────────────────────────────────
 
-function DayView({ shifts, currentDate }: { shifts: ScheduledShift[]; currentDate: Date }) {
+function DayView({ shifts, currentDate, onShiftClick }: { shifts: ScheduledShift[]; currentDate: Date; onShiftClick: (id: string) => void }) {
   const layouted = useMemo(() => layoutDayShifts(shifts), [shifts])
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -311,7 +513,7 @@ function DayView({ shifts, currentDate }: { shifts: ScheduledShift[]; currentDat
                   paddingRight: 4,
                 }}
               >
-                <EventCard shift={item} />
+                <EventCard shift={item} onShiftClick={onShiftClick} />
               </div>
             )
           })}
@@ -323,7 +525,7 @@ function DayView({ shifts, currentDate }: { shifts: ScheduledShift[]; currentDat
 
 // ─── Week View ────────────────────────────────────────────────────────────────
 
-function WeekView({ shifts, currentDate }: { shifts: ScheduledShift[]; currentDate: Date }) {
+function WeekView({ shifts, currentDate, onShiftClick }: { shifts: ScheduledShift[]; currentDate: Date; onShiftClick: (id: string) => void }) {
   const mon = startOfWeek(currentDate)
   const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i))
   const today = new Date()
@@ -421,7 +623,7 @@ function WeekView({ shifts, currentDate }: { shifts: ScheduledShift[]; currentDa
                         width: `${colW}%`,
                       }}
                     >
-                      <EventCard shift={item} compact />
+                      <EventCard shift={item} compact onShiftClick={onShiftClick} />
                     </div>
                   )
                 })}
@@ -440,10 +642,12 @@ function MonthView({
   shifts,
   currentDate,
   onDayClick,
+  onShiftClick,
 }: {
   shifts: ScheduledShift[]
   currentDate: Date
   onDayClick: (d: Date) => void
+  onShiftClick: (id: string) => void
 }) {
   const today = new Date()
   const first = startOfMonth(currentDate)
@@ -507,7 +711,11 @@ function MonthView({
               {visible.map((s) => (
                 <div
                   key={s.id}
-                  className="truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-white"
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onShiftClick(s.id) }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onShiftClick(s.id) } }}
+                  className="truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-white hover:opacity-80 transition-opacity cursor-pointer"
                   style={{ backgroundColor: "#00B4B8" }}
                 >
                   {s.title}
@@ -527,11 +735,18 @@ function MonthView({
 // ─── Main Schedule Page ───────────────────────────────────────────────────────
 
 export default function FamilySchedulePage() {
+  const navigateTo = useNavigate()
   const [view, setView] = useState<ViewMode>("day")
   const [currentDate, setCurrentDate] = useState(new Date())
   const [search, setSearch] = useState("")
   const [shifts, setShifts] = useState<ScheduledShift[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeShiftId, setActiveShiftId] = useState<string | null>(null)
+
+  const handleShiftClick = (id: string) => setActiveShiftId(id)
+  const handleCloseModal = () => setActiveShiftId(null)
+  const handleMessage = (contactId: string) =>
+    navigateTo(`${Routes.family.messages}?contactId=${contactId}`)
 
   // Compute date range for current view
   const { startDate, endDate, label } = useMemo(() => {
@@ -583,7 +798,7 @@ export default function FamilySchedulePage() {
     )
   }, [shifts, search])
 
-  const navigate = (delta: number) => {
+  const navDate = (delta: number) => {
     setCurrentDate((d) => {
       const next = new Date(d)
       if (view === "day") next.setDate(next.getDate() + delta)
@@ -601,6 +816,14 @@ export default function FamilySchedulePage() {
   }
 
   return (
+    <>
+    {activeShiftId && (
+      <ShiftDetailModal
+        shiftId={activeShiftId}
+        onClose={handleCloseModal}
+        onMessage={handleMessage}
+      />
+    )}
     <div className="flex h-full flex-col gap-4">
       {/* Page title */}
       <div className="flex items-center justify-between">
@@ -638,7 +861,7 @@ export default function FamilySchedulePage() {
         <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-0.5">
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => navDate(-1)}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -652,7 +875,7 @@ export default function FamilySchedulePage() {
           </button>
           <button
             type="button"
-            onClick={() => navigate(1)}
+            onClick={() => navDate(1)}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
           >
             <ChevronRight className="h-4 w-4" />
@@ -682,13 +905,14 @@ export default function FamilySchedulePage() {
             <Loader2 className="h-7 w-7 animate-spin text-[#00B4B8]" />
           </div>
         ) : view === "day" ? (
-          <DayView shifts={filtered} currentDate={currentDate} />
+          <DayView shifts={filtered} currentDate={currentDate} onShiftClick={handleShiftClick} />
         ) : view === "week" ? (
-          <WeekView shifts={filtered} currentDate={currentDate} />
+          <WeekView shifts={filtered} currentDate={currentDate} onShiftClick={handleShiftClick} />
         ) : (
-          <MonthView shifts={filtered} currentDate={currentDate} onDayClick={handleDayClick} />
+          <MonthView shifts={filtered} currentDate={currentDate} onDayClick={handleDayClick} onShiftClick={handleShiftClick} />
         )}
       </div>
     </div>
+    </>
   )
 }

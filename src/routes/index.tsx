@@ -2,6 +2,8 @@ import { lazy } from "react";
 import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
 
+const RouteErrorPage = lazy(() => import("@/pages/error/RouteErrorPage"));
+
 const SplashScreen = lazy(() => import("@/pages/splash"));
 const VerifyOTP = lazy(() => import("@/pages/onboarding/VerifyOTP"));
 const VerifyEmail = lazy(() => import("@/pages/onboarding/VerifyEmail"));
@@ -150,6 +152,9 @@ const MobileAppRedirect = lazy(() => import("@/pages/app/MobileAppRedirect"));
 
 
 export const router = createBrowserRouter([
+    {
+        errorElement: <RouteErrorPage />,
+        children: [
     {
         path: Routes.root,
         Component: SplashScreen,
@@ -780,6 +785,8 @@ export const router = createBrowserRouter([
                 path: Routes.family.messages,
                 Component: FamilyMessagesPage,
             },
+        ],
+    },
         ],
     },
 ]);
