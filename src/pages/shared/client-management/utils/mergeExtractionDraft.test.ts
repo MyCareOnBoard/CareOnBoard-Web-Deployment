@@ -419,8 +419,6 @@ describe("mergeExtractionDraft", () => {
       draft: {
         type: "hha",
         stage2: {
-          legalGuardian: "Yes",
-          powerOfAttorney: "NO",
           insuranceInfo: [
             {
               type: "primary",
@@ -435,8 +433,6 @@ describe("mergeExtractionDraft", () => {
       },
     });
     const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: true });
-    expect(formData.stage2.legalGuardian).toBe("yes");
-    expect(formData.stage2.powerOfAttorney).toBe("no");
     expect(formData.stage2.insuranceInfo?.[0].authorizationRequired).toBe("yes");
     expect(formData.stage3.fallRisk).toBe("yes");
   });

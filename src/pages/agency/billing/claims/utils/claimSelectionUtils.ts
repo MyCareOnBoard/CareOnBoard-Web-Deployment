@@ -3,6 +3,7 @@ import type { ReadyToClaimRow } from "@/lib/api/claims";
 import type { Shift } from "@/lib/api/shifts";
 import type { MileageRide } from "@/lib/api/mileage";
 import { isTransportationClientService } from "@/pages/agency/mileage/utils/transportationClientService";
+import { getClientServicesForOperations } from "@/pages/shared/client-management/utils/clientServicesForOperations";
 import { parseSdrWeekRange } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
 import { format, parseISO, subDays } from "date-fns";
 
@@ -12,7 +13,7 @@ export type WeekRangeBounds = {
 };
 
 export function flattenClientServices(client?: Client): ClientService[] {
-  return (client?.outcomes ?? []).flatMap((outcome) => outcome.services ?? []);
+  return getClientServicesForOperations(client);
 }
 
 export function resolveWeekRangeIsoBounds(weekRange: string | undefined): WeekRangeBounds | null {

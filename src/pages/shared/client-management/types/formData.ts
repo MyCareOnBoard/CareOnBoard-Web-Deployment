@@ -59,6 +59,8 @@ export type HhaAuthorization = {
     serviceType?: string;
     modifier?: string;
     clientPayType?: ServicePayType;
+    staffRate?: string;
+    payType?: ServicePayType;
 };
 
 export type HhaPhysicianInfo = {
@@ -259,6 +261,7 @@ export type Outcome = {
 
 /** Guardians / representatives; optional support coordinator fields mirror the legacy single-row ISP layout. */
 export type GuardianContact = {
+    id: string;
     name?: string;
     relationship?: GuardianRelationship;
     email?: string;
@@ -269,6 +272,8 @@ export type GuardianContact = {
     supportCoordinatorName?: string;
     supportCoordinatorAgency?: string;
     supportCoordinatorContact?: string;
+    isLegalGuardian?: YesNo;
+    hasPowerOfAttorney?: YesNo;
 };
 
 export type CareTeamContact = {
@@ -293,8 +298,6 @@ export type Stage2GuardianAndFundingData = {
     outcomes: Outcome[];
     guardians?: GuardianContact[];
     careTeam?: CareTeamContact[];
-    legalGuardian?: YesNo;
-    powerOfAttorney?: YesNo;
     insuranceInfo?: HhaInsuranceInfo[];
     hhaServiceRequest?: HhaServiceRequest;
     hhaAuthorizations?: HhaAuthorization[];
@@ -547,6 +550,19 @@ function newId(prefix: string): string {
         : `${prefix}-${Math.random().toString(16).slice(2)}`;
 }
 
+export function createEmptyGuardianContact(): GuardianContact {
+    return {
+        id: newId("guardian"),
+        name: "",
+        email: "",
+        primaryPhone: "",
+        address: "",
+        supportCoordinatorName: "",
+        supportCoordinatorAgency: "",
+        supportCoordinatorContact: "",
+    };
+}
+
 export function createEmptyHhaInsuranceInfo(type: HhaInsuranceType = "primary"): HhaInsuranceInfo {
     return {
         id: newId("insurance"),
@@ -576,6 +592,8 @@ export function createEmptyHhaAuthorization(): HhaAuthorization {
         serviceType: undefined,
         modifier: undefined,
         clientPayType: undefined,
+        staffRate: "",
+        payType: undefined,
     };
 }
 
@@ -754,8 +772,6 @@ export function createInitialAddClientFormData(): AddClientFormData {
             outcomes: [],
             guardians: [],
             careTeam: [],
-            legalGuardian: "",
-            powerOfAttorney: "",
             insuranceInfo: [createEmptyHhaInsuranceInfo("primary")],
             hhaServiceRequest: {
                 requestedServices: [],

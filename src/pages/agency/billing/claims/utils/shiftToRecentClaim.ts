@@ -78,8 +78,6 @@ function formatRate(
 }
 
 export { computeTotalHours, findMatchingClientService, resolvePaNumber } from "./claimShiftBillingUtils";
-export { getClientServicesFromOutcomes } from "./claimShiftBillingUtils";
-
 export function mapShiftToRecentClaim(shift: Shift): RecentClaim {
   const client = shift.client;
   const matchedService = findMatchingClientService(client, shift);

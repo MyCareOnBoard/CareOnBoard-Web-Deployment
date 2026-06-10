@@ -421,54 +421,89 @@ function buildAssignedDspsSection(client: Client): ProfileSection {
   };
 }
 
+function guardianRoleBadge(g: NonNullable<Client["guardians"]>[number]): string {
+  const roles: string[] = [];
+  if (g.isLegalGuardian === "yes") roles.push("Legal guardian");
+  if (g.hasPowerOfAttorney === "yes") roles.push("Power of attorney");
+  return roles.join(", ");
+}
+
 function buildGuardianSection(client: Client): ProfileSection | null {
-  const g = client.guardians?.[0];
   const gi = client.guardianInfo;
+  const guardians = client.guardians ?? [];
 
-  const name =
-    trimOrEmpty(g?.name) ||
-    trimOrEmpty(gi?.guardianName) ||
-    trimOrEmpty(client.guardianName);
-  const relationship =
-    trimOrEmpty(g?.relationship) ||
-    trimOrEmpty(gi?.guardianRelationship) ||
-    trimOrEmpty(client.guardianRelationship);
-  const phone =
-    trimOrEmpty(g?.primaryPhone) ||
-    trimOrEmpty(gi?.guardianPhone) ||
-    trimOrEmpty(client.guardianPhone);
-  const email =
-    trimOrEmpty(g?.email) || trimOrEmpty(gi?.guardianEmail) || trimOrEmpty(client.guardianEmail);
+  const fields: ProfileField[] = [];
 
-  const scName =
-    trimOrEmpty(g?.supportCoordinatorName) ||
-    trimOrEmpty(gi?.supportCoordinatorName) ||
-    trimOrEmpty(client.supportCoordinatorName);
-  const scAgency =
-    trimOrEmpty(g?.supportCoordinatorAgency) ||
-    trimOrEmpty(gi?.supportCoordinatorAgency) ||
-    trimOrEmpty(client.supportCoordinatorAgency);
-  const scContact =
-    trimOrEmpty(g?.supportCoordinatorContact) ||
-    trimOrEmpty(gi?.supportCoordinatorContact) ||
-    trimOrEmpty(client.supportCoordinatorContact);
+  if (guardians.length > 0) {
+    for (let i = 0; i < guardians.length; i++) {
+      const g = guardians[i];
+      const label = guardians.length === 1 ? "Guardian" : `Guardian ${i + 1}`;
+      const prefix = guardians.length > 1 ? `G${i + 1} ` : "";
+      const name = trimOrEmpty(g.name);
+      if (name) fields.push(field(label, name, { icon: "users" }));
 
-  const fields: ProfileField[] = [
-    fieldIfPresent("Guardian", name, "users"),
-    fieldIfPresent("Relationship", relationship, "user"),
-    fieldIfPresent("Guardian phone", phone, "phone"),
-    fieldIfPresent("Guardian email", email, "mail"),
-    fieldIfPresent("Support coordinator", scName, "users"),
-    fieldIfPresent("SC agency", scAgency, "layers"),
-    fieldIfPresent("SC contact", scContact, "phone"),
-  ].filter((f): f is ProfileField => f !== null);
+      const relationship = trimOrEmpty(g.relationship);
+      if (relationship) fields.push(field(`${prefix}Relationship`, relationship, { icon: "user" }));
+
+      const roles = guardianRoleBadge(g);
+      if (roles) fields.push(field(`${prefix}Role`, roles, { icon: "shield" }));
+
+      const phone = trimOrEmpty(g.primaryPhone);
+      if (phone) fields.push(field(`${prefix}Phone`, phone, { icon: "phone" }));
+
+      const email = trimOrEmpty(g.email);
+      if (email) fields.push(field(`${prefix}Email`, email, { icon: "mail" }));
+
+      const scName = trimOrEmpty(g.supportCoordinatorName);
+      const scAgency = trimOrEmpty(g.supportCoordinatorAgency);
+      const scContact = trimOrEmpty(g.supportCoordinatorContact);
+      if (scName) fields.push(field(`${prefix}Support coordinator`, scName, { icon: "users" }));
+      if (scAgency) fields.push(field(`${prefix}SC agency`, scAgency, { icon: "layers" }));
+      if (scContact) fields.push(field(`${prefix}SC contact`, scContact, { icon: "phone" }));
+    }
+  } else {
+    // Legacy flat-field fallback (clients without guardians[] array)
+    const name =
+      trimOrEmpty(gi?.guardianName) || trimOrEmpty(client.guardianName);
+    const relationship =
+      trimOrEmpty(gi?.guardianRelationship) || trimOrEmpty(client.guardianRelationship);
+    const phone =
+      trimOrEmpty(gi?.guardianPhone) || trimOrEmpty(client.guardianPhone);
+    const email =
+      trimOrEmpty(gi?.guardianEmail) || trimOrEmpty(client.guardianEmail);
+    const scName =
+      trimOrEmpty(gi?.supportCoordinatorName) || trimOrEmpty(client.supportCoordinatorName);
+    const scAgency =
+      trimOrEmpty(gi?.supportCoordinatorAgency) || trimOrEmpty(client.supportCoordinatorAgency);
+    const scContact =
+      trimOrEmpty(gi?.supportCoordinatorContact) || trimOrEmpty(client.supportCoordinatorContact);
+
+    if (name) fields.push(field("Guardian", name, { icon: "users" }));
+    if (relationship) fields.push(field("Relationship", relationship, { icon: "user" }));
+    if (phone) fields.push(field("Guardian phone", phone, { icon: "phone" }));
+    if (email) fields.push(field("Guardian email", email, { icon: "mail" }));
+    if (scName) fields.push(field("Support coordinator", scName, { icon: "users" }));
+    if (scAgency) fields.push(field("SC agency", scAgency, { icon: "layers" }));
+    if (scContact) fields.push(field("SC contact", scContact, { icon: "phone" }));
+  }
 
   if (fields.length === 0) return null;
 
+  const hasSupportCoordinator = guardians.some(
+    (g) => trimOrEmpty(g.supportCoordinatorName).length > 0,
+  );
+
   return {
     id: "guardian",
-    title: "Guardian & care team",
-    subtitle: "Primary guardian and support coordinator",
+    title: `Guardian${guardians.length !== 1 ? "s" : ""} & care team`,
+    subtitle:
+      guardians.length > 1
+        ? hasSupportCoordinator
+          ? `${guardians.length} guardians and support coordinator`
+          : `${guardians.length} guardians`
+        : hasSupportCoordinator
+          ? "Guardian and support coordinator"
+          : "Guardian",
     fields,
   };
 }

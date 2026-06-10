@@ -63,8 +63,6 @@ export interface Client {
   ispMetadata?: ClientIspMetadata;
   guardians?: ClientGuardianContactRow[];
   careTeam?: ClientCareTeamContact[];
-  legalGuardian?: ClientYesNo;
-  powerOfAttorney?: ClientYesNo;
   insuranceInfo?: ClientHhaInsuranceInfo[];
   hhaServiceRequest?: ClientHhaServiceRequest;
   /** When the API nests guardian rows under `guardianInfo`. */
@@ -214,6 +212,7 @@ export interface ClientIspMetadata {
 }
 
 export interface ClientGuardianContactRow {
+  id?: string;
   name?: string;
   relationship?: string;
   email?: string;
@@ -224,6 +223,8 @@ export interface ClientGuardianContactRow {
   supportCoordinatorName?: string;
   supportCoordinatorAgency?: string;
   supportCoordinatorContact?: string;
+  isLegalGuardian?: ClientYesNo;
+  hasPowerOfAttorney?: ClientYesNo;
 }
 
 export interface ClientCareTeamContact {
@@ -296,6 +297,8 @@ export interface ClientHhaAuthorization {
   serviceType?: string;
   modifier?: string;
   clientPayType?: ClientService["payType"];
+  staffRate?: string;
+  payType?: ClientService["payType"];
   assignedDsps?: ClientDsp[];
 }
 
@@ -598,8 +601,6 @@ export interface CreateClientRequest {
   ispMetadata?: ClientIspMetadata;
   guardians?: ClientGuardianContactRow[];
   careTeam?: ClientCareTeamContact[];
-  legalGuardian?: ClientYesNo;
-  powerOfAttorney?: ClientYesNo;
   insuranceInfo?: ClientHhaInsuranceInfo[];
   hhaServiceRequest?: ClientHhaServiceRequest;
 
@@ -733,8 +734,6 @@ export interface UpdateClientRequest {
   ispMetadata?: ClientIspMetadata | null;
   guardians?: ClientGuardianContactRow[] | null;
   careTeam?: ClientCareTeamContact[] | null;
-  legalGuardian?: ClientYesNo | null;
-  powerOfAttorney?: ClientYesNo | null;
   insuranceInfo?: ClientHhaInsuranceInfo[] | null;
   hhaServiceRequest?: ClientHhaServiceRequest | null;
   guardianName?: string | null;

@@ -1,6 +1,7 @@
 import { format, parseISO } from "date-fns";
 import type { Client, ClientService } from "@/lib/api/clients";
 import type { Shift } from "@/lib/api/shifts";
+import { getClientServicesForOperations } from "@/pages/shared/client-management/utils/clientServicesForOperations";
 import { parseSdrWeekRange } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
 
 export const CLAIM_SHIFT_MISSING_VALUE = "—";
@@ -12,8 +13,16 @@ function serviceCodesMatch(serviceCode?: string, shiftCode?: string): boolean {
   return left.toLowerCase() === right.toLowerCase();
 }
 
-export function getClientServicesFromOutcomes(client?: Client): ClientService[] {
-  return (client?.outcomes ?? []).flatMap((outcome) => outcome.services ?? []);
+function parseAuthDateToYmd(val?: string): string | null {
+  if (!val?.trim()) return null;
+  const trimmed = val.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
+  try {
+    const d = parseISO(trimmed);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  } catch {
+    return null;
+  }
 }
 
 function shiftDateInServiceWeekRanges(shiftDate: string, service: ClientService): boolean {
@@ -29,21 +38,49 @@ function shiftDateInServiceWeekRanges(shiftDate: string, service: ClientService)
   });
 }
 
-function findCodeAndWeekRangeMatches(client: Client | undefined, shift: Shift): ClientService[] {
-  if (!shift.serviceCode?.trim() || !shift.date) return [];
+function shiftDateWithinAuthRange(shiftDate: string, service: ClientService): boolean {
+  const start = parseAuthDateToYmd(service.startAuthDate);
+  const end = parseAuthDateToYmd(service.endAuthDate);
+  if (!start && !end) return true;
+  if (start && shiftDate < start) return false;
+  if (end && shiftDate > end) return false;
+  return true;
+}
 
-  return getClientServicesFromOutcomes(client).filter(
-    (service) =>
-      serviceCodesMatch(service.code, shift.serviceCode) &&
-      shiftDateInServiceWeekRanges(shift.date, service),
-  );
+/** @deprecated Prefer getClientServicesForOperations */
+export function getClientServicesFromOutcomes(client?: Client): ClientService[] {
+  return getClientServicesForOperations(client);
+}
+
+export function findMatchingServicesForShift(
+  client: Client | undefined,
+  shift: Shift,
+): ClientService[] {
+  const code = shift.serviceCode?.trim();
+  const shiftDate = shift.date?.trim();
+  if (!code || !shiftDate) return [];
+
+  const services = getClientServicesForOperations(client);
+  const candidates = services.filter((service) => serviceCodesMatch(service.code, code));
+
+  const sdrMatches = candidates.filter((service) => {
+    const rows = service.sdrWeeklyDistribution?.rows ?? [];
+    return rows.length > 0 && shiftDateInServiceWeekRanges(shiftDate, service);
+  });
+  if (sdrMatches.length) return sdrMatches;
+
+  return candidates.filter((service) => shiftDateWithinAuthRange(shiftDate, service));
+}
+
+function findCodeAndWeekRangeMatches(client: Client | undefined, shift: Shift): ClientService[] {
+  return findMatchingServicesForShift(client, shift);
 }
 
 export function findMatchingClientService(
   client: Client | undefined,
   shift: Shift,
 ): ClientService | undefined {
-  return findCodeAndWeekRangeMatches(client, shift)[0];
+  return findMatchingServicesForShift(client, shift)[0];
 }
 
 export function resolveWeekRangeForShift(

@@ -19,12 +19,15 @@ import {
   GUARDIAN_RELATIONSHIP_LABELS,
   GUARDIAN_RELATIONSHIP_VALUES,
   createEmptyOutcome,
+  createEmptyGuardianContact,
   createEmptyHhaAuthorization,
   createEmptyHhaInsuranceInfo,
   createEmptyServiceAuthorization,
   type GuardianRelationship,
+  type GuardianContact,
   Service,
   type ServicePayType,
+  type YesNo,
   SDR_DETAILS_LIST_MAX,
   type ServiceSdrDetails,
 } from "@/pages/shared/client-management/types/formData";
@@ -34,6 +37,7 @@ import { Stage2SdrImportPanel } from "@/pages/shared/client-management/component
 import { WeeklyDistributionInline } from "@/pages/shared/client-management/components/WeeklyDistributionInline";
 import { ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
 import { HhaAuthorizationFields } from "@/pages/shared/client-management/components/HhaAuthorizationFields";
+import { RatePayTypeField } from "@/pages/shared/client-management/components/RatePayTypeField";
 import { applyHhaCatalogService } from "@/pages/shared/client-management/utils/applyHhaCatalogService";
 import type { HhaAuthorization } from "@/pages/shared/client-management/types/formData";
 import { deriveAuthorizedHoursPerWeek } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
@@ -69,6 +73,20 @@ function splitSdrLinesToList(raw: string, maxEntries: number): string[] {
 
 function stripCurrencyAndCommas(raw: string): string {
   return raw.replace(/\$/g, "").replace(/,/g, "").trim();
+}
+
+function applyGuardianFlagSelection(
+  guardians: GuardianContact[],
+  pickerValue: string,
+  flag: "isLegalGuardian" | "hasPowerOfAttorney",
+): GuardianContact[] {
+  if (!pickerValue) {
+    return guardians.map((g) => ({ ...g, [flag]: "no" as YesNo }));
+  }
+  return guardians.map((g) => ({
+    ...g,
+    [flag]: (g.id === pickerValue ? "yes" : "no") as YesNo,
+  }));
 }
 
 /** Persist cost without `$`; allow decimals. */
@@ -162,52 +180,6 @@ function CalendarDateField({
       onSelectDate={onSelectDate}
       placeholder={placeholder}
     />
-  );
-}
-
-function RatePayTypeField({
-  label,
-  rate,
-  payType,
-  includeMile = false,
-  onRateChange,
-  onPayTypeChange,
-}: {
-  label: string;
-  rate: string;
-  payType?: ServicePayType;
-  /** Include per-mile option (client and staff reimbursement). */
-  includeMile?: boolean;
-  onRateChange: (value: string) => void;
-  onPayTypeChange: (value: ServicePayType) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[12px] font-normal text-[#10141a]">{label}</label>
-      <div className="flex gap-2">
-        <Input
-          type="number"
-          inputMode="decimal"
-          min={0}
-          step={0.01}
-          value={rate}
-          onChange={(e) => onRateChange(e.target.value)}
-          className={RATE_INPUT_CLASS}
-          placeholder="Enter rate"
-        />
-        <Select value={payType} onValueChange={(v) => onPayTypeChange(v as ServicePayType)}>
-          <SelectTrigger className={SELECT_TRIGGER_CLASS}>
-            <SelectValue placeholder="Pay type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="hourly">Hourly</SelectItem>
-            <SelectItem value="15-min">15 minutes</SelectItem>
-            <SelectItem value="daily">Daily</SelectItem>
-            {includeMile ? <SelectItem value="mile">Mile</SelectItem> : null}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
   );
 }
 
@@ -578,7 +550,50 @@ export function Stage2GuardianAndFunding({
   const updateStage2 = useCallback(
     (patch: Partial<AddClientFormData["stage2"]>) =>
       setFormData((prev) => ({ ...prev, stage2: { ...prev.stage2, ...patch } })),
-    []
+    [setFormData],
+  );
+
+  const guardianPickerOptions = useMemo(
+    () =>
+      (stage2.guardians ?? []).map((g, i) => ({
+        value: g.id,
+        label: g.name?.trim() || `Guardian ${i + 1}`,
+      })),
+    [stage2.guardians],
+  );
+
+  const legalGuardianPickerValue = useMemo(() => {
+    return stage2.guardians?.find((g) => g.isLegalGuardian === "yes")?.id ?? "";
+  }, [stage2.guardians]);
+
+  const poaPickerValue = useMemo(() => {
+    return stage2.guardians?.find((g) => g.hasPowerOfAttorney === "yes")?.id ?? "";
+  }, [stage2.guardians]);
+
+  const hasGuardians = guardianPickerOptions.length > 0;
+
+  const handleLegalGuardianPickerChange = useCallback(
+    (value: string) => {
+      const next = applyGuardianFlagSelection(
+        stage2.guardians ?? [],
+        value === "__none__" ? "" : value,
+        "isLegalGuardian",
+      );
+      updateStage2({ guardians: next });
+    },
+    [stage2.guardians, updateStage2],
+  );
+
+  const handlePoaPickerChange = useCallback(
+    (value: string) => {
+      const next = applyGuardianFlagSelection(
+        stage2.guardians ?? [],
+        value === "__none__" ? "" : value,
+        "hasPowerOfAttorney",
+      );
+      updateStage2({ guardians: next });
+    },
+    [stage2.guardians, updateStage2],
   );
 
   const handleOutcomeServiceChange = useCallback(
@@ -932,7 +947,7 @@ export function Stage2GuardianAndFunding({
             <p className="text-[14px] font-medium text-[#808081]">No guardians added yet.</p>
           ) : null}
           {(stage2.guardians ?? []).map((g, gi) => (
-            <div key={gi} className="group">
+            <div key={g.id} className="group">
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
                   Guardian {gi + 1}
@@ -1101,18 +1116,7 @@ export function Stage2GuardianAndFunding({
             className="w-full border-dashed border-[#808081] text-[#10141a] sm:w-auto"
             onClick={() =>
               updateStage2({
-                guardians: [
-                  ...(stage2.guardians ?? []),
-                  {
-                    name: "",
-                    email: "",
-                    primaryPhone: "",
-                    address: "",
-                    supportCoordinatorName: "",
-                    supportCoordinatorAgency: "",
-                    supportCoordinatorContact: "",
-                  },
-                ],
+                guardians: [...(stage2.guardians ?? []), createEmptyGuardianContact()],
               })
             }
           >
@@ -1124,32 +1128,46 @@ export function Stage2GuardianAndFunding({
         {isHhaClient ? (
           <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">Legal guardian?</label>
+              <label className="text-[12px] font-normal text-[#10141a]">Legal guardian</label>
               <Select
-                value={stage2.legalGuardian || undefined}
-                onValueChange={(v) => updateStage2({ legalGuardian: v as AddClientFormData["stage2"]["legalGuardian"] })}
+                value={legalGuardianPickerValue || "__none__"}
+                onValueChange={handleLegalGuardianPickerChange}
+                disabled={!hasGuardians}
               >
                 <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-                  <SelectValue placeholder="Select answer" />
+                  <SelectValue
+                    placeholder={hasGuardians ? "Select guardian" : "Add a guardian first"}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yes">Yes</SelectItem>
-                  <SelectItem value="no">No</SelectItem>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {guardianPickerOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">Power of attorney?</label>
+              <label className="text-[12px] font-normal text-[#10141a]">Power of attorney</label>
               <Select
-                value={stage2.powerOfAttorney || undefined}
-                onValueChange={(v) => updateStage2({ powerOfAttorney: v as AddClientFormData["stage2"]["powerOfAttorney"] })}
+                value={poaPickerValue || "__none__"}
+                onValueChange={handlePoaPickerChange}
+                disabled={!hasGuardians}
               >
                 <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-                  <SelectValue placeholder="Select answer" />
+                  <SelectValue
+                    placeholder={hasGuardians ? "Select guardian" : "Add a guardian first"}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yes">Yes</SelectItem>
-                  <SelectItem value="no">No</SelectItem>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {guardianPickerOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

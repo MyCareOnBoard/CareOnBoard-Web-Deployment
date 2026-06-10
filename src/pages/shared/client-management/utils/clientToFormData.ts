@@ -1,6 +1,7 @@
 import { Client } from "@/lib/api/clients";
 import {
     AddClientFormData,
+    createEmptyGuardianContact,
     createEmptyServiceAuthorization,
     createInitialAddClientFormData,
     createInitialDocs,
@@ -265,6 +266,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                     : gi?.guardians) ?? [];
 
             const mapGuardianRow = (g: (typeof rawGuardians)[number]) => ({
+                id: g.id?.trim() || createEmptyGuardianContact().id,
                 name: g.name ?? "",
                 relationship: coerceGuardianRelationship(g.relationship),
                 email: g.email ?? "",
@@ -275,6 +277,8 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                 supportCoordinatorName: g.supportCoordinatorName ?? "",
                 supportCoordinatorAgency: g.supportCoordinatorAgency ?? "",
                 supportCoordinatorContact: g.supportCoordinatorContact ?? "",
+                isLegalGuardian: g.isLegalGuardian ?? undefined,
+                hasPowerOfAttorney: g.hasPowerOfAttorney ?? undefined,
             });
 
             let guardians = rawGuardians.map(mapGuardianRow);
@@ -302,6 +306,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             if (guardians.length === 0 && (hasFlatGuardian || hasFlatSc)) {
                 guardians = [
                     {
+                        ...createEmptyGuardianContact(),
                         name: client.guardianName || gi?.guardianName || "",
                         relationship: coerceGuardianRelationship(
                             client.guardianRelationship || gi?.guardianRelationship,
@@ -317,6 +322,8 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                             client.supportCoordinatorAgency || gi?.supportCoordinatorAgency || "",
                         supportCoordinatorContact:
                             client.supportCoordinatorContact || gi?.supportCoordinatorContact || "",
+                        isLegalGuardian: undefined,
+                        hasPowerOfAttorney: undefined,
                     },
                 ];
             } else if (guardians.length > 0 && hasFlatSc) {
@@ -360,8 +367,6 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                         email: c.email ?? "",
                         address: c.address ?? "",
                     })),
-                legalGuardian: (client.legalGuardian as "yes" | "no" | "") ?? "",
-                powerOfAttorney: (client.powerOfAttorney as "yes" | "no" | "") ?? "",
                 insuranceInfo:
                     client.insuranceInfo?.map((i) => ({
                         id: i.id ?? `insurance-${Math.random().toString(16).slice(2)}`,
@@ -398,6 +403,8 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                         serviceType: a.serviceType,
                         modifier: a.modifier,
                         clientPayType: a.clientPayType,
+                        staffRate: a.staffRate ?? "",
+                        payType: a.payType,
                         assignedDsps:
                             a.assignedDsps?.map((d) => ({ id: d.id, name: d.name ?? "" })) ?? [],
                     })) ?? [],

@@ -276,8 +276,6 @@ export type ClientExtractionDraft = {
     supportCoordinatorName: string;
     supportCoordinatorAgency: string;
     supportCoordinatorContact: string;
-    legalGuardian: string;
-    powerOfAttorney: string;
     insuranceInfo: ExtractionHhaInsuranceInfo[];
     hhaServiceRequest: ExtractionHhaServiceRequest;
     hhaAuthorizations: ExtractionHhaAuthorization[];

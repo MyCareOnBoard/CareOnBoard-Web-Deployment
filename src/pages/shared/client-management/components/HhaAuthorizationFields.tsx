@@ -18,11 +18,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import type { Service } from "@/lib/api/services";
 import type { HhaAuthorization } from "@/pages/shared/client-management/types/formData";
+import { RatePayTypeField } from "@/pages/shared/client-management/components/RatePayTypeField";
 import { ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
 import { payTypeToLabel } from "@/pages/shared/client-management/utils/applyHhaCatalogService";
 
 const READONLY_INPUT_CLASS =
   "h-[44px] rounded-[12px] border-[#cccccd] bg-[#fafbfc] text-[#10141a]";
+
+const CALENDAR_TO_YEAR = new Date().getFullYear() + 10;
 
 function HhaCalendarDateField({
   label,
@@ -63,7 +66,7 @@ function HhaCalendarDateField({
             defaultMonth={value ?? new Date()}
             captionLayout="dropdown"
             fromYear={2000}
-            toYear={new Date().getFullYear() + 10}
+            toYear={CALENDAR_TO_YEAR}
             formatters={{
               formatMonthDropdown: (date) => date.toLocaleString("default", { month: "long" }),
             }}
@@ -72,10 +75,8 @@ function HhaCalendarDateField({
                 "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
             }}
             onSelect={(d) => {
-              if (d) {
-                onSelectDate(d);
-                setOpen(false);
-              }
+              onSelectDate(d);
+              setOpen(false);
             }}
           />
         </PopoverContent>
@@ -215,6 +216,13 @@ export const HhaAuthorizationFields = React.memo(function HhaAuthorizationFields
               placeholder="e.g. Medicaid, UnitedHealthcare"
             />
           </div>
+          <RatePayTypeField
+            label="Staff rate"
+            rate={row.staffRate ?? ""}
+            payType={row.payType}
+            onRateChange={(v) => onChange({ staffRate: v })}
+            onPayTypeChange={(v) => onChange({ payType: v })}
+          />
         </div>
       </div>
 

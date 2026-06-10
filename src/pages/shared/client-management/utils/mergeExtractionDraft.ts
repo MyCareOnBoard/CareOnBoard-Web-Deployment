@@ -13,6 +13,7 @@ import type {
   ExtractionTeamMember,
 } from "../types/clientExtraction";
 import { isDocKeyForImport } from "../types/clientExtraction";
+import { createEmptyGuardianContact } from "../types/formData";
 import type {
   AddClientFormData,
   AdlSupportNeed,
@@ -554,6 +555,7 @@ function mergeGuardianContacts(
   if (!incoming?.length) return current;
   const mapped: GuardianContact[] = incoming
     .map((g) => ({
+      ...createEmptyGuardianContact(),
       name: mergeString("", g.name ?? "", true).trim() || undefined,
       relationship: mergeGuardianRelationship(undefined, g.relationship, true),
       email: normalizeExtractedOptionalEmail(
@@ -1015,6 +1017,7 @@ export function mergeExtractionDraft(
       if (hasRow) {
         next.stage2.guardians = [
           {
+            ...createEmptyGuardianContact(),
             name: r.guardianName?.trim() || undefined,
             relationship: r.guardianRelationship,
             email: normalizeExtractedOptionalEmail(r.guardianEmail),
@@ -1033,16 +1036,6 @@ export function mergeExtractionDraft(
       overwrite,
     );
 
-    next.stage2.legalGuardian = applyYesNo(
-      next.stage2.legalGuardian ?? "",
-      s2.legalGuardian,
-      overwrite,
-    );
-    next.stage2.powerOfAttorney = applyYesNo(
-      next.stage2.powerOfAttorney ?? "",
-      s2.powerOfAttorney,
-      overwrite,
-    );
     if (Array.isArray(s2.insuranceInfo) && (s2.insuranceInfo.length || overwrite)) {
       next.stage2.insuranceInfo = s2.insuranceInfo.map((row: ExtractionHhaInsuranceInfo, idx: number) => ({
         id: `insurance-${idx}`,

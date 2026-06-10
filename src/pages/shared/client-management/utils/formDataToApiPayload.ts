@@ -32,6 +32,8 @@ function isMeaningfulHhaAuthorizationRow(row: HhaAuthorization): boolean {
       row.payerSource?.trim() ||
       row.rate?.trim() ||
       row.unitType?.trim() ||
+      row.staffRate?.trim() ||
+      row.payType ||
       (row.assignedDsps?.length ?? 0) > 0,
   );
 }
@@ -173,6 +175,7 @@ export function formDataToApiPayload(
     guardians:
       s2.guardians && s2.guardians.length > 0
         ? s2.guardians.map((g) => ({
+            id: g.id?.trim() || undefined,
             name: g.name?.trim() || undefined,
             relationship: g.relationship || undefined,
             email: sanitizeOptionalEmail(g.email),
@@ -183,6 +186,8 @@ export function formDataToApiPayload(
             supportCoordinatorName: g.supportCoordinatorName?.trim() || undefined,
             supportCoordinatorAgency: g.supportCoordinatorAgency?.trim() || undefined,
             supportCoordinatorContact: g.supportCoordinatorContact?.trim() || undefined,
+            isLegalGuardian: g.isLegalGuardian || undefined,
+            hasPowerOfAttorney: g.hasPowerOfAttorney || undefined,
           }))
         : undefined,
     careTeam:
@@ -210,8 +215,6 @@ export function formDataToApiPayload(
     supportCoordinatorContact:
       (s2.guardians?.[0]?.supportCoordinatorContact?.trim() || s2.supportCoordinatorContact) || undefined,
     outcomes: outcomesPayload,
-    legalGuardian: isHhaClient ? s2.legalGuardian || undefined : undefined,
-    powerOfAttorney: isHhaClient ? s2.powerOfAttorney || undefined : undefined,
     insuranceInfo: (() => {
       if (!isHhaClient || !s2.insuranceInfo?.length) return undefined;
       const rows = s2.insuranceInfo
@@ -256,6 +259,8 @@ export function formDataToApiPayload(
           serviceType: a.serviceType?.trim() || undefined,
           modifier: a.modifier?.trim() || undefined,
           clientPayType: a.clientPayType || undefined,
+          staffRate: a.staffRate?.trim() || undefined,
+          payType: a.payType || undefined,
           assignedDsps:
             a.assignedDsps && a.assignedDsps.length > 0
               ? a.assignedDsps.map((d) => ({ id: d.id, name: d.name }))
