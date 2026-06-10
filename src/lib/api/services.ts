@@ -8,9 +8,13 @@ import { customBaseQuery } from "@/lib/baseQuery";
  */
 export interface Service {
   id: string;
+  program?: "ddd" | "hha";
   type: string;
   name: string;
   code: string;
+  unitType?: string | null;
+  defaultRate?: string | null;
+  modifier?: string | null;
   createdAt?: string | Date;
   updatedAt?: string | Date;
 }
@@ -19,6 +23,7 @@ export interface Service {
  * List services query parameters
  */
 export interface ListServicesParams {
+  program?: "ddd" | "hha";
   type?: string;
   search?: string;
   limit?: number;
@@ -45,18 +50,26 @@ export interface ListServicesResponse {
  */
 export interface CreateServiceRequest {
   id?: string;
+  program?: "ddd" | "hha";
   type: string;
   name: string;
   code: string;
+  unitType?: string;
+  defaultRate?: string;
+  modifier?: string;
 }
 
 /**
  * Update service request
  */
 export interface UpdateServiceRequest {
+  program?: "ddd" | "hha";
   type?: string;
   name?: string;
   code?: string;
+  unitType?: string;
+  defaultRate?: string;
+  modifier?: string;
 }
 
 /**
@@ -71,6 +84,7 @@ export async function listServices(
     {
       params: {
         type: params?.type,
+        program: params?.program,
         search: params?.search,
         limit: params?.limit,
         offset: params?.offset,
@@ -122,6 +136,7 @@ export async function deleteService(id: string): Promise<void> {
 function buildListServicesQuery(params?: ListServicesParams): string {
   if (!params || Object.keys(params).length === 0) return "";
   const searchParams = new URLSearchParams();
+  if (params.program) searchParams.set("program", params.program);
   if (params.type) searchParams.set("type", params.type);
   if (params.search) searchParams.set("search", params.search);
   if (params.limit != null) searchParams.set("limit", String(params.limit));

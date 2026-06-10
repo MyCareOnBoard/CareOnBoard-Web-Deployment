@@ -1,10 +1,40 @@
-import { AddClientFormData } from "../types/formData";
+import {
+  AddClientFormData,
+  type HhaAuthorization,
+  type HhaInsuranceInfo,
+} from "../types/formData";
 import { CreateClientRequest } from "@/lib/api/clients";
 import {
   wizardOutcomesToApiOutcomes,
 } from "./outcomeServices";
 
 const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
+
+function isMeaningfulHhaInsuranceRow(row: HhaInsuranceInfo): boolean {
+  return Boolean(
+    row.company?.trim() ||
+      row.memberId?.trim() ||
+      row.groupNumber?.trim() ||
+      row.effectiveDate ||
+      row.authorizationRequired,
+  );
+}
+
+function isMeaningfulHhaAuthorizationRow(row: HhaAuthorization): boolean {
+  return Boolean(
+    row.authorizationNumber?.trim() ||
+      row.serviceId?.trim() ||
+      row.serviceName?.trim() ||
+      row.serviceCode?.trim() ||
+      row.approvedHours?.trim() ||
+      row.startDate ||
+      row.endDate ||
+      row.payerSource?.trim() ||
+      row.rate?.trim() ||
+      row.unitType?.trim() ||
+      (row.assignedDsps?.length ?? 0) > 0,
+  );
+}
 
 function sanitizeOptionalEmail(raw: string | undefined): string | undefined {
   const s = raw?.trim() ?? "";
@@ -25,15 +55,28 @@ export function formDataToApiPayload(
   const s5 = formData.stage5;
   const s6 = formData.stage6;
   const s7 = formData.stage7;
+  const isHhaClient = formData.type === "hha";
 
   const primaryLocation = s1.location;
   if (!progressive && (!primaryLocation || !primaryLocation.lat || !primaryLocation.lon)) {
     throw new Error("Please select an address from the suggestions so we can capture coordinates.");
   }
 
-  const outcomesPayload = wizardOutcomesToApiOutcomes(s2.outcomes ?? []);
+  const outcomesPayload = isHhaClient ? [] : wizardOutcomesToApiOutcomes(s2.outcomes ?? []);
+  const hasDddIspMetadata =
+    !isHhaClient &&
+    Boolean(
+      (s1.planId && s1.planId.trim()) ||
+        (s1.planType && s1.planType.trim()) ||
+        s1.planPrintDate ||
+        (s1.program && s1.program.trim()) ||
+        s1.waiverEnrollmentDate ||
+        (s1.dddStatus && s1.dddStatus.trim()) ||
+        (s1.medicaidType && s1.medicaidType.trim()) ||
+        (s1.insuranceDetails && s1.insuranceDetails.length > 0),
+    );
 
-  if (!progressive) {
+  if (!progressive && !isHhaClient) {
     const flatForValidation = s2.outcomes?.flatMap((o) => o.services) ?? [];
     const hasInvalidService = flatForValidation.some((svc) => !svc.name || !svc.code);
     if (hasInvalidService) {
@@ -45,6 +88,7 @@ export function formDataToApiPayload(
 
   const payload: CreateClientRequest = {
     ...(includeAgencyId && formData.agencyId ? { agencyId: formData.agencyId } : {}),
+    type: formData.type || "ddd",
     firstName: s1.firstName || undefined,
     lastName: s1.lastName || undefined,
     middleName: s1.middleName || undefined,
@@ -80,17 +124,32 @@ export function formDataToApiPayload(
     communicationMethod: s1.communicationMethod || undefined,
     medicaidId: s1.medicaidId || undefined,
     dddId: s1.dddId || undefined,
+    preferredName: s1.preferredName?.trim() || undefined,
+    maritalStatus: s1.maritalStatus?.trim() || undefined,
+    medicareId: s1.medicareId?.trim() || undefined,
+    homeInfo:
+      isHhaClient && s1.homeInfo
+        ? {
+            apartmentNumber: s1.homeInfo.apartmentNumber?.trim() || undefined,
+            county: s1.homeInfo.county?.trim() || undefined,
+            accessInstructions: s1.homeInfo.accessInstructions?.trim() || undefined,
+            homeType: s1.homeInfo.homeType?.trim() || undefined,
+          }
+        : undefined,
+    referralInfo:
+      isHhaClient && s1.referralInfo
+        ? {
+            source: s1.referralInfo.source?.trim() || undefined,
+            date: toIso(s1.referralInfo.date),
+            organization: s1.referralInfo.organization?.trim() || undefined,
+            contactPerson: s1.referralInfo.contactPerson?.trim() || undefined,
+            contactNumber: s1.referralInfo.contactNumber?.trim() || undefined,
+          }
+        : undefined,
     ssn: s1.ssn || undefined,
-    tier: s1.tier || undefined,
+    tier: isHhaClient ? undefined : s1.tier || undefined,
     ispMetadata:
-      (s1.planId && s1.planId.trim()) ||
-      (s1.planType && s1.planType.trim()) ||
-      s1.planPrintDate ||
-      (s1.program && s1.program.trim()) ||
-      s1.waiverEnrollmentDate ||
-      (s1.dddStatus && s1.dddStatus.trim()) ||
-      (s1.medicaidType && s1.medicaidType.trim()) ||
-      (s1.insuranceDetails && s1.insuranceDetails.length > 0)
+      hasDddIspMetadata
         ? {
             planId: s1.planId?.trim() || undefined,
             planType: s1.planType?.trim() || undefined,
@@ -151,6 +210,59 @@ export function formDataToApiPayload(
     supportCoordinatorContact:
       (s2.guardians?.[0]?.supportCoordinatorContact?.trim() || s2.supportCoordinatorContact) || undefined,
     outcomes: outcomesPayload,
+    legalGuardian: isHhaClient ? s2.legalGuardian || undefined : undefined,
+    powerOfAttorney: isHhaClient ? s2.powerOfAttorney || undefined : undefined,
+    insuranceInfo: (() => {
+      if (!isHhaClient || !s2.insuranceInfo?.length) return undefined;
+      const rows = s2.insuranceInfo
+        .filter(isMeaningfulHhaInsuranceRow)
+        .map((i) => ({
+          id: i.id,
+          type: i.type,
+          company: i.company?.trim() || undefined,
+          memberId: i.memberId?.trim() || undefined,
+          groupNumber: i.groupNumber?.trim() || undefined,
+          effectiveDate: toIso(i.effectiveDate),
+          authorizationRequired: i.authorizationRequired || undefined,
+        }));
+      return rows.length > 0 ? rows : undefined;
+    })(),
+    hhaServiceRequest:
+      isHhaClient && s2.hhaServiceRequest
+        ? {
+            requestedServices: s2.hhaServiceRequest.requestedServices?.filter(Boolean),
+            daysNeeded: s2.hhaServiceRequest.daysNeeded?.filter(Boolean),
+            startDate: toIso(s2.hhaServiceRequest.startDate),
+            preferredTime: s2.hhaServiceRequest.preferredTime?.trim() || undefined,
+            hoursRequested: s2.hhaServiceRequest.hoursRequested?.trim() || undefined,
+          }
+        : undefined,
+    hhaAuthorizations: (() => {
+      if (!isHhaClient || !s2.hhaAuthorizations?.length) return undefined;
+      const rows = s2.hhaAuthorizations
+        .filter(isMeaningfulHhaAuthorizationRow)
+        .map((a) => ({
+          id: a.id,
+          authorizationNumber: a.authorizationNumber?.trim() || undefined,
+          serviceId: a.serviceId?.trim() || undefined,
+          serviceName: a.serviceName?.trim() || undefined,
+          serviceCode: a.serviceCode?.trim() || undefined,
+          approvedHours: a.approvedHours?.trim() || undefined,
+          startDate: toIso(a.startDate),
+          endDate: toIso(a.endDate),
+          payerSource: a.payerSource?.trim() || undefined,
+          rate: a.rate?.trim() || undefined,
+          unitType: a.unitType?.trim() || undefined,
+          serviceType: a.serviceType?.trim() || undefined,
+          modifier: a.modifier?.trim() || undefined,
+          clientPayType: a.clientPayType || undefined,
+          assignedDsps:
+            a.assignedDsps && a.assignedDsps.length > 0
+              ? a.assignedDsps.map((d) => ({ id: d.id, name: d.name }))
+              : undefined,
+        }));
+      return rows.length > 0 ? rows : undefined;
+    })(),
     medicalConditions: s3.medicalConditions?.length ? s3.medicalConditions : undefined,
     allergies: s3.allergies?.length ? s3.allergies : undefined,
     dietaryRestrictions: s3.dietaryRestrictions?.length ? s3.dietaryRestrictions : undefined,
@@ -170,6 +282,18 @@ export function formDataToApiPayload(
             notes: a.notes?.trim() || undefined,
           }))
         : undefined,
+    physicianInfo:
+      isHhaClient && s3.physicianInfo
+        ? {
+            name: s3.physicianInfo.name?.trim() || undefined,
+            npi: s3.physicianInfo.npi?.trim() || undefined,
+            phone: s3.physicianInfo.phone?.trim() || undefined,
+            fax: s3.physicianInfo.fax?.trim() || undefined,
+            address: s3.physicianInfo.address?.trim() || undefined,
+          }
+        : undefined,
+    fallRisk: isHhaClient ? s3.fallRisk || undefined : undefined,
+    specialPrecautions: isHhaClient ? s3.specialPrecautions?.trim() || undefined : undefined,
     documents:
       s3.docs?.map((d) => ({
         key: d.key,
@@ -186,12 +310,26 @@ export function formDataToApiPayload(
     maxShiftLength: s4.maxShiftLength || undefined,
     backToBackAllowed: s4.backToBackAllowed,
     travelTimeAllowed: s4.travelTimeAllowed,
+    telephonyPhone: isHhaClient ? s4.telephonyPhone?.trim() || undefined : undefined,
     genderPreference: s5.genderPreference || undefined,
     requiredCertifications: s5.requiredCertifications || undefined,
     specialConditions: s5.specialConditions || undefined,
     prefersFamiliar: s5.prefersFamiliar,
     noMaleFemaleStaff: s5.noMaleFemaleStaff,
     medicalRestrictionsTrained: s5.medicalRestrictionsTrained,
+    caregiverPreferences:
+      isHhaClient && s5.hhaCaregiverPreferences
+        ? {
+            languagePreference: s5.hhaCaregiverPreferences.languagePreference?.trim() || undefined,
+            smokingAllowed: s5.hhaCaregiverPreferences.smokingAllowed || undefined,
+            petInHome: s5.hhaCaregiverPreferences.petInHome || undefined,
+            liftAssistanceRequired:
+              s5.hhaCaregiverPreferences.liftAssistanceRequired || undefined,
+            vehicleRequired: s5.hhaCaregiverPreferences.vehicleRequired || undefined,
+            specialSkillsNeeded:
+              s5.hhaCaregiverPreferences.specialSkillsNeeded?.trim() || undefined,
+          }
+        : undefined,
     autoChecks: s5.autoChecks,
     clientGoals: s6.clientGoals || undefined,
     communityGoals: s6.communityGoals || undefined,

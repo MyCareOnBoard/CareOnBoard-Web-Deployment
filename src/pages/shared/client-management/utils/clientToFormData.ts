@@ -41,6 +41,7 @@ function coerceEmergencyRelationship(
 
 export function clientToFormData(client: Client, includeAgencyId: boolean = false): AddClientFormData {
     const initial = createInitialAddClientFormData();
+    const clientType = client.type === "hha" ? "hha" : "ddd";
 
     const parseDate = (dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): Date | undefined => {
         if (!dateValue) return undefined;
@@ -133,6 +134,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
 
     return {
         ...initial,
+        type: clientType,
         ...(includeAgencyId && client.agencyId ? { agencyId: String(client.agencyId) } : {}),
         stage1: {
             firstName: client.firstName || "",
@@ -144,6 +146,22 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             dddId: client.dddId || "",
             ssn: client.ssn || "",
             tier: client.tier,
+            preferredName: client.preferredName || "",
+            maritalStatus: client.maritalStatus || "",
+            medicareId: client.medicareId || "",
+            homeInfo: {
+                apartmentNumber: client.homeInfo?.apartmentNumber ?? "",
+                county: client.homeInfo?.county ?? "",
+                accessInstructions: client.homeInfo?.accessInstructions ?? "",
+                homeType: client.homeInfo?.homeType ?? "",
+            },
+            referralInfo: {
+                source: client.referralInfo?.source ?? "",
+                date: parseDate(client.referralInfo?.date),
+                organization: client.referralInfo?.organization ?? "",
+                contactPerson: client.referralInfo?.contactPerson ?? "",
+                contactNumber: client.referralInfo?.contactNumber ?? "",
+            },
             address: client.primaryAddress?.address || client.address || "",
             location: client.primaryAddress?.location || client.location,
             countyState: client.primaryAddress?.countyState || client.countyState || "",
@@ -342,6 +360,47 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                         email: c.email ?? "",
                         address: c.address ?? "",
                     })),
+                legalGuardian: (client.legalGuardian as "yes" | "no" | "") ?? "",
+                powerOfAttorney: (client.powerOfAttorney as "yes" | "no" | "") ?? "",
+                insuranceInfo:
+                    client.insuranceInfo?.map((i) => ({
+                        id: i.id ?? `insurance-${Math.random().toString(16).slice(2)}`,
+                        type: i.type ?? "primary",
+                        company: i.company ?? "",
+                        memberId: i.memberId ?? "",
+                        groupNumber: i.groupNumber ?? "",
+                        effectiveDate: parseDate(i.effectiveDate),
+                        authorizationRequired:
+                            i.authorizationRequired === "yes" || i.authorizationRequired === "no"
+                                ? i.authorizationRequired
+                                : "",
+                    })) ?? [],
+                hhaServiceRequest: {
+                    requestedServices: client.hhaServiceRequest?.requestedServices ?? [],
+                    daysNeeded: client.hhaServiceRequest?.daysNeeded ?? [],
+                    startDate: parseDate(client.hhaServiceRequest?.startDate),
+                    preferredTime: client.hhaServiceRequest?.preferredTime ?? "",
+                    hoursRequested: client.hhaServiceRequest?.hoursRequested ?? "",
+                },
+                hhaAuthorizations:
+                    client.hhaAuthorizations?.map((a) => ({
+                        id: a.id ?? `hha-auth-${Math.random().toString(16).slice(2)}`,
+                        authorizationNumber: a.authorizationNumber ?? "",
+                        serviceId: a.serviceId,
+                        serviceName: a.serviceName ?? "",
+                        serviceCode: a.serviceCode ?? "",
+                        approvedHours: a.approvedHours ?? "",
+                        startDate: parseDate(a.startDate),
+                        endDate: parseDate(a.endDate),
+                        payerSource: a.payerSource ?? "",
+                        rate: a.rate ?? "",
+                        unitType: a.unitType ?? "",
+                        serviceType: a.serviceType,
+                        modifier: a.modifier,
+                        clientPayType: a.clientPayType,
+                        assignedDsps:
+                            a.assignedDsps?.map((d) => ({ id: d.id, name: d.name ?? "" })) ?? [],
+                    })) ?? [],
             };
         })(),
         stage3: {
@@ -381,8 +440,17 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                     client.healthcareSafety?.selfCareNeeds ?? (client as any).selfCareNeeds;
                 return Array.isArray(v) ? v : [];
             })(),
+            physicianInfo: {
+                name: client.physicianInfo?.name ?? "",
+                npi: client.physicianInfo?.npi ?? "",
+                phone: client.physicianInfo?.phone ?? "",
+                fax: client.physicianInfo?.fax ?? "",
+                address: client.physicianInfo?.address ?? "",
+            },
+            fallRisk: normalizeYesNo(client.fallRisk),
+            specialPrecautions: client.specialPrecautions ?? "",
             docs: (() => {
-                const allDocs = createInitialDocs();
+                const allDocs = createInitialDocs(clientType);
                 const existingDocs = client.documents || [];
 
                 return allDocs.map((defaultDoc) => {
@@ -409,6 +477,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             maxShiftLength: client.evvVisitConfig?.maxShiftLength ?? (client as any).maxShiftLength ?? "",
             backToBackAllowed: normalizeYesNo(client.evvVisitConfig?.backToBackAllowed ?? (client as any).backToBackAllowed),
             travelTimeAllowed: normalizeYesNo(client.evvVisitConfig?.travelTimeAllowed ?? (client as any).travelTimeAllowed),
+            telephonyPhone: client.evvVisitConfig?.telephonyPhone ?? client.telephonyPhone ?? "",
         },
         stage5: {
             genderPreference: (client as any).genderPreference ?? undefined,
@@ -427,6 +496,14 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                 training: false,
                 background: false,
                 expired: false,
+            },
+            hhaCaregiverPreferences: {
+                languagePreference: client.caregiverPreferences?.languagePreference ?? "",
+                smokingAllowed: normalizeYesNo(client.caregiverPreferences?.smokingAllowed),
+                petInHome: normalizeYesNo(client.caregiverPreferences?.petInHome),
+                liftAssistanceRequired: normalizeYesNo(client.caregiverPreferences?.liftAssistanceRequired),
+                vehicleRequired: normalizeYesNo(client.caregiverPreferences?.vehicleRequired),
+                specialSkillsNeeded: client.caregiverPreferences?.specialSkillsNeeded ?? "",
             },
         },
         stage6: {

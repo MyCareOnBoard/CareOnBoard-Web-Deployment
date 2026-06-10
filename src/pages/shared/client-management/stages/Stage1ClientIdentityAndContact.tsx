@@ -40,6 +40,7 @@ export function Stage1ClientIdentityAndContact({
   clientId,
   isEditMode = false,
   headerRightAction,
+  onChangeClientType,
 }: {
   showAgencySelection?: boolean;
   agencies?: Agency[];
@@ -53,10 +54,28 @@ export function Stage1ClientIdentityAndContact({
   clientId?: string;
   isEditMode?: boolean;
   headerRightAction?: React.ReactNode;
+  onChangeClientType?: () => void;
 }) {
   const stage1 = formData.stage1;
+  const isHhaClient = formData.type === "hha";
   const updateStage1 = (patch: Partial<AddClientFormData["stage1"]>) =>
     setFormData((prev) => ({ ...prev, stage1: { ...prev.stage1, ...patch } }));
+  const updateHomeInfo = (patch: Partial<NonNullable<AddClientFormData["stage1"]["homeInfo"]>>) =>
+    setFormData((prev) => ({
+      ...prev,
+      stage1: {
+        ...prev.stage1,
+        homeInfo: { ...(prev.stage1.homeInfo ?? {}), ...patch },
+      },
+    }));
+  const updateReferralInfo = (patch: Partial<NonNullable<AddClientFormData["stage1"]["referralInfo"]>>) =>
+    setFormData((prev) => ({
+      ...prev,
+      stage1: {
+        ...prev.stage1,
+        referralInfo: { ...(prev.stage1.referralInfo ?? {}), ...patch },
+      },
+    }));
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -87,6 +106,7 @@ export function Stage1ClientIdentityAndContact({
   const [isDobOpen, setIsDobOpen] = useState(false);
   const [isWaiverEnrollmentOpen, setIsWaiverEnrollmentOpen] = useState(false);
   const [isPlanPrintOpen, setIsPlanPrintOpen] = useState(false);
+  const [isReferralDateOpen, setIsReferralDateOpen] = useState(false);
 
   const addressInputRef = useRef<HTMLDivElement>(null);
   const secondaryAddressInputRef = useRef<HTMLDivElement>(null);
@@ -306,13 +326,24 @@ const maskSSN = (value: string) => {
       )}
 
       <div className="mb-10">
-        <div className="mb-2">
-          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-            1. Client Identity Information
-          </p>
-          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            These fields uniquely identify the agency in the system.
-          </p>
+        <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+              1. Client Identity Information
+            </p>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              These fields uniquely identify the client in the system.
+            </p>
+          </div>
+          {onChangeClientType ? (
+            <button
+              type="button"
+              onClick={onChangeClientType}
+              className="shrink-0 cursor-pointer text-[13px] font-semibold text-[#007f83] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2"
+            >
+              Change type
+            </button>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
@@ -345,6 +376,39 @@ const maskSSN = (value: string) => {
               placeholder="Enter middle name"
             />
           </div>
+
+          {isHhaClient ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Preferred name</label>
+                <Input
+                  value={stage1.preferredName ?? ""}
+                  onChange={(e) => updateStage1({ preferredName: e.target.value })}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Name the client prefers"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Marital status</label>
+                <Select
+                  value={stage1.maritalStatus || undefined}
+                  onValueChange={(v) => updateStage1({ maritalStatus: v })}
+                >
+                  <SelectTrigger className={SELECT_TRIGGER_CN}>
+                    <SelectValue placeholder="Select marital status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single">Single</SelectItem>
+                    <SelectItem value="married">Married</SelectItem>
+                    <SelectItem value="widowed">Widowed</SelectItem>
+                    <SelectItem value="divorced">Divorced</SelectItem>
+                    <SelectItem value="separated">Separated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : null}
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Gender</label>
@@ -416,15 +480,27 @@ const maskSSN = (value: string) => {
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Client DDD ID</label>
-            <Input
-              value={stage1.dddId}
-              onChange={(e) => updateStage1({ dddId: e.target.value })}
-              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-              placeholder="Enter DDD ID"
-            />
-          </div>
+          {!isHhaClient ? (
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Client DDD ID</label>
+              <Input
+                value={stage1.dddId}
+                onChange={(e) => updateStage1({ dddId: e.target.value })}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="Enter DDD ID"
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Medicare ID</label>
+              <Input
+                value={stage1.medicareId ?? ""}
+                onChange={(e) => updateStage1({ medicareId: e.target.value })}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="Enter Medicare ID"
+              />
+            </div>
+          )}
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Social Security Card number</label>
@@ -479,24 +555,26 @@ const maskSSN = (value: string) => {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Tier</label>
-            <Select
-              value={stage1.tier}
-              onValueChange={(v) => updateStage1({ tier: v })}
-            >
-              <SelectTrigger className={SELECT_TRIGGER_CN}>
-                <SelectValue placeholder="Select tier" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="A">Tier A</SelectItem>
-                <SelectItem value="B">Tier B</SelectItem>
-                <SelectItem value="C">Tier C</SelectItem>
-                <SelectItem value="D">Tier D</SelectItem>
-                <SelectItem value="E">Tier E</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {!isHhaClient ? (
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Tier</label>
+              <Select
+                value={stage1.tier}
+                onValueChange={(v) => updateStage1({ tier: v })}
+              >
+                <SelectTrigger className={SELECT_TRIGGER_CN}>
+                  <SelectValue placeholder="Select tier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">Tier A</SelectItem>
+                  <SelectItem value="B">Tier B</SelectItem>
+                  <SelectItem value="C">Tier C</SelectItem>
+                  <SelectItem value="D">Tier D</SelectItem>
+                  <SelectItem value="E">Tier E</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -575,6 +653,56 @@ const maskSSN = (value: string) => {
               placeholder="Enter Zip Code"
             />
           </div>
+
+          {isHhaClient ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Apartment number</label>
+                <Input
+                  value={stage1.homeInfo?.apartmentNumber ?? ""}
+                  onChange={(e) => updateHomeInfo({ apartmentNumber: e.target.value })}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Apartment, unit, or suite"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">County</label>
+                <Input
+                  value={stage1.homeInfo?.county ?? ""}
+                  onChange={(e) => updateHomeInfo({ county: e.target.value })}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="County"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Home type</label>
+                <Select
+                  value={stage1.homeInfo?.homeType || undefined}
+                  onValueChange={(v) => updateHomeInfo({ homeType: v })}
+                >
+                  <SelectTrigger className={SELECT_TRIGGER_CN}>
+                    <SelectValue placeholder="Select home type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single-family">Single-family home</SelectItem>
+                    <SelectItem value="apartment">Apartment</SelectItem>
+                    <SelectItem value="assisted-living">Assisted living</SelectItem>
+                    <SelectItem value="facility">Facility</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1 lg:col-span-2 xl:col-span-4">
+                <label className="text-[12px] font-normal text-[#10141a]">Access instructions</label>
+                <Input
+                  value={stage1.homeInfo?.accessInstructions ?? ""}
+                  onChange={(e) => updateHomeInfo({ accessInstructions: e.target.value })}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Gate code, entry notes, parking, pets, or other arrival instructions"
+                />
+              </div>
+            </>
+          ) : null}
         </div>
 
         <div className="mt-6 mb-6">
@@ -705,6 +833,8 @@ const maskSSN = (value: string) => {
         </div>
       </div>
 
+      {!isHhaClient ? (
+      <>
       <div className="mb-10">
         <div className="mb-2">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
@@ -942,6 +1072,93 @@ const maskSSN = (value: string) => {
           </Button>
         </div>
       </div>
+      </>
+      ) : (
+      <div className="mb-10">
+        <div className="mb-2">
+          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+            2.1 Referral information
+          </p>
+          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+            Capture where the HHA intake request came from and who to contact if details are missing.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Referral source</label>
+            <Input
+              value={stage1.referralInfo?.source ?? ""}
+              onChange={(e) => updateReferralInfo({ source: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Hospital, MCO, family, physician, or other source"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Referral date</label>
+            <Popover open={isReferralDateOpen} onOpenChange={setIsReferralDateOpen}>
+              <PopoverTrigger asChild>
+                <button type="button" className="w-full focus:outline-none">
+                  <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
+                    <InputGroupInput
+                      value={stage1.referralInfo?.date ? format(stage1.referralInfo.date, "MMM d, yyyy") : ""}
+                      placeholder="Select date"
+                      readOnly
+                      className="text-[#10141a]"
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <CalendarDays className="h-5 w-5 text-[#10141a]" />
+                    </InputGroupAddon>
+                  </InputGroup>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                <Calendar
+                  mode="single"
+                  selected={stage1.referralInfo?.date}
+                  defaultMonth={stage1.referralInfo?.date ?? new Date()}
+                  captionLayout="dropdown"
+                  fromYear={2000}
+                  toYear={new Date().getFullYear() + 5}
+                  onSelect={(d) => {
+                    if (d) {
+                      updateReferralInfo({ date: d });
+                      setIsReferralDateOpen(false);
+                    }
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Referring organization</label>
+            <Input
+              value={stage1.referralInfo?.organization ?? ""}
+              onChange={(e) => updateReferralInfo({ organization: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Organization name"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Contact person</label>
+            <Input
+              value={stage1.referralInfo?.contactPerson ?? ""}
+              onChange={(e) => updateReferralInfo({ contactPerson: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Referral contact"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Contact number</label>
+            <Input
+              value={stage1.referralInfo?.contactNumber ?? ""}
+              onChange={(e) => updateReferralInfo({ contactNumber: e.target.value })}
+              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+              placeholder="Phone number"
+            />
+          </div>
+        </div>
+      </div>
+      )}
 
       {footer}
     </div>

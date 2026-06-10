@@ -9,6 +9,14 @@ const docKeyToType: Record<string, string> = {
   bsp: "bsp",
   medicalDocs: "medical-documents",
   consents: "consent-and-releases",
+  physicianOrders: "physician-orders",
+  insuranceCards: "insurance-cards",
+  medicaidCard: "medicaid-card",
+  medicareCard: "medicare-card",
+  idCard: "id-card",
+  guardianshipDocs: "guardianship-documents",
+  assessmentForms: "assessment-forms",
+  hospitalDischarge: "hospital-discharge-papers",
 };
 
 export async function handleDocumentUploads(

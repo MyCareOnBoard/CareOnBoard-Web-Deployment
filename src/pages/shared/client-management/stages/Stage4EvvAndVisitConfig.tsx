@@ -83,6 +83,7 @@ export function Stage4EvvAndVisitConfig({
     : MAX_SHIFT_LENGTH_OPTIONS_ALL.filter((o) => o !== CUSTOM_OPTION);
 
   const stage4 = formData.stage4;
+  const isHhaClient = formData.type === "hha";
   const updateStage4 = (patch: Partial<AddClientFormData["stage4"]>) =>
     setFormData((prev) => ({ ...prev, stage4: { ...prev.stage4, ...patch } }));
 
@@ -115,6 +116,19 @@ export function Stage4EvvAndVisitConfig({
             value={stage4.primaryVisitLocationGps}
             onChange={(v) => updateStage4({ primaryVisitLocationGps: v })}
           />
+          {isHhaClient ? (
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">
+                Phone number for telephony EVV
+              </label>
+              <Input
+                value={stage4.telephonyPhone ?? ""}
+                onChange={(e) => updateStage4({ telephonyPhone: e.target.value })}
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="Enter telephony EVV phone number"
+              />
+            </div>
+          ) : null}
           <YesNoRadio
             label="Allowed Secondary Locations (for Community Inclusion/Transportation)"
             value={stage4.allowedSecondaryLocations}

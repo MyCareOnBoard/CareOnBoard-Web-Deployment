@@ -411,4 +411,33 @@ describe("mergeExtractionDraft", () => {
     expect(formData.stage6.employmentStatus).toBe("Not employed");
     expect(formData.stage7.teamMembers?.[0].name).toBe("Jamie Helper");
   });
+
+  it("normalizes uppercase HHA yes/no fields from extraction", () => {
+    const initial = createInitialAddClientFormData();
+    initial.type = "hha";
+    const extraction = makeExtraction({
+      draft: {
+        type: "hha",
+        stage2: {
+          legalGuardian: "Yes",
+          powerOfAttorney: "NO",
+          insuranceInfo: [
+            {
+              type: "primary",
+              company: "UHC",
+              authorizationRequired: "Yes",
+            },
+          ],
+        },
+        stage3: {
+          fallRisk: "YES",
+        },
+      },
+    });
+    const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: true });
+    expect(formData.stage2.legalGuardian).toBe("yes");
+    expect(formData.stage2.powerOfAttorney).toBe("no");
+    expect(formData.stage2.insuranceInfo?.[0].authorizationRequired).toBe("yes");
+    expect(formData.stage3.fallRisk).toBe("yes");
+  });
 });

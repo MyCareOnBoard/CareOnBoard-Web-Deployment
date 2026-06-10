@@ -405,7 +405,10 @@ function buildAssignedDspsSection(client: Client): ProfileSection {
       title: "Assigned DSPs",
       subtitle: "Direct support professionals assigned to this client",
       fields: [],
-      emptyMessage: "No staff assigned yet. Assign staff on the Services tab.",
+      emptyMessage:
+        client.type === "hha"
+          ? "No caregivers assigned yet. Assign caregivers on each service authorization in the client wizard."
+          : "No staff assigned yet. Assign staff on the Services tab.",
     };
   }
 
@@ -470,19 +473,111 @@ function buildGuardianSection(client: Client): ProfileSection | null {
   };
 }
 
+function buildHhaOverviewSections(client: Client, formatDate: FormatClientDateFn): ProfileSection[] {
+  const referralFields: ProfileField[] = [
+    fieldIfPresent("Referral source", client.referralInfo?.source, "clipboard"),
+    client.referralInfo?.date
+      ? field("Referral date", formatDate(client.referralInfo.date), { icon: "calendar" })
+      : null,
+    fieldIfPresent("Referring organization", client.referralInfo?.organization, "layers"),
+    fieldIfPresent("Contact person", client.referralInfo?.contactPerson, "user"),
+    fieldIfPresent("Contact number", client.referralInfo?.contactNumber, "phone"),
+  ].filter((f): f is ProfileField => f !== null);
+
+  const insuranceFields =
+    client.insuranceInfo?.flatMap((row, index) => [
+      field(`Insurance ${index + 1}`, row.company || "Not specified", { icon: "shield" }),
+      fieldIfPresent("Member ID", row.memberId, "idCard"),
+      fieldIfPresent("Group number", row.groupNumber, "idCard"),
+      row.effectiveDate
+        ? field("Effective date", formatDate(row.effectiveDate), { icon: "calendar" })
+        : null,
+      row.authorizationRequired
+        ? field("Authorization required", row.authorizationRequired === "yes" ? "Yes" : "No", {
+            icon: "clipboard",
+          })
+        : null,
+    ]) ?? [];
+
+  const physicianFields: ProfileField[] = [
+    fieldIfPresent("Physician", client.physicianInfo?.name, "user"),
+    fieldIfPresent("NPI", client.physicianInfo?.npi, "idCard"),
+    fieldIfPresent("Phone", client.physicianInfo?.phone, "phone"),
+    fieldIfPresent("Fax", client.physicianInfo?.fax, "phone"),
+    fieldIfPresent("Address", client.physicianInfo?.address, "mapPin"),
+  ].filter((f): f is ProfileField => f !== null);
+
+  const authorizationFields =
+    client.hhaAuthorizations?.flatMap((auth, index) => [
+      field(`Authorization ${index + 1}`, auth.authorizationNumber || "Not specified", {
+        icon: "clipboard",
+      }),
+      fieldIfPresent("Service", auth.serviceName || auth.serviceCode, "layers"),
+      fieldIfPresent("Approved hours", auth.approvedHours, "calendar"),
+      fieldIfPresent("Payer source", auth.payerSource, "shield"),
+    ]) ?? [];
+
+  const preference = client.caregiverPreferences;
+  const preferenceFields: ProfileField[] = [
+    fieldIfPresent("Caregiver language", preference?.languagePreference, "globe"),
+    preference?.smokingAllowed
+      ? field("Smoking allowed", preference.smokingAllowed === "yes" ? "Yes" : "No", { icon: "shield" })
+      : null,
+    preference?.petInHome
+      ? field("Pet in home", preference.petInHome === "yes" ? "Yes" : "No", { icon: "heart" })
+      : null,
+    preference?.liftAssistanceRequired
+      ? field("Lift assistance", preference.liftAssistanceRequired === "yes" ? "Required" : "Not required", { icon: "heart" })
+      : null,
+    preference?.vehicleRequired
+      ? field("Vehicle required", preference.vehicleRequired === "yes" ? "Yes" : "No", { icon: "mapPin" })
+      : null,
+    fieldIfPresent("Special skills", preference?.specialSkillsNeeded, "clipboard"),
+  ].filter((f): f is ProfileField => f !== null);
+
+  const sections: Array<ProfileSection | null> = [
+    referralFields.length
+      ? { id: "hha-referral", title: "Referral", subtitle: "HHA intake source", fields: referralFields }
+      : null,
+    insuranceFields.length
+      ? { id: "hha-insurance", title: "Insurance", subtitle: "HHA payer details", fields: insuranceFields.filter((f): f is ProfileField => f !== null) }
+      : null,
+    physicianFields.length
+      ? { id: "hha-physician", title: "Physician", subtitle: "Ordering or primary physician", fields: physicianFields }
+      : null,
+    authorizationFields.length
+      ? { id: "hha-authorizations", title: "Authorizations", subtitle: "Approved HHA services", fields: authorizationFields.filter((f): f is ProfileField => f !== null) }
+      : null,
+    preferenceFields.length
+      ? { id: "hha-caregiver-preferences", title: "Caregiver preferences", subtitle: "Matching guidance", fields: preferenceFields }
+      : null,
+  ];
+
+  return sections.filter((s): s is ProfileSection => s !== null);
+}
+
 export function buildProfileSections(
   client: Client,
   formatDate: FormatClientDateFn,
 ): ProfileSection[] {
   const sections: ProfileSection[] = [buildContactSection(client, formatDate)];
+  const isHhaClient = client.type === "hha";
 
-  const ispPlan = buildIspPlanSection(client, formatDate);
-  if (ispPlan) sections.push(ispPlan);
+  if (isHhaClient) {
+    sections.push(...buildHhaOverviewSections(client, formatDate));
+  }
+
+  if (!isHhaClient) {
+    const ispPlan = buildIspPlanSection(client, formatDate);
+    if (ispPlan) sections.push(ispPlan);
+  }
 
   sections.push(buildAssignedDspsSection(client));
 
-  const insurance = buildInsuranceSection(client);
-  if (insurance) sections.push(insurance);
+  if (!isHhaClient) {
+    const insurance = buildInsuranceSection(client);
+    if (insurance) sections.push(insurance);
+  }
 
   const clinical = buildClinicalSection(client);
   if (clinical) sections.push(clinical);
@@ -499,8 +594,10 @@ export function buildProfileSections(
   const medications = buildMedicationsSection(client);
   if (medications) sections.push(medications);
 
-  const outcomes = buildOutcomesSection(client);
-  if (outcomes) sections.push(outcomes);
+  if (!isHhaClient) {
+    const outcomes = buildOutcomesSection(client);
+    if (outcomes) sections.push(outcomes);
+  }
 
   const guardian = buildGuardianSection(client);
   if (guardian) sections.push(guardian);

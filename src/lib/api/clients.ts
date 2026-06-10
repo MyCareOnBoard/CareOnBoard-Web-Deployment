@@ -8,6 +8,8 @@ import { ApiResponse } from '@/lib/api-types';
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 
+export type ClientType = "ddd" | "hha";
+
 /**
  * Client interface
  * Represents a client/consumer in the care system
@@ -15,6 +17,7 @@ import { customBaseQuery } from "@/lib/baseQuery";
 export interface Client {
   // Core identifiers
   id: string;
+  type?: ClientType;
   firstName?: string;
   lastName?: string;
   middleName?: string;
@@ -41,6 +44,11 @@ export interface Client {
   communicationMethod?: string;
   medicaidId?: string;
   dddId?: string;
+  preferredName?: string;
+  maritalStatus?: string;
+  medicareId?: string;
+  homeInfo?: ClientHhaHomeInfo;
+  referralInfo?: ClientHhaReferralInfo;
   ssn?: string;
   tier?: string;
   billingRate?: string;
@@ -50,10 +58,15 @@ export interface Client {
   services?: ClientService[];
   /** Canonical nested outcome groups (each owns `services[]`). */
   outcomes?: ClientOutcome[];
+  hhaAuthorizations?: ClientHhaAuthorization[];
   ispOutcomes?: string;
   ispMetadata?: ClientIspMetadata;
   guardians?: ClientGuardianContactRow[];
   careTeam?: ClientCareTeamContact[];
+  legalGuardian?: ClientYesNo;
+  powerOfAttorney?: ClientYesNo;
+  insuranceInfo?: ClientHhaInsuranceInfo[];
+  hhaServiceRequest?: ClientHhaServiceRequest;
   /** When the API nests guardian rows under `guardianInfo`. */
   guardianInfo?: ClientGuardianInfo;
 
@@ -81,7 +94,11 @@ export interface Client {
   healthHazards?: string;
   nutritionNotes?: string;
   selfCareNeeds?: ClientAdlSupportNeed[];
+  physicianInfo?: ClientHhaPhysicianInfo;
+  fallRisk?: ClientYesNo;
+  specialPrecautions?: string;
   evvVisitConfig?: ClientEvvVisitConfig;
+  telephonyPhone?: string;
   goalsAndEmergency?: ClientGoalsAndEmergency;
   medications?: ClientMedicationRow[];
   emergencyBackupPlan?: ClientEmergencyBackupPlan;
@@ -91,6 +108,7 @@ export interface Client {
   votingPlan?: string;
   systemAiAndAudit?: ClientSystemAiAndAudit;
   teamMembers?: ClientTeamMember[];
+  caregiverPreferences?: ClientHhaCaregiverPreferences;
 
   // Agency relationship
   agencyId?: string;
@@ -230,6 +248,74 @@ export interface ClientGuardianInfo {
   careTeam?: ClientCareTeamContact[];
 }
 
+export interface ClientHhaReferralInfo {
+  source?: string;
+  date?: string;
+  organization?: string;
+  contactPerson?: string;
+  contactNumber?: string;
+}
+
+export interface ClientHhaHomeInfo {
+  apartmentNumber?: string;
+  county?: string;
+  accessInstructions?: string;
+  homeType?: string;
+}
+
+export interface ClientHhaInsuranceInfo {
+  id?: string;
+  type?: "primary" | "secondary";
+  company?: string;
+  memberId?: string;
+  groupNumber?: string;
+  effectiveDate?: string;
+  authorizationRequired?: ClientYesNo;
+}
+
+export interface ClientHhaServiceRequest {
+  requestedServices?: string[];
+  daysNeeded?: string[];
+  startDate?: string;
+  preferredTime?: string;
+  hoursRequested?: string;
+}
+
+export interface ClientHhaAuthorization {
+  id?: string;
+  authorizationNumber?: string;
+  serviceId?: string;
+  serviceName?: string;
+  serviceCode?: string;
+  approvedHours?: string;
+  startDate?: string;
+  endDate?: string;
+  payerSource?: string;
+  rate?: string;
+  unitType?: string;
+  serviceType?: string;
+  modifier?: string;
+  clientPayType?: ClientService["payType"];
+  assignedDsps?: ClientDsp[];
+}
+
+export interface ClientHhaPhysicianInfo {
+  name?: string;
+  npi?: string;
+  phone?: string;
+  fax?: string;
+  address?: string;
+}
+
+export interface ClientHhaCaregiverPreferences {
+  languagePreference?: string;
+  smokingAllowed?: ClientYesNo;
+  petInHome?: ClientYesNo;
+  liftAssistanceRequired?: ClientYesNo;
+  vehicleRequired?: ClientYesNo;
+  specialSkillsNeeded?: string;
+}
+
 export interface ClientAdlSupportNeed {
   domain?: string;
   levelOfSupport?: string;
@@ -249,6 +335,9 @@ export interface ClientHealthcareSafety {
   healthHazards?: string;
   nutritionNotes?: string;
   selfCareNeeds?: ClientAdlSupportNeed[];
+  physicianInfo?: ClientHhaPhysicianInfo;
+  fallRisk?: ClientYesNo;
+  specialPrecautions?: string;
 }
 
 export type ClientDocumentKey =
@@ -258,7 +347,15 @@ export type ClientDocumentKey =
   | "sdr"
   | "bsp"
   | "medicalDocs"
-  | "consents";
+  | "consents"
+  | "physicianOrders"
+  | "insuranceCards"
+  | "medicaidCard"
+  | "medicareCard"
+  | "idCard"
+  | "guardianshipDocs"
+  | "assessmentForms"
+  | "hospitalDischarge";
 
 export interface ClientDocument {
   key: ClientDocumentKey;
@@ -292,6 +389,7 @@ export interface ClientEvvVisitConfig {
   maxShiftLength?: string;
   backToBackAllowed?: ClientYesNo;
   travelTimeAllowed?: ClientYesNo;
+  telephonyPhone?: string;
 }
 
 export type ClientAutoCheckKey = "compliance" | "training" | "background" | "expired";
@@ -444,6 +542,7 @@ export interface ClientStatsResponse {
  */
 export interface ListClientsParams {
   agencyId?: string; // Required for employees
+  type?: ClientType;
   status?: 'active' | 'inactive' | 'pending' | 'archived';
   service?: string;
   search?: string;
@@ -464,6 +563,7 @@ export interface Address {
  */
 export interface CreateClientRequest {
   agencyId?: string;
+  type?: ClientType;
   firstName?: string;
   lastName?: string;
   middleName?: string;
@@ -483,15 +583,25 @@ export interface CreateClientRequest {
   communicationMethod?: string;
   medicaidId?: string;
   dddId?: string;
+  preferredName?: string;
+  maritalStatus?: string;
+  medicareId?: string;
+  homeInfo?: ClientHhaHomeInfo;
+  referralInfo?: ClientHhaReferralInfo;
   ssn?: string;
   tier?: string;
   service?: string;
   serviceCode?: string;
   billingRate?: string;
   outcomes?: ClientOutcome[];
+  hhaAuthorizations?: ClientHhaAuthorization[];
   ispMetadata?: ClientIspMetadata;
   guardians?: ClientGuardianContactRow[];
   careTeam?: ClientCareTeamContact[];
+  legalGuardian?: ClientYesNo;
+  powerOfAttorney?: ClientYesNo;
+  insuranceInfo?: ClientHhaInsuranceInfo[];
+  hhaServiceRequest?: ClientHhaServiceRequest;
 
   /**
    * Flattened wizard fields (Stage 2–7)
@@ -519,6 +629,9 @@ export interface CreateClientRequest {
   healthHazards?: string;
   nutritionNotes?: string;
   selfCareNeeds?: ClientAdlSupportNeed[];
+  physicianInfo?: ClientHhaPhysicianInfo;
+  fallRisk?: ClientYesNo;
+  specialPrecautions?: string;
 
   evvRequirement?: ClientYesNo;
   primaryVisitLocationGps?: ClientYesNo;
@@ -527,6 +640,7 @@ export interface CreateClientRequest {
   maxShiftLength?: string;
   backToBackAllowed?: ClientYesNo;
   travelTimeAllowed?: ClientYesNo;
+  telephonyPhone?: string;
 
   genderPreference?: string;
   requiredCertifications?: string;
@@ -534,6 +648,7 @@ export interface CreateClientRequest {
   prefersFamiliar?: ClientYesNo;
   noMaleFemaleStaff?: ClientYesNo;
   medicalRestrictionsTrained?: ClientYesNo;
+  caregiverPreferences?: ClientHhaCaregiverPreferences;
   autoChecks?: Record<ClientAutoCheckKey, boolean>;
 
   clientGoals?: string;
@@ -585,6 +700,7 @@ export interface CreateClientRequest {
  */
 export interface UpdateClientRequest {
   agencyId?: string;
+  type?: ClientType;
   firstName?: string;
   lastName?: string;
   middleName?: string;
@@ -602,15 +718,25 @@ export interface UpdateClientRequest {
   communicationMethod?: string;
   medicaidId?: string;
   dddId?: string;
+  preferredName?: string | null;
+  maritalStatus?: string | null;
+  medicareId?: string | null;
+  homeInfo?: ClientHhaHomeInfo | null;
+  referralInfo?: ClientHhaReferralInfo | null;
   ssn?: string;
   tier?: string;
   service?: string;
   serviceCode?: string;
   billingRate?: string;
   outcomes?: ClientOutcome[] | null;
+  hhaAuthorizations?: ClientHhaAuthorization[] | null;
   ispMetadata?: ClientIspMetadata | null;
   guardians?: ClientGuardianContactRow[] | null;
   careTeam?: ClientCareTeamContact[] | null;
+  legalGuardian?: ClientYesNo | null;
+  powerOfAttorney?: ClientYesNo | null;
+  insuranceInfo?: ClientHhaInsuranceInfo[] | null;
+  hhaServiceRequest?: ClientHhaServiceRequest | null;
   guardianName?: string | null;
   guardianRelationship?: string | null;
   guardianEmail?: string | null;
@@ -631,6 +757,9 @@ export interface UpdateClientRequest {
   healthHazards?: string | null;
   nutritionNotes?: string | null;
   selfCareNeeds?: ClientAdlSupportNeed[] | null;
+  physicianInfo?: ClientHhaPhysicianInfo | null;
+  fallRisk?: ClientYesNo | null;
+  specialPrecautions?: string | null;
   evvRequirement?: ClientYesNo | null;
   primaryVisitLocationGps?: ClientYesNo | null;
   allowedSecondaryLocations?: ClientYesNo | null;
@@ -638,12 +767,14 @@ export interface UpdateClientRequest {
   maxShiftLength?: string | null;
   backToBackAllowed?: ClientYesNo | null;
   travelTimeAllowed?: ClientYesNo | null;
+  telephonyPhone?: string | null;
   genderPreference?: string | null;
   requiredCertifications?: string | null;
   specialConditions?: string | null;
   prefersFamiliar?: ClientYesNo | null;
   noMaleFemaleStaff?: ClientYesNo | null;
   medicalRestrictionsTrained?: ClientYesNo | null;
+  caregiverPreferences?: ClientHhaCaregiverPreferences | null;
   autoChecks?: Record<ClientAutoCheckKey, boolean> | null;
   clientGoals?: string | null;
   communityGoals?: string | null;

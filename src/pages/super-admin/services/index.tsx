@@ -25,6 +25,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function ServicesManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [programFilter, setProgramFilter] = useState<"all" | "ddd" | "hha">("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,6 +53,9 @@ export default function ServicesManagementPage() {
 
   const filteredServices = useMemo(() => {
     let result = services;
+    if (programFilter !== "all") {
+      result = result.filter((s) => (s.program ?? "ddd") === programFilter);
+    }
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase();
       result = result.filter(
@@ -65,7 +69,7 @@ export default function ServicesManagementPage() {
       result = result.filter((s) => s.type === typeFilter);
     }
     return result;
-  }, [services, debouncedSearch, typeFilter]);
+  }, [services, debouncedSearch, typeFilter, programFilter]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredServices.length / ITEMS_PER_PAGE)),
@@ -116,6 +120,10 @@ export default function ServicesManagementPage() {
 
   const handleTypeFilter = useCallback((type: string) => {
     setTypeFilter(type);
+    setCurrentPage(1);
+  }, []);
+  const handleProgramFilter = useCallback((program: "all" | "ddd" | "hha") => {
+    setProgramFilter(program);
     setCurrentPage(1);
   }, []);
 
@@ -193,6 +201,23 @@ export default function ServicesManagementPage() {
             </div>
           </div>
 
+          {/* Program Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {(["all", "ddd", "hha"] as const).map((program) => (
+              <button
+                key={program}
+                onClick={() => handleProgramFilter(program)}
+                className={`backdrop-blur-[22px] flex items-center justify-center px-4 py-[9px] rounded-[60px] font-semibold text-[14px] leading-[1.4] transition-colors ${
+                  programFilter === program
+                    ? "bg-[#00b4b8] text-white"
+                    : "border border-[#808081] text-[#808081] font-medium"
+                }`}
+              >
+                {program === "all" ? "All programs" : program.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
           {/* Type Filter Pills */}
           <div className="flex flex-wrap items-center gap-2 mb-6">
             <button
@@ -248,7 +273,7 @@ export default function ServicesManagementPage() {
                 <div className="py-12 text-center">
                   <Briefcase className="w-16 h-16 text-[#808081] mx-auto mb-4" />
                   <p className="text-[14px] font-medium text-[#808081]">
-                    {searchQuery || typeFilter !== "all"
+                    {searchQuery || typeFilter !== "all" || programFilter !== "all"
                       ? "No services match your filters."
                       : "No services yet. Add your first service to get started."}
                   </p>
@@ -262,6 +287,9 @@ export default function ServicesManagementPage() {
                       </th>
                       <th className="text-left px-4 py-3 text-[14px] font-semibold leading-[1.4] text-[#808081]">
                         Code
+                      </th>
+                      <th className="text-left px-4 py-3 text-[14px] font-semibold leading-[1.4] text-[#808081]">
+                        Program
                       </th>
                       <th className="text-left px-4 py-3 text-[14px] font-semibold leading-[1.4] text-[#808081]">
                         Type
@@ -286,6 +314,11 @@ export default function ServicesManagementPage() {
                           <p className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
                             {service.code}
                           </p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="inline-flex rounded-full bg-[#e6fafa] px-3 py-1 text-[12px] font-semibold uppercase text-[#007f83]">
+                            {(service.program ?? "ddd").toUpperCase()}
+                          </span>
                         </td>
                         <td className="px-4 py-4">
                           <p className="text-[14px] font-medium leading-[1.4] text-[#10141a]">

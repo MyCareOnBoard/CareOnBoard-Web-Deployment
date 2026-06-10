@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback, Suspense, lazy, useRef, useState } from "react";
-import { AddClientFormData } from "./types/formData";
+import { useNavigate } from "react-router";
+import { AddClientFormData, createInitialDocs, type ClientType } from "./types/formData";
 import { ClientFormConfig } from "./types/config";
 import { useClientForm } from "./hooks/useClientForm";
 import { useClientSave } from "./hooks/useClientSave";
@@ -26,6 +27,7 @@ import {
 } from "./components/PocSaveGuardModal";
 import type { GeneratePocPanelHandle } from "./components/GeneratePocPanel";
 import { scrollToPocUpload } from "./utils/pocUploadDom";
+import { ClientTypePicker } from "./components/ClientTypePicker";
 
 const ClientImportFromFilePanel = lazy(
   () => import("./components/ClientImportFromFilePanel"),
@@ -73,12 +75,39 @@ export function ClientFormWizard({
   } = useClientSave();
 
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
   const [savedClientName, setSavedClientName] = React.useState<string | undefined>(undefined);
   const [pocGuardOpen, setPocGuardOpen] = useState(false);
   const [generatePocOpen, setGeneratePocOpen] = useState(false);
+  const [typeSelected, setTypeSelected] = useState(isEditMode);
   const pendingSuccessClientIdRef = useRef<string | undefined>(undefined);
+  const handleTypeSelect = useCallback(
+    (type: ClientType) => {
+      setFormData((prev) => ({
+        ...prev,
+        type,
+        stage3: {
+          ...prev.stage3,
+          docs: createInitialDocs(type),
+        },
+      }));
+      setTypeSelected(true);
+    },
+    [setFormData],
+  );
+
+  const handlePickerBack = useCallback(() => {
+    if (config.backNavigate) {
+      navigate(config.backNavigate);
+    }
+  }, [config.backNavigate, navigate]);
+
+  const handleChangeClientType = useCallback(() => {
+    setTypeSelected(false);
+  }, []);
+
   const skipPocGuardRef = useRef(false);
   const generatePocRef = useRef<GeneratePocPanelHandle>(null);
 
@@ -196,8 +225,19 @@ export function ClientFormWizard({
   );
 
   const pageTitle = config.pageTitle || (isEditMode ? "Edit client" : "Add client");
+  const isDddClient = formData.type !== "hha";
 
   const stageContent = useMemo(() => {
+    if (!isEditMode && !typeSelected) {
+      return (
+        <ClientTypePicker
+          pageTitle={pageTitle}
+          onSelect={handleTypeSelect}
+          onBack={config.backNavigate ? handlePickerBack : undefined}
+        />
+      );
+    }
+
     if (stage === 1)
       return (
         <Stage1ClientIdentityAndContact
@@ -210,7 +250,8 @@ export function ClientFormWizard({
           setFormData={setFormData}
           pageTitle={pageTitle}
           backNavigate={config.backNavigate}
-          clientId={config.clientId}
+          clientId={clientId ?? config.clientId}
+          onChangeClientType={!isEditMode && !clientId ? handleChangeClientType : undefined}
           isEditMode={config.isEditMode}
           headerRightAction={
             !isEditMode ? (
@@ -277,7 +318,21 @@ export function ClientFormWizard({
         />
       );
     return null;
-  }, [stage, config, formData, setFormData, pageTitle, footer, isEditMode]);
+  }, [
+    stage,
+    config,
+    formData,
+    setFormData,
+    pageTitle,
+    footer,
+    isEditMode,
+    typeSelected,
+    handleTypeSelect,
+    handlePickerBack,
+    handleChangeClientType,
+    clientId,
+    isDddClient,
+  ]);
 
   return (
     <>
@@ -312,11 +367,11 @@ export function ClientFormWizard({
       <PocSaveGuardModal
         open={pocGuardOpen}
         onOpenChange={setPocGuardOpen}
-        showGenerateOption={canGeneratePoc(formData)}
+        showGenerateOption={isDddClient && canGeneratePoc(formData)}
         onAction={handlePocGuardAction}
       />
 
-      {(canGeneratePoc(formData) || generatePocOpen) ? (
+      {(isDddClient && (canGeneratePoc(formData) || generatePocOpen)) ? (
         <Suspense fallback={null}>
           <GeneratePocPanel
             ref={generatePocRef}

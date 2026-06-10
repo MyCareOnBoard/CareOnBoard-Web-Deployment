@@ -35,6 +35,14 @@ const documentTypes: Array<{ value: ClientDocumentKey | "other"; label: string }
   { value: "bsp", label: "Behavior Plan / BSP" },
   { value: "medicalDocs", label: "Medical Documents" },
   { value: "consents", label: "Consents & Releases" },
+  { value: "physicianOrders", label: "Physician Orders" },
+  { value: "insuranceCards", label: "Insurance Cards" },
+  { value: "medicaidCard", label: "Medicaid Card" },
+  { value: "medicareCard", label: "Medicare Card" },
+  { value: "idCard", label: "ID Card" },
+  { value: "guardianshipDocs", label: "Guardianship / POA Documents" },
+  { value: "assessmentForms", label: "Assessment Forms" },
+  { value: "hospitalDischarge", label: "Hospital Discharge Papers" },
   { value: "other", label: "Other" },
 ];
 
@@ -46,6 +54,14 @@ const docKeyToType: Record<ClientDocumentKey | "other", string> = {
   bsp: "bsp",
   medicalDocs: "medical-documents",
   consents: "consent-and-releases",
+  physicianOrders: "physician-orders",
+  insuranceCards: "insurance-cards",
+  medicaidCard: "medicaid-card",
+  medicareCard: "medicare-card",
+  idCard: "id-card",
+  guardianshipDocs: "guardianship-documents",
+  assessmentForms: "assessment-forms",
+  hospitalDischarge: "hospital-discharge-papers",
   other: "others",
 };
 

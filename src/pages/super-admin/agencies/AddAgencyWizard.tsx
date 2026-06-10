@@ -233,7 +233,7 @@ export default function AddAgencyWizard() {
     const [getDraftAgency, {data: draft}] = useLazyGetDraftAgencyQuery();
     const [getAgency, {data: currentAgency}] = useLazyGetAgencyQuery();
     const [updateAgency, {isLoading: isUpdating}] = useUpdateAgencyMutation();
-    const {data: services} = useGetServicesQuery("shouldPopulate=false&return=name,code");
+    const {data: services} = useGetServicesQuery("shouldPopulate=false&return=name,code,program");
 
     const isSaving = isCreating || isUploading || isSavingDraft || isUpdating;
     const draftId = new URLSearchParams(location.search).get("draftId");

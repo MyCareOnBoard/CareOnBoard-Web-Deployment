@@ -37,10 +37,11 @@ export const EXTRACT_DOCUMENT_TIMEOUT_MS = 300_000;
  */
 export async function extractClientIspViaApi(
   file: File,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; type?: "ddd" | "hha" },
 ): Promise<ClientExtractionResponse> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("type", options?.type === "hha" ? "hha" : "ddd");
 
   const response = await axiosClient.post<ClientExtractionResponse>(
     "/gemini/extract-client-isp",

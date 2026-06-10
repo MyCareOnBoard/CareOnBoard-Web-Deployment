@@ -19,6 +19,7 @@ const badgeStyles: Record<string, string> = {
   expired: "border-[#ff4545] bg-[#fef2f2] text-[#ff4545]",
   error: "border-[#ff4545] bg-[#fef2f2] text-[#ff4545]",
   info: "border-[#00b4b8] bg-[#f0faf4] text-[#00b4b8]",
+  outline: "border-[#b2b2b3] bg-white/60 text-[#10141a]",
   ...SHIFT_STATUS_BADGE_CLASS,
 }
 

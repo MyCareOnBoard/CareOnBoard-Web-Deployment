@@ -71,6 +71,7 @@ export function Stage6GoalsAndEmergency({
   pageTitle?: string;
 }) {
   const stage6 = formData.stage6;
+  const isHhaClient = formData.type === "hha";
   const updateStage6 = (patch: Partial<AddClientFormData["stage6"]>) =>
     setFormData((prev) => ({ ...prev, stage6: { ...prev.stage6, ...patch } }));
 
@@ -119,6 +120,7 @@ export function Stage6GoalsAndEmergency({
         </h1>
       </div>
 
+      {!isHhaClient ? (
       <div className="mb-10">
         <div className="mb-4">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
@@ -270,6 +272,7 @@ export function Stage6GoalsAndEmergency({
           </div>
         </div>
       </div>
+      ) : null}
 
       <div className="mb-10">
         <div className="mb-4">

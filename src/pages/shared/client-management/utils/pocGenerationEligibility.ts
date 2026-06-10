@@ -23,6 +23,7 @@ export function hasPocDocument(formData: AddClientFormData): boolean {
 }
 
 export function hasIspOrPcptSource(formData: AddClientFormData): boolean {
+  if (formData.type === "hha") return false;
   const isp = getDocByKey(formData.stage3.docs, "isp");
   const pcpt = getDocByKey(formData.stage3.docs, "pcpt");
   return hasDocSource(isp) || hasDocSource(pcpt);
