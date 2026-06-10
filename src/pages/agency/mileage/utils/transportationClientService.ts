@@ -2,7 +2,8 @@ import { format, isValid, parseISO } from "date-fns";
 import type { Client, ClientService } from "@/lib/api/clients";
 import { getClientServicesForOperations } from "@/pages/shared/client-management/utils/clientServicesForOperations";
 
-const TRANSPORTATION_CODES = new Set(["T2003", "A0120"]);
+// T2003/A0120: DDD transportation; S0215: HHA non-emergency transportation (per mile).
+const TRANSPORTATION_CODES = new Set(["T2003", "A0120", "S0215"]);
 const TRANSPORT_NAME_RE = /\btransport(ation)?\b|\bmileage\b|\bnemt\b/i;
 
 export function clientServicesForMileage(client: Client | null): ClientService[] {
