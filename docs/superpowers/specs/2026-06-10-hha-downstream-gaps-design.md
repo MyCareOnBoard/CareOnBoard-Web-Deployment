@@ -56,7 +56,8 @@ frontend `src/pages/shared/client-management/utils/clientServicesForOperations.t
 2. **Derive staff `payType` from `unitType` when blank.** New
    `resolveHhaStaffPayType(auth)`: returns `auth.payType` if set, otherwise the same
    `unitType` → pay-type mapping used by `resolveHhaClientPayType` (15-min, daily,
-   hourly, mile). Used for the normalized `payType` field.
+   hourly, mile). Used for the normalized `payType` field. This exists for legacy
+   rows saved before item 3's validation; new rows always carry an explicit payType.
 3. **Require `staffRate` and `payType` on meaningful HHA authorization rows.** In the
    backend `hhaAuthorizationSchema` (`functions/schemas/client.schema.js`) and the
    wizard Stage 2 validation: any row with a `serviceId` or `serviceCode` must have a
