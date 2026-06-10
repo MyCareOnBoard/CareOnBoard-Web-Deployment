@@ -42,8 +42,8 @@ function timeToMinutes(t: string | null | undefined): number {
   // "HH:MM" 24-hour
   const m24 = t.match(/^(\d{1,2}):(\d{2})$/)
   if (m24) return parseInt(m24[1], 10) * 60 + parseInt(m24[2], 10)
-  // "H:MM AM/PM"
-  const m12 = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)/i)
+  // "H:MM AM/PM" or "H:MM:AM/PM" (colon-separated variant)
+  const m12 = t.match(/^(\d{1,2}):(\d{2})[\s:](AM|PM)/i)
   if (m12) {
     let h = parseInt(m12[1], 10)
     const min = parseInt(m12[2], 10)
