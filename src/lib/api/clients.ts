@@ -159,6 +159,8 @@ export interface ClientService {
   provider?: string;
   location?: string;
   claimsSource?: string;
+  /** Billing modifier from the HHA authorization (e.g. EPSDT/UA on PDN variants). */
+  modifier?: string;
   unitType?: string;
   frequency?: string;
   totalUnits?: string;

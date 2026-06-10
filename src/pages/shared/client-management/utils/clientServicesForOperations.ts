@@ -1,15 +1,29 @@
 import type { Client, ClientHhaAuthorization, ClientService } from "@/lib/api/clients";
 import { flattenOutcomeServices } from "./outcomeServices";
 
-function resolveHhaClientPayType(
+function resolveHhaUnitPayType(
   auth: ClientHhaAuthorization,
 ): ClientService["clientPayType"] | undefined {
-  if (auth.clientPayType) return auth.clientPayType;
   if (auth.unitType === "15-min") return "15-min";
   if (auth.unitType === "daily") return "daily";
   if (auth.unitType === "hourly") return "hourly";
   if (auth.unitType === "mile") return "mile";
   return undefined;
+}
+
+function resolveHhaClientPayType(
+  auth: ClientHhaAuthorization,
+): ClientService["clientPayType"] | undefined {
+  if (auth.clientPayType) return auth.clientPayType;
+  return resolveHhaUnitPayType(auth);
+}
+
+/** Legacy rows saved before staffRate/payType validation may lack an explicit payType. */
+function resolveHhaStaffPayType(
+  auth: ClientHhaAuthorization,
+): ClientService["payType"] | undefined {
+  if (auth.payType) return auth.payType;
+  return resolveHhaUnitPayType(auth);
 }
 
 /** Mirror BE normalize for wizard/draft fallback when API has not computed services yet. */
@@ -34,7 +48,8 @@ export function hhaAuthorizationToClientService(
     clientRate: auth.rate?.trim() || undefined,
     clientPayType: resolveHhaClientPayType(auth),
     staffRate: auth.staffRate?.trim() || undefined,
-    payType: auth.payType,
+    payType: resolveHhaStaffPayType(auth),
+    modifier: auth.modifier?.trim() || undefined,
     unitType: auth.unitType?.trim() || undefined,
     startAuthDate: auth.startDate,
     endAuthDate: auth.endDate,
