@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Loader2, TriangleAlert } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import BillingCornerModalHeader from "@/pages/agency/billing/components/BillingCornerModalHeader";
@@ -66,6 +66,10 @@ function buildItemMetaLine(item: PayrollInvoicePreviewItem) {
     .join(" · ");
 }
 
+function itemHasRateIssue(item: PayrollInvoicePreviewItem): boolean {
+  return Boolean(item.rateStatus && item.rateStatus !== "ok");
+}
+
 const PreviewItemRow = memo(function PreviewItemRow({
   item,
   checked,
@@ -75,8 +79,15 @@ const PreviewItemRow = memo(function PreviewItemRow({
   checked: boolean;
   onToggle: (id: string) => void;
 }) {
+  const flagged = itemHasRateIssue(item);
+
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-[12px] border border-[#e5e5e6] bg-white px-4 py-3">
+    <label
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-[12px] border bg-white px-4 py-3",
+        flagged ? "border-[#e8a23d] bg-[#fdf8ef]" : "border-[#e5e5e6]",
+      )}
+    >
       <Checkbox
         checked={checked}
         onChange={() => onToggle(item.id)}
@@ -89,6 +100,12 @@ const PreviewItemRow = memo(function PreviewItemRow({
           <span className="ml-2 text-[12px] font-normal text-[#808081]">{item.typeLabel}</span>
         </p>
         <p className="mt-1 text-[13px] text-[#808081]">{buildItemMetaLine(item)}</p>
+        {flagged ? (
+          <p className="mt-1 flex items-center gap-1 text-[13px] font-medium text-[#b97f1f]">
+            <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+            {item.rateIssue || "No staff pay rate — this shift would pay $0."}
+          </p>
+        ) : null}
       </div>
     </label>
   );
@@ -177,7 +194,11 @@ export default function CreatePayrollInvoiceModal({
       }
 
       setPreview(data);
-      setSelectedIds(new Set(data.items.map((item) => item.id)));
+      // Flagged shifts would block invoice creation; leave them unchecked so the
+      // agency consciously fixes the authorization instead of hitting the error.
+      setSelectedIds(
+        new Set(data.items.filter((item) => !itemHasRateIssue(item)).map((item) => item.id)),
+      );
     } catch (error) {
       if (signal.aborted) {
         return;
