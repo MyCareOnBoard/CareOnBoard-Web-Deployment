@@ -3,11 +3,15 @@ import type { Client, ClientService } from "@/lib/api/clients";
 import type { Shift } from "@/lib/api/shifts";
 import { parseSdrWeekRange } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
 import {
+  type ClaimInsurancePartySnapshot,
+  type ClaimInsuranceSnapshot,
   type ClaimReportFormState,
   type ClaimReportServiceLine,
   type ClaimReportSummary,
   DIAGNOSIS_CODE_LETTERS,
 } from "../data/mockClaimReportData";
+
+export type { ClaimInsurancePartySnapshot, ClaimInsuranceSnapshot };
 import { formatGender } from "@/pages/shared/client-details/tabs/profileTabViewModel";
 import {
   computeTotalHours,
@@ -38,6 +42,7 @@ export type ClaimReportPrefillSnapshot = Pick<
 > & {
   serviceLines: ClaimReportServiceLine[];
   summary: ClaimReportSummary;
+  insurance?: ClaimInsuranceSnapshot;
 };
 
 type FirestoreTimestamp = { _seconds?: number; _nanoseconds?: number };
@@ -215,11 +220,54 @@ export function computeClaimBilling(
   }
 
   const normalizedPayType = payType?.trim().toLowerCase() ?? "";
+  // Per-diem services bill one unit per day worked, regardless of shift length;
+  // callers dedupe repeat shifts on the same date (see buildClaimReportPrefillFromShifts).
   const units =
-    normalizedPayType === "15-min" ? Math.round(hours * 4) : Math.round(hours * 100) / 100;
+    normalizedPayType === "daily"
+      ? 1
+      : normalizedPayType === "15-min"
+        ? Math.round(hours * 4)
+        : Math.round(hours * 100) / 100;
   const charge = Math.round(units * rate * 100) / 100;
 
   return { units, charge };
+}
+
+function isDailyPayType(payType?: string): boolean {
+  return (payType?.trim().toLowerCase() ?? "") === "daily";
+}
+
+/** Claim-time payer snapshot for HHA clients; DDD claims have no insurance block. */
+export function buildInsuranceSnapshotForClient(
+  client?: Client,
+): ClaimInsuranceSnapshot | undefined {
+  if (client?.type !== "hha" || !Array.isArray(client?.insuranceInfo)) return undefined;
+
+  function pickRow(type: string): ClaimInsurancePartySnapshot | undefined {
+    const row = client?.insuranceInfo?.find(
+      (r) => (r?.type ?? "").trim().toLowerCase() === type,
+    );
+    if (!row) return undefined;
+    const company = row.company?.trim() ?? "";
+    const memberId = row.memberId?.trim() ?? "";
+    const groupNumber = row.groupNumber?.trim() ?? "";
+    if (!company && !memberId && !groupNumber) return undefined;
+    return {
+      company: company || undefined,
+      memberId: memberId || undefined,
+      groupNumber: groupNumber || undefined,
+      authorizationRequired:
+        row.authorizationRequired?.trim().toLowerCase() || undefined,
+    };
+  }
+
+  const primary = pickRow("primary");
+  const secondary = pickRow("secondary");
+  if (!primary && !secondary) return undefined;
+  return {
+    ...(primary ? { primary } : {}),
+    ...(secondary ? { secondary } : {}),
+  };
 }
 
 function formatPatientSex(gender?: string): string {
@@ -279,7 +327,8 @@ export function buildClaimReportPrefillFromShifts(
 
   const serviceCode =
     matchedService?.code?.trim() || anchorShift.serviceCode?.trim() || "";
-  const { cptHcpcs, modifier } = splitServiceCode(serviceCode);
+  const { cptHcpcs, modifier: parsedModifier } = splitServiceCode(serviceCode);
+  const modifier = matchedService?.modifier?.trim() || parsedModifier;
 
   const rate =
     parseRateToNumber(matchedService?.clientRate) ??
@@ -289,6 +338,7 @@ export function buildClaimReportPrefillFromShifts(
   let totalHoursSum = 0;
   let totalUnits = 0;
   let totalCharge = 0;
+  const dailyBilledDates = new Set<string>();
 
   for (const shift of shifts) {
     const shiftService = findMatchingClientService(shift.client, shift) ?? matchedService;
@@ -298,7 +348,17 @@ export function buildClaimReportPrefillFromShifts(
       rate;
     const shiftPayType = shiftService?.clientPayType ?? shiftService?.payType ?? payType;
     const hours = parseShiftHours(computeTotalHours(shift));
-    const { units, charge } = computeClaimBilling(hours, shiftRate ?? 0, shiftPayType);
+    let { units, charge } = computeClaimBilling(hours, shiftRate ?? 0, shiftPayType);
+
+    if (isDailyPayType(shiftPayType)) {
+      const day = shift.date?.trim() ?? "";
+      if (day && dailyBilledDates.has(day)) {
+        units = 0;
+        charge = 0;
+      } else if (day) {
+        dailyBilledDates.add(day);
+      }
+    }
 
     totalHoursSum += hours;
     totalUnits += units;
@@ -329,6 +389,8 @@ export function buildClaimReportPrefillFromShifts(
     totalClaimAmount: chargeFormatted,
   };
 
+  const insurance = buildInsuranceSnapshotForClient(client);
+
   return {
     dateOfBirth: formatClientDateOfBirth(client?.dateOfBirth),
     patientSex: formatPatientSex(client?.gender),
@@ -340,6 +402,7 @@ export function buildClaimReportPrefillFromShifts(
     paNumber,
     serviceLines: [serviceLine],
     summary,
+    ...(insurance ? { insurance } : {}),
   };
 }
 
@@ -352,7 +415,8 @@ export function buildClaimReportPrefill(
   const diagnosisCodes = buildDiagnosisCodesMap(getClientDiagnosisLines(client));
 
   const serviceCode = matchedService?.code?.trim() || timing.serviceCode.trim();
-  const { cptHcpcs, modifier } = splitServiceCode(serviceCode);
+  const { cptHcpcs, modifier: parsedModifier } = splitServiceCode(serviceCode);
+  const modifier = matchedService?.modifier?.trim() || parsedModifier;
 
   const hours = parseShiftHours(timing.totalHours);
   const rate =
@@ -382,6 +446,8 @@ export function buildClaimReportPrefill(
     totalClaimAmount: chargeFormatted,
   };
 
+  const insurance = buildInsuranceSnapshotForClient(client);
+
   return {
     dateOfBirth: formatClientDateOfBirth(client?.dateOfBirth),
     patientSex: formatPatientSex(client?.gender),
@@ -393,5 +459,6 @@ export function buildClaimReportPrefill(
     paNumber,
     serviceLines: [serviceLine],
     summary,
+    ...(insurance ? { insurance } : {}),
   };
 }

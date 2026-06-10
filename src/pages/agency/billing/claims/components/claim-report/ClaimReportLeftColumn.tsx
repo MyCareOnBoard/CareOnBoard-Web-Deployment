@@ -53,6 +53,50 @@ function ClaimReportLeftColumn({ form, onUpdate }: ClaimReportLeftColumnProps) {
         </div>
       </section>
 
+      {form.insurance?.primary || form.insurance?.secondary ? (
+        <section className={CLAIM_REPORT_SECTION} data-section="insured">
+          <ReportSectionTitle>Insured information</ReportSectionTitle>
+          {form.insurance.primary ? (
+            <div className="[&>div]:py-1">
+              <BioRow
+                label="Insurance plan name"
+                value={form.insurance.primary.company ?? ""}
+                emphasis={false}
+              />
+              <BioRow
+                label="Insured's ID number"
+                value={form.insurance.primary.memberId ?? ""}
+                emphasis={false}
+              />
+              <BioRow
+                label="Group number"
+                value={form.insurance.primary.groupNumber ?? ""}
+                emphasis={false}
+              />
+            </div>
+          ) : null}
+          {form.insurance.secondary ? (
+            <div className="mt-2 [&>div]:py-1">
+              <BioRow
+                label="Secondary plan name"
+                value={form.insurance.secondary.company ?? ""}
+                emphasis={false}
+              />
+              <BioRow
+                label="Secondary ID number"
+                value={form.insurance.secondary.memberId ?? ""}
+                emphasis={false}
+              />
+              <BioRow
+                label="Secondary group number"
+                value={form.insurance.secondary.groupNumber ?? ""}
+                emphasis={false}
+              />
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       <section className={CLAIM_REPORT_SECTION} data-section="condition">
         <ReportSectionTitle>Is patient condition related to</ReportSectionTitle>
         <div>
