@@ -116,19 +116,6 @@ export function Stage4EvvAndVisitConfig({
             value={stage4.primaryVisitLocationGps}
             onChange={(v) => updateStage4({ primaryVisitLocationGps: v })}
           />
-          {isHhaClient ? (
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">
-                Phone number for telephony EVV
-              </label>
-              <Input
-                value={stage4.telephonyPhone ?? ""}
-                onChange={(e) => updateStage4({ telephonyPhone: e.target.value })}
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                placeholder="Enter telephony EVV phone number"
-              />
-            </div>
-          ) : null}
           <YesNoRadio
             label="Allowed Secondary Locations (for Community Inclusion/Transportation)"
             value={stage4.allowedSecondaryLocations}

@@ -31,6 +31,8 @@ describe("formDataToApiPayload HHA", () => {
         rate: "6.67",
         serviceType: "Personal Care",
         clientPayType: "15-min",
+        staffRate: "12.50",
+        payType: "hourly",
         assignedDsps: [{ id: "dsp-1", name: "Jamie Helper" }],
       },
     ];
@@ -49,7 +51,33 @@ describe("formDataToApiPayload HHA", () => {
     expect(payload.ispMetadata).toBeUndefined();
   });
 
-  it("keeps service-only HHA authorization rows when a catalog service is selected", () => {
+  it("keeps catalog-service rows with pay fields in progressive saves", () => {
+    const data = createInitialAddClientFormData();
+    data.type = "hha";
+    data.stage1.firstName = "Jane";
+    data.stage1.lastName = "Client";
+    data.stage1.address = "10 Main St";
+    data.stage1.location = { lat: "40.7", lon: "-74.0" };
+    data.stage2.hhaAuthorizations = [
+      {
+        id: "auth-1",
+        serviceId: "T1019",
+        serviceCode: "T1019",
+        serviceName: "Personal Care Assistant",
+        unitType: "15-min",
+        rate: "6.67",
+        staffRate: "12.50",
+        payType: "hourly",
+        assignedDsps: [],
+      },
+    ];
+
+    const payload = formDataToApiPayload(data, false, true, false);
+
+    expect(payload.hhaAuthorizations?.[0]?.serviceId).toBe("T1019");
+  });
+
+  it("excludes service rows missing staffRate/payType from progressive saves", () => {
     const data = createInitialAddClientFormData();
     data.type = "hha";
     data.stage1.firstName = "Jane";
@@ -70,7 +98,42 @@ describe("formDataToApiPayload HHA", () => {
 
     const payload = formDataToApiPayload(data, false, true, false);
 
-    expect(payload.hhaAuthorizations?.[0]?.serviceId).toBe("T1019");
+    expect(payload.hhaAuthorizations).toBeUndefined();
+  });
+
+  it("throws on final submit when a service row lacks staffRate/payType", () => {
+    const data = createInitialAddClientFormData();
+    data.type = "hha";
+    data.stage1.firstName = "Jane";
+    data.stage1.lastName = "Client";
+    data.stage1.address = "10 Main St";
+    data.stage1.location = { lat: "40.7", lon: "-74.0" };
+    data.stage2.hhaAuthorizations = [
+      {
+        id: "auth-1",
+        serviceCode: "T1019",
+        serviceName: "Personal Care Assistant",
+        unitType: "15-min",
+        assignedDsps: [],
+      },
+    ];
+
+    expect(() => formDataToApiPayload(data, false, false, false)).toThrow(
+      /staff rate and pay type.*Personal Care Assistant/i,
+    );
+  });
+
+  it("never includes telephonyPhone in the payload", () => {
+    const data = createInitialAddClientFormData();
+    data.type = "hha";
+    data.stage1.firstName = "Jane";
+    data.stage1.lastName = "Client";
+    data.stage1.address = "10 Main St";
+    data.stage1.location = { lat: "40.7", lon: "-74.0" };
+
+    const payload = formDataToApiPayload(data, false, true, false);
+
+    expect("telephonyPhone" in payload).toBe(false);
   });
 
   it("omits seeded empty HHA insurance and authorization rows", () => {

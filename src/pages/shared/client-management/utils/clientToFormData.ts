@@ -484,7 +484,6 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             maxShiftLength: client.evvVisitConfig?.maxShiftLength ?? (client as any).maxShiftLength ?? "",
             backToBackAllowed: normalizeYesNo(client.evvVisitConfig?.backToBackAllowed ?? (client as any).backToBackAllowed),
             travelTimeAllowed: normalizeYesNo(client.evvVisitConfig?.travelTimeAllowed ?? (client as any).travelTimeAllowed),
-            telephonyPhone: client.evvVisitConfig?.telephonyPhone ?? client.telephonyPhone ?? "",
         },
         stage5: {
             genderPreference: (client as any).genderPreference ?? undefined,

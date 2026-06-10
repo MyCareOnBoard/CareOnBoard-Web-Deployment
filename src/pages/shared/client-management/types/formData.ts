@@ -368,7 +368,6 @@ export type Stage4EvvAndVisitConfigData = {
     maxShiftLength: string;
     backToBackAllowed: YesNo;
     travelTimeAllowed: YesNo;
-    telephonyPhone?: string;
 };
 
 export type AutoCheckKey = "compliance" | "training" | "background" | "expired";
@@ -814,7 +813,6 @@ export function createInitialAddClientFormData(): AddClientFormData {
             maxShiftLength: "",
             backToBackAllowed: "",
             travelTimeAllowed: "",
-            telephonyPhone: "",
         },
         stage5: {
             genderPreference: undefined,

@@ -38,6 +38,12 @@ function isMeaningfulHhaAuthorizationRow(row: HhaAuthorization): boolean {
   );
 }
 
+/** Mirrors backend client.schema: rows tied to a service must carry staffRate + payType. */
+function hhaAuthorizationRowMissingPayFields(row: HhaAuthorization): boolean {
+  const hasService = Boolean(row.serviceId?.trim() || row.serviceCode?.trim());
+  return hasService && (!row.staffRate?.trim() || !row.payType);
+}
+
 function sanitizeOptionalEmail(raw: string | undefined): string | undefined {
   const s = raw?.trim() ?? "";
   if (!s) return undefined;
@@ -84,6 +90,19 @@ export function formDataToApiPayload(
     if (hasInvalidService) {
       throw new Error(
         "Enter both a service code and service name for each service authorization row.",
+      );
+    }
+  }
+
+  if (!progressive && isHhaClient) {
+    const incomplete = (s2.hhaAuthorizations ?? [])
+      .filter(isMeaningfulHhaAuthorizationRow)
+      .find(hhaAuthorizationRowMissingPayFields);
+    if (incomplete) {
+      const label =
+        incomplete.serviceName?.trim() || incomplete.serviceCode?.trim() || "a service";
+      throw new Error(
+        `Enter a staff rate and pay type for the authorization covering ${label}.`,
       );
     }
   }
@@ -244,6 +263,9 @@ export function formDataToApiPayload(
       if (!isHhaClient || !s2.hhaAuthorizations?.length) return undefined;
       const rows = s2.hhaAuthorizations
         .filter(isMeaningfulHhaAuthorizationRow)
+        // Backend rejects service rows without staffRate/payType; keep incomplete
+        // rows out of progressive draft saves (they stay in local wizard state).
+        .filter((a) => !progressive || !hhaAuthorizationRowMissingPayFields(a))
         .map((a) => ({
           id: a.id,
           authorizationNumber: a.authorizationNumber?.trim() || undefined,
@@ -315,7 +337,6 @@ export function formDataToApiPayload(
     maxShiftLength: s4.maxShiftLength || undefined,
     backToBackAllowed: s4.backToBackAllowed,
     travelTimeAllowed: s4.travelTimeAllowed,
-    telephonyPhone: isHhaClient ? s4.telephonyPhone?.trim() || undefined : undefined,
     genderPreference: s5.genderPreference || undefined,
     requiredCertifications: s5.requiredCertifications || undefined,
     specialConditions: s5.specialConditions || undefined,

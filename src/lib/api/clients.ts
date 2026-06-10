@@ -96,7 +96,6 @@ export interface Client {
   fallRisk?: ClientYesNo;
   specialPrecautions?: string;
   evvVisitConfig?: ClientEvvVisitConfig;
-  telephonyPhone?: string;
   goalsAndEmergency?: ClientGoalsAndEmergency;
   medications?: ClientMedicationRow[];
   emergencyBackupPlan?: ClientEmergencyBackupPlan;
@@ -394,7 +393,6 @@ export interface ClientEvvVisitConfig {
   maxShiftLength?: string;
   backToBackAllowed?: ClientYesNo;
   travelTimeAllowed?: ClientYesNo;
-  telephonyPhone?: string;
 }
 
 export type ClientAutoCheckKey = "compliance" | "training" | "background" | "expired";
@@ -643,7 +641,6 @@ export interface CreateClientRequest {
   maxShiftLength?: string;
   backToBackAllowed?: ClientYesNo;
   travelTimeAllowed?: ClientYesNo;
-  telephonyPhone?: string;
 
   genderPreference?: string;
   requiredCertifications?: string;
@@ -768,7 +765,6 @@ export interface UpdateClientRequest {
   maxShiftLength?: string | null;
   backToBackAllowed?: ClientYesNo | null;
   travelTimeAllowed?: ClientYesNo | null;
-  telephonyPhone?: string | null;
   genderPreference?: string | null;
   requiredCertifications?: string | null;
   specialConditions?: string | null;
