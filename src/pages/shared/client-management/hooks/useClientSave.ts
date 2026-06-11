@@ -30,7 +30,9 @@ export function useClientSave() {
     try {
       const payload = formDataToApiPayload(formData, includeAgencyId, progressive, markComplete);
 
-      const useUpdatePath = isEditMode || (progressive && clientId);
+      // Update whenever we already have a client doc (e.g. created by an earlier
+      // progressive save) — the final non-progressive save must not re-create.
+      const useUpdatePath = isEditMode || Boolean(clientId);
 
       if (useUpdatePath && clientId) {
         const { documents, ...payloadWithoutDocs } = payload;
