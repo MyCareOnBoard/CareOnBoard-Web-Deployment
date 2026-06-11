@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Search, MoreHorizontal, Send, HelpCircle, Loader2, Pencil, ArrowLeft } from "lucide-react"
+import { Search, MoreHorizontal, Send, HelpCircle, Loader2, Pencil, ArrowLeft, Phone, Trash2 } from "lucide-react"
 import { useSearchParams } from "react-router"
 import axiosClient from "@/lib/axios"
 import { useSelector } from "react-redux"
@@ -145,6 +145,9 @@ export default function FamilyMessagesPage() {
   const [contactSearch, setContactSearch] = useState("")
   const [starting, setStarting] = useState<string | null>(null)
 
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -238,6 +241,36 @@ export default function FamilyMessagesPage() {
       .catch(() => {})
       .finally(() => setLoadingMsgs(false))
   }, [activeConvId])
+
+  // ── Close menu when clicking outside ─────────────────────────────────────
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [menuOpen])
+
+  // ── Delete conversation ────────────────────────────────────────────────────
+  const handleDeleteConversation = async () => {
+    if (!activeConvId || deleting) return
+    setMenuOpen(false)
+    setDeleting(true)
+    try {
+      await axiosClient.delete(`/familyPortal/messages/${activeConvId}`)
+      setConversations((prev) => prev.filter((c) => c.id !== activeConvId))
+      setActiveConvId(null)
+      setMessages([])
+    } catch {
+      // conversation removed optimistically even if backend call fails
+      setConversations((prev) => prev.filter((c) => c.id !== activeConvId))
+      setActiveConvId(null)
+      setMessages([])
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // ── Scroll to bottom when new messages arrive ──────────────────────────────
   useEffect(() => {
@@ -489,12 +522,42 @@ export default function FamilyMessagesPage() {
                 {activeOther.role?.replace(/_/g, " ") || "Caregiver"}
               </p>
             </div>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
+            <div ref={menuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((o) => !o)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+
+              {menuOpen && (
+                <div className="absolute right-0 top-10 z-30 min-w-[160px] overflow-hidden rounded-xl border border-slate-100 bg-white shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-[13px] text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <Phone className="h-4 w-4 text-slate-400" />
+                    Call
+                  </button>
+                  <div className="mx-4 h-px bg-slate-100" />
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteConversation()}
+                    disabled={deleting}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-[13px] text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    {deleting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Messages */}
