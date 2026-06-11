@@ -567,6 +567,8 @@ export interface Address {
 export interface CreateClientRequest {
   agencyId?: string;
   type?: ClientType;
+  /** Sent on the wizard's final save so completed onboardings activate immediately. */
+  status?: 'active' | 'inactive' | 'pending' | 'archived';
   firstName?: string;
   lastName?: string;
   middleName?: string;
