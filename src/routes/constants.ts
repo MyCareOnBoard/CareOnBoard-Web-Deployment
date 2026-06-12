@@ -168,6 +168,12 @@ export const Routes = {
         resetPassword: "/auth/reset-password",
         mfaEnroll: "/auth/mfa-enroll",
         mfaChallenge: "/auth/mfa-challenge",
+        familyLogin: "/auth/family-login",
+    },
+    family: {
+        dashboard: "/family/dashboard",
+        schedule: "/family/schedule",
+        messages: "/family/messages",
     },
     onboarding: {
         index: "/onboarding",
