@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   CalendarDays,
   MessageSquare,
+  Megaphone,
   LogOut,
   Bell,
   HelpCircle,
@@ -52,9 +53,10 @@ interface ClientInfo {
 }
 
 const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: "Dashboard", to: Routes.family.dashboard as string | null },
-  { icon: CalendarDays,   label: "Schedule",  to: Routes.family.schedule as string | null },
-  { icon: MessageSquare,  label: "Messages",  to: Routes.family.messages as string | null },
+  { icon: LayoutDashboard, label: "Dashboard",      to: Routes.family.dashboard      as string | null },
+  { icon: CalendarDays,   label: "Schedule",        to: Routes.family.schedule       as string | null },
+  { icon: MessageSquare,  label: "Messages",        to: Routes.family.messages       as string | null },
+  { icon: Megaphone,      label: "Announcements",   to: Routes.family.announcements  as string | null },
 ] satisfies { icon: React.ComponentType<{ className?: string }>; label: string; to: string | null }[]
 
 export default function FamilyLayout() {

@@ -27,7 +27,8 @@ import {
     UsersRound,
     Network,
     Settings,
-    Sun
+    Sun,
+    Megaphone,
 } from "lucide-react";
 
 /** Canonical scope for the scheduling hub; legacy token "Scheduling" still honored in accessList. */
@@ -84,6 +85,7 @@ const allNavItems: NavItem[] = [
     { label: "Trainings", path: Routes.agency.trainings, icon: Network, accessKey: "Trainings" },
     { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon, accessKey: "Mileage" },
     { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon, accessKey: "Incident" },
+    { label: "Announcements", path: Routes.agency.announcements, icon: Megaphone },
     { label: "Settings", path: Routes.agency.agencySettings, icon: Settings },
 ];
 
