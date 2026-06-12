@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react"
-import { Megaphone, Plus, Pencil, Trash2, Loader2, ToggleLeft, ToggleRight, X, AlertTriangle, Info, Siren } from "lucide-react"
+import { useState, useEffect, useCallback, useMemo } from "react"
+import { Megaphone, Plus, Pencil, Trash2, Loader2, ToggleLeft, ToggleRight, X, AlertTriangle, Info, Siren, ChevronDown, ChevronUp } from "lucide-react"
 import axiosClient from "@/lib/axios"
 
 interface Announcement {
@@ -23,24 +23,9 @@ interface FormState {
 const EMPTY_FORM: FormState = { title: "", body: "", type: "info", expiresAt: "" }
 
 const TYPE_META = {
-  info: {
-    label: "Info",
-    badge: "bg-blue-50 text-blue-700 border border-blue-200",
-    border: "border-l-blue-500",
-    icon: Info,
-  },
-  warning: {
-    label: "Warning",
-    badge: "bg-amber-50 text-amber-700 border border-amber-200",
-    border: "border-l-amber-500",
-    icon: AlertTriangle,
-  },
-  urgent: {
-    label: "Urgent",
-    badge: "bg-red-50 text-red-700 border border-red-200",
-    border: "border-l-red-500",
-    icon: Siren,
-  },
+  info:    { label: "Info",    badge: "bg-blue-50 text-blue-700 border border-blue-200",   border: "border-l-blue-500",   pill: "bg-blue-50 text-blue-700 border-blue-200",   icon: Info },
+  warning: { label: "Warning", badge: "bg-amber-50 text-amber-700 border border-amber-200", border: "border-l-amber-500",  pill: "bg-amber-50 text-amber-700 border-amber-200", icon: AlertTriangle },
+  urgent:  { label: "Urgent",  badge: "bg-red-50 text-red-700 border border-red-200",       border: "border-l-red-500",    pill: "bg-red-50 text-red-700 border-red-200",       icon: Siren },
 } as const
 
 function formatDate(val: { seconds: number } | string | null): string {
@@ -50,19 +35,33 @@ function formatDate(val: { seconds: number } | string | null): string {
   return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
+type TypeFilter   = "all" | "info" | "warning" | "urgent"
+type StatusFilter = "all" | "active" | "inactive"
+
 export default function AgencyAnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState<string | null>(null)
 
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
+  // ── filters ──
+  const [typeFilter,   setTypeFilter]   = useState<TypeFilter>("all")
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+
+  // ── expand/collapse body ──
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const toggleExpand = (id: string) =>
+    setExpandedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  // ── form ──
+  const [form,       setForm]       = useState<FormState>(EMPTY_FORM)
+  const [editingId,  setEditingId]  = useState<string | null>(null)
+  const [showForm,   setShowForm]   = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError,  setFormError]  = useState<string | null>(null)
 
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [togglingId, setTogglingId] = useState<string | null>(null)
+  // ── mutation state ──
+  const [deletingId,  setDeletingId]  = useState<string | null>(null)
+  const [togglingId,  setTogglingId]  = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -79,58 +78,56 @@ export default function AgencyAnnouncementsPage() {
 
   useEffect(() => { void load() }, [load])
 
-  const openCreate = () => {
-    setEditingId(null)
-    setForm(EMPTY_FORM)
-    setFormError(null)
-    setShowForm(true)
-  }
+  // ── derived filtered list ──
+  const filtered = useMemo(() =>
+    announcements
+      .filter((a) => typeFilter   === "all" || a.type     === typeFilter)
+      .filter((a) => statusFilter === "all" || (statusFilter === "active" ? a.isActive : !a.isActive)),
+    [announcements, typeFilter, statusFilter]
+  )
+
+  const openCreate = () => { setEditingId(null); setForm(EMPTY_FORM); setFormError(null); setShowForm(true) }
 
   const openEdit = (a: Announcement) => {
     setEditingId(a.id)
     setForm({
       title: a.title,
-      body: a.body,
-      type: a.type,
+      body:  a.body,
+      type:  a.type,
       expiresAt: a.expiresAt
-        ? new Date(typeof a.expiresAt === "string" ? a.expiresAt : a.expiresAt.seconds * 1000)
-            .toISOString()
-            .slice(0, 10)
+        ? new Date(typeof a.expiresAt === "string" ? a.expiresAt : a.expiresAt.seconds * 1000).toISOString().slice(0, 10)
         : "",
     })
     setFormError(null)
     setShowForm(true)
   }
 
-  const cancelForm = () => {
-    setShowForm(false)
-    setEditingId(null)
-    setForm(EMPTY_FORM)
-    setFormError(null)
-  }
+  const cancelForm = () => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); setFormError(null) }
 
+  // Optimistic create/edit — no full re-fetch
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.title.trim() || !form.body.trim()) {
-      setFormError("Title and body are required.")
-      return
-    }
+    if (!form.title.trim() || !form.body.trim()) { setFormError("Title and body are required."); return }
     setSubmitting(true)
     setFormError(null)
+    const payload = {
+      title:     form.title.trim(),
+      body:      form.body.trim(),
+      type:      form.type,
+      expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
+    }
     try {
-      const payload = {
-        title: form.title.trim(),
-        body: form.body.trim(),
-        type: form.type,
-        expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
-      }
       if (editingId) {
         await axiosClient.put(`/agencyAnnouncements/announcements/${editingId}`, payload)
+        setAnnouncements((prev) =>
+          prev.map((a) => a.id === editingId ? { ...a, ...payload } : a)
+        )
       } else {
-        await axiosClient.post("/agencyAnnouncements/announcements", payload)
+        const res = await axiosClient.post<{ success: boolean; data: Announcement }>("/agencyAnnouncements/announcements", payload)
+        const created = res.data.data
+        setAnnouncements((prev) => [created, ...prev])
       }
       cancelForm()
-      await load()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       setFormError(msg || "Failed to save. Please try again.")
@@ -139,26 +136,30 @@ export default function AgencyAnnouncementsPage() {
     }
   }
 
+  // Already optimistic — flips state immediately, rolls back on error
   const handleToggle = async (a: Announcement) => {
     setTogglingId(a.id)
+    const next = !a.isActive
+    setAnnouncements((prev) => prev.map((x) => x.id === a.id ? { ...x, isActive: next } : x))
     try {
-      await axiosClient.put(`/agencyAnnouncements/announcements/${a.id}`, { isActive: !a.isActive })
-      setAnnouncements((prev) => prev.map((x) => (x.id === a.id ? { ...x, isActive: !a.isActive } : x)))
+      await axiosClient.put(`/agencyAnnouncements/announcements/${a.id}`, { isActive: next })
     } catch {
-      // silent
+      setAnnouncements((prev) => prev.map((x) => x.id === a.id ? { ...x, isActive: a.isActive } : x))
     } finally {
       setTogglingId(null)
     }
   }
 
+  // Optimistic delete — removes immediately, restores on error
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this announcement? This cannot be undone.")) return
+    const snapshot = announcements.find((a) => a.id === id)
+    setAnnouncements((prev) => prev.filter((a) => a.id !== id))
     setDeletingId(id)
     try {
       await axiosClient.delete(`/agencyAnnouncements/announcements/${id}`)
-      setAnnouncements((prev) => prev.filter((a) => a.id !== id))
     } catch {
-      // silent
+      if (snapshot) setAnnouncements((prev) => [snapshot, ...prev])
     } finally {
       setDeletingId(null)
     }
@@ -169,10 +170,10 @@ export default function AgencyAnnouncementsPage() {
       {/* ── Left: list ── */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Header */}
-        <div className="mb-5 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#063E3F]/10">
-              <Megaphone className="h-4.5 w-4.5 text-[#063E3F]" />
+              <Megaphone className="h-4 w-4 text-[#063E3F]" />
             </div>
             <div>
               <h1 className="text-[17px] font-semibold text-slate-900">Announcements</h1>
@@ -188,24 +189,81 @@ export default function AgencyAnnouncementsPage() {
           </button>
         </div>
 
-        {/* List content */}
+        {/* ── Filter bar ── */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {/* Type pills */}
+          <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-1">
+            {(["all", "info", "warning", "urgent"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTypeFilter(t)}
+                className={`rounded-lg px-3 py-1 text-[12px] font-semibold capitalize transition-colors ${
+                  typeFilter === t
+                    ? t === "all"
+                      ? "bg-slate-800 text-white"
+                      : `border ${TYPE_META[t].badge}`
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {t === "all" ? "All types" : TYPE_META[t].label}
+              </button>
+            ))}
+          </div>
+
+          {/* Status pills */}
+          <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-1">
+            {(["all", "active", "inactive"] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`rounded-lg px-3 py-1 text-[12px] font-semibold capitalize transition-colors ${
+                  statusFilter === s
+                    ? s === "active"
+                      ? "bg-green-600 text-white"
+                      : s === "inactive"
+                      ? "bg-slate-400 text-white"
+                      : "bg-slate-800 text-white"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {s === "all" ? "All status" : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Result count */}
+          {!loading && (
+            <span className="ml-auto text-[12px] text-slate-400">
+              {filtered.length} of {announcements.length}
+            </span>
+          )}
+        </div>
+
+        {/* List */}
         {loading ? (
           <div className="flex flex-1 items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
           </div>
         ) : error ? (
           <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-[13px] text-red-600">{error}</div>
-        ) : announcements.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
             <Megaphone className="h-10 w-10 text-slate-300" />
-            <p className="text-[14px] font-medium text-slate-500">No announcements yet</p>
-            <p className="text-[12px] text-slate-400">Create one to notify family portal users</p>
+            <p className="text-[14px] font-medium text-slate-500">
+              {announcements.length === 0 ? "No announcements yet" : "No results for current filters"}
+            </p>
+            <p className="text-[12px] text-slate-400">
+              {announcements.length === 0 ? "Create one to notify family portal users" : "Try changing the type or status filter"}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {announcements.map((a) => {
-              const meta = TYPE_META[a.type] ?? TYPE_META.info
+            {filtered.map((a) => {
+              const meta     = TYPE_META[a.type] ?? TYPE_META.info
               const TypeIcon = meta.icon
+              const expanded = expandedIds.has(a.id)
+              const isLong   = a.body.length > 120
+
               return (
                 <div
                   key={a.id}
@@ -223,14 +281,29 @@ export default function AgencyAnnouncementsPage() {
                         </span>
                       )}
                     </div>
+
                     <p className="text-[14px] font-semibold text-slate-800 truncate">{a.title}</p>
-                    <p className="text-[12px] text-slate-500 line-clamp-2">{a.body}</p>
+
+                    <p className={`text-[12px] text-slate-500 ${!expanded && isLong ? "line-clamp-2" : ""}`}>
+                      {a.body}
+                    </p>
+
+                    {isLong && (
+                      <button
+                        onClick={() => toggleExpand(a.id)}
+                        className="mt-0.5 flex items-center gap-0.5 self-start text-[11px] font-semibold text-[#063E3F] hover:underline"
+                      >
+                        {expanded ? <><ChevronUp className="h-3 w-3" /> Show less</> : <><ChevronDown className="h-3 w-3" /> Read more</>}
+                      </button>
+                    )}
+
                     <p className="text-[11px] text-slate-400 mt-0.5">
                       Posted {formatDate(a.createdAt)}
                       {a.expiresAt && ` · Expires ${formatDate(a.expiresAt)}`}
                       {a.createdByName && ` · by ${a.createdByName}`}
                     </p>
                   </div>
+
                   <div className="flex items-start gap-1.5 flex-shrink-0">
                     <button
                       onClick={() => void handleToggle(a)}
@@ -321,9 +394,7 @@ export default function AgencyAnnouncementsPage() {
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, type: t }))}
                       className={`flex-1 rounded-xl border py-2 text-[12px] font-semibold capitalize transition-colors ${
-                        form.type === t
-                          ? TYPE_META[t].badge
-                          : "border-slate-200 text-slate-500 hover:border-slate-300"
+                        form.type === t ? TYPE_META[t].badge : "border-slate-200 text-slate-500 hover:border-slate-300"
                       }`}
                     >
                       {TYPE_META[t].label}
