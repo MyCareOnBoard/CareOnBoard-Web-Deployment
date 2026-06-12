@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Megaphone, Loader2, AlertTriangle, Info, Siren } from "lucide-react"
+import { Megaphone, Loader2, AlertTriangle, Info, Siren, ChevronDown, ChevronUp } from "lucide-react"
 import axiosClient from "@/lib/axios"
 
 interface Announcement {
@@ -40,15 +40,28 @@ function formatDate(val: { seconds: number } | string | null): string {
   return new Date(ms).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
 }
 
+const SEEN_AT_KEY = "family_ann_seen_at"
+const BADGE_EVENT = "family_ann_badge_change"
+
 export default function FamilyAnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState<string | null>(null)
+  const [expandedIds, setExpandedIds]     = useState<Set<string>>(new Set())
+
+  const toggleExpand = (id: string) =>
+    setExpandedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   useEffect(() => {
     axiosClient
       .get<{ success: boolean; data: Announcement[] }>("/familyPortal/announcements")
-      .then((res) => setAnnouncements(res.data.data || []))
+      .then((res) => {
+        setAnnouncements(res.data.data || [])
+        // Mark all current announcements as seen — clears "New" badge in nav
+        localStorage.setItem(SEEN_AT_KEY, Date.now().toString())
+        localStorage.removeItem("family_ann_has_new")
+        window.dispatchEvent(new CustomEvent(BADGE_EVENT, { detail: false }))
+      })
       .catch(() => setError("Failed to load announcements. Please try again."))
       .finally(() => setLoading(false))
   }, [])
@@ -81,9 +94,12 @@ export default function FamilyAnnouncementsPage() {
       ) : (
         <div className="space-y-4">
           {announcements.map((a) => {
-            const meta = TYPE_META[a.type] ?? TYPE_META.info
+            const meta     = TYPE_META[a.type] ?? TYPE_META.info
             const TypeIcon = meta.icon
-            const posted = formatDate(a.createdAt)
+            const posted   = formatDate(a.createdAt)
+            const expanded = expandedIds.has(a.id)
+            const isLong   = a.body.length > 160
+
             return (
               <div
                 key={a.id}
@@ -98,8 +114,25 @@ export default function FamilyAnnouncementsPage() {
                     <span className="text-[11px] text-slate-400">Posted {posted}</span>
                   )}
                 </div>
+
                 <p className="mb-1.5 text-[15px] font-semibold text-slate-800">{a.title}</p>
-                <p className="text-[13px] leading-relaxed text-slate-600">{a.body}</p>
+
+                <p className={`text-[13px] leading-relaxed text-slate-600 ${!expanded && isLong ? "line-clamp-3" : ""}`}>
+                  {a.body}
+                </p>
+
+                {isLong && (
+                  <button
+                    onClick={() => toggleExpand(a.id)}
+                    className="mt-1.5 flex items-center gap-0.5 text-[12px] font-semibold text-[#063E3F] hover:underline"
+                  >
+                    {expanded
+                      ? <><ChevronUp className="h-3.5 w-3.5" /> Show less</>
+                      : <><ChevronDown className="h-3.5 w-3.5" /> Read more</>
+                    }
+                  </button>
+                )}
+
                 {a.createdByName && (
                   <p className="mt-3 text-[11px] text-slate-400">— {a.createdByName}</p>
                 )}

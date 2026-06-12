@@ -608,7 +608,24 @@ export default function FamilyDashboardPage() {
         ])
             .then(([dashRes, annRes]) => {
                 setData(dashRes.data.data)
-                if (annRes) setAnnouncements(annRes.data.data || [])
+                if (annRes) {
+                    const list = annRes.data.data || []
+                    setAnnouncements(list)
+                    // Badge logic: flag new announcements so FamilyLayout can show a dot
+                    const seenAt = parseInt(localStorage.getItem("family_ann_seen_at") ?? "0", 10)
+                    const hasNew = list.some((a) => {
+                        const ms = a.createdAt
+                            ? typeof a.createdAt === "string"
+                                ? Date.parse(a.createdAt)
+                                : a.createdAt.seconds * 1000
+                            : 0
+                        return ms > seenAt
+                    })
+                    if (hasNew) {
+                        localStorage.setItem("family_ann_has_new", "1")
+                        window.dispatchEvent(new CustomEvent("family_ann_badge_change", { detail: true }))
+                    }
+                }
             })
             .catch(() => setError("Failed to load dashboard. Please refresh."))
             .finally(() => setLoading(false))

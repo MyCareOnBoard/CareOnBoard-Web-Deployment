@@ -59,12 +59,23 @@ const NAV_ITEMS = [
   { icon: Megaphone,      label: "Announcements",   to: Routes.family.announcements  as string | null },
 ] satisfies { icon: React.ComponentType<{ className?: string }>; label: string; to: string | null }[]
 
+const BADGE_EVENT = "family_ann_badge_change"
+
 export default function FamilyLayout() {
   const navigate = useNavigate()
   const dispatch = useDispatch<AppDispatch>()
   const user = useSelector(selectUser)
   const isAuthenticated = useSelector(selectIsAuthenticated)
   const [client, setClient] = useState<ClientInfo | null>(null)
+  const [hasNewAnn, setHasNewAnn] = useState<boolean>(
+    () => localStorage.getItem("family_ann_has_new") === "1"
+  )
+
+  useEffect(() => {
+    const handler = (e: Event) => setHasNewAnn((e as CustomEvent<boolean>).detail)
+    window.addEventListener(BADGE_EVENT, handler)
+    return () => window.removeEventListener(BADGE_EVENT, handler)
+  }, [])
 
   useEffect(() => {
     if (!isAuthenticated || user?.userType !== UserType.FAMILY_MEMBER) {
@@ -149,7 +160,12 @@ export default function FamilyLayout() {
                   }`
                 }
               >
-                <Icon className="h-4 w-4 flex-shrink-0" />
+                <div className="relative flex-shrink-0">
+                  <Icon className="h-4 w-4" />
+                  {label === "Announcements" && hasNewAnn && (
+                    <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-400 ring-1 ring-[#063E3F]" />
+                  )}
+                </div>
                 {label}
               </NavLink>
             ) : (
