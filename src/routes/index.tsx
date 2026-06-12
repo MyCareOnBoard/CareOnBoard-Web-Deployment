@@ -18,6 +18,7 @@ const FamilyLayout = lazy(() => import("@/layouts/FamilyLayout"));
 const FamilyDashboardPage = lazy(() => import("@/pages/family/dashboard"));
 const FamilySchedulePage = lazy(() => import("@/pages/family/schedule"));
 const FamilyMessagesPage = lazy(() => import("@/pages/family/messages"));
+const FamilyAnnouncementsPage = lazy(() => import("@/pages/family/announcements"));
 const ApplicantDashboardPage = lazy(() => import("@/pages/applicant/dashboard"));
 const DocumentsPage = lazy(() => import("@/pages/applicant/documents"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
@@ -127,6 +128,7 @@ const AgencyBillingMonitorPage = lazy(() => import("@/pages/super-admin/agency-b
 const AIAutomationPage = lazy(() => import("@/pages/agency/ai-automation"));
 const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));
 const AgencyIncidentPage = lazy(() => import("@/pages/agency/incident"));
+const AgencyAnnouncementsPage = lazy(() => import("@/pages/agency/announcements"));
 const AgencyReports = lazy(() => import("@/pages/agency/reports"));
 const AgencyClientReports = lazy(() => import("@/pages/agency/reports/clientsReport"));
 const AgencyDSPReports = lazy(() => import("@/pages/agency/reports/dspReports"));
@@ -426,6 +428,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.incident,
                 Component: AgencyIncidentPage,
+            },
+            {
+                path: Routes.agency.announcements,
+                Component: AgencyAnnouncementsPage,
             },
             {
                 path: Routes.agency.helpCenter,
@@ -789,6 +795,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.family.messages,
                 Component: FamilyMessagesPage,
+            },
+            {
+                path: Routes.family.announcements,
+                Component: FamilyAnnouncementsPage,
             },
         ],
     },

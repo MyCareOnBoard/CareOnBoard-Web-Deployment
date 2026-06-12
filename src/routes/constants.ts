@@ -61,6 +61,7 @@ export const Routes = {
         notes: "/agency/notes",
         mileage: "/agency/mileage",
         incident: "/agency/incident",
+        announcements: "/agency/announcements",
         helpCenter: "/agency/help-center",
         agencySettings: "/agency/agency-settings",
         agencySettingsInternalUsers: "/agency/agency-settings/user-levels/internal-users",
@@ -174,6 +175,7 @@ export const Routes = {
         dashboard: "/family/dashboard",
         schedule: "/family/schedule",
         messages: "/family/messages",
+        announcements: "/family/announcements",
     },
     onboarding: {
         index: "/onboarding",
