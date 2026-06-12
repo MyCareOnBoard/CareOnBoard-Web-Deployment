@@ -11,6 +11,11 @@ import {
     ChevronRight,
     Phone,
     MessageCircle,
+    Megaphone,
+    Info,
+    Siren,
+    X,
+    ArrowRight,
 } from "lucide-react"
 import axiosClient from "@/lib/axios"
 import {Routes} from "@/routes/constants"
@@ -62,6 +67,105 @@ interface DashboardData {
     upcomingSchedule: ShiftItem[]
     recentActivities: ActivityItem[]
     careTeam: TeamMember[]
+}
+
+interface Announcement {
+    id: string
+    title: string
+    body: string
+    type: "info" | "warning" | "urgent"
+    createdByName?: string
+    createdAt: { seconds: number } | string | null
+}
+
+// ─── Announcements Banner ─────────────────────────────────────────────────────
+
+const BANNER_META = {
+    info:    { bg: "bg-blue-50",   border: "border-blue-200",  text: "text-blue-800",  icon: Info,          label: "Info" },
+    warning: { bg: "bg-amber-50",  border: "border-amber-200", text: "text-amber-800", icon: AlertTriangle, label: "Warning" },
+    urgent:  { bg: "bg-red-50",    border: "border-red-200",   text: "text-red-800",   icon: Siren,         label: "Urgent" },
+} as const
+
+const DISMISSED_KEY = "family_dismissed_announcements"
+
+function getDismissed(): Set<string> {
+    try { return new Set(JSON.parse(sessionStorage.getItem(DISMISSED_KEY) ?? "[]")) }
+    catch { return new Set() }
+}
+
+function dismiss(id: string) {
+    const s = getDismissed()
+    s.add(id)
+    sessionStorage.setItem(DISMISSED_KEY, JSON.stringify([...s]))
+}
+
+function AnnouncementsBanner({
+    announcements,
+    onViewAll,
+}: {
+    announcements: Announcement[]
+    onViewAll: () => void
+}) {
+    const [dismissed, setDismissed] = useState<Set<string>>(getDismissed)
+    const visible = announcements.filter((a) => !dismissed.has(a.id))
+
+    if (visible.length === 0) return null
+
+    const top = visible[0]
+    const meta = BANNER_META[top.type] ?? BANNER_META.info
+    const TypeIcon = meta.icon
+    const extras = visible.length - 1
+
+    const handleDismiss = (id: string) => {
+        dismiss(id)
+        setDismissed(getDismissed())
+    }
+
+    return (
+        <div className={`rounded-2xl border p-4 ${meta.bg} ${meta.border}`}>
+            <div className="flex items-start gap-3">
+                <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/60`}>
+                    <TypeIcon className={`h-3.5 w-3.5 ${meta.text}`} />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[11px] font-bold uppercase tracking-wide ${meta.text} opacity-70`}>
+                            {meta.label}
+                        </span>
+                        <Megaphone className={`h-3 w-3 ${meta.text} opacity-50`} />
+                    </div>
+                    <p className={`mt-0.5 text-[14px] font-semibold ${meta.text}`}>{top.title}</p>
+                    <p className={`mt-0.5 text-[13px] ${meta.text} opacity-80 line-clamp-2`}>{top.body}</p>
+                    <div className="mt-2 flex items-center gap-3">
+                        {extras > 0 && (
+                            <button
+                                type="button"
+                                onClick={onViewAll}
+                                className={`flex items-center gap-1 text-[12px] font-semibold ${meta.text} underline-offset-2 hover:underline`}
+                            >
+                                +{extras} more announcement{extras > 1 ? "s" : ""}
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={onViewAll}
+                            className={`flex items-center gap-1 text-[12px] font-semibold ${meta.text} hover:underline underline-offset-2`}
+                        >
+                            View all <ArrowRight className="h-3 w-3" />
+                        </button>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => handleDismiss(top.id)}
+                    className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full hover:bg-black/10 ${meta.text} opacity-60`}
+                    aria-label="Dismiss"
+                >
+                    <X className="h-3.5 w-3.5" />
+                </button>
+            </div>
+        </div>
+    )
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -490,14 +594,22 @@ function CareTeamCard({team}: { team: TeamMember[] }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function FamilyDashboardPage() {
+    const navigate = useNavigate()
     const [data, setData] = useState<DashboardData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [announcements, setAnnouncements] = useState<Announcement[]>([])
 
     useEffect(() => {
-        axiosClient
-            .get<{ success: boolean; data: DashboardData }>("/familyPortal/dashboard")
-            .then((res) => setData(res.data.data))
+        // Fetch dashboard and announcements in parallel
+        Promise.all([
+            axiosClient.get<{ success: boolean; data: DashboardData }>("/familyPortal/dashboard"),
+            axiosClient.get<{ success: boolean; data: Announcement[] }>("/familyPortal/announcements").catch(() => null),
+        ])
+            .then(([dashRes, annRes]) => {
+                setData(dashRes.data.data)
+                if (annRes) setAnnouncements(annRes.data.data || [])
+            })
             .catch(() => setError("Failed to load dashboard. Please refresh."))
             .finally(() => setLoading(false))
     }, [])
@@ -529,6 +641,12 @@ export default function FamilyDashboardPage() {
 
     return (
         <div className="flex flex-col gap-5">
+            {announcements.length > 0 && (
+                <AnnouncementsBanner
+                    announcements={announcements}
+                    onViewAll={() => navigate(Routes.family.announcements)}
+                />
+            )}
             <h3 className={"font-bold text-xl"}>Overview</h3>
             <OverviewCards data={data}/>
 

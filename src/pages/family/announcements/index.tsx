@@ -54,7 +54,7 @@ export default function FamilyAnnouncementsPage() {
   }, [])
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       {/* Header */}
       <div className="mb-6 flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#063E3F]/10">
