@@ -36,6 +36,14 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   bsp: "Behavior Plan / BSP",
   medicalDocs: "Medical Documents",
   consents: "Consents and Releases",
+  physicianOrders: "Physician Orders",
+  insuranceCards: "Insurance Cards",
+  medicaidCard: "Medicaid Card",
+  medicareCard: "Medicare Card",
+  idCard: "ID Card",
+  guardianshipDocs: "Guardianship / POA Documents",
+  assessmentForms: "Assessment Forms",
+  hospitalDischarge: "Hospital Discharge Papers",
   unknown: "Not detected",
 };
 
@@ -47,6 +55,15 @@ const FIELD_LABELS: Record<string, string> = {
   "stage1.dob": "Date of birth",
   "stage1.medicaidId": "Medicaid ID",
   "stage1.dddId": "DDD ID",
+  "stage1.medicareId": "Medicare ID",
+  "stage1.preferredName": "Preferred name",
+  "stage1.maritalStatus": "Marital status",
+  "stage1.referralInfo.source": "Referral source",
+  "stage1.referralInfo.organization": "Referring organization",
+  "stage2.hhaServiceRequest.requestedServices": "Requested services",
+  "stage2.hhaAuthorizations": "HHA authorizations",
+  "stage3.physicianInfo.name": "Physician name",
+  "stage3.fallRisk": "Fall risk",
   "stage1.ssn": "Social Security number",
   "stage1.address": "Address",
   "stage1.countyState": "County / state",
@@ -170,7 +187,7 @@ export default function ClientImportFromFilePanel({
     setError(null);
     setPendingFile(file);
     try {
-      const res = await extractClientIspViaApi(file);
+      const res = await extractClientIspViaApi(file, { type: formData.type });
       setExtraction(res);
       setModalStep("review");
     } catch (e: unknown) {
@@ -256,12 +273,12 @@ export default function ClientImportFromFilePanel({
       <Button
         type="button"
         variant="outline"
-        aria-label="Import from document"
+        aria-label="Import from ISP document"
         className="h-11 min-h-[44px] shrink-0 rounded-[12px] border-[#00b4b8] px-3 text-[#00b4b8] hover:bg-[#e6fafa] sm:px-4"
         onClick={openImportModal}
       >
         <FileUp className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
-        <span className="hidden font-semibold sm:inline">Import from document</span>
+        <span className="hidden font-semibold sm:inline">Import from ISP document</span>
         <span className="font-semibold sm:hidden">Import</span>
       </Button>
 
@@ -269,7 +286,7 @@ export default function ClientImportFromFilePanel({
         <DialogContent className="flex max-h-[90vh] w-[min(96vw,560px)] flex-col gap-4 p-5">
           <DialogHeader className="shrink-0 space-y-1 text-left">
             <DialogTitle className="text-lg font-semibold text-[#10141a]">
-              {modalStep === "pick" && "Import from document"}
+              {modalStep === "pick" && "Import from ISP document"}
               {modalStep === "review" && "Review extracted information"}
             </DialogTitle>
             {modalStep === "pick" ? (

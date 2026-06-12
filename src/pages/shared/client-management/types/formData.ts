@@ -7,6 +7,79 @@ export type InsuranceDetail = {
     contact?: string;
 };
 
+export type ClientType = "ddd" | "hha";
+export type HhaInsuranceType = "primary" | "secondary";
+
+export type HhaReferralInfo = {
+    source?: string;
+    date?: Date;
+    organization?: string;
+    contactPerson?: string;
+    contactNumber?: string;
+};
+
+export type HhaHomeInfo = {
+    apartmentNumber?: string;
+    county?: string;
+    accessInstructions?: string;
+    homeType?: string;
+};
+
+export type HhaInsuranceInfo = {
+    id: string;
+    type: HhaInsuranceType;
+    company?: string;
+    memberId?: string;
+    groupNumber?: string;
+    effectiveDate?: Date;
+    authorizationRequired?: YesNo;
+};
+
+export type HhaServiceRequest = {
+    requestedServices?: string[];
+    daysNeeded?: string[];
+    startDate?: Date;
+    preferredTime?: string;
+    hoursRequested?: string;
+};
+
+export type HhaAuthorization = {
+    id: string;
+    authorizationNumber?: string;
+    serviceId?: string;
+    serviceName?: string;
+    serviceCode?: string;
+    approvedHours?: string;
+    startDate?: Date;
+    endDate?: Date;
+    payerSource?: string;
+    rate?: string;
+    unitType?: string;
+    assignedDsps?: Dsp[];
+    serviceType?: string;
+    modifier?: string;
+    clientPayType?: ServicePayType;
+    staffRate?: string;
+    payType?: ServicePayType;
+};
+
+export type HhaPhysicianInfo = {
+    name?: string;
+    npi?: string;
+    phone?: string;
+    fax?: string;
+    address?: string;
+};
+
+export type HhaCaregiverPreferences = {
+    languagePreference?: string;
+    smokingAllowed?: YesNo;
+    petInHome?: YesNo;
+    liftAssistanceRequired?: YesNo;
+    vehicleRequired?: YesNo;
+    specialSkillsNeeded?: string;
+};
+
 export type Stage1ClientIdentityAndContactData = {
     firstName: string;
     lastName: string;
@@ -38,6 +111,11 @@ export type Stage1ClientIdentityAndContactData = {
     dddStatus?: string;
     medicaidType?: string;
     insuranceDetails?: InsuranceDetail[];
+    preferredName?: string;
+    maritalStatus?: string;
+    medicareId?: string;
+    homeInfo?: HhaHomeInfo;
+    referralInfo?: HhaReferralInfo;
 };
 
 /** Client pay type may include per-mile billing; staff pay type uses only hourly / 15-min / daily in the UI. */
@@ -183,6 +261,7 @@ export type Outcome = {
 
 /** Guardians / representatives; optional support coordinator fields mirror the legacy single-row ISP layout. */
 export type GuardianContact = {
+    id: string;
     name?: string;
     relationship?: GuardianRelationship;
     email?: string;
@@ -193,6 +272,8 @@ export type GuardianContact = {
     supportCoordinatorName?: string;
     supportCoordinatorAgency?: string;
     supportCoordinatorContact?: string;
+    isLegalGuardian?: YesNo;
+    hasPowerOfAttorney?: YesNo;
 };
 
 export type CareTeamContact = {
@@ -217,6 +298,9 @@ export type Stage2GuardianAndFundingData = {
     outcomes: Outcome[];
     guardians?: GuardianContact[];
     careTeam?: CareTeamContact[];
+    insuranceInfo?: HhaInsuranceInfo[];
+    hhaServiceRequest?: HhaServiceRequest;
+    hhaAuthorizations?: HhaAuthorization[];
 };
 
 export type DocKey =
@@ -226,7 +310,15 @@ export type DocKey =
     | "sdr"
     | "bsp"
     | "medicalDocs"
-    | "consents";
+    | "consents"
+    | "physicianOrders"
+    | "insuranceCards"
+    | "medicaidCard"
+    | "medicareCard"
+    | "idCard"
+    | "guardianshipDocs"
+    | "assessmentForms"
+    | "hospitalDischarge";
 
 export type DocState = {
     key: DocKey;
@@ -261,6 +353,9 @@ export type Stage3HealthcareAndDocumentsData = {
     healthHazards?: string;
     nutritionNotes?: string;
     selfCareNeeds?: AdlSupportNeed[];
+    physicianInfo?: HhaPhysicianInfo;
+    fallRisk?: YesNo;
+    specialPrecautions?: string;
 };
 
 export type YesNo = "yes" | "no" | "";
@@ -309,6 +404,7 @@ export type Stage5StaffAssignmentAndRestrictionsData = {
     noMaleFemaleStaff: YesNo;
     medicalRestrictionsTrained: YesNo;
     autoChecks: Record<AutoCheckKey, boolean>;
+    hhaCaregiverPreferences?: HhaCaregiverPreferences;
 };
 
 export type ClientMedication = {
@@ -386,6 +482,7 @@ export type Stage7SystemAiAndAuditData = {
 
 export type AddClientFormData = {
     agencyId?: string;
+    type: ClientType;
     /**
      * Stage 1 should run Places autocomplete on imported primary address and clear after processing.
      * Not sent to APIs.
@@ -446,7 +543,125 @@ export function createEmptyOutcome(): Outcome {
     };
 }
 
-export function createInitialDocs(): DocState[] {
+function newId(prefix: string): string {
+    return typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? `${prefix}-${crypto.randomUUID()}`
+        : `${prefix}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function createEmptyGuardianContact(): GuardianContact {
+    return {
+        id: newId("guardian"),
+        name: "",
+        email: "",
+        primaryPhone: "",
+        address: "",
+        supportCoordinatorName: "",
+        supportCoordinatorAgency: "",
+        supportCoordinatorContact: "",
+    };
+}
+
+export function createEmptyHhaInsuranceInfo(type: HhaInsuranceType = "primary"): HhaInsuranceInfo {
+    return {
+        id: newId("insurance"),
+        type,
+        company: "",
+        memberId: "",
+        groupNumber: "",
+        effectiveDate: undefined,
+        authorizationRequired: "",
+    };
+}
+
+export function createEmptyHhaAuthorization(): HhaAuthorization {
+    return {
+        id: newId("hha-auth"),
+        authorizationNumber: "",
+        serviceId: undefined,
+        serviceName: "",
+        serviceCode: "",
+        approvedHours: "",
+        startDate: undefined,
+        endDate: undefined,
+        payerSource: "",
+        rate: "",
+        unitType: "",
+        assignedDsps: [],
+        serviceType: undefined,
+        modifier: undefined,
+        clientPayType: undefined,
+        staffRate: "",
+        payType: undefined,
+    };
+}
+
+export function createInitialDocs(type: ClientType = "ddd"): DocState[] {
+    if (type === "hha") {
+        return [
+            {
+                key: "physicianOrders",
+                title: "Physician Orders",
+                uploadLabel: "Upload Physician Orders",
+                autoReminder: true,
+            },
+            {
+                key: "poc",
+                title: "Plan of Care (POC)",
+                uploadLabel: "Upload Plan of Care (POC)",
+                autoReminder: true,
+            },
+            {
+                key: "insuranceCards",
+                title: "Insurance Cards",
+                uploadLabel: "Upload front and back insurance cards",
+                autoReminder: true,
+            },
+            {
+                key: "medicaidCard",
+                title: "Medicaid Card",
+                uploadLabel: "Upload Medicaid card",
+                autoReminder: true,
+            },
+            {
+                key: "medicareCard",
+                title: "Medicare Card",
+                uploadLabel: "Upload Medicare card",
+                autoReminder: true,
+            },
+            {
+                key: "idCard",
+                title: "ID Card",
+                uploadLabel: "Upload ID card",
+                autoReminder: true,
+            },
+            {
+                key: "guardianshipDocs",
+                title: "Guardianship / POA Documents",
+                uploadLabel: "Upload guardianship or POA documents",
+                autoReminder: true,
+            },
+            {
+                key: "consents",
+                title: "Consent Forms",
+                uploadLabel: "Upload consent forms",
+                autoReminder: true,
+            },
+            {
+                key: "assessmentForms",
+                title: "Assessment Forms",
+                uploadLabel: "Upload assessment forms",
+                autoReminder: true,
+            },
+            {
+                key: "hospitalDischarge",
+                title: "Hospital Discharge Papers",
+                uploadLabel: "Upload hospital discharge papers",
+                autoReminder: true,
+            },
+        ];
+    }
+
     return [
         {
             key: "isp",
@@ -496,6 +711,7 @@ export function createInitialDocs(): DocState[] {
 export function createInitialAddClientFormData(): AddClientFormData {
     return {
         agencyId: undefined,
+        type: "ddd",
         stage1: {
             firstName: "",
             lastName: "",
@@ -526,6 +742,22 @@ export function createInitialAddClientFormData(): AddClientFormData {
             dddStatus: undefined,
             medicaidType: undefined,
             insuranceDetails: [],
+            preferredName: "",
+            maritalStatus: "",
+            medicareId: "",
+            homeInfo: {
+                apartmentNumber: "",
+                county: "",
+                accessInstructions: "",
+                homeType: "",
+            },
+            referralInfo: {
+                source: "",
+                date: undefined,
+                organization: "",
+                contactPerson: "",
+                contactNumber: "",
+            },
         },
         stage2: {
             guardianName: "",
@@ -539,6 +771,15 @@ export function createInitialAddClientFormData(): AddClientFormData {
             outcomes: [],
             guardians: [],
             careTeam: [],
+            insuranceInfo: [createEmptyHhaInsuranceInfo("primary")],
+            hhaServiceRequest: {
+                requestedServices: [],
+                daysNeeded: [],
+                startDate: undefined,
+                preferredTime: "",
+                hoursRequested: "",
+            },
+            hhaAuthorizations: [createEmptyHhaAuthorization()],
         },
         stage3: {
             medicalConditions: [],
@@ -554,6 +795,15 @@ export function createInitialAddClientFormData(): AddClientFormData {
             healthHazards: undefined,
             nutritionNotes: undefined,
             selfCareNeeds: [],
+            physicianInfo: {
+                name: "",
+                npi: "",
+                phone: "",
+                fax: "",
+                address: "",
+            },
+            fallRisk: "",
+            specialPrecautions: "",
         },
         stage4: {
             evvRequirement: "",
@@ -576,6 +826,14 @@ export function createInitialAddClientFormData(): AddClientFormData {
                 training: false,
                 background: false,
                 expired: false,
+            },
+            hhaCaregiverPreferences: {
+                languagePreference: "",
+                smokingAllowed: "",
+                petInHome: "",
+                liftAssistanceRequired: "",
+                vehicleRequired: "",
+                specialSkillsNeeded: "",
             },
         },
         stage6: {

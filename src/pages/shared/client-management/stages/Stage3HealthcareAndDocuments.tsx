@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { Suspense, lazy, useState } from "react";
 import { CalendarDays, Upload, File, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,11 @@ import { MultiSelect, MultiSelectItem } from "@/components/ui/multi-select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AddClientFormData, DocKey, DocState, createInitialDocs } from "@/pages/shared/client-management/types/formData";
+import { canGeneratePoc } from "@/pages/shared/client-management/utils/pocGenerationEligibility";
+
+const GeneratePocPanel = lazy(
+  () => import("@/pages/shared/client-management/components/GeneratePocPanel"),
+);
 
 const OTHER_VALUE = "Other (specify)";
 
@@ -173,13 +178,16 @@ export function Stage3HealthcareAndDocuments({
   formData,
   setFormData,
   pageTitle = "Add client",
+  clientId,
 }: {
   footer: React.ReactNode;
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
   pageTitle?: string;
+  clientId?: string;
 }) {
   const stage3 = formData.stage3;
+  const isHhaClient = formData.type === "hha";
   const [medicalConditionsOtherText, setMedicalConditionsOtherText] = useState<string | null>(null);
   const [allergiesOtherText, setAllergiesOtherText] = useState<string | null>(null);
   const [dietaryRestrictionsOtherText, setDietaryRestrictionsOtherText] = useState<string | null>(null);
@@ -188,6 +196,14 @@ export function Stage3HealthcareAndDocuments({
 
   const updateStage3 = (patch: Partial<AddClientFormData["stage3"]>) =>
     setFormData((prev) => ({ ...prev, stage3: { ...prev.stage3, ...patch } }));
+  const updatePhysicianInfo = (patch: Partial<NonNullable<AddClientFormData["stage3"]["physicianInfo"]>>) =>
+    setFormData((prev) => ({
+      ...prev,
+      stage3: {
+        ...prev.stage3,
+        physicianInfo: { ...(prev.stage3.physicianInfo ?? {}), ...patch },
+      },
+    }));
 
   const updateDoc = (key: DocKey, patch: Partial<DocState>) => {
     updateStage3({
@@ -214,6 +230,61 @@ export function Stage3HealthcareAndDocuments({
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
+          {isHhaClient ? (
+            <div className="col-span-1 border-b border-[#e5e5e6] pb-6 lg:col-span-2 xl:col-span-4">
+              <div className="mb-4">
+                <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+                  Physician information
+                </p>
+                <p className="mt-1 text-[13px] font-medium leading-[1.4] text-[#808081]">
+                  Use the ordering or primary physician tied to the HHA plan of care.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Physician name</label>
+                  <Input
+                    value={stage3.physicianInfo?.name ?? ""}
+                    onChange={(e) => updatePhysicianInfo({ name: e.target.value })}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">NPI number</label>
+                  <Input
+                    value={stage3.physicianInfo?.npi ?? ""}
+                    onChange={(e) => updatePhysicianInfo({ npi: e.target.value })}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Phone number</label>
+                  <Input
+                    value={stage3.physicianInfo?.phone ?? ""}
+                    onChange={(e) => updatePhysicianInfo({ phone: e.target.value })}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Fax number</label>
+                  <Input
+                    value={stage3.physicianInfo?.fax ?? ""}
+                    onChange={(e) => updatePhysicianInfo({ fax: e.target.value })}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-2 xl:col-span-4">
+                  <label className="text-[12px] font-normal text-[#10141a]">Physician address</label>
+                  <Input
+                    value={stage3.physicianInfo?.address ?? ""}
+                    onChange={(e) => updatePhysicianInfo({ address: e.target.value })}
+                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Medical Conditions</label>
             <MultiSelect
@@ -335,6 +406,35 @@ export function Stage3HealthcareAndDocuments({
               </div>
             </div>
           </div>
+
+          {isHhaClient ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Fall risk</label>
+                <Select
+                  value={stage3.fallRisk || undefined}
+                  onValueChange={(v) => updateStage3({ fallRisk: v as AddClientFormData["stage3"]["fallRisk"] })}
+                >
+                  <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                    <SelectValue placeholder="Select answer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="yes">Yes</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1 md:col-span-2 xl:col-span-3">
+                <label className="text-[12px] font-normal text-[#10141a]">Special precautions</label>
+                <Input
+                  value={stage3.specialPrecautions ?? ""}
+                  onChange={(e) => updateStage3({ specialPrecautions: e.target.value })}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Precautions caregivers should follow"
+                />
+              </div>
+            </>
+          ) : null}
 
           <div className="flex flex-col gap-1">
             <label className="text-[12px] font-normal text-[#10141a]">Behavior Support Plan (if any)</label>
@@ -679,7 +779,7 @@ export function Stage3HealthcareAndDocuments({
 
         <div className="mt-6 space-y-8">
           {(() => {
-            const allDocs = createInitialDocs();
+            const allDocs = createInitialDocs(formData.type);
             return allDocs.map((defaultDoc) => {
               const doc = stage3.docs.find((d) => d.key === defaultDoc.key) || defaultDoc;
               const hasExistingFile = !!doc.url && !doc.file && !doc.files;
@@ -690,6 +790,16 @@ export function Stage3HealthcareAndDocuments({
                     {doc.title}
                   </p>
 
+                  {doc.key === "poc" && canGeneratePoc(formData) ? (
+                    <Suspense fallback={null}>
+                      <GeneratePocPanel
+                        formData={formData}
+                        setFormData={setFormData}
+                        clientId={clientId}
+                      />
+                    </Suspense>
+                  ) : null}
+
                   <label
                     htmlFor={`doc-upload-${doc.key}`}
                     className="h-[101px] w-full rounded-[12px] border border-[#cccccd] bg-white flex items-center justify-center cursor-pointer hover:bg-[#f8f9fa] transition-colors"
@@ -699,12 +809,22 @@ export function Stage3HealthcareAndDocuments({
                       type="file"
                       className="sr-only"
                       accept=".pdf,.doc,.docx,image/*"
-                      multiple={doc.key === "medicalDocs" || doc.key === "consents"}
+                      multiple={
+                        doc.key === "medicalDocs" ||
+                        doc.key === "consents" ||
+                        doc.key === "insuranceCards" ||
+                        doc.key === "assessmentForms"
+                      }
                       onChange={(e) => {
                         const files = e.target.files;
                         if (!files || files.length === 0) return;
 
-                        if (doc.key === "medicalDocs" || doc.key === "consents") {
+                        if (
+                          doc.key === "medicalDocs" ||
+                          doc.key === "consents" ||
+                          doc.key === "insuranceCards" ||
+                          doc.key === "assessmentForms"
+                        ) {
                           const fileArray = Array.from(files);
                           const fileName =
                             fileArray.length === 1

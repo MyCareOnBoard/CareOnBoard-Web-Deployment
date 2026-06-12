@@ -14,6 +14,8 @@ import {
 
   getCreatePayrollInvoiceErrorMessage,
 
+  getPayrollBlockedShifts,
+
   getPayrollInvoiceMutationErrorMessage,
 
   getPayrollListErrorMessage,
@@ -418,9 +420,20 @@ export default function PayrollDashboardPage() {
           return;
         }
 
+        const blockedShifts = getPayrollBlockedShifts(error);
         toast({
           title: "Couldn't create payroll invoice",
-          description: getCreatePayrollInvoiceErrorMessage(error),
+          description:
+            blockedShifts.length > 0
+              ? `${getCreatePayrollInvoiceErrorMessage(error)} Blocked: ${blockedShifts
+                  .map(
+                    (shift) =>
+                      `${shift.date ?? "unknown date"} — ${shift.clientName ?? "client"} (${
+                        shift.serviceCode ?? "no code"
+                      }): ${shift.reason}`,
+                  )
+                  .join("; ")}`
+              : getCreatePayrollInvoiceErrorMessage(error),
           variant: "destructive",
         });
       } finally {

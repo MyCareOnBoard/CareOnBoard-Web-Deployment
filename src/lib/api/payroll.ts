@@ -150,6 +150,8 @@ export type CreatePayrollInvoicePayload = {
 
 export type PayrollInvoicePreviewItemType = "shift" | "ride" | "expense";
 
+export type PayrollRateStatus = "ok" | "no-service-match" | "missing-staff-rate";
+
 export type PayrollInvoicePreviewItem = {
   id: string;
   type: PayrollInvoicePreviewItemType;
@@ -161,6 +163,18 @@ export type PayrollInvoicePreviewItem = {
   amount: number;
   amountLabel: string;
   quantity: number;
+  /** Present on shift items; non-"ok" means the shift would pay $0 and blocks invoicing. */
+  rateStatus?: PayrollRateStatus;
+  rateIssue?: string;
+};
+
+export type PayrollBlockedShift = {
+  shiftId: string;
+  date: string | null;
+  clientName: string | null;
+  serviceCode: string | null;
+  rateStatus: PayrollRateStatus;
+  reason: string;
 };
 
 export type PayrollInvoicePreview = {
@@ -227,10 +241,26 @@ type PayrollInvoicePreviewResponse = {
 
 function getAxiosErrorPayload(error: unknown) {
   if (typeof error === "object" && error !== null && "response" in error) {
-    return (error as { response?: { data?: { error?: string; message?: string } } }).response
-      ?.data;
+    return (
+      error as {
+        response?: {
+          data?: {
+            error?: string;
+            message?: string;
+            details?: { blockedShifts?: PayrollBlockedShift[] };
+          };
+        };
+      }
+    ).response?.data;
   }
   return undefined;
+}
+
+/** Shifts the backend refused to invoice because no staff rate could be resolved. */
+export function getPayrollBlockedShifts(error: unknown): PayrollBlockedShift[] {
+  const response = getAxiosErrorPayload(error);
+  if (response?.error !== "SHIFT_RATE_UNRESOLVED") return [];
+  return response.details?.blockedShifts ?? [];
 }
 
 export async function getPayrollDashboard(
@@ -355,6 +385,12 @@ export function getCreatePayrollInvoiceErrorMessage(error: unknown): string {
   }
   if (response?.error === "SHIFT_NOT_APPROVED") {
     return "Shifts must be approved before creating a payroll invoice.";
+  }
+  if (response?.error === "SHIFT_RATE_UNRESOLVED") {
+    return (
+      response.message ||
+      "Some shifts have no staff pay rate. Fix the client authorization and try again."
+    );
   }
   if (response?.message) {
     return response.message;

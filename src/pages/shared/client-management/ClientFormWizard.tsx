@@ -1,5 +1,6 @@
-import React, { useMemo, useCallback, Suspense, lazy, useRef } from "react";
-import { AddClientFormData } from "./types/formData";
+import React, { useMemo, useCallback, Suspense, lazy, useRef, useState } from "react";
+import { useNavigate } from "react-router";
+import { AddClientFormData, createInitialDocs, type ClientType } from "./types/formData";
 import { ClientFormConfig } from "./types/config";
 import { useClientForm } from "./hooks/useClientForm";
 import { useClientSave } from "./hooks/useClientSave";
@@ -16,9 +17,24 @@ import { Stage6GoalsAndEmergency } from "./stages/Stage6GoalsAndEmergency";
 import { Stage7SystemAiAndAudit } from "./stages/Stage7SystemAiAndAudit";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import {
+  canGeneratePoc,
+  shouldShowPocSaveGuard,
+} from "./utils/pocGenerationEligibility";
+import {
+  PocSaveGuardModal,
+  type PocSaveGuardAction,
+} from "./components/PocSaveGuardModal";
+import type { GeneratePocPanelHandle } from "./components/GeneratePocPanel";
+import { scrollToPocUpload } from "./utils/pocUploadDom";
+import { ClientTypePicker } from "./components/ClientTypePicker";
 
 const ClientImportFromFilePanel = lazy(
   () => import("./components/ClientImportFromFilePanel"),
+);
+
+const GeneratePocPanel = lazy(
+  () => import("./components/GeneratePocPanel"),
 );
 
 type ClientFormWizardProps = {
@@ -46,6 +62,7 @@ export function ClientFormWizard({
     isLast,
     goToNext,
     goToPrev,
+    goToStage,
   } = useClientForm(initialFormData);
 
   const {
@@ -58,14 +75,45 @@ export function ClientFormWizard({
   } = useClientSave();
 
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
   const [savedClientName, setSavedClientName] = React.useState<string | undefined>(undefined);
+  const [pocGuardOpen, setPocGuardOpen] = useState(false);
+  const [generatePocOpen, setGeneratePocOpen] = useState(false);
+  const [typeSelected, setTypeSelected] = useState(isEditMode);
   const pendingSuccessClientIdRef = useRef<string | undefined>(undefined);
+  const handleTypeSelect = useCallback(
+    (type: ClientType) => {
+      setFormData((prev) => ({
+        ...prev,
+        type,
+        stage3: {
+          ...prev.stage3,
+          docs: createInitialDocs(type),
+        },
+      }));
+      setTypeSelected(true);
+    },
+    [setFormData],
+  );
 
-  const handleSave = useCallback(async () => {
+  const handlePickerBack = useCallback(() => {
+    if (config.backNavigate) {
+      navigate(config.backNavigate);
+    }
+  }, [config.backNavigate, navigate]);
+
+  const handleChangeClientType = useCallback(() => {
+    setTypeSelected(false);
+  }, []);
+
+  const skipPocGuardRef = useRef(false);
+  const generatePocRef = useRef<GeneratePocPanelHandle>(null);
+
+  const runSave = useCallback(async (dataToSave: AddClientFormData = formData) => {
     const result = await saveClient(
-      formData,
+      dataToSave,
       isEditMode,
       clientId,
       config.showAgencySelection,
@@ -117,6 +165,38 @@ export function ClientFormWizard({
     toast,
   ]);
 
+  const handleSave = useCallback(() => {
+    if (!skipPocGuardRef.current && shouldShowPocSaveGuard(formData)) {
+      setPocGuardOpen(true);
+      return;
+    }
+    skipPocGuardRef.current = false;
+    void runSave();
+  }, [formData, runSave]);
+
+  const handlePocGuardAction = useCallback(
+    (action: PocSaveGuardAction) => {
+      setPocGuardOpen(false);
+      if (action === "upload") {
+        if (stage !== 3) {
+          goToStage(3);
+          requestAnimationFrame(() => scrollToPocUpload());
+        } else {
+          scrollToPocUpload();
+        }
+        return;
+      }
+      if (action === "generate") {
+        setGeneratePocOpen(true);
+        generatePocRef.current?.openModal();
+        return;
+      }
+      skipPocGuardRef.current = true;
+      void runSave();
+    },
+    [runSave, stage, goToStage],
+  );
+
   const handleSuccessClose = useCallback(() => {
     setShowSaveSuccess(false);
     onSuccess?.(pendingSuccessClientIdRef.current);
@@ -145,8 +225,19 @@ export function ClientFormWizard({
   );
 
   const pageTitle = config.pageTitle || (isEditMode ? "Edit client" : "Add client");
+  const isDddClient = formData.type !== "hha";
 
   const stageContent = useMemo(() => {
+    if (!isEditMode && !typeSelected) {
+      return (
+        <ClientTypePicker
+          pageTitle={pageTitle}
+          onSelect={handleTypeSelect}
+          onBack={config.backNavigate ? handlePickerBack : undefined}
+        />
+      );
+    }
+
     if (stage === 1)
       return (
         <Stage1ClientIdentityAndContact
@@ -159,7 +250,8 @@ export function ClientFormWizard({
           setFormData={setFormData}
           pageTitle={pageTitle}
           backNavigate={config.backNavigate}
-          clientId={config.clientId}
+          clientId={clientId ?? config.clientId}
+          onChangeClientType={!isEditMode && !clientId ? handleChangeClientType : undefined}
           isEditMode={config.isEditMode}
           headerRightAction={
             !isEditMode ? (
@@ -186,6 +278,7 @@ export function ClientFormWizard({
           formData={formData}
           setFormData={setFormData}
           pageTitle={pageTitle}
+          clientId={clientId}
         />
       );
     if (stage === 4)
@@ -225,7 +318,21 @@ export function ClientFormWizard({
         />
       );
     return null;
-  }, [stage, config, formData, setFormData, pageTitle, footer, isEditMode]);
+  }, [
+    stage,
+    config,
+    formData,
+    setFormData,
+    pageTitle,
+    footer,
+    isEditMode,
+    typeSelected,
+    handleTypeSelect,
+    handlePickerBack,
+    handleChangeClientType,
+    clientId,
+    isDddClient,
+  ]);
 
   return (
     <>
@@ -256,6 +363,31 @@ export function ClientFormWizard({
         onOpenChange={handleErrorClose}
         errorMessage={errorMessage}
       />
+
+      <PocSaveGuardModal
+        open={pocGuardOpen}
+        onOpenChange={setPocGuardOpen}
+        showGenerateOption={isDddClient && canGeneratePoc(formData)}
+        onAction={handlePocGuardAction}
+      />
+
+      {(isDddClient && (canGeneratePoc(formData) || generatePocOpen)) ? (
+        <Suspense fallback={null}>
+          <GeneratePocPanel
+            ref={generatePocRef}
+            formData={formData}
+            setFormData={setFormData}
+            clientId={clientId}
+            modalOnly
+            open={generatePocOpen}
+            onOpenChange={setGeneratePocOpen}
+            onApplied={(nextFormData) => {
+              skipPocGuardRef.current = true;
+              void runSave(nextFormData);
+            }}
+          />
+        </Suspense>
+      ) : null}
     </>
   );
 }

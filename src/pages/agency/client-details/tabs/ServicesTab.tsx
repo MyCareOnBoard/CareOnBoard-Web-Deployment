@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router";
+import { Routes } from "@/routes/constants";
 import { CalendarDays, Loader2, Plus, Trash2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -37,6 +39,7 @@ import {
 } from "@/pages/shared/client-management/components/WeeklyDistributionInline";
 import { ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
 import { deriveWeeklyDistributionScalars } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
+import { payTypeToLabel } from "@/pages/shared/client-management/utils/applyHhaCatalogService";
 import {
   cloneWeeklyDistributionForPersist,
   normalizeWeeklyDistributionUpdate,
@@ -1358,6 +1361,13 @@ function ServiceRow({
 }
 
 export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTabProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isSuperAdminContext = location.pathname.includes("/super-admin/");
+  const editClientPath = isSuperAdminContext
+    ? Routes.superAdmin.editClient.replace(":clientId", clientId)
+    : Routes.agency.editClient.replace(":clientId", clientId);
+
   const [outcomeGroups, setOutcomeGroups] = useState<EditableOutcomeGroup[]>(() =>
     mapClientOutcomesToEditable(client.outcomes),
   );
@@ -1493,6 +1503,109 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
     setError(null);
     setIsEditing(false);
   };
+
+  if (client.type === "hha") {
+    const authorizations = client.hhaAuthorizations ?? [];
+    return (
+      <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-5 flex flex-col gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="text-[24px] font-medium leading-[normal] text-[#10141a]">
+              Service authorizations
+            </p>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              Approved HHA services, payer details, and assigned caregivers.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 shrink-0 rounded-[60px] border-[#b2b2b3] bg-white/60 px-5 text-[#10141a] hover:bg-white"
+            onClick={() => navigate(editClientPath)}
+          >
+            Edit service authorizations
+          </Button>
+        </div>
+
+        {authorizations.length === 0 ? (
+          <div className="rounded-[20px] border border-dashed border-[#b2b2b3] bg-white/50 p-8 text-center">
+            <p className="text-[14px] font-medium text-[#808081]">
+              No service authorizations yet. Add them in the client wizard under Service
+              authorizations.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {authorizations.map((auth, index) => (
+              <div
+                key={auth.id ?? `${auth.serviceCode}-${index}`}
+                className="rounded-[20px] border border-[rgba(255,255,255,0.4)] bg-white/70 p-4"
+              >
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[16px] font-semibold text-[#10141a]">
+                      {auth.serviceName || auth.serviceCode || `Authorization ${index + 1}`}
+                    </p>
+                    <p className="text-[13px] font-medium text-[#808081]">
+                      {auth.serviceCode || "No service code"}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-[#e6fafa] px-3 py-1 text-[12px] font-semibold text-[#007f83]">
+                    HHA
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <p className="text-[13px] text-[#10141a]">
+                    <span className="font-semibold">Authorization:</span>{" "}
+                    {auth.authorizationNumber || "Not specified"}
+                  </p>
+                  <p className="text-[13px] text-[#10141a]">
+                    <span className="font-semibold">Authorized hours per week:</span>{" "}
+                    {auth.approvedHours || "Not specified"}
+                  </p>
+                  <p className="text-[13px] text-[#10141a]">
+                    <span className="font-semibold">Payer:</span>{" "}
+                    {auth.payerSource || "Not specified"}
+                  </p>
+                  <p className="text-[13px] text-[#10141a]">
+                    <span className="font-semibold">Client rate:</span>{" "}
+                    {auth.rate || "Not specified"}
+                  </p>
+                  {auth.unitType ? (
+                    <p className="text-[13px] text-[#10141a]">
+                      <span className="font-semibold">Unit type:</span> {auth.unitType}
+                    </p>
+                  ) : null}
+                  {auth.clientPayType ? (
+                    <p className="text-[13px] text-[#10141a]">
+                      <span className="font-semibold">Pay type:</span>{" "}
+                      {payTypeToLabel(auth.clientPayType)}
+                    </p>
+                  ) : null}
+                  {auth.serviceType ? (
+                    <p className="text-[13px] text-[#10141a]">
+                      <span className="font-semibold">Service category:</span> {auth.serviceType}
+                    </p>
+                  ) : null}
+                  {auth.modifier ? (
+                    <p className="text-[13px] text-[#10141a]">
+                      <span className="font-semibold">Modifier:</span> {auth.modifier}
+                    </p>
+                  ) : null}
+                  <p className="text-[13px] text-[#10141a] sm:col-span-2">
+                    <span className="font-semibold">Assigned caregivers:</span>{" "}
+                    {auth.assignedDsps?.length
+                      ? auth.assignedDsps.map((d) => d.name).filter(Boolean).join(", ")
+                      : "No caregivers assigned to this service."}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-5 flex flex-col gap-4">

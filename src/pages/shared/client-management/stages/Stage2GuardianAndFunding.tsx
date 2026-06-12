@@ -19,16 +19,27 @@ import {
   GUARDIAN_RELATIONSHIP_LABELS,
   GUARDIAN_RELATIONSHIP_VALUES,
   createEmptyOutcome,
+  createEmptyGuardianContact,
+  createEmptyHhaAuthorization,
+  createEmptyHhaInsuranceInfo,
   createEmptyServiceAuthorization,
   type GuardianRelationship,
+  type GuardianContact,
   Service,
   type ServicePayType,
+  type YesNo,
   SDR_DETAILS_LIST_MAX,
   type ServiceSdrDetails,
 } from "@/pages/shared/client-management/types/formData";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { useListServicesQuery } from "@/lib/api/services";
 import { Stage2SdrImportPanel } from "@/pages/shared/client-management/components/Stage2SdrImportPanel";
 import { WeeklyDistributionInline } from "@/pages/shared/client-management/components/WeeklyDistributionInline";
 import { ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
+import { HhaAuthorizationFields } from "@/pages/shared/client-management/components/HhaAuthorizationFields";
+import { RatePayTypeField } from "@/pages/shared/client-management/components/RatePayTypeField";
+import { applyHhaCatalogService } from "@/pages/shared/client-management/utils/applyHhaCatalogService";
+import type { HhaAuthorization } from "@/pages/shared/client-management/types/formData";
 import { deriveAuthorizedHoursPerWeek } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
 import { stripExtractedMoney } from "@/pages/shared/client-management/utils/normalizeExtractedServiceAuthorization";
 import { weeklyDistributionFingerprintFromWd, normalizeWeeklyDistributionUpdate } from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
@@ -64,6 +75,20 @@ function stripCurrencyAndCommas(raw: string): string {
   return raw.replace(/\$/g, "").replace(/,/g, "").trim();
 }
 
+function applyGuardianFlagSelection(
+  guardians: GuardianContact[],
+  pickerValue: string,
+  flag: "isLegalGuardian" | "hasPowerOfAttorney",
+): GuardianContact[] {
+  if (!pickerValue) {
+    return guardians.map((g) => ({ ...g, [flag]: "no" as YesNo }));
+  }
+  return guardians.map((g) => ({
+    ...g,
+    [flag]: (g.id === pickerValue ? "yes" : "no") as YesNo,
+  }));
+}
+
 /** Persist cost without `$`; allow decimals. */
 function normalizeCostStored(raw: string): string | undefined {
   const s = stripCurrencyAndCommas(raw);
@@ -78,12 +103,14 @@ function ServiceCalendarDateField({
   open,
   onOpenChange,
   onSelectDate,
+  placeholder = " ",
 }: {
   label: string;
   value: Date | undefined;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onSelectDate: (d: Date | undefined) => void;
+  placeholder?: string;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -94,7 +121,7 @@ function ServiceCalendarDateField({
             <InputGroup className="h-[44px] bg-white border border-[#cccccd] rounded-[12px] px-4">
               <InputGroupInput
                 value={value ? format(value, "MMM d, yyyy") : ""}
-                placeholder=" "
+                placeholder={placeholder}
                 readOnly
                 className="text-[#10141a]"
               />
@@ -132,49 +159,27 @@ function ServiceCalendarDateField({
   );
 }
 
-function RatePayTypeField({
+function CalendarDateField({
   label,
-  rate,
-  payType,
-  includeMile = false,
-  onRateChange,
-  onPayTypeChange,
+  value,
+  onSelectDate,
+  placeholder = "Select date",
 }: {
   label: string;
-  rate: string;
-  payType?: ServicePayType;
-  /** Include per-mile option (client and staff reimbursement). */
-  includeMile?: boolean;
-  onRateChange: (value: string) => void;
-  onPayTypeChange: (value: ServicePayType) => void;
+  value: Date | undefined;
+  onSelectDate: (d: Date | undefined) => void;
+  placeholder?: string;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[12px] font-normal text-[#10141a]">{label}</label>
-      <div className="flex gap-2">
-        <Input
-          type="number"
-          inputMode="decimal"
-          min={0}
-          step={0.01}
-          value={rate}
-          onChange={(e) => onRateChange(e.target.value)}
-          className={RATE_INPUT_CLASS}
-          placeholder="Enter rate"
-        />
-        <Select value={payType} onValueChange={(v) => onPayTypeChange(v as ServicePayType)}>
-          <SelectTrigger className={SELECT_TRIGGER_CLASS}>
-            <SelectValue placeholder="Pay type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="hourly">Hourly</SelectItem>
-            <SelectItem value="15-min">15 minutes</SelectItem>
-            <SelectItem value="daily">Daily</SelectItem>
-            {includeMile ? <SelectItem value="mile">Mile</SelectItem> : null}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
+    <ServiceCalendarDateField
+      label={label}
+      value={value}
+      open={open}
+      onOpenChange={setOpen}
+      onSelectDate={onSelectDate}
+      placeholder={placeholder}
+    />
   );
 }
 
@@ -532,11 +537,63 @@ export function Stage2GuardianAndFunding({
   pageTitle?: string;
 }) {
   const stage2 = formData.stage2;
+  const isHhaClient = formData.type === "hha";
+  const { data: hhaServicesData } = useListServicesQuery(
+    isHhaClient ? { program: "hha", limit: 200 } : skipToken,
+  );
+  const hhaServices = hhaServicesData?.services ?? [];
+  const hhaServiceById = useMemo(
+    () => new Map(hhaServices.map((s) => [s.id, s])),
+    [hhaServices],
+  );
   const [sdrImportOpen, setSdrImportOpen] = useState(false);
   const updateStage2 = useCallback(
     (patch: Partial<AddClientFormData["stage2"]>) =>
       setFormData((prev) => ({ ...prev, stage2: { ...prev.stage2, ...patch } })),
-    []
+    [setFormData],
+  );
+
+  const guardianPickerOptions = useMemo(
+    () =>
+      (stage2.guardians ?? []).map((g, i) => ({
+        value: g.id,
+        label: g.name?.trim() || `Guardian ${i + 1}`,
+      })),
+    [stage2.guardians],
+  );
+
+  const legalGuardianPickerValue = useMemo(() => {
+    return stage2.guardians?.find((g) => g.isLegalGuardian === "yes")?.id ?? "";
+  }, [stage2.guardians]);
+
+  const poaPickerValue = useMemo(() => {
+    return stage2.guardians?.find((g) => g.hasPowerOfAttorney === "yes")?.id ?? "";
+  }, [stage2.guardians]);
+
+  const hasGuardians = guardianPickerOptions.length > 0;
+
+  const handleLegalGuardianPickerChange = useCallback(
+    (value: string) => {
+      const next = applyGuardianFlagSelection(
+        stage2.guardians ?? [],
+        value === "__none__" ? "" : value,
+        "isLegalGuardian",
+      );
+      updateStage2({ guardians: next });
+    },
+    [stage2.guardians, updateStage2],
+  );
+
+  const handlePoaPickerChange = useCallback(
+    (value: string) => {
+      const next = applyGuardianFlagSelection(
+        stage2.guardians ?? [],
+        value === "__none__" ? "" : value,
+        "hasPowerOfAttorney",
+      );
+      updateStage2({ guardians: next });
+    },
+    [stage2.guardians, updateStage2],
   );
 
   const handleOutcomeServiceChange = useCallback(
@@ -559,6 +616,31 @@ export function Stage2GuardianAndFunding({
     [setFormData],
   );
 
+  const handleHhaAuthorizationChange = useCallback(
+    (index: number, patch: Partial<HhaAuthorization>) => {
+      setFormData((prev) => {
+        const rows = [...(prev.stage2.hhaAuthorizations ?? [])];
+        if (!rows[index]) return prev;
+        rows[index] = { ...rows[index], ...patch };
+        return { ...prev, stage2: { ...prev.stage2, hhaAuthorizations: rows } };
+      });
+    },
+    [setFormData],
+  );
+
+  const handleHhaAuthorizationSelectService = useCallback(
+    (index: number, serviceId: string | undefined) => {
+      setFormData((prev) => {
+        const rows = [...(prev.stage2.hhaAuthorizations ?? [])];
+        if (!rows[index]) return prev;
+        const svc = serviceId ? hhaServiceById.get(serviceId) : undefined;
+        rows[index] = applyHhaCatalogService(rows[index], svc);
+        return { ...prev, stage2: { ...prev.stage2, hhaAuthorizations: rows } };
+      });
+    },
+    [setFormData, hhaServiceById],
+  );
+
   const outcomes = stage2.outcomes;
 
   return (
@@ -568,6 +650,288 @@ export function Stage2GuardianAndFunding({
           {pageTitle}
         </h1>
       </div>
+
+      {isHhaClient ? (
+      <div className="mb-10 space-y-10">
+        <div>
+          <div className="mb-4">
+            <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+              4. Insurance information
+            </p>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              Add each payer that may authorize HHA services for this client.
+            </p>
+          </div>
+          <div className="space-y-4">
+            {(stage2.insuranceInfo ?? []).map((row, idx) => (
+              <div key={row.id || idx} className="rounded-[12px] border border-[#cccccd]/80 bg-white/50 p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <p className="text-[14px] font-semibold text-[#10141a]">Insurance {idx + 1}</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className={SECTION_REMOVE_BTN_CLASS}
+                    onClick={() =>
+                      updateStage2({
+                        insuranceInfo: (stage2.insuranceInfo ?? []).filter((_, i) => i !== idx),
+                      })
+                    }
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" />
+                    Remove insurance
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[12px] font-normal text-[#10141a]">Coverage type</label>
+                    <Select
+                      value={row.type || "primary"}
+                      onValueChange={(v) => {
+                        const next = [...(stage2.insuranceInfo ?? [])];
+                        next[idx] = { ...next[idx], type: v as "primary" | "secondary" };
+                        updateStage2({ insuranceInfo: next });
+                      }}
+                    >
+                      <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="primary">Primary</SelectItem>
+                        <SelectItem value="secondary">Secondary</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(
+                    [
+                      ["company", "Insurance company", "Company name"],
+                      ["memberId", "Member ID", "Member ID"],
+                      ["groupNumber", "Group number", "Group number"],
+                    ] as const
+                  ).map(([key, label, placeholder]) => (
+                    <div key={key} className="flex flex-col gap-1">
+                      <label className="text-[12px] font-normal text-[#10141a]">{label}</label>
+                      <Input
+                        value={(row[key] as string) ?? ""}
+                        onChange={(e) => {
+                          const next = [...(stage2.insuranceInfo ?? [])];
+                          next[idx] = { ...next[idx], [key]: e.target.value };
+                          updateStage2({ insuranceInfo: next });
+                        }}
+                        className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                        placeholder={placeholder}
+                      />
+                    </div>
+                  ))}
+                  <CalendarDateField
+                    label="Effective date"
+                    value={row.effectiveDate}
+                    onSelectDate={(d) => {
+                      const next = [...(stage2.insuranceInfo ?? [])];
+                      next[idx] = { ...next[idx], effectiveDate: d };
+                      updateStage2({ insuranceInfo: next });
+                    }}
+                  />
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[12px] font-normal text-[#10141a]">Authorization required?</label>
+                    <Select
+                      value={row.authorizationRequired || undefined}
+                      onValueChange={(v) => {
+                        const next = [...(stage2.insuranceInfo ?? [])];
+                        next[idx] = { ...next[idx], authorizationRequired: v as "yes" | "no" };
+                        updateStage2({ insuranceInfo: next });
+                      }}
+                    >
+                      <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                        <SelectValue placeholder="Select answer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-dashed border-[#808081] text-[#10141a] sm:w-auto"
+              onClick={() =>
+                updateStage2({
+                  insuranceInfo: [
+                    ...(stage2.insuranceInfo ?? []),
+                    createEmptyHhaInsuranceInfo((stage2.insuranceInfo ?? []).length ? "secondary" : "primary"),
+                  ],
+                })
+              }
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Add insurance
+            </Button>
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-4">
+            <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+              5. Service request
+            </p>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              Capture the requested HHA services before final authorization is entered.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+            <div className="flex flex-col gap-1 xl:col-span-2">
+              <label className="text-[12px] font-normal text-[#10141a]">Requested services</label>
+              <Input
+                value={(stage2.hhaServiceRequest?.requestedServices ?? []).join(", ")}
+                onChange={(e) =>
+                  updateStage2({
+                    hhaServiceRequest: {
+                      ...(stage2.hhaServiceRequest ?? {}),
+                      requestedServices: e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
+                    },
+                  })
+                }
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="Personal care, private duty nursing, adult day care"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Days needed</label>
+              <Input
+                value={(stage2.hhaServiceRequest?.daysNeeded ?? []).join(", ")}
+                onChange={(e) =>
+                  updateStage2({
+                    hhaServiceRequest: {
+                      ...(stage2.hhaServiceRequest ?? {}),
+                      daysNeeded: e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
+                    },
+                  })
+                }
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="Mon, Tue, Wed"
+              />
+            </div>
+            <CalendarDateField
+              label="Start date"
+              value={stage2.hhaServiceRequest?.startDate}
+              onSelectDate={(d) =>
+                updateStage2({
+                  hhaServiceRequest: {
+                    ...(stage2.hhaServiceRequest ?? {}),
+                    startDate: d,
+                  },
+                })
+              }
+            />
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Preferred time</label>
+              <Input
+                value={stage2.hhaServiceRequest?.preferredTime ?? ""}
+                onChange={(e) =>
+                  updateStage2({
+                    hhaServiceRequest: {
+                      ...(stage2.hhaServiceRequest ?? {}),
+                      preferredTime: e.target.value,
+                    },
+                  })
+                }
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="Morning, afternoon, or exact time"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Hours requested</label>
+              <Input
+                value={stage2.hhaServiceRequest?.hoursRequested ?? ""}
+                onChange={(e) =>
+                  updateStage2({
+                    hhaServiceRequest: {
+                      ...(stage2.hhaServiceRequest ?? {}),
+                      hoursRequested: e.target.value,
+                    },
+                  })
+                }
+                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                placeholder="Hours per week or per day"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-4">
+            <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+              6. Service authorizations
+            </p>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              Choose an HHA service from the catalog for each row, enter payer authorization details,
+              and assign caregivers who will deliver that service.
+            </p>
+          </div>
+          <div className="mt-6 space-y-10">
+            {(stage2.hhaAuthorizations ?? []).length === 0 ? (
+              <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                No service authorizations yet. Add one below.
+              </p>
+            ) : null}
+            {(stage2.hhaAuthorizations ?? []).map((row, idx) => (
+              <div
+                key={row.id || idx}
+                className={`group ${idx === 0 ? "" : "border-t border-[#cccccd]/60 pt-6"}`}
+              >
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+                    Service authorization {idx + 1}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className={SECTION_REMOVE_BTN_CLASS}
+                    onClick={() =>
+                      updateStage2({
+                        hhaAuthorizations: (stage2.hhaAuthorizations ?? []).filter((_, i) => i !== idx),
+                      })
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remove service
+                  </Button>
+                </div>
+                <HhaAuthorizationFields
+                  row={row}
+                  hhaServices={hhaServices}
+                  onChange={(patch) => handleHhaAuthorizationChange(idx, patch)}
+                  onSelectServiceId={(serviceId) =>
+                    handleHhaAuthorizationSelectService(idx, serviceId)
+                  }
+                />
+              </div>
+            ))}
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-dashed border-[#808081] text-[#10141a] sm:w-auto"
+                onClick={() =>
+                  updateStage2({
+                    hhaAuthorizations: [
+                      ...(stage2.hhaAuthorizations ?? []),
+                      createEmptyHhaAuthorization(),
+                    ],
+                  })
+                }
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Add service authorization
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+      ) : null}
 
       <div className="mb-10">
         <div className="mb-4">
@@ -583,7 +947,7 @@ export function Stage2GuardianAndFunding({
             <p className="text-[14px] font-medium text-[#808081]">No guardians added yet.</p>
           ) : null}
           {(stage2.guardians ?? []).map((g, gi) => (
-            <div key={gi} className="group">
+            <div key={g.id} className="group">
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
                   Guardian {gi + 1}
@@ -692,53 +1056,57 @@ export function Stage2GuardianAndFunding({
                   />
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">
-                    Support Coordinator Name
-                  </label>
-                  <Input
-                    value={g.supportCoordinatorName ?? ""}
-                    onChange={(e) => {
-                      const next = [...(stage2.guardians ?? [])];
-                      next[gi] = { ...next[gi], supportCoordinatorName: e.target.value };
-                      updateStage2({ guardians: next });
-                    }}
-                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                    placeholder="Enter Support Coordinator Name"
-                  />
-                </div>
+                {!isHhaClient ? (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-normal text-[#10141a]">
+                        Support Coordinator Name
+                      </label>
+                      <Input
+                        value={g.supportCoordinatorName ?? ""}
+                        onChange={(e) => {
+                          const next = [...(stage2.guardians ?? [])];
+                          next[gi] = { ...next[gi], supportCoordinatorName: e.target.value };
+                          updateStage2({ guardians: next });
+                        }}
+                        className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                        placeholder="Enter Support Coordinator Name"
+                      />
+                    </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">
-                    Support Coordinator Agency
-                  </label>
-                  <Input
-                    value={g.supportCoordinatorAgency ?? ""}
-                    onChange={(e) => {
-                      const next = [...(stage2.guardians ?? [])];
-                      next[gi] = { ...next[gi], supportCoordinatorAgency: e.target.value };
-                      updateStage2({ guardians: next });
-                    }}
-                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                    placeholder="Enter Support Coordinator Agency"
-                  />
-                </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-normal text-[#10141a]">
+                        Support Coordinator Agency
+                      </label>
+                      <Input
+                        value={g.supportCoordinatorAgency ?? ""}
+                        onChange={(e) => {
+                          const next = [...(stage2.guardians ?? [])];
+                          next[gi] = { ...next[gi], supportCoordinatorAgency: e.target.value };
+                          updateStage2({ guardians: next });
+                        }}
+                        className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                        placeholder="Enter Support Coordinator Agency"
+                      />
+                    </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">
-                    Support Coordinator Phone/Email
-                  </label>
-                  <Input
-                    value={g.supportCoordinatorContact ?? ""}
-                    onChange={(e) => {
-                      const next = [...(stage2.guardians ?? [])];
-                      next[gi] = { ...next[gi], supportCoordinatorContact: e.target.value };
-                      updateStage2({ guardians: next });
-                    }}
-                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                    placeholder="Enter phone number/email"
-                  />
-                </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-normal text-[#10141a]">
+                        Support Coordinator Phone/Email
+                      </label>
+                      <Input
+                        value={g.supportCoordinatorContact ?? ""}
+                        onChange={(e) => {
+                          const next = [...(stage2.guardians ?? [])];
+                          next[gi] = { ...next[gi], supportCoordinatorContact: e.target.value };
+                          updateStage2({ guardians: next });
+                        }}
+                        className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                        placeholder="Enter phone number/email"
+                      />
+                    </div>
+                  </>
+                ) : null}
               </div>
             </div>
           ))}
@@ -748,18 +1116,7 @@ export function Stage2GuardianAndFunding({
             className="w-full border-dashed border-[#808081] text-[#10141a] sm:w-auto"
             onClick={() =>
               updateStage2({
-                guardians: [
-                  ...(stage2.guardians ?? []),
-                  {
-                    name: "",
-                    email: "",
-                    primaryPhone: "",
-                    address: "",
-                    supportCoordinatorName: "",
-                    supportCoordinatorAgency: "",
-                    supportCoordinatorContact: "",
-                  },
-                ],
+                guardians: [...(stage2.guardians ?? []), createEmptyGuardianContact()],
               })
             }
           >
@@ -767,6 +1124,55 @@ export function Stage2GuardianAndFunding({
             Add guardian
           </Button>
         </div>
+
+        {isHhaClient ? (
+          <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Legal guardian</label>
+              <Select
+                value={legalGuardianPickerValue || "__none__"}
+                onValueChange={handleLegalGuardianPickerChange}
+                disabled={!hasGuardians}
+              >
+                <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                  <SelectValue
+                    placeholder={hasGuardians ? "Select guardian" : "Add a guardian first"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {guardianPickerOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Power of attorney</label>
+              <Select
+                value={poaPickerValue || "__none__"}
+                onValueChange={handlePoaPickerChange}
+                disabled={!hasGuardians}
+              >
+                <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                  <SelectValue
+                    placeholder={hasGuardians ? "Select guardian" : "Add a guardian first"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {guardianPickerOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-10">
           <div className="mb-4">
@@ -884,6 +1290,7 @@ export function Stage2GuardianAndFunding({
         </div>
       </div>
 
+      {!isHhaClient ? (
       <div className="mb-10">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1037,6 +1444,7 @@ export function Stage2GuardianAndFunding({
           </div>
         </div>
       </div>
+      ) : null}
 
       {footer}
     </div>

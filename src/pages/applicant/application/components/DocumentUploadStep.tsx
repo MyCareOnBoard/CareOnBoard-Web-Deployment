@@ -55,31 +55,35 @@ const files = [
     id: "diploma",
     label: "Upload High School Diploma/GED certificate.",
     placeholder: "Upload high school certificate",
-    requiresExpiry: true
+    requiresExpiry: false
   },
   {
     id: "certifications",
     label: "Upload Any relevant certifications (e.g., CPR, First Aid — optional at this stage).",
     placeholder: "Upload any certificate",
-    requiresExpiry: false
+    requiresExpiry: false,
+    optional: true,
   },
   {
     id: "hepatitis-b-vaccination",
     label: "Upload Hepatitis B vaccination series documents or chest x ray.",
     placeholder: "Upload Hepatitis B vaccination series documents or chest x ray.",
-    requiresExpiry: false
+    requiresExpiry: false,
+    optional: true
   },
   {
     id: "hepatitis-b-immunity",
     label: "Upload Hepatitis B immunity (titer result)",
     placeholder: "Upload Hepatitis B immunity (titer result)",
-    requiresExpiry: false
+    requiresExpiry: false,
+    optional: true
   },
   {
     id: "tb-test",
     label: "Upload tb test result.",
     placeholder: "Upload TB test result",
-    requiresExpiry: false
+    requiresExpiry: false,
+    optional: true
   }
 ]
 
@@ -283,6 +287,10 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
 
   return (
     <>
+     <h2 className="mb-2 text-xl font-bold text-gray-900">
+        Upload all required documents and add expiry date by picking a date on sections with an Expiry Date attached. 
+        Once you have uploaded the documents, click the submit button to complete this stage.
+      </h2>
     <form className={"w-full"} onSubmit={handleSubmit}>
       {files.map((file, index) => {
         const fileUpload = fileUploads.find((item) => item.fileType === file.id);
@@ -291,7 +299,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
             <div className={"flex justify-between items-center"}>
               <p className={"text-sm mb-2"}>{file.label}</p>
               {file.requiresExpiry && (
-                <div className="px-4 py-3 flex items-center justify-center">
+                <div className="flex items-center justify-center px-4 py-3">
                   <Popover
                     open={openDatePopoverId === String(index)}
                     onOpenChange={(open) => setOpenDatePopoverId(open ? String(index) : null)}
@@ -299,7 +307,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
                     <PopoverTrigger asChild>
                       <button
                         type="button"
-                        className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
+                        className="flex items-center justify-center w-full h-full cursor-pointer focus:outline-none"
                       >
                         <span
                           className="flex items-center gap-2 text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]"
@@ -312,7 +320,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
                         </span>
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                    <PopoverContent align="start" className="w-auto p-0 mt-3 bg-white border-none shadow-lg">
                       <Calendar
                         mode="single"
                         className="bg-white"
@@ -368,9 +376,8 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
       })}
       <div className={"mb-6"}>
         <p className={"text-sm mb-2 flex items-center"}>
-          <span>Upload document</span>
           <span className={"ml-1 flex items-center"}>
-            <span className={"text-[#5993FF]"}>I-9 form</span>
+            <a href="https://drive.google.com/uc?export=download&id=1qOI9TiJrCTagScUNJBzHbNg8FJhpQH6N" className={"text-[#5993FF] font-extrabold"}> Click here to download I-9 form</a>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path fill-rule="evenodd" clip-rule="evenodd"
                 d="M15.4168 5.76152L5.34501 15.8334L4.1665 14.6549L14.2383 4.58301L15.4168 5.76152Z"
@@ -380,7 +387,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
                 fill="#5993FF" />
             </svg>
           </span>
-          <span>(Download the form, after filling up the form, You need to upload the form here)</span>
+          <span>( Upload document below after filling the form)</span>
         </p>
         <FileUpload
           name={"upload-i-9-form"}
@@ -395,9 +402,8 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
       </div>
       <div className={"mb-6"}>
         <p className={"text-sm mb-2 flex items-center"}>
-          <span>Upload document</span>
           <span className={"ml-1 flex items-center"}>
-            <span className={"text-[#5993FF]"}>W-4 forms</span>
+            <a href="https://drive.google.com/uc?export=download&id=1MraR-6Wn9CwlsQPs-a-nG2AfavOj5fKF" className={"text-[#5993FF] font-extrabold"}>Click here to download W-4 forms</a>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path fill-rule="evenodd" clip-rule="evenodd"
                 d="M15.4168 5.76152L5.34501 15.8334L4.1665 14.6549L14.2383 4.58301L15.4168 5.76152Z"
@@ -407,7 +413,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
                 fill="#5993FF" />
             </svg>
           </span>
-          <span>(Download the form, after filling up the form, You need to upload the form here)</span>
+          <span>(Upload document below after filling the form)</span>
         </p>
         <FileUpload
           name={"upload-w-4-form"}
@@ -422,7 +428,8 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
       </div>
 
       <div>
-        <h3 className={"font-semibold mb-3"}>Provide Two Professional References:</h3>
+        <h3 className={"font-semibold mb-3"}>Provide Two Professional References: <p className={"text-sm text-[#00B4B8] text-bold"}>Note: Please provide valid email address for your references.</p></h3>
+        
         {references.map((reference, index) => (
           <div key={index}>
             <p className={"font-semibold mb-2"}>Reference {index + 1}</p>
@@ -520,7 +527,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
           required={true}
         />
       </div>
-      <div className="mt-6 pb-6">
+      <div className="pb-6 mt-6">
         {canGoToNextStage ? (
           <Button
             type="button"
@@ -528,7 +535,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
             className={'bg-[#00B4B8] backdrop-blur-[22px] hover:bg-[#00B4B8] active:bg-[#b2b2b3]'}
           >
             <span>Next</span>
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
+            <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
               <path
                 d="M4 10H16M16 10L10 4M16 10L10 16"
                 stroke="currentColor"
@@ -547,7 +554,7 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
             <span>
               {isSubmitting ? 'Saving...' : 'Save Documents & References'}
             </span>
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
+            <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
               <path
                 d="M4 10H16M16 10L10 4M16 10L10 16"
                 stroke="currentColor"

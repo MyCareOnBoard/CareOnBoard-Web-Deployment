@@ -42,7 +42,11 @@ function ServiceModalInner({
 }: ServiceModalProps) {
   const [name, setName] = useState(initialData?.name ?? "");
   const [code, setCode] = useState(initialData?.code ?? "");
+  const [program, setProgram] = useState<"ddd" | "hha">(initialData?.program ?? "ddd");
   const [type, setType] = useState(initialData?.type ?? "");
+  const [unitType, setUnitType] = useState(initialData?.unitType ?? "");
+  const [defaultRate, setDefaultRate] = useState(initialData?.defaultRate ?? "");
+  const [modifier, setModifier] = useState(initialData?.modifier ?? "");
   const [customType, setCustomType] = useState("");
   const [useCustomType, setUseCustomType] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -52,7 +56,11 @@ function ServiceModalInner({
     if (open) {
       setName(initialData?.name ?? "");
       setCode(initialData?.code ?? "");
+      setProgram(initialData?.program ?? "ddd");
       setType(initialData?.type ?? "");
+      setUnitType(initialData?.unitType ?? "");
+      setDefaultRate(initialData?.defaultRate ?? "");
+      setModifier(initialData?.modifier ?? "");
       setCustomType("");
       setUseCustomType(
         initialData?.type ? !existingTypes.includes(initialData.type) : false
@@ -98,7 +106,11 @@ function ServiceModalInner({
       await onSave({
         name: name.trim(),
         code: code.trim(),
+        program,
         type: effectiveType,
+        unitType: unitType.trim() || undefined,
+        defaultRate: defaultRate.trim() || undefined,
+        modifier: modifier.trim() || undefined,
       });
       onOpenChange(false);
     } catch (err: unknown) {
@@ -108,7 +120,7 @@ function ServiceModalInner({
     } finally {
       setIsSaving(false);
     }
-  }, [name, code, effectiveType, mode, initialData, existingCodes, onSave, onOpenChange]);
+  }, [name, code, program, unitType, defaultRate, modifier, effectiveType, mode, initialData, existingCodes, onSave, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,6 +150,20 @@ function ServiceModalInner({
               {error}
             </p>
           )}
+          <div className="flex flex-col gap-[4px] w-full">
+            <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+              Program
+            </Label>
+            <Select value={program} onValueChange={(v) => setProgram(v as "ddd" | "hha")}>
+              <SelectTrigger className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#00b4b8]">
+                <SelectValue placeholder="Select program" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ddd">DDD</SelectItem>
+                <SelectItem value="hha">HHA</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex flex-col gap-[4px] w-full">
             <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
               Service type
@@ -218,6 +244,49 @@ function ServiceModalInner({
               Use the format from your funding source. Codes are used for billing and reporting.
             </p>
           </div>
+          {program === "hha" ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="flex flex-col gap-[4px]">
+                <Label htmlFor="service-unit-type" className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+                  Unit type
+                </Label>
+                <Input
+                  id="service-unit-type"
+                  value={unitType ?? ""}
+                  onChange={(e) => setUnitType(e.target.value)}
+                  placeholder="15-min or daily"
+                  disabled={isSaving}
+                  className={INPUT_CLASS}
+                />
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <Label htmlFor="service-default-rate" className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+                  Default rate
+                </Label>
+                <Input
+                  id="service-default-rate"
+                  value={defaultRate ?? ""}
+                  onChange={(e) => setDefaultRate(e.target.value)}
+                  placeholder="e.g. 6.67"
+                  disabled={isSaving}
+                  className={INPUT_CLASS}
+                />
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <Label htmlFor="service-modifier" className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+                  Modifier
+                </Label>
+                <Input
+                  id="service-modifier"
+                  value={modifier ?? ""}
+                  onChange={(e) => setModifier(e.target.value)}
+                  placeholder="EP, UA, TT"
+                  disabled={isSaving}
+                  className={INPUT_CLASS}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
         <DialogFooter className="flex gap-3 sm:justify-end pt-2">
           <Button

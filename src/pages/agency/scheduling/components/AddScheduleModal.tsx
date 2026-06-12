@@ -18,10 +18,8 @@ import {
   parseIspOutcomesFromDisplayText,
   serializeIspOutcomesForShift,
 } from "@/pages/agency/scheduling/isp-outcomes";
-import {
-  findOutcomeStatementsForServiceCode,
-  flattenOutcomeServices,
-} from "@/pages/shared/client-management/utils/outcomeServices";
+import { findOutcomeStatementsForServiceCode } from "@/pages/shared/client-management/utils/outcomeServices";
+import { getClientServicesForOperations } from "@/pages/shared/client-management/utils/clientServicesForOperations";
 import {
   sanitizeWeeklyPartsFromUnknown,
   weeklyDistributionFingerprintFromWd,
@@ -41,12 +39,6 @@ import {
   weekdayIndicesInDateRange,
   type WeeklyDistributionSnapshot,
 } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
-
-function clientServicesForScheduling(client: Client | null): ClientService[] {
-  if (!client) return [];
-  if (client.outcomes?.length) return flattenOutcomeServices(client.outcomes);
-  return client.services ?? [];
-}
 
 function tryParseServiceAuthDate(raw?: string): Date | null {
   if (!raw?.trim()) return null;
@@ -426,7 +418,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           getAgencyClientById(editData.clientId)
             .then((client) => {
               setSelectedClient(client);
-              setSelectedClientServices(clientServicesForScheduling(client));
+              setSelectedClientServices(getClientServicesForOperations(client));
             })
             .catch((error) => {
               console.error("Failed to fetch client for edit:", error);
@@ -664,7 +656,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       ispOutcome: "",
     }));
     setSelectedClient(client);
-    setSelectedClientServices(clientServicesForScheduling(client));
+    setSelectedClientServices(getClientServicesForOperations(client));
     setSelectedWeeklyDistributionIndex(null);
     setSelectedDistributionSnapshot(null);
     setShowClientDropdown(false);
@@ -680,6 +672,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
     return eachDayOfInterval({ start: startDate, end: endDate });
   }, [currentMonth]);
+
+  const isHhaClient = selectedClient?.type === "hha";
 
   const selectedService = useMemo(
     () => pickSelectedServiceRow(selectedClientServices, formData),
@@ -708,22 +702,24 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
   /** Read-only copy shown in the modal: always the selected service's outcomes when available. */
   const ispOutcomeDisplay = useMemo(() => {
+    if (isHhaClient) return "";
     if (selectedService?.outcomes && selectedService.outcomes.length > 0) {
       return ispOutcomesToDisplayText(selectedService.outcomes);
     }
     if (!formData.serviceCode) return "";
     return formData.ispOutcome;
-  }, [selectedService, formData.serviceCode, formData.ispOutcome]);
+  }, [isHhaClient, selectedService, formData.serviceCode, formData.ispOutcome]);
 
-  const weeklyDistributionFingerprint = useMemo(
-    () => weeklyDistributionFingerprintFromWd(selectedService?.sdrWeeklyDistribution),
-    [selectedService?.sdrWeeklyDistribution],
-  );
+  const weeklyDistributionFingerprint = useMemo(() => {
+    if (isHhaClient) return "";
+    return weeklyDistributionFingerprintFromWd(selectedService?.sdrWeeklyDistribution);
+  }, [isHhaClient, selectedService?.sdrWeeklyDistribution]);
 
   const weeklyDistributionRows = useMemo(() => {
+    if (isHhaClient) return [];
     const parts = sanitizeWeeklyPartsFromUnknown(selectedService?.sdrWeeklyDistribution);
     return parts?.fullSanitizedRows ?? [];
-  }, [selectedService?.id, weeklyDistributionFingerprint]);
+  }, [isHhaClient, selectedService?.id, weeklyDistributionFingerprint]);
 
   const weeklyDistributionOptions = useMemo(
     () =>
@@ -739,7 +735,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     return typeof line === "string" ? line.trim() : "";
   }, [selectedService?.sdrWeeklyDistribution?.standardLine]);
 
-  const showWeeklyDistributionPicker = weeklyDistributionRows.length > 0;
+  const showWeeklyDistributionPicker = !isHhaClient && weeklyDistributionRows.length > 0;
 
   const sdrWeekdayIndices = useMemo(() => {
     if (!selectedDistributionSnapshot) return null;
@@ -2595,23 +2591,24 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   </div>
                 )}
 
-                {/* ISP Outcome — read-only, from selected service */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">ISP Outcome</label>
-                  <textarea
-                    readOnly
-                    rows={4}
-                    value={ispOutcomeDisplay}
-                    placeholder={
-                      !formData.serviceCode
-                        ? "Select a service to view ISP outcomes"
-                        : ispOutcomeDisplay
-                          ? ""
-                          : "No ISP outcomes on file for this service"
-                    }
-                    className="w-full rounded-xl border border-[#e0e0e0] bg-[#f5f5f5] px-4 py-3 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none resize-none cursor-default min-h-[100px]"
-                  />
-                </div>
+                {!isHhaClient ? (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[12px] font-normal text-[#10141a]">ISP Outcome</label>
+                    <textarea
+                      readOnly
+                      rows={4}
+                      value={ispOutcomeDisplay}
+                      placeholder={
+                        !formData.serviceCode
+                          ? "Select a service to view ISP outcomes"
+                          : ispOutcomeDisplay
+                            ? ""
+                            : "No ISP outcomes on file for this service"
+                      }
+                      className="w-full rounded-xl border border-[#e0e0e0] bg-[#f5f5f5] px-4 py-3 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none resize-none cursor-default min-h-[100px]"
+                    />
+                  </div>
+                ) : null}
 
                 {/* Plan of Care */}
                 <div className="flex flex-col gap-1">

@@ -21,6 +21,19 @@ export type ClaimSignaturePayload = {
   signatureData: string;
 };
 
+export type ClaimInsurancePartySnapshot = {
+  company?: string;
+  memberId?: string;
+  groupNumber?: string;
+  authorizationRequired?: string;
+};
+
+/** Payer snapshot captured at claim time for HHA clients; absent on DDD claims. */
+export type ClaimInsuranceSnapshot = {
+  primary?: ClaimInsurancePartySnapshot;
+  secondary?: ClaimInsurancePartySnapshot;
+};
+
 export type ClaimReportFormState = {
   clientName: string;
   clientAvatarUrl?: string;
@@ -49,6 +62,7 @@ export type ClaimReportFormState = {
   paNumber: string;
   serviceLines: ClaimReportServiceLine[];
   summary: ClaimReportSummary;
+  insurance?: ClaimInsuranceSnapshot;
 };
 
 export const CLAIM_REPORT_AGREEMENT_TEXT =

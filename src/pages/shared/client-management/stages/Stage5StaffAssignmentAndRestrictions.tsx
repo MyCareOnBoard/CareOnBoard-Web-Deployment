@@ -53,8 +53,22 @@ export function Stage5StaffAssignmentAndRestrictions({
   pageTitle?: string;
 }) {
   const stage5 = formData.stage5;
+  const isHhaClient = formData.type === "hha";
   const updateStage5 = (patch: Partial<AddClientFormData["stage5"]>) =>
     setFormData((prev) => ({ ...prev, stage5: { ...prev.stage5, ...patch } }));
+  const updateHhaPreference = (
+    patch: Partial<NonNullable<AddClientFormData["stage5"]["hhaCaregiverPreferences"]>>,
+  ) =>
+    setFormData((prev) => ({
+      ...prev,
+      stage5: {
+        ...prev.stage5,
+        hhaCaregiverPreferences: {
+          ...(prev.stage5.hhaCaregiverPreferences ?? {}),
+          ...patch,
+        },
+      },
+    }));
 
   const autoCheckOptions = useMemo(
     () =>
@@ -81,7 +95,9 @@ export function Stage5StaffAssignmentAndRestrictions({
             8. Staff Assignment &amp; Restrictions
           </p>
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            Staff are assigned per service in step 3 (Service Authorization). Use this section for preferences and restrictions that apply across services.
+            {isHhaClient
+              ? "Caregivers are assigned per service in step 2 (Service authorizations). Use this section for matching preferences and restrictions across all services."
+              : "Staff are assigned per service in step 2 (Outcomes & service authorizations). Use this section for preferences and restrictions that apply across services."}
           </p>
         </div>
 
@@ -130,6 +146,55 @@ export function Stage5StaffAssignmentAndRestrictions({
             />
           </div>
         </div>
+
+        {isHhaClient ? (
+          <div className="mt-8">
+            <div className="mb-4">
+              <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+                Caregiver preferences
+              </p>
+              <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+                These preferences help match HHA caregivers to the home environment and client needs.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Language preference</label>
+                <Input
+                  value={stage5.hhaCaregiverPreferences?.languagePreference ?? ""}
+                  onChange={(e) => updateHhaPreference({ languagePreference: e.target.value })}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Preferred caregiver language"
+                />
+              </div>
+              {(
+                [
+                  ["smokingAllowed", "Smoking allowed in home?"],
+                  ["petInHome", "Pet in home?"],
+                  ["liftAssistanceRequired", "Lift assistance required?"],
+                  ["vehicleRequired", "Vehicle required?"],
+                ] as const
+              ).map(([key, label]) => (
+                <YesNoRadio
+                  key={key}
+                  label={label}
+                  value={stage5.hhaCaregiverPreferences?.[key] ?? ""}
+                  onChange={(v) => updateHhaPreference({ [key]: v })}
+                />
+              ))}
+              <div className="flex flex-col gap-1 lg:col-span-2 xl:col-span-4">
+                <label className="text-[12px] font-normal text-[#10141a]">Special skills needed</label>
+                <Textarea
+                  value={stage5.hhaCaregiverPreferences?.specialSkillsNeeded ?? ""}
+                  onChange={(e) => updateHhaPreference({ specialSkillsNeeded: e.target.value })}
+                  rows={3}
+                  className="min-h-[88px] resize-y rounded-[12px] border border-[#cccccd] bg-white px-4 py-3 text-sm font-normal leading-[1.4] text-[#10141a] placeholder:text-[#b2b2b3] shadow-none outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:ring-offset-0"
+                  placeholder="Examples: Hoyer lift, dementia care, pediatric experience, bilingual care"
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-8 max-w-[720px] space-y-6">
           <YesNoRadio

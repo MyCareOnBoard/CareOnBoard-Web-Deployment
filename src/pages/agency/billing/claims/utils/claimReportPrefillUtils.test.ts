@@ -188,3 +188,86 @@ describe("claimReportPrefillUtils", () => {
     expect(prefill.serviceLines[0].totalCharges).toBe("$394.01");
   });
 });
+
+// parity: see docs/superpowers/specs/2026-06-10-hha-downstream-gaps-design.md —
+// daily math, modifier preference, and insurance snapshot mirror the backend
+// billing-claim-prefill tests.
+describe("HHA claims parity fixtures", () => {
+  const hhaClient: Client = {
+    id: "client-hha",
+    type: "hha",
+    gender: "female",
+    insuranceInfo: [
+      {
+        id: "ins-1",
+        type: "primary",
+        company: "Aetna",
+        memberId: "M-99",
+        groupNumber: "G-7",
+        authorizationRequired: "yes",
+      },
+    ],
+    hhaAuthorizations: [
+      {
+        id: "auth-1",
+        authorizationNumber: "PA-555",
+        serviceName: "Medical Day Care",
+        serviceCode: "S5102",
+        approvedHours: "10",
+        payerSource: "Aetna",
+        rate: "120.00",
+        unitType: "daily",
+        modifier: "UA",
+        staffRate: "20.00",
+        payType: "daily",
+        startDate: "2026-03-01",
+        endDate: "2026-03-31",
+      },
+    ],
+  };
+
+  function hhaShift(id: string, date: string, startTime: string, endTime: string): Shift {
+    return {
+      id,
+      date,
+      serviceCode: "S5102",
+      startTime,
+      endTime,
+      status: "completed" as Shift["status"],
+      client: hhaClient,
+      clientId: hhaClient.id,
+    };
+  }
+
+  it("computeClaimBilling bills daily as one unit regardless of hours", () => {
+    expect(computeClaimBilling(8, 120, "daily")).toEqual({ units: 1, charge: 120 });
+    expect(computeClaimBilling(2, 120, "daily")).toEqual({ units: 1, charge: 120 });
+    expect(computeClaimBilling(2, 9.61, "15-min")).toEqual({ units: 8, charge: 76.88 });
+  });
+
+  it("daily shifts bill one unit per distinct day with same-day dedupe", () => {
+    const prefill = buildClaimReportPrefillFromShifts([
+      hhaShift("s1", "2026-03-02", "9:00 AM", "5:00 PM"),
+      hhaShift("s2", "2026-03-02", "6:00 PM", "8:00 PM"),
+      hhaShift("s3", "2026-03-03", "9:00 AM", "5:00 PM"),
+    ]);
+    expect(prefill.summary.totalUnitsBilled).toBe("2");
+    expect(prefill.summary.totalClaimAmount).toBe("$240.00");
+  });
+
+  it("prefers the authorization modifier and snapshots insurance", () => {
+    const prefill = buildClaimReportPrefillFromShifts([
+      hhaShift("s1", "2026-03-02", "9:00 AM", "5:00 PM"),
+    ]);
+    expect(prefill.serviceLines[0].modifier).toBe("UA");
+    expect(prefill.insurance?.primary?.memberId).toBe("M-99");
+    expect(prefill.insurance?.primary?.groupNumber).toBe("G-7");
+    expect(prefill.insurance?.secondary).toBeUndefined();
+  });
+
+  it("DDD claims keep code-parsed modifiers and have no insurance block", () => {
+    const prefill = buildClaimReportPrefillFromShifts([buildTestShift({ id: "shift-1" })]);
+    expect(prefill.serviceLines[0].modifier).toBe("HI");
+    expect(prefill.insurance).toBeUndefined();
+  });
+});

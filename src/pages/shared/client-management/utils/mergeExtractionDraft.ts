@@ -4,6 +4,8 @@ import type {
   ExtractionCareTeamContact,
   ExtractionEmergencyBackupPlan,
   ExtractionGuardianContact,
+  ExtractionHhaAuthorization,
+  ExtractionHhaInsuranceInfo,
   ExtractionInsuranceDetail,
   ExtractionMedication,
   ExtractionOutcomeRow,
@@ -11,6 +13,7 @@ import type {
   ExtractionTeamMember,
 } from "../types/clientExtraction";
 import { isDocKeyForImport } from "../types/clientExtraction";
+import { createEmptyGuardianContact } from "../types/formData";
 import type {
   AddClientFormData,
   AdlSupportNeed,
@@ -21,6 +24,7 @@ import type {
   EmergencyContactRelationship,
   GuardianContact,
   GuardianRelationship,
+  HhaAuthorization,
   InsuranceDetail,
   Outcome,
   Service,
@@ -45,6 +49,13 @@ export type MergeExtractionResult = {
   formData: AddClientFormData;
   localWarnings: string[];
 };
+
+/** Missing or invalid extracted emails normalize to "" for optional guardian/care-team fields. */
+function normalizeExtractedOptionalEmail(raw: string | undefined): string {
+  const s = raw?.trim() ?? "";
+  if (!s) return "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : "";
+}
 
 /** Gemini / OCR often emits these when no value exists; treat as absent (leave field empty). */
 function isExtractedNoDataToken(v: unknown): boolean {
@@ -206,6 +217,11 @@ function toYesNo(v: unknown): YesNo {
   if (s === "yes" || s === "y" || s === "true" || s === "1") return "yes";
   if (s === "no" || s === "n" || s === "false" || s === "0") return "no";
   return "";
+}
+
+/** Lowercase + whitelist Gemini yes/no values for wizard form fields. */
+export function normalizeYesNoForForm(raw: unknown): YesNo {
+  return toYesNo(raw);
 }
 
 function applyYesNo(current: YesNo, incoming: string | undefined, overwrite: boolean): YesNo {
@@ -539,9 +555,12 @@ function mergeGuardianContacts(
   if (!incoming?.length) return current;
   const mapped: GuardianContact[] = incoming
     .map((g) => ({
+      ...createEmptyGuardianContact(),
       name: mergeString("", g.name ?? "", true).trim() || undefined,
       relationship: mergeGuardianRelationship(undefined, g.relationship, true),
-      email: mergeString("", g.email ?? "", true).trim() || undefined,
+      email: normalizeExtractedOptionalEmail(
+        mergeString("", g.email ?? "", true),
+      ),
       primaryPhone: mergeString("", g.primaryPhone ?? "", true).trim() || undefined,
       secondaryPhone: mergeString("", g.secondaryPhone ?? "", true).trim() || undefined,
       address: mergeString("", g.address ?? "", true).trim() || undefined,
@@ -577,7 +596,9 @@ function mergeCareTeamContacts(
       name: mergeString("", c.name ?? "", true).trim() || undefined,
       agency: mergeString("", c.agency ?? "", true).trim() || undefined,
       phone: mergeString("", c.phone ?? "", true).trim() || undefined,
-      email: mergeString("", c.email ?? "", true).trim() || undefined,
+      email: normalizeExtractedOptionalEmail(
+        mergeString("", c.email ?? "", true),
+      ),
       address: mergeString("", c.address ?? "", true).trim() || undefined,
     }))
     .filter(
@@ -774,6 +795,7 @@ export function mergeExtractionDraft(
 
   const next: AddClientFormData = {
     ...prev,
+    type: draft.type === "hha" ? "hha" : prev.type,
     stage1: { ...prev.stage1 },
     stage2: {
       ...prev.stage2,
@@ -843,6 +865,42 @@ export function mergeExtractionDraft(
     next.stage1.dddId = mergeString(next.stage1.dddId, s1.dddId, overwrite);
     next.stage1.ssn = mergeString(next.stage1.ssn, s1.ssn, overwrite);
     next.stage1.tier = mergeString(next.stage1.tier ?? "", s1.tier, overwrite) || undefined;
+    next.stage1.preferredName =
+      mergeString(next.stage1.preferredName ?? "", s1.preferredName, overwrite) || undefined;
+    next.stage1.maritalStatus =
+      mergeString(next.stage1.maritalStatus ?? "", s1.maritalStatus, overwrite) || undefined;
+    next.stage1.medicareId =
+      mergeString(next.stage1.medicareId ?? "", s1.medicareId, overwrite) || undefined;
+    if (s1.homeInfo) {
+      next.stage1.homeInfo = {
+        ...(next.stage1.homeInfo ?? {}),
+        apartmentNumber:
+          mergeString(next.stage1.homeInfo?.apartmentNumber ?? "", s1.homeInfo.apartmentNumber, overwrite) || undefined,
+        county:
+          mergeString(next.stage1.homeInfo?.county ?? "", s1.homeInfo.county, overwrite) || undefined,
+        accessInstructions:
+          mergeString(next.stage1.homeInfo?.accessInstructions ?? "", s1.homeInfo.accessInstructions, overwrite) || undefined,
+        homeType:
+          mergeString(next.stage1.homeInfo?.homeType ?? "", s1.homeInfo.homeType, overwrite) || undefined,
+      };
+    }
+    if (s1.referralInfo) {
+      const referralDate = parseIsoOrUsDate(s1.referralInfo.date);
+      next.stage1.referralInfo = {
+        ...(next.stage1.referralInfo ?? {}),
+        source:
+          mergeString(next.stage1.referralInfo?.source ?? "", s1.referralInfo.source, overwrite) || undefined,
+        date: referralDate && (!next.stage1.referralInfo?.date || overwrite)
+          ? referralDate
+          : next.stage1.referralInfo?.date,
+        organization:
+          mergeString(next.stage1.referralInfo?.organization ?? "", s1.referralInfo.organization, overwrite) || undefined,
+        contactPerson:
+          mergeString(next.stage1.referralInfo?.contactPerson ?? "", s1.referralInfo.contactPerson, overwrite) || undefined,
+        contactNumber:
+          mergeString(next.stage1.referralInfo?.contactNumber ?? "", s1.referralInfo.contactNumber, overwrite) || undefined,
+      };
+    }
 
     next.stage1.address = mergeString(next.stage1.address, s1.address, overwrite);
     next.stage1.countyState = mergeString(next.stage1.countyState, s1.countyState, overwrite);
@@ -911,10 +969,8 @@ export function mergeExtractionDraft(
       s2.guardianRelationship,
       overwrite,
     );
-    next.stage2.guardianEmail = mergeString(
-      next.stage2.guardianEmail,
-      s2.guardianEmail,
-      overwrite,
+    next.stage2.guardianEmail = normalizeExtractedOptionalEmail(
+      mergeString(next.stage2.guardianEmail, s2.guardianEmail, overwrite),
     );
     next.stage2.guardianPhone = mergeString(
       next.stage2.guardianPhone,
@@ -961,9 +1017,10 @@ export function mergeExtractionDraft(
       if (hasRow) {
         next.stage2.guardians = [
           {
+            ...createEmptyGuardianContact(),
             name: r.guardianName?.trim() || undefined,
             relationship: r.guardianRelationship,
-            email: r.guardianEmail?.trim() || undefined,
+            email: normalizeExtractedOptionalEmail(r.guardianEmail),
             primaryPhone: r.guardianPhone?.trim() || undefined,
             address: r.guardianAddress?.trim() || undefined,
             supportCoordinatorName: r.supportCoordinatorName?.trim() || undefined,
@@ -978,6 +1035,53 @@ export function mergeExtractionDraft(
       s2.careTeam,
       overwrite,
     );
+
+    if (Array.isArray(s2.insuranceInfo) && (s2.insuranceInfo.length || overwrite)) {
+      next.stage2.insuranceInfo = s2.insuranceInfo.map((row: ExtractionHhaInsuranceInfo, idx: number) => ({
+        id: `insurance-${idx}`,
+        type: row.type === "secondary" ? "secondary" : "primary",
+        company: row.company ?? "",
+        memberId: row.memberId ?? "",
+        groupNumber: row.groupNumber ?? "",
+        effectiveDate: parseIsoOrUsDate(row.effectiveDate),
+        authorizationRequired: normalizeYesNoForForm(row.authorizationRequired),
+      }));
+    }
+    if (s2.hhaServiceRequest) {
+      const req = s2.hhaServiceRequest;
+      next.stage2.hhaServiceRequest = {
+        ...(next.stage2.hhaServiceRequest ?? {}),
+        requestedServices: Array.isArray(req.requestedServices) ? req.requestedServices : [],
+        daysNeeded: Array.isArray(req.daysNeeded) ? req.daysNeeded : [],
+        startDate: parseIsoOrUsDate(req.startDate),
+        preferredTime:
+          mergeString(next.stage2.hhaServiceRequest?.preferredTime ?? "", req.preferredTime, overwrite) || "",
+        hoursRequested:
+          mergeString(next.stage2.hhaServiceRequest?.hoursRequested ?? "", req.hoursRequested, overwrite) || "",
+      };
+    }
+    if (Array.isArray(s2.hhaAuthorizations) && (s2.hhaAuthorizations.length || overwrite)) {
+      next.stage2.hhaAuthorizations = s2.hhaAuthorizations.map((row: ExtractionHhaAuthorization, idx: number) => ({
+        id: `hha-auth-${idx}`,
+        authorizationNumber: row.authorizationNumber ?? "",
+        serviceId: row.serviceId,
+        serviceName: row.serviceName ?? "",
+        serviceCode: row.serviceCode ?? "",
+        approvedHours: row.approvedHours ?? "",
+        startDate: parseIsoOrUsDate(row.startDate),
+        endDate: parseIsoOrUsDate(row.endDate),
+        payerSource: row.payerSource ?? "",
+        rate: row.rate ?? "",
+        unitType: row.unitType ?? "",
+        serviceType: row.serviceType,
+        modifier: row.modifier,
+        clientPayType: row.clientPayType as HhaAuthorization["clientPayType"],
+        assignedDsps: row.assignedDsps?.length
+          ? row.assignedDsps.map((d) => ({ id: d.id, name: d.name ?? "" }))
+          : [],
+      }));
+      localWarnings.push("Review imported HHA authorizations before saving.");
+    }
 
     if (s2.outcomes?.length) {
       next.stage2.outcomes = applyImportedOutcomeGroups(
@@ -1052,6 +1156,24 @@ export function mergeExtractionDraft(
       s3.nutritionNotes,
       overwrite,
     ) || undefined;
+    if (s3.physicianInfo) {
+      next.stage3.physicianInfo = {
+        ...(next.stage3.physicianInfo ?? {}),
+        name:
+          mergeString(next.stage3.physicianInfo?.name ?? "", s3.physicianInfo.name, overwrite) || undefined,
+        npi:
+          mergeString(next.stage3.physicianInfo?.npi ?? "", s3.physicianInfo.npi, overwrite) || undefined,
+        phone:
+          mergeString(next.stage3.physicianInfo?.phone ?? "", s3.physicianInfo.phone, overwrite) || undefined,
+        fax:
+          mergeString(next.stage3.physicianInfo?.fax ?? "", s3.physicianInfo.fax, overwrite) || undefined,
+        address:
+          mergeString(next.stage3.physicianInfo?.address ?? "", s3.physicianInfo.address, overwrite) || undefined,
+      };
+    }
+    next.stage3.fallRisk = applyYesNo(next.stage3.fallRisk ?? "", s3.fallRisk, overwrite);
+    next.stage3.specialPrecautions =
+      mergeString(next.stage3.specialPrecautions ?? "", s3.specialPrecautions, overwrite) || undefined;
     next.stage3.selfCareNeeds = mergeAdlSupportNeeds(
       next.stage3.selfCareNeeds ?? [],
       s3.selfCareNeeds,
@@ -1146,6 +1268,44 @@ export function mergeExtractionDraft(
       s5.medicalRestrictionsTrained,
       overwrite,
     );
+    if (s5.hhaCaregiverPreferences) {
+      const prefs = s5.hhaCaregiverPreferences;
+      next.stage5.hhaCaregiverPreferences = {
+        ...(next.stage5.hhaCaregiverPreferences ?? {}),
+        languagePreference:
+          mergeString(
+            next.stage5.hhaCaregiverPreferences?.languagePreference ?? "",
+            prefs.languagePreference,
+            overwrite,
+          ) || undefined,
+        smokingAllowed: applyYesNo(
+          next.stage5.hhaCaregiverPreferences?.smokingAllowed ?? "",
+          prefs.smokingAllowed,
+          overwrite,
+        ),
+        petInHome: applyYesNo(
+          next.stage5.hhaCaregiverPreferences?.petInHome ?? "",
+          prefs.petInHome,
+          overwrite,
+        ),
+        liftAssistanceRequired: applyYesNo(
+          next.stage5.hhaCaregiverPreferences?.liftAssistanceRequired ?? "",
+          prefs.liftAssistanceRequired,
+          overwrite,
+        ),
+        vehicleRequired: applyYesNo(
+          next.stage5.hhaCaregiverPreferences?.vehicleRequired ?? "",
+          prefs.vehicleRequired,
+          overwrite,
+        ),
+        specialSkillsNeeded:
+          mergeString(
+            next.stage5.hhaCaregiverPreferences?.specialSkillsNeeded ?? "",
+            prefs.specialSkillsNeeded,
+            overwrite,
+          ) || undefined,
+      };
+    }
   }
 
   const s6 = draft.stage6;

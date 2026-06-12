@@ -27,6 +27,72 @@ export type ExtractionInsuranceDetail = Partial<{
   contact: string;
 }>;
 
+export type ExtractionHhaHomeInfo = Partial<{
+  apartmentNumber: string;
+  county: string;
+  accessInstructions: string;
+  homeType: string;
+}>;
+
+export type ExtractionHhaReferralInfo = Partial<{
+  source: string;
+  date: string;
+  organization: string;
+  contactPerson: string;
+  contactNumber: string;
+}>;
+
+export type ExtractionHhaInsuranceInfo = Partial<{
+  type: string;
+  company: string;
+  memberId: string;
+  groupNumber: string;
+  effectiveDate: string;
+  authorizationRequired: string;
+}>;
+
+export type ExtractionHhaServiceRequest = Partial<{
+  requestedServices: string[];
+  daysNeeded: string[];
+  startDate: string;
+  preferredTime: string;
+  hoursRequested: string;
+}>;
+
+export type ExtractionHhaAuthorization = Partial<{
+  authorizationNumber: string;
+  serviceId: string;
+  serviceName: string;
+  serviceCode: string;
+  approvedHours: string;
+  startDate: string;
+  endDate: string;
+  payerSource: string;
+  rate: string;
+  unitType: string;
+  serviceType: string;
+  modifier: string;
+  clientPayType: string;
+  assignedDsps: Array<{ id: string; name: string }>;
+}>;
+
+export type ExtractionHhaPhysicianInfo = Partial<{
+  name: string;
+  npi: string;
+  phone: string;
+  fax: string;
+  address: string;
+}>;
+
+export type ExtractionHhaCaregiverPreferences = Partial<{
+  languagePreference: string;
+  smokingAllowed: string;
+  petInHome: string;
+  liftAssistanceRequired: string;
+  vehicleRequired: string;
+  specialSkillsNeeded: string;
+}>;
+
 export type ExtractionGuardianContact = Partial<{
   name: string;
   relationship: string;
@@ -166,6 +232,7 @@ export type ExtractionOutcomeRow = Partial<{
 
 /** Raw draft from Gemini (strings / ISO date strings). */
 export type ClientExtractionDraft = {
+  type?: "ddd" | "hha";
   stage1?: Partial<{
     firstName: string;
     lastName: string;
@@ -174,8 +241,11 @@ export type ClientExtractionDraft = {
     dob: string;
     medicaidId: string;
     dddId: string;
+    medicareId: string;
     ssn: string;
     tier: string;
+    preferredName: string;
+    maritalStatus: string;
     address: string;
     countyState: string;
     zipCode: string;
@@ -194,6 +264,8 @@ export type ClientExtractionDraft = {
     dddStatus: string;
     medicaidType: string;
     insuranceDetails: ExtractionInsuranceDetail[];
+    homeInfo: ExtractionHhaHomeInfo;
+    referralInfo: ExtractionHhaReferralInfo;
   }>;
   stage2?: Partial<{
     guardianName: string;
@@ -204,6 +276,9 @@ export type ClientExtractionDraft = {
     supportCoordinatorName: string;
     supportCoordinatorAgency: string;
     supportCoordinatorContact: string;
+    insuranceInfo: ExtractionHhaInsuranceInfo[];
+    hhaServiceRequest: ExtractionHhaServiceRequest;
+    hhaAuthorizations: ExtractionHhaAuthorization[];
     /** Canonical: outcome rows with nested service authorizations. */
     outcomes?: ExtractionOutcomeRow[];
     /** @deprecated Legacy extraction shape; merged into `outcomes` when present. */
@@ -226,6 +301,9 @@ export type ClientExtractionDraft = {
     healthHazards: string;
     nutritionNotes: string;
     selfCareNeeds: ExtractionAdlSupportNeed[];
+    physicianInfo: ExtractionHhaPhysicianInfo;
+    fallRisk: string;
+    specialPrecautions: string;
   }>;
   stage4?: Partial<{
     evvRequirement: string;
@@ -243,6 +321,7 @@ export type ClientExtractionDraft = {
     prefersFamiliar: string;
     noMaleFemaleStaff: string;
     medicalRestrictionsTrained: string;
+    hhaCaregiverPreferences: ExtractionHhaCaregiverPreferences;
   }>;
   stage6?: Partial<{
     clientGoals: string;

@@ -15,6 +15,7 @@ export const Routes = {
     agency: {
         dashboard: "/agency/dashboard",
         dspManagement: "/agency/dsp-management",
+        manualStaffOnboarding: "/agency/dsp-management/manual-staff-onboarding",
         dspProfile: "/agency/dsp-management/:dspId",
         clients: "/agency/clients",
         addClient: "/agency/clients/add",

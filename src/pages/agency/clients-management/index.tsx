@@ -18,6 +18,7 @@ interface DisplayClient {
   statusLabel: string;
   roleLabel: string;
   roleValue: string | number;
+  type: "ddd" | "hha";
   accountCreated: string;
   avatarUrl?: string;
 }
@@ -130,6 +131,7 @@ export default function ClientsPage() {
         statusLabel,
         roleLabel: "DSP",
         roleValue: dspCount,
+        type: client.type === "hha" ? "hha" : "ddd",
         accountCreated: formatDate(client.createdAt),
         avatarUrl: client.profileImage,
       };
@@ -366,6 +368,10 @@ export default function ClientsPage() {
                     }
                   >
                     {client.statusLabel}
+                  </Badge>
+
+                  <Badge variant="outline" className="hidden uppercase sm:inline-flex">
+                    {client.type}
                   </Badge>
 
                   <div className="w-[75px] text-[14px] font-medium leading-[1.4]">

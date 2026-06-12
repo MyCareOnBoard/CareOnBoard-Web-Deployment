@@ -27,11 +27,20 @@ function sortDsps(dsps: ClientDsp[]): ClientDsp[] {
   return [...dsps].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", undefined, { sensitivity: "base" }));
 }
 
-/** Distinct assigned DSPs for display (outcomes → flat services → legacy primary/secondary). */
+/** Distinct assigned DSPs for display (outcomes → flat services → HHA authorizations → legacy primary/secondary). */
 export function collectUniqueAssignedDspsForClient(
-  client: Pick<Client, "outcomes" | "services" | "primaryDsp" | "secondaryDsps">,
+  client: Pick<
+    Client,
+    "outcomes" | "services" | "primaryDsp" | "secondaryDsps" | "hhaAuthorizations"
+  >,
 ): ClientDsp[] {
   const map = new Map<string, ClientDsp>();
+
+  for (const auth of client.hhaAuthorizations ?? []) {
+    for (const d of auth.assignedDsps ?? []) {
+      addDspToMap(map, d);
+    }
+  }
 
   if (client.outcomes?.length) {
     for (const o of client.outcomes) {
@@ -76,7 +85,10 @@ export function countUniqueAssignedDspsAcrossServices(
 }
 
 export function countUniqueAssignedDspsForClient(
-  client: Pick<Client, "outcomes" | "services" | "primaryDsp" | "secondaryDsps">,
+  client: Pick<
+    Client,
+    "outcomes" | "services" | "primaryDsp" | "secondaryDsps" | "hhaAuthorizations"
+  >,
 ): number {
   return collectUniqueAssignedDspsForClient(client).length;
 }

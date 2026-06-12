@@ -164,7 +164,7 @@ function ServiceAssignedDspsEditor({
     <div>
       <div className="mb-4">
         <p className="mb-1 text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-          Assigned DSPs
+          Assigned Caregivers
         </p>
         <p className="text-[13px] text-[#808081]">
           Search for staff to assign to this service. Assignments are not imported from uploaded
@@ -173,7 +173,7 @@ function ServiceAssignedDspsEditor({
       </div>
       {assignedDsps.length === 0 ? (
         <p className="mb-2 text-[13px] text-[#808081]">
-          No staff assigned yet. Use Add staff below to search.
+          No caregivers assigned yet. Use Add Caregiver below to search.
         </p>
       ) : (
         <ul className="mb-3 flex w-full max-w-md flex-col gap-2">
@@ -215,7 +215,7 @@ function ServiceAssignedDspsEditor({
         onClick={addSearchSlot}
       >
         <Plus className="mr-1 h-4 w-4" />
-        Add staff
+        Add Caregiver
       </Button>
     </div>
   );

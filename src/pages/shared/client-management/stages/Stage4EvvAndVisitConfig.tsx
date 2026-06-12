@@ -83,6 +83,7 @@ export function Stage4EvvAndVisitConfig({
     : MAX_SHIFT_LENGTH_OPTIONS_ALL.filter((o) => o !== CUSTOM_OPTION);
 
   const stage4 = formData.stage4;
+  const isHhaClient = formData.type === "hha";
   const updateStage4 = (patch: Partial<AddClientFormData["stage4"]>) =>
     setFormData((prev) => ({ ...prev, stage4: { ...prev.stage4, ...patch } }));
 
