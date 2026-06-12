@@ -2,6 +2,8 @@ import { lazy } from "react";
 import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
 
+const RouteErrorPage = lazy(() => import("@/pages/error/RouteErrorPage"));
+
 const SplashScreen = lazy(() => import("@/pages/splash"));
 const VerifyOTP = lazy(() => import("@/pages/onboarding/VerifyOTP"));
 const VerifyEmail = lazy(() => import("@/pages/onboarding/VerifyEmail"));
@@ -11,6 +13,11 @@ const ForgotPasswordPage = lazy(() => import("@/pages/auth/forgot-password"));
 const ResetPasswordPage = lazy(() => import("@/pages/auth/reset-password"));
 const MfaEnrollPage = lazy(() => import("@/pages/auth/mfa-enroll"));
 const MfaChallengePage = lazy(() => import("@/pages/auth/mfa-challenge"));
+const FamilyLoginPage = lazy(() => import("@/pages/auth/family-login"));
+const FamilyLayout = lazy(() => import("@/layouts/FamilyLayout"));
+const FamilyDashboardPage = lazy(() => import("@/pages/family/dashboard"));
+const FamilySchedulePage = lazy(() => import("@/pages/family/schedule"));
+const FamilyMessagesPage = lazy(() => import("@/pages/family/messages"));
 const ApplicantDashboardPage = lazy(() => import("@/pages/applicant/dashboard"));
 const DocumentsPage = lazy(() => import("@/pages/applicant/documents"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
@@ -147,6 +154,9 @@ const MobileAppRedirect = lazy(() => import("@/pages/app/MobileAppRedirect"));
 
 export const router = createBrowserRouter([
     {
+        errorElement: <RouteErrorPage />,
+        children: [
+    {
         path: Routes.root,
         Component: SplashScreen,
     },
@@ -211,6 +221,11 @@ export const router = createBrowserRouter([
                 Component: MfaChallengePage,
             },
         ],
+    },
+    {
+        // Family portal login — standalone layout (not AuthLayout)
+        path: Routes.auth.familyLogin,
+        Component: FamilyLoginPage,
     },
     {
         Component: ApplicantDashboardLayout,
@@ -758,6 +773,25 @@ export const router = createBrowserRouter([
                 path: Routes.superAdmin.services,
                 Component: ServicesManagementPage,
             },
+        ],
+    },
+    {
+        Component: FamilyLayout,
+        children: [
+            {
+                path: Routes.family.dashboard,
+                Component: FamilyDashboardPage,
+            },
+            {
+                path: Routes.family.schedule,
+                Component: FamilySchedulePage,
+            },
+            {
+                path: Routes.family.messages,
+                Component: FamilyMessagesPage,
+            },
+        ],
+    },
         ],
     },
 ]);

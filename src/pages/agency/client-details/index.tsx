@@ -8,12 +8,13 @@ import { ActivityTab } from "@/pages/shared/client-details/tabs/ActivityTab";
 import { ProfileTab } from "@/pages/shared/client-details/tabs/ProfileTab";
 import { ServicesTab } from "@/pages/agency/client-details/tabs/ServicesTab";
 import { DocumentsTab } from "@/pages/agency/client-details/tabs/DocumentsTab";
+import { FamilyPortalTab } from "@/pages/agency/client-details/tabs/FamilyPortalTab";
 import { UploadClientDocumentModal } from "@/pages/agency/client-details/components/UploadClientDocumentModal";
 import { useAuth } from "@/utils/auth";
 import { getAgencyClientById, type Client, type ClientDocument } from "@/lib/api/clients";
 import { Routes } from "@/routes/constants";
 
-type ClientDetailsTab = "activity" | "profile" | "services" | "documents";
+type ClientDetailsTab = "activity" | "profile" | "services" | "documents" | "family-portal";
 
 export default function ClientDetailsPage() {
   const { clientId } = useParams();
@@ -299,6 +300,18 @@ export default function ClientDetailsPage() {
           >
             Documents
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("family-portal")}
+            className={[
+              "h-[36px] rounded-[200px] px-[16px] py-[8px] text-[12px] font-medium leading-[1.4] backdrop-blur-[22px] cursor-pointer whitespace-nowrap",
+              activeTab === "family-portal"
+                ? "bg-[#00b4b8] border border-[#00b4b8] text-white"
+                : "border border-[#b2b2b3] text-[#b2b2b3]",
+            ].join(" ")}
+          >
+            Family Portal
+          </button>
         </div>
       </div>
 
@@ -335,6 +348,13 @@ export default function ClientDetailsPage() {
             setDocumentToEdit(document);
             setIsUploadModalOpen(true);
           }}
+        />
+      )}
+      {activeTab === "family-portal" && (
+        <FamilyPortalTab
+          client={client}
+          clientId={clientId || ""}
+          onClientUpdated={fetchClient}
         />
       )}
 

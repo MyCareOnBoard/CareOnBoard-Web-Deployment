@@ -139,7 +139,7 @@ export default function DashboardHeader(
   }, []);
 
   const makeCommonRoute = (route: string) => {
-    const userTypeKeys = {
+    const userTypeKeys: Partial<Record<UserType, string>> = {
       [UserType.APPLICANT]: "applicant",
       [UserType.EMPLOYEE]: "user-panel",
       [UserType.AGENCY]: "agency",

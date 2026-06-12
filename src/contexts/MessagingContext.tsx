@@ -22,6 +22,7 @@ import {
   AgencyContact,
 } from "@/lib/api/userMessaging";
 import { useAuth } from "@/utils/auth";
+import { UserType } from "@/utils/auth/types/user.types";
 import { useToast } from "@/hooks/use-toast";
 
 interface MessagingContextType {
@@ -68,9 +69,10 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   // Initialize presence manager
   usePresenceManager();
 
-  // RTK Query hooks - skip if user is not authenticated
+  // RTK Query hooks - skip for unauthenticated users and family members (they use their own messaging API)
+  const isFamilyMember = user?.userType === UserType.FAMILY_MEMBER;
   const { data: contactsData, refetch: refetchContacts } = useGetContactsQuery(undefined, {
-    skip: !user, // Skip if no authenticated user
+    skip: !user || isFamilyMember,
   });
   const [createConversationMutation] = useCreateConversationMutation();
   const [sendMessageMutation] = useSendMessageMutation();
