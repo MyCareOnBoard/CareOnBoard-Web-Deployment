@@ -24,8 +24,7 @@ const STORAGE_KEY = "agencyManualStaffOnboarding";
 const STEP_TITLES = [
   "Profile & Pre-Screening",
   "Document Upload & Eligibility Verification",
-  "Conditional Hire & Compliance",
-  "Official Hire & Orientation",
+  "Staff Credentials Creation",
 ] as const;
 
 const STEP_COUNT = STEP_TITLES.length;
@@ -102,7 +101,7 @@ const defaultProfileData: ProfilePreScreeningData = {
   address: "",
   gender: "",
   booleanQuestions: {
-    isAdult: "",
+    isAdult: "Yes",
     hasDiploma: "",
     eligibleToWork: "",
     hasDisqualifyingOffense: "",
@@ -388,13 +387,7 @@ export default function ManualStaffOnboarding() {
     return null;
   };
 
-  const validateStep3 = (): string | null => {
-    const allAuthorized = Object.values(conditionalHireData.authorizations).every(Boolean);
-    if (!allAuthorized) return "All authorizations must be enabled";
-    const allAgreed = Object.values(conditionalHireData.agreements).every(Boolean);
-    if (!allAgreed) return "All compliance agreements must be accepted";
-    return null;
-  };
+  // Conditional hire / compliance step removed from agency flow
 
   // ===== SAVE HANDLER =====
 
@@ -416,13 +409,6 @@ export default function ManualStaffOnboarding() {
       persistToStorage({ activeStep: 2, maxSavedStep: newMax });
       setActiveStep(2);
     } else if (activeStep === 2) {
-      const err = validateStep3();
-      if (err) { toast({ title: "Validation error", description: err, variant: "destructive" }); return; }
-      const newMax = Math.max(maxSavedStep, 3);
-      setMaxSavedStep(newMax);
-      persistToStorage({ conditionalHireData, activeStep: 3, maxSavedStep: newMax });
-      setActiveStep(3);
-    } else if (activeStep === 3) {
       if (!orientationDeclaration) {
         toast({ title: "Validation error", description: "Please confirm credentials have been shared with the new staff member", variant: "destructive" });
         return;
@@ -441,6 +427,10 @@ export default function ManualStaffOnboarding() {
         if (resumeUrl) docs.resume = { url: resumeUrl, expiryDate: "" };
         if (i9Url) docs.i9Form = { url: i9Url, expiryDate: "" };
         if (w4Url) docs.w4Form = { url: w4Url, expiryDate: "" };
+
+        const newMax = Math.max(maxSavedStep, 3);
+        setMaxSavedStep(newMax);
+        persistToStorage({ activeStep: 2, maxSavedStep: newMax });
 
         await completeManualOnboarding({
           profile: {
@@ -553,9 +543,11 @@ export default function ManualStaffOnboarding() {
             <div className="flex gap-3">
               <Radio id={`${q.name}-yes`} name={q.name} value="Yes" label="Yes"
                 checked={profileData.booleanQuestions[q.name] === "Yes"}
+                disabled={q.name === "isAdult"}
                 onChange={() => setProfileData({ ...profileData, booleanQuestions: { ...profileData.booleanQuestions, [q.name]: "Yes" } })} />
               <Radio id={`${q.name}-no`} name={q.name} value="No" label="No"
                 checked={profileData.booleanQuestions[q.name] === "No"}
+                disabled={q.name === "isAdult"}
                 onChange={() => setProfileData({ ...profileData, booleanQuestions: { ...profileData.booleanQuestions, [q.name]: "No" } })} />
             </div>
           </div>
@@ -749,77 +741,20 @@ export default function ManualStaffOnboarding() {
       </div>
     </section>,
 
-    // Step 3: Conditional Hire & Compliance
-    <section key="conditional" className="space-y-8">
-      <div className="space-y-3">
-        <h2 className="text-2xl font-bold text-[#10141a]">Conditional Hire & Compliance</h2>
-        <p className="text-sm text-[#808081] max-w-3xl">
-          Toggle all required authorizations and check all compliance agreements.
-        </p>
-      </div>
+    
 
-      <div className="space-y-6 rounded-2xl border border-[#d9d9d9] bg-white p-6">
-        {(
-          [
-            { label: "Authorize Drug test appointment", key: "drugTest" },
-            { label: "Authorize Fingerprint appointment", key: "fingerprint" },
-            { label: "Authorize Central Registry Check (Developmental Disabilities Abuse/Neglect Registry)", key: "centralRegistry" },
-            { label: "Authorize CARI Check (Child Abuse Record Information, DCF)", key: "cariCheck" },
-            { label: "Authorize Sex Offender Registry Check (Megan's Law)", key: "sexOffender" },
-            { label: "Authorize OIG Exclusion List Check (LEIE)", key: "oigExclusion" },
-            { label: "Authorize Health & TB Screening", key: "healthTB" },
-            { label: "Authorize Reference Checks (Minimum 2, Non-Family)", key: "referenceChecks" },
-          ] as const
-        ).map((item) => (
-          <div key={item.key} className="flex items-center justify-between border-b border-[#e5e5e6] py-4 last:border-b-0">
-            <p className="text-sm text-[#10141a]">{item.label}</p>
-            <Toggle
-              pressed={conditionalHireData.authorizations[item.key]}
-              onPressedChange={(pressed) =>
-                setConditionalHireData({
-                  ...conditionalHireData,
-                  authorizations: { ...conditionalHireData.authorizations, [item.key]: pressed },
-                })
-              } />
-          </div>
-        ))}
-      </div>
-
-      <div className="space-y-6 rounded-2xl border border-[#d9d9d9] bg-white p-6">
-        {(
-          [
-            { label: "I accept the terms and condition for Abuse, Neglect, and Exploitation Awareness", key: "abuseAwareness" },
-            { label: "I accept the terms and condition for HIPAA & Confidentiality", key: "hipaaConfidentiality" },
-            { label: "I accept the terms and condition for Overview of Developmental Disabilities", key: "developmentalDisabilities" },
-          ] as const
-        ).map((item) => (
-          <div key={item.key} className="flex items-start gap-3">
-            <Checkbox id={item.key}
-              checked={conditionalHireData.agreements[item.key]}
-              onChange={() =>
-                setConditionalHireData({
-                  ...conditionalHireData,
-                  agreements: { ...conditionalHireData.agreements, [item.key]: !conditionalHireData.agreements[item.key] },
-                })
-              } />
-            <Label htmlFor={item.key} className="text-sm text-[#808081] cursor-pointer">{item.label}</Label>
-          </div>
-        ))}
-      </div>
-    </section>,
-
-    // Step 4: Official Hire & Orientation
+    // Step 4: Staff Credentials
     <section key="orientation" className="space-y-8">
       <div className="space-y-3">
-        <h2 className="text-2xl font-bold text-[#10141a]">Official Hire & Orientation</h2>
+        <h2 className="text-2xl font-bold text-[#10141a]">Staff Credentials Creation</h2>
         <p className="text-sm text-[#808081] max-w-3xl">
           Review the login credentials below. The staff member's account will be created when you click "Complete Onboarding".
         </p>
       </div>
 
       <div className="rounded-2xl border border-[#d9d9d9] bg-white p-6 space-y-6">
-        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4">
-          <p className="text-sm text-amber-800 font-medium">
+        <div className="p-4 border rounded-2xl bg-amber-50 border-amber-200">
+          <p className="text-sm font-medium text-amber-800">
             The account has not been created yet. Clicking "Complete Onboarding" below will create the account and finalize all records.
           </p>
         </div>
@@ -951,7 +886,7 @@ export default function ManualStaffOnboarding() {
       <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <SuccessDialogContent
           title="Staff Onboarded Successfully"
-          description={`${profileData.fullName} has been onboarded as a DSP staff member. Their account is now active — share the login credentials with them so they can log in.`}
+          description={`${profileData.fullName} has been onboarded as a staff member. Their account is now active — share the login credentials with them so they can log in.`}
           buttonText="Done"
           onButtonClick={() => { setShowSuccessDialog(false); navigate(Routes.agency.dspManagement); }}
         />
