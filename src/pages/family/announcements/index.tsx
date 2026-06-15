@@ -13,24 +13,9 @@ interface Announcement {
 }
 
 const TYPE_META = {
-  info: {
-    label: "Info",
-    badge: "bg-blue-50 text-blue-700",
-    border: "border-l-blue-500",
-    icon: Info,
-  },
-  warning: {
-    label: "Warning",
-    badge: "bg-amber-50 text-amber-700",
-    border: "border-l-amber-500",
-    icon: AlertTriangle,
-  },
-  urgent: {
-    label: "Urgent",
-    badge: "bg-red-50 text-red-700",
-    border: "border-l-red-500",
-    icon: Siren,
-  },
+  info:    { label: "Info",    border: "border-[#2b82ff] text-[#2b82ff]",   left: "border-l-[#2b82ff]",   icon: Info },
+  warning: { label: "Warning", border: "border-[#FF6C10] text-[#FF6C10]",   left: "border-l-[#FF6C10]",   icon: AlertTriangle },
+  urgent:  { label: "Urgent",  border: "border-[#ef4444] text-[#ef4444]",   left: "border-l-[#ef4444]",   icon: Siren },
 } as const
 
 function formatDate(val: { seconds: number } | string | null): string {
@@ -57,7 +42,6 @@ export default function FamilyAnnouncementsPage() {
       .get<{ success: boolean; data: Announcement[] }>("/familyPortal/announcements")
       .then((res) => {
         setAnnouncements(res.data.data || [])
-        // Mark all current announcements as seen — clears "New" badge in nav
         localStorage.setItem(SEEN_AT_KEY, Date.now().toString())
         localStorage.removeItem("family_ann_has_new")
         window.dispatchEvent(new CustomEvent(BADGE_EVENT, { detail: false }))
@@ -67,80 +51,92 @@ export default function FamilyAnnouncementsPage() {
   }, [])
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#063E3F]/10">
-          <Megaphone className="h-5 w-5 text-[#063E3F]" />
-        </div>
-        <div>
-          <h1 className="text-[18px] font-semibold text-slate-900">Announcements</h1>
-          <p className="text-[12px] text-slate-400">Notices from your care agency</p>
-        </div>
+    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
+      {/* Page Header */}
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.4] text-[#10141a]">
+          Announcements
+        </h1>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+      <div className="overflow-hidden bg-white shadow-sm rounded-xl sm:rounded-2xl">
+        {/* Card header */}
+        <div className="p-4 sm:p-6 border-b border-[#e5e7eb]">
+          <h2 className="text-[20px] sm:text-[22px] font-bold text-[#10141a]">Agency Notices</h2>
+          <p className="mt-0.5 text-[13px] sm:text-[14px] text-[#6b7280]">
+            Important updates from your care agency
+          </p>
         </div>
-      ) : error ? (
-        <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-[13px] text-red-600">{error}</div>
-      ) : announcements.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 py-20 text-center">
-          <Megaphone className="h-12 w-12 text-slate-200" />
-          <p className="text-[14px] font-medium text-slate-500">No announcements</p>
-          <p className="text-[12px] text-slate-400">Your care agency hasn't posted any announcements yet</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {announcements.map((a) => {
-            const meta     = TYPE_META[a.type] ?? TYPE_META.info
-            const TypeIcon = meta.icon
-            const posted   = formatDate(a.createdAt)
-            const expanded = expandedIds.has(a.id)
-            const isLong   = a.body.length > 160
 
-            return (
-              <div
-                key={a.id}
-                className={`rounded-2xl border border-slate-100 bg-white p-5 shadow-sm border-l-4 ${meta.border}`}
-              >
-                <div className="mb-2 flex items-center gap-2">
-                  <span className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${meta.badge}`}>
-                    <TypeIcon className="h-3 w-3" />
-                    {meta.label}
-                  </span>
-                  {posted && (
-                    <span className="text-[11px] text-slate-400">Posted {posted}</span>
+        {loading ? (
+          <div className="p-8 sm:p-12 text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent" />
+            <p className="mt-4 text-[14px] text-[#6b7280]">Loading announcements…</p>
+          </div>
+        ) : error ? (
+          <div className="p-6">
+            <p className="text-[14px] text-[#ef4444]">{error}</p>
+          </div>
+        ) : announcements.length === 0 ? (
+          <div className="p-8 sm:p-12 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f3f4f6]">
+              <Megaphone className="h-7 w-7 text-[#b2b2b3]" />
+            </div>
+            <p className="text-[14px] font-semibold text-[#10141a]">No announcements</p>
+            <p className="mt-1 text-[13px] text-[#6b7280]">
+              Your care agency hasn't posted any announcements yet
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-[#e5e7eb]">
+            {announcements.map((a) => {
+              const meta     = TYPE_META[a.type] ?? TYPE_META.info
+              const TypeIcon = meta.icon
+              const posted   = formatDate(a.createdAt)
+              const expanded = expandedIds.has(a.id)
+              const isLong   = a.body.length > 160
+
+              return (
+                <div
+                  key={a.id}
+                  className={`p-4 sm:p-6 border-l-4 ${meta.left}`}
+                >
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className={`px-3 py-1 rounded-full text-[13px] font-medium border ${meta.border} bg-transparent flex items-center gap-1.5`}>
+                      <TypeIcon className="h-3.5 w-3.5" />
+                      {meta.label}
+                    </span>
+                    {posted && (
+                      <span className="text-[12px] text-[#b2b2b3]">Posted {posted}</span>
+                    )}
+                  </div>
+
+                  <p className="text-[15px] font-semibold text-[#10141a]">{a.title}</p>
+
+                  <p className={`mt-1.5 text-[14px] text-[#6b7280] leading-[1.5] ${!expanded && isLong ? "line-clamp-3" : ""}`}>
+                    {a.body}
+                  </p>
+
+                  {isLong && (
+                    <button
+                      onClick={() => toggleExpand(a.id)}
+                      className="mt-1.5 flex items-center gap-0.5 text-[13px] font-medium text-[#00b4b8] hover:underline"
+                    >
+                      {expanded
+                        ? <><ChevronUp className="h-3.5 w-3.5" /> Show less</>
+                        : <><ChevronDown className="h-3.5 w-3.5" /> Read more</>}
+                    </button>
+                  )}
+
+                  {a.createdByName && (
+                    <p className="mt-3 text-[12px] text-[#b2b2b3]">— {a.createdByName}</p>
                   )}
                 </div>
-
-                <p className="mb-1.5 text-[15px] font-semibold text-slate-800">{a.title}</p>
-
-                <p className={`text-[13px] leading-relaxed text-slate-600 ${!expanded && isLong ? "line-clamp-3" : ""}`}>
-                  {a.body}
-                </p>
-
-                {isLong && (
-                  <button
-                    onClick={() => toggleExpand(a.id)}
-                    className="mt-1.5 flex items-center gap-0.5 text-[12px] font-semibold text-[#063E3F] hover:underline"
-                  >
-                    {expanded
-                      ? <><ChevronUp className="h-3.5 w-3.5" /> Show less</>
-                      : <><ChevronDown className="h-3.5 w-3.5" /> Read more</>
-                    }
-                  </button>
-                )}
-
-                {a.createdByName && (
-                  <p className="mt-3 text-[11px] text-slate-400">— {a.createdByName}</p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

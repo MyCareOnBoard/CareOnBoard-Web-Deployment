@@ -81,9 +81,9 @@ interface Announcement {
 // ─── Announcements Banner ─────────────────────────────────────────────────────
 
 const BANNER_META = {
-    info:    { bg: "bg-blue-50",   border: "border-blue-200",  text: "text-blue-800",  icon: Info,          label: "Info" },
-    warning: { bg: "bg-amber-50",  border: "border-amber-200", text: "text-amber-800", icon: AlertTriangle, label: "Warning" },
-    urgent:  { bg: "bg-red-50",    border: "border-red-200",   text: "text-red-800",   icon: Siren,         label: "Urgent" },
+    info:    { borderColor: "border-l-[#2b82ff]", badgeBorder: "border-[#2b82ff] text-[#2b82ff]", icon: Info,          label: "Info" },
+    warning: { borderColor: "border-l-[#FF6C10]", badgeBorder: "border-[#FF6C10] text-[#FF6C10]", icon: AlertTriangle, label: "Warning" },
+    urgent:  { borderColor: "border-l-[#ef4444]", badgeBorder: "border-[#ef4444] text-[#ef4444]", icon: Siren,         label: "Urgent" },
 } as const
 
 const DISMISSED_KEY = "family_dismissed_announcements"
@@ -122,26 +122,24 @@ function AnnouncementsBanner({
     }
 
     return (
-        <div className={`rounded-2xl border p-4 ${meta.bg} ${meta.border}`}>
-            <div className="flex items-start gap-3">
-                <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/60`}>
-                    <TypeIcon className={`h-3.5 w-3.5 ${meta.text}`} />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[11px] font-bold uppercase tracking-wide ${meta.text} opacity-70`}>
+        <div className={`overflow-hidden bg-white shadow-sm rounded-xl border-l-4 ${meta.borderColor}`}>
+            <div className="flex items-start gap-4 p-4 sm:p-5">
+                <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <span className={`px-3 py-1 rounded-full text-[13px] font-medium border ${meta.badgeBorder} bg-transparent flex items-center gap-1.5`}>
+                            <TypeIcon className="h-3.5 w-3.5" />
                             {meta.label}
                         </span>
-                        <Megaphone className={`h-3 w-3 ${meta.text} opacity-50`} />
+                        <Megaphone className="h-3.5 w-3.5 text-[#b2b2b3]" />
                     </div>
-                    <p className={`mt-0.5 text-[14px] font-semibold ${meta.text}`}>{top.title}</p>
-                    <p className={`mt-0.5 text-[13px] ${meta.text} opacity-80 line-clamp-2`}>{top.body}</p>
-                    <div className="mt-2 flex items-center gap-3">
+                    <p className="text-[15px] font-semibold text-[#10141a]">{top.title}</p>
+                    <p className="mt-0.5 text-[13px] text-[#6b7280] line-clamp-2">{top.body}</p>
+                    <div className="mt-2 flex items-center gap-4">
                         {extras > 0 && (
                             <button
                                 type="button"
                                 onClick={onViewAll}
-                                className={`flex items-center gap-1 text-[12px] font-semibold ${meta.text} underline-offset-2 hover:underline`}
+                                className="text-[13px] font-medium text-[#00b4b8] hover:underline underline-offset-2"
                             >
                                 +{extras} more announcement{extras > 1 ? "s" : ""}
                             </button>
@@ -149,19 +147,19 @@ function AnnouncementsBanner({
                         <button
                             type="button"
                             onClick={onViewAll}
-                            className={`flex items-center gap-1 text-[12px] font-semibold ${meta.text} hover:underline underline-offset-2`}
+                            className="flex items-center gap-1 text-[13px] font-medium text-[#00b4b8] hover:underline underline-offset-2"
                         >
-                            View all <ArrowRight className="h-3 w-3" />
+                            View all <ArrowRight className="h-3.5 w-3.5" />
                         </button>
                     </div>
                 </div>
                 <button
                     type="button"
                     onClick={() => handleDismiss(top.id)}
-                    className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full hover:bg-black/10 ${meta.text} opacity-60`}
+                    className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#f3f4f6] hover:text-[#10141a] transition-colors"
                     aria-label="Dismiss"
                 >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-4 w-4" />
                 </button>
             </div>
         </div>
@@ -267,6 +265,15 @@ function OverviewCards({data}: { data: DashboardData }) {
             ? Math.min(100, Math.round((weeklyHours.approved / weeklyHours.total) * 100))
             : 0
 
+    // Remaining balance — prefer SDR-based figures from serviceHours over the generic remainingBalance
+    const svc = data.serviceHours
+    const remainingHrs = svc != null
+        ? Math.max(0, svc.totalHours - svc.usedHours)
+        : (remainingBalance?.hours ?? null)
+    const periodLabel = fmtMonthRange(svc?.startDate, svc?.endDate)
+        ?? remainingBalance?.period
+        ?? "Remaining this period"
+
     return (
         <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             {/* Today's Schedule */}
@@ -327,11 +334,9 @@ function OverviewCards({data}: { data: DashboardData }) {
                     <span className="text-[14px] font-semibold">Remaining balance</span>
                 </div>
                 <p className="text-[17px] font-semibold text-slate-900">
-                    {remainingBalance ? `${remainingBalance.hours} hrs` : "—"}
+                    {remainingHrs != null ? `${remainingHrs} hrs` : "—"}
                 </p>
-                <p className="mt-1 text-[13px] text-gray-500">
-                    {remainingBalance?.period ?? "Remaining this month"}
-                </p>
+                <p className="mt-1 text-[13px] text-gray-500">{periodLabel}</p>
             </div>
 
             {/* Alerts */}
@@ -382,6 +387,17 @@ function ServiceHoursCard({service}: { service: DashboardData["serviceHours"] })
     const remaining = Math.max(0, service.totalHours - service.usedHours)
     const dateRange = fmtMonthRange(service.startDate, service.endDate)
 
+    // Build end-date label for the notice footer
+    const endDateLabel = (() => {
+        if (!service.endDate) return null
+        const part = service.endDate.split("T")[0]
+        const [y, m, d] = part.split("-").map(Number)
+        if (!y || !m || !d) return null
+        return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+            month: "short", day: "numeric", year: "numeric",
+        })
+    })()
+
     return (
         <div className="rounded-2xl bg-white p-6 border border-[#DBDBDB]">
             <h2 className="mb-4 text-[15px] font-semibold text-slate-800">Service &amp; hours</h2>
@@ -402,7 +418,7 @@ function ServiceHoursCard({service}: { service: DashboardData["serviceHours"] })
                 </div>
                 {dateRange && (
                     <div className="mt-1 flex items-center justify-between">
-                        <span className="text-[13px] text-slate-500">This month</span>
+                        <span className="text-[13px] text-slate-500">Service period</span>
                         <span className="text-[13px] font-semibold text-slate-800">{dateRange}</span>
                     </div>
                 )}
@@ -413,7 +429,7 @@ function ServiceHoursCard({service}: { service: DashboardData["serviceHours"] })
                 <b className="text-black">{service.usedHours}</b>
                 <span className="font-normal text-gray-500"> / {service.totalHours} hrs</span>
             </p>
-            <p className="mt-1 text-[13px] text-gray-500">{remaining} hrs remaining hours</p>
+            <p className="mt-1 text-[13px] text-gray-500">{remaining} hrs remaining</p>
 
             {/* Progress bar */}
             <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-green-100">
@@ -423,10 +439,14 @@ function ServiceHoursCard({service}: { service: DashboardData["serviceHours"] })
                 />
             </div>
 
-            {/* Refresh notice */}
+            {/* Period notice */}
             <div className="mt-4 flex items-center gap-2 rounded-xl bg-[#E8F8F7] px-4 py-3">
                 <Clock className="h-4 w-4 flex-shrink-0 text-[#00B4B8]"/>
-                <span className="text-[13px] text-[#00B4B8]">Hours refresh on the 1st of each month</span>
+                <span className="text-[13px] text-[#00B4B8]">
+                    {endDateLabel
+                        ? `Authorization period ends ${endDateLabel}`
+                        : "Service authorization period"}
+                </span>
             </div>
         </div>
     )
