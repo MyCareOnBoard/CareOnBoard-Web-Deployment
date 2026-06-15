@@ -18,6 +18,7 @@ import { ANOMALY_LABELS } from "@/pages/shared/shift-maintenance/audit-display";
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
+import { roleLabel } from "@/lib/roleLabel";
 
 const REASON_MAX = 500;
 
@@ -253,10 +254,12 @@ export default function ShiftDetailsModal({
 
   if (!isOpen || !shift) return null;
 
+  // Caregiver for HHA employees, DSP otherwise (driven by the employee's role).
+  const workerRoleLabel = roleLabel({ role: resolvedShift?.employee?.role });
   const dspName =
     resolvedShift?.employee?.fullName ||
     resolvedShift?.assignedDsp ||
-    "Unknown DSP";
+    `Unknown ${workerRoleLabel}`;
   const clientExtra = resolvedShift
     ? (resolvedShift as unknown as { clientName?: string | null; clientId?: string | null })
     : null;
@@ -427,7 +430,7 @@ export default function ShiftDetailsModal({
                 </Avatar>
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[16px] leading-[1.6] font-semibold text-black">{dspName}</span>
-                  <span className="text-[14px] leading-[1.4] font-medium text-[#808081]">DSP</span>
+                  <span className="text-[14px] leading-[1.4] font-medium text-[#808081]">{workerRoleLabel}</span>
                 </div>
               </div>
 

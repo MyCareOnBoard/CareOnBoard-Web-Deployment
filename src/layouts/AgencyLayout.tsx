@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo } from "react";
-import { Outlet, useNavigate, useLocation } from "react-router";
+import { Outlet, useNavigate, useLocation, Link } from "react-router";
 import { useAuth } from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
@@ -8,6 +8,9 @@ import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, { NavItem } from "@/components/DashboardSidebar";
 import { UserType } from "@/utils/auth/types/user.types";
 import { resolveActiveNavItem } from "@/lib/nav-utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Sparkles } from "lucide-react";
+import { staffLabels } from "@/lib/roleLabel";
 import HomeIcon from "@/assets/icons/home.svg?react";
 import AiIcon from "@/assets/icons/ai.svg?react";
 import SupportIcon from "@/assets/icons/support.svg?react";
@@ -59,7 +62,16 @@ function filterNavItemsByAccess(items: NavItem[], userType: UserType | undefined
 const allNavItems: NavItem[] = [
     { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon }, // Always accessible
     { label: "Shift Management", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: SHIFT_MANAGEMENT_ACCESS_KEY },
-    { label: "DSP Management", path: Routes.agency.dspManagement, icon: DSPManagementIcon, accessKey: "DSP Management" },
+    {
+        label: "DSP Management",
+        path: Routes.agency.dspManagement,
+        icon: DSPManagementIcon,
+        accessKey: "DSP Management",
+        children: [
+            { label: "Manage DSPs", path: Routes.agency.dspManagement },
+            { label: "Staff Task Management", path: Routes.agency.tasks },
+        ],
+    },
     { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
     { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
@@ -104,10 +116,20 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         }
     };
 
+    // Staff-management label reflects the agency's supported client types
+    // (DSP Management / Caregivers Management / DSP/Caregiver Management).
+    const dspManagementLabel = `${staffLabels(user?.agency?.supportedClientTypes).title} Management`;
+
     // Filter navigation items based on user access
     const navItems = useMemo(
-        () => filterNavItemsByAccess(allNavItems, user?.userType, user?.profile?.accessList),
-        [user?.userType, user?.profile?.accessList]
+        () =>
+            filterNavItemsByAccess(allNavItems, user?.userType, user?.profile?.accessList).map(
+                (item) =>
+                    item.path === Routes.agency.dspManagement
+                        ? { ...item, label: dspManagementLabel }
+                        : item
+            ),
+        [user?.userType, user?.profile?.accessList, dspManagementLabel]
     );
 
     // Protect routes - redirect if user tries to access unauthorized page
@@ -154,6 +176,46 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
             <main className="ml-[240px] pt-[130px] pb-10">
                 <div className="px-8">{children ?? <Outlet />}</div>
             </main>
+            {/* Floating Icon */}
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                    <Link
+                        to={Routes.agency.tasks}
+                        className="
+                        fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[999]
+                        flex h-12 w-12 items-center justify-center
+                        rounded-full
+                        border border-[#12B5B0] bg-white
+                        shadow-[0_10px_30px_rgba(0,0,0,0.12)]
+                        transition-all duration-200
+                        hover:scale-105
+                        hover:shadow-[0_16px_40px_rgba(0,0,0,0.16)]
+                        "
+                    >
+                        <Sparkles
+                        className="h-7 w-7 text-[#12B5B0]"
+                        strokeWidth={2.5}
+                        />
+                    </Link>
+                    </TooltipTrigger>
+
+                    <TooltipContent
+                    side="left"
+                    className="
+                        rounded-4xl
+                        border border-[#12B5B0]
+                        bg-white
+                        px-3 py-2
+                        text-[13px]
+                        font-semibold
+                        text-black
+                    "
+                    >
+                    Smart Manager
+                    </TooltipContent>
+                </Tooltip>
+                </TooltipProvider>
         </div>
         </ProtectedRoute>
     );

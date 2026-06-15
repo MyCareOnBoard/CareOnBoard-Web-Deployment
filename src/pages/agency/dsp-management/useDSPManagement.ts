@@ -82,12 +82,6 @@ function normalizeAddress(address: any): string {
     return parts.join(", ");
 }
 
-function isDSPEmployee(employee: Employee): boolean {
-    const normalizedRole = employee.role?.toLowerCase();
-    if (!normalizedRole) return true;
-    return normalizedRole === "dsp";
-}
-
 function computeDSPStats(dsps: DSP[]): EmployeeStats {
     const active = dsps.filter((dsp) => dsp.status === "active").length;
     const inactive = dsps.filter(
@@ -145,7 +139,6 @@ export function useDSPList() {
             do {
                 const employeesResponse = await listEmployees({
                     agencyId,
-                    role: 'dsp',
                     limit: pageSize,
                     includeStats: true,
                     page,
@@ -162,7 +155,7 @@ export function useDSPList() {
                 page += 1;
             } while (allEmployees.length < total && page <= 20);
 
-            const employees = uniqueEmployeesById(allEmployees).filter(isDSPEmployee);
+            const employees = uniqueEmployeesById(allEmployees);
 
             const transformedDSPs = employees.map((employee) => {
                 return transformEmployeeToDSP(employee);
@@ -214,9 +207,7 @@ export function useDSPSearch() {
         try {
             setIsSearching(true);
             const employees = await searchEmployees(query, agencyId);
-            const transformedDSPs = employees
-                .filter(isDSPEmployee)
-                .map(transformEmployeeToDSP);
+            const transformedDSPs = employees.map(transformEmployeeToDSP);
             setResults(transformedDSPs);
         } catch (err) {
             console.error("Search failed:", err);

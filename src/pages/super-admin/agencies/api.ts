@@ -29,6 +29,8 @@ export interface CreateAgencyWithUserPayloadAgency {
   state?: string;
   zipCode?: string;
   website?: string;
+  // Supported client types (DDD / HHA)
+  supportedClientTypes?: ("ddd" | "hha")[];
   // Step 4: Service Configuration
   services?: string[];
   serviceCodeMapping?: Record<string, any>;
@@ -253,7 +255,7 @@ export const superAdminApi = createApi({
       }),
     }),
     getServices: builder.query<
-      { services: { code: string; name: string }[] },
+      { services: { code: string; name: string; program?: string }[] },
       string
     >({
       query: (query) => ({

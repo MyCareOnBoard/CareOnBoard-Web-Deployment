@@ -68,6 +68,7 @@ export const Routes = {
         agencySettingsDSP: "/agency/agency-settings/user-levels/dsp",
         agencySettingsClients: "/agency/agency-settings/user-levels/clients",
         profile: "/agency/profile",
+        tasks: "/agency/tasks",
         reports: {
             index: "/agency/reports",
             clients: "/agency/reports/clients",

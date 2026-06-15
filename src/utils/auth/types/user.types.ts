@@ -84,6 +84,7 @@ export interface UserAgency {
   city?: string
   state?: string
   zipCode?: string
+  supportedClientTypes?: ("ddd" | "hha")[]
 }
 
 
@@ -123,6 +124,8 @@ export interface User {
   // Family member fields (only set for userType === "family_member")
   clientId?: string
   relationship?: string
+  // Applicant subtype: "dsp" | "hha" (default "dsp")
+  applicantType?: string
   // Agency reference
   agencyId?: string
   // Some endpoints embed agency details rather than only agencyId

@@ -74,6 +74,7 @@ export async function getUser(): Promise<User> {
       fullName: backendUser.fullName,
       emailVerified: resolveEmailVerified(),
       userType: backendUser.userType,
+      applicantType: backendUser.applicantType,
       otpVerified: backendUser.otpVerified,
       otpVerifiedAt: backendUser.otpVerifiedAt,
       onboardingCompleted: backendUser.onboardingCompleted,
@@ -120,6 +121,22 @@ export async function getUser(): Promise<User> {
         address: backendUser.agency?.address,
         city: backendUser.agency?.city,
         state: backendUser.agency?.state,
+        supportedClientTypes: backendUser.agency?.supportedClientTypes,
+      };
+    }
+
+    // Agency owners/staff: surface the agency's supported client types so the
+    // staff-management labels (DSP / Caregiver) can be derived from the auth
+    // user without an extra fetch. For an agency owner the agency document is
+    // the profile; for agency staff it is the embedded `agency`.
+    if ([UserType.AGENCY, UserType.AGENCY_STAFF].includes(user.userType)) {
+      const agencyDoc =
+        user.userType === UserType.AGENCY ? profileSource : backendUser.agency;
+      user.agency = {
+        ...user.agency,
+        id: backendUser.agencyId || agencyDoc?.id,
+        name: agencyDoc?.name || user.agency?.name,
+        supportedClientTypes: agencyDoc?.supportedClientTypes,
       };
     }
 

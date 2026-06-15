@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import axiosClient from "@/lib/axios"
 import {Routes} from "@/routes/constants"
+import {roleLabel} from "@/lib/roleLabel"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -584,7 +585,7 @@ function CareTeamCard({team}: { team: TeamMember[] }) {
                                     {member.fullName}
                                 </p>
                                 <p className="text-[12px] text-slate-400">
-                                    {member.isPrimary ? "Primary caregiver" : (member.role ?? "DSP")}
+                                    {member.isPrimary ? "Primary caregiver" : (member.role ?? roleLabel({}))}
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">

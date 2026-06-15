@@ -4,6 +4,7 @@
  */
 
 import { Conversation, ConversationParticipant } from "@/lib/hooks/useMessaging";
+import { roleLabel } from "@/lib/roleLabel";
 
 /**
  * Get display name for a participant
@@ -50,7 +51,8 @@ export function getParticipantBadgeText(
   } else if (userType === "agency_staff") {
     return "Staff";
   } else if (userType === "employee") {
-    return "DSP";
+    // Caregiver for HHA users, DSP otherwise (driven by the participant's role).
+    return roleLabel({ role: participant.role });
   }
   
   return participant.role || null;

@@ -53,3 +53,5 @@ emulator-data/
 
 tsconfig.tsbuildinfo
 package-lock.json
+
+.claude/
