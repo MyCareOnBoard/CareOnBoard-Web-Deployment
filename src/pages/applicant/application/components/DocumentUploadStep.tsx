@@ -171,6 +171,25 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
       }
     }
 
+    const isReferenceIncomplete = references.some(
+      (ref) =>
+        !ref.name?.trim() ||
+        !ref.relationship?.trim() ||
+        !ref.phoneNumber?.trim() ||
+        !ref.email?.trim(),
+    );
+    if (isReferenceIncomplete) {
+      toast.error(
+        "Please complete both professional references (name, relationship, phone number, and email).",
+      );
+      return;
+    }
+
+    if (!value) {
+      toast.error("Please confirm the declaration that all information is correct.");
+      return;
+    }
+
     try {
       // Build the eligibility payload from the config defs (keyed by camelCase *Url field).
       const payloadData: Partial<DocumentUploadAndEligibilityPayload> = {};
@@ -189,8 +208,14 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
       }).unwrap();
 
       setShowSuccessDialog(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting document upload and eligibility verification:", error);
+      const message =
+        error?.data?.error ||
+        error?.data?.message ||
+        error?.message ||
+        "Failed to save documents and references. Please try again.";
+      toast.error(message);
     }
   };
 

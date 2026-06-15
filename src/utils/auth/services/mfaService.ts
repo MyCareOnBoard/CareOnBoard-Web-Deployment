@@ -72,6 +72,10 @@ export async function completeMfaEnrollment(
   const credential = PhoneAuthProvider.credential(verificationId, smsCode)
   const assertion = PhoneMultiFactorGenerator.assertion(credential)
   await multiFactor(user).enroll(assertion, displayName)
+  // Reload so the client User object reflects the newly enrolled factor
+  // immediately; otherwise hasEnrolledMfa() reads stale enrolledFactors and
+  // post-enrollment guards can bounce the user back to /auth/mfa-enroll.
+  await user.reload()
   await refreshAuthToken()
 }
 

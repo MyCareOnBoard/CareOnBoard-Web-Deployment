@@ -10,6 +10,7 @@ import { UserType } from "@/utils/auth/types/user.types";
 import { resolveActiveNavItem } from "@/lib/nav-utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sparkles } from "lucide-react";
+import { staffLabels } from "@/lib/roleLabel";
 import HomeIcon from "@/assets/icons/home.svg?react";
 import AiIcon from "@/assets/icons/ai.svg?react";
 import SupportIcon from "@/assets/icons/support.svg?react";
@@ -115,10 +116,20 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         }
     };
 
+    // Staff-management label reflects the agency's supported client types
+    // (DSP Management / Caregivers Management / DSP/Caregiver Management).
+    const dspManagementLabel = `${staffLabels(user?.agency?.supportedClientTypes).title} Management`;
+
     // Filter navigation items based on user access
     const navItems = useMemo(
-        () => filterNavItemsByAccess(allNavItems, user?.userType, user?.profile?.accessList),
-        [user?.userType, user?.profile?.accessList]
+        () =>
+            filterNavItemsByAccess(allNavItems, user?.userType, user?.profile?.accessList).map(
+                (item) =>
+                    item.path === Routes.agency.dspManagement
+                        ? { ...item, label: dspManagementLabel }
+                        : item
+            ),
+        [user?.userType, user?.profile?.accessList, dspManagementLabel]
     );
 
     // Protect routes - redirect if user tries to access unauthorized page

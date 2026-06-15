@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Megaphone, Plus, Pencil, Trash2, Loader2, ToggleLeft, ToggleRight, X, AlertTriangle, Info, Siren, ChevronDown, ChevronUp } from "lucide-react"
+import {
+  Megaphone, Plus, Pencil, Trash2, Loader2, ToggleLeft, ToggleRight,
+  X, AlertTriangle, Info, Siren, ChevronDown, ChevronUp,
+} from "lucide-react"
 import axiosClient from "@/lib/axios"
 
 interface Announcement {
@@ -23,9 +26,9 @@ interface FormState {
 const EMPTY_FORM: FormState = { title: "", body: "", type: "info", expiresAt: "" }
 
 const TYPE_META = {
-  info:    { label: "Info",    badge: "bg-blue-50 text-blue-700 border border-blue-200",   border: "border-l-blue-500",   pill: "bg-blue-50 text-blue-700 border-blue-200",   icon: Info },
-  warning: { label: "Warning", badge: "bg-amber-50 text-amber-700 border border-amber-200", border: "border-l-amber-500",  pill: "bg-amber-50 text-amber-700 border-amber-200", icon: AlertTriangle },
-  urgent:  { label: "Urgent",  badge: "bg-red-50 text-red-700 border border-red-200",       border: "border-l-red-500",    pill: "bg-red-50 text-red-700 border-red-200",       icon: Siren },
+  info:    { label: "Info",    border: "border-[#2b82ff] text-[#2b82ff]",   left: "border-l-[#2b82ff]",   icon: Info },
+  warning: { label: "Warning", border: "border-[#FF6C10] text-[#FF6C10]",   left: "border-l-[#FF6C10]",   icon: AlertTriangle },
+  urgent:  { label: "Urgent",  border: "border-[#ef4444] text-[#ef4444]",   left: "border-l-[#ef4444]",   icon: Siren },
 } as const
 
 function formatDate(val: { seconds: number } | string | null): string {
@@ -43,25 +46,21 @@ export default function AgencyAnnouncementsPage() {
   const [loading, setLoading]             = useState(true)
   const [error, setError]                 = useState<string | null>(null)
 
-  // ── filters ──
   const [typeFilter,   setTypeFilter]   = useState<TypeFilter>("all")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
 
-  // ── expand/collapse body ──
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const toggleExpand = (id: string) =>
     setExpandedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  // ── form ──
   const [form,       setForm]       = useState<FormState>(EMPTY_FORM)
   const [editingId,  setEditingId]  = useState<string | null>(null)
   const [showForm,   setShowForm]   = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError,  setFormError]  = useState<string | null>(null)
 
-  // ── mutation state ──
-  const [deletingId,  setDeletingId]  = useState<string | null>(null)
-  const [togglingId,  setTogglingId]  = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -78,10 +77,9 @@ export default function AgencyAnnouncementsPage() {
 
   useEffect(() => { void load() }, [load])
 
-  // ── derived filtered list ──
   const filtered = useMemo(() =>
     announcements
-      .filter((a) => typeFilter   === "all" || a.type     === typeFilter)
+      .filter((a) => typeFilter   === "all" || a.type === typeFilter)
       .filter((a) => statusFilter === "all" || (statusFilter === "active" ? a.isActive : !a.isActive)),
     [announcements, typeFilter, statusFilter]
   )
@@ -91,11 +89,12 @@ export default function AgencyAnnouncementsPage() {
   const openEdit = (a: Announcement) => {
     setEditingId(a.id)
     setForm({
-      title: a.title,
-      body:  a.body,
-      type:  a.type,
+      title:    a.title,
+      body:     a.body,
+      type:     a.type,
       expiresAt: a.expiresAt
-        ? new Date(typeof a.expiresAt === "string" ? a.expiresAt : a.expiresAt.seconds * 1000).toISOString().slice(0, 10)
+        ? new Date(typeof a.expiresAt === "string" ? a.expiresAt : a.expiresAt.seconds * 1000)
+            .toISOString().slice(0, 10)
         : "",
     })
     setFormError(null)
@@ -104,7 +103,6 @@ export default function AgencyAnnouncementsPage() {
 
   const cancelForm = () => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); setFormError(null) }
 
-  // Optimistic create/edit — no full re-fetch
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.title.trim() || !form.body.trim()) { setFormError("Title and body are required."); return }
@@ -119,13 +117,10 @@ export default function AgencyAnnouncementsPage() {
     try {
       if (editingId) {
         await axiosClient.put(`/agencyAnnouncements/announcements/${editingId}`, payload)
-        setAnnouncements((prev) =>
-          prev.map((a) => a.id === editingId ? { ...a, ...payload } : a)
-        )
+        setAnnouncements((prev) => prev.map((a) => a.id === editingId ? { ...a, ...payload } : a))
       } else {
         const res = await axiosClient.post<{ success: boolean; data: Announcement }>("/agencyAnnouncements/announcements", payload)
-        const created = res.data.data
-        setAnnouncements((prev) => [created, ...prev])
+        setAnnouncements((prev) => [res.data.data, ...prev])
       }
       cancelForm()
     } catch (err: unknown) {
@@ -136,7 +131,6 @@ export default function AgencyAnnouncementsPage() {
     }
   }
 
-  // Already optimistic — flips state immediately, rolls back on error
   const handleToggle = async (a: Announcement) => {
     setTogglingId(a.id)
     const next = !a.isActive
@@ -150,7 +144,6 @@ export default function AgencyAnnouncementsPage() {
     }
   }
 
-  // Optimistic delete — removes immediately, restores on error
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this announcement? This cannot be undone.")) return
     const snapshot = announcements.find((a) => a.id === id)
@@ -166,280 +159,310 @@ export default function AgencyAnnouncementsPage() {
   }
 
   return (
-    <div className="flex h-full gap-6">
-      {/* ── Left: list ── */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#063E3F]/10">
-              <Megaphone className="h-4 w-4 text-[#063E3F]" />
-            </div>
-            <div>
-              <h1 className="text-[17px] font-semibold text-slate-900">Announcements</h1>
-              <p className="text-[12px] text-slate-400">Broadcast notices to all family portal users</p>
-            </div>
-          </div>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-1.5 rounded-xl bg-[#063E3F] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#0a5456]"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New Announcement
-          </button>
-        </div>
+    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
+      {/* Page Header */}
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.4] text-[#10141a]">
+          Announcements
+        </h1>
+      </div>
 
-        {/* ── Filter bar ── */}
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          {/* Type pills */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-1">
-            {(["all", "info", "warning", "urgent"] as const).map((t) => (
+      <div className="flex gap-6">
+        {/* ── Main card ── */}
+        <div className="flex-1 min-w-0 overflow-hidden bg-white shadow-sm rounded-xl sm:rounded-2xl">
+          {/* Card header */}
+          <div className="p-4 sm:p-6 border-b border-[#e5e7eb]">
+            <div className="flex items-center justify-between mb-1">
+              <div>
+                <h2 className="text-[20px] sm:text-[22px] font-bold text-[#10141a]">All Announcements</h2>
+                <p className="mt-0.5 text-[13px] sm:text-[14px] text-[#6b7280]">
+                  Broadcast notices to all family portal users
+                </p>
+              </div>
               <button
-                key={t}
-                onClick={() => setTypeFilter(t)}
-                className={`rounded-lg px-3 py-1 text-[12px] font-semibold capitalize transition-colors ${
-                  typeFilter === t
-                    ? t === "all"
-                      ? "bg-slate-800 text-white"
-                      : `border ${TYPE_META[t].badge}`
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
+                onClick={openCreate}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#00b4b8] text-white text-[14px] font-semibold hover:bg-[#00a0a4] transition-colors"
               >
-                {t === "all" ? "All types" : TYPE_META[t].label}
+                <Plus className="h-4 w-4" />
+                New Announcement
               </button>
-            ))}
+            </div>
+
+            {/* Filter bar */}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {/* Type filters */}
+              <div className="flex items-center gap-1">
+                {(["all", "info", "warning", "urgent"] as const).map((t) => {
+                  const active = typeFilter === t
+                  const meta   = t !== "all" ? TYPE_META[t] : null
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => setTypeFilter(t)}
+                      className={`px-3 py-1 rounded-full text-[13px] font-medium border transition-colors ${
+                        active
+                          ? t === "all"
+                            ? "bg-[#10141a] border-[#10141a] text-white"
+                            : `${meta!.border} bg-transparent`
+                          : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
+                      }`}
+                    >
+                      {t === "all" ? "All types" : TYPE_META[t].label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="h-5 w-px bg-[#e5e7eb]" />
+
+              {/* Status filters */}
+              <div className="flex items-center gap-1">
+                {(["all", "active", "inactive"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(s)}
+                    className={`px-3 py-1 rounded-full text-[13px] font-medium border transition-colors ${
+                      statusFilter === s
+                        ? s === "active"
+                          ? "bg-[#22c55e] border-[#22c55e] text-white"
+                          : s === "inactive"
+                          ? "bg-[#6b7280] border-[#6b7280] text-white"
+                          : "bg-[#10141a] border-[#10141a] text-white"
+                        : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
+                    }`}
+                  >
+                    {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {!loading && (
+                <span className="ml-auto text-[13px] text-[#6b7280]">
+                  {filtered.length} of {announcements.length}
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Status pills */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-1">
-            {(["all", "active", "inactive"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`rounded-lg px-3 py-1 text-[12px] font-semibold capitalize transition-colors ${
-                  statusFilter === s
-                    ? s === "active"
-                      ? "bg-green-600 text-white"
-                      : s === "inactive"
-                      ? "bg-slate-400 text-white"
-                      : "bg-slate-800 text-white"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                {s === "all" ? "All status" : s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
-          </div>
+          {/* Content */}
+          {loading ? (
+            <div className="p-8 sm:p-12 text-center">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent" />
+              <p className="mt-4 text-[14px] text-[#6b7280]">Loading announcements…</p>
+            </div>
+          ) : error ? (
+            <div className="p-6">
+              <p className="text-[14px] text-[#ef4444]">{error}</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="p-8 sm:p-12 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f3f4f6]">
+                <Megaphone className="h-7 w-7 text-[#b2b2b3]" />
+              </div>
+              <p className="text-[14px] font-semibold text-[#10141a]">
+                {announcements.length === 0 ? "No announcements yet" : "No results for current filters"}
+              </p>
+              <p className="mt-1 text-[13px] text-[#6b7280]">
+                {announcements.length === 0
+                  ? "Create one to notify family portal users"
+                  : "Try changing the type or status filter"}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#e5e7eb]">
+              {filtered.map((a) => {
+                const meta     = TYPE_META[a.type] ?? TYPE_META.info
+                const TypeIcon = meta.icon
+                const expanded = expandedIds.has(a.id)
+                const isLong   = a.body.length > 120
 
-          {/* Result count */}
-          {!loading && (
-            <span className="ml-auto text-[12px] text-slate-400">
-              {filtered.length} of {announcements.length}
-            </span>
+                return (
+                  <div
+                    key={a.id}
+                    className={`p-4 sm:p-6 border-l-4 ${meta.left} ${!a.isActive ? "opacity-50" : ""}`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        {/* Badges row */}
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className={`px-3 py-1 rounded-full text-[13px] font-medium border ${meta.border} bg-transparent flex items-center gap-1.5`}>
+                            <TypeIcon className="h-3.5 w-3.5" />
+                            {meta.label}
+                          </span>
+                          {!a.isActive && (
+                            <span className="px-3 py-1 rounded-full text-[13px] font-medium border border-[#6b7280] text-[#6b7280] bg-transparent">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-[15px] font-semibold text-[#10141a] truncate">{a.title}</p>
+
+                        <p className={`mt-1 text-[14px] text-[#6b7280] leading-[1.5] ${!expanded && isLong ? "line-clamp-2" : ""}`}>
+                          {a.body}
+                        </p>
+
+                        {isLong && (
+                          <button
+                            onClick={() => toggleExpand(a.id)}
+                            className="mt-1 flex items-center gap-0.5 text-[13px] font-medium text-[#00b4b8] hover:underline"
+                          >
+                            {expanded
+                              ? <><ChevronUp className="h-3.5 w-3.5" /> Show less</>
+                              : <><ChevronDown className="h-3.5 w-3.5" /> Read more</>}
+                          </button>
+                        )}
+
+                        <p className="mt-2 text-[12px] text-[#b2b2b3]">
+                          Posted {formatDate(a.createdAt)}
+                          {a.expiresAt && ` · Expires ${formatDate(a.expiresAt)}`}
+                          {a.createdByName && ` · by ${a.createdByName}`}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => void handleToggle(a)}
+                          disabled={togglingId === a.id}
+                          title={a.isActive ? "Deactivate" : "Activate"}
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#f3f4f6] hover:text-[#10141a] transition-colors disabled:opacity-50"
+                        >
+                          {togglingId === a.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : a.isActive ? (
+                            <ToggleRight className="h-5 w-5 text-[#00b4b8]" />
+                          ) : (
+                            <ToggleLeft className="h-5 w-5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => openEdit(a)}
+                          title="Edit"
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#f3f4f6] hover:text-[#10141a] transition-colors"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => void handleDelete(a.id)}
+                          disabled={deletingId === a.id}
+                          title="Delete"
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#fff0f0] hover:text-[#ef4444] transition-colors disabled:opacity-50"
+                        >
+                          {deletingId === a.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
 
-        {/* List */}
-        {loading ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-          </div>
-        ) : error ? (
-          <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-[13px] text-red-600">{error}</div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
-            <Megaphone className="h-10 w-10 text-slate-300" />
-            <p className="text-[14px] font-medium text-slate-500">
-              {announcements.length === 0 ? "No announcements yet" : "No results for current filters"}
-            </p>
-            <p className="text-[12px] text-slate-400">
-              {announcements.length === 0 ? "Create one to notify family portal users" : "Try changing the type or status filter"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map((a) => {
-              const meta     = TYPE_META[a.type] ?? TYPE_META.info
-              const TypeIcon = meta.icon
-              const expanded = expandedIds.has(a.id)
-              const isLong   = a.body.length > 120
-
-              return (
-                <div
-                  key={a.id}
-                  className={`flex gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm border-l-4 ${meta.border} ${!a.isActive ? "opacity-50" : ""}`}
+        {/* ── Form panel ── */}
+        {showForm && (
+          <div className="w-[380px] flex-shrink-0">
+            <div className="sticky top-0 overflow-hidden bg-white shadow-sm rounded-xl sm:rounded-2xl">
+              <div className="p-4 sm:p-6 border-b border-[#e5e7eb] flex items-center justify-between">
+                <h2 className="text-[18px] font-bold text-[#10141a]">
+                  {editingId ? "Edit Announcement" : "New Announcement"}
+                </h2>
+                <button
+                  onClick={cancelForm}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#f3f4f6] hover:text-[#10141a] transition-colors"
                 >
-                  <div className="flex flex-1 flex-col gap-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${meta.badge}`}>
-                        <TypeIcon className="h-3 w-3" />
-                        {meta.label}
-                      </span>
-                      {!a.isActive && (
-                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500">
-                          Inactive
-                        </span>
-                      )}
-                    </div>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
 
-                    <p className="text-[14px] font-semibold text-slate-800 truncate">{a.title}</p>
+              <form onSubmit={(e) => void handleSubmit(e)} className="p-4 sm:p-6 space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-semibold text-[#10141a]">Title *</label>
+                  <input
+                    type="text"
+                    value={form.title}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="e.g. Holiday Closure"
+                    className="w-full h-11 rounded-xl border border-[#cccccd] px-4 text-[14px] text-[#10141a] placeholder-[#b2b2b3] outline-none focus:border-[#00b4b8] focus:ring-2 focus:ring-[#00b4b8]/20 transition-colors"
+                  />
+                </div>
 
-                    <p className={`text-[12px] text-slate-500 ${!expanded && isLong ? "line-clamp-2" : ""}`}>
-                      {a.body}
-                    </p>
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-semibold text-[#10141a]">Body *</label>
+                  <textarea
+                    value={form.body}
+                    onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+                    rows={4}
+                    placeholder="Write your announcement here…"
+                    className="w-full resize-none rounded-xl border border-[#cccccd] px-4 py-3 text-[14px] text-[#10141a] placeholder-[#b2b2b3] outline-none focus:border-[#00b4b8] focus:ring-2 focus:ring-[#00b4b8]/20 transition-colors"
+                  />
+                </div>
 
-                    {isLong && (
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-semibold text-[#10141a]">Type</label>
+                  <div className="flex gap-2">
+                    {(["info", "warning", "urgent"] as const).map((t) => (
                       <button
-                        onClick={() => toggleExpand(a.id)}
-                        className="mt-0.5 flex items-center gap-0.5 self-start text-[11px] font-semibold text-[#063E3F] hover:underline"
+                        key={t}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, type: t }))}
+                        className={`flex-1 rounded-full py-2 text-[13px] font-medium border transition-colors ${
+                          form.type === t
+                            ? `${TYPE_META[t].border} bg-transparent`
+                            : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
+                        }`}
                       >
-                        {expanded ? <><ChevronUp className="h-3 w-3" /> Show less</> : <><ChevronDown className="h-3 w-3" /> Read more</>}
+                        {TYPE_META[t].label}
                       </button>
-                    )}
-
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Posted {formatDate(a.createdAt)}
-                      {a.expiresAt && ` · Expires ${formatDate(a.expiresAt)}`}
-                      {a.createdByName && ` · by ${a.createdByName}`}
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => void handleToggle(a)}
-                      disabled={togglingId === a.id}
-                      title={a.isActive ? "Deactivate" : "Activate"}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50"
-                    >
-                      {togglingId === a.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : a.isActive ? (
-                        <ToggleRight className="h-4 w-4 text-[#063E3F]" />
-                      ) : (
-                        <ToggleLeft className="h-4 w-4" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => openEdit(a)}
-                      title="Edit"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => void handleDelete(a.id)}
-                      disabled={deletingId === a.id}
-                      title="Delete"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
-                    >
-                      {deletingId === a.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                    </button>
+                    ))}
                   </div>
                 </div>
-              )
-            })}
+
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-semibold text-[#10141a]">
+                    Expires on <span className="font-normal text-[#b2b2b3]">(optional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={form.expiresAt}
+                    onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
+                    className="w-full h-11 rounded-xl border border-[#cccccd] px-4 text-[14px] text-[#10141a] outline-none focus:border-[#00b4b8] focus:ring-2 focus:ring-[#00b4b8]/20 transition-colors"
+                  />
+                </div>
+
+                {formError && (
+                  <p className="rounded-xl bg-[#fff0f0] border border-[#fca5a5] px-4 py-2.5 text-[13px] text-[#ef4444]">
+                    {formError}
+                  </p>
+                )}
+
+                <div className="flex gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={cancelForm}
+                    className="flex-1 rounded-full border border-[#cccccd] py-2.5 text-[14px] font-medium text-[#6b7280] hover:bg-[#f3f4f6] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-full bg-[#00b4b8] py-2.5 text-[14px] font-semibold text-white hover:bg-[#00a0a4] transition-colors disabled:opacity-60"
+                  >
+                    {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {editingId ? "Save Changes" : "Publish"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>
-
-      {/* ── Right: form panel ── */}
-      {showForm && (
-        <div className="w-96 flex-shrink-0">
-          <div className="sticky top-0 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-[15px] font-semibold text-slate-800">
-                {editingId ? "Edit Announcement" : "New Announcement"}
-              </h2>
-              <button
-                onClick={cancelForm}
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-slate-600">Title *</label>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="e.g. Holiday Closure"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:border-[#063E3F] focus:ring-1 focus:ring-[#063E3F]/20"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-slate-600">Body *</label>
-                <textarea
-                  value={form.body}
-                  onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
-                  rows={4}
-                  placeholder="Write your announcement here…"
-                  className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:border-[#063E3F] focus:ring-1 focus:ring-[#063E3F]/20"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-slate-600">Type</label>
-                <div className="flex gap-2">
-                  {(["info", "warning", "urgent"] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, type: t }))}
-                      className={`flex-1 rounded-xl border py-2 text-[12px] font-semibold capitalize transition-colors ${
-                        form.type === t ? TYPE_META[t].badge : "border-slate-200 text-slate-500 hover:border-slate-300"
-                      }`}
-                    >
-                      {TYPE_META[t].label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-slate-600">
-                  Expires on <span className="text-slate-400">(optional)</span>
-                </label>
-                <input
-                  type="date"
-                  value={form.expiresAt}
-                  onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px] text-slate-800 outline-none focus:border-[#063E3F] focus:ring-1 focus:ring-[#063E3F]/20"
-                />
-              </div>
-
-              {formError && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-[12px] text-red-600">{formError}</p>
-              )}
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={cancelForm}
-                  className="flex-1 rounded-xl border border-slate-200 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#063E3F] py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#0a5456] disabled:opacity-60"
-                >
-                  {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  {editingId ? "Save Changes" : "Publish"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
