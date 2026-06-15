@@ -7,6 +7,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DSP } from "./types";
 import { Routes } from "@/routes/constants";
+import { useAuth } from "@/utils/auth";
+import { roleLabel, staffLabels, programLabel } from "@/lib/roleLabel";
 
 interface DSPStats {
   active: number;
@@ -22,6 +24,8 @@ interface DSPListProps {
 
 export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const labels = staffLabels(user?.agency?.supportedClientTypes);
   const navigateToProfile = (dsp: DSP) => {
     navigate(Routes.agency.dspProfile.replace(":dspId", dsp.id));
   };
@@ -92,8 +96,8 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
       {/* DSP Overview Stats */}
       <div className="bg-gray-100 flex justify-between rounded-2xl shadow-sm p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-bold text-gray-900">DSP</h3>
-          <p className="text-sm text-gray-600">DSP overview who are managing shifts for clients</p>
+          <h3 className="text-lg font-bold text-gray-900">{labels.noun}</h3>
+          <p className="text-sm text-gray-600">{labels.noun} overview who are managing shifts for clients</p>
         </div>
         <div className="flex items-center gap-12">
           {isLoading ? (
@@ -141,8 +145,8 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
         {/* Directory Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold text-gray-900">DSP Directory</h3>
-            <p className="text-sm text-gray-600">Browse, search, and manage your direct support professionals</p>
+            <h3 className="text-lg font-bold text-gray-900">{labels.noun} Directory</h3>
+            <p className="text-sm text-gray-600">Browse, search, and manage your {labels.plural}</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="relative" ref={searchRef}>
@@ -174,7 +178,7 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
                       </Avatar>
                       <div>
                         <p className="text-sm font-medium text-gray-900">{dsp.fullName}</p>
-                        <p className="text-xs text-gray-500">{dsp.role} · {dsp.status}</p>
+                        <p className="text-xs text-gray-500">{roleLabel({ role: dsp.role })} · {dsp.status}</p>
                       </div>
                     </button>
                   ))}
@@ -254,7 +258,15 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
                       </Avatar>
                       <div onClick={() => navigateToProfile(dsp)} className="text-left cursor-pointer">
                         <p className="font-semibold text-gray-900 text-sm">{dsp.fullName}</p>
-                        <p className="text-xs text-gray-500">DSP</p>
+                        <span
+                          className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            programLabel({ role: dsp.role }) === "HHA"
+                              ? "bg-teal-100 text-teal-700"
+                              : "bg-indigo-100 text-indigo-700"
+                          }`}
+                        >
+                          {programLabel({ role: dsp.role })}
+                        </span>
                       </div>
                     </button>
                   </div>

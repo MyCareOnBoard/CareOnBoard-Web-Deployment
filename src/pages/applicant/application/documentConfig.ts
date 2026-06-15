@@ -107,7 +107,7 @@ const HHA_DOCS: ApplicantDocDef[] = [
     label: "Upload Photo ID (Driver's License, State ID, Passport)",
     placeholder: "Upload your photo ID",
     required: true,
-    requiresExpiry: false,
+    requiresExpiry: true,
   },
   {
     id: "social-security-card",
@@ -115,7 +115,7 @@ const HHA_DOCS: ApplicantDocDef[] = [
     label: "Upload Social Security Card or Valid Work Permit",
     placeholder: "Upload social security card",
     required: true,
-    requiresExpiry: false,
+    requiresExpiry: true,
   },
   {
     id: "diploma",
@@ -163,7 +163,7 @@ const HHA_DOCS: ApplicantDocDef[] = [
     label: "Upload Physical Exam",
     placeholder: "Upload physical exam",
     required: true,
-    requiresExpiry: true,
+    requiresExpiry: false,
   },
   {
     id: "tb-test",

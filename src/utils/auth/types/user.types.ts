@@ -84,6 +84,7 @@ export interface UserAgency {
   city?: string
   state?: string
   zipCode?: string
+  supportedClientTypes?: ("ddd" | "hha")[]
 }
 
 
