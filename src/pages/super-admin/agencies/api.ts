@@ -255,7 +255,7 @@ export const superAdminApi = createApi({
       }),
     }),
     getServices: builder.query<
-      { services: { code: string; name: string }[] },
+      { services: { code: string; name: string; program?: string }[] },
       string
     >({
       query: (query) => ({

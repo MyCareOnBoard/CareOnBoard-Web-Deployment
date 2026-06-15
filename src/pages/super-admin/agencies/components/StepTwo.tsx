@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 interface Step3LeadershipProps {
   formData: any;
   onChange: (key: any, value: any) => void;
-  services: {name: string; code: string}[];
+  services: {name: string; code: string; program?: string}[];
   fieldsWithErrors: string[];
 }
 
@@ -48,12 +48,41 @@ export default function Step3Leadership({formData, onChange, services = [], fiel
         { value: "hha", label: "HHA" },
     ];
 
+    // A service's effective program; services default to "ddd" on the backend,
+    // so treat any service missing `program` as DDD rather than hiding it.
+    const serviceProgram = (service: { program?: string }): "ddd" | "hha" =>
+        (service.program === "hha" ? "hha" : "ddd");
+
+    const selectedClientTypes: ("ddd" | "hha")[] = formData.supportedClientTypes || [];
+
+    // Services available for selection depend on the supported client types.
+    // No client type selected -> no services to choose; once chosen, show only
+    // services for those programs.
+    const visibleServices =
+        selectedClientTypes.length > 0
+            ? services.filter((s) => selectedClientTypes.includes(serviceProgram(s)))
+            : [];
+
     const toggleClientType = (clientType: "ddd" | "hha") => {
         const currentTypes: ("ddd" | "hha")[] = formData.supportedClientTypes || [];
         const newTypes = currentTypes.includes(clientType)
             ? currentTypes.filter((t) => t !== clientType)
             : [...currentTypes, clientType];
         onChange("supportedClientTypes", newTypes);
+
+        // Keep the Services selection consistent: drop any selected service whose
+        // program is no longer among the supported client types.
+        if (newTypes.length > 0) {
+            const currentServices: string[] = formData.services || [];
+            const prunedServices = currentServices.filter((name) => {
+                const svc = services.find((s) => s.name === name);
+                if (!svc) return true; // unknown service — leave the selection as-is
+                return newTypes.includes(serviceProgram(svc));
+            });
+            if (prunedServices.length !== currentServices.length) {
+                onChange("services", prunedServices);
+            }
+        }
     };
 
     return (
@@ -313,7 +342,14 @@ export default function Step3Leadership({formData, onChange, services = [], fiel
 
                                     {/* Options - Scrollable */}
                                     <div className="flex flex-col mt-[8px] overflow-y-auto">
-                                        {services.map((service) => {
+                                        {visibleServices.length === 0 && (
+                                            <p className="px-[20px] py-[12px] text-[14px] font-normal text-[#808081]">
+                                                {selectedClientTypes.length > 0
+                                                    ? "No services available for the selected client types."
+                                                    : "Select supported client types first."}
+                                            </p>
+                                        )}
+                                        {visibleServices.map((service) => {
                                             const isSelected = formData.services?.includes(service.name) || false;
                                             return (
                                                 <button
