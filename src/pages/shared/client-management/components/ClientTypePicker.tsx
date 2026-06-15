@@ -5,10 +5,15 @@ type ClientTypePickerProps = {
   pageTitle: string;
   onSelect: (type: ClientType) => void;
   onBack?: () => void;
+  /**
+   * Client types to offer. When omitted, both DDD and HHA are rendered
+   * (backward-compatible default).
+   */
+  allowed?: ClientType[];
 };
 
-export function ClientTypePicker({ pageTitle, onSelect, onBack }: ClientTypePickerProps) {
-  const options: Array<{
+export function ClientTypePicker({ pageTitle, onSelect, onBack, allowed }: ClientTypePickerProps) {
+  const allOptions: Array<{
     type: ClientType;
     title: string;
     description: string;
@@ -27,6 +32,10 @@ export function ClientTypePicker({ pageTitle, onSelect, onBack }: ClientTypePick
       icon: Home,
     },
   ];
+
+  const options = allowed?.length
+    ? allOptions.filter((option) => allowed.includes(option.type))
+    : allOptions;
 
   return (
     <div className="min-h-[calc(100vh-200px)]">

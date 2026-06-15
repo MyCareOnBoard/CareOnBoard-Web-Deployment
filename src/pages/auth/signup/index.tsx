@@ -11,7 +11,7 @@
  */
 
 import type React from "react"
-import {useState} from "react"
+import {useEffect, useState} from "react"
 import {useNavigate, Link, useLocation} from "react-router"
 import {Eye, EyeOff} from "lucide-react"
 import {Button} from "@/components/ui/button"
@@ -26,6 +26,8 @@ import {
   getValidationMessage
 } from "@/utils/auth/helpers/errorMessages"
 import {Routes} from "@/routes/constants";
+import {getAgencyInfo} from "@/lib/api/onboarding"
+import type {ApplicantType} from "@/pages/applicant/application/documentConfig"
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState("")
@@ -41,9 +43,71 @@ export default function SignUpPage() {
 
   const agencyId = new URLSearchParams(useLocation().search).get('agencyId');
 
+  // Applicant type mirrors the agency's supported client types.
+  // Default "dsp"; show a DSP/HHA selector only when the agency supports both.
+  const [applicantType, setApplicantType] = useState<ApplicantType>("dsp")
+  const [showApplicantTypeSelector, setShowApplicantTypeSelector] = useState(false)
+  // Agency load state — signup is gated on a successfully loaded agency.
+  const [agencyInfo, setAgencyInfo] = useState<any | null>(null)
+  const [agencyLoading, setAgencyLoading] = useState<boolean>(Boolean(agencyId))
+
   const {signup} = useAuth()
   const navigate = useNavigate()
   const {toast} = useToast()
+
+  // On mount, resolve the agency's supported client types to decide applicantType.
+  useEffect(() => {
+    if (!agencyId) {
+      setAgencyLoading(false)
+      setAgencyInfo(null)
+      return
+    }
+
+    let cancelled = false
+    setAgencyLoading(true)
+
+    const resolveApplicantType = async () => {
+      try {
+        const info = await getAgencyInfo(agencyId)
+        if (cancelled) return
+
+        setAgencyInfo(info ?? null)
+        if (!info) return
+
+        const supported: string[] =
+          info?.agency?.supportedClientTypes ?? info?.supportedClientTypes ?? []
+
+        const supportsDdd = supported.includes("ddd")
+        const supportsHha = supported.includes("hha")
+
+        if (supportsDdd && supportsHha) {
+          // Both supported -> let the applicant choose.
+          setShowApplicantTypeSelector(true)
+          setApplicantType("dsp")
+        } else if (supportsHha) {
+          // HHA-only -> auto-set caregiver.
+          setShowApplicantTypeSelector(false)
+          setApplicantType("hha")
+        } else if (supportsDdd) {
+          // DDD-only -> auto-set DSP.
+          setShowApplicantTypeSelector(false)
+          setApplicantType("dsp")
+        } else {
+          // Missing/empty supportedClientTypes => treated as both (back-compat).
+          setShowApplicantTypeSelector(true)
+          setApplicantType("dsp")
+        }
+      } finally {
+        if (!cancelled) setAgencyLoading(false)
+      }
+    }
+
+    resolveApplicantType()
+
+    return () => {
+      cancelled = true
+    }
+  }, [agencyId])
 
   // Validate full name
   const validateFullName = (name: string) => {
@@ -132,6 +196,16 @@ export default function SignUpPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Block signup until a valid agency has loaded.
+    if (!agencyId || !agencyInfo) {
+      toast({
+        title: "Agency not loaded",
+        description: "Please use a valid agency invite link to sign up.",
+        variant: "destructive",
+      })
+      return
+    }
+
     // Validate all fields
     const nameError = validateFullName(fullName)
     const emailError = validateEmail(email)
@@ -154,7 +228,7 @@ export default function SignUpPage() {
     setLoading(true)
 
     try {
-      await signup(email, password, fullName, agencyId ?? undefined)
+      await signup(email, password, fullName, agencyId ?? undefined, applicantType)
       const successMsg = getSuccessMessage('signup')
       toast({
         title: successMsg.title,
@@ -173,6 +247,10 @@ export default function SignUpPage() {
       setLoading(false)
     }
   }
+
+  // Signup is allowed only once a valid agency has loaded for the agencyId.
+  const agencyReady = Boolean(agencyId) && !agencyLoading && !!agencyInfo
+  const signupDisabled = loading || !agencyReady
 
   return (
     <div className="space-y-6">
@@ -294,9 +372,44 @@ export default function SignUpPage() {
           )}
         </div>
 
+        {/* Applicant Type Selector (only when agency supports both DSP and HHA) */}
+        {showApplicantTypeSelector && (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-900">
+              I am applying as
+            </Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setApplicantType("dsp")}
+                aria-pressed={applicantType === "dsp"}
+                className={`h-12 rounded-2xl border text-base font-semibold transition-all ${
+                  applicantType === "dsp"
+                    ? "border-[#17a2b8] bg-[#17a2b8]/10 text-[#17a2b8]"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                DSP
+              </button>
+              <button
+                type="button"
+                onClick={() => setApplicantType("hha")}
+                aria-pressed={applicantType === "hha"}
+                className={`h-12 rounded-2xl border text-base font-semibold transition-all ${
+                  applicantType === "hha"
+                    ? "border-[#17a2b8] bg-[#17a2b8]/10 text-[#17a2b8]"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Caregiver
+              </button>
+            </div>
+          </div>
+        )}
+
         <Button
           type="submit"
-          disabled={loading}
+          disabled={signupDisabled}
           className="w-full h-12 bg-[#17a2b8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold mt-4 transition-all"
         >
           {loading ? (
@@ -304,10 +417,27 @@ export default function SignUpPage() {
               <ButtonLoader/>
               Creating account...
             </span>
+          ) : agencyLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <ButtonLoader/>
+              Loading agency...
+            </span>
           ) : (
             "Sign Up"
           )}
         </Button>
+
+        {/* Gating messages: explain why signup is unavailable */}
+        {!agencyLoading && !agencyId && (
+          <p className="text-center text-sm text-red-600">
+            An agency invite link is required to sign up.
+          </p>
+        )}
+        {!agencyLoading && agencyId && !agencyInfo && (
+          <p className="text-center text-sm text-red-600">
+            We couldn&apos;t load this agency. Please check your invite link and try again.
+          </p>
+        )}
       </form>
 
       <div className="space-y-3 pt-2">

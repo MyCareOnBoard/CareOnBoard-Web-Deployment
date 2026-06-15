@@ -30,6 +30,7 @@ export interface CreateUserData {
     email: string;
     fullName: string;
     uid: string;
+    applicantType?: string;
 }
 
 

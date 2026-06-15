@@ -28,7 +28,8 @@ interface AuthContextType {
     email: string,
     password: string,
     fullName: string,
-    agencyId?: string
+    agencyId?: string,
+    applicantType?: string
   ) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
@@ -132,7 +133,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     password: string,
     fullName: string,
-    agencyId?: string
+    agencyId?: string,
+    applicantType?: string
   ) => {
     const response = await registerWithEmail(fullName, email, password)
 
@@ -143,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Create user in backend FIRST (before updating state so presence/heartbeat don't run)
     try {
-      await createBackendUser(fullName, agencyId)
+      await createBackendUser(fullName, agencyId, applicantType)
       if (auth.currentUser) {
         await reload(auth.currentUser)
       }

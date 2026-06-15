@@ -9,13 +9,15 @@ import {
   useSubmitDocumentUploadAndEligibilityVerificationMutation,
   useUploadDocumentMutation
 } from "@/pages/applicant/application/api";
-import { DocumentTypes } from "@/pages/applicant/application/types";
+import { DocumentTypes, DocumentUploadAndEligibilityPayload } from "@/pages/applicant/application/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
 import { getApplicationStatus } from "@/lib/api/job-application";
+import { useAuth } from "@/utils/auth";
+import { getApplicantDocs, type ApplicantType } from "@/pages/applicant/application/documentConfig";
 
 interface DocumentUploadStepProps {
   onBack?: () => void;
@@ -30,77 +32,52 @@ export interface ApplicantDocumentFileUploadedInfo {
   expiryDate?: string;
 }
 
-const files = [
-  {
-    id: "photo-id",
-    label: "Upload Photo ID (State ID, Passport)",
-    placeholder: "Upload your photo ID",
-    requiresExpiry: true,
-    optional: false,
-  },
-  {
-    id: "driver-license",
-    label: "Upload Driver’s License (optional)",
-    placeholder: "Upload your driver’s license",
-    requiresExpiry: true,
-    optional: true,
-  },
-  {
-    id: "social-security-card",
-    label: "Upload Social Security Card or valid work permit.",
-    placeholder: "Upload social security card",
-    requiresExpiry: true
-  },
-  {
-    id: "diploma",
-    label: "Upload High School Diploma/GED certificate.",
-    placeholder: "Upload high school certificate",
-    requiresExpiry: false
-  },
-  {
-    id: "certifications",
-    label: "Upload Any relevant certifications (e.g., CPR, First Aid — optional at this stage).",
-    placeholder: "Upload any certificate",
-    requiresExpiry: false,
-    optional: true,
-  },
-  {
-    id: "hepatitis-b-vaccination",
-    label: "Upload Hepatitis B vaccination series documents or chest x ray.",
-    placeholder: "Upload Hepatitis B vaccination series documents or chest x ray.",
-    requiresExpiry: false,
-    optional: true
-  },
-  {
-    id: "hepatitis-b-immunity",
-    label: "Upload Hepatitis B immunity (titer result)",
-    placeholder: "Upload Hepatitis B immunity (titer result)",
-    requiresExpiry: false,
-    optional: true
-  },
-  {
-    id: "tb-test",
-    label: "Upload tb test result.",
-    placeholder: "Upload TB test result",
-    requiresExpiry: false,
-    optional: true
-  }
-]
-
 const tenYearsFromNow = new Date()
 tenYearsFromNow.setFullYear(new Date().getFullYear() + 10)
 
+// Download metadata for the government-form (isForm) document blocks.
+// Keyed by doc id; copy preserved verbatim from the original DSP markup.
+const FORM_DOWNLOADS: Record<string, {
+  downloadUrl: string;
+  linkText: string;
+  uploadHint: string;
+  uploadName: string;
+}> = {
+  "i9-form": {
+    downloadUrl: "https://drive.google.com/uc?export=download&id=1qOI9TiJrCTagScUNJBzHbNg8FJhpQH6N",
+    linkText: " Click here to download I-9 form",
+    uploadHint: "( Upload document below after filling the form)",
+    uploadName: "upload-i-9-form",
+  },
+  "w4-form": {
+    downloadUrl: "https://drive.google.com/uc?export=download&id=1MraR-6Wn9CwlsQPs-a-nG2AfavOj5fKF",
+    linkText: "Click here to download W-4 forms",
+    uploadHint: "(Upload document below after filling the form)",
+    uploadName: "upload-w-4-form",
+  },
+};
+
 export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUploadStepProps) {
+  const { user } = useAuth();
+  const applicantType: ApplicantType = user?.applicantType === "hha" ? "hha" : "dsp";
+
+  // All document definitions for this applicant type (single source of truth).
+  const docDefs = getApplicantDocs(applicantType);
+  // Documents rendered as upload cards in the main loop (excludes I-9/W-4 form blocks).
+  const uploadDocs = docDefs.filter((def) => !def.isForm);
+  // Government form definitions (I-9 / W-4) rendered with download links.
+  const formDocs = docDefs.filter((def) => def.isForm);
+
   const [documentTypeUploading, setDocumentTypeUploading] = useState<DocumentTypes | null>(null);
   const ref = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(false);
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [canGoToNextStage, setCanGoToNextStage] = useState(false);
-  const [fileUploads, setFileUploads] = useState<ApplicantDocumentFileUploadedInfo[]>(files.map((file) => ({
+  const [fileUploads, setFileUploads] = useState<ApplicantDocumentFileUploadedInfo[]>(docDefs.map((def) => ({
     fileName: "",
     fileUrl: "",
-    fileType: file.id,
+    fileType: def.id,
     expiryDate: undefined
   })));
 
@@ -173,12 +150,12 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
   ) => {
     event.preventDefault();
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (file.requiresExpiry) {
-        const findUpload = fileUploads.find((item) => item.fileType === file.id);
+    for (let i = 0; i < docDefs.length; i++) {
+      const def = docDefs[i];
+      if (def.requiresExpiry) {
+        const findUpload = fileUploads.find((item) => item.fileType === def.id);
         if (findUpload?.fileUrl && !findUpload.expiryDate) {
-          toast.error("Please select an expiry date for " + file.label);
+          toast.error("Please select an expiry date for " + def.label);
           return;
         }
       }
@@ -187,26 +164,24 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
     const fileUploadsWithExpiryDateButNoFile = fileUploads.filter((item) => item.expiryDate && !item.fileUrl);
 
     if (fileUploadsWithExpiryDateButNoFile.length > 0) {
-      const file = files.find((item) => item.id === fileUploadsWithExpiryDateButNoFile[0].fileType);
-      if (file) {
-        toast.error("Please upload a file for " + file.label);
+      const def = docDefs.find((item) => item.id === fileUploadsWithExpiryDateButNoFile[0].fileType);
+      if (def) {
+        toast.error("Please upload a file for " + def.label);
         return;
       }
     }
 
     try {
+      // Build the eligibility payload from the config defs (keyed by camelCase *Url field).
+      const payloadData: Partial<DocumentUploadAndEligibilityPayload> = {};
+      docDefs.forEach((def) => {
+        (payloadData as Record<string, ApplicantDocumentFileUploadedInfo | undefined>)[def.field] =
+          fileUploads.find((item) => item.fileType === def.id);
+      });
+
       const response = await submitDocumentUploadAndEligibilityVerification({
         data: {
-          photoIdUrl: fileUploads.find((item) => item.fileType === "photo-id"),
-          driverLicenseUrl: fileUploads.find((item) => item.fileType === "driver-license"),
-          socialSecurityCardUrl: fileUploads.find((item) => item.fileType === "social-security-card"),
-          diplomaUrl: fileUploads.find((item) => item.fileType === "diploma"),
-          certificationsUrl: fileUploads.find((item) => item.fileType === "certifications"),
-          hepatitisBVaccinationUrl: fileUploads.find((item) => item.fileType === "hepatitis-b-vaccination"),
-          hepatitisBImmunityUrl: fileUploads.find((item) => item.fileType === "hepatitis-b-immunity"),
-          tbTestResultUrl: fileUploads.find((item) => item.fileType === "tb-test"),
-          i9FormUrl: fileUploads.find((item) => item.fileType === "i9-form"),
-          w4FormUrl: fileUploads.find((item) => item.fileType === "w4-form"),
+          ...payloadData,
           references,
           declarationAgreed: value
         },
@@ -227,18 +202,13 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
       );
       setValue(Boolean(payload.declarationAgreed));
 
-      const fileFieldToType: Record<string, string> = {
-        photoIdUrl: "photo-id",
-        driverLicenseUrl: "driver-license",
-        socialSecurityCardUrl: "social-security-card",
-        diplomaUrl: "diploma",
-        certificationsUrl: "certifications",
-        hepatitisBVaccinationUrl: "hepatitis-b-vaccination",
-        hepatitisBImmunityUrl: "hepatitis-b-immunity",
-        tbTestResultUrl: "tb-test",
-        i9FormUrl: "i9-form",
-        w4FormUrl: "w4-form",
-      };
+      const fileFieldToType: Record<string, string> = docDefs.reduce(
+        (acc, def) => {
+          acc[def.field] = def.id;
+          return acc;
+        },
+        {} as Record<string, string>,
+      );
 
       const normalizeExpiryDate = (value?: string) => {
         if (!value) return undefined;
@@ -292,10 +262,10 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
         Once you have uploaded the documents, click the submit button to complete this stage.
       </h2>
     <form className={"w-full"} onSubmit={handleSubmit}>
-      {files.map((file, index) => {
+      {uploadDocs.map((file, index) => {
         const fileUpload = fileUploads.find((item) => item.fileType === file.id);
         return (
-          <div className={"mb-6"} key={index}>
+          <div className={"mb-6"} key={file.id}>
             <div className={"flex justify-between items-center"}>
               <p className={"text-sm mb-2"}>{file.label}</p>
               {file.requiresExpiry && (
@@ -374,58 +344,37 @@ export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUpload
           </div>
         )
       })}
-      <div className={"mb-6"}>
-        <p className={"text-sm mb-2 flex items-center"}>
-          <span className={"ml-1 flex items-center"}>
-            <a href="https://drive.google.com/uc?export=download&id=1qOI9TiJrCTagScUNJBzHbNg8FJhpQH6N" className={"text-[#5993FF] font-extrabold"}> Click here to download I-9 form</a>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" clip-rule="evenodd"
-                d="M15.4168 5.76152L5.34501 15.8334L4.1665 14.6549L14.2383 4.58301L15.4168 5.76152Z"
-                fill="#5993FF" />
-              <path fill-rule="evenodd" clip-rule="evenodd"
-                d="M5.8335 4.16699H15.8335V14.167H14.1668V5.83366H5.8335V4.16699Z"
-                fill="#5993FF" />
-            </svg>
-          </span>
-          <span>( Upload document below after filling the form)</span>
-        </p>
-        <FileUpload
-          name={"upload-i-9-form"}
-          className="h-[90px] w-full max-w-[100vw]"
-          label={(isLoading && "i9-form" === documentTypeUploading) ? "Uploading..." : "Upload I-9 Form"}
-          accept=".pdf, .jpg, .png, .webp"
-          onChange={async (event) => {
-            await handleFileUpload(event.target.files ?? null, "i9-form");
-          }}
-        />
-        <FileNameCard fileUploads={fileUploads} documentType={"i9-form" as DocumentTypes} />
-      </div>
-      <div className={"mb-6"}>
-        <p className={"text-sm mb-2 flex items-center"}>
-          <span className={"ml-1 flex items-center"}>
-            <a href="https://drive.google.com/uc?export=download&id=1MraR-6Wn9CwlsQPs-a-nG2AfavOj5fKF" className={"text-[#5993FF] font-extrabold"}>Click here to download W-4 forms</a>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" clip-rule="evenodd"
-                d="M15.4168 5.76152L5.34501 15.8334L4.1665 14.6549L14.2383 4.58301L15.4168 5.76152Z"
-                fill="#5993FF" />
-              <path fill-rule="evenodd" clip-rule="evenodd"
-                d="M5.8335 4.16699H15.8335V14.167H14.1668V5.83366H5.8335V4.16699Z"
-                fill="#5993FF" />
-            </svg>
-          </span>
-          <span>(Upload document below after filling the form)</span>
-        </p>
-        <FileUpload
-          name={"upload-w-4-form"}
-          className="h-[90px] w-full max-w-[100vw]"
-          label={(isLoading && "w4-form" === documentTypeUploading) ? "Uploading..." : "Upload W-4 Form"}
-          accept=".pdf, .jpg, .png, .webp"
-          onChange={async (event) => {
-            await handleFileUpload(event.target.files ?? null, "w4-form");
-          }}
-        />
-        <FileNameCard fileUploads={fileUploads} documentType={"w4-form" as DocumentTypes} />
-      </div>
+      {formDocs.map((formDoc) => {
+        const meta = FORM_DOWNLOADS[formDoc.id];
+        return (
+          <div className={"mb-6"} key={formDoc.id}>
+            <p className={"text-sm mb-2 flex items-center"}>
+              <span className={"ml-1 flex items-center"}>
+                <a href={meta.downloadUrl} className={"text-[#5993FF] font-extrabold"}>{meta.linkText}</a>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M15.4168 5.76152L5.34501 15.8334L4.1665 14.6549L14.2383 4.58301L15.4168 5.76152Z"
+                    fill="#5993FF" />
+                  <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M5.8335 4.16699H15.8335V14.167H14.1668V5.83366H5.8335V4.16699Z"
+                    fill="#5993FF" />
+                </svg>
+              </span>
+              <span>{meta.uploadHint}</span>
+            </p>
+            <FileUpload
+              name={meta.uploadName}
+              className="h-[90px] w-full max-w-[100vw]"
+              label={(isLoading && formDoc.id === documentTypeUploading) ? "Uploading..." : formDoc.label}
+              accept=".pdf, .jpg, .png, .webp"
+              onChange={async (event) => {
+                await handleFileUpload(event.target.files ?? null, formDoc.id);
+              }}
+            />
+            <FileNameCard fileUploads={fileUploads} documentType={formDoc.id} />
+          </div>
+        );
+      })}
 
       <div>
         <h3 className={"font-semibold mb-3"}>Provide Two Professional References: <p className={"text-sm text-[#00B4B8] text-bold"}>Note: Please provide valid email address for your references.</p></h3>

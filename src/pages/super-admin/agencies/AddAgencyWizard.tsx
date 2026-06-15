@@ -8,7 +8,9 @@ import {
     useCreateAgencyWithUserMutation, useLazyGetAgencyQuery,
     useLazyGetDraftAgencyQuery,
     useSaveDraftMutation, useUpdateAgencyMutation,
-    useUploadAgencyFileMutation, useGetServicesQuery
+    useUploadAgencyFileMutation, useGetServicesQuery,
+    type CreateAgencyWithUserPayloadAgency,
+    type CreateAgencyWithUserPayloadUser
 } from "./api";
 import {UserType} from "@/utils/auth/types/user.types";
 import {SaveDraftModal} from "./SaveDraftModal";
@@ -45,6 +47,9 @@ interface AgencyFormData {
     userPhone: string;
     userEmail: string;
     userPassword: string;
+
+    // Supported client types (DDD / HHA)
+    supportedClientTypes: ("ddd" | "hha")[];
 
     // Step 4: Service Configuration
     services: string[];
@@ -142,6 +147,7 @@ const STEPS = [
             "userPhone",
             "userEmail",
             "userPassword",
+            "supportedClientTypes",
             "services"
         ]
     },
@@ -260,6 +266,7 @@ export default function AddAgencyWizard() {
         userPhone: "",
         userEmail: "",
         userPassword: "",
+        supportedClientTypes: [],
         services: [],
         serviceCodeMapping: {},
         evvSettings: {},
@@ -341,6 +348,8 @@ export default function AddAgencyWizard() {
             userPhone: responseData.user?.phone || "",
             userEmail: responseData.user?.email || "",
             userPassword: responseData.user?.password || "",
+            // Supported client types (DDD / HHA)
+            supportedClientTypes: responseData.agencyData?.supportedClientTypes || [],
             // Step 4: Service Configuration
             services: responseData.agencyData?.services || [],
             serviceCodeMapping: responseData.agencyData?.serviceCodeMapping || {},
@@ -431,105 +440,140 @@ export default function AddAgencyWizard() {
         setFieldsWithErrors((prev) => prev.filter((f) => f !== field));
     };
 
+    // Upload logo/letterhead files (if newly selected) and return their URLs.
+    const uploadBrandingAssets = async (): Promise<{ logoUrl: string; letterheadUrl: string }> => {
+        let logoUrl = formData.logo ? (typeof formData.logo === 'string' ? formData.logo : '') : '';
+        if (formData.logo && typeof formData.logo !== 'string') {
+            const logoResult = await uploadFile({ file: formData.logo, fileType: 'logo' }).unwrap();
+            logoUrl = logoResult.url;
+        }
+
+        let letterheadUrl = formData.letterhead ? (typeof formData.letterhead === 'string' ? formData.letterhead : '') : '';
+        if (formData.letterhead && typeof formData.letterhead !== 'string') {
+            const letterheadResult = await uploadFile({ file: formData.letterhead, fileType: 'letterhead' }).unwrap();
+            letterheadUrl = letterheadResult.url;
+        }
+
+        return { logoUrl, letterheadUrl };
+    };
+
+    // Single source of truth for the agency payload built from the current form data.
+    const buildAgencyPayload = (
+        logoUrl: string,
+        letterheadUrl: string,
+    ): CreateAgencyWithUserPayloadAgency => ({
+        name: formData.agencyName,
+        legalBusinessName: formData.legalBusinessName,
+        dba: formData.dba,
+        agencyType: formData.agencyType,
+        ein: formData.ein,
+        npi: formData.npi,
+        providerId: formData.providerId,
+        medicaidProviderId: formData.medicaidProviderId,
+        email: formData.supportEmail,
+        phone: formData.mainPhone,
+        address: formData.primaryAddress,
+        state: formData.county_or_state,
+        zipCode: formData.zipCode,
+        website: formData.websiteUrl,
+        supportedClientTypes: formData.supportedClientTypes,
+        services: formData.services,
+        serviceCodeMapping: formData.serviceCodeMapping,
+        evvSettings: formData.evvSettings,
+        schedulingRules: formData.schedulingRules,
+        maxShiftPerDay: parseInt(formData.maxShiftPerDay),
+        travelTimeRules: formData.travelTimeRules,
+        mileageSettings: formData.mileageSettings,
+        mileageRate: formData.mileageRate,
+        incidentReportingSettings: formData.incidentReportingSettings,
+        whoReceivesNotifications: formData.whoReceivesNotifications,
+        expenseReportSettings: formData.expenseReportSettings,
+        allowedFileTypes: formData.allowedFileTypes,
+        allowRecurringSchedules: formData.allowRecurringSchedules,
+        allowOverlappingVisits: formData.allowOverlappingVisits,
+        offerMileageReimbursements: formData.offerMileageReimbursements,
+        realtimeGpsTracking: formData.realtimeGpsTracking,
+        aiNotesReview: formData.aiNotesReview,
+        aiPlanOfCareBuilder: formData.aiPlanOfCareBuilder,
+        aiScheduleOptimizer: formData.aiScheduleOptimizer,
+        aiDataCleaner: formData.aiDataCleaner,
+        aiBillingValidator: formData.aiBillingValidator,
+        requireIds: formData.requireIds,
+        requireSsn: formData.requireSsn,
+        requireResume: formData.requireResume,
+        requireCertificates: formData.requireCertificates,
+        requireTrainings: formData.requireTrainings,
+        requireClearances: formData.requireClearances,
+        expiryRules: formData.expiryRules,
+        autoReminders: formData.autoReminders,
+        reminderFrequency: formData.reminderFrequency,
+        whoReceivesReminders: formData.whoReceivesReminders,
+        logo: logoUrl,
+        themeColor: formData.themeColor,
+        letterhead: letterheadUrl,
+        primaryColor: formData.themeColor,
+        billingFormat: formData.billingFormat,
+        dddFormat: formData.dddFormat,
+        hhaExchangeFormat: formData.hhaExchangeFormat,
+        allowCustomReport: formData.allowCustomReport,
+        invoiceName: formData.invoiceName,
+        invoiceEmail: formData.invoiceEmail,
+        invoiceFax: formData.invoiceFax,
+        payrollSystemIntegration: formData.payrollSystemIntegration,
+        quickBooks: formData.quickBooks,
+        adp: formData.adp,
+        paycheck: formData.paycheck,
+        subscriptionTier: formData.subscriptionTier,
+        addOns: formData.addOns,
+        permissionTemplates: formData.permissionTemplates,
+        auditRetentionPeriod: formData.auditRetentionPeriod,
+        auditRetentionPeriodNumber: formData.auditRetentionPeriodNumber,
+        planStartDate: formData.planStartDate,
+        planEndDate: formData.planEndDate,
+    });
+
+    const buildUserPayload = (): CreateAgencyWithUserPayloadUser => ({
+        fullName: formData.userName,
+        email: formData.userEmail,
+        password: formData.userPassword,
+        phone: formData.userPhone,
+        userType: UserType.AGENCY,
+    });
+
+    // Edit mode: persist the current form data to the agency document at any
+    // stage. The backend PATCH preserves existing values for fields left blank,
+    // so this is a safe partial update (no full-form validation required).
+    const handleSaveEdit = async () => {
+        if (!agencyId) return;
+        try {
+            const { logoUrl, letterheadUrl } = await uploadBrandingAssets();
+            await updateAgency({
+                agencyId,
+                data: {
+                    agency: buildAgencyPayload(logoUrl, letterheadUrl),
+                    user: buildUserPayload(),
+                },
+            }).unwrap();
+            toast({
+                title: "Changes Saved",
+                description: "Agency information has been updated.",
+            });
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description: error?.data?.error || error?.message || "Failed to update agency",
+                variant: "destructive",
+            });
+        }
+    };
+
     const handleSaveDraft = async (saveName: string) => {
         try {
-            // Upload logo if exists
-            let logoUrl = formData.logo ? (typeof formData.logo === 'string' ? formData.logo : '') : '';
-            if (formData.logo && typeof formData.logo !== 'string') {
-                const logoResult = await uploadFile({
-                    file: formData.logo,
-                    fileType: 'logo',
-                }).unwrap();
-                logoUrl = logoResult.url;
-            }
-
-            // Upload letterhead if exists
-            let letterheadUrl = formData.letterhead ? (typeof formData.letterhead === 'string' ? formData.letterhead : '') : '';
-            if (formData.letterhead && typeof formData.letterhead !== 'string') {
-                const letterheadResult = await uploadFile({
-                    file: formData.letterhead,
-                    fileType: 'letterhead',
-                }).unwrap();
-                letterheadUrl = letterheadResult.url;
-            }
+            const { logoUrl, letterheadUrl } = await uploadBrandingAssets();
 
             await createDraft({
-                agency: {
-                    name: formData.agencyName,
-                    legalBusinessName: formData.legalBusinessName,
-                    dba: formData.dba,
-                    agencyType: formData.agencyType,
-                    ein: formData.ein,
-                    npi: formData.npi,
-                    providerId: formData.providerId,
-                    medicaidProviderId: formData.medicaidProviderId,
-                    email: formData.supportEmail,
-                    phone: formData.mainPhone,
-                    address: formData.primaryAddress,
-                    state: formData.county_or_state,
-                    zipCode: formData.zipCode,
-                    website: formData.websiteUrl,
-                    services: formData.services,
-                    serviceCodeMapping: formData.serviceCodeMapping,
-                    evvSettings: formData.evvSettings,
-                    schedulingRules: formData.schedulingRules,
-                    maxShiftPerDay: parseInt(formData.maxShiftPerDay),
-                    travelTimeRules: formData.travelTimeRules,
-                    mileageSettings: formData.mileageSettings,
-                    mileageRate: formData.mileageRate,
-                    incidentReportingSettings: formData.incidentReportingSettings,
-                    whoReceivesNotifications: formData.whoReceivesNotifications,
-                    expenseReportSettings: formData.expenseReportSettings,
-                    allowedFileTypes: formData.allowedFileTypes,
-                    allowRecurringSchedules: formData.allowRecurringSchedules,
-                    allowOverlappingVisits: formData.allowOverlappingVisits,
-                    offerMileageReimbursements: formData.offerMileageReimbursements,
-                    realtimeGpsTracking: formData.realtimeGpsTracking,
-                    aiNotesReview: formData.aiNotesReview,
-                    aiPlanOfCareBuilder: formData.aiPlanOfCareBuilder,
-                    aiScheduleOptimizer: formData.aiScheduleOptimizer,
-                    aiDataCleaner: formData.aiDataCleaner,
-                    aiBillingValidator: formData.aiBillingValidator,
-                    requireIds: formData.requireIds,
-                    requireSsn: formData.requireSsn,
-                    requireResume: formData.requireResume,
-                    requireCertificates: formData.requireCertificates,
-                    requireTrainings: formData.requireTrainings,
-                    requireClearances: formData.requireClearances,
-                    expiryRules: formData.expiryRules,
-                    autoReminders: formData.autoReminders,
-                    reminderFrequency: formData.reminderFrequency,
-                    whoReceivesReminders: formData.whoReceivesReminders,
-                    logo: logoUrl,
-                    themeColor: formData.themeColor,
-                    letterhead: letterheadUrl,
-                    primaryColor: formData.themeColor,
-                    billingFormat: formData.billingFormat,
-                    dddFormat: formData.dddFormat,
-                    hhaExchangeFormat: formData.hhaExchangeFormat,
-                    allowCustomReport: formData.allowCustomReport,
-                    invoiceName: formData.invoiceName,
-                    invoiceEmail: formData.invoiceEmail,
-                    invoiceFax: formData.invoiceFax,
-                    payrollSystemIntegration: formData.payrollSystemIntegration,
-                    quickBooks: formData.quickBooks,
-                    adp: formData.adp,
-                    paycheck: formData.paycheck,
-                    subscriptionTier: formData.subscriptionTier,
-                    addOns: formData.addOns,
-                    permissionTemplates: formData.permissionTemplates,
-                    auditRetentionPeriod: formData.auditRetentionPeriod,
-                    auditRetentionPeriodNumber: formData.auditRetentionPeriodNumber,
-                    planStartDate: formData.planStartDate,
-                    planEndDate: formData.planEndDate,
-                },
-                user: {
-                    fullName: formData.userName,
-                    email: formData.userEmail,
-                    password: formData.userPassword,
-                    phone: formData.userPhone,
-                    userType: UserType.AGENCY,
-                },
+                agency: buildAgencyPayload(logoUrl, letterheadUrl),
+                user: buildUserPayload(),
                 name: saveName,
             }).unwrap();
 
@@ -646,104 +690,12 @@ export default function AddAgencyWizard() {
         }
 
         try {
-            // Upload logo if exists
-            let logoUrl = formData.logo ? (typeof formData.logo === 'string' ? formData.logo : '') : '';
-            if (formData.logo && typeof formData.logo !== 'string') {
-                const logoResult = await uploadFile({
-                    file: formData.logo,
-                    fileType: 'logo',
-                }).unwrap();
-                logoUrl = logoResult.url;
-            }
-
-            // Upload letterhead if exists
-            let letterheadUrl = formData.letterhead ? (typeof formData.letterhead === 'string' ? formData.letterhead : '') : '';
-            if (formData.letterhead && typeof formData.letterhead !== 'string') {
-                const letterheadResult = await uploadFile({
-                    file: formData.letterhead,
-                    fileType: 'letterhead',
-                }).unwrap();
-                letterheadUrl = letterheadResult.url;
-            }
+            const { logoUrl, letterheadUrl } = await uploadBrandingAssets();
 
             const requestPayload = {
-                agency: {
-                    name: formData.agencyName,
-                    legalBusinessName: formData.legalBusinessName,
-                    dba: formData.dba,
-                    agencyType: formData.agencyType,
-                    ein: formData.ein,
-                    npi: formData.npi,
-                    providerId: formData.providerId,
-                    medicaidProviderId: formData.medicaidProviderId,
-                    email: formData.supportEmail,
-                    phone: formData.mainPhone,
-                    address: formData.primaryAddress,
-                    state: formData.county_or_state,
-                    zipCode: formData.zipCode,
-                    website: formData.websiteUrl,
-                    services: formData.services,
-                    serviceCodeMapping: formData.serviceCodeMapping,
-                    evvSettings: formData.evvSettings,
-                    schedulingRules: formData.schedulingRules,
-                    maxShiftPerDay: parseInt(formData.maxShiftPerDay),
-                    travelTimeRules: formData.travelTimeRules,
-                    mileageSettings: formData.mileageSettings,
-                    mileageRate: formData.mileageRate,
-                    incidentReportingSettings: formData.incidentReportingSettings,
-                    whoReceivesNotifications: formData.whoReceivesNotifications,
-                    expenseReportSettings: formData.expenseReportSettings,
-                    allowedFileTypes: formData.allowedFileTypes,
-                    allowRecurringSchedules: formData.allowRecurringSchedules,
-                    allowOverlappingVisits: formData.allowOverlappingVisits,
-                    offerMileageReimbursements: formData.offerMileageReimbursements,
-                    realtimeGpsTracking: formData.realtimeGpsTracking,
-                    aiNotesReview: formData.aiNotesReview,
-                    aiPlanOfCareBuilder: formData.aiPlanOfCareBuilder,
-                    aiScheduleOptimizer: formData.aiScheduleOptimizer,
-                    aiDataCleaner: formData.aiDataCleaner,
-                    aiBillingValidator: formData.aiBillingValidator,
-                    requireIds: formData.requireIds,
-                    requireSsn: formData.requireSsn,
-                    requireResume: formData.requireResume,
-                    requireCertificates: formData.requireCertificates,
-                    requireTrainings: formData.requireTrainings,
-                    requireClearances: formData.requireClearances,
-                    expiryRules: formData.expiryRules,
-                    autoReminders: formData.autoReminders,
-                    reminderFrequency: formData.reminderFrequency,
-                    whoReceivesReminders: formData.whoReceivesReminders,
-                    logo: logoUrl,
-                    themeColor: formData.themeColor,
-                    letterhead: letterheadUrl,
-                    primaryColor: formData.themeColor,
-                    billingFormat: formData.billingFormat,
-                    dddFormat: formData.dddFormat,
-                    hhaExchangeFormat: formData.hhaExchangeFormat,
-                    allowCustomReport: formData.allowCustomReport,
-                    invoiceName: formData.invoiceName,
-                    invoiceEmail: formData.invoiceEmail,
-                    invoiceFax: formData.invoiceFax,
-                    payrollSystemIntegration: formData.payrollSystemIntegration,
-                    quickBooks: formData.quickBooks,
-                    adp: formData.adp,
-                    paycheck: formData.paycheck,
-                    subscriptionTier: formData.subscriptionTier,
-                    addOns: formData.addOns,
-                    permissionTemplates: formData.permissionTemplates,
-                    auditRetentionPeriod: formData.auditRetentionPeriod,
-                    auditRetentionPeriodNumber: formData.auditRetentionPeriodNumber,
-                    planStartDate: formData.planStartDate,
-                    planEndDate: formData.planEndDate,
-                },
-                user: {
-                    fullName: formData.userName,
-                    email: formData.userEmail,
-                    password: formData.userPassword,
-                    phone: formData.userPhone,
-                    userType: UserType.AGENCY,
-                },
-            }
+                agency: buildAgencyPayload(logoUrl, letterheadUrl),
+                user: buildUserPayload(),
+            };
 
             if (!!agencyId) {
                 await updateAgency({agencyId, data: requestPayload}).unwrap();
@@ -893,12 +845,12 @@ export default function AddAgencyWizard() {
                             </Button>
                             <Button
                                 type="button"
-                                onClick={() => setShowSaveModal(true)}
+                                onClick={() => (agencyId ? handleSaveEdit() : setShowSaveModal(true))}
                                 variant="outline"
                                 className="bg-[#B2B2B3] hover:bg-[#d0d0d0] text-[#10141a] border-none px-6 py-2 rounded-[60px] font-semibold text-[14px] flex items-center gap-2"
                                 disabled={isSaving}
                             >
-                                Save
+                                {isSaving ? "Saving..." : agencyId ? "Save Changes" : "Save"}
                             </Button>
                             {currentStep > 1 && (
                                 <Button

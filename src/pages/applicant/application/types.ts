@@ -27,6 +27,12 @@ export type DocumentTypes = "resume"
   | "hepatitis-b-vaccination"
   | "hepatitis-b-immunity"
   | "tb-test"
+  | "chha-certificate"
+  | "cpr-certification"
+  | "cna-hha-license"
+  | "mmr-record"
+  | "physical-exam"
+  | "additional-vaccination"
   | "i9-form"
   | "w4-form"
 
@@ -44,6 +50,12 @@ export interface DocumentUploadAndEligibilityPayload {
   hepatitisBVaccinationUrl?: ApplicantDocumentFileUploadedInfo;
   hepatitisBImmunityUrl?: ApplicantDocumentFileUploadedInfo;
   tbTestResultUrl?: ApplicantDocumentFileUploadedInfo;
+  chhaCertificateUrl?: ApplicantDocumentFileUploadedInfo;
+  cprCertificationUrl?: ApplicantDocumentFileUploadedInfo;
+  cnaHhaLicenseUrl?: ApplicantDocumentFileUploadedInfo;
+  mmrRecordUrl?: ApplicantDocumentFileUploadedInfo;
+  physicalExamUrl?: ApplicantDocumentFileUploadedInfo;
+  additionalVaccinationUrl?: ApplicantDocumentFileUploadedInfo;
   i9FormUrl?: ApplicantDocumentFileUploadedInfo;
   w4FormUrl?: ApplicantDocumentFileUploadedInfo;
   references: {
