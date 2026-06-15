@@ -850,7 +850,7 @@ export default function AddAgencyWizard() {
                                 className="bg-[#B2B2B3] hover:bg-[#d0d0d0] text-[#10141a] border-none px-6 py-2 rounded-[60px] font-semibold text-[14px] flex items-center gap-2"
                                 disabled={isSaving}
                             >
-                                {agencyId ? "Save Changes" : "Save"}
+                                {isSaving ? "Saving..." : agencyId ? "Save Changes" : "Save"}
                             </Button>
                             {currentStep > 1 && (
                                 <Button
