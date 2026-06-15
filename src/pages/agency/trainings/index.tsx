@@ -137,10 +137,10 @@ export default function AgencyTrainings() {
                 paginatedData.map((item) => (
                   <div
                     key={item.id}
-                    className="flex justify-between gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] flex items-center p-4"
+                    className="flex justify-between gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] items-center p-4"
                   >
                     {/* Avatar */}
-                    <div className={"flex gap-4 items-center"}>
+                    <div className="flex gap-4 items-center">
                       <div className="w-[52.5px] h-[60px] rounded-[8px] overflow-hidden flex-shrink-0">
                         {item?.profilePictureUrl
                           ? (
