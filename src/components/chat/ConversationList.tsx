@@ -11,6 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Conversation, ConversationParticipant } from "@/lib/hooks/useMessaging";
 import { format } from "date-fns";
 import { formatRoleLabel, getInitials, sanitizeSearchQuery, validateImageUrl } from "@/lib/utils/string-utils";
+import { roleLabel } from "@/lib/roleLabel";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMultiplePresence } from "@/lib/hooks/usePresence";
 
@@ -49,6 +50,19 @@ const isStaffRole = (role: string): boolean => {
 const isAdministrationRole = (role: string): boolean => {
   const r = (role || "").toLowerCase();
   return r.includes("super");
+};
+
+/**
+ * Role tag for a direct conversation participant.
+ * Maps DSP/HHA roles through roleLabel (so an HHA user shows "Caregiver"),
+ * and falls back to the existing underscore-stripping formatter for all
+ * other roles to preserve current behaviour exactly.
+ */
+const getParticipantRoleTag = (role: string): string => {
+  if (isDspRole(role) || role.toLowerCase() === "hha" || role.toLowerCase() === "caregiver") {
+    return roleLabel({ role });
+  }
+  return formatRoleLabel(role);
 };
 
 /** Helper to get display name for group conversations */
@@ -346,7 +360,7 @@ export const ConversationList = React.memo(function ConversationList({
             // Subtitle: member count for groups, role for direct
             const subtitle = isGroup
               ? `${otherParticipants.length + 1} members`
-              : formatRoleLabel(primaryParticipant?.role || "");
+              : getParticipantRoleTag(primaryParticipant?.role || "");
 
             return (
               <div

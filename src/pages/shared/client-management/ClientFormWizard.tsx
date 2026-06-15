@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, Suspense, lazy, useRef, useState } from "react";
+import React, { useMemo, useCallback, useEffect, Suspense, lazy, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { AddClientFormData, createInitialDocs, type ClientType } from "./types/formData";
 import { ClientFormConfig } from "./types/config";
@@ -97,6 +97,28 @@ export function ClientFormWizard({
     },
     [setFormData],
   );
+
+  // Client types the agency is allowed to create. Missing/empty => both
+  // (backward-compatible: existing agencies keep showing the picker).
+  const allowed = useMemo<ClientType[]>(
+    () =>
+      config.supportedClientTypes?.length
+        ? config.supportedClientTypes
+        : ["ddd", "hha"],
+    [config.supportedClientTypes],
+  );
+
+  // When the agency supports exactly one client type, skip the picker entirely
+  // for new clients by auto-selecting that type (jumps straight to Stage 1).
+  const autoSelectedRef = useRef(false);
+  useEffect(() => {
+    if (isEditMode) return;
+    if (autoSelectedRef.current) return;
+    if (allowed.length === 1) {
+      autoSelectedRef.current = true;
+      handleTypeSelect(allowed[0]);
+    }
+  }, [isEditMode, allowed, handleTypeSelect]);
 
   const handlePickerBack = useCallback(() => {
     if (config.backNavigate) {
@@ -234,6 +256,7 @@ export function ClientFormWizard({
           pageTitle={pageTitle}
           onSelect={handleTypeSelect}
           onBack={config.backNavigate ? handlePickerBack : undefined}
+          allowed={allowed}
         />
       );
     }
@@ -332,6 +355,7 @@ export function ClientFormWizard({
     handleChangeClientType,
     clientId,
     isDddClient,
+    allowed,
   ]);
 
   return (

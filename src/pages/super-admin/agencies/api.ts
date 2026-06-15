@@ -29,6 +29,8 @@ export interface CreateAgencyWithUserPayloadAgency {
   state?: string;
   zipCode?: string;
   website?: string;
+  // Supported client types (DDD / HHA)
+  supportedClientTypes?: ("ddd" | "hha")[];
   // Step 4: Service Configuration
   services?: string[];
   serviceCodeMapping?: Record<string, any>;

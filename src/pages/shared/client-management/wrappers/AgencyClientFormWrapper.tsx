@@ -3,10 +3,11 @@ import { useParams, useNavigate } from "react-router";
 import { Loader2 } from "lucide-react";
 import { Routes } from "@/routes/constants";
 import { getAgencyClientById, type Client } from "@/lib/api/clients";
+import { getAgencyById } from "@/lib/api/agencies";
 import { useAuth } from "@/utils/auth";
 import { ClientFormWizard } from "../ClientFormWizard";
 import { clientToFormData } from "../utils/clientToFormData";
-import { createInitialAddClientFormData } from "../types/formData";
+import { createInitialAddClientFormData, type ClientType } from "../types/formData";
 import { ClientFormConfig } from "../types/config";
 
 type AgencyClientFormWrapperProps = {
@@ -17,38 +18,76 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const agencyId = user?.agencyId;
   const [client, setClient] = useState<Client | null>(null);
-  const [isLoading, setIsLoading] = useState(isEditMode);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Agency-supported client types. On error/missing we leave this undefined so
+  // the wizard falls back to offering both DDD and HHA.
+  const [supportedClientTypes, setSupportedClientTypes] = useState<ClientType[] | undefined>(undefined);
 
   useEffect(() => {
-    if (!isEditMode) {
-      setIsLoading(false);
-      return;
-    }
+    let cancelled = false;
 
-    const fetchClient = async () => {
-      if (!clientId) {
-        setError("Client ID is required");
-        setIsLoading(false);
-        return;
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      const tasks: Promise<unknown>[] = [];
+
+      // Fetch the agency to read its supported client types. On error/missing we
+      // leave supportedClientTypes undefined (wizard treats that as both).
+      if (agencyId) {
+        tasks.push(
+          getAgencyById(agencyId)
+            .then((agency) => {
+              if (cancelled) return;
+              const types = agency?.supportedClientTypes;
+              if (Array.isArray(types) && types.length) {
+                setSupportedClientTypes(types as ClientType[]);
+              } else {
+                setSupportedClientTypes(undefined);
+              }
+            })
+            .catch((err: any) => {
+              console.error("Failed to fetch agency supported client types:", err);
+              if (!cancelled) setSupportedClientTypes(undefined);
+            }),
+        );
       }
 
-      try {
-        setIsLoading(true);
-        setError(null);
-        const clientData = await getAgencyClientById(clientId);
-        setClient(clientData);
-      } catch (err: any) {
-        console.error("Failed to fetch client:", err);
-        setError(err.message || "Failed to load client details");
-      } finally {
-        setIsLoading(false);
+      // Only the edit flow needs to preload the existing client.
+      if (isEditMode) {
+        if (!clientId) {
+          if (!cancelled) {
+            setError("Client ID is required");
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        tasks.push(
+          getAgencyClientById(clientId)
+            .then((clientData) => {
+              if (!cancelled) setClient(clientData);
+            })
+            .catch((err: any) => {
+              console.error("Failed to fetch client:", err);
+              if (!cancelled) setError(err.message || "Failed to load client details");
+            }),
+        );
       }
+
+      await Promise.all(tasks);
+      if (!cancelled) setIsLoading(false);
     };
 
-    fetchClient();
-  }, [clientId, isEditMode]);
+    loadData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, isEditMode, agencyId]);
 
   if (isLoading) {
     return (
@@ -91,6 +130,7 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
     backNavigate: isEditMode && clientId ? Routes.agency.clientDetails.replace(":clientId", clientId) : Routes.agency.clients,
     clientId,
     isEditMode,
+    supportedClientTypes,
   };
 
   const handleSuccess = (id?: string, isProgressive?: boolean) => {

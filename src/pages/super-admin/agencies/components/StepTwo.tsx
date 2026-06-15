@@ -17,6 +17,7 @@ interface Step3LeadershipProps {
 export default function Step3Leadership({formData, onChange, services = [], fieldsWithErrors = []}: Step3LeadershipProps) {
     const [showPassword, setShowPassword] = useState(false);
     const [isServicesOpen, setIsServicesOpen] = useState(false);
+    const [isClientTypesOpen, setIsClientTypesOpen] = useState(false);
     const {toast} = useToast();
 
     const generatePassword = () => {
@@ -40,6 +41,19 @@ export default function Step3Leadership({formData, onChange, services = [], fiel
             ? currentServices.filter((s: string) => s !== serviceName)
             : [...currentServices, serviceName];
         onChange("services", newServices);
+    };
+
+    const CLIENT_TYPE_OPTIONS: { value: "ddd" | "hha"; label: string }[] = [
+        { value: "ddd", label: "DDD" },
+        { value: "hha", label: "HHA" },
+    ];
+
+    const toggleClientType = (clientType: "ddd" | "hha") => {
+        const currentTypes: ("ddd" | "hha")[] = formData.supportedClientTypes || [];
+        const newTypes = currentTypes.includes(clientType)
+            ? currentTypes.filter((t) => t !== clientType)
+            : [...currentTypes, clientType];
+        onChange("supportedClientTypes", newTypes);
     };
 
     return (
@@ -163,6 +177,107 @@ export default function Step3Leadership({formData, onChange, services = [], fiel
                     </p>
                 </div>
                 <div className="space-y-6 mt-6">
+                    {/* Supported Client Types (DDD / HHA / Both) */}
+                    <div className="flex flex-col gap-[4px] w-full max-w-[350px]">
+                        <Label className="text-[14px] font-medium text-[#10141a]">
+                            Supported Client Types
+                        </Label>
+
+                        <Popover open={isClientTypesOpen} onOpenChange={setIsClientTypesOpen}>
+                            <PopoverTrigger asChild>
+                                <button
+                                    className={cn(
+                                        "flex items-center justify-between h-[44px] w-full rounded-[12px] border border-[#cccccd] bg-white px-[16px] hover:bg-[#fafafa] transition-colors",
+                                        fieldsWithErrors.includes("supportedClientTypes") && "border-red-500"
+                                    )}
+                                >
+                                    <span className="text-[14px] font-normal text-[#525253]">
+                                        {formData.supportedClientTypes && formData.supportedClientTypes.length > 0
+                                            ? formData.supportedClientTypes.length === CLIENT_TYPE_OPTIONS.length
+                                                ? "Both (DDD & HHA)"
+                                                : CLIENT_TYPE_OPTIONS
+                                                      .filter((o) => formData.supportedClientTypes.includes(o.value))
+                                                      .map((o) => o.label)
+                                                      .join(", ")
+                                            : "Select Client Types"}
+                                    </span>
+                                    <ChevronDown className="w-5 h-5 text-[#10141a]" />
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                className="w-[var(--radix-popover-trigger-width)] bg-white border border-[#cccccd] rounded-[12px] p-0 shadow-lg"
+                                align="start"
+                            >
+                                <div className="flex flex-col max-h-[300px]">
+                                    {/* Header */}
+                                    <div className="px-[20px] pt-[12px] pb-0 shrink-0">
+                                        <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
+                                            Select client types
+                                        </p>
+                                    </div>
+
+                                    {/* Options */}
+                                    <div className="flex flex-col mt-[8px] overflow-y-auto">
+                                        {CLIENT_TYPE_OPTIONS.map((option) => {
+                                            const isSelected = formData.supportedClientTypes?.includes(option.value) || false;
+                                            return (
+                                                <button
+                                                    key={option.value}
+                                                    onClick={() => toggleClientType(option.value)}
+                                                    className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${
+                                                        isSelected ? "bg-[#e5effa]" : ""
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`text-[14px] leading-[1.4] ${
+                                                            isSelected
+                                                                ? "font-semibold text-[#00b4b8]"
+                                                                : "font-normal text-[#808081]"
+                                                        }`}
+                                                    >
+                                                        {option.label}
+                                                    </span>
+                                                    {isSelected && (
+                                                        <Check className="w-5 h-5 text-[#00b4b8]" />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+
+                        {fieldsWithErrors.includes("supportedClientTypes") && (
+                            <p className="text-red-500 mt-1 text-[12px]">
+                                Supported client types are required.
+                            </p>
+                        )}
+                    </div>
+                    {/* Selected Client Type Badges */}
+                    {formData.supportedClientTypes && formData.supportedClientTypes.length > 0 && (
+                        <div className="flex flex-wrap gap-[8px] w-full">
+                            {CLIENT_TYPE_OPTIONS
+                                .filter((option) => formData.supportedClientTypes.includes(option.value))
+                                .map((option) => (
+                                    <div
+                                        key={option.value}
+                                        className="group flex items-center gap-[6px] px-[10px] py-[6px] rounded-[6px] bg-[#00b4b8] border-[0.5px] border-[#808081] hover:bg-[#00a0a3] transition-colors"
+                                    >
+                                        <span className="text-[14px] font-medium leading-[1.4] text-white">
+                                            {option.label}
+                                        </span>
+                                        <button
+                                            onClick={() => toggleClientType(option.value)}
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-white/20 rounded-full p-0.5"
+                                            aria-label={`Remove ${option.label}`}
+                                        >
+                                            <X className="w-3.5 h-3.5 text-white" />
+                                        </button>
+                                    </div>
+                                ))}
+                        </div>
+                    )}
                     <div className="flex flex-col gap-[4px] w-full max-w-[350px]">
                         <Label className="text-[14px] font-medium text-[#10141a]">
                             Select Services

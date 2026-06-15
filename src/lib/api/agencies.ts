@@ -63,6 +63,8 @@ export interface Agency {
     allowOverlappingVisits?: boolean;
     offerMileageReimbursements?: boolean;
     realtimeGpsTracking?: boolean;
+    // Supported client types (DDD / HHA). Missing => treated as both.
+    supportedClientTypes?: ("ddd" | "hha")[];
     // Legacy
     taxId?: string;
     licenseNumber?: string;

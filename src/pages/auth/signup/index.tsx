@@ -11,7 +11,7 @@
  */
 
 import type React from "react"
-import {useState} from "react"
+import {useEffect, useState} from "react"
 import {useNavigate, Link, useLocation} from "react-router"
 import {Eye, EyeOff} from "lucide-react"
 import {Button} from "@/components/ui/button"
@@ -26,6 +26,8 @@ import {
   getValidationMessage
 } from "@/utils/auth/helpers/errorMessages"
 import {Routes} from "@/routes/constants";
+import {getAgencyInfo} from "@/lib/api/onboarding"
+import type {ApplicantType} from "@/pages/applicant/application/documentConfig"
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState("")
@@ -41,9 +43,56 @@ export default function SignUpPage() {
 
   const agencyId = new URLSearchParams(useLocation().search).get('agencyId');
 
+  // Applicant type mirrors the agency's supported client types.
+  // Default "dsp"; show a DSP/HHA selector only when the agency supports both.
+  const [applicantType, setApplicantType] = useState<ApplicantType>("dsp")
+  const [showApplicantTypeSelector, setShowApplicantTypeSelector] = useState(false)
+
   const {signup} = useAuth()
   const navigate = useNavigate()
   const {toast} = useToast()
+
+  // On mount, resolve the agency's supported client types to decide applicantType.
+  useEffect(() => {
+    if (!agencyId) return
+
+    let cancelled = false
+
+    const resolveApplicantType = async () => {
+      const info = await getAgencyInfo(agencyId)
+      if (cancelled || !info) return
+
+      const supported: string[] =
+        info?.agency?.supportedClientTypes ?? info?.supportedClientTypes ?? []
+
+      const supportsDdd = supported.includes("ddd")
+      const supportsHha = supported.includes("hha")
+
+      if (supportsDdd && supportsHha) {
+        // Both supported -> let the applicant choose.
+        setShowApplicantTypeSelector(true)
+        setApplicantType("dsp")
+      } else if (supportsHha) {
+        // HHA-only -> auto-set caregiver.
+        setShowApplicantTypeSelector(false)
+        setApplicantType("hha")
+      } else if (supportsDdd) {
+        // DDD-only -> auto-set DSP.
+        setShowApplicantTypeSelector(false)
+        setApplicantType("dsp")
+      } else {
+        // Missing/empty supportedClientTypes => treated as both (back-compat).
+        setShowApplicantTypeSelector(true)
+        setApplicantType("dsp")
+      }
+    }
+
+    resolveApplicantType()
+
+    return () => {
+      cancelled = true
+    }
+  }, [agencyId])
 
   // Validate full name
   const validateFullName = (name: string) => {
@@ -154,7 +203,7 @@ export default function SignUpPage() {
     setLoading(true)
 
     try {
-      await signup(email, password, fullName, agencyId ?? undefined)
+      await signup(email, password, fullName, agencyId ?? undefined, applicantType)
       const successMsg = getSuccessMessage('signup')
       toast({
         title: successMsg.title,
@@ -293,6 +342,41 @@ export default function SignUpPage() {
             </div>
           )}
         </div>
+
+        {/* Applicant Type Selector (only when agency supports both DSP and HHA) */}
+        {showApplicantTypeSelector && (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-900">
+              I am applying as
+            </Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setApplicantType("dsp")}
+                aria-pressed={applicantType === "dsp"}
+                className={`h-12 rounded-2xl border text-base font-semibold transition-all ${
+                  applicantType === "dsp"
+                    ? "border-[#17a2b8] bg-[#17a2b8]/10 text-[#17a2b8]"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                DSP
+              </button>
+              <button
+                type="button"
+                onClick={() => setApplicantType("hha")}
+                aria-pressed={applicantType === "hha"}
+                className={`h-12 rounded-2xl border text-base font-semibold transition-all ${
+                  applicantType === "hha"
+                    ? "border-[#17a2b8] bg-[#17a2b8]/10 text-[#17a2b8]"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Caregiver
+              </button>
+            </div>
+          </div>
+        )}
 
         <Button
           type="submit"

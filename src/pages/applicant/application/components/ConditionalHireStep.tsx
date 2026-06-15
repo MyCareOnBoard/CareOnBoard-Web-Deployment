@@ -9,6 +9,7 @@ import {
 } from "@/pages/applicant/application/api";
 import { useAuth } from "@/utils/auth";
 import { toast } from "sonner";
+import { getConditionalHireLetterContent } from "@/pages/applicant/application/conditionalHireLetterContent";
 
 interface ConditionalHireStepProps {
   onBack?: () => void;
@@ -32,6 +33,10 @@ export default function ConditionalHireStep({
   const hasSignature = !!signatureStatus?.data?.signatureId;
   const userName = user?.fullName || user?.email?.split("@")[0] || "Applicant";
   const agency = user?.agency?.name || "Agency Name";
+
+  // Resolve the applicant type (default "dsp") and the matching letter content.
+  // DSP renders the existing copy verbatim; HHA renders the Caregiver-worded variant.
+  const letter = getConditionalHireLetterContent(user?.applicantType);
 
   // Auto-submit if signature exists, or show letter modal if not signed
   useEffect(() => {
@@ -194,7 +199,7 @@ export default function ConditionalHireStep({
                       </span>{" "}
                       as a{" "}
                       <span className="font-semibold text-green-700">
-                        Staff member.
+                        {letter.roleWording}.
                       </span>{" "} Your employment is conditional upon the
                       successful completion of all pre-employment requirements
                       and state-mandated training.
@@ -212,94 +217,41 @@ export default function ConditionalHireStep({
                     </p>
 
                     <div className="space-y-3">
-                      {/* Section 1 */}
-                      <div>
-                        <p className="font-semibold text-gray-900 mb-1.5">
-                          1. Pre-Employment Screening & Background Checks
-                        </p>
-                        <ul className="ml-4 space-y-1 text-xs text-green-700 list-none">
-                          <li className="flex items-start">
-                            <span className="mr-2">○</span>
-                            <span>
-                              Fingerprint-based criminal history check (State &
-                              FBI)
-                            </span>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="mr-2">○</span>
-                            <span>
-                              Central Registry - Child Abuse Record Information
-                              (CARI) check
-                            </span>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="mr-2">○</span>
-                            <span>Sex Offender Registry check</span>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="mr-2">○</span>
-                            <span>OIG Exclusion List check</span>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="mr-2">○</span>
-                            <span>Drug screening (if applicable)</span>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="mr-2">○</span>
-                            <span>Verification of professional references</span>
-                          </li>
-                        </ul>
-                      </div>
-
-                      {/* Section 2 */}
-                      <div>
-                        <p className="font-semibold text-gray-900 mb-1.5">
-                          2. Pre-Service Training
-                        </p>
-                        <p className="text-green-700 text-xs mb-1.5">
-                          You must complete all CDS Portal modules and agency
-                          pre-service trainings prior to working independently.
-                          This includes, but is not limited to:
-                        </p>
-                        <ul className="ml-4 space-y-1 text-xs text-green-700 list-none">
-                          <li className="flex items-start">
-                            <span className="mr-2">○</span>
-                            <span>
-                              CDS-required modules (Introduction to DD,
-                              Person-Centered Planning, Everyone Can
-                              Communicate, etc.)
-                            </span>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="mr-2">○</span>
-                            <span>
-                              Mandated Reporter Training (CPR/First Aid, Fire
-                              Safety, Infection Control, HIPAA, Orientation,
-                              etc.)
-                            </span>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="mr-2">○</span>
-                            <span>
-                              NT-specific law trainings (Incident Reporting,
-                              Daniel's Law, Kimone's Law, etc.)
-                            </span>
-                          </li>
-                        </ul>
-                      </div>
-
-                      {/* Section 3 */}
-                      <div>
-                        <p className="font-semibold text-gray-900 mb-1.5">
-                          3. Documentation & Compliance
-                        </p>
-                        <p className="text-xs text-green-700">
-                          All certificates, verifications, and required
-                          documentation must be submitted and approved by
-                          <span className="font-semibold text-green-700">{agency}</span> before your conditional employment
-                          status can be converted to regular employment.
-                        </p>
-                      </div>
+                      {letter.conditions.map((section, idx) => (
+                        <div key={idx}>
+                          <p className="font-semibold text-gray-900 mb-1.5">
+                            {section.heading}
+                          </p>
+                          {section.intro && (
+                            <p className="text-green-700 text-xs mb-1.5">
+                              {section.intro}
+                            </p>
+                          )}
+                          {section.body ? (
+                            <p className="text-xs text-green-700">
+                              {section.body.split("{agency}").map((part, i, arr) => (
+                                <span key={i}>
+                                  {part}
+                                  {i < arr.length - 1 && (
+                                    <span className="font-semibold text-green-700">
+                                      {agency}
+                                    </span>
+                                  )}
+                                </span>
+                              ))}
+                            </p>
+                          ) : (
+                            <ul className="ml-4 space-y-1 text-xs text-green-700 list-none">
+                              {section.items.map((item, i) => (
+                                <li key={i} className="flex items-start">
+                                  <span className="mr-2">○</span>
+                                  <span>{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -312,32 +264,12 @@ export default function ConditionalHireStep({
                       By signing this letter, you consent to the following:
                     </p>
                     <ul className="ml-4 space-y-1 text-xs text-green-700 list-none">
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>
-                          Submission of your fingerprints for state and federal
-                          criminal history checks
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>
-                          Review of your screening, including Central Registry,
-                          CARI, Sex Offender Registry, and OIG Exclusion List
-                          verification
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>Drug testing (if applicable)</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>
-                          Verification of education, certifications, and
-                          professional references
-                        </span>
-                      </li>
+                      {letter.consentItems.map((item, i) => (
+                        <li key={i} className="flex items-start">
+                          <span className="mr-2">•</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
                     </ul>
                   </div>
 
@@ -348,27 +280,12 @@ export default function ConditionalHireStep({
                       may be rescinded if:
                     </p>
                     <ul className="ml-4 space-y-1 text-xs text-red-800 list-none">
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>
-                          Any of the pre-employment checks or screenings return
-                          unsatisfactory results
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>
-                          You fail to complete required pre-service trainings
-                          within the stipulated time
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>
-                          You provide false, misleading, or incomplete
-                          information during the application or hiring process
-                        </span>
-                      </li>
+                      {letter.warningItems.map((item, i) => (
+                        <li key={i} className="flex items-start">
+                          <span className="mr-2">•</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
                     </ul>
                   </div>
 
@@ -376,8 +293,8 @@ export default function ConditionalHireStep({
                   <div>
                     <p className="text-xs leading-relaxed text-green-700">
                       We are excited to have you on our team and look forward to
-                      supporting you in your professional growth as a Staff
-                      member of <span className="font-semibold">
+                      supporting you in your professional growth as a{" "}
+                      {letter.roleWording} of <span className="font-semibold">
                         {agency}
                       </span>
                     </p>

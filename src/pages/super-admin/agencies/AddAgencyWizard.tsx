@@ -46,6 +46,9 @@ interface AgencyFormData {
     userEmail: string;
     userPassword: string;
 
+    // Supported client types (DDD / HHA)
+    supportedClientTypes: ("ddd" | "hha")[];
+
     // Step 4: Service Configuration
     services: string[];
     serviceCodeMapping: Record<string, any>;
@@ -142,6 +145,7 @@ const STEPS = [
             "userPhone",
             "userEmail",
             "userPassword",
+            "supportedClientTypes",
             "services"
         ]
     },
@@ -260,6 +264,7 @@ export default function AddAgencyWizard() {
         userPhone: "",
         userEmail: "",
         userPassword: "",
+        supportedClientTypes: [],
         services: [],
         serviceCodeMapping: {},
         evvSettings: {},
@@ -341,6 +346,8 @@ export default function AddAgencyWizard() {
             userPhone: responseData.user?.phone || "",
             userEmail: responseData.user?.email || "",
             userPassword: responseData.user?.password || "",
+            // Supported client types (DDD / HHA)
+            supportedClientTypes: responseData.agencyData?.supportedClientTypes || [],
             // Step 4: Service Configuration
             services: responseData.agencyData?.services || [],
             serviceCodeMapping: responseData.agencyData?.serviceCodeMapping || {},
@@ -469,6 +476,7 @@ export default function AddAgencyWizard() {
                     state: formData.county_or_state,
                     zipCode: formData.zipCode,
                     website: formData.websiteUrl,
+                    supportedClientTypes: formData.supportedClientTypes,
                     services: formData.services,
                     serviceCodeMapping: formData.serviceCodeMapping,
                     evvSettings: formData.evvSettings,
@@ -682,6 +690,7 @@ export default function AddAgencyWizard() {
                     state: formData.county_or_state,
                     zipCode: formData.zipCode,
                     website: formData.websiteUrl,
+                    supportedClientTypes: formData.supportedClientTypes,
                     services: formData.services,
                     serviceCodeMapping: formData.serviceCodeMapping,
                     evvSettings: formData.evvSettings,

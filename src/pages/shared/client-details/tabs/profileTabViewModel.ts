@@ -399,11 +399,18 @@ function buildAssignedDspsSection(client: Client): ProfileSection {
     .map((d) => trimOrEmpty(d.name))
     .filter(Boolean);
 
+  // Subtitle is driven by the CLIENT's type: HHA clients have Caregivers,
+  // DDD clients keep the existing "Direct support professionals" wording.
+  const assignedSubtitle =
+    client.type === "hha"
+      ? "Caregivers assigned to this client"
+      : "Direct support professionals assigned to this client";
+
   if (names.length === 0) {
     return {
       id: "assigned-dsps",
       title: "Assigned DSPs",
-      subtitle: "Direct support professionals assigned to this client",
+      subtitle: assignedSubtitle,
       fields: [],
       emptyMessage:
         client.type === "hha"
@@ -415,7 +422,7 @@ function buildAssignedDspsSection(client: Client): ProfileSection {
   return {
     id: "assigned-dsps",
     title: "Assigned DSPs",
-    subtitle: "Direct support professionals assigned to this client",
+    subtitle: assignedSubtitle,
     fields: [],
     listItems: names,
   };

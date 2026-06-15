@@ -25,6 +25,8 @@ import { DocumentsTab } from "./components/DocumentsTab";
 import { ConditionalHireTab } from "./components/ConditionalHireTab";
 import { OfficialHireTab } from "./components/OfficialHireTab";
 import { FinalReviewTab, type ReviewStepsState } from "./components/FinalReviewTab";
+import { getApplicantDocs, type ApplicantType } from "@/pages/applicant/application/documentConfig";
+import { roleLabel } from "@/lib/roleLabel";
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
@@ -119,6 +121,8 @@ export default function ApplicantProfilePage() {
     uid?: string;
     name: string;
     userType: string;
+    applicantType?: string;
+    role?: string;
     address?: string;
     dob?: string;
     gender?: string;
@@ -148,18 +152,40 @@ export default function ApplicantProfilePage() {
     finalAgencyReview: false,
   });
 
-  // Document and references configuration - mirror main /documents items
-  const documentDefinitions = [
-    { type: "photo-id", label: "Photo ID" }, // documents.photoId.fileType
-    { type: "social-security-card", label: "Social Security Card" }, // documents.socialSecurityCard.fileType
-    { type: "diploma", label: "School Diploma Certificate" }, // documents.diploma.fileType
-    { type: "certifications", label: "Extra Certificates" }, // documents.certifications (array/object)
-    { type: "hepatitis-b-vaccination", label: "Hepatitis B Vaccination" }, // documents.hepatitisBVaccination.fileType
-    { type: "hepatitis-b-immunity", label: "Hepatitis B Immunity" }, // documents.hepatitisBImmunity.fileType
-    { type: "tb-test", label: "TB Test" }, // documents.tbTest
-    { type: "i9-form", label: "Filled I-9 form" }, // documents.i9Form.fileType
-    { type: "w4-form", label: "Filled W-4 form" }, // documents.w4Form.fileType
-  ] as const;
+  // Resolve the applicant's document set from the shared config (default "dsp").
+  const applicantType: ApplicantType =
+    applicant.applicantType === "hha" ? "hha" : "dsp";
+  const applicantDocDefs = getApplicantDocs(applicantType);
+
+  // Short, agency-facing display labels. Preserves the existing DSP wording;
+  // new HHA doc ids fall back to their config label.
+  const DIRECTORY_DOC_LABELS: Record<string, string> = {
+    "photo-id": "Photo ID",
+    "driver-license": "Driver's License",
+    "social-security-card": "Social Security Card",
+    "diploma": "School Diploma Certificate",
+    "certifications": "Extra Certificates",
+    "hepatitis-b-vaccination": "Hepatitis B Vaccination",
+    "hepatitis-b-immunity": "Hepatitis B Immunity",
+    "tb-test": "TB Test",
+    "chha-certificate": "CHHA Certificate",
+    "cpr-certification": "CPR Certification",
+    "cna-hha-license": "CNA/HHA License",
+    "mmr-record": "MMR Record",
+    "physical-exam": "Physical Exam",
+    "additional-vaccination": "Additional Vaccination Records",
+    "i9-form": "Filled I-9 form",
+    "w4-form": "Filled W-4 form",
+  };
+
+  const directoryLabelFor = (def: { id: string; label: string }) =>
+    DIRECTORY_DOC_LABELS[def.id] ?? def.label;
+
+  // Document configuration derived from the shared config (single source of truth).
+  const documentDefinitions = applicantDocDefs.map((def) => ({
+    type: def.id,
+    label: directoryLabelFor(def),
+  }));
 
   const documentLabelByType: Record<string, string> = documentDefinitions.reduce(
     (acc, def) => {
@@ -281,6 +307,8 @@ export default function ApplicantProfilePage() {
         uid: data.uid || prev.uid,
         name: data.fullName || prev.name,
         userType: data.userType || '',
+        applicantType: (data as { applicantType?: string }).applicantType || prev.applicantType,
+        role: (data as { role?: string }).role || prev.role,
         avatar: data.profilePictureUrl || prev.avatar,
         address: data.address?.address || prev.address,
         dob: data.dateOfBirth || prev.dob,
@@ -314,18 +342,18 @@ export default function ApplicantProfilePage() {
           return new Date(ts._seconds * 1000).toISOString();
         };
 
-        // Map each document type
-        const docMap: Record<string, { url?: DocumentFile; label: string }> = {
-          'photo-id': { url: eligibility.photoIdUrl, label: 'Photo ID' },
-          'social-security-card': { url: eligibility.socialSecurityCardUrl, label: 'Social Security Card' },
-          'diploma': { url: eligibility.diplomaUrl, label: 'School Diploma Certificate' },
-          'certifications': { url: eligibility.certificationsUrl, label: 'Extra Certificates' },
-          'hepatitis-b-vaccination': { url: eligibility.hepatitisBVaccinationUrl, label: 'Hepatitis B Vaccination' },
-          'hepatitis-b-immunity': { url: eligibility.hepatitisBImmunityUrl, label: 'Hepatitis B Immunity' },
-          'tb-test': { url: eligibility.tbTestResultUrl, label: 'TB Test' },
-          'i9-form': { url: eligibility.i9FormUrl, label: 'Filled I-9 form' },
-          'w4-form': { url: eligibility.w4FormUrl, label: 'Filled W-4 form' },
-        };
+        // Build the doc map from the shared config (single source of truth),
+        // keyed by the applicant's resolved type (default "dsp").
+        const fetchedApplicantType: ApplicantType =
+          (data as { applicantType?: string }).applicantType === "hha" ? "hha" : "dsp";
+        const eligibilityRecord = eligibility as unknown as Record<string, DocumentFile | undefined>;
+        const docMap: Record<string, { url?: DocumentFile; label: string }> = {};
+        getApplicantDocs(fetchedApplicantType).forEach((def) => {
+          docMap[def.id] = {
+            url: eligibilityRecord[def.field],
+            label: directoryLabelFor(def),
+          };
+        });
 
         Object.entries(docMap).forEach(([type, { url, label }]) => {
           if (url?.fileUrl) {
@@ -534,7 +562,10 @@ export default function ApplicantProfilePage() {
   };
 
   const statusByType = new Map(documentsData.map((document) => [document.type, document.status]));
-  const requiredDocumentTypes = documentDefinitions.map((definition) => definition.type);
+  // Required-docs affordance uses only the config-required defs (not optional uploads).
+  const requiredDocumentTypes = applicantDocDefs
+    .filter((def) => def.required)
+    .map((def) => def.id);
   const allRequiredDocumentsExist = requiredDocumentTypes.every((type) =>
     Boolean(getDocumentUrlByType(type)),
   );
@@ -764,7 +795,9 @@ export default function ApplicantProfilePage() {
                   <div className="flex-1 space-y-3">
                     <div className="inline-flex rounded-[60px] border border-[#0eaf52] bg-[#f0faf4] px-4 py-[6px]">
                       <span className="text-[10px] font-semibold leading-[1.4] text-[#0eaf52]">
-                        {applicant.userType === 'applicant' ? 'Applicant' : 'DSP'}
+                        {applicant.userType === 'applicant'
+                          ? 'Applicant'
+                          : roleLabel({ applicantType: applicant.applicantType, role: applicant.role })}
                       </span>
                     </div>
                     <div>
