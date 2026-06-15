@@ -13,9 +13,9 @@ interface Announcement {
 }
 
 const TYPE_META = {
-  info:    { label: "Info",    border: "border-[#2b82ff] text-[#2b82ff]",   left: "border-l-[#2b82ff]",   icon: Info },
-  warning: { label: "Warning", border: "border-[#FF6C10] text-[#FF6C10]",   left: "border-l-[#FF6C10]",   icon: AlertTriangle },
-  urgent:  { label: "Urgent",  border: "border-[#ef4444] text-[#ef4444]",   left: "border-l-[#ef4444]",   icon: Siren },
+  info:    { label: "Info",    border: "border-[#2b82ff] text-[#2b82ff]",  left: "border-l-[#2b82ff]",  icon: Info },
+  warning: { label: "Warning", border: "border-[#FF6C10] text-[#FF6C10]",  left: "border-l-[#FF6C10]",  icon: AlertTriangle },
+  urgent:  { label: "Urgent",  border: "border-[#ef4444] text-[#ef4444]",  left: "border-l-[#ef4444]",  icon: Siren },
 } as const
 
 function formatDate(val: { seconds: number } | string | null): string {
@@ -51,44 +51,43 @@ export default function FamilyAnnouncementsPage() {
   }, [])
 
   return (
-    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
-      {/* Page Header */}
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.4] text-[#10141a]">
-          Announcements
-        </h1>
+    <div className="flex h-full flex-col gap-4">
+      {/* Page title */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-[20px] font-bold text-slate-900">Announcements</h1>
       </div>
 
-      <div className="overflow-hidden bg-white shadow-sm rounded-xl sm:rounded-2xl">
+      {/* Card */}
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
         {/* Card header */}
-        <div className="p-4 sm:p-6 border-b border-[#e5e7eb]">
-          <h2 className="text-[20px] sm:text-[22px] font-bold text-[#10141a]">Agency Notices</h2>
-          <p className="mt-0.5 text-[13px] sm:text-[14px] text-[#6b7280]">
-            Important updates from your care agency
-          </p>
+        <div className="border-b border-slate-100 px-5 py-4">
+          <p className="text-[15px] font-semibold text-slate-800">Agency Notices</p>
+          <p className="mt-0.5 text-[13px] text-slate-400">Important updates from your care agency</p>
         </div>
 
         {loading ? (
-          <div className="p-8 sm:p-12 text-center">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent" />
-            <p className="mt-4 text-[14px] text-[#6b7280]">Loading announcements…</p>
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-[#00B4B8]" />
           </div>
         ) : error ? (
-          <div className="p-6">
-            <p className="text-[14px] text-[#ef4444]">{error}</p>
+          <div className="px-5 py-6">
+            <p className="text-[13px] text-red-500">{error}</p>
           </div>
         ) : announcements.length === 0 ? (
-          <div className="p-8 sm:p-12 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f3f4f6]">
-              <Megaphone className="h-7 w-7 text-[#b2b2b3]" />
+          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-full"
+              style={{ backgroundColor: "rgba(0,180,184,0.1)" }}
+            >
+              <Megaphone className="h-6 w-6 text-[#00B4B8]" />
             </div>
-            <p className="text-[14px] font-semibold text-[#10141a]">No announcements</p>
-            <p className="mt-1 text-[13px] text-[#6b7280]">
+            <p className="text-[14px] font-medium text-slate-500">No announcements yet</p>
+            <p className="text-[12px] text-slate-400">
               Your care agency hasn't posted any announcements yet
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-[#e5e7eb]">
+          <div className="divide-y divide-slate-100">
             {announcements.map((a) => {
               const meta     = TYPE_META[a.type] ?? TYPE_META.info
               const TypeIcon = meta.icon
@@ -97,30 +96,30 @@ export default function FamilyAnnouncementsPage() {
               const isLong   = a.body.length > 160
 
               return (
-                <div
-                  key={a.id}
-                  className={`p-4 sm:p-6 border-l-4 ${meta.left}`}
-                >
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className={`px-3 py-1 rounded-full text-[13px] font-medium border ${meta.border} bg-transparent flex items-center gap-1.5`}>
-                      <TypeIcon className="h-3.5 w-3.5" />
+                <div key={a.id} className={`border-l-4 ${meta.left} px-5 py-4`}>
+                  {/* Badge + date row */}
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[12px] font-medium ${meta.border} bg-transparent`}>
+                      <TypeIcon className="h-3 w-3" />
                       {meta.label}
                     </span>
                     {posted && (
-                      <span className="text-[12px] text-[#b2b2b3]">Posted {posted}</span>
+                      <span className="text-[12px] text-slate-400">{posted}</span>
                     )}
                   </div>
 
-                  <p className="text-[15px] font-semibold text-[#10141a]">{a.title}</p>
+                  {/* Title */}
+                  <p className="text-[14px] font-semibold text-slate-800">{a.title}</p>
 
-                  <p className={`mt-1.5 text-[14px] text-[#6b7280] leading-[1.5] ${!expanded && isLong ? "line-clamp-3" : ""}`}>
+                  {/* Body */}
+                  <p className={`mt-1 text-[13px] leading-relaxed text-slate-500 ${!expanded && isLong ? "line-clamp-3" : ""}`}>
                     {a.body}
                   </p>
 
                   {isLong && (
                     <button
                       onClick={() => toggleExpand(a.id)}
-                      className="mt-1.5 flex items-center gap-0.5 text-[13px] font-medium text-[#00b4b8] hover:underline"
+                      className="mt-1 flex items-center gap-0.5 text-[12px] font-medium text-[#00B4B8] hover:underline underline-offset-2"
                     >
                       {expanded
                         ? <><ChevronUp className="h-3.5 w-3.5" /> Show less</>
@@ -129,7 +128,7 @@ export default function FamilyAnnouncementsPage() {
                   )}
 
                   {a.createdByName && (
-                    <p className="mt-3 text-[12px] text-[#b2b2b3]">— {a.createdByName}</p>
+                    <p className="mt-2.5 text-[11px] text-slate-400">— {a.createdByName}</p>
                   )}
                 </div>
               )
