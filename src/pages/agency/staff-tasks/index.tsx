@@ -83,8 +83,9 @@ export default function StaffTasksPage() {
   const [viewingTask,    setViewingTask]   = useState<StaffTask | null>(null);
   const [editingTask,    setEditingTask]   = useState<StaffTask | null>(null);
   const [showEditModal,  setShowEditModal] = useState(false);
-  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
-  const [isDeleting,     setIsDeleting]   = useState(false);
+  const [deletingTaskId,   setDeletingTaskId]   = useState<string | null>(null);
+  const [isDeleting,       setIsDeleting]       = useState(false);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
   const { data: tasksResponse, isLoading: tasksLoading } = useGetTasksQuery();
   const { data: staffResponse, isLoading: staffLoading } = useListAgencyStaffQuery({ limit: 200 });
@@ -142,6 +143,15 @@ export default function StaffTasksPage() {
       setDeletingTaskId(null);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleStatusChange = async (taskId: string, status: StaffTask["status"]) => {
+    setUpdatingStatusId(taskId);
+    try {
+      await updateTask({ taskId, data: { status } }).unwrap();
+    } finally {
+      setUpdatingStatusId(null);
     }
   };
 
@@ -278,6 +288,8 @@ export default function StaffTasksPage() {
                 const statusMeta = STATUS_META[task.status];
                 const priMeta    = PRIORITY_META[task.priority];
 
+                const isAssigned = task.staffMember === currentUser?.uid;
+
                 return (
                   <tr key={task.id} className="border-b border-[#e5e5e6] hover:bg-[#f9fafb] transition-colors">
                     {/* Title + description */}
@@ -316,9 +328,24 @@ export default function StaffTasksPage() {
                     </td>
 
                     <td className="py-4 px-4">
-                      <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${statusMeta?.border ?? ""}`}>
-                        {task.status}
-                      </span>
+                      {isAssigned ? (
+                        <select
+                          value={task.status}
+                          disabled={updatingStatusId === task.id}
+                          onChange={(e) => void handleStatusChange(task.id, e.target.value as StaffTask["status"])}
+                          className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent cursor-pointer outline-none transition-opacity ${
+                            updatingStatusId === task.id ? "opacity-50 cursor-not-allowed" : ""
+                          } ${statusMeta?.border ?? ""}`}
+                        >
+                          <option value="Open">Open</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Completed">Completed</option>
+                        </select>
+                      ) : (
+                        <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${statusMeta?.border ?? ""}`}>
+                          {task.status}
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-4 px-4">
@@ -363,7 +390,8 @@ export default function StaffTasksPage() {
           {viewingTask && (() => {
             const deptLabel  = departments.find((d) => d.value === viewingTask.department)?.label ?? "—";
             const staffName  = staffMap[viewingTask.staffMember] ?? "—";
-            const isCreator  = viewingTask.createdBy === currentUser?.uid;
+            const isCreator  = viewingTask.createdBy  === currentUser?.uid;
+            const isAssigned = viewingTask.staffMember === currentUser?.uid;
             const statusMeta = STATUS_META[viewingTask.status];
             const priMeta    = PRIORITY_META[viewingTask.priority];
             return (
@@ -415,6 +443,34 @@ export default function StaffTasksPage() {
                         </li>
                       ))}
                     </ul>
+                  </div>
+                )}
+
+                {isAssigned && !isCreator && (
+                  <div>
+                    <p className="mb-2 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Update status</p>
+                    <div className="flex items-center gap-2">
+                      {(["Open", "In Progress", "Completed"] as const).map((s) => {
+                        const m = STATUS_META[s];
+                        return (
+                          <button
+                            key={s}
+                            disabled={updatingStatusId === viewingTask.id}
+                            onClick={async () => {
+                              await handleStatusChange(viewingTask.id, s);
+                              setViewingTask((prev) => prev ? { ...prev, status: s } : prev);
+                            }}
+                            className={`px-3 py-1 rounded-full text-[13px] font-medium border transition-colors ${
+                              viewingTask.status === s
+                                ? `${m.border} font-semibold`
+                                : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
+                            } disabled:opacity-50`}
+                          >
+                            {s}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
