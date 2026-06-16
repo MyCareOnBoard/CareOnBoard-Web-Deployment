@@ -9,6 +9,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { Department, StaffMember, StaffTask } from "@/components/tasks/types";
+import {
+  useGetTasksQuery,
+  useCreateTaskMutation,
+  useAddActivityMutation,
+} from "./api";
 
 const departments: Department[] = [
   { value: "hr", label: "HR" },
@@ -30,58 +35,47 @@ const staffMembers: StaffMember[] = [
   { id: "staff-7", name: "Casey Morgan", department: "admin", role: "Admin" },
 ];
 
-const initialTasks: StaffTask[] = [];
-
 const StaffTasksPage: React.FC = () => {
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedStaff, setSelectedStaff] = useState("");
-  const [tasks, setTasks] = useState<StaffTask[]>(initialTasks);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedStaffMember, setSelectedStaffMember] = useState<StaffMember | null>(null);
   const [showStaffDetails, setShowStaffDetails] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Pending" | "Inactive">("All");
 
-  const getStaffTasks = (staffId: string) => {
-    return tasks.filter((t) => t.staffMember === staffId);
-  };
+  const { data: tasksResponse, isLoading } = useGetTasksQuery();
+  const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();
+  const [addActivity] = useAddActivityMutation();
+
+  const tasks: StaffTask[] = useMemo(
+    () => (tasksResponse?.data ?? []) as StaffTask[],
+    [tasksResponse]
+  );
+
+  const getStaffTasks = (staffId: string) =>
+    tasks.filter((t) => t.staffMember === staffId);
 
   const getStaffStatus = (staffId: string) => {
     const staffTasks = getStaffTasks(staffId);
     if (staffTasks.length === 0) return "Inactive";
-    const inProgressCount = staffTasks.filter((t) => t.status === "In Progress").length;
-    return inProgressCount > 0 ? "Active" : "Pending";
+    return staffTasks.some((t) => t.status === "In Progress") ? "Active" : "Pending";
   };
 
   const getActivitySummary = (staffId: string) => {
-    const staffTasks = getStaffTasks(staffId);
-    const totalActivities = staffTasks.reduce((sum, t) => sum + t.activities.length, 0);
-    return totalActivities > 0 ? `${totalActivities} activity note${totalActivities !== 1 ? 's' : ''}` : "No activities";
+    const total = getStaffTasks(staffId).reduce((sum, t) => sum + t.activities.length, 0);
+    return total > 0 ? `${total} activity note${total !== 1 ? "s" : ""}` : "No activities";
   };
 
   const filteredAndSearchedStaff = useMemo(() => {
     return staffMembers.filter((staff) => {
-      if (searchQuery && !staff.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
-      if (statusFilter !== "All") {
-        if (getStaffStatus(staff.id) !== statusFilter) {
-          return false;
-        }
-      }
+      if (searchQuery && !staff.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (statusFilter !== "All" && getStaffStatus(staff.id) !== statusFilter) return false;
       return true;
     });
   }, [searchQuery, statusFilter, tasks]);
 
-  const filteredStaff = useMemo(
-    () =>
-      selectedDepartment
-        ? staffMembers.filter((member) => member.department === selectedDepartment)
-        : staffMembers,
-    [selectedDepartment]
-  );
-
-  const handleAssignTask = (task: {
+  const handleCreateTask = async (task: {
     title: string;
     description: string;
     department: string;
@@ -89,50 +83,11 @@ const StaffTasksPage: React.FC = () => {
     dueDate: string;
     priority: "High" | "Medium" | "Low";
   }) => {
-    const newTask: StaffTask = {
-      id: `task-${tasks.length + 1}`,
-      ...task,
-      status: "Open",
-      activities: [],
-    };
-    setTasks((prevTasks) => [newTask, ...prevTasks]);
+    await createTask(task);
   };
 
-  const handleCreateTask = (task: {
-    title: string;
-    description: string;
-    department: string;
-    staffMember: string;
-    dueDate: string;
-    priority: "High" | "Medium" | "Low";
-  }) => {
-    const newTask: StaffTask = {
-      id: `task-${tasks.length + 1}`,
-      ...task,
-      status: "Open",
-      activities: [],
-    };
-    setTasks((prevTasks) => [newTask, ...prevTasks]);
-  };
-
-  const handleAddActivity = (taskId: string, description: string) => {
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              activities: [
-                ...task.activities,
-                {
-                  id: `activity-${task.activities.length + 1}`,
-                  description,
-                  createdAt: new Date().toISOString().split("T")[0],
-                },
-              ],
-            }
-          : task
-      )
-    );
+  const handleAddActivity = async (taskId: string, description: string) => {
+    await addActivity({ taskId, description });
   };
 
   return (
@@ -173,6 +128,7 @@ const StaffTasksPage: React.FC = () => {
           </div>
         </div>
       </div>
+
       <div className="grid grid-cols-1 gap-6">
         <div>
           <div className="p-4 bg-white rounded shadow">
@@ -184,97 +140,69 @@ const StaffTasksPage: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <button
-                onClick={() => setStatusFilter("Active")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                  statusFilter === "Active"
-                    ? "bg-[#00b4b8] text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                Active
-              </button>
-              <button
-                onClick={() => setStatusFilter("Pending")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                  statusFilter === "Pending"
-                    ? "bg-[#00b4b8] text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                Pending
-              </button>
-              <button
-                onClick={() => setStatusFilter("Inactive")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                  statusFilter === "Inactive"
-                    ? "bg-[#00b4b8] text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                Inactive
-              </button>
-              <button
-                onClick={() => setStatusFilter("All")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                  statusFilter === "All"
-                    ? "bg-[#00b4b8] text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                All
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {filteredAndSearchedStaff.map((staff) => (
-                <div key={staff.id} className="flex items-center justify-between p-4 border rounded-lg border-slate-200 hover:bg-slate-50">
-                  <div className="flex items-center flex-1 gap-4">
-                    <div className="flex items-center justify-center w-10 h-10 text-sm font-semibold rounded-full bg-slate-200 text-slate-700">
-                      {staff.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-900">{staff.name}</p>
-                      <p className="text-xs text-slate-500">{staff.role}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-6">
-                    <div className="text-center">
-                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        getStaffStatus(staff.id) === "Active" 
-                          ? "bg-emerald-100 text-emerald-700"
-                          : getStaffStatus(staff.id) === "Pending"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-slate-100 text-slate-700"
-                      }`}>
-                        {getStaffStatus(staff.id)}
-                      </div>
-                    </div>
-                    
-                    <div className="text-center min-w-[100px]">
-                      <p className="text-sm text-slate-600">{getActivitySummary(staff.id)}</p>
-                    </div>
-                    
-                    <button
-                      className="px-4 py-2 rounded-full bg-[#00b4b8] text-white text-sm font-medium hover:bg-[#0099a0]"
-                      onClick={() => {
-                        setSelectedStaffMember(staff);
-                        setShowStaffDetails(true);
-                      }}
-                    >
-                      Details
-                    </button>
-                  </div>
-                </div>
+              {(["Active", "Pending", "Inactive", "All"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                    statusFilter === s
+                      ? "bg-[#00b4b8] text-white"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {s}
+                </button>
               ))}
             </div>
-            
+
+            {isLoading ? (
+              <div className="py-8 text-sm text-center text-slate-500">Loading tasks…</div>
+            ) : (
+              <div className="space-y-3">
+                {filteredAndSearchedStaff.map((staff) => (
+                  <div key={staff.id} className="flex items-center justify-between p-4 border rounded-lg border-slate-200 hover:bg-slate-50">
+                    <div className="flex items-center flex-1 gap-4">
+                      <div className="flex items-center justify-center w-10 h-10 text-sm font-semibold rounded-full bg-slate-200 text-slate-700">
+                        {staff.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-slate-900">{staff.name}</p>
+                        <p className="text-xs text-slate-500">{staff.role}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                      <div className="text-center">
+                        <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          getStaffStatus(staff.id) === "Active"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : getStaffStatus(staff.id) === "Pending"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-slate-100 text-slate-700"
+                        }`}>
+                          {getStaffStatus(staff.id)}
+                        </div>
+                      </div>
+
+                      <div className="text-center min-w-[100px]">
+                        <p className="text-sm text-slate-600">{getActivitySummary(staff.id)}</p>
+                      </div>
+
+                      <button
+                        className="px-4 py-2 rounded-full bg-[#00b4b8] text-white text-sm font-medium hover:bg-[#0099a0]"
+                        onClick={() => {
+                          setSelectedStaffMember(staff);
+                          setShowStaffDetails(true);
+                        }}
+                      >
+                        Details
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <AddTaskModal
               open={showAddModal}
               onClose={() => setShowAddModal(false)}
@@ -295,16 +223,17 @@ const StaffTasksPage: React.FC = () => {
               <DialogHeader>
                 <div className="space-y-1">
                   <DialogTitle className="text-2xl">{selectedStaffMember.name}</DialogTitle>
-                  <p className="text-sm text-slate-600">{selectedStaffMember.role} • {
-                    departments.find((d) => d.value === selectedStaffMember.department)?.label || "-"
-                  }</p>
+                  <p className="text-sm text-slate-600">
+                    {selectedStaffMember.role} •{" "}
+                    {departments.find((d) => d.value === selectedStaffMember.department)?.label || "-"}
+                  </p>
                 </div>
               </DialogHeader>
 
               <div className="py-4 space-y-6">
                 <div>
                   <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                    getStaffStatus(selectedStaffMember.id) === "Active" 
+                    getStaffStatus(selectedStaffMember.id) === "Active"
                       ? "bg-emerald-100 text-emerald-700"
                       : getStaffStatus(selectedStaffMember.id) === "Pending"
                       ? "bg-yellow-100 text-yellow-700"
@@ -334,18 +263,21 @@ const StaffTasksPage: React.FC = () => {
                             </span>
                           </div>
                           <div className="grid grid-cols-2 gap-3 mb-3 text-sm text-slate-700">
-                            <div><span className="font-medium text-slate-600">Assigned Date:</span> {task.dueDate}</div>
+                            <div><span className="font-medium text-slate-600">Due Date:</span> {task.dueDate}</div>
                             <div><span className="font-medium text-slate-600">Priority:</span> {task.priority}</div>
-                            <div className="col-span-2"><span className="font-medium text-slate-600">Department:</span> {
-                              departments.find((d) => d.value === task.department)?.label || "-"
-                            }</div>
+                            <div className="col-span-2">
+                              <span className="font-medium text-slate-600">Department:</span>{" "}
+                              {departments.find((d) => d.value === task.department)?.label || "-"}
+                            </div>
                           </div>
                           {task.activities.length > 0 && (
                             <div className="pt-3 border-t border-slate-200">
                               <p className="mb-2 text-xs font-medium text-slate-700">Activity Log:</p>
                               <ul className="space-y-1">
                                 {task.activities.map((activity) => (
-                                  <li key={activity.id} className="text-xs text-slate-600">{activity.createdAt} — {activity.description}</li>
+                                  <li key={activity.id} className="text-xs text-slate-600">
+                                    {activity.createdAt} — {activity.description}
+                                  </li>
                                 ))}
                               </ul>
                             </div>
@@ -360,10 +292,7 @@ const StaffTasksPage: React.FC = () => {
               </div>
 
               <DialogFooter className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowStaffDetails(false)}
-                >
+                <Button variant="outline" onClick={() => setShowStaffDetails(false)}>
                   Close
                 </Button>
                 <Button

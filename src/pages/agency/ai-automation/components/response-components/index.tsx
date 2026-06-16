@@ -9,12 +9,14 @@ import TextContentCard from "./TextContentCard";
 import GenericListCard from "./GenericListCard";
 import GenericDetailCard from "./GenericDetailCard";
 import GenericActionCard from "./GenericActionCard";
+import TaskListCard from "./TaskListCard";
 
 const STATIC_REGISTRY: Record<string, React.FC<{ data: unknown }>> = {
   "shift-list": ShiftListCard,
   "risk-summary": RiskSummaryCard,
   "no-caregivers": NoCaregiversCard,
   "text-content": TextContentCard,
+  "task-list": TaskListCard,
   "generic-list": GenericListCard,
   "generic-detail": GenericDetailCard,
   "generic-action": GenericActionCard,

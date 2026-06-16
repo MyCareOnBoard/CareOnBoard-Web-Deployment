@@ -33,6 +33,7 @@ import { agencyStaffApi } from "@/lib/api/agency-staff";
 import { planOfCareApi } from "@/pages/userPanel/planOfCare/api";
 import { userMessagingApi } from "@/lib/api/userMessaging";
 import { aiAutomationApi } from "@/pages/agency/ai-automation/api";
+import { agencyStaffTasksApi } from "@/pages/agency/staff-tasks/api";
 
 const rootReducer = combineReducers({
     auth: authReducer,
@@ -58,6 +59,7 @@ const rootReducer = combineReducers({
     [planOfCareApi.reducerPath]: planOfCareApi.reducer,
     [userMessagingApi.reducerPath]: userMessagingApi.reducer,
     [aiAutomationApi.reducerPath]: aiAutomationApi.reducer,
+    [agencyStaffTasksApi.reducerPath]: agencyStaffTasksApi.reducer,
 });
 
 const persistConfig = {
@@ -97,7 +99,8 @@ export const store = configureStore({
             .concat(agencyStaffApi.middleware)
             .concat(planOfCareApi.middleware)
             .concat(userMessagingApi.middleware)
-            .concat(aiAutomationApi.middleware),
+            .concat(aiAutomationApi.middleware)
+            .concat(agencyStaffTasksApi.middleware),
     devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
 
