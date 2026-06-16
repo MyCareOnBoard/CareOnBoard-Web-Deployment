@@ -26,4 +26,5 @@ export type StaffTask = {
   priority: "High" | "Medium" | "Low";
   status: "Open" | "In Progress" | "Completed";
   activities: TaskActivity[];
+  createdBy?: string;
 };

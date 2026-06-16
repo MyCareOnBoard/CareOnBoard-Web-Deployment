@@ -1,5 +1,9 @@
 import React, { useMemo, useState } from "react";
+import { useSelector } from "react-redux";
+import { selectUser } from "@/utils/auth/store/authSelectors";
 import AddTaskModal from "@/components/tasks/AddTaskModal";
+import EditTaskModal from "@/components/tasks/EditTaskModal";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -8,11 +12,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Plus, Pencil, Trash2, Search, ClipboardList, ChevronDown } from "lucide-react";
 import type { Department, StaffMember, StaffTask } from "@/components/tasks/types";
 import {
   useGetTasksQuery,
   useCreateTaskMutation,
-  useAddActivityMutation,
+  useUpdateTaskMutation,
+  useDeleteTaskMutation,
 } from "./api";
 import { useListAgencyStaffQuery } from "@/lib/api/agency-staff";
 
@@ -26,133 +32,214 @@ const departments: Department[] = [
   { value: "admin", label: "Admin" },
 ];
 
-const StaffTasksPage: React.FC = () => {
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [selectedStaff, setSelectedStaff] = useState("");
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedStaffMember, setSelectedStaffMember] = useState<StaffMember | null>(null);
-  const [showStaffDetails, setShowStaffDetails] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Pending" | "Inactive">("All");
+const STATUS_META: Record<string, { border: string; dot: string }> = {
+  "Open":        { border: "border-[#FF6C10] text-[#FF6C10]",  dot: "bg-[#FF6C10]" },
+  "In Progress": { border: "border-[#2b82ff] text-[#2b82ff]",  dot: "bg-[#2b82ff]" },
+  "Completed":   { border: "border-[#0eaf52] text-[#0eaf52]",  dot: "bg-[#0eaf52]" },
+};
 
-  const { data: tasksResponse, isLoading } = useGetTasksQuery();
-  const [createTask] = useCreateTaskMutation();
-  const [addActivity] = useAddActivityMutation();
+const PRIORITY_META: Record<string, { border: string; dot: string }> = {
+  "High":   { border: "border-[#ef4444] text-[#ef4444]",  dot: "bg-[#ef4444]" },
+  "Medium": { border: "border-[#FF6C10] text-[#FF6C10]",  dot: "bg-[#FF6C10]" },
+  "Low":    { border: "border-[#b2b2b3] text-[#b2b2b3]",  dot: "bg-[#b2b2b3]" },
+};
+
+type StatusFilter = "All" | "Open" | "In Progress" | "Completed";
+
+function SkeletonRow() {
+  return (
+    <tr className="border-b border-[#e5e5e6]">
+      <td className="py-4 px-4">
+        <div className="flex items-center gap-2.5">
+          <Skeleton className="w-2 h-2 rounded-full shrink-0" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-3.5 w-36" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+        </div>
+      </td>
+      <td className="py-4 px-4"><Skeleton className="h-3.5 w-28" /></td>
+      <td className="py-4 px-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
+      <td className="py-4 px-4"><Skeleton className="h-3.5 w-20" /></td>
+      <td className="py-4 px-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
+      <td className="py-4 px-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
+      <td className="py-4 px-4">
+        <div className="flex items-center justify-end gap-1">
+          <Skeleton className="h-7 w-14 rounded-full" />
+          <Skeleton className="h-9 w-9 rounded-full" />
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+export default function StaffTasksPage() {
+  const currentUser = useSelector(selectUser);
+
+  const [searchQuery,    setSearchQuery]   = useState("");
+  const [staffFilter,    setStaffFilter]   = useState("");
+  const [statusFilter,   setStatusFilter]  = useState<StatusFilter>("All");
+  const [showAddModal,   setShowAddModal]  = useState(false);
+  const [viewingTask,    setViewingTask]   = useState<StaffTask | null>(null);
+  const [editingTask,    setEditingTask]   = useState<StaffTask | null>(null);
+  const [showEditModal,  setShowEditModal] = useState(false);
+  const [deletingTaskId,   setDeletingTaskId]   = useState<string | null>(null);
+  const [isDeleting,       setIsDeleting]       = useState(false);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+
+  const { data: tasksResponse, isLoading: tasksLoading } = useGetTasksQuery();
   const { data: staffResponse, isLoading: staffLoading } = useListAgencyStaffQuery({ limit: 200 });
+  const [createTask] = useCreateTaskMutation();
+  const [updateTask] = useUpdateTaskMutation();
+  const [deleteTask] = useDeleteTaskMutation();
 
   const tasks: StaffTask[] = useMemo(
     () => (tasksResponse?.data ?? []) as StaffTask[],
-    [tasksResponse]
+    [tasksResponse],
   );
 
   const staffList: StaffMember[] = useMemo(
     () =>
       (staffResponse?.data ?? [])
         .filter((s) => s.isActive)
-        .map((s) => ({
-          id: s.uid,
-          name: s.name,
-          department: "",
-          role: s.accessList[0] ?? "Team Member",
-        })),
-    [staffResponse]
+        .map((s) => ({ id: s.uid, name: s.name, department: "", role: s.accessList[0] ?? "Team Member" }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [staffResponse],
   );
 
-  const getStaffTasks = (staffId: string) =>
-    tasks.filter((t) => t.staffMember === staffId);
+  const staffMap = useMemo(
+    () => Object.fromEntries(staffList.map((s) => [s.id, s.name])),
+    [staffList],
+  );
 
-  const getStaffStatus = (staffId: string) => {
-    const staffTasks = getStaffTasks(staffId);
-    if (staffTasks.length === 0) return "Inactive";
-    return staffTasks.some((t) => t.status === "In Progress") ? "Active" : "Pending";
-  };
-
-  const getActivitySummary = (staffId: string) => {
-    const total = getStaffTasks(staffId).reduce((sum, t) => sum + t.activities.length, 0);
-    return total > 0 ? `${total} activity note${total !== 1 ? "s" : ""}` : "No activities";
-  };
-
-  const filteredAndSearchedStaff = useMemo(() => {
-    return staffList.filter((staff) => {
-      if (searchQuery && !staff.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      if (statusFilter !== "All" && getStaffStatus(staff.id) !== statusFilter) return false;
+  const filtered = useMemo(() =>
+    tasks.filter((t) => {
+      if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (staffFilter && t.staffMember !== staffFilter) return false;
+      if (statusFilter !== "All" && t.status !== statusFilter) return false;
       return true;
-    });
-  }, [searchQuery, statusFilter, tasks, staffList]);
+    }),
+    [tasks, searchQuery, staffFilter, statusFilter],
+  );
+
+  const isLoading = tasksLoading || staffLoading;
 
   const handleCreateTask = async (task: {
-    title: string;
-    description: string;
-    department: string;
-    staffMember: string;
-    dueDate: string;
-    priority: "High" | "Medium" | "Low";
-  }) => {
-    await createTask(task);
+    title: string; description: string; department: string;
+    staffMember: string; dueDate: string; priority: "High" | "Medium" | "Low";
+  }) => { await createTask(task); };
+
+  const handleUpdateTask = async (
+    taskId: string,
+    data: Partial<Omit<StaffTask, "id" | "activities">>,
+  ) => { await updateTask({ taskId, data }).unwrap(); };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingTaskId) return;
+    setIsDeleting(true);
+    try {
+      await deleteTask(deletingTaskId).unwrap();
+      if (viewingTask?.id === deletingTaskId) setViewingTask(null);
+      setDeletingTaskId(null);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-  const handleAddActivity = async (taskId: string, description: string) => {
-    await addActivity({ taskId, description });
+  const handleStatusChange = async (taskId: string, status: StaffTask["status"]) => {
+    setUpdatingStatusId(taskId);
+    try {
+      await updateTask({ taskId, data: { status } }).unwrap();
+    } finally {
+      setUpdatingStatusId(null);
+    }
   };
+
+  const openEdit = (task: StaffTask) => {
+    setEditingTask(task);
+    setShowEditModal(true);
+  };
+
+  const tableHead = (
+    <thead>
+      <tr className="border-b border-[#e5e5e6] bg-[#f9fafb]">
+        {["Task", "Assigned to", "Department", "Due date", "Priority", "Status", ""].map((h) => (
+          <th key={h} className="text-left py-3 px-4 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">
+            {h}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
 
   return (
-    <div className="max-w-6xl p-6 mx-auto">
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Smart Manager</h1>
-          <p className="text-sm text-slate-600">Manage and assign tasks to staff</p>
-        </div>
-        <div>
-          <button
-            className="px-4 py-2 rounded-full bg-[#00b4b8] text-white cursor-pointer hover:bg-[#0099a0] transition-colors"
-            onClick={() => setShowAddModal(true)}
-          >
-            Add Task
-          </button>
-        </div>
+    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
+      {/* Page header */}
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.4] text-[#10141a]">
+          Smart Manager
+        </h1>
       </div>
 
-      <div className="flex items-center justify-between p-4 mb-6 bg-white shadow-sm rounded-xl">
-        <div>
-          <div className="text-sm font-medium">Staff</div>
-          <div className="text-xs text-slate-500">Staff overview and task distribution</div>
-        </div>
+      {/* Main card */}
+      <div className="min-w-0 overflow-hidden bg-white shadow-sm rounded-xl sm:rounded-2xl">
 
-        <div className="flex items-center gap-8">
-          <div className="text-center">
-            <div className="text-2xl font-semibold">{tasks.filter((t) => t.status === "In Progress").length}</div>
-            <div className="flex items-center gap-2 text-xs text-slate-500"><span className="inline-block w-2 h-2 rounded-full bg-emerald-500"/>Active</div>
+        {/* Card header */}
+        <div className="p-4 sm:p-6 border-b border-[#e5e7eb]">
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <h2 className="text-[20px] sm:text-[22px] font-bold text-[#10141a]">All Tasks</h2>
+              <p className="mt-0.5 text-[13px] sm:text-[14px] text-[#6b7280]">
+                Create and assign tasks to agency staff members
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#00b4b8] text-white text-[14px] font-semibold hover:bg-[#00a0a4] transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Add Task
+            </button>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-semibold">{tasks.filter((t) => t.status === "Open").length}</div>
-            <div className="flex items-center gap-2 text-xs text-slate-500"><span className="inline-block w-2 h-2 bg-yellow-400 rounded-full"/>Pending</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-semibold">{tasks.length}</div>
-            <div className="flex items-center gap-2 text-xs text-slate-500"><span className="inline-block w-2 h-2 rounded-full bg-slate-400"/>Total</div>
-          </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        <div>
-          <div className="p-4 bg-white rounded shadow">
-            <div className="flex items-center gap-3 mb-6">
+          {/* Filter bar */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {/* Search */}
+            <div className="relative flex items-center gap-2 border border-[#e5e7eb] rounded-full px-3 h-9 min-w-[200px]">
+              <Search className="h-3.5 w-3.5 text-[#808081] shrink-0" />
               <input
                 type="text"
-                placeholder="Search staff name"
-                className="flex-1 h-10 px-4 rounded-lg border border-slate-300 text-sm outline-none focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8]"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tasks…"
+                className="h-full border-0 bg-transparent px-0 py-0 text-[13px] text-[#10141a] placeholder:text-[#808081] outline-none focus:ring-0 min-w-0 w-full"
               />
-              {(["Active", "Pending", "Inactive", "All"] as const).map((s) => (
+            </div>
+
+            {/* Staff filter */}
+            <select
+              value={staffFilter}
+              onChange={(e) => setStaffFilter(e.target.value)}
+              className="h-9 px-3 rounded-full border border-[#e5e7eb] text-[13px] text-[#6b7280] outline-none focus:border-[#00b4b8] bg-white transition-colors cursor-pointer"
+            >
+              <option value="">All Staff</option>
+              {staffList.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+
+            <div className="h-5 w-px bg-[#e5e7eb]" />
+
+            {/* Status pills */}
+            <div className="flex items-center gap-1">
+              {(["All", "Open", "In Progress", "Completed"] as const).map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                  className={`px-3 py-1 rounded-full text-[13px] font-medium border transition-colors ${
                     statusFilter === s
-                      ? "bg-[#00b4b8] text-white"
-                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      ? "bg-[#00b4b8] border-[#00b4b8] text-white"
+                      : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
                   }`}
                 >
                   {s}
@@ -160,162 +247,302 @@ const StaffTasksPage: React.FC = () => {
               ))}
             </div>
 
-            {isLoading || staffLoading ? (
-              <div className="py-8 text-sm text-center text-slate-500">Loading…</div>
-            ) : (
-              <div className="space-y-3">
-                {filteredAndSearchedStaff.map((staff) => (
-                  <div key={staff.id} className="flex items-center justify-between p-4 border rounded-lg border-slate-200 hover:bg-slate-50">
-                    <div className="flex items-center flex-1 gap-4">
-                      <div className="flex items-center justify-center w-10 h-10 text-sm font-semibold rounded-full bg-slate-200 text-slate-700">
-                        {staff.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900">{staff.name}</p>
-                        <p className="text-xs text-slate-500">{staff.role}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-6">
-                      <div className="text-center">
-                        <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          getStaffStatus(staff.id) === "Active"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : getStaffStatus(staff.id) === "Pending"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-slate-100 text-slate-700"
-                        }`}>
-                          {getStaffStatus(staff.id)}
-                        </div>
-                      </div>
-
-                      <div className="text-center min-w-[100px]">
-                        <p className="text-sm text-slate-600">{getActivitySummary(staff.id)}</p>
-                      </div>
-
-                      <button
-                        className="px-4 py-2 rounded-full bg-[#00b4b8] text-white text-sm font-medium hover:bg-[#0099a0]"
-                        onClick={() => {
-                          setSelectedStaffMember(staff);
-                          setShowStaffDetails(true);
-                        }}
-                      >
-                        Details
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {!isLoading && (
+              <span className="ml-auto text-[13px] text-[#6b7280]">
+                {filtered.length} of {tasks.length}
+              </span>
             )}
-
-            <AddTaskModal
-              open={showAddModal}
-              onClose={() => setShowAddModal(false)}
-              onOpenChange={setShowAddModal}
-              departments={departments}
-              staff={staffList}
-              onCreateTask={handleCreateTask}
-            />
           </div>
         </div>
+
+        {/* Table body */}
+        {isLoading ? (
+          <table className="w-full text-sm">
+            {tableHead}
+            <tbody>
+              {Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)}
+            </tbody>
+          </table>
+        ) : filtered.length === 0 ? (
+          <div className="p-8 sm:p-12 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f3f4f6]">
+              <ClipboardList className="h-7 w-7 text-[#b2b2b3]" />
+            </div>
+            <p className="text-[14px] font-semibold text-[#10141a]">
+              {tasks.length === 0 ? "No tasks yet" : "No tasks match your filters"}
+            </p>
+            <p className="mt-1 text-[13px] text-[#6b7280]">
+              {tasks.length === 0
+                ? "Click \"Add Task\" to create your first task"
+                : "Try adjusting your search, staff, or status filter"}
+            </p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            {tableHead}
+            <tbody>
+              {filtered.map((task) => {
+                const isCreator  = task.createdBy === currentUser?.uid;
+                const deptLabel  = departments.find((d) => d.value === task.department)?.label ?? "—";
+                const staffName  = staffMap[task.staffMember] ?? "—";
+                const statusMeta = STATUS_META[task.status];
+                const priMeta    = PRIORITY_META[task.priority];
+
+                const isAssigned = task.staffMember === currentUser?.uid;
+
+                return (
+                  <tr key={task.id} className="border-b border-[#e5e5e6] hover:bg-[#f9fafb] transition-colors">
+                    {/* Title + description */}
+                    <td className="py-4 px-4 max-w-[260px]">
+                      <div className="flex items-start gap-2.5">
+                        <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${priMeta?.dot ?? "bg-[#b2b2b3]"}`} />
+                        <div className="min-w-0">
+                          <p className="text-[14px] font-semibold text-[#10141a] truncate">{task.title}</p>
+                          {task.description && (
+                            <p className="text-[13px] text-[#6b7280] truncate mt-0.5">{task.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="py-4 px-4 text-[14px] text-[#10141a] whitespace-nowrap">{staffName}</td>
+
+                    <td className="py-4 px-4">
+                      {task.department ? (
+                        <span className="px-3 py-1 rounded-full text-[13px] font-medium border border-[#e5e7eb] text-[#6b7280] bg-transparent">
+                          {deptLabel}
+                        </span>
+                      ) : (
+                        <span className="text-[13px] text-[#b2b2b3]">—</span>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-4 text-[14px] text-[#6b7280] whitespace-nowrap">
+                      {task.dueDate || <span className="text-[#b2b2b3]">—</span>}
+                    </td>
+
+                    <td className="py-4 px-4">
+                      <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${priMeta?.border ?? ""}`}>
+                        {task.priority}
+                      </span>
+                    </td>
+
+                    <td className="py-4 px-4">
+                      <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${statusMeta?.border ?? ""}`}>
+                        {task.status}
+                      </span>
+                    </td>
+
+                    <td className="py-4 px-4">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {isAssigned && (
+                          <div className={`relative ${updatingStatusId === task.id ? "opacity-50" : ""}`}>
+                            <select
+                              value={task.status}
+                              disabled={updatingStatusId === task.id}
+                              onChange={(e) => void handleStatusChange(task.id, e.target.value as StaffTask["status"])}
+                              className={`appearance-none pl-3 pr-7 py-1.5 rounded-full text-[13px] font-medium border bg-transparent cursor-pointer outline-none transition-colors ${statusMeta?.border ?? ""}`}
+                            >
+                              <option value="Open">Open</option>
+                              <option value="In Progress">In Progress</option>
+                              <option value="Completed">Completed</option>
+                            </select>
+                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none h-3 w-3 text-[#808081]" />
+                          </div>
+                        )}
+                        <button
+                          onClick={() => setViewingTask(task)}
+                          className="px-4 py-1.5 rounded-full text-[13px] font-medium border border-[#00b4b8] text-[#00b4b8] hover:bg-[#00b4b8] hover:text-white transition-colors"
+                        >
+                          View
+                        </button>
+                        {isCreator && (
+                          <>
+                            <button
+                              title="Edit"
+                              onClick={() => openEdit(task)}
+                              className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#f3f4f6] hover:text-[#10141a] transition-colors"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              title="Delete"
+                              onClick={() => setDeletingTaskId(task.id)}
+                              className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#fff0f0] hover:text-[#ef4444] transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {/* Staff Details Modal */}
-      <Dialog open={showStaffDetails} onOpenChange={setShowStaffDetails}>
-        <DialogContent className="w-[500px] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[18px]">
-          {selectedStaffMember && (
-            <>
-              <DialogHeader>
-                <div className="space-y-1">
-                  <DialogTitle className="text-2xl">{selectedStaffMember.name}</DialogTitle>
-                  <p className="text-sm text-slate-600">
-                    {selectedStaffMember.role} •{" "}
-                    {departments.find((d) => d.value === selectedStaffMember.department)?.label || "-"}
-                  </p>
-                </div>
-              </DialogHeader>
+      {/* ── Task detail modal ── */}
+      <Dialog open={!!viewingTask} onOpenChange={(open) => { if (!open) setViewingTask(null); }}>
+        <DialogContent className="w-[520px] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[16px]">
+          {viewingTask && (() => {
+            const deptLabel  = departments.find((d) => d.value === viewingTask.department)?.label ?? "—";
+            const staffName  = staffMap[viewingTask.staffMember] ?? "—";
+            const isCreator  = viewingTask.createdBy  === currentUser?.uid;
+            const isAssigned = viewingTask.staffMember === currentUser?.uid;
+            const statusMeta = STATUS_META[viewingTask.status];
+            const priMeta    = PRIORITY_META[viewingTask.priority];
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-[20px] font-bold text-[#10141a] leading-snug pr-6">
+                    {viewingTask.title}
+                  </DialogTitle>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${statusMeta?.border ?? ""}`}>
+                      {viewingTask.status}
+                    </span>
+                    <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${priMeta?.border ?? ""}`}>
+                      {viewingTask.priority} priority
+                    </span>
+                  </div>
+                </DialogHeader>
 
-              <div className="py-4 space-y-6">
-                <div>
-                  <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                    getStaffStatus(selectedStaffMember.id) === "Active"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : getStaffStatus(selectedStaffMember.id) === "Pending"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-slate-100 text-slate-700"
-                  }`}>
-                    {getStaffStatus(selectedStaffMember.id)}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                  <div>
+                    <p className="mb-0.5 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Assigned to</p>
+                    <p className="text-[14px] font-semibold text-[#10141a]">{staffName}</p>
+                  </div>
+                  <div>
+                    <p className="mb-0.5 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Department</p>
+                    <p className="text-[14px] text-[#6b7280]">{deptLabel}</p>
+                  </div>
+                  <div>
+                    <p className="mb-0.5 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Due date</p>
+                    <p className="text-[14px] text-[#6b7280]">{viewingTask.dueDate || "—"}</p>
                   </div>
                 </div>
 
-                <div>
-                  <h4 className="mb-4 text-base font-semibold">Assigned Tasks</h4>
-                  {getStaffTasks(selectedStaffMember.id).length > 0 ? (
-                    <div className="space-y-3 overflow-y-auto max-h-80">
-                      {getStaffTasks(selectedStaffMember.id).map((task) => (
-                        <div key={task.id} className="p-4 border rounded-lg border-slate-200 bg-slate-50">
-                          <div className="flex items-start justify-between gap-3 mb-3">
-                            <div className="flex-1">
-                              <p className="mb-1 font-medium text-slate-900">{task.title}</p>
-                              <p className="text-sm text-slate-600">{task.description}</p>
-                            </div>
-                            <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${
-                              task.status === "In Progress" ? "bg-blue-100 text-blue-700" :
-                              task.status === "Open" ? "bg-yellow-100 text-yellow-700" :
-                              "bg-green-100 text-green-700"
-                            }`}>
-                              {task.status}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 mb-3 text-sm text-slate-700">
-                            <div><span className="font-medium text-slate-600">Due Date:</span> {task.dueDate}</div>
-                            <div><span className="font-medium text-slate-600">Priority:</span> {task.priority}</div>
-                            <div className="col-span-2">
-                              <span className="font-medium text-slate-600">Department:</span>{" "}
-                              {departments.find((d) => d.value === task.department)?.label || "-"}
-                            </div>
-                          </div>
-                          {task.activities.length > 0 && (
-                            <div className="pt-3 border-t border-slate-200">
-                              <p className="mb-2 text-xs font-medium text-slate-700">Activity Log:</p>
-                              <ul className="space-y-1">
-                                {task.activities.map((activity) => (
-                                  <li key={activity.id} className="text-xs text-slate-600">
-                                    {activity.createdAt} — {activity.description}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500">No tasks assigned to this staff member.</p>
-                  )}
-                </div>
-              </div>
+                {viewingTask.description && (
+                  <div>
+                    <p className="mb-1 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Description</p>
+                    <p className="text-[14px] text-[#6b7280] leading-relaxed">{viewingTask.description}</p>
+                  </div>
+                )}
 
-              <DialogFooter className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setShowStaffDetails(false)}>
-                  Close
-                </Button>
-                <Button
-                  className="bg-[#00b4b8] hover:bg-[#0099a0]"
-                  onClick={() => {
-                    setShowStaffDetails(false);
-                    setShowAddModal(true);
-                  }}
-                >
-                  Assign Task
-                </Button>
-              </DialogFooter>
-            </>
-          )}
+                {viewingTask.activities.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Activity log</p>
+                    <ul className="space-y-1.5 max-h-36 overflow-y-auto">
+                      {viewingTask.activities.map((a) => (
+                        <li key={a.id} className="flex items-start gap-2 text-[13px] text-[#6b7280]">
+                          <span className="shrink-0 text-[#b2b2b3]">{a.createdAt}</span>
+                          <span>— {a.description}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {isAssigned && !isCreator && (
+                  <div>
+                    <p className="mb-2 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Update status</p>
+                    <div className="flex items-center gap-2">
+                      {(["Open", "In Progress", "Completed"] as const).map((s) => {
+                        const m = STATUS_META[s];
+                        return (
+                          <button
+                            key={s}
+                            disabled={updatingStatusId === viewingTask.id}
+                            onClick={async () => {
+                              await handleStatusChange(viewingTask.id, s);
+                              setViewingTask((prev) => prev ? { ...prev, status: s } : prev);
+                            }}
+                            className={`px-3 py-1 rounded-full text-[13px] font-medium border transition-colors ${
+                              viewingTask.status === s
+                                ? `${m.border} font-semibold`
+                                : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
+                            } disabled:opacity-50`}
+                          >
+                            {s}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <DialogFooter className="flex justify-end gap-2 pt-1">
+                  <Button variant="outline" onClick={() => setViewingTask(null)}>Close</Button>
+                  {isCreator && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => { openEdit(viewingTask); setViewingTask(null); }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />Edit
+                      </Button>
+                      <Button
+                        className="bg-[#ef4444] hover:bg-[#dc2626] text-white gap-1.5"
+                        onClick={() => { setDeletingTaskId(viewingTask.id); setViewingTask(null); }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />Delete
+                      </Button>
+                    </>
+                  )}
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add Task modal ── */}
+      <AddTaskModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onOpenChange={setShowAddModal}
+        departments={departments}
+        staff={staffList}
+        onCreateTask={handleCreateTask}
+      />
+
+      {/* ── Edit Task modal ── */}
+      <EditTaskModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        task={editingTask}
+        departments={departments}
+        staff={staffList}
+        onUpdateTask={handleUpdateTask}
+      />
+
+      {/* ── Delete confirmation ── */}
+      <Dialog open={!!deletingTaskId} onOpenChange={(open) => { if (!open) setDeletingTaskId(null); }}>
+        <DialogContent className="w-[400px] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[16px]">
+          <DialogHeader>
+            <DialogTitle className="text-[18px] font-bold text-[#10141a]">Delete task?</DialogTitle>
+          </DialogHeader>
+          <p className="text-[14px] text-[#6b7280]">
+            This action cannot be undone. The task and all its activity notes will be permanently removed.
+          </p>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeletingTaskId(null)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-[#ef4444] hover:bg-[#dc2626] text-white"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
-};
-
-export default StaffTasksPage;
+}
