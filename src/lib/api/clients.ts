@@ -368,6 +368,8 @@ export type ClientDocumentKey =
   | "idCard"
   | "guardianshipDocs"
   | "assessmentForms"
+  | "clinicalAssessment"
+  | "form485"
   | "hospitalDischarge";
 
 export interface ClientDocument {

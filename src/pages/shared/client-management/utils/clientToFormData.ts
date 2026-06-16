@@ -231,14 +231,17 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             );
             if (!hasAssigned && (client.primaryDsp || client.secondaryDsps?.length)) {
                 const dspList: Dsp[] = [];
+                const seenDspIds = new Set<string>();
                 if (client.primaryDsp?.id) {
+                    seenDspIds.add(client.primaryDsp.id);
                     dspList.push({
                         id: client.primaryDsp.id,
                         name: client.primaryDsp.name ?? "",
                     });
                 }
                 for (const d of client.secondaryDsps ?? []) {
-                    if (d.id && !dspList.some((x) => x.id === d.id)) {
+                    if (d.id && !seenDspIds.has(d.id)) {
+                        seenDspIds.add(d.id);
                         dspList.push({ id: d.id, name: d.name ?? "" });
                     }
                 }
@@ -459,8 +462,9 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             docs: (() => {
                 const allDocs = createInitialDocs(clientType);
                 const existingDocs = client.documents || [];
+                const knownKeys = new Set(allDocs.map((d) => d.key));
 
-                return allDocs.map((defaultDoc) => {
+                const mapped = allDocs.map((defaultDoc) => {
                     const existingDoc = existingDocs.find((d) => d.key === defaultDoc.key);
                     if (existingDoc) {
                         return {
@@ -474,6 +478,24 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                     }
                     return defaultDoc;
                 });
+
+                // Preserve persisted documents whose key is no longer in the initial
+                // set (e.g. a legacy HHA "assessmentForms" upload, now replaced by
+                // "clinicalAssessment") so existing files still display on edit.
+                const legacy = existingDocs
+                    .filter((d) => d.key && !knownKeys.has(d.key))
+                    .map((d) => ({
+                        key: d.key,
+                        title: d.title || d.key,
+                        uploadLabel: `Upload ${d.title || d.key}`,
+                        url: d.url,
+                        fileName: d.fileName,
+                        issuedOnDate: d.issuedOnDate ? parseDate(d.issuedOnDate) : undefined,
+                        expiryDate: d.expiryDate ? parseDate(d.expiryDate) : undefined,
+                        autoReminder: d.autoReminder ?? true,
+                    }));
+
+                return [...mapped, ...legacy];
             })(),
         },
         stage4: {

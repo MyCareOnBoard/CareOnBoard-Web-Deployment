@@ -33,6 +33,10 @@ const ClientImportFromFilePanel = lazy(
   () => import("./components/ClientImportFromFilePanel"),
 );
 
+const HhaImportFromFilePanel = lazy(
+  () => import("./components/HhaImportFromFilePanel"),
+);
+
 const GeneratePocPanel = lazy(
   () => import("./components/GeneratePocPanel"),
 );
@@ -279,7 +283,11 @@ export function ClientFormWizard({
           headerRightAction={
             !isEditMode ? (
               <Suspense fallback={null}>
-                <ClientImportFromFilePanel formData={formData} setFormData={setFormData} />
+                {formData.type === "hha" ? (
+                  <HhaImportFromFilePanel formData={formData} setFormData={setFormData} />
+                ) : (
+                  <ClientImportFromFilePanel formData={formData} setFormData={setFormData} />
+                )}
               </Suspense>
             ) : undefined
           }

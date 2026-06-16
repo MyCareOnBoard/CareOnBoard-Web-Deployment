@@ -1,23 +1,8 @@
 import { AddClientFormData, DocKey } from "../types/formData";
 import { ClientDocument, ClientDocumentKey, ClientDocumentUploadResult, uploadClientDocument } from "@/lib/api/clients";
+import { DOC_KEY_TO_SERVER_TYPE } from "./documentTypeConstants";
 
-const docKeyToType: Record<string, string> = {
-  isp: "isp",
-  pcpt: "pcpt",
-  poc: "plan-of-care",
-  sdr: "sdr",
-  bsp: "bsp",
-  medicalDocs: "medical-documents",
-  consents: "consent-and-releases",
-  physicianOrders: "physician-orders",
-  insuranceCards: "insurance-cards",
-  medicaidCard: "medicaid-card",
-  medicareCard: "medicare-card",
-  idCard: "id-card",
-  guardianshipDocs: "guardianship-documents",
-  assessmentForms: "assessment-forms",
-  hospitalDischarge: "hospital-discharge-papers",
-};
+const docKeyToType: Record<string, string> = DOC_KEY_TO_SERVER_TYPE;
 
 export async function handleDocumentUploads(
   clientId: string,
