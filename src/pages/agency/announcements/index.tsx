@@ -202,7 +202,7 @@ export default function AgencyAnnouncementsPage() {
                       className={`px-3 py-1 rounded-full text-[13px] font-medium border transition-colors ${
                         active
                           ? t === "all"
-                            ? "bg-[#10141a] border-[#10141a] text-white"
+                            ? "bg-[#00b4b8] border-[#00b4b8] text-white"
                             : `${meta!.border} bg-transparent`
                           : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
                       }`}
@@ -224,10 +224,10 @@ export default function AgencyAnnouncementsPage() {
                     className={`px-3 py-1 rounded-full text-[13px] font-medium border transition-colors ${
                       statusFilter === s
                         ? s === "active"
-                          ? "bg-[#22c55e] border-[#22c55e] text-white"
+                          ? "bg-[#00b4b8] border-[#00b4b8] text-white"
                           : s === "inactive"
                           ? "bg-[#6b7280] border-[#6b7280] text-white"
-                          : "bg-[#10141a] border-[#10141a] text-white"
+                          : "bg-[#00b4b8] border-[#00b4b8] text-white"
                         : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
                     }`}
                   >
