@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from "react";
+import { useSelector } from "react-redux";
+import { selectUser } from "@/utils/auth/store/authSelectors";
 import AddTaskModal from "@/components/tasks/AddTaskModal";
+import EditTaskModal from "@/components/tasks/EditTaskModal";
 import {
   Dialog,
   DialogContent,
@@ -8,11 +11,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Pencil, Trash2, ClipboardList } from "lucide-react";
 import type { Department, StaffMember, StaffTask } from "@/components/tasks/types";
 import {
   useGetTasksQuery,
   useCreateTaskMutation,
-  useAddActivityMutation,
+  useUpdateTaskMutation,
+  useDeleteTaskMutation,
 } from "./api";
 import { useListAgencyStaffQuery } from "@/lib/api/agency-staff";
 
@@ -26,18 +31,44 @@ const departments: Department[] = [
   { value: "admin", label: "Admin" },
 ];
 
+const PRIORITY_DOT: Record<string, string> = {
+  High: "bg-red-500",
+  Medium: "bg-amber-400",
+  Low: "bg-slate-300",
+};
+
+const PRIORITY_TEXT: Record<string, string> = {
+  High: "text-red-600 bg-red-50 border-red-200",
+  Medium: "text-amber-600 bg-amber-50 border-amber-200",
+  Low: "text-slate-500 bg-slate-50 border-slate-200",
+};
+
+const STATUS_STYLE: Record<string, string> = {
+  "In Progress": "text-blue-700 bg-blue-50 border-blue-200",
+  Open: "text-yellow-700 bg-yellow-50 border-yellow-200",
+  Completed: "text-emerald-700 bg-emerald-50 border-emerald-200",
+};
+
 const StaffTasksPage: React.FC = () => {
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [selectedStaff, setSelectedStaff] = useState("");
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedStaffMember, setSelectedStaffMember] = useState<StaffMember | null>(null);
-  const [showStaffDetails, setShowStaffDetails] = useState(false);
+  const currentUser = useSelector(selectUser);
+
+  // Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Pending" | "Inactive">("All");
+  const [staffFilter, setStaffFilter] = useState(""); // uid or "" for all
+  const [statusFilter, setStatusFilter] = useState<"All" | "Open" | "In Progress" | "Completed">("All");
+
+  // Modals
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [viewingTask, setViewingTask] = useState<StaffTask | null>(null);
+  const [editingTask, setEditingTask] = useState<StaffTask | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { data: tasksResponse, isLoading } = useGetTasksQuery();
   const [createTask] = useCreateTaskMutation();
-  const [addActivity] = useAddActivityMutation();
+  const [updateTask] = useUpdateTaskMutation();
+  const [deleteTask] = useDeleteTaskMutation();
   const { data: staffResponse, isLoading: staffLoading } = useListAgencyStaffQuery({ limit: 200 });
 
   const tasks: StaffTask[] = useMemo(
@@ -45,40 +76,30 @@ const StaffTasksPage: React.FC = () => {
     [tasksResponse]
   );
 
+  // Sorted staff list for the filter dropdown
   const staffList: StaffMember[] = useMemo(
     () =>
       (staffResponse?.data ?? [])
         .filter((s) => s.isActive)
-        .map((s) => ({
-          id: s.uid,
-          name: s.name,
-          department: "",
-          role: s.accessList[0] ?? "Team Member",
-        })),
+        .map((s) => ({ id: s.uid, name: s.name, department: "", role: s.accessList[0] ?? "Team Member" }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [staffResponse]
   );
 
-  const getStaffTasks = (staffId: string) =>
-    tasks.filter((t) => t.staffMember === staffId);
+  // uid → name lookup for task rows
+  const staffMap = useMemo(
+    () => Object.fromEntries(staffList.map((s) => [s.id, s.name])),
+    [staffList]
+  );
 
-  const getStaffStatus = (staffId: string) => {
-    const staffTasks = getStaffTasks(staffId);
-    if (staffTasks.length === 0) return "Inactive";
-    return staffTasks.some((t) => t.status === "In Progress") ? "Active" : "Pending";
-  };
-
-  const getActivitySummary = (staffId: string) => {
-    const total = getStaffTasks(staffId).reduce((sum, t) => sum + t.activities.length, 0);
-    return total > 0 ? `${total} activity note${total !== 1 ? "s" : ""}` : "No activities";
-  };
-
-  const filteredAndSearchedStaff = useMemo(() => {
-    return staffList.filter((staff) => {
-      if (searchQuery && !staff.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      if (statusFilter !== "All" && getStaffStatus(staff.id) !== statusFilter) return false;
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (staffFilter && t.staffMember !== staffFilter) return false;
+      if (statusFilter !== "All" && t.status !== statusFilter) return false;
       return true;
     });
-  }, [searchQuery, statusFilter, tasks, staffList]);
+  }, [tasks, searchQuery, staffFilter, statusFilter]);
 
   const handleCreateTask = async (task: {
     title: string;
@@ -91,227 +112,354 @@ const StaffTasksPage: React.FC = () => {
     await createTask(task);
   };
 
-  const handleAddActivity = async (taskId: string, description: string) => {
-    await addActivity({ taskId, description });
+  const handleUpdateTask = async (
+    taskId: string,
+    data: Partial<Omit<StaffTask, "id" | "activities">>
+  ) => {
+    await updateTask({ taskId, data }).unwrap();
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingTaskId) return;
+    setIsDeleting(true);
+    try {
+      await deleteTask(deletingTaskId).unwrap();
+      setDeletingTaskId(null);
+      // Close detail modal if viewing the deleted task
+      if (viewingTask?.id === deletingTaskId) setViewingTask(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const openEdit = (task: StaffTask) => {
+    setEditingTask(task);
+    setShowEditModal(true);
   };
 
   return (
     <div className="max-w-6xl p-6 mx-auto">
-      <div className="flex items-start justify-between mb-4">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold">Smart Manager</h1>
-          <p className="text-sm text-slate-600">Manage and assign tasks to staff</p>
+          <p className="text-sm text-slate-500">Manage and assign tasks to staff</p>
         </div>
-        <div>
-          <button
-            className="px-4 py-2 rounded-full bg-[#00b4b8] text-white cursor-pointer hover:bg-[#0099a0] transition-colors"
-            onClick={() => setShowAddModal(true)}
-          >
-            Add Task
-          </button>
-        </div>
+        <button
+          className="px-4 py-2 rounded-full bg-[#00b4b8] text-white text-sm font-medium hover:bg-[#0099a0] transition-colors"
+          onClick={() => setShowAddModal(true)}
+        >
+          + Add Task
+        </button>
       </div>
 
-      <div className="flex items-center justify-between p-4 mb-6 bg-white shadow-sm rounded-xl">
-        <div>
-          <div className="text-sm font-medium">Staff</div>
-          <div className="text-xs text-slate-500">Staff overview and task distribution</div>
+      {/* Stats */}
+      <div className="flex items-center gap-6 p-4 mb-6 bg-white shadow-sm rounded-xl">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-700">Tasks overview</p>
+          <p className="text-xs text-slate-400">All tasks across the agency</p>
         </div>
-
         <div className="flex items-center gap-8">
           <div className="text-center">
-            <div className="text-2xl font-semibold">{tasks.filter((t) => t.status === "In Progress").length}</div>
-            <div className="flex items-center gap-2 text-xs text-slate-500"><span className="inline-block w-2 h-2 rounded-full bg-emerald-500"/>Active</div>
+            <p className="text-2xl font-semibold text-blue-600">{tasks.filter((t) => t.status === "In Progress").length}</p>
+            <p className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />In Progress
+            </p>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-semibold">{tasks.filter((t) => t.status === "Open").length}</div>
-            <div className="flex items-center gap-2 text-xs text-slate-500"><span className="inline-block w-2 h-2 bg-yellow-400 rounded-full"/>Pending</div>
+            <p className="text-2xl font-semibold text-yellow-600">{tasks.filter((t) => t.status === "Open").length}</p>
+            <p className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />Open
+            </p>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-semibold">{tasks.length}</div>
-            <div className="flex items-center gap-2 text-xs text-slate-500"><span className="inline-block w-2 h-2 rounded-full bg-slate-400"/>Total</div>
+            <p className="text-2xl font-semibold text-emerald-600">{tasks.filter((t) => t.status === "Completed").length}</p>
+            <p className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />Completed
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-semibold text-slate-700">{tasks.length}</p>
+            <p className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-slate-400" />Total
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        <div>
-          <div className="p-4 bg-white rounded shadow">
-            <div className="flex items-center gap-3 mb-6">
-              <input
-                type="text"
-                placeholder="Search staff name"
-                className="flex-1 h-10 px-4 rounded-lg border border-slate-300 text-sm outline-none focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8]"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {(["Active", "Pending", "Inactive", "All"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setStatusFilter(s)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                    statusFilter === s
-                      ? "bg-[#00b4b8] text-white"
-                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        {/* Search */}
+        <input
+          type="text"
+          placeholder="Search task title…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="h-9 flex-1 min-w-[180px] px-4 rounded-lg border border-slate-200 text-sm outline-none focus:border-[#00b4b8] focus:ring-1 focus:ring-[#00b4b8] bg-white"
+        />
 
-            {isLoading || staffLoading ? (
-              <div className="py-8 text-sm text-center text-slate-500">Loading…</div>
-            ) : (
-              <div className="space-y-3">
-                {filteredAndSearchedStaff.map((staff) => (
-                  <div key={staff.id} className="flex items-center justify-between p-4 border rounded-lg border-slate-200 hover:bg-slate-50">
-                    <div className="flex items-center flex-1 gap-4">
-                      <div className="flex items-center justify-center w-10 h-10 text-sm font-semibold rounded-full bg-slate-200 text-slate-700">
-                        {staff.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900">{staff.name}</p>
-                        <p className="text-xs text-slate-500">{staff.role}</p>
-                      </div>
-                    </div>
+        {/* Staff filter */}
+        <select
+          value={staffFilter}
+          onChange={(e) => setStaffFilter(e.target.value)}
+          className="h-9 px-3 rounded-lg border border-slate-200 text-sm outline-none focus:border-[#00b4b8] bg-white text-slate-700 min-w-[160px]"
+        >
+          <option value="">All Staff</option>
+          {staffList.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
 
-                    <div className="flex items-center gap-6">
-                      <div className="text-center">
-                        <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          getStaffStatus(staff.id) === "Active"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : getStaffStatus(staff.id) === "Pending"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-slate-100 text-slate-700"
-                        }`}>
-                          {getStaffStatus(staff.id)}
-                        </div>
-                      </div>
-
-                      <div className="text-center min-w-[100px]">
-                        <p className="text-sm text-slate-600">{getActivitySummary(staff.id)}</p>
-                      </div>
-
-                      <button
-                        className="px-4 py-2 rounded-full bg-[#00b4b8] text-white text-sm font-medium hover:bg-[#0099a0]"
-                        onClick={() => {
-                          setSelectedStaffMember(staff);
-                          setShowStaffDetails(true);
-                        }}
-                      >
-                        Details
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <AddTaskModal
-              open={showAddModal}
-              onClose={() => setShowAddModal(false)}
-              onOpenChange={setShowAddModal}
-              departments={departments}
-              staff={staffList}
-              onCreateTask={handleCreateTask}
-            />
-          </div>
+        {/* Status tabs */}
+        <div className="flex items-center gap-1">
+          {(["All", "Open", "In Progress", "Completed"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                statusFilter === s
+                  ? "bg-[#00b4b8] text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Staff Details Modal */}
-      <Dialog open={showStaffDetails} onOpenChange={setShowStaffDetails}>
-        <DialogContent className="w-[500px] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[18px]">
-          {selectedStaffMember && (
-            <>
-              <DialogHeader>
-                <div className="space-y-1">
-                  <DialogTitle className="text-2xl">{selectedStaffMember.name}</DialogTitle>
-                  <p className="text-sm text-slate-600">
-                    {selectedStaffMember.role} •{" "}
-                    {departments.find((d) => d.value === selectedStaffMember.department)?.label || "-"}
-                  </p>
-                </div>
-              </DialogHeader>
-
-              <div className="py-4 space-y-6">
-                <div>
-                  <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                    getStaffStatus(selectedStaffMember.id) === "Active"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : getStaffStatus(selectedStaffMember.id) === "Pending"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-slate-100 text-slate-700"
-                  }`}>
-                    {getStaffStatus(selectedStaffMember.id)}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="mb-4 text-base font-semibold">Assigned Tasks</h4>
-                  {getStaffTasks(selectedStaffMember.id).length > 0 ? (
-                    <div className="space-y-3 overflow-y-auto max-h-80">
-                      {getStaffTasks(selectedStaffMember.id).map((task) => (
-                        <div key={task.id} className="p-4 border rounded-lg border-slate-200 bg-slate-50">
-                          <div className="flex items-start justify-between gap-3 mb-3">
-                            <div className="flex-1">
-                              <p className="mb-1 font-medium text-slate-900">{task.title}</p>
-                              <p className="text-sm text-slate-600">{task.description}</p>
-                            </div>
-                            <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${
-                              task.status === "In Progress" ? "bg-blue-100 text-blue-700" :
-                              task.status === "Open" ? "bg-yellow-100 text-yellow-700" :
-                              "bg-green-100 text-green-700"
-                            }`}>
-                              {task.status}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 mb-3 text-sm text-slate-700">
-                            <div><span className="font-medium text-slate-600">Due Date:</span> {task.dueDate}</div>
-                            <div><span className="font-medium text-slate-600">Priority:</span> {task.priority}</div>
-                            <div className="col-span-2">
-                              <span className="font-medium text-slate-600">Department:</span>{" "}
-                              {departments.find((d) => d.value === task.department)?.label || "-"}
-                            </div>
-                          </div>
-                          {task.activities.length > 0 && (
-                            <div className="pt-3 border-t border-slate-200">
-                              <p className="mb-2 text-xs font-medium text-slate-700">Activity Log:</p>
-                              <ul className="space-y-1">
-                                {task.activities.map((activity) => (
-                                  <li key={activity.id} className="text-xs text-slate-600">
-                                    {activity.createdAt} — {activity.description}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
+      {/* Task list */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {isLoading || staffLoading ? (
+          <div className="py-16 text-center text-sm text-slate-400">Loading…</div>
+        ) : filteredTasks.length === 0 ? (
+          <div className="py-16 flex flex-col items-center gap-3 text-slate-400">
+            <ClipboardList className="w-8 h-8 opacity-40" />
+            <p className="text-sm">No tasks match your filters</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Task</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Assigned to</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Department</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Due</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Priority</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredTasks.map((task) => {
+                const isCreator = task.createdBy === currentUser?.uid;
+                const deptLabel = departments.find((d) => d.value === task.department)?.label ?? "-";
+                const staffName = staffMap[task.staffMember] ?? "—";
+                return (
+                  <tr key={task.id} className="hover:bg-slate-50 transition-colors">
+                    {/* Title + description */}
+                    <td className="px-5 py-3.5 max-w-[260px]">
+                      <div className="flex items-start gap-2.5">
+                        <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${PRIORITY_DOT[task.priority] ?? "bg-slate-300"}`} />
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 truncate">{task.title}</p>
+                          {task.description && (
+                            <p className="text-xs text-slate-400 truncate mt-0.5">{task.description}</p>
                           )}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500">No tasks assigned to this staff member.</p>
-                  )}
-                </div>
-              </div>
+                      </div>
+                    </td>
+                    {/* Assigned to */}
+                    <td className="px-4 py-3.5 text-slate-600 whitespace-nowrap">{staffName}</td>
+                    {/* Department */}
+                    <td className="px-4 py-3.5">
+                      {task.department ? (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">{deptLabel}</span>
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
+                    </td>
+                    {/* Due date */}
+                    <td className="px-4 py-3.5 text-slate-500 whitespace-nowrap">{task.dueDate || "—"}</td>
+                    {/* Priority */}
+                    <td className="px-4 py-3.5">
+                      <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${PRIORITY_TEXT[task.priority] ?? ""}`}>
+                        {task.priority}
+                      </span>
+                    </td>
+                    {/* Status */}
+                    <td className="px-4 py-3.5">
+                      <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${STATUS_STYLE[task.status] ?? ""}`}>
+                        {task.status}
+                      </span>
+                    </td>
+                    {/* Actions */}
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setViewingTask(task)}
+                          className="px-3 py-1 rounded-full text-xs font-medium text-[#00b4b8] border border-[#00b4b8] hover:bg-[#00b4b8] hover:text-white transition-colors"
+                        >
+                          View
+                        </button>
+                        {isCreator && (
+                          <>
+                            <button
+                              title="Edit"
+                              onClick={() => openEdit(task)}
+                              className="p-1.5 rounded-md text-slate-400 hover:text-[#00b4b8] hover:bg-slate-100 transition-colors"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              title="Delete"
+                              onClick={() => setDeletingTaskId(task.id)}
+                              className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-              <DialogFooter className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setShowStaffDetails(false)}>
-                  Close
-                </Button>
-                <Button
-                  className="bg-[#00b4b8] hover:bg-[#0099a0]"
-                  onClick={() => {
-                    setShowStaffDetails(false);
-                    setShowAddModal(true);
-                  }}
-                >
-                  Assign Task
-                </Button>
-              </DialogFooter>
-            </>
-          )}
+      {/* ── Task detail modal ── */}
+      <Dialog open={!!viewingTask} onOpenChange={(open) => { if (!open) setViewingTask(null); }}>
+        <DialogContent className="w-[520px] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[16px]">
+          {viewingTask && (() => {
+            const deptLabel = departments.find((d) => d.value === viewingTask.department)?.label ?? "-";
+            const staffName = staffMap[viewingTask.staffMember] ?? "—";
+            const isCreator = viewingTask.createdBy === currentUser?.uid;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-xl leading-snug pr-6">{viewingTask.title}</DialogTitle>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${STATUS_STYLE[viewingTask.status]}`}>
+                      {viewingTask.status}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${PRIORITY_TEXT[viewingTask.priority]}`}>
+                      {viewingTask.priority} priority
+                    </span>
+                  </div>
+                </DialogHeader>
+
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <div>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-0.5">Assigned to</p>
+                    <p className="text-slate-800 font-medium">{staffName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-0.5">Department</p>
+                    <p className="text-slate-700">{deptLabel}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-0.5">Due date</p>
+                    <p className="text-slate-700">{viewingTask.dueDate || "—"}</p>
+                  </div>
+                </div>
+
+                {viewingTask.description && (
+                  <div>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Description</p>
+                    <p className="text-sm text-slate-600 leading-relaxed">{viewingTask.description}</p>
+                  </div>
+                )}
+
+                {viewingTask.activities.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Activity log</p>
+                    <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {viewingTask.activities.map((a) => (
+                        <li key={a.id} className="flex items-start gap-2 text-xs text-slate-600">
+                          <span className="shrink-0 text-slate-300 mt-0.5">{a.createdAt}</span>
+                          <span>— {a.description}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <DialogFooter className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setViewingTask(null)}>Close</Button>
+                  {isCreator && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => {
+                          openEdit(viewingTask);
+                          setViewingTask(null);
+                        }}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />Edit
+                      </Button>
+                      <Button
+                        className="bg-red-500 hover:bg-red-600 text-white gap-1.5"
+                        onClick={() => {
+                          setDeletingTaskId(viewingTask.id);
+                          setViewingTask(null);
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />Delete
+                      </Button>
+                    </>
+                  )}
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add Task modal ── */}
+      <AddTaskModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onOpenChange={setShowAddModal}
+        departments={departments}
+        staff={staffList}
+        onCreateTask={handleCreateTask}
+      />
+
+      {/* ── Edit Task modal ── */}
+      <EditTaskModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        task={editingTask}
+        departments={departments}
+        staff={staffList}
+        onUpdateTask={handleUpdateTask}
+      />
+
+      {/* ── Delete confirmation ── */}
+      <Dialog open={!!deletingTaskId} onOpenChange={(open) => { if (!open) setDeletingTaskId(null); }}>
+        <DialogContent className="w-[400px] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[16px]">
+          <DialogHeader>
+            <DialogTitle>Delete task?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600">
+            This action cannot be undone. The task and all its activity notes will be permanently removed.
+          </p>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeletingTaskId(null)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-500 hover:bg-red-600 text-white"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
