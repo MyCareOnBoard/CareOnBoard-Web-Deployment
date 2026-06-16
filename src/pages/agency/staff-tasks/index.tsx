@@ -14,6 +14,7 @@ import {
   useCreateTaskMutation,
   useAddActivityMutation,
 } from "./api";
+import { useListAgencyStaffQuery } from "@/lib/api/agency-staff";
 
 const departments: Department[] = [
   { value: "hr", label: "HR" },
@@ -23,16 +24,6 @@ const departments: Department[] = [
   { value: "supervisor", label: "Supervisor" },
   { value: "finance", label: "Finance" },
   { value: "admin", label: "Admin" },
-];
-
-const staffMembers: StaffMember[] = [
-  { id: "staff-1", name: "Avery Lane", department: "hr", role: "Coordinator" },
-  { id: "staff-2", name: "Jordan Reese", department: "compliance", role: "Supervisor" },
-  { id: "staff-3", name: "Morgan Tate", department: "director", role: "Director" },
-  { id: "staff-4", name: "Riley Brooks", department: "coordinator", role: "Coordinator" },
-  { id: "staff-5", name: "Taylor Kim", department: "supervisor", role: "Supervisor" },
-  { id: "staff-6", name: "Jamie Cruz", department: "finance", role: "Finance" },
-  { id: "staff-7", name: "Casey Morgan", department: "admin", role: "Admin" },
 ];
 
 const StaffTasksPage: React.FC = () => {
@@ -45,12 +36,26 @@ const StaffTasksPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Pending" | "Inactive">("All");
 
   const { data: tasksResponse, isLoading } = useGetTasksQuery();
-  const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();
+  const [createTask] = useCreateTaskMutation();
   const [addActivity] = useAddActivityMutation();
+  const { data: staffResponse, isLoading: staffLoading } = useListAgencyStaffQuery({ limit: 200 });
 
   const tasks: StaffTask[] = useMemo(
     () => (tasksResponse?.data ?? []) as StaffTask[],
     [tasksResponse]
+  );
+
+  const staffList: StaffMember[] = useMemo(
+    () =>
+      (staffResponse?.data ?? [])
+        .filter((s) => s.isActive)
+        .map((s) => ({
+          id: s.uid,
+          name: s.name,
+          department: "",
+          role: s.accessList[0] ?? "Team Member",
+        })),
+    [staffResponse]
   );
 
   const getStaffTasks = (staffId: string) =>
@@ -68,12 +73,12 @@ const StaffTasksPage: React.FC = () => {
   };
 
   const filteredAndSearchedStaff = useMemo(() => {
-    return staffMembers.filter((staff) => {
+    return staffList.filter((staff) => {
       if (searchQuery && !staff.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       if (statusFilter !== "All" && getStaffStatus(staff.id) !== statusFilter) return false;
       return true;
     });
-  }, [searchQuery, statusFilter, tasks]);
+  }, [searchQuery, statusFilter, tasks, staffList]);
 
   const handleCreateTask = async (task: {
     title: string;
@@ -155,8 +160,8 @@ const StaffTasksPage: React.FC = () => {
               ))}
             </div>
 
-            {isLoading ? (
-              <div className="py-8 text-sm text-center text-slate-500">Loading tasks…</div>
+            {isLoading || staffLoading ? (
+              <div className="py-8 text-sm text-center text-slate-500">Loading…</div>
             ) : (
               <div className="space-y-3">
                 {filteredAndSearchedStaff.map((staff) => (
@@ -208,7 +213,7 @@ const StaffTasksPage: React.FC = () => {
               onClose={() => setShowAddModal(false)}
               onOpenChange={setShowAddModal}
               departments={departments}
-              staff={staffMembers}
+              staff={staffList}
               onCreateTask={handleCreateTask}
             />
           </div>
