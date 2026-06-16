@@ -12,7 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash2, Search, ClipboardList } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ClipboardList, ChevronDown } from "lucide-react";
 import type { Department, StaffMember, StaffTask } from "@/components/tasks/types";
 import {
   useGetTasksQuery,
@@ -328,28 +328,28 @@ export default function StaffTasksPage() {
                     </td>
 
                     <td className="py-4 px-4">
-                      {isAssigned ? (
-                        <select
-                          value={task.status}
-                          disabled={updatingStatusId === task.id}
-                          onChange={(e) => void handleStatusChange(task.id, e.target.value as StaffTask["status"])}
-                          className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent cursor-pointer outline-none transition-opacity ${
-                            updatingStatusId === task.id ? "opacity-50 cursor-not-allowed" : ""
-                          } ${statusMeta?.border ?? ""}`}
-                        >
-                          <option value="Open">Open</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Completed">Completed</option>
-                        </select>
-                      ) : (
-                        <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${statusMeta?.border ?? ""}`}>
-                          {task.status}
-                        </span>
-                      )}
+                      <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${statusMeta?.border ?? ""}`}>
+                        {task.status}
+                      </span>
                     </td>
 
                     <td className="py-4 px-4">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {isAssigned && (
+                          <div className={`relative ${updatingStatusId === task.id ? "opacity-50" : ""}`}>
+                            <select
+                              value={task.status}
+                              disabled={updatingStatusId === task.id}
+                              onChange={(e) => void handleStatusChange(task.id, e.target.value as StaffTask["status"])}
+                              className={`appearance-none pl-3 pr-7 py-1.5 rounded-full text-[13px] font-medium border bg-transparent cursor-pointer outline-none transition-colors ${statusMeta?.border ?? ""}`}
+                            >
+                              <option value="Open">Open</option>
+                              <option value="In Progress">In Progress</option>
+                              <option value="Completed">Completed</option>
+                            </select>
+                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none h-3 w-3 text-[#808081]" />
+                          </div>
+                        )}
                         <button
                           onClick={() => setViewingTask(task)}
                           className="px-4 py-1.5 rounded-full text-[13px] font-medium border border-[#00b4b8] text-[#00b4b8] hover:bg-[#00b4b8] hover:text-white transition-colors"
