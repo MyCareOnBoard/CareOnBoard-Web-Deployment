@@ -1,15 +1,41 @@
+import { useEffect } from "react";
 import { useRouteError, isRouteErrorResponse, useNavigate } from "react-router";
 import logoSrc from "@/assets/icons/green-black-logo.svg";
+
+function isChunkLoadError(err: unknown): boolean {
+    const msg = err instanceof Error ? err.message : String(err);
+    return (
+        msg.includes("Failed to fetch dynamically imported module") ||
+        msg.includes("Importing a module script failed") ||
+        msg.includes("Loading chunk")
+    );
+}
 
 export default function RouteErrorPage() {
     const error = useRouteError();
     const navigate = useNavigate();
 
+    // Auto-reload once when a stale deployment causes chunk fetch failures.
+    // The sessionStorage flag prevents an infinite reload loop if the reload
+    // doesn't resolve the error.
+    useEffect(() => {
+        if (isChunkLoadError(error)) {
+            const key = "cob_chunk_error_reload";
+            if (!sessionStorage.getItem(key)) {
+                sessionStorage.setItem(key, "1");
+                window.location.reload();
+            }
+        }
+    }, [error]);
+
     let title = "Something went wrong";
     let message = "An unexpected error occurred. Please try refreshing or go back to the home page.";
     let statusCode: number | null = null;
 
-    if (isRouteErrorResponse(error)) {
+    if (isChunkLoadError(error)) {
+        title = "Update available";
+        message = "A new version of the app was deployed. The page will reload automatically — or click Reload below.";
+    } else if (isRouteErrorResponse(error)) {
         statusCode = error.status;
         if (error.status === 404) {
             title = "Page not found";
