@@ -70,6 +70,7 @@ export interface Profile {
   tagId?: string
   // Super Admin specific
   accessList?: string[]  // List of access scopes for super admins
+  supportedClientTypes?: ("ddd" | "hha")[]
 }
 
 /**

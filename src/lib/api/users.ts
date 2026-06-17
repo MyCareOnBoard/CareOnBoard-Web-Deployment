@@ -109,6 +109,7 @@ export async function getUser(): Promise<User> {
       professionalSummary: profileSource.professionalSummary || profileSource.summary,
       workAvailability: profileSource.workAvailability,
       tagId: profileSource.tagId,
+      supportedClientTypes: profileSource?.supportedClientTypes || [],
     };
 
     // Add agency details if user is an employee
