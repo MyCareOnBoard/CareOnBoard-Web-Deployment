@@ -10,6 +10,7 @@ import GenericListCard from "./GenericListCard";
 import GenericDetailCard from "./GenericDetailCard";
 import GenericActionCard from "./GenericActionCard";
 import TaskListCard from "./TaskListCard";
+import PdfDownloadCard from "./PdfDownloadCard";
 
 const STATIC_REGISTRY: Record<string, React.FC<{ data: unknown }>> = {
   "shift-list": ShiftListCard,
@@ -20,6 +21,9 @@ const STATIC_REGISTRY: Record<string, React.FC<{ data: unknown }>> = {
   "generic-list": GenericListCard,
   "generic-detail": GenericDetailCard,
   "generic-action": GenericActionCard,
+  "pdf-download": PdfDownloadCard,
+  "excel-download": PdfDownloadCard,
+  "word-download": PdfDownloadCard,
 };
 
 const INTERACTIVE_REGISTRY = {
