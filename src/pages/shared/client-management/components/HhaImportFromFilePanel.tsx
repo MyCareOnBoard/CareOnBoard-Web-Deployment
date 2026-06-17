@@ -5,18 +5,12 @@ import type { AddClientFormData } from "../types/formData";
 import { mergeExtractionDraft } from "../utils/mergeExtractionDraft";
 import { attachImportFileToDoc } from "../utils/attachImportFileToDoc";
 import DocumentImportDialog, {
-  type DownloadForm,
   type ImportSlot,
 } from "./extraction/DocumentImportDialog";
 
 const SLOTS: ImportSlot[] = [
   { id: "poc", label: "Plan of Care" },
   { id: "clinicalAssessment", label: "Clinical Assessment" },
-];
-
-const DOWNLOAD_FORMS: DownloadForm[] = [
-  { label: "Plan of Care form", href: "/assets/Plan_of_Care_Form.pdf" },
-  { label: "Clinical Assessment form", href: "/assets/Clinical_Assessment_Form.pdf" },
 ];
 
 export default function HhaImportFromFilePanel({
@@ -74,7 +68,6 @@ export default function HhaImportFromFilePanel({
       dialogTitlePick="Import from Plan of Care / Clinical Assessment"
       pickDescription={pickDescription}
       slots={SLOTS}
-      downloadForms={DOWNLOAD_FORMS}
       onExtract={onExtract}
       onApply={onApply}
       computePreviewWarnings={computePreviewWarnings}

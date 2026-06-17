@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { FileUp, Loader2, Download, X } from "lucide-react";
+import { FileUp, Loader2, X } from "lucide-react";
 import type { ClientExtractionResponse } from "../../types/clientExtraction";
 import { formatGeminiExtractError } from "../../utils/formatGeminiExtractError";
 import {
@@ -49,7 +49,6 @@ function validateImportFile(file: File): string | null {
 }
 
 export type ImportSlot = { id: string; label: string; accept?: string };
-export type DownloadForm = { label: string; href: string };
 
 export type DocumentImportDialogProps = {
   triggerLabel: string;
@@ -60,8 +59,6 @@ export type DocumentImportDialogProps = {
   pickDescription?: React.ReactNode;
   /** One slot for single-file import (DDD); two for HHA POC + Clinical Assessment. */
   slots: ImportSlot[];
-  /** Optional blank-form download links shown beside the upload area. */
-  downloadForms?: DownloadForm[];
   /** Single-slot panels extract immediately on pick; multi-slot use an explicit Extract button. */
   autoExtractOnPick?: boolean;
   onExtract: (files: Record<string, File>) => Promise<ClientExtractionResponse>;
@@ -85,7 +82,6 @@ export default function DocumentImportDialog({
   dialogTitlePick,
   pickDescription,
   slots,
-  downloadForms,
   autoExtractOnPick = false,
   onExtract,
   onApply,
@@ -315,28 +311,6 @@ export default function DocumentImportDialog({
                     ) : null}
                   </div>
                 )}
-
-                {downloadForms?.length ? (
-                  <div className="rounded-xl border border-[#e2e4e6] bg-[#f8fafb] p-3">
-                    <p className="mb-2 text-[12px] font-semibold text-[#10141a]">
-                      Blank forms
-                    </p>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                      {downloadForms.map((form) => (
-                        <a
-                          key={form.href}
-                          href={form.href}
-                          download
-                          aria-label={`Download blank ${form.label} (PDF)`}
-                          className="inline-flex items-center gap-2 rounded-[10px] border border-[#00b4b8]/40 bg-white px-3 py-2 text-[12px] font-medium text-[#00b4b8] transition-colors hover:bg-[#e6fafa]"
-                        >
-                          <Download className="h-4 w-4 shrink-0" aria-hidden />
-                          {form.label}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
 
                 <div className="space-y-1" aria-live="polite">
                   {busy ? (

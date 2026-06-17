@@ -20,6 +20,7 @@ import { AddClientFormData, type InsuranceDetail } from "@/pages/shared/client-m
 import { Button } from "@/components/ui/button";
 import { Agency } from "@/lib/api/clients";
 import { useGooglePlacesAutocomplete, fetchFirstPlaceDetailsForQuery } from "@/hooks/useGooglePlacesAutocomplete";
+import HhaBlankFormsCard from "@/pages/shared/client-management/components/HhaBlankFormsCard";
 
 const SELECT_TRIGGER_CN =
   "w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white";
@@ -324,6 +325,10 @@ const maskSSN = (value: string) => {
           </div>
         </div>
       )}
+
+      {isHhaClient ? (
+        <HhaBlankFormsCard formData={formData} setFormData={setFormData} />
+      ) : null}
 
       <div className="mb-10">
         <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
