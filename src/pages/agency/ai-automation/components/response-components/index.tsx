@@ -22,6 +22,8 @@ const STATIC_REGISTRY: Record<string, React.FC<{ data: unknown }>> = {
   "generic-detail": GenericDetailCard,
   "generic-action": GenericActionCard,
   "pdf-download": PdfDownloadCard,
+  "excel-download": PdfDownloadCard,
+  "word-download": PdfDownloadCard,
 };
 
 const INTERACTIVE_REGISTRY = {
