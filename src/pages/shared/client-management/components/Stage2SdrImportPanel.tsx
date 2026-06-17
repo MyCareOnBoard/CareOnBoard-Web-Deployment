@@ -29,6 +29,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { DOCUMENT_TYPE_LABELS } from "../utils/documentTypeConstants";
 
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMPORT_MIME = new Set([
@@ -38,17 +39,6 @@ const ALLOWED_IMPORT_MIME = new Set([
   "image/png",
   "image/webp",
 ]);
-
-const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  isp: "ISP (Individualized Service Plan)",
-  poc: "Plan of Care",
-  pcpt: "PCPT",
-  sdr: "SDR",
-  bsp: "Behavior Plan / BSP",
-  medicalDocs: "Medical Documents",
-  consents: "Consents and Releases",
-  unknown: "Not detected",
-};
 
 const IDENTITY_FIELD_LABELS: Record<string, string> = {
   dddId: "DDD ID",

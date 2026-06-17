@@ -104,6 +104,37 @@ export async function extractSdrDocumentViaApi(
   return response.data;
 }
 
+/**
+ * HHA Plan of Care and/or Clinical Assessment extraction. Provide at least one file.
+ */
+export async function extractClientHhaPocClinicalViaApi(
+  files: { poc?: File; clinicalAssessment?: File },
+  options?: { signal?: AbortSignal },
+): Promise<ClientExtractionResponse> {
+  const formData = new FormData();
+  if (files.poc) formData.append("poc", files.poc);
+  if (files.clinicalAssessment) formData.append("clinicalAssessment", files.clinicalAssessment);
+
+  const response = await axiosClient.post<ClientExtractionResponse>(
+    "/gemini/extract-client-hha-poc-clinical",
+    formData,
+    {
+      timeout: EXTRACT_DOCUMENT_TIMEOUT_MS,
+      signal: options?.signal,
+      transformRequest: [
+        (data, headers) => {
+          if (data instanceof FormData) {
+            delete headers["Content-Type"];
+          }
+          return data;
+        },
+      ],
+    },
+  );
+
+  return response.data;
+}
+
 const GENERATE_POC_TIMEOUT_MS = EXTRACT_DOCUMENT_TIMEOUT_MS;
 
 /**

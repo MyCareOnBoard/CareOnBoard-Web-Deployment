@@ -812,8 +812,7 @@ export function Stage3HealthcareAndDocuments({
                       multiple={
                         doc.key === "medicalDocs" ||
                         doc.key === "consents" ||
-                        doc.key === "insuranceCards" ||
-                        doc.key === "assessmentForms"
+                        doc.key === "insuranceCards"
                       }
                       onChange={(e) => {
                         const files = e.target.files;
@@ -822,8 +821,7 @@ export function Stage3HealthcareAndDocuments({
                         if (
                           doc.key === "medicalDocs" ||
                           doc.key === "consents" ||
-                          doc.key === "insuranceCards" ||
-                          doc.key === "assessmentForms"
+                          doc.key === "insuranceCards"
                         ) {
                           const fileArray = Array.from(files);
                           const fileName =

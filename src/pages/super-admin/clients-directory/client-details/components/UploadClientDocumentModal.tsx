@@ -16,6 +16,10 @@ import {
   type ClientDocumentKey,
   type ClientDocument,
 } from "@/lib/api/clients";
+import {
+  DOCUMENT_TYPE_OPTIONS,
+  DOC_KEY_TO_SERVER_TYPE,
+} from "@/pages/shared/client-management/utils/documentTypeConstants";
 
 interface FormData {
   documentType: ClientDocumentKey | "other" | "";
@@ -28,40 +32,12 @@ interface FormData {
 }
 
 const documentTypes: Array<{ value: ClientDocumentKey | "other"; label: string }> = [
-  { value: "isp", label: "ISP (Individualized Service Plan)" },
-  { value: "pcpt", label: "PCPT (Person-Centered Planning Tool)" },
-  { value: "poc", label: "Plan of Care (POC)" },
-  { value: "sdr", label: "SDR (Service Detail Report)" },
-  { value: "bsp", label: "Behavior Plan / BSP" },
-  { value: "medicalDocs", label: "Medical Documents" },
-  { value: "consents", label: "Consents & Releases" },
-  { value: "physicianOrders", label: "Physician Orders" },
-  { value: "insuranceCards", label: "Insurance Cards" },
-  { value: "medicaidCard", label: "Medicaid Card" },
-  { value: "medicareCard", label: "Medicare Card" },
-  { value: "idCard", label: "ID Card" },
-  { value: "guardianshipDocs", label: "Guardianship / POA Documents" },
-  { value: "assessmentForms", label: "Assessment Forms" },
-  { value: "hospitalDischarge", label: "Hospital Discharge Papers" },
+  ...DOCUMENT_TYPE_OPTIONS,
   { value: "other", label: "Other" },
 ];
 
 const docKeyToType: Record<ClientDocumentKey | "other", string> = {
-  isp: "isp",
-  pcpt: "pcpt",
-  poc: "plan-of-care",
-  sdr: "sdr",
-  bsp: "bsp",
-  medicalDocs: "medical-documents",
-  consents: "consent-and-releases",
-  physicianOrders: "physician-orders",
-  insuranceCards: "insurance-cards",
-  medicaidCard: "medicaid-card",
-  medicareCard: "medicare-card",
-  idCard: "id-card",
-  guardianshipDocs: "guardianship-documents",
-  assessmentForms: "assessment-forms",
-  hospitalDischarge: "hospital-discharge-papers",
+  ...DOC_KEY_TO_SERVER_TYPE,
   other: "others",
 };
 

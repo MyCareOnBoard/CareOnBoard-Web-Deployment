@@ -24,7 +24,7 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
   const [error, setError] = useState<string | null>(null);
   // Agency-supported client types. On error/missing we leave this undefined so
   // the wizard falls back to offering both DDD and HHA.
-  const [supportedClientTypes, setSupportedClientTypes] = useState<ClientType[] | undefined>(undefined);
+  const [supportedClientTypes, setSupportedClientTypes] = useState<ClientType[] | undefined>(user?.agency?.supportedClientTypes || user?.profile?.supportedClientTypes || undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,27 +34,6 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
       setError(null);
 
       const tasks: Promise<unknown>[] = [];
-
-      // Fetch the agency to read its supported client types. On error/missing we
-      // leave supportedClientTypes undefined (wizard treats that as both).
-      if (agencyId) {
-        tasks.push(
-          getAgencyById(agencyId)
-            .then((agency) => {
-              if (cancelled) return;
-              const types = agency?.supportedClientTypes;
-              if (Array.isArray(types) && types.length) {
-                setSupportedClientTypes(types as ClientType[]);
-              } else {
-                setSupportedClientTypes(undefined);
-              }
-            })
-            .catch((err: any) => {
-              console.error("Failed to fetch agency supported client types:", err);
-              if (!cancelled) setSupportedClientTypes(undefined);
-            }),
-        );
-      }
 
       // Only the edit flow needs to preload the existing client.
       if (isEditMode) {
@@ -87,7 +66,7 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
     return () => {
       cancelled = true;
     };
-  }, [clientId, isEditMode, agencyId]);
+  }, [clientId, isEditMode]);
 
   if (isLoading) {
     return (

@@ -1,3 +1,5 @@
+import type { ClientDocumentKey } from "@/lib/api/clients";
+
 /** Insurance / payer row from an ISP (ASO, MCO, private). */
 export type InsuranceDetail = {
     type?: string;
@@ -318,7 +320,17 @@ export type DocKey =
     | "idCard"
     | "guardianshipDocs"
     | "assessmentForms"
+    | "clinicalAssessment"
+    | "form485"
     | "hospitalDischarge";
+
+/**
+ * Compile-time guard: DocKey must stay identical to the API's ClientDocumentKey.
+ * If the two unions diverge, the assignment below fails to type-check.
+ */
+type _AssertExtends<A, B> = [A] extends [B] ? true : never;
+export const DOC_KEY_MATCHES_API: _AssertExtends<DocKey, ClientDocumentKey> &
+    _AssertExtends<ClientDocumentKey, DocKey> = true;
 
 export type DocState = {
     key: DocKey;
@@ -612,6 +624,12 @@ export function createInitialDocs(type: ClientType = "ddd"): DocState[] {
                 autoReminder: true,
             },
             {
+                key: "form485",
+                title: "Form 485",
+                uploadLabel: "Upload Form 485 (CMS-485 Plan of Care)",
+                autoReminder: true,
+            },
+            {
                 key: "insuranceCards",
                 title: "Insurance Cards",
                 uploadLabel: "Upload front and back insurance cards",
@@ -648,9 +666,9 @@ export function createInitialDocs(type: ClientType = "ddd"): DocState[] {
                 autoReminder: true,
             },
             {
-                key: "assessmentForms",
-                title: "Assessment Forms",
-                uploadLabel: "Upload assessment forms",
+                key: "clinicalAssessment",
+                title: "Clinical Assessment",
+                uploadLabel: "Upload clinical assessment",
                 autoReminder: true,
             },
             {
