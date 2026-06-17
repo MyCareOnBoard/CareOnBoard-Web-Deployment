@@ -1,8 +1,7 @@
 import { lazy } from "react";
 import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
-
-const RouteErrorPage = lazy(() => import("@/pages/error/RouteErrorPage"));
+import RouteErrorPage from "@/pages/error/RouteErrorPage";
 
 const SplashScreen = lazy(() => import("@/pages/splash"));
 const VerifyOTP = lazy(() => import("@/pages/onboarding/VerifyOTP"));
