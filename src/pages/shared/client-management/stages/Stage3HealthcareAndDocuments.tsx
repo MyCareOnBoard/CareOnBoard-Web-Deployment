@@ -18,9 +18,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AddClientFormData, DocKey, DocState, createInitialDocs } from "@/pages/shared/client-management/types/formData";
 import { canGeneratePoc } from "@/pages/shared/client-management/utils/pocGenerationEligibility";
+import { canShowForm485Generate } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
 
 const GeneratePocPanel = lazy(
   () => import("@/pages/shared/client-management/components/GeneratePocPanel"),
+);
+const GenerateForm485Panel = lazy(
+  () => import("@/pages/shared/client-management/components/GenerateForm485Panel"),
 );
 
 const OTHER_VALUE = "Other (specify)";
@@ -793,6 +797,16 @@ export function Stage3HealthcareAndDocuments({
                   {doc.key === "poc" && canGeneratePoc(formData) ? (
                     <Suspense fallback={null}>
                       <GeneratePocPanel
+                        formData={formData}
+                        setFormData={setFormData}
+                        clientId={clientId}
+                      />
+                    </Suspense>
+                  ) : null}
+
+                  {doc.key === "form485" && canShowForm485Generate(formData) ? (
+                    <Suspense fallback={null}>
+                      <GenerateForm485Panel
                         formData={formData}
                         setFormData={setFormData}
                         clientId={clientId}

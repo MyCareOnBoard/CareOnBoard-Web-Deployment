@@ -1,0 +1,301 @@
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Sparkles, X } from "lucide-react";
+import type { AddClientFormData } from "../types/formData";
+import {
+  canGenerateForm485,
+  getForm485MissingSources,
+} from "../utils/form485GenerationEligibility";
+import { useGenerateForm485 } from "../hooks/useGenerateForm485";
+import Form485PrintTemplate from "./Form485PrintTemplate";
+import { generateFormPdfBlob } from "../utils/generateFormPdfBlob";
+import { downloadPocPdfFromBlob } from "../utils/generatePocPdf";
+import { withGeneratedForm485File } from "../utils/withGeneratedForm485File";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+
+type ModalStep = "confirm" | "generating" | "preview";
+
+type GenerateForm485PanelProps = {
+  formData: AddClientFormData;
+  setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+  clientId?: string;
+  onApplied?: (nextFormData: AddClientFormData) => void;
+};
+
+export default function GenerateForm485Panel({
+  formData,
+  setFormData,
+  clientId,
+  onApplied,
+}: GenerateForm485PanelProps) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<ModalStep>("confirm");
+  const printRef = useRef<HTMLDivElement>(null);
+  const blobCacheRef = useRef<{ key: string; blob: Blob } | null>(null);
+
+  const { busy, error, result, generate, cancel, reset } = useGenerateForm485(
+    formData,
+    clientId,
+  );
+
+  const canGenerate = canGenerateForm485(formData);
+  const missingSources = getForm485MissingSources(formData);
+
+  const closeModal = useCallback(() => {
+    cancel();
+    reset();
+    blobCacheRef.current = null;
+    setStep("confirm");
+    setOpen(false);
+  }, [cancel, reset]);
+
+  const openModal = useCallback(() => {
+    reset();
+    setStep("confirm");
+    setOpen(true);
+  }, [reset]);
+
+  const handleDialogOpenChange = useCallback(
+    (next: boolean) => {
+      if (!next) closeModal();
+    },
+    [closeModal],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    if (step !== "generating") return;
+    if (busy) return;
+    if (result) setStep("preview");
+    else if (error) setStep("confirm");
+  }, [open, step, busy, result, error]);
+
+  const handleGenerate = useCallback(async () => {
+    setStep("generating");
+    await generate(false);
+  }, [generate]);
+
+  const buildBlob = useCallback(async (): Promise<Blob | null> => {
+    if (!printRef.current || !result) return null;
+    // Cache by result identity so "Download PDF" then "Use as Form 485" doesn't
+    // run the html2canvas + jsPDF pipeline twice for the same generated form.
+    const key = `${result.generationJobId ?? ""}|${result.fileName}`;
+    if (blobCacheRef.current?.key === key) return blobCacheRef.current.blob;
+    const blob = await generateFormPdfBlob(printRef.current);
+    blobCacheRef.current = { key, blob };
+    return blob;
+  }, [result]);
+
+  const handleDownload = useCallback(async () => {
+    if (!result) return;
+    const blob = await buildBlob();
+    if (blob) downloadPocPdfFromBlob(blob, result.fileName || "form-485.pdf");
+  }, [result, buildBlob]);
+
+  const handleUseAsForm485 = useCallback(async () => {
+    if (!result) return;
+    try {
+      const blob = await buildBlob();
+      if (!blob) throw new Error("template not ready");
+      const fileName = result.fileName || "form-485.pdf";
+      const file = new File([blob], fileName, { type: "application/pdf" });
+      const nextFormData = withGeneratedForm485File(formData, {
+        file,
+        fileName,
+        issuedOnDate: new Date(),
+      });
+      setFormData(nextFormData);
+      toast({
+        title: "Form 485 added",
+        description: "It will upload when you save the client.",
+        variant: "success",
+      });
+      onApplied?.(nextFormData);
+      closeModal();
+    } catch {
+      toast({
+        title: "Couldn't prepare the PDF",
+        description: "Try again or upload a Form 485 manually.",
+        variant: "destructive",
+      });
+    }
+  }, [result, formData, setFormData, toast, onApplied, closeModal, buildBlob]);
+
+  return (
+    <>
+      <div className="mb-3 rounded-[12px] border border-[#cceeee] bg-[#f0fbfb] p-4">
+        <p className="mb-3 text-[13px] text-[#10141a]">
+          Generate the CMS-485 (Form 485) from the Plan of Care and Clinical Assessment, then
+          review before saving.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-10 rounded-[12px] border-[#00b4b8] text-[#00b4b8] hover:bg-[#e6fafa] disabled:opacity-50"
+          onClick={openModal}
+          disabled={busy || !canGenerate}
+        >
+          <Sparkles className="mr-2 h-4 w-4" />
+          Generate Form 485
+        </Button>
+        {!canGenerate ? (
+          <p className="mt-2 text-[12px] text-[#808081]">
+            Attach a {missingSources.join(" and a ")} to generate the Form 485.
+          </p>
+        ) : null}
+      </div>
+
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+        <DialogContent
+          showCloseButton={false}
+          className={
+            step === "preview"
+              ? "flex max-h-[92vh] w-[min(96vw,820px)] flex-col gap-0 p-0"
+              : "flex w-[min(96vw,480px)] flex-col gap-0 p-0"
+          }
+        >
+          <DialogHeader className="shrink-0 items-start gap-2 space-y-0 border-b border-[#e6e7e8] px-5 pb-2.5 pt-5 text-left">
+            <div className="flex w-full items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e6fafa] text-[#00b4b8]">
+                  <Sparkles className="h-4 w-4" aria-hidden />
+                </span>
+                <DialogTitle className="text-left text-lg font-semibold text-[#10141a]">
+                  Generate Form 485
+                </DialogTitle>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-full text-[#808081] hover:bg-[#f5f5f6] hover:text-[#10141a]"
+                onClick={closeModal}
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            {step === "confirm" ? (
+              <DialogDescription className="text-left text-[13px] leading-relaxed text-[#808081]">
+                AI will draft a CMS-485 from the Plan of Care and Clinical Assessment. Review the
+                result before saving it to the client record.
+              </DialogDescription>
+            ) : step === "generating" ? (
+              <DialogDescription className="text-left text-[13px] leading-relaxed text-[#808081]">
+                This usually takes up to a minute. You can cancel at any time.
+              </DialogDescription>
+            ) : null}
+          </DialogHeader>
+
+          <div className="flex min-h-0 flex-1 flex-col px-5 py-4">
+            {step === "confirm" ? (
+              <div className="space-y-4">
+                <div className="rounded-[12px] border border-[#cceeee] bg-[#f0fbfb] px-4 py-3">
+                  <p className="text-[12px] font-medium uppercase tracking-wide text-[#00b4b8]">
+                    Source documents
+                  </p>
+                  <p className="mt-1 text-[14px] font-medium text-[#10141a]">
+                    Using: Plan of Care and Clinical Assessment
+                  </p>
+                </div>
+                {error ? (
+                  <p
+                    className="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700"
+                    role="alert"
+                  >
+                    {error}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {step === "generating" ? (
+              <div className="flex flex-col items-center justify-center gap-4 py-8">
+                <Loader2 className="h-10 w-10 animate-spin text-[#00b4b8]" />
+                <p className="max-w-[320px] text-center text-[14px] font-medium leading-relaxed text-[#10141a]">
+                  Generating the Form 485 from the Plan of Care and Clinical Assessment&hellip;
+                </p>
+              </div>
+            ) : null}
+
+            {step === "preview" && result ? (
+              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+                <DialogDescription className="text-left text-[13px] leading-relaxed text-[#808081]">
+                  Review the generated CMS-485, then attach it as the client&apos;s Form 485.
+                </DialogDescription>
+                {result.warnings.length > 0 ? (
+                  <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                    <p className="mb-1 font-semibold">Review before signing:</p>
+                    <ul className="list-disc space-y-0.5 pl-4">
+                      {result.warnings.map((w, i) => (
+                        <li key={i}>{w.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <div className="max-h-[58vh] min-h-0 flex-1 overflow-auto rounded-[12px] border border-[#e5e5e6] bg-white p-4">
+                  <div ref={printRef}>
+                    <Form485PrintTemplate form485={result.form485} />
+                  </div>
+                </div>
+                {error ? (
+                  <p
+                    className="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700"
+                    role="alert"
+                  >
+                    {error}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          {step === "confirm" ? (
+            <DialogFooter className="flex shrink-0 flex-row items-center justify-between gap-2 border-t border-[#e6e7e8] px-5 py-4">
+              <Button type="button" variant="outline" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={() => void handleGenerate()} disabled={busy}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate
+              </Button>
+            </DialogFooter>
+          ) : null}
+
+          {step === "generating" ? (
+            <DialogFooter className="flex shrink-0 flex-row justify-start gap-2 border-t border-[#e6e7e8] px-5 py-4">
+              <Button type="button" variant="outline" onClick={closeModal}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          ) : null}
+
+          {step === "preview" && result ? (
+            <DialogFooter className="flex shrink-0 flex-row items-center justify-between gap-2 border-t border-[#e6e7e8] px-5 py-4">
+              <Button type="button" variant="outline" onClick={closeModal}>
+                Cancel
+              </Button>
+              <div className="flex flex-row gap-2">
+                <Button type="button" variant="outline" onClick={() => void handleDownload()}>
+                  Download PDF
+                </Button>
+                <Button type="button" onClick={() => void handleUseAsForm485()}>
+                  Use as Form 485
+                </Button>
+              </div>
+            </DialogFooter>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

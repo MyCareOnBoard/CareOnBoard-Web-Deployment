@@ -71,6 +71,8 @@ export type DocumentImportDialogProps = {
     extraction: ClientExtractionResponse,
     ctx: { overwrite: boolean; files: Record<string, File> },
   ) => string[];
+  /** Files already attached to the target doc slots, shown pre-filled each time the modal opens. */
+  initialFiles?: Record<string, File>;
 };
 
 type ModalStep = "pick" | "review";
@@ -86,6 +88,7 @@ export default function DocumentImportDialog({
   onExtract,
   onApply,
   computePreviewWarnings,
+  initialFiles,
 }: DocumentImportDialogProps) {
   const backToPickRef = useRef<HTMLButtonElement>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -111,11 +114,20 @@ export default function DocumentImportDialog({
     setPreviewLocalWarnings([]);
   }, []);
 
+  // Pre-fill the slots with any files already attached to the target doc slots
+  // so the pick step shows what's there instead of empty pickers.
+  const seedInitialFiles = useCallback(() => {
+    if (initialFiles && Object.keys(initialFiles).length > 0) {
+      setSelectedFiles(initialFiles);
+    }
+  }, [initialFiles]);
+
   const openImportModal = useCallback(() => {
     resetPickState();
+    seedInitialFiles();
     setModalStep("pick");
     setImportModalOpen(true);
-  }, [resetPickState]);
+  }, [resetPickState, seedInitialFiles]);
 
   const closeImportModal = useCallback(() => {
     setImportModalOpen(false);
@@ -198,7 +210,8 @@ export default function DocumentImportDialog({
   const backToPick = useCallback(() => {
     setModalStep("pick");
     resetPickState();
-  }, [resetPickState]);
+    seedInitialFiles();
+  }, [resetPickState, seedInitialFiles]);
 
   const applyImport = useCallback(() => {
     if (!extraction || selectedCount === 0) return;
@@ -206,7 +219,10 @@ export default function DocumentImportDialog({
     closeImportModal();
   }, [extraction, selectedCount, onApply, overwrite, selectedFiles, closeImportModal]);
 
-  const reviewLines = extraction?.warnings?.map((w) => w.message) ?? [];
+  const reviewLines =
+    extraction?.warnings
+      ?.map((w) => w?.message)
+      .filter((line): line is string => Boolean(line && line.trim())) ?? [];
   const lowConfidence =
     extraction?.fieldConfidences?.filter(
       (f) => typeof f.confidence === "number" && f.confidence < LOW_CONFIDENCE,

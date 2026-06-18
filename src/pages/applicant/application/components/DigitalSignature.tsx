@@ -1,10 +1,27 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/ui/file-upload";
 import { cn } from "@/lib/utils";
 import { useSignDocumentMutation } from "@/pages/applicant/application/api";
+
+const INK_ALPHA_THRESHOLD = 10;
+
+/** True if the canvas has any non-transparent pixels (i.e. the user actually drew). */
+function canvasHasInk(canvas: HTMLCanvasElement): boolean {
+  const context = canvas.getContext("2d");
+  if (!context) return false;
+  try {
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] > INK_ALPHA_THRESHOLD) return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
 
 type SignaturePayload = {
   signatureType: string;
@@ -45,6 +62,54 @@ const DigitalSignatureModal = ({
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
 
   const [signDocument] = useSignDocumentMutation();
+
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  // Treat the hand-rolled portal as a real dialog: move focus in on open, trap
+  // Tab within it, close on Escape, and restore focus to the opener on close.
+  useEffect(() => {
+    if (!isOpen || typeof document === "undefined") return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setIsOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+      const focusables = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null);
+      if (focusables.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === dialog)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [isOpen, setIsOpen]);
 
   // Initialize canvas for drawing
   useEffect(() => {
@@ -151,9 +216,9 @@ const DigitalSignatureModal = ({
   const handleNext = async () => {
     let signatureData: SignaturePayload | null = null;
 
-    if (activeTab === 'type' && typedSignature) {
-      signatureData = { signatureType: 'type', signatureData: typedSignature };
-    } else if (activeTab === 'draw' && canvasRef.current) {
+    if (activeTab === 'type' && typedSignature.trim()) {
+      signatureData = { signatureType: 'type', signatureData: typedSignature.trim() };
+    } else if (activeTab === 'draw' && canvasRef.current && canvasHasInk(canvasRef.current)) {
       signatureData = { signatureType: 'draw', signatureData: canvasRef.current.toDataURL() };
     } else if (activeTab === 'upload' && uploadedImage) {
       signatureData = { signatureType: 'upload', signatureData: uploadedImage };
@@ -198,12 +263,17 @@ const DigitalSignatureModal = ({
       onClick={() => setIsOpen(false)}
     >
       <div
-        className="relative w-full max-w-2xl animate-fadeIn rounded-lg bg-white p-6 shadow-2xl"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="relative w-full max-w-2xl animate-fadeIn rounded-lg bg-white p-6 shadow-2xl focus:outline-none"
         onClick={(event) => event.stopPropagation()}
       >
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xl font-semibold text-gray-900">Digital Signature</h2>
+            <h2 id={titleId} className="text-xl font-semibold text-gray-900">Digital Signature</h2>
             <button
               onClick={handleCancel}
               className="cursor-pointer text-gray-400 hover:text-gray-600 transition-colors"

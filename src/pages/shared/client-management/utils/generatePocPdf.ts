@@ -361,14 +361,13 @@ export function downloadPocPdfFromBlob(
   fileName: string,
 ): void {
   const url = URL.createObjectURL(blob);
-  try {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    a.click();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  // Defer revocation so the browser has started the download before the URL is
+  // invalidated (synchronous revoke can cancel the download in some browsers).
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export async function downloadPocPdf(response: ClientPocGenerationResponse): Promise<void> {

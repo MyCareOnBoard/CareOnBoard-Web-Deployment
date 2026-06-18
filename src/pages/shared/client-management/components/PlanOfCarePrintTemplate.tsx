@@ -1,5 +1,5 @@
 import React from "react";
-import { POC_TASKS, type PlanOfCareFormData } from "../types/planOfCare";
+import { POC_TASKS, type PlanOfCareFormData, type PocSignatureType } from "../types/planOfCare";
 
 /**
  * Paper-faithful render of the Plan of Care used ONLY for PDF export. It mirrors
@@ -116,17 +116,28 @@ function Line({
   );
 }
 
+/** Captured-signature heights: uploaded scans at full size, typed/drawn at 50%. */
+const SIG_MAX_H_UPLOAD = 30;
+const SIG_MAX_H_DRAWN = 15;
+
 /** Signature line: renders the captured signature image (or a blank line). */
 function SignatureLine({
   label,
   value,
+  signatureType,
   grow = 1,
 }: {
   label: string;
   value: string;
+  signatureType?: PocSignatureType;
   grow?: number;
 }) {
   const isImage = value.startsWith("data:image");
+  // Uploaded signatures render at full size; typed/drawn signatures are
+  // reduced by 50% (they come in oversized from the type/draw pad).
+  const isUpload = signatureType === "upload";
+  const imgMaxHeight = isUpload ? SIG_MAX_H_UPLOAD : SIG_MAX_H_DRAWN;
+  const lineMinHeight = isUpload ? SIG_MAX_H_UPLOAD + 2 : CHECK_ROW;
   return (
     <div style={{ display: "flex", alignItems: "flex-end", gap: 6, flex: grow, minWidth: 0 }}>
       <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{label}</span>
@@ -134,14 +145,18 @@ function SignatureLine({
         style={{
           flex: 1,
           borderBottom: UNDERLINE,
-          minHeight: 26,
+          minHeight: lineMinHeight,
           display: "flex",
           alignItems: "flex-end",
           overflow: "hidden",
         }}
       >
         {isImage ? (
-          <img src={value} alt="" style={{ maxHeight: 30, maxWidth: "100%", objectFit: "contain" }} />
+          <img
+            src={value}
+            alt=""
+            style={{ maxHeight: imgMaxHeight, maxWidth: "100%", objectFit: "contain" }}
+          />
         ) : null}
       </span>
     </div>
@@ -202,8 +217,8 @@ function DateField({ label, value }: { label: string; value?: Date }) {
 function GoalItem({ checked, children }: { checked: boolean; children: React.ReactNode }) {
   // Box absolutely positioned so it aligns with the first line; text may wrap.
   return (
-    <div style={{ position: "relative", paddingLeft: 21, margin: "3px 0", lineHeight: "18px" }}>
-      <span style={{ position: "absolute", left: 0, top: 5 }}>
+    <div style={{ position: "relative", paddingLeft: 21, margin: "3px 0", lineHeight: `${CHECK_ROW}px` }}>
+      <span style={{ position: "absolute", left: 0, top: BOX_TOP }}>
         <Box checked={checked} />
       </span>
       {children}
@@ -211,7 +226,7 @@ function GoalItem({ checked, children }: { checked: boolean; children: React.Rea
   );
 }
 
-export default function PlanOfCarePrintTemplate({ poc }: { poc: PlanOfCareFormData }) {
+function PlanOfCarePrintTemplate({ poc }: { poc: PlanOfCareFormData }) {
   const cell: React.CSSProperties = {
     border: BORDER,
     padding: "4px 6px",
@@ -229,6 +244,7 @@ export default function PlanOfCarePrintTemplate({ poc }: { poc: PlanOfCareFormDa
         fontFamily: "Arial, Helvetica, sans-serif",
         fontSize: 12.5,
         lineHeight: 1.35,
+        paddingBottom: 10,
       }}
     >
       {/* Header — slightly larger font than the table body */}
@@ -404,7 +420,12 @@ export default function PlanOfCarePrintTemplate({ poc }: { poc: PlanOfCareFormDa
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <Line label="RN NAME (PRINT)" value={poc.rnName} />
         <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
-          <SignatureLine label="RN SIGNATURE:" value={poc.rnSignature} grow={3} />
+          <SignatureLine
+            label="RN SIGNATURE:"
+            value={poc.rnSignature}
+            signatureType={poc.rnSignatureType}
+            grow={3}
+          />
           <DateField label="DATE:" value={poc.rnDate} />
         </div>
         <div style={{ display: "flex", gap: 16 }}>
@@ -412,10 +433,19 @@ export default function PlanOfCarePrintTemplate({ poc }: { poc: PlanOfCareFormDa
           <Line label="RELATIONSHIP" value={poc.clientRepRelationship} grow={2} />
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
-          <SignatureLine label="CLIENT/REP SIGNATURE" value={poc.clientRepSignature} grow={3} />
+          <SignatureLine
+            label="CLIENT/REP SIGNATURE"
+            value={poc.clientRepSignature}
+            signatureType={poc.clientRepSignatureType}
+            grow={3}
+          />
           <DateField label="DATE:" value={poc.clientRepDate} />
         </div>
       </div>
     </div>
   );
 }
+
+// Memoized: the off-screen template only changes when its `poc` prop does, so it
+// skips reconciliation while the caller defers updates during rapid form edits.
+export default React.memo(PlanOfCarePrintTemplate);

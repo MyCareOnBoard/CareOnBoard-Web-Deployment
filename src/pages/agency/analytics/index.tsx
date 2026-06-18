@@ -71,6 +71,7 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="no-print">
         <OperationReportHeader
+          title="AI Analytics & Operation report"
           dateRange={dateRange}
           onOpenDateModal={() => setShowDateModal(true)}
           onActionSelect={(action) => {

@@ -149,6 +149,8 @@ export type PocTaskState = {
 
 export type PocAdvanceDirective = "" | "no" | "yes";
 
+export type PocSignatureType = "type" | "draw" | "upload";
+
 export type PlanOfCareFormData = {
   dateOfInitialPoc?: Date;
   clientName: string;
@@ -171,10 +173,12 @@ export type PlanOfCareFormData = {
   changesToReportToRn: [string, string];
   rnName: string;
   rnSignature: string;
+  rnSignatureType?: PocSignatureType;
   rnDate?: Date;
   clientRepName: string;
   clientRepRelationship: string;
   clientRepSignature: string;
+  clientRepSignatureType?: PocSignatureType;
   clientRepDate?: Date;
 };
 
