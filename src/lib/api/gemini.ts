@@ -8,6 +8,10 @@ import type {
   ClientPocGenerationResponse,
   GenerateClientPocInput,
 } from "@/pages/shared/client-management/types/clientPocGeneration";
+import type {
+  ClientForm485GenerationResponse,
+  GenerateClientForm485Input,
+} from "@/pages/shared/client-management/types/clientForm485Generation";
 
 interface TranslateToEnglishResponse {
   translatedText: string;
@@ -154,6 +158,42 @@ export async function generateClientPocViaApi(
 
   const response = await axiosClient.post<ClientPocGenerationResponse>(
     "/gemini/generate-client-poc",
+    formData,
+    {
+      timeout: GENERATE_POC_TIMEOUT_MS,
+      signal: options?.signal,
+      transformRequest: [
+        (data, headers) => {
+          if (data instanceof FormData) {
+            delete headers["Content-Type"];
+          }
+          return data;
+        },
+      ],
+    },
+  );
+
+  return response.data;
+}
+
+/**
+ * Generate a CMS-485 (Home Health Certification and Plan of Care) from a Plan of
+ * Care and a Clinical Assessment (both required, as uploads or existing URLs).
+ */
+export async function generateClientForm485ViaApi(
+  input: GenerateClientForm485Input,
+  options?: { signal?: AbortSignal },
+): Promise<ClientForm485GenerationResponse> {
+  const formData = new FormData();
+  if (input.pocFile) formData.append("pocFile", input.pocFile);
+  if (input.clinicalFile) formData.append("clinicalFile", input.clinicalFile);
+  if (input.pocUrl?.trim()) formData.append("pocUrl", input.pocUrl.trim());
+  if (input.clinicalUrl?.trim()) formData.append("clinicalUrl", input.clinicalUrl.trim());
+  if (input.clientId?.trim()) formData.append("clientId", input.clientId.trim());
+  formData.append("formContext", JSON.stringify(input.formContext ?? {}));
+
+  const response = await axiosClient.post<ClientForm485GenerationResponse>(
+    "/gemini/generate-client-form485",
     formData,
     {
       timeout: GENERATE_POC_TIMEOUT_MS,
