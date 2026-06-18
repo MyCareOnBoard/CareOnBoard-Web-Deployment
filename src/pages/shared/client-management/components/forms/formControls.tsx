@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Check, CalendarDays, X } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -74,7 +74,7 @@ export function SegmentedToggle<T extends string>({
             aria-pressed={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              "min-h-[40px] min-w-[64px] rounded-[8px] px-4 text-[13px] font-semibold transition-colors",
+              "min-h-[44px] min-w-[64px] rounded-[8px] px-4 text-[13px] font-semibold transition-colors",
               active ? "bg-[#00b4b8] text-white" : "bg-transparent text-[#10141a] active:bg-[#f1f5f5]",
             )}
           >
@@ -203,28 +203,35 @@ export function SignatureField({
   ariaLabel?: string;
 }) {
   const hasValue = Boolean(value);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   return (
     <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={onOpen}
         aria-label={ariaLabel ?? (hasValue ? "Edit signature" : "Add signature")}
         className="flex h-16 w-full items-center justify-center rounded-[10px] border border-[#cccccd] bg-white px-3 transition-colors hover:border-[#00b4b8]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/30"
       >
         {hasValue ? (
-          <img src={value} alt="Signature" className="max-h-12 object-contain" />
+          <img src={value} alt={ariaLabel ?? "Signature"} className="max-h-12 object-contain" />
         ) : (
-          <span className="text-[13px] text-[#b2b2b3]">Click to sign</span>
+          <span className="text-[13px] text-[#767676]">Click to sign</span>
         )}
       </button>
       {hasValue && onClear ? (
         <button
           type="button"
           aria-label="Clear signature"
-          onClick={onClear}
-          className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-[#5c6368] transition-colors hover:bg-[#e6e7e8]"
+          onClick={() => {
+            onClear();
+            // The clear button unmounts once cleared; move focus back to the trigger
+            // so keyboard users don't get dropped to <body>.
+            triggerRef.current?.focus();
+          }}
+          className="absolute right-1 top-1 inline-flex h-11 w-11 items-center justify-center rounded-full text-[#5c6368] transition-colors hover:bg-[#e6e7e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/30"
         >
-          <X className="h-3.5 w-3.5" aria-hidden />
+          <X className="h-4 w-4" aria-hidden />
         </button>
       ) : null}
     </div>

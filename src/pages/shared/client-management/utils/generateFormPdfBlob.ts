@@ -32,6 +32,18 @@ export async function generateFormPdfBlob(
     ]);
 
     await document.fonts.ready;
+    // Wait for embedded images (e.g. captured signatures) to finish decoding so
+    // the measured height is correct and the bottom of the form isn't clipped.
+    await Promise.all(
+      Array.from(clone.querySelectorAll("img")).map((img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((res) => {
+              img.addEventListener("load", () => res(), { once: true });
+              img.addEventListener("error", () => res(), { once: true });
+            }),
+      ),
+    );
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
     });
@@ -48,19 +60,20 @@ export async function generateFormPdfBlob(
     });
 
     const A4_WIDTH_MM = 210;
-    const MARGIN = 10;
-    const imgWidth = A4_WIDTH_MM - MARGIN * 2;
+    const MARGIN_X = 10;
+    const MARGIN_Y = 6;
+    const imgWidth = A4_WIDTH_MM - MARGIN_X * 2;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     // Single page sized to the content height (A4 width) so the form is never
     // split or clipped at a page boundary.
-    const pageHeight = imgHeight + MARGIN * 2;
+    const pageHeight = imgHeight + MARGIN_Y * 2;
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
       format: [A4_WIDTH_MM, pageHeight],
     });
     const imageData = canvas.toDataURL("image/jpeg", 0.95);
-    pdf.addImage(imageData, "JPEG", MARGIN, MARGIN, imgWidth, imgHeight);
+    pdf.addImage(imageData, "JPEG", MARGIN_X, MARGIN_Y, imgWidth, imgHeight);
 
     return pdf.output("blob");
   } finally {

@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { Download, FileCheck2, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ import {
   createEmptyPlanOfCareForm,
   buildPlanOfCareFileName,
   type PlanOfCareFormData,
+  type PocSignatureType,
 } from "../types/planOfCare";
 import { generateFormPdfBlob } from "../utils/generateFormPdfBlob";
 import { downloadPocPdfFromBlob } from "../utils/generatePocPdf";
@@ -30,7 +31,6 @@ import {
   SignatureField,
 } from "./forms/formControls";
 import { normalizeSignaturePayload } from "@/pages/agency/billing/claims/utils/claimReportSignatureUtils";
-import type { ClaimSignaturePayload } from "@/pages/agency/billing/claims/data/mockClaimReportData";
 
 const DigitalSignatureModal = lazy(
   () => import("@/pages/applicant/application/components/DigitalSignature"),
@@ -65,6 +65,10 @@ export default function PlanOfCareFormModal({
   const [busy, setBusy] = useState<null | "download" | "apply">(null);
   const [signatureTarget, setSignatureTarget] = useState<"rn" | "clientRep" | null>(null);
   const [signatureModalEverOpened, setSignatureModalEverOpened] = useState(false);
+
+  // The off-screen print template only needs to be current at export time. Defer it
+  // so typing in the form doesn't reconcile the heavy paper template on every keystroke.
+  const deferredPoc = useDeferredValue(poc);
 
   // Prefill empty identity fields from the wizard each time the modal opens,
   // without clobbering anything the user already typed.
@@ -106,10 +110,25 @@ export default function PlanOfCareFormModal({
       })),
     [],
   );
+  const setGroupField = useCallback(
+    <G extends "shortTermGoals" | "longTermGoals" | "dischargePlan">(
+      group: G,
+      patch: Partial<PlanOfCareFormData[G]>,
+    ) => setPoc((prev) => ({ ...prev, [group]: { ...prev[group], ...patch } })),
+    [],
+  );
 
   const generate = useCallback(
     async (mode: "download" | "apply") => {
       if (!printRef.current) return;
+      if (!poc.clientName.trim()) {
+        toast({
+          title: "Client name required",
+          description: "Add the client's name before downloading or saving the Plan of Care.",
+          variant: "destructive",
+        });
+        return;
+      }
       setBusy(mode);
       try {
         const blob = await generateFormPdfBlob(printRef.current);
@@ -160,15 +179,16 @@ export default function PlanOfCareFormModal({
 
   const handleSignatureSave = useCallback(
     async (payload: { signatureType: string; signatureData: string }) => {
+      const sigType = payload.signatureType as PocSignatureType;
       const normalized = await normalizeSignaturePayload({
-        signatureType: payload.signatureType as ClaimSignaturePayload["signatureType"],
+        signatureType: sigType,
         signatureData: payload.signatureData,
       });
       setPoc((prev) => ({
         ...prev,
         ...(signatureTarget === "rn"
-          ? { rnSignature: normalized.signatureData }
-          : { clientRepSignature: normalized.signatureData }),
+          ? { rnSignature: normalized.signatureData, rnSignatureType: sigType }
+          : { clientRepSignature: normalized.signatureData, clientRepSignatureType: sigType }),
       }));
       setSignatureTarget(null);
     },
@@ -189,7 +209,9 @@ export default function PlanOfCareFormModal({
         open={open}
         modal={signatureTarget === null}
         onOpenChange={(value) => {
-          if (!value && signatureTarget !== null) return;
+          // Keep open while the signature sub-modal is up, and don't allow closing
+          // mid-export (an in-flight "apply" would otherwise still attach the PDF).
+          if (!value && (signatureTarget !== null || busy)) return;
           onOpenChange(value);
         }}
       >
@@ -350,31 +372,16 @@ export default function PlanOfCareFormModal({
                   <CheckTile
                     label="Personal Care needs will be met"
                     checked={poc.shortTermGoals.personalCareMet}
-                    onChange={(v) =>
-                      setPoc((p) => ({
-                        ...p,
-                        shortTermGoals: { ...p.shortTermGoals, personalCareMet: v },
-                      }))
-                    }
+                    onChange={(v) => setGroupField("shortTermGoals", { personalCareMet: v })}
                   />
                   <CheckTile
                     label="Client will remain free from injury"
                     checked={poc.shortTermGoals.freeFromInjury}
-                    onChange={(v) =>
-                      setPoc((p) => ({
-                        ...p,
-                        shortTermGoals: { ...p.shortTermGoals, freeFromInjury: v },
-                      }))
-                    }
+                    onChange={(v) => setGroupField("shortTermGoals", { freeFromInjury: v })}
                   />
                   <LineInput
                     value={poc.shortTermGoals.other}
-                    onChange={(e) =>
-                      setPoc((p) => ({
-                        ...p,
-                        shortTermGoals: { ...p.shortTermGoals, other: e.target.value },
-                      }))
-                    }
+                    onChange={(e) => setGroupField("shortTermGoals", { other: e.target.value })}
                     placeholder="Other"
                   />
                 </div>
@@ -385,31 +392,16 @@ export default function PlanOfCareFormModal({
                   <CheckTile
                     label="Client will reach maximum level of independence"
                     checked={poc.longTermGoals.maxIndependence}
-                    onChange={(v) =>
-                      setPoc((p) => ({
-                        ...p,
-                        longTermGoals: { ...p.longTermGoals, maxIndependence: v },
-                      }))
-                    }
+                    onChange={(v) => setGroupField("longTermGoals", { maxIndependence: v })}
                   />
                   <CheckTile
                     label="Client will be maintained in a safe environment"
                     checked={poc.longTermGoals.safeEnvironment}
-                    onChange={(v) =>
-                      setPoc((p) => ({
-                        ...p,
-                        longTermGoals: { ...p.longTermGoals, safeEnvironment: v },
-                      }))
-                    }
+                    onChange={(v) => setGroupField("longTermGoals", { safeEnvironment: v })}
                   />
                   <LineInput
                     value={poc.longTermGoals.other}
-                    onChange={(e) =>
-                      setPoc((p) => ({
-                        ...p,
-                        longTermGoals: { ...p.longTermGoals, other: e.target.value },
-                      }))
-                    }
+                    onChange={(e) => setGroupField("longTermGoals", { other: e.target.value })}
                     placeholder="Other"
                   />
                 </div>
@@ -420,31 +412,16 @@ export default function PlanOfCareFormModal({
                   <CheckTile
                     label="Adequate level of functioning in the home"
                     checked={poc.dischargePlan.adequateFunctioning}
-                    onChange={(v) =>
-                      setPoc((p) => ({
-                        ...p,
-                        dischargePlan: { ...p.dischargePlan, adequateFunctioning: v },
-                      }))
-                    }
+                    onChange={(v) => setGroupField("dischargePlan", { adequateFunctioning: v })}
                   />
                   <CheckTile
                     label="Independent management of care"
                     checked={poc.dischargePlan.independentManagement}
-                    onChange={(v) =>
-                      setPoc((p) => ({
-                        ...p,
-                        dischargePlan: { ...p.dischargePlan, independentManagement: v },
-                      }))
-                    }
+                    onChange={(v) => setGroupField("dischargePlan", { independentManagement: v })}
                   />
                   <LineInput
                     value={poc.dischargePlan.other}
-                    onChange={(e) =>
-                      setPoc((p) => ({
-                        ...p,
-                        dischargePlan: { ...p.dischargePlan, other: e.target.value },
-                      }))
-                    }
+                    onChange={(e) => setGroupField("dischargePlan", { other: e.target.value })}
                     placeholder="Other"
                   />
                 </div>
@@ -542,11 +519,11 @@ export default function PlanOfCareFormModal({
         {/* Off-screen paper-faithful template snapshotted for the PDF export. */}
         <div aria-hidden className="pointer-events-none fixed left-[-10000px] top-0 w-[800px]">
           <div ref={printRef}>
-            <PlanOfCarePrintTemplate poc={poc} />
+            <PlanOfCarePrintTemplate poc={deferredPoc} />
           </div>
         </div>
 
-        <DialogFooter className="shrink-0 flex-col gap-2 border-t border-[#e6e7e8] px-5 py-4 sm:flex-row sm:justify-end">
+        <DialogFooter className="shrink-0 flex flex-col gap-2 border-t border-[#e6e7e8] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <Button
             type="button"
             variant="ghost"
@@ -556,33 +533,35 @@ export default function PlanOfCareFormModal({
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 min-h-[44px] w-full border-[#00b4b8] text-[#00b4b8] hover:bg-[#e6fafa] sm:w-auto"
-            onClick={() => void generate("download")}
-            disabled={!!busy}
-          >
-            {busy === "download" ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-            ) : (
-              <Download className="mr-2 h-4 w-4" aria-hidden />
-            )}
-            Download PDF
-          </Button>
-          <Button
-            type="button"
-            className="h-11 min-h-[44px] w-full shrink-0 bg-[#00b4b8] hover:bg-[#009ea1] sm:w-auto"
-            onClick={() => void generate("apply")}
-            disabled={!!busy}
-          >
-            {busy === "apply" ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-            ) : (
-              <FileCheck2 className="mr-2 h-4 w-4" aria-hidden />
-            )}
-            Use as Plan of Care
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 min-h-[44px] w-full border-[#00b4b8] text-[#00b4b8] hover:bg-[#e6fafa] sm:w-auto"
+              onClick={() => void generate("download")}
+              disabled={!!busy}
+            >
+              {busy === "download" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <Download className="mr-2 h-4 w-4" aria-hidden />
+              )}
+              Download PDF
+            </Button>
+            <Button
+              type="button"
+              className="h-11 min-h-[44px] w-full shrink-0 bg-[#00b4b8] hover:bg-[#009ea1] sm:w-auto"
+              onClick={() => void generate("apply")}
+              disabled={!!busy}
+            >
+              {busy === "apply" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <FileCheck2 className="mr-2 h-4 w-4" aria-hidden />
+              )}
+              Use as Plan of Care
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -590,6 +569,7 @@ export default function PlanOfCareFormModal({
       {signatureModalEverOpened ? (
         <Suspense fallback={null}>
           <DigitalSignatureModal
+            key={signatureTarget ?? "none"}
             isOpen={signatureTarget !== null}
             setIsOpen={(value) => {
               if (!value) setSignatureTarget(null);
