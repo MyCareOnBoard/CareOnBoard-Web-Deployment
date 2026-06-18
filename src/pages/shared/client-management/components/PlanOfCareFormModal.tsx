@@ -121,10 +121,12 @@ export default function PlanOfCareFormModal({
   const generate = useCallback(
     async (mode: "download" | "apply") => {
       if (!printRef.current) return;
-      if (!poc.clientName.trim()) {
+      // Downloading a blank form to fill by hand is fine; only require a client
+      // name when attaching it to the client's record.
+      if (mode === "apply" && !poc.clientName.trim()) {
         toast({
           title: "Client name required",
-          description: "Add the client's name before downloading or saving the Plan of Care.",
+          description: "Add the client's name before saving the Plan of Care to the client.",
           variant: "destructive",
         });
         return;
