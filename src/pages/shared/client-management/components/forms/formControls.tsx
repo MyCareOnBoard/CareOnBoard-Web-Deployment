@@ -51,6 +51,68 @@ export function CheckTile({
   );
 }
 
+/**
+ * Single-select tiles that WRAP — same look as CheckTile but radiogroup
+ * semantics. Use for option sets too long for SegmentedToggle's non-wrapping row
+ * (e.g. ADL levels, assessment type, 0–10 pain scale).
+ */
+export function OptionTiles<T extends string>({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  id,
+  required,
+}: {
+  value: T | "";
+  options: Array<{ value: T; label: string }>;
+  onChange: (next: T) => void;
+  ariaLabel?: string;
+  id?: string;
+  required?: boolean;
+}) {
+  return (
+    <div
+      id={id}
+      tabIndex={id ? -1 : undefined}
+      className="flex flex-wrap gap-2 outline-none"
+      role="radiogroup"
+      aria-label={ariaLabel}
+      aria-required={required || undefined}
+    >
+      {options.map((o) => {
+        const active = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={o.label}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "inline-flex min-h-[44px] items-center gap-2 rounded-[10px] border px-3 py-2 text-left text-[13px] font-medium leading-[1.25] transition-colors",
+              active
+                ? "border-[#00b4b8] bg-[#e6fafa] text-[#0c5d5f]"
+                : "border-[#cccccd] bg-white text-[#10141a] hover:border-[#00b4b8]/60 active:bg-[#f1f5f5]",
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
+                active ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#9aa0a6] bg-white",
+              )}
+            >
+              {active ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
+            </span>
+            <span>{o.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Two-option mutually-exclusive segmented control (e.g. No / Yes). */
 export function SegmentedToggle<T extends string>({
   value,
@@ -89,13 +151,20 @@ export function SegmentedToggle<T extends string>({
 export function FieldLabel({
   children,
   htmlFor,
+  required,
 }: {
   children: React.ReactNode;
   htmlFor?: string;
+  required?: boolean;
 }) {
   return (
     <label htmlFor={htmlFor} className="text-[12px] font-medium text-[#5c6368]">
       {children}
+      {required ? (
+        <span className="ml-0.5 text-[#d53411]" aria-hidden="true">
+          *
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -133,20 +202,26 @@ export function DatePickerField({
   value,
   onChange,
   placeholder = "Select date",
+  required,
 }: {
   id?: string;
   label?: string;
   value?: Date;
   onChange: (next: Date | undefined) => void;
   placeholder?: string;
+  required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="flex flex-col gap-1">
-      {label ? <FieldLabel htmlFor={id}>{label}</FieldLabel> : null}
+      {label ? (
+        <FieldLabel htmlFor={id} required={required}>
+          {label}
+        </FieldLabel>
+      ) : null}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" id={id} className="w-full focus:outline-none">
+          <button type="button" id={id} aria-required={required || undefined} className="w-full focus:outline-none">
             <InputGroup className="h-11 rounded-[10px] border border-[#cccccd] bg-white px-3">
               <InputGroupInput
                 value={value ? format(value, "MMM d, yyyy") : ""}
@@ -196,11 +271,13 @@ export function SignatureField({
   onOpen,
   onClear,
   ariaLabel,
+  id,
 }: {
   value?: string;
   onOpen: () => void;
   onClear?: () => void;
   ariaLabel?: string;
+  id?: string;
 }) {
   const hasValue = Boolean(value);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -209,6 +286,7 @@ export function SignatureField({
       <button
         ref={triggerRef}
         type="button"
+        id={id}
         onClick={onOpen}
         aria-label={ariaLabel ?? (hasValue ? "Edit signature" : "Add signature")}
         className="flex h-16 w-full items-center justify-center rounded-[10px] border border-[#cccccd] bg-white px-3 transition-colors hover:border-[#00b4b8]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/30"

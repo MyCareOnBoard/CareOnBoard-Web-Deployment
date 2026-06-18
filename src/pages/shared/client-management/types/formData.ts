@@ -1,4 +1,6 @@
 import type { ClientDocumentKey } from "@/lib/api/clients";
+import type { PlanOfCareFormData } from "./planOfCare";
+import type { ClinicalAssessmentFormData } from "./clinicalAssessment";
 
 /** Insurance / payer row from an ISP (ASO, MCO, private). */
 export type InsuranceDetail = {
@@ -507,6 +509,13 @@ export type AddClientFormData = {
     stage5: Stage5StaffAssignmentAndRestrictionsData;
     stage6: Stage6GoalsAndEmergencyData;
     stage7: Stage7SystemAiAndAuditData;
+    /**
+     * In-progress drafts of the on-site HHA intake forms, kept while the wizard is
+     * open so closing/reopening the modal (or switching stages) preserves entries.
+     * In-memory only — not sent to APIs (formDataToApiPayload ignores these).
+     */
+    planOfCareDraft?: PlanOfCareFormData;
+    clinicalAssessmentDraft?: ClinicalAssessmentFormData;
 };
 
 export function createEmptyServiceAuthorization(): Service {
@@ -890,5 +899,7 @@ export function createInitialAddClientFormData(): AddClientFormData {
             billingValidationRules: "",
             teamMembers: [],
         },
+        planOfCareDraft: undefined,
+        clinicalAssessmentDraft: undefined,
     };
 }

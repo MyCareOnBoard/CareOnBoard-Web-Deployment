@@ -62,6 +62,8 @@ export default function PlanOfCareFormModal({
   const [poc, setPoc] = useState<PlanOfCareFormData>(() =>
     createEmptyPlanOfCareForm(),
   );
+  const pocRef = useRef(poc);
+  pocRef.current = poc;
   const [busy, setBusy] = useState<null | "download" | "apply">(null);
   const [signatureTarget, setSignatureTarget] = useState<"rn" | "clientRep" | null>(null);
   const [signatureModalEverOpened, setSignatureModalEverOpened] = useState(false);
@@ -70,18 +72,30 @@ export default function PlanOfCareFormModal({
   // so typing in the form doesn't reconcile the heavy paper template on every keystroke.
   const deferredPoc = useDeferredValue(poc);
 
-  // Prefill empty identity fields from the wizard each time the modal opens,
-  // without clobbering anything the user already typed.
+  // Hydrate from the saved draft on open (so closing/reopening keeps entries),
+  // then non-destructively prefill identity fields from the wizard.
   useEffect(() => {
     if (!open) return;
     const fd = formDataRef.current;
-    setPoc((prev) => ({
-      ...prev,
-      clientName: prev.clientName || clientNameFromWizard(fd),
-      medicalNursingDx: prev.medicalNursingDx || (fd.stage3.diagnosis ?? ""),
-      allergies: prev.allergies || (fd.stage3.allergies ?? []).join(", "),
-    }));
+    const base = fd.planOfCareDraft ?? createEmptyPlanOfCareForm();
+    setPoc({
+      ...base,
+      clientName: base.clientName || clientNameFromWizard(fd),
+      medicalNursingDx: base.medicalNursingDx || (fd.stage3.diagnosis ?? ""),
+      allergies: base.allergies || (fd.stage3.allergies ?? []).join(", "),
+    });
   }, [open]);
+
+  // Persist the draft on every close path, then forward to the parent.
+  const closeModal = useCallback(
+    (next: boolean) => {
+      if (!next) {
+        setFormData((prev) => ({ ...prev, planOfCareDraft: pocRef.current }));
+      }
+      onOpenChange(next);
+    },
+    [onOpenChange, setFormData],
+  );
 
   const setField = useCallback(
     <K extends keyof PlanOfCareFormData>(key: K, value: PlanOfCareFormData[K]) =>
@@ -150,7 +164,7 @@ export default function PlanOfCareFormModal({
             description: "Attached as the Plan of Care (POC) document in step 3.",
             variant: "success",
           });
-          onOpenChange(false);
+          closeModal(false);
         }
       } catch {
         toast({
@@ -162,7 +176,7 @@ export default function PlanOfCareFormModal({
         setBusy(null);
       }
     },
-    [poc.clientName, setFormData, toast, onOpenChange],
+    [poc.clientName, setFormData, toast, closeModal],
   );
 
   const advChecks: Array<{
@@ -214,7 +228,7 @@ export default function PlanOfCareFormModal({
           // Keep open while the signature sub-modal is up, and don't allow closing
           // mid-export (an in-flight "apply" would otherwise still attach the PDF).
           if (!value && (signatureTarget !== null || busy)) return;
-          onOpenChange(value);
+          closeModal(value);
         }}
       >
         <DialogContent
@@ -530,7 +544,7 @@ export default function PlanOfCareFormModal({
             type="button"
             variant="ghost"
             className="h-11 min-h-[44px] w-full sm:w-auto"
-            onClick={() => onOpenChange(false)}
+            onClick={() => closeModal(false)}
             disabled={!!busy}
           >
             Cancel
