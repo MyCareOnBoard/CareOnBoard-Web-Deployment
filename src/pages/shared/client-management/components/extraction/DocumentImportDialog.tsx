@@ -114,16 +114,20 @@ export default function DocumentImportDialog({
     setPreviewLocalWarnings([]);
   }, []);
 
-  const openImportModal = useCallback(() => {
-    resetPickState();
-    // Pre-fill the slots with any files already attached to the target doc slots
-    // so reopening the modal shows what's there instead of empty pickers.
+  // Pre-fill the slots with any files already attached to the target doc slots
+  // so the pick step shows what's there instead of empty pickers.
+  const seedInitialFiles = useCallback(() => {
     if (initialFiles && Object.keys(initialFiles).length > 0) {
       setSelectedFiles(initialFiles);
     }
+  }, [initialFiles]);
+
+  const openImportModal = useCallback(() => {
+    resetPickState();
+    seedInitialFiles();
     setModalStep("pick");
     setImportModalOpen(true);
-  }, [resetPickState, initialFiles]);
+  }, [resetPickState, seedInitialFiles]);
 
   const closeImportModal = useCallback(() => {
     setImportModalOpen(false);
@@ -206,7 +210,8 @@ export default function DocumentImportDialog({
   const backToPick = useCallback(() => {
     setModalStep("pick");
     resetPickState();
-  }, [resetPickState]);
+    seedInitialFiles();
+  }, [resetPickState, seedInitialFiles]);
 
   const applyImport = useCallback(() => {
     if (!extraction || selectedCount === 0) return;
