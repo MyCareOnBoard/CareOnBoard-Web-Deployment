@@ -219,7 +219,10 @@ export default function DocumentImportDialog({
     closeImportModal();
   }, [extraction, selectedCount, onApply, overwrite, selectedFiles, closeImportModal]);
 
-  const reviewLines = extraction?.warnings?.map((w) => w.message) ?? [];
+  const reviewLines =
+    extraction?.warnings
+      ?.map((w) => w?.message)
+      .filter((line): line is string => Boolean(line && line.trim())) ?? [];
   const lowConfidence =
     extraction?.fieldConfidences?.filter(
       (f) => typeof f.confidence === "number" && f.confidence < LOW_CONFIDENCE,

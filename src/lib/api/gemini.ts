@@ -3,7 +3,10 @@
  */
 
 import axiosClient from "../axios";
-import type { ClientExtractionResponse } from "@/pages/shared/client-management/types/clientExtraction";
+import type {
+  ClientExtractionResponse,
+  ExtractionWarning,
+} from "@/pages/shared/client-management/types/clientExtraction";
 import type {
   ClientPocGenerationResponse,
   GenerateClientPocInput,
@@ -37,6 +40,31 @@ export async function translateToEnglishViaApi(
 export const EXTRACT_DOCUMENT_TIMEOUT_MS = 300_000;
 
 /**
+ * Coerce an extraction response's `warnings` into the ExtractionWarning object form.
+ * The Gemini extraction schema returns warnings as plain strings, but the app's type
+ * and every consumer expect `{ message, code?, path? }` — without this, the review
+ * step's "Notes from the document" renders blank bullets (a string has no `.message`).
+ * Idempotent for endpoints that already return objects; blank warnings are dropped.
+ */
+function normalizeExtractionResponse(data: ClientExtractionResponse): ClientExtractionResponse {
+  const raw = (data?.warnings ?? []) as unknown[];
+  const warnings = raw.reduce<ExtractionWarning[]>((acc, w) => {
+    if (typeof w === "string") {
+      if (w.trim()) acc.push({ message: w });
+    } else if (
+      w &&
+      typeof w === "object" &&
+      typeof (w as ExtractionWarning).message === "string" &&
+      (w as ExtractionWarning).message.trim()
+    ) {
+      acc.push(w as ExtractionWarning);
+    }
+    return acc;
+  }, []);
+  return { ...data, warnings };
+}
+
+/**
  * ISP / POC document extraction (multipart file only).
  */
 export async function extractClientIspViaApi(
@@ -64,7 +92,7 @@ export async function extractClientIspViaApi(
     },
   );
 
-  return response.data;
+  return normalizeExtractionResponse(response.data);
 }
 
 /** Match backend gemini Cloud Function timeoutSeconds (300). */
@@ -105,7 +133,7 @@ export async function extractSdrDocumentViaApi(
     },
   );
 
-  return response.data;
+  return normalizeExtractionResponse(response.data);
 }
 
 /**
@@ -136,7 +164,7 @@ export async function extractClientHhaPocClinicalViaApi(
     },
   );
 
-  return response.data;
+  return normalizeExtractionResponse(response.data);
 }
 
 const GENERATE_POC_TIMEOUT_MS = EXTRACT_DOCUMENT_TIMEOUT_MS;
