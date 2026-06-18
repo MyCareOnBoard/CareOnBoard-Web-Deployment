@@ -75,7 +75,7 @@ export function OptionTiles<T extends string>({
     <div
       id={id}
       tabIndex={id ? -1 : undefined}
-      className="flex flex-wrap gap-2 outline-none"
+      className="flex flex-wrap gap-2 rounded-[10px] outline-none focus:ring-2 focus:ring-[#00b4b8]/30"
       role="radiogroup"
       aria-label={ariaLabel}
       aria-required={required || undefined}
@@ -272,12 +272,14 @@ export function SignatureField({
   onClear,
   ariaLabel,
   id,
+  required,
 }: {
   value?: string;
   onOpen: () => void;
   onClear?: () => void;
   ariaLabel?: string;
   id?: string;
+  required?: boolean;
 }) {
   const hasValue = Boolean(value);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -289,6 +291,7 @@ export function SignatureField({
         id={id}
         onClick={onOpen}
         aria-label={ariaLabel ?? (hasValue ? "Edit signature" : "Add signature")}
+        aria-required={required || undefined}
         className="flex h-16 w-full items-center justify-center rounded-[10px] border border-[#cccccd] bg-white px-3 transition-colors hover:border-[#00b4b8]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/30"
       >
         {hasValue ? (

@@ -111,6 +111,9 @@ export function AddressAutocompleteField({
   };
 
   const handleUseCurrentLocation = () => {
+    // Dismiss any open suggestions up front so every exit path (unsupported,
+    // success, or error) leaves a clean field.
+    closeList();
     if (!navigator.geolocation) {
       toast({
         title: "Location unavailable",
@@ -141,7 +144,6 @@ export function AddressAutocompleteField({
           onChange(`Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`);
         } finally {
           setLocating(false);
-          closeList();
         }
       },
       (error) => {
@@ -242,6 +244,9 @@ export function AddressAutocompleteField({
                     id={optionId(index)}
                     aria-selected={index === activeIndex}
                     tabIndex={-1}
+                    // Keep focus on the input through select-and-close so it stays
+                    // typeable (the list unmounts on select and focus can't be restored).
+                    onMouseDown={(e) => e.preventDefault()}
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => void commitSuggestion(suggestion.placeId)}
                     className={cn(

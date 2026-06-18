@@ -71,6 +71,8 @@ export type DocumentImportDialogProps = {
     extraction: ClientExtractionResponse,
     ctx: { overwrite: boolean; files: Record<string, File> },
   ) => string[];
+  /** Files already attached to the target doc slots, shown pre-filled each time the modal opens. */
+  initialFiles?: Record<string, File>;
 };
 
 type ModalStep = "pick" | "review";
@@ -86,6 +88,7 @@ export default function DocumentImportDialog({
   onExtract,
   onApply,
   computePreviewWarnings,
+  initialFiles,
 }: DocumentImportDialogProps) {
   const backToPickRef = useRef<HTMLButtonElement>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -113,9 +116,14 @@ export default function DocumentImportDialog({
 
   const openImportModal = useCallback(() => {
     resetPickState();
+    // Pre-fill the slots with any files already attached to the target doc slots
+    // so reopening the modal shows what's there instead of empty pickers.
+    if (initialFiles && Object.keys(initialFiles).length > 0) {
+      setSelectedFiles(initialFiles);
+    }
     setModalStep("pick");
     setImportModalOpen(true);
-  }, [resetPickState]);
+  }, [resetPickState, initialFiles]);
 
   const closeImportModal = useCallback(() => {
     setImportModalOpen(false);

@@ -811,6 +811,7 @@ export default function ClinicalAssessmentFormModal({
                       </FieldLabel>
                       <SignatureField
                         id="ca-nurse-signature"
+                        required
                         value={ca.nurseSignature}
                         onOpen={openSignature}
                         onClear={() => setField("nurseSignature", "")}

@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { extractClientHhaPocClinicalViaApi } from "@/lib/api/gemini";
 import type { ClientExtractionResponse } from "../types/clientExtraction";
 import type { AddClientFormData } from "../types/formData";
@@ -52,6 +52,17 @@ export default function HhaImportFromFilePanel({
     [formData],
   );
 
+  // Show files already attached to the POC / Clinical Assessment slots when the
+  // modal reopens, instead of empty pickers.
+  const initialFiles = useMemo(() => {
+    const out: Record<string, File> = {};
+    for (const slot of SLOTS) {
+      const doc = formData.stage3.docs.find((d) => d.key === slot.id);
+      if (doc?.file) out[slot.id] = doc.file;
+    }
+    return out;
+  }, [formData.stage3.docs]);
+
   const pickDescription = (
     <p className="text-[12px] leading-relaxed text-muted-foreground">
       Upload the client's Plan of Care and/or Clinical Assessment (PDF, JPEG, PNG, or WebP,
@@ -71,6 +82,7 @@ export default function HhaImportFromFilePanel({
       onExtract={onExtract}
       onApply={onApply}
       computePreviewWarnings={computePreviewWarnings}
+      initialFiles={initialFiles}
     />
   );
 }
