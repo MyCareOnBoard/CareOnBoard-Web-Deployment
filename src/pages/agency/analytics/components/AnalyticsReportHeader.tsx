@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 
 interface OperationReportHeaderProps {
+  title?: string;
+
   dateRange: {
     startDate: string;
     endDate: string;
@@ -36,6 +38,7 @@ const ACTIONS = [
 ];
 
 export default function OperationReportHeader({
+  title = "AI Analytics & Operation report",
   dateRange,
   onOpenDateModal,
   onActionSelect,
@@ -68,7 +71,7 @@ export default function OperationReportHeader({
   return (
     <div className="flex items-center justify-between gap-4 mb-6">
       <h2 className="text-[30px] font-semibold text-[#111827]">
-        AI Analytics & Operation report
+        {title}
       </h2>
 
       <div className="flex items-center gap-3">
