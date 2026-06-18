@@ -28,7 +28,7 @@ export default function HhaBlankFormsCard({
         Plan of Care &amp; Clinical Assessment forms
       </p>
       <p className="mb-3 text-[12px] text-[#5c6368]">
-        Create a Plan of Care or a Clinical Assessment online, then download it or attach it to the client.
+        Fill one out, then download it as a PDF or save it to this client&apos;s documents.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Button
