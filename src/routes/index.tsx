@@ -129,6 +129,7 @@ const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));
 const AgencyIncidentPage = lazy(() => import("@/pages/agency/incident"));
 const AgencyAnnouncementsPage = lazy(() => import("@/pages/agency/announcements"));
 const StaffTasksPage = lazy(() => import("@/pages/agency/staff-tasks"));
+const RemindersPage = lazy(() => import("@/pages/agency/reminders"));
 const AgencyReports = lazy(() => import("@/pages/agency/reports"));
 const AgencyClientReports = lazy(() => import("@/pages/agency/reports/clientsReport"));
 const AgencyDSPReports = lazy(() => import("@/pages/agency/reports/dspReports"));
@@ -436,6 +437,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.tasks,
                 Component: StaffTasksPage,
+            },
+            {
+                path: Routes.agency.reminders,
+                Component: RemindersPage,
             },
             {
                 path: Routes.agency.helpCenter,

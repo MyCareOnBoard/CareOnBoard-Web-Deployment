@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
+import { useNavigate } from "react-router";
 import { selectUser } from "@/utils/auth/store/authSelectors";
 import AddTaskModal from "@/components/tasks/AddTaskModal";
 import EditTaskModal from "@/components/tasks/EditTaskModal";
@@ -12,7 +13,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash2, Search, ClipboardList, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ClipboardList, ChevronDown, BellRing } from "lucide-react";
+import { Routes } from "@/routes/constants";
 import type { Department, StaffMember, StaffTask } from "@/components/tasks/types";
 import {
   useGetTasksQuery,
@@ -49,24 +51,24 @@ type StatusFilter = "All" | "Open" | "In Progress" | "Completed";
 function SkeletonRow() {
   return (
     <tr className="border-b border-[#e5e5e6]">
-      <td className="py-4 px-4">
+      <td className="px-4 py-4">
         <div className="flex items-center gap-2.5">
           <Skeleton className="w-2 h-2 rounded-full shrink-0" />
           <div className="space-y-1.5">
             <Skeleton className="h-3.5 w-36" />
-            <Skeleton className="h-3 w-24" />
+            <Skeleton className="w-24 h-3" />
           </div>
         </div>
       </td>
-      <td className="py-4 px-4"><Skeleton className="h-3.5 w-28" /></td>
-      <td className="py-4 px-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
-      <td className="py-4 px-4"><Skeleton className="h-3.5 w-20" /></td>
-      <td className="py-4 px-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
-      <td className="py-4 px-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
-      <td className="py-4 px-4">
+      <td className="px-4 py-4"><Skeleton className="h-3.5 w-28" /></td>
+      <td className="px-4 py-4"><Skeleton className="w-20 h-6 rounded-full" /></td>
+      <td className="px-4 py-4"><Skeleton className="h-3.5 w-20" /></td>
+      <td className="px-4 py-4"><Skeleton className="w-16 h-6 rounded-full" /></td>
+      <td className="px-4 py-4"><Skeleton className="w-20 h-6 rounded-full" /></td>
+      <td className="px-4 py-4">
         <div className="flex items-center justify-end gap-1">
-          <Skeleton className="h-7 w-14 rounded-full" />
-          <Skeleton className="h-9 w-9 rounded-full" />
+          <Skeleton className="rounded-full h-7 w-14" />
+          <Skeleton className="rounded-full h-9 w-9" />
         </div>
       </td>
     </tr>
@@ -74,6 +76,7 @@ function SkeletonRow() {
 }
 
 export default function StaffTasksPage() {
+  const navigate = useNavigate();
   const currentUser = useSelector(selectUser);
 
   const [searchQuery,    setSearchQuery]   = useState("");
@@ -186,24 +189,33 @@ export default function StaffTasksPage() {
 
         {/* Card header */}
         <div className="p-4 sm:p-6 border-b border-[#e5e7eb]">
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex flex-col gap-4 mb-1 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
             <div>
               <h2 className="text-[20px] sm:text-[22px] font-bold text-[#10141a]">All Tasks</h2>
               <p className="mt-0.5 text-[13px] sm:text-[14px] text-[#6b7280]">
                 Create and assign tasks to agency staff members
               </p>
             </div>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#00b4b8] text-white text-[14px] font-semibold hover:bg-[#00a0a4] transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Task
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => navigate(Routes.agency.reminders)}
+                className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-[#00b4b8] bg-white text-[#008f93] text-[14px] font-semibold hover:bg-[#f0fbfb] transition-colors cursor-pointer"
+              >
+                <BellRing className="w-4 h-4" />
+                Add Reminder
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#00b4b8] text-white text-[14px] font-semibold hover:bg-[#00a0a4] transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                Add Task
+              </button>
+            </div>
           </div>
 
           {/* Filter bar */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 mt-4">
             {/* Search */}
             <div className="relative flex items-center gap-2 border border-[#e5e7eb] rounded-full px-3 h-9 min-w-[200px]">
               <Search className="h-3.5 w-3.5 text-[#808081] shrink-0" />
@@ -264,7 +276,7 @@ export default function StaffTasksPage() {
             </tbody>
           </table>
         ) : filtered.length === 0 ? (
-          <div className="p-8 sm:p-12 text-center">
+          <div className="p-8 text-center sm:p-12">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f3f4f6]">
               <ClipboardList className="h-7 w-7 text-[#b2b2b3]" />
             </div>
@@ -307,7 +319,7 @@ export default function StaffTasksPage() {
 
                     <td className="py-4 px-4 text-[14px] text-[#10141a] whitespace-nowrap">{staffName}</td>
 
-                    <td className="py-4 px-4">
+                    <td className="px-4 py-4">
                       {task.department ? (
                         <span className="px-3 py-1 rounded-full text-[13px] font-medium border border-[#e5e7eb] text-[#6b7280] bg-transparent">
                           {deptLabel}
@@ -321,19 +333,19 @@ export default function StaffTasksPage() {
                       {task.dueDate || <span className="text-[#b2b2b3]">—</span>}
                     </td>
 
-                    <td className="py-4 px-4">
+                    <td className="px-4 py-4">
                       <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${priMeta?.border ?? ""}`}>
                         {task.priority}
                       </span>
                     </td>
 
-                    <td className="py-4 px-4">
+                    <td className="px-4 py-4">
                       <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${statusMeta?.border ?? ""}`}>
                         {task.status}
                       </span>
                     </td>
 
-                    <td className="py-4 px-4">
+                    <td className="px-4 py-4">
                       <div className="flex items-center justify-end gap-1.5">
                         {isAssigned && (
                           <div className={`relative ${updatingStatusId === task.id ? "opacity-50" : ""}`}>
@@ -363,14 +375,14 @@ export default function StaffTasksPage() {
                               onClick={() => openEdit(task)}
                               className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#f3f4f6] hover:text-[#10141a] transition-colors"
                             >
-                              <Pencil className="h-4 w-4" />
+                              <Pencil className="w-4 h-4" />
                             </button>
                             <button
                               title="Delete"
                               onClick={() => setDeletingTaskId(task.id)}
                               className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#fff0f0] hover:text-[#ef4444] transition-colors"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </>
                         )}
@@ -400,7 +412,7 @@ export default function StaffTasksPage() {
                   <DialogTitle className="text-[20px] font-bold text-[#10141a] leading-snug pr-6">
                     {viewingTask.title}
                   </DialogTitle>
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
                     <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${statusMeta?.border ?? ""}`}>
                       {viewingTask.status}
                     </span>
