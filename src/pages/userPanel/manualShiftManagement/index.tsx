@@ -9,7 +9,7 @@ import SuccessModal from "./components/SuccessModal";
 import { useToast } from "@/hooks/use-toast";
 import { Routes } from "@/routes/constants";
 import DigitalSignatureModal from "@/pages/applicant/application/components/DigitalSignature";
-import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift, ShiftActionStatus, formatShiftLocation } from "@/lib/api/shifts";
+import { createShift, CreateShiftRequest, ShiftStatus, ShiftType, SubmissionStatus, listShifts, Shift, deleteShift, updateShift, ShiftActionStatus, formatShiftLocation, ShiftLocation } from "@/lib/api/shifts";
 import { format, parse } from "date-fns";
 import { useSignDocumentMutation, useCheckSignatureStatusQuery } from "@/pages/applicant/application/api";
 import { searchClients, Client } from "@/lib/api/clients";
@@ -85,6 +85,10 @@ function buildManualShiftRequests(
           location: formData.location,
           startTime: dayData.checkIn,
           endTime: dayData.checkOut,
+          // Manual timesheets have no live clock punch, so the entered check in/out
+          // times are the source of truth for both the shift times and the clocked times.
+          clockedInAt: dayData.checkIn,
+          clockedOutAt: dayData.checkOut,
           status: ShiftStatus.PENDING, // Default to PENDING, will be overridden by caller
           type: ShiftType.MANUAL,
           submissionStatus: SubmissionStatus.DRAFT, // Default to DRAFT, will be overridden by caller
@@ -105,6 +109,35 @@ function buildManualShiftRequests(
   return requests;
 }
 
+/**
+ * Renders a saved signature: typed signatures show as styled text, while drawn or
+ * uploaded signatures are image data URLs and render as an <img>.
+ */
+function SignaturePreview({
+  signature,
+}: {
+  signature: { signatureType: string; signatureData: string };
+}) {
+  if (signature.signatureType === "type") {
+    return (
+      <p
+        className="max-w-full break-words text-center text-3xl leading-tight text-[#10141a]"
+        style={{ fontFamily: "Brush Script MT, cursive" }}
+      >
+        {signature.signatureData}
+      </p>
+    );
+  }
+
+  return (
+    <img
+      src={signature.signatureData}
+      alt="Signature"
+      className="max-h-[110px] max-w-full object-contain"
+    />
+  );
+}
+
 export default function ManualShiftManagementPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -113,7 +146,9 @@ export default function ManualShiftManagementPage() {
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState<{ display_name?: string; place_id?: string; lat?: string; lon?: string } | null>(null);
+  // Structured location for the shift, matching how the agency panel stores it:
+  // { address, countyState, zipCode, latlon: { lat, lon } }.
+  const [selectedLocation, setSelectedLocation] = useState<ShiftLocation | null>(null);
   const locationInputRef = useRef<HTMLDivElement>(null);
   const locationAutocomplete = useGooglePlacesAutocomplete();
   const { reverseGeocode } = useReverseGeocode();
@@ -208,11 +243,12 @@ export default function ManualShiftManagementPage() {
 
       try {
         setLoading(true);
-        // Fetch manual draft shifts
+        // Fetch manual draft shifts (populate client so we can restore the name)
         const response = await listShifts({
           agencyId: user?.agencyId,
           type: ShiftType.MANUAL,
           submissionStatus: SubmissionStatus.DRAFT,
+          client: true,
           limit: 100,
         });
 
@@ -239,6 +275,11 @@ export default function ManualShiftManagementPage() {
             clientId: client.id || "",
             location: formatShiftLocation(firstShift.location) || prev.location,
           }));
+
+          // Restore the structured location so re-saving keeps the agency-style shape.
+          if (firstShift.location && typeof firstShift.location === "object") {
+            setSelectedLocation(firstShift.location as ShiftLocation);
+          }
         }
 
         // Group shifts by week and day
@@ -370,9 +411,10 @@ export default function ManualShiftManagementPage() {
     if (details) {
       setFormData((prev) => ({ ...prev, location: details.formattedAddress }));
       setSelectedLocation({
-        display_name: details.formattedAddress,
-        lat: String(details.lat),
-        lon: String(details.lng),
+        address: details.formattedAddress,
+        countyState: [details.county, details.state].filter(Boolean).join(" / "),
+        zipCode: details.zipCode,
+        latlon: { lat: String(details.lat), lon: String(details.lng) },
       });
     }
   };
@@ -404,12 +446,19 @@ export default function ManualShiftManagementPage() {
           }
 
           const data = await response.json();
-          
+          const addr = data.address || {};
+
           // Format address from the response
           const address = data.display_name || `${latitude}, ${longitude}`;
-          
+
           setFormData((prev) => ({ ...prev, location: address }));
-          
+          setSelectedLocation({
+            address,
+            countyState: [addr.county, addr.state].filter(Boolean).join(" / "),
+            zipCode: addr.postcode,
+            latlon: { lat: String(latitude), lon: String(longitude) },
+          });
+
           toast({
             title: "Location Retrieved",
             description: "Your current location has been added.",
@@ -417,11 +466,13 @@ export default function ManualShiftManagementPage() {
         } catch (error) {
           console.error("Failed to get address:", error);
           // Fallback to coordinates if reverse geocoding fails
-          setFormData((prev) => ({ 
-            ...prev, 
-            location: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` 
-          }));
-          
+          const coords = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+          setFormData((prev) => ({ ...prev, location: coords }));
+          setSelectedLocation({
+            address: coords,
+            latlon: { lat: String(latitude), lon: String(longitude) },
+          });
+
           toast({
             title: "Location Retrieved",
             description: "Location coordinates have been added.",
@@ -586,7 +637,7 @@ export default function ManualShiftManagementPage() {
       // Step 3: Override submission status to DRAFT and set clocked times
       const draftRequests = shiftRequests.map(request => ({
         ...request,
-        location: `${selectedLocation?.lat},${selectedLocation?.lon}` || request.location,
+        location: selectedLocation || request.location,
         submissionStatus: SubmissionStatus.DRAFT,
         status: ShiftStatus.PENDING, // Use PENDING for drafts instead of COMPLETED
         type: ShiftType.MANUAL, // Ensure type is set to manual
@@ -613,7 +664,7 @@ export default function ManualShiftManagementPage() {
         if (existingShift) {
           // Update existing shift
           return updateShift(existingShift.id, {
-            location: `${selectedLocation?.lat},${selectedLocation?.lon}` || request.location,
+            location: selectedLocation || request.location,
             startTime: request.startTime,
             endTime: request.endTime,
             clockedInAt: request.clockedInAt,
@@ -631,7 +682,7 @@ export default function ManualShiftManagementPage() {
           console.log(`➕ Creating new shift for ${request.date}`);
           return createShift({
             ...request,
-            location: `${selectedLocation?.lat},${selectedLocation?.lon}` || request.location,
+            location: selectedLocation || request.location,
           });
         }
       });
@@ -744,20 +795,28 @@ export default function ManualShiftManagementPage() {
     try {
       setSubmitting(true);
 
-      // Step 1: Upload signatures to backend
+      // Step 1: Upload signatures to backend.
+      // A 409 means a signature for this context is already stored (e.g. it was saved
+      // on a prior draft Save), so it's effectively done — don't fail the submission.
+      const uploadSignature = async (
+        context: string,
+        data: { signatureType: string; signatureData: string }
+      ) => {
+        try {
+          await signDocument({ context, data }).unwrap();
+        } catch (err: any) {
+          if (err?.status === 409) return;
+          throw err;
+        }
+      };
+
       try {
         if (clientSignature) {
-          await signDocument({
-            context: "manual-timesheet-client",
-            data: clientSignature,
-          }).unwrap();
+          await uploadSignature("manual-timesheet-client", clientSignature);
         }
 
         if (userSignature) {
-          await signDocument({
-            context: "manual-timesheet-user",
-            data: userSignature,
-          }).unwrap();
+          await uploadSignature("manual-timesheet-user", userSignature);
         }
       } catch (signatureError: any) {
         console.error("Failed to upload signatures:", signatureError);
@@ -809,7 +868,7 @@ export default function ManualShiftManagementPage() {
       // Step 3: Set status to COMPLETED and add clockedInAt/clockedOutAt for submission
       const finalShiftRequests = shiftRequests.map(request => ({
         ...request,
-        location: `${selectedLocation?.lat},${selectedLocation?.lon}` || request.location,
+        location: selectedLocation || request.location,
         status: ShiftStatus.COMPLETED, // Set to COMPLETED only on submit
         submissionStatus: SubmissionStatus.SUBMITTED, // Set to SUBMITTED only on submit
         actionStatus: ShiftActionStatus.CLOCK_IN,
@@ -818,9 +877,44 @@ export default function ManualShiftManagementPage() {
         type: ShiftType.MANUAL, // Ensure type is set to manual
       }));
 
-      // Step 4: Submit all shifts in parallel
+      // Step 4: Finalize. Promote any existing draft for the same date to submitted
+      // (so it stops repopulating the form) instead of creating a duplicate; create a
+      // new shift only when there's no saved draft for that date.
+      let existingDrafts: Shift[] = [];
+      try {
+        const existingDraftsResponse = await listShifts({
+          agencyId: user.agencyId,
+          employeeId: user.id,
+          type: ShiftType.MANUAL,
+          submissionStatus: SubmissionStatus.DRAFT,
+          limit: 100,
+        });
+        existingDrafts = existingDraftsResponse.shifts;
+      } catch (fetchError) {
+        console.warn("Could not load existing drafts before submit:", fetchError);
+      }
+
       const results = await Promise.allSettled(
-        finalShiftRequests.map((request) => createShift(request))
+        finalShiftRequests.map((request) => {
+          const existingShift = existingDrafts.find((draft) => draft.date === request.date);
+          if (existingShift) {
+            return updateShift(existingShift.id, {
+              location: request.location,
+              startTime: request.startTime,
+              endTime: request.endTime,
+              clockedInAt: request.clockedInAt,
+              clockedOutAt: request.clockedOutAt,
+              week: request.week,
+              day: request.day,
+              sessionDuration: request.sessionDuration,
+              signatureInfo: request.signatureInfo,
+              status: request.status,
+              submissionStatus: request.submissionStatus,
+              type: request.type,
+            });
+          }
+          return createShift(request);
+        })
       );
 
       // Check for failures
@@ -1142,19 +1236,25 @@ export default function ManualShiftManagementPage() {
                 </p>
                 <div
                   onClick={() => setClientSignatureModalOpen(true)}
-                  className="border-2 border-dashed border-[#e5e5e6] rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-[#00b4b8] hover:bg-[#f8f9fa] transition-colors min-h-[150px]"
+                  className="border-2 border-dashed border-[#e5e5e6] rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-[#00b4b8] hover:bg-[#f8f9fa] transition-colors min-h-[150px]"
                 >
-                  <svg className="w-8 h-8 mb-2 text-[#808081]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  <span className="text-sm text-[#808081]">Client Signature</span>
+                  {clientSignature ? (
+                    <SignaturePreview signature={clientSignature} />
+                  ) : (
+                    <>
+                      <svg className="w-8 h-8 mb-2 text-[#808081]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span className="text-sm text-[#808081]">Client Signature</span>
+                    </>
+                  )}
                 </div>
                 {clientSignature && (
                   <div className="flex items-center gap-2 mt-3 text-sm text-[#22c55e]">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Client Signature Added
+                    Client Signature Added · tap to change
                   </div>
                 )}
               </div>
@@ -1166,19 +1266,25 @@ export default function ManualShiftManagementPage() {
                 </p>
                 <div
                   onClick={() => setUserSignatureModalOpen(true)}
-                  className="border-2 border-dashed border-[#e5e5e6] rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-[#00b4b8] hover:bg-[#f8f9fa] transition-colors min-h-[150px]"
+                  className="border-2 border-dashed border-[#e5e5e6] rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-[#00b4b8] hover:bg-[#f8f9fa] transition-colors min-h-[150px]"
                 >
-                  <svg className="w-8 h-8 mb-2 text-[#808081]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  <span className="text-sm text-[#808081]">User Signature</span>
+                  {userSignature ? (
+                    <SignaturePreview signature={userSignature} />
+                  ) : (
+                    <>
+                      <svg className="w-8 h-8 mb-2 text-[#808081]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span className="text-sm text-[#808081]">User Signature</span>
+                    </>
+                  )}
                 </div>
                 {userSignature && (
                   <div className="flex items-center gap-2 mt-3 text-sm text-[#22c55e]">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    User Signature Added
+                    User Signature Added · tap to change
                   </div>
                 )}
               </div>

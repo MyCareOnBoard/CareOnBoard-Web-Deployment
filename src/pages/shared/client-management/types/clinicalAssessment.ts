@@ -66,6 +66,24 @@ export const CA_ASSESSMENT_STATUSES: CaOption[] = [
   { value: "approved", label: "Approved" },
 ];
 
+// Client demographics — values mirror the Add Client wizard Stage 1 options so a
+// prefilled value maps straight through and the PDF prints the matching label.
+export const CA_GENDERS: CaOption[] = [
+  { value: "female", label: "Female" },
+  { value: "male", label: "Male" },
+  { value: "other", label: "Other" },
+  { value: "non-binary", label: "Non-binary" },
+  { value: "prefer-not-to-say", label: "Prefer not to say" },
+];
+
+export const CA_MARITAL_STATUSES: CaOption[] = [
+  { value: "single", label: "Single" },
+  { value: "married", label: "Married" },
+  { value: "widowed", label: "Widowed" },
+  { value: "divorced", label: "Divorced" },
+  { value: "separated", label: "Separated" },
+];
+
 export const CA_PAIN_LEVELS: CaOption[] = Array.from({ length: 11 }, (_, i) => ({
   value: String(i),
   label: String(i),
@@ -158,7 +176,22 @@ export type ClinicalAssessmentFormData = {
   locationOfAssessment: string;
   referralReason: string;
 
-  // Section 2 — Medical History
+  // Section 2 — Client Basic Information
+  clientFirstName: string;
+  clientLastName: string;
+  clientMiddleName: string;
+  clientPreferredName: string;
+  clientDob?: Date;
+  clientGender: string;
+  clientMaritalStatus: string;
+  clientPhone: string;
+  clientEmail: string;
+  clientAddress: string;
+  clientMedicaidId: string;
+  clientMedicareId: string;
+  clientSsn: string;
+
+  // Section 3 — Medical History
   primaryDiagnosis: string;
   secondaryDiagnoses: string;
   pastMedicalHistory: string;
@@ -167,7 +200,7 @@ export type ClinicalAssessmentFormData = {
   emergencyRoomVisits: string;
   chronicConditions: string;
 
-  // Section 3 — Vital Signs & Physical Health (strings: values carry units)
+  // Section 4 — Vital Signs & Physical Health (strings: values carry units)
   bloodPressure: string;
   heartRate: string;
   respiratoryRate: string;
@@ -178,19 +211,19 @@ export type ClinicalAssessmentFormData = {
   bmi: string;
   painLevel: string;
 
-  // Section 4 — Medication Assessment
+  // Section 5 — Medication Assessment
   medications: CaMedication[];
 
-  // Section 5 — Allergy Assessment
+  // Section 6 — Allergy Assessment
   drugAllergies: string;
   foodAllergies: string;
   environmentalAllergies: string;
   reactionType: string;
 
-  // Section 6 — Functional Assessment (ADL); keyed by CA_ADL_ACTIVITIES id
+  // Section 7 — Functional Assessment (ADL); keyed by CA_ADL_ACTIVITIES id
   adl: Record<string, string>;
 
-  // Section 7 — Cognitive & Mental Status
+  // Section 8 — Cognitive & Mental Status
   alertAndOriented: CaYesNo;
   memoryImpairment: CaYesNo;
   confusion: CaYesNo;
@@ -199,7 +232,7 @@ export type ClinicalAssessmentFormData = {
   abilityToMakeDecisions: CaYesNo;
   behavioralConcerns: string;
 
-  // Section 8 — Skin & Wound
+  // Section 9 — Skin & Wound
   skinCondition: CaSkinCondition;
   pressureInjuryRisk: CaRiskLevel;
   existingWounds: CaYesNo;
@@ -208,7 +241,7 @@ export type ClinicalAssessmentFormData = {
   drainagePresent: CaYesNo;
   dressingRequirements: string;
 
-  // Section 9 — Fall & Safety
+  // Section 10 — Fall & Safety
   historyOfFalls: CaYesNo;
   numberOfFallsLast6Months: string;
   balanceProblems: CaYesNo;
@@ -216,7 +249,7 @@ export type ClinicalAssessmentFormData = {
   homeSafetyHazards: string;
   fallRiskLevel: CaRiskLevel;
 
-  // Section 10 — Respiratory & Cardiovascular
+  // Section 11 — Respiratory & Cardiovascular
   respShortnessOfBreath: CaYesNo;
   respOxygenUse: CaYesNo;
   respOxygenFlowRate: string;
@@ -226,7 +259,7 @@ export type ClinicalAssessmentFormData = {
   cardioEdema: CaYesNo;
   cardioCirculationProblems: string;
 
-  // Section 11 — Nutritional
+  // Section 12 — Nutritional
   currentDiet: string;
   appetite: string;
   swallowingDifficulty: CaYesNo;
@@ -234,11 +267,11 @@ export type ClinicalAssessmentFormData = {
   feedingAssistanceRequired: CaYesNo;
   fluidRestrictions: string;
 
-  // Section 12 — Durable Medical Equipment; keyed by CA_DME_ITEMS id
+  // Section 13 — Durable Medical Equipment; keyed by CA_DME_ITEMS id
   dme: Record<string, boolean>;
   dmeOther: string;
 
-  // Section 13 — Home Environment & Support System
+  // Section 14 — Home Environment & Support System
   livingSituation: CaLivingSituation;
   primaryCaregiver: string;
   caregiverAbility: string;
@@ -248,7 +281,7 @@ export type ClinicalAssessmentFormData = {
   transportationAvailability: string;
   emergencyPreparedness: string;
 
-  // Section 14 — Skilled Care Needs (records keyed by their constant ids)
+  // Section 15 — Skilled Care Needs (records keyed by their constant ids)
   skilledNursingNeeded: CaYesNo;
   skilledNursingReasons: Record<string, boolean>;
   homeHealthAideNeeded: CaYesNo;
@@ -257,14 +290,14 @@ export type ClinicalAssessmentFormData = {
   medicalSocialWorkerNeeded: CaYesNo;
   medicalSocialWorkerReason: string;
 
-  // Section 15 — Clinical Summary & Recommendations
+  // Section 16 — Clinical Summary & Recommendations
   clinicalFindings: string;
   riskFactors: string;
   recommendedServices: string;
   recommendedVisitFrequency: string;
   recommendedGoals: string;
 
-  // Section 16 — Nurse Assessment & Approval (assessorName kept separate from Section 1)
+  // Section 17 — Nurse Assessment & Approval (assessorName kept separate from Section 1)
   approvalAssessorName: string;
   licenseNumber: string;
   nurseSignature: string;
@@ -313,6 +346,20 @@ export function createEmptyClinicalAssessmentForm(
     assessorDiscipline: "",
     locationOfAssessment: "",
     referralReason: "",
+
+    clientFirstName: "",
+    clientLastName: "",
+    clientMiddleName: "",
+    clientPreferredName: "",
+    clientDob: undefined,
+    clientGender: "",
+    clientMaritalStatus: "",
+    clientPhone: "",
+    clientEmail: "",
+    clientAddress: "",
+    clientMedicaidId: "",
+    clientMedicareId: "",
+    clientSsn: "",
 
     primaryDiagnosis: "",
     secondaryDiagnoses: "",

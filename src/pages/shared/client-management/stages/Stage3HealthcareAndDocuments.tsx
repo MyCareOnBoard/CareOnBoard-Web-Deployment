@@ -1,5 +1,5 @@
-import React, { Suspense, lazy, useState } from "react";
-import { CalendarDays, Upload, File, Plus, Trash2 } from "lucide-react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
+import { CalendarDays, Upload, FileText, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -177,6 +177,58 @@ function DatePickerInput({
   );
 }
 
+/**
+ * "View" links for a document slot, shown beneath its upload box once a file is
+ * set. Freshly selected/generated File objects get a temporary object URL (revoked
+ * on change/unmount); an already-saved document links to its stored url. Multi-file
+ * slots (e.g. medical docs, consents) render one link per file.
+ */
+function DocViewLinks({ doc }: { doc: DocState }) {
+  const [links, setLinks] = useState<Array<{ href: string; fileName: string }>>([]);
+
+  useEffect(() => {
+    const created: string[] = [];
+    let next: Array<{ href: string; fileName: string }> = [];
+
+    if (doc.files && doc.files.length > 0) {
+      next = doc.files.map((file) => {
+        const href = URL.createObjectURL(file);
+        created.push(href);
+        return { href, fileName: file.name };
+      });
+    } else if (doc.file) {
+      const href = URL.createObjectURL(doc.file);
+      created.push(href);
+      next = [{ href, fileName: doc.file.name }];
+    } else if (doc.url) {
+      next = [{ href: doc.url, fileName: doc.fileName || doc.title }];
+    }
+
+    setLinks(next);
+    return () => created.forEach((url) => URL.revokeObjectURL(url));
+  }, [doc.file, doc.files, doc.url, doc.fileName, doc.title]);
+
+  if (links.length === 0) return null;
+
+  return (
+    <div className="mt-3 flex flex-col gap-1.5">
+      {links.map((link, idx) => (
+        <a
+          key={`${link.fileName}-${idx}`}
+          href={link.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex w-fit items-center gap-1.5 text-[12px] font-medium text-[#00b4b8] hover:underline"
+        >
+          <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          View {doc.title}
+          <span className="font-normal text-[#808081]">({link.fileName})</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export function Stage3HealthcareAndDocuments({
   footer,
   formData,
@@ -216,7 +268,7 @@ export function Stage3HealthcareAndDocuments({
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)]">
+    <div className="@container min-h-[calc(100vh-200px)]">
       <div className="mb-10">
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
           {pageTitle}
@@ -233,9 +285,9 @@ export function Stage3HealthcareAndDocuments({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-6 @lg:grid-cols-2 @4xl:grid-cols-4">
           {isHhaClient ? (
-            <div className="col-span-1 border-b border-[#e5e5e6] pb-6 lg:col-span-2 xl:col-span-4">
+            <div className="col-span-1 border-b border-[#e5e5e6] pb-6 @lg:col-span-2 @4xl:col-span-4">
               <div className="mb-4">
                 <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
                   Physician information
@@ -244,7 +296,7 @@ export function Stage3HealthcareAndDocuments({
                   Use the ordering or primary physician tied to the HHA plan of care.
                 </p>
               </div>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-6 @lg:grid-cols-2 @4xl:grid-cols-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[12px] font-normal text-[#10141a]">Physician name</label>
                   <Input
@@ -277,7 +329,7 @@ export function Stage3HealthcareAndDocuments({
                     className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                   />
                 </div>
-                <div className="flex flex-col gap-1 md:col-span-2 xl:col-span-4">
+                <div className="flex flex-col gap-1 @lg:col-span-2 @4xl:col-span-4">
                   <label className="text-[12px] font-normal text-[#10141a]">Physician address</label>
                   <Input
                     value={stage3.physicianInfo?.address ?? ""}
@@ -371,7 +423,7 @@ export function Stage3HealthcareAndDocuments({
             )}
           </div>
 
-          <div className="col-span-1 border-t border-[#e5e5e6] pt-6 lg:col-span-2 xl:col-span-4 space-y-4">
+          <div className="col-span-1 border-t border-[#e5e5e6] pt-6 @lg:col-span-2 @4xl:col-span-4 space-y-4">
             <div>
               <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
                 Clinical details
@@ -380,8 +432,8 @@ export function Stage3HealthcareAndDocuments({
                 Diagnoses from the SDR (primary) or ISP when no SDR is on file.
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-              <div className="flex flex-col gap-1 md:col-span-2">
+            <div className="grid grid-cols-1 gap-6 @lg:grid-cols-2 @4xl:grid-cols-4">
+              <div className="flex flex-col gap-1 @lg:col-span-2">
                 <label className="text-[12px] font-normal text-[#10141a]">Diagnosis</label>
                 <Textarea
                   value={stage3.diagnosis ?? ""}
@@ -390,7 +442,7 @@ export function Stage3HealthcareAndDocuments({
                   placeholder="CODE - Description, one line per diagnosis (from SDR or ISP)"
                 />
               </div>
-              <div className="flex flex-col gap-1 md:col-span-2">
+              <div className="flex flex-col gap-1 @lg:col-span-2">
                 <label className="text-[12px] font-normal text-[#10141a]">Health or environmental hazards</label>
                 <Textarea
                   value={stage3.healthHazards ?? ""}
@@ -399,7 +451,7 @@ export function Stage3HealthcareAndDocuments({
                   placeholder="Allergies, seizures, equipment, or safety risks staff should know"
                 />
               </div>
-              <div className="flex flex-col gap-1 md:col-span-2 xl:col-span-4">
+              <div className="flex flex-col gap-1 @lg:col-span-2 @4xl:col-span-4">
                 <label className="text-[12px] font-normal text-[#10141a]">Nutrition notes</label>
                 <Textarea
                   value={stage3.nutritionNotes ?? ""}
@@ -419,7 +471,7 @@ export function Stage3HealthcareAndDocuments({
                   value={stage3.fallRisk || undefined}
                   onValueChange={(v) => updateStage3({ fallRisk: v as AddClientFormData["stage3"]["fallRisk"] })}
                 >
-                  <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                  <SelectTrigger className="w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white">
                     <SelectValue placeholder="Select answer" />
                   </SelectTrigger>
                   <SelectContent>
@@ -428,7 +480,7 @@ export function Stage3HealthcareAndDocuments({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-1 md:col-span-2 xl:col-span-3">
+              <div className="flex flex-col gap-1 @lg:col-span-2 @4xl:col-span-3">
                 <label className="text-[12px] font-normal text-[#10141a]">Special precautions</label>
                 <Input
                   value={stage3.specialPrecautions ?? ""}
@@ -599,7 +651,7 @@ export function Stage3HealthcareAndDocuments({
             )}
           </div>
 
-          <div className="col-span-1 border-t border-[#e5e5e6] pt-6 lg:col-span-2 xl:col-span-4 space-y-4">
+          <div className="col-span-1 border-t border-[#e5e5e6] pt-6 @lg:col-span-2 @4xl:col-span-4 space-y-4">
             <div className="mb-4">
               <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
                 Daily living support needs
@@ -614,7 +666,7 @@ export function Stage3HealthcareAndDocuments({
             {(stage3.selfCareNeeds ?? []).map((row, idx) => (
               <div
                 key={idx}
-                className="flex flex-col gap-3 rounded-[12px] border border-[#e5e5e6] bg-white/60 p-4 lg:flex-row lg:flex-wrap lg:items-end"
+                className="flex flex-col gap-3 rounded-[12px] border border-[#e5e5e6] bg-white/60 p-4 @2xl:flex-row @2xl:flex-wrap @2xl:items-end"
               >
                 <div className="flex min-w-[140px] flex-1 flex-col gap-1">
                   <label className="text-[12px] font-normal text-[#10141a]">Area</label>
@@ -674,7 +726,7 @@ export function Stage3HealthcareAndDocuments({
             <Button
               type="button"
               variant="outline"
-              className="w-full border-dashed border-[#808081] text-[#10141a] sm:w-auto mt-2"
+              className="w-full border-dashed border-[#808081] text-[#10141a] @md:w-auto mt-2"
               onClick={() =>
                 updateStage3({
                   selfCareNeeds: [
@@ -786,7 +838,6 @@ export function Stage3HealthcareAndDocuments({
             const allDocs = createInitialDocs(formData.type);
             return allDocs.map((defaultDoc) => {
               const doc = stage3.docs.find((d) => d.key === defaultDoc.key) || defaultDoc;
-              const hasExistingFile = !!doc.url && !doc.file && !doc.files;
 
               return (
                 <div key={doc.key}>
@@ -857,23 +908,9 @@ export function Stage3HealthcareAndDocuments({
                     </div>
                   </label>
 
-                  {hasExistingFile && (
-                    <div className="mt-3">
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="backdrop-blur-[8px] bg-[rgba(0,216,65,0.08)] border border-[rgba(255,255,255,0.3)] rounded-[8px] p-[8px] flex items-start gap-[8px] hover:bg-[rgba(0,216,65,0.12)] transition-colors"
-                      >
-                        <File className="h-5 w-5 text-[#10141a] shrink-0 mt-0.5" />
-                        <span className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
-                          {doc.fileName || doc.title}
-                        </span>
-                      </a>
-                    </div>
-                  )}
+                  <DocViewLinks doc={doc} />
 
-                  <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                  <div className="mt-3 grid grid-cols-1 gap-4 @2xl:grid-cols-3">
                     <div className="flex flex-col gap-1">
                       <label className="text-[12px] font-normal text-[#10141a]">Issued on date</label>
                       <DatePickerInput
@@ -892,7 +929,7 @@ export function Stage3HealthcareAndDocuments({
                       />
                     </div>
 
-                    <div className="flex items-center gap-3 pt-6">
+                    <div className="flex items-center gap-3 pt-2 @2xl:pt-6">
                       <p className="text-[14px] font-normal text-[#10141a]">Auto Reminder</p>
                       <Switch
                         checked={doc.autoReminder}
