@@ -241,7 +241,7 @@ export function DatePickerField({
             selected={value}
             defaultMonth={value ?? new Date()}
             captionLayout="dropdown"
-            fromYear={2000}
+            fromYear={1900}
             toYear={new Date().getFullYear() + 10}
             formatters={{
               formatMonthDropdown: (date) =>

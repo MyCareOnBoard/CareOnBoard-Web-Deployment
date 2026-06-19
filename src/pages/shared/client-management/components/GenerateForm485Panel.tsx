@@ -1,15 +1,18 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { Loader2, Sparkles, X } from "lucide-react";
 import type { AddClientFormData } from "../types/formData";
+import type { Form485Document } from "../types/clientForm485Generation";
 import {
   canGenerateForm485,
   getForm485MissingSources,
 } from "../utils/form485GenerationEligibility";
 import { useGenerateForm485 } from "../hooks/useGenerateForm485";
 import Form485PrintTemplate from "./Form485PrintTemplate";
+import Form485EditForm from "./Form485EditForm";
 import { generateFormPdfBlob } from "../utils/generateFormPdfBlob";
 import { downloadPocPdfFromBlob } from "../utils/generatePocPdf";
 import { withGeneratedForm485File } from "../utils/withGeneratedForm485File";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +25,12 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 type ModalStep = "confirm" | "generating" | "preview";
+type Form485Tab = "edit" | "preview";
+
+const FORM485_TABS: ReadonlyArray<{ id: Form485Tab; label: string }> = [
+  { id: "edit", label: "Edit form" },
+  { id: "preview", label: "Preview" },
+];
 
 type GenerateForm485PanelProps = {
   formData: AddClientFormData;
@@ -39,12 +48,40 @@ export default function GenerateForm485Panel({
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<ModalStep>("confirm");
+  const [activeTab, setActiveTab] = useState<Form485Tab>("edit");
+  // Editable copy of the generated form. Drives the Edit form, the Preview tab,
+  // and (deferred) the off-screen template captured to PDF, so exports reflect edits.
+  const [editedForm485, setEditedForm485] = useState<Form485Document | null>(null);
+  const deferredForm485 = useDeferredValue(editedForm485);
   const printRef = useRef<HTMLDivElement>(null);
   const blobCacheRef = useRef<{ key: string; blob: Blob } | null>(null);
 
   const { busy, error, result, generate, cancel, reset } = useGenerateForm485(
     formData,
     clientId,
+  );
+
+  // Re-seed the editable copy whenever a new result arrives (a regenerate is a
+  // fresh draft, so prior edits are intentionally discarded).
+  useEffect(() => {
+    if (result) {
+      setEditedForm485(result.form485);
+      setActiveTab("edit");
+      blobCacheRef.current = null;
+    } else {
+      setEditedForm485(null);
+    }
+  }, [result]);
+
+  const setField = useCallback(
+    <K extends keyof Form485Document>(key: K, next: Form485Document[K]) =>
+      setEditedForm485((prev) => {
+        if (!prev || prev[key] === next) return prev;
+        // Content changed: drop the cached PDF so the next export re-renders.
+        blobCacheRef.current = null;
+        return { ...prev, [key]: next };
+      }),
+    [],
   );
 
   const canGenerate = canGenerateForm485(formData);
@@ -54,6 +91,8 @@ export default function GenerateForm485Panel({
     cancel();
     reset();
     blobCacheRef.current = null;
+    setEditedForm485(null);
+    setActiveTab("edit");
     setStep("confirm");
     setOpen(false);
   }, [cancel, reset]);
@@ -227,10 +266,10 @@ export default function GenerateForm485Panel({
               </div>
             ) : null}
 
-            {step === "preview" && result ? (
+            {step === "preview" && result && editedForm485 ? (
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
                 <DialogDescription className="text-left text-[13px] leading-relaxed text-[#808081]">
-                  Review the generated CMS-485, then attach it as the client&apos;s Form 485.
+                  Review and edit the generated CMS-485, then attach it as the client&apos;s Form 485.
                 </DialogDescription>
                 {result.warnings.length > 0 ? (
                   <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
@@ -242,10 +281,36 @@ export default function GenerateForm485Panel({
                     </ul>
                   </div>
                 ) : null}
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                  {FORM485_TABS.map((tab, index) => (
+                    <React.Fragment key={tab.id}>
+                      {index > 0 ? (
+                        <span aria-hidden className="select-none text-[#cccccd]">
+                          &middot;
+                        </span>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        aria-pressed={activeTab === tab.id}
+                        className={cn(
+                          "inline-flex min-h-[44px] cursor-pointer items-center rounded-[8px] px-3 text-sm transition-colors",
+                          activeTab === tab.id
+                            ? "font-semibold text-[#00b4b8]"
+                            : "font-medium text-[#808081] hover:text-[#10141a]",
+                        )}
+                      >
+                        {tab.label}
+                      </button>
+                    </React.Fragment>
+                  ))}
+                </div>
                 <div className="max-h-[58vh] min-h-0 flex-1 overflow-auto rounded-[12px] border border-[#e5e5e6] bg-white p-4">
-                  <div ref={printRef}>
-                    <Form485PrintTemplate form485={result.form485} />
-                  </div>
+                  {activeTab === "edit" ? (
+                    <Form485EditForm value={editedForm485} setField={setField} />
+                  ) : (
+                    <Form485PrintTemplate form485={editedForm485} />
+                  )}
                 </div>
                 {error ? (
                   <p
@@ -258,6 +323,20 @@ export default function GenerateForm485Panel({
               </div>
             ) : null}
           </div>
+
+          {/* Always-mounted off-screen template fed by the deferred edited values.
+              Holds printRef so the PDF capture works from either tab without
+              reconciling the heavy paper template on every keystroke. */}
+          {step === "preview" && editedForm485 ? (
+            <div
+              aria-hidden
+              className="pointer-events-none fixed left-[-10000px] top-0 w-[800px]"
+            >
+              <div ref={printRef}>
+                <Form485PrintTemplate form485={deferredForm485 ?? editedForm485} />
+              </div>
+            </div>
+          ) : null}
 
           {step === "confirm" ? (
             <DialogFooter className="flex shrink-0 flex-row items-center justify-between gap-2 border-t border-[#e6e7e8] px-5 py-4">
