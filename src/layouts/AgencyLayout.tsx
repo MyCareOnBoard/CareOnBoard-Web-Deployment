@@ -32,6 +32,7 @@ import {
     Settings,
     Sun,
     Megaphone,
+    ClipboardList,
 } from "lucide-react";
 
 /** Canonical scope for the scheduling hub; legacy token "Scheduling" still honored in accessList. */
@@ -67,11 +68,8 @@ const allNavItems: NavItem[] = [
         path: Routes.agency.dspManagement,
         icon: DSPManagementIcon,
         accessKey: "DSP Management",
-        children: [
-            { label: "Manage DSPs", path: Routes.agency.dspManagement },
-            { label: "Staff Task Management", path: Routes.agency.tasks },
-        ],
     },
+    { label: "Staff Task Management", path: Routes.agency.tasks, icon: ClipboardList, accessKey: "DSP Management" },
     { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
     { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },

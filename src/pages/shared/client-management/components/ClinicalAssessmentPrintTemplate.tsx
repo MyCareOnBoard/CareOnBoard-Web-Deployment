@@ -5,7 +5,9 @@ import {
   CA_ASSESSMENT_TYPES,
   CA_ASSESSOR_DISCIPLINES,
   CA_DME_ITEMS,
+  CA_GENDERS,
   CA_HHA_ASSISTANCE,
+  CA_MARITAL_STATUSES,
   CA_RISK_LEVELS,
   CA_SKILLED_NURSING_REASONS,
   CA_THERAPY_SERVICES,
@@ -320,7 +322,35 @@ export default function ClinicalAssessmentPrintTemplate({
       </Row>
 
       {/* Section 2 */}
-      <SectionTitle n={2} title="Medical History" />
+      <SectionTitle n={2} title="Client Basic Information" />
+      <Row>
+        <Line label="First Name" value={ca.clientFirstName} />
+        <Line label="Last Name" value={ca.clientLastName} />
+      </Row>
+      <Row>
+        <Line label="Middle Name" value={ca.clientMiddleName} />
+        <Line label="Preferred Name" value={ca.clientPreferredName} />
+      </Row>
+      <Row>
+        <DateField label="Date of Birth" value={ca.clientDob} />
+      </Row>
+      <OptionRow label="Gender" options={CA_GENDERS} value={ca.clientGender} />
+      <OptionRow label="Marital Status" options={CA_MARITAL_STATUSES} value={ca.clientMaritalStatus} />
+      <Row>
+        <Line label="Phone" value={ca.clientPhone} />
+        <Line label="Email" value={ca.clientEmail} />
+      </Row>
+      <Row>
+        <Line label="Address" value={ca.clientAddress} />
+      </Row>
+      <Row>
+        <Line label="Medicaid ID" value={ca.clientMedicaidId} />
+        <Line label="Medicare ID" value={ca.clientMedicareId} />
+        <Line label="SSN" value={ca.clientSsn} />
+      </Row>
+
+      {/* Section 3 */}
+      <SectionTitle n={3} title="Medical History" />
       <Row>
         <Line label="Primary Diagnosis" value={ca.primaryDiagnosis} />
       </Row>
@@ -343,8 +373,8 @@ export default function ClinicalAssessmentPrintTemplate({
         <Line label="Chronic Conditions" value={ca.chronicConditions} />
       </Row>
 
-      {/* Section 3 */}
-      <SectionTitle n={3} title="Vital Signs & Physical Health" />
+      {/* Section 4 */}
+      <SectionTitle n={4} title="Vital Signs & Physical Health" />
       <Row>
         <Line label="Blood Pressure" value={ca.bloodPressure} />
         <Line label="Heart Rate" value={ca.heartRate} />
@@ -361,8 +391,8 @@ export default function ClinicalAssessmentPrintTemplate({
         <Line label="BMI" value={ca.bmi} />
       </Row>
 
-      {/* Section 4 */}
-      <SectionTitle n={4} title="Medication Assessment" />
+      {/* Section 5 */}
+      <SectionTitle n={5} title="Medication Assessment" />
       {ca.medications.length === 0 ? (
         <div data-pdf-block="1" style={{ fontStyle: "italic" }}>No medications recorded.</div>
       ) : (
@@ -390,8 +420,8 @@ export default function ClinicalAssessmentPrintTemplate({
         ))
       )}
 
-      {/* Section 5 */}
-      <SectionTitle n={5} title="Allergy Assessment" />
+      {/* Section 6 */}
+      <SectionTitle n={6} title="Allergy Assessment" />
       <Row>
         <Line label="Drug Allergies" value={ca.drugAllergies} />
         <Line label="Food Allergies" value={ca.foodAllergies} />
@@ -401,8 +431,8 @@ export default function ClinicalAssessmentPrintTemplate({
         <Line label="Reaction Type" value={ca.reactionType} />
       </Row>
 
-      {/* Section 6 */}
-      <SectionTitle n={6} title="Functional Assessment (ADL)" breakBefore />
+      {/* Section 7 */}
+      <SectionTitle n={7} title="Functional Assessment (ADL)" breakBefore />
       {CA_ADL_ACTIVITIES.map((activity) => (
         <OptionRow
           key={activity.id}
@@ -412,8 +442,8 @@ export default function ClinicalAssessmentPrintTemplate({
         />
       ))}
 
-      {/* Section 7 */}
-      <SectionTitle n={7} title="Cognitive & Mental Status" />
+      {/* Section 8 */}
+      <SectionTitle n={8} title="Cognitive & Mental Status" />
       <Row>
         <YesNo label="Alert and Oriented" value={ca.alertAndOriented} />
         <YesNo label="Memory Impairment" value={ca.memoryImpairment} />
@@ -428,8 +458,8 @@ export default function ClinicalAssessmentPrintTemplate({
         <Line label="Behavioral Concerns" value={ca.behavioralConcerns} />
       </Row>
 
-      {/* Section 8 */}
-      <SectionTitle n={8} title="Skin & Wound Assessment" />
+      {/* Section 9 */}
+      <SectionTitle n={9} title="Skin & Wound Assessment" />
       <OptionRow label="Skin Condition" options={SKIN_OPTIONS} value={ca.skinCondition} />
       <OptionRow label="Pressure Injury Risk" options={CA_RISK_LEVELS} value={ca.pressureInjuryRisk} />
       <Row>
@@ -444,8 +474,8 @@ export default function ClinicalAssessmentPrintTemplate({
         <Line label="Dressing Requirements" value={ca.dressingRequirements} />
       </Row>
 
-      {/* Section 9 */}
-      <SectionTitle n={9} title="Fall & Safety Assessment" />
+      {/* Section 10 */}
+      <SectionTitle n={10} title="Fall & Safety Assessment" />
       <Row>
         <YesNo label="History of Falls" value={ca.historyOfFalls} />
         <YesNo label="Balance Problems" value={ca.balanceProblems} />
@@ -459,8 +489,8 @@ export default function ClinicalAssessmentPrintTemplate({
       </Row>
       <OptionRow label="Fall Risk Level" options={CA_RISK_LEVELS} value={ca.fallRiskLevel} />
 
-      {/* Section 10 */}
-      <SectionTitle n={10} title="Respiratory & Cardiovascular Assessment" />
+      {/* Section 11 */}
+      <SectionTitle n={11} title="Respiratory & Cardiovascular Assessment" />
       <div data-pdf-block="1" data-pdf-keep-next="1" style={{ fontWeight: 700, marginBottom: 5 }}>
         Respiratory
       </div>
@@ -488,8 +518,8 @@ export default function ClinicalAssessmentPrintTemplate({
         <Line label="Circulation Problems" value={ca.cardioCirculationProblems} />
       </Row>
 
-      {/* Section 11 */}
-      <SectionTitle n={11} title="Nutritional Assessment" breakBefore />
+      {/* Section 12 */}
+      <SectionTitle n={12} title="Nutritional Assessment" breakBefore />
       <Row>
         <Line label="Current Diet" value={ca.currentDiet} />
         <Line label="Appetite" value={ca.appetite} />
@@ -503,15 +533,15 @@ export default function ClinicalAssessmentPrintTemplate({
         <Line label="Fluid Restrictions" value={ca.fluidRestrictions} />
       </Row>
 
-      {/* Section 12 */}
-      <SectionTitle n={12} title="Durable Medical Equipment (DME)" />
+      {/* Section 13 */}
+      <SectionTitle n={13} title="Durable Medical Equipment (DME)" />
       <MultiRow label="Equipment Used" items={CA_DME_ITEMS} selected={ca.dme} />
       <Row>
         <Line label="Other Equipment" value={ca.dmeOther} />
       </Row>
 
-      {/* Section 13 */}
-      <SectionTitle n={13} title="Home Environment & Support System" />
+      {/* Section 14 */}
+      <SectionTitle n={14} title="Home Environment & Support System" />
       <OptionRow options={LIVING_OPTIONS} value={ca.livingSituation} />
       <Row>
         <Line label="Primary Caregiver" value={ca.primaryCaregiver} />
@@ -531,8 +561,8 @@ export default function ClinicalAssessmentPrintTemplate({
         <Line label="Emergency Preparedness" value={ca.emergencyPreparedness} />
       </Row>
 
-      {/* Section 14 */}
-      <SectionTitle n={14} title="Skilled Care Needs Assessment" />
+      {/* Section 15 */}
+      <SectionTitle n={15} title="Skilled Care Needs Assessment" />
       <Row>
         <YesNo label="Skilled Nursing" value={ca.skilledNursingNeeded} />
       </Row>
@@ -549,8 +579,8 @@ export default function ClinicalAssessmentPrintTemplate({
         <Line label="Reason for Need" value={ca.medicalSocialWorkerReason} />
       </Row>
 
-      {/* Section 15 */}
-      <SectionTitle n={15} title="Clinical Summary & Recommendations" />
+      {/* Section 16 */}
+      <SectionTitle n={16} title="Clinical Summary & Recommendations" />
       <Row>
         <Line label="Clinical Findings" value={ca.clinicalFindings} />
       </Row>
@@ -567,8 +597,8 @@ export default function ClinicalAssessmentPrintTemplate({
         <Line label="Recommended Goals" value={ca.recommendedGoals} />
       </Row>
 
-      {/* Section 16 */}
-      <SectionTitle n={16} title="Nurse Assessment & Approval" />
+      {/* Section 17 */}
+      <SectionTitle n={17} title="Nurse Assessment & Approval" />
       <Row>
         <Line label="Assessor Name" value={ca.approvalAssessorName} grow={2} />
         <Line label="License Number" value={ca.licenseNumber} />
