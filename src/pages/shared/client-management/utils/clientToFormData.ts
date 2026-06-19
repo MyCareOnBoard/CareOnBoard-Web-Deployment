@@ -13,6 +13,7 @@ import {
     type Outcome,
 } from "../types/formData";
 import { groupLoadedServicesIntoOutcomes, clientSdrDetailsToWizard, type ServiceLoadRow } from "./outcomeServices";
+import { normalizeMaritalStatusForForm } from "./mergeExtractionDraft";
 
 const EMERGENCY_CONTACT_RELATIONSHIP_LOOKUP = new Set<string>(
     EMERGENCY_CONTACT_RELATIONSHIP_VALUES,
@@ -148,7 +149,11 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             ssn: client.ssn || "",
             tier: client.tier,
             preferredName: client.preferredName || "",
-            maritalStatus: client.maritalStatus || "",
+            // Canonicalize stored values (e.g. legacy "Widowed") so the Stage 1 picker
+            // matches; keep the raw value if it's an unrecognized variant rather than blanking it.
+            maritalStatus:
+                normalizeMaritalStatusForForm(client.maritalStatus).value ??
+                (client.maritalStatus || ""),
             medicareId: client.medicareId || "",
             homeInfo: {
                 apartmentNumber: client.homeInfo?.apartmentNumber ?? "",

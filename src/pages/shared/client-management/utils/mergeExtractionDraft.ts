@@ -310,6 +310,45 @@ function normalizeGenderForForm(
   };
 }
 
+/** Canonical marital-status values — must match the Stage 1 picker option values. */
+export const MARITAL_STATUS_VALUES = [
+  "single",
+  "married",
+  "widowed",
+  "divorced",
+  "separated",
+] as const;
+const MARITAL_STATUS_SET = new Set<string>(MARITAL_STATUS_VALUES);
+const MARITAL_STATUS_SYNONYMS: Record<string, string> = {
+  unmarried: "single",
+  "never married": "single",
+  remarried: "married",
+  widow: "widowed",
+  widower: "widowed",
+  divorce: "divorced",
+  "legally separated": "separated",
+};
+
+/**
+ * Normalize an extracted marital status to a canonical Stage 1 option value.
+ * Gemini emits free-form casing/synonyms (e.g. "Widowed", "Widow", "Never married");
+ * the Stage 1 <Select> only shows a selection when the value EXACTLY matches an item
+ * value (lowercase), so an un-normalized "Widowed" leaves the field blank.
+ */
+export function normalizeMaritalStatusForForm(
+  raw: string | undefined,
+): { value: string | undefined; warning?: string } {
+  if (!raw?.trim() || isExtractedNoDataToken(raw)) return { value: undefined };
+  const x = raw.trim().toLowerCase().replace(/\s+/g, " ");
+  if (MARITAL_STATUS_SET.has(x)) return { value: x };
+  const synonym = MARITAL_STATUS_SYNONYMS[x];
+  if (synonym) return { value: synonym };
+  return {
+    value: undefined,
+    warning: `Imported marital status "${raw}" wasn't recognized. Pick one manually.`,
+  };
+}
+
 function mergeUniqueStrings(
   current: string[],
   incoming: string[] | undefined,
@@ -867,8 +906,17 @@ export function mergeExtractionDraft(
     next.stage1.tier = mergeString(next.stage1.tier ?? "", s1.tier, overwrite) || undefined;
     next.stage1.preferredName =
       mergeString(next.stage1.preferredName ?? "", s1.preferredName, overwrite) || undefined;
-    next.stage1.maritalStatus =
-      mergeString(next.stage1.maritalStatus ?? "", s1.maritalStatus, overwrite) || undefined;
+
+    const ms = normalizeMaritalStatusForForm(s1.maritalStatus);
+    if (ms.warning) localWarnings.push(ms.warning);
+    if (ms.value) {
+      if (next.stage1.maritalStatus && next.stage1.maritalStatus !== ms.value && !overwrite) {
+        localWarnings.push("Marital status was not overwritten — existing value kept.");
+      } else {
+        next.stage1.maritalStatus = ms.value;
+      }
+    }
+
     next.stage1.medicareId =
       mergeString(next.stage1.medicareId ?? "", s1.medicareId, overwrite) || undefined;
     if (s1.homeInfo) {

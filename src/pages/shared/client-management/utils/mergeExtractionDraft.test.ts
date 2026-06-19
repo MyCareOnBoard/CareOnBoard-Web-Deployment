@@ -66,6 +66,36 @@ describe("mergeExtractionDraft", () => {
     expect(localWarnings.some((w) => w.toLowerCase().includes("gender"))).toBe(false);
   });
 
+  it("normalizes capitalized marital status to the Stage 1 option value", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: { stage1: { maritalStatus: "Widowed" } },
+    });
+    const { formData, localWarnings } = mergeExtractionDraft(initial, extraction);
+    expect(formData.stage1.maritalStatus).toBe("widowed");
+    expect(localWarnings.some((w) => w.toLowerCase().includes("marital"))).toBe(false);
+  });
+
+  it("maps marital-status synonyms to canonical values", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: { stage1: { maritalStatus: "Never Married" } },
+    });
+    const { formData } = mergeExtractionDraft(initial, extraction);
+    expect(formData.stage1.maritalStatus).toBe("single");
+  });
+
+  it("warns and leaves marital status unset when the value is unrecognized", () => {
+    const initial = createInitialAddClientFormData();
+    const extraction = makeExtraction({
+      draft: { stage1: { maritalStatus: "Domestic Partner" } },
+    });
+    const { formData, localWarnings } = mergeExtractionDraft(initial, extraction);
+    // Left unset (empty) so the picker stays blank rather than storing an unmatchable value.
+    expect(formData.stage1.maritalStatus || "").toBe("");
+    expect(localWarnings.some((w) => w.toLowerCase().includes("marital status"))).toBe(true);
+  });
+
   it("treats extracted N/A and Not applicable as empty strings", () => {
     const initial = createInitialAddClientFormData();
     const extraction = makeExtraction({
