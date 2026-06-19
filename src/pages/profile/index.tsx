@@ -460,13 +460,13 @@ export default function ProfilePage() {
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-3xl font-semibold text-gray-800">Profile</h2>
-          <Button
+          {/* <Button
             onClick={() => navigate(Routes.applicant.application)}
             className="rounded-full bg-[#00B4B8] hover:bg-[#00a0a4] px-4 py-2 h-10 text-white gap-2"
           >
             <Plus size={16} />
             New Application
-          </Button>
+          </Button> */}
         </div>
 
         {/* Error Message */}

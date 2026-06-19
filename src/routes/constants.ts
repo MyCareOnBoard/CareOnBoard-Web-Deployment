@@ -69,6 +69,7 @@ export const Routes = {
         agencySettingsClients: "/agency/agency-settings/user-levels/clients",
         profile: "/agency/profile",
         tasks: "/agency/tasks",
+        reminders: "/agency/reminders",
         reports: {
             index: "/agency/reports",
             clients: "/agency/reports/clients",
