@@ -52,8 +52,12 @@ export default function PersonalCareNoteForm({
   );
 
   useEffect(() => {
-    if (activityLog && activityLog.notes.length > 0) {
-      const note = activityLog.notes[activityLog.notes.length - 1];
+    // Prefer the active (editable) note; fall back to a submitted note so a
+    // locked note still shows what was checked after a reload.
+    const sourceNotes =
+      activityLog?.notes?.length ? activityLog.notes : activityLog?.submittedNotes ?? [];
+    if (sourceNotes.length > 0) {
+      const note = sourceNotes[sourceNotes.length - 1];
       setCheckedActivities(note?.metadata?.checkedActivities ?? []);
       setExistingNoteId(note.id);
     }
@@ -115,7 +119,7 @@ export default function PersonalCareNoteForm({
   // Lock the form once the note is submitted: the log status stays "active"
   // server-side, so a local flag is the reliable signal in-session.
   const readOnly = Boolean(activityLog?.status && activityLog.status !== "active");
-  const locked = submitted || readOnly;
+  const locked = submitted || readOnly || Boolean(activityLog?.hasSubmittedNotes);
 
   return (
     <div className="space-y-6">

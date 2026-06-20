@@ -69,7 +69,7 @@ export default function HhaServiceActivityLogPage() {
   // Lock the form once submitted (log status stays "active" server-side, so a
   // local flag is the reliable in-session signal).
   const readOnly = Boolean(activityLog?.status && activityLog.status !== "active");
-  const locked = submitted || readOnly;
+  const locked = submitted || readOnly || Boolean(activityLog?.hasSubmittedNotes);
 
   const updateRow = async (id: string, index: number, field: keyof ServiceRow, value: any) => {
     if (locked) return;
@@ -113,8 +113,13 @@ export default function HhaServiceActivityLogPage() {
   };
 
   useEffect(() => {
-    if (!isLoading && activityLog && activityLog.notes.length > 0) {
-      const mapped = activityLog.notes.map((note) => ({
+    // Prefer active (editable) notes; fall back to submitted notes so a locked
+    // log still renders its rows after a reload.
+    const sourceNotes = activityLog?.notes?.length
+      ? activityLog.notes
+      : activityLog?.submittedNotes ?? [];
+    if (!isLoading && sourceNotes.length > 0) {
+      const mapped = sourceNotes.map((note) => ({
         id: note.id,
         date: note.startDate ? new Date(note.startDate) : undefined,
         activity: note.metadata?.activity ?? "",
