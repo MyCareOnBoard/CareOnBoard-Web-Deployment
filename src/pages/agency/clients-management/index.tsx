@@ -9,6 +9,7 @@ import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { useListAgencyClientsQuery, useGetClientStatsQuery, type Client } from "@/lib/api/clients";
 import { countUniqueAssignedDspsForClient } from "@/lib/countUniqueAssignedDsps";
+import { isForm485Required } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
 
 interface DisplayClient {
   id: string;
@@ -117,9 +118,20 @@ export default function ClientsPage() {
   // Transform API clients to display format
   const displayClients: DisplayClient[] = useMemo(() => {
     return clients.map((client) => {
-      const status = client.status || "active";
-      const statusCapitalized = status.charAt(0).toUpperCase() + status.slice(1) as DisplayClient["status"];
-      const statusLabel = status === "pending" ? "Pending Setup" : statusCapitalized;
+      // HHA clients can't be activated until an approved Form 485 is uploaded, so
+      // one without it must never read as "Active" here — force it to pending and
+      // surface why. Existing active-but-485-less clients reflect this on sight.
+      const requires485 = isForm485Required(client);
+      const rawStatus = client.status || "active";
+      const effectiveStatus =
+        requires485 && rawStatus === "active" ? "pending" : rawStatus;
+      const statusCapitalized = effectiveStatus.charAt(0).toUpperCase() + effectiveStatus.slice(1) as DisplayClient["status"];
+      const statusLabel =
+        requires485 && effectiveStatus === "pending"
+          ? "Form 485 required"
+          : effectiveStatus === "pending"
+            ? "Pending Setup"
+            : statusCapitalized;
 
       const dspCount = countUniqueAssignedDspsForClient(client);
 

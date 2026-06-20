@@ -24,7 +24,11 @@ export interface GetActivityLogResponse {
   description: string;
   metadata: Record<string, any>;
   status: string;
+  /** True when any note on this log has been submitted (log status stays "active"). */
+  hasSubmittedNotes?: boolean;
   notes: ActivityLogNote[];
+  /** Notes already submitted (excluded from `notes`); used to render a locked note. */
+  submittedNotes?: ActivityLogNote[];
   createdBy: string;
   createdAt: string;
 }

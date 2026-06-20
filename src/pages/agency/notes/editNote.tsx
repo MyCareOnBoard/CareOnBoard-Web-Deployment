@@ -4,6 +4,8 @@ import AgencyCommunityBasedNote from "@/pages/agency/notes/components/commnityBa
 import AgencyActivitiesLogTemplate from "@/pages/agency/notes/components/activitiesLogTemplate";
 import AgencyRespiteLog from "@/pages/agency/notes/components/respiteLog";
 import AgencySupportedEmploymentIntervention from "@/pages/agency/notes/components/supportedEmploymentIntervention";
+import AgencyPersonalCareNote from "@/pages/agency/notes/components/personalCareNote";
+import AgencyHhaServiceActivityLog from "@/pages/agency/notes/components/hhaServiceActivityLog";
 import {useGetSubmittedNoteDetailsQuery} from "@/pages/agency/notes/api";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
@@ -92,6 +94,22 @@ export default function AgencyEditNote(
       case 'respite-log':
         return (
           <AgencyRespiteLog
+            submissionId={submissionId}
+            isLoading={isLoading}
+            submittedNote={submittedNote}
+          />
+        );
+      case 'hha-personal-care':
+        return (
+          <AgencyPersonalCareNote
+            submissionId={submissionId}
+            isLoading={isLoading}
+            submittedNote={submittedNote}
+          />
+        );
+      case 'hha-service-log':
+        return (
+          <AgencyHhaServiceActivityLog
             submissionId={submissionId}
             isLoading={isLoading}
             submittedNote={submittedNote}

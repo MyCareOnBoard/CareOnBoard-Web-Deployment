@@ -8,6 +8,10 @@ import { format } from "date-fns";
 import { ClockOutModal } from "./ClockOutModal";
 import { ClockInModal } from "./ClockInModal";
 import { LocationErrorModal } from "./LocationErrorModal";
+import { PersonalCareNoteModal } from "./components/PersonalCareNoteModal";
+import { createEmployeeActivityLog } from "@/lib/api/employees";
+import { getClientBasicInfo } from "@/lib/notes/clientBasicInfo";
+import { HHA_PERSONAL_CARE } from "@/lib/notes/noteTypes";
 import ExpandIcon from "@/assets/icons/arrow-expand-01.svg?react";
 import { Routes } from "@/routes/constants";
 import { toast } from "sonner";
@@ -28,6 +32,15 @@ const formatTimeRemaining = (minutes: number): string => {
   }
 
   return `${hours} ${hours === 1 ? 'hour' : 'hours'} ${remainingMinutes} min remaining`;
+};
+
+// date-fns `format` throws RangeError on an unparseable value. Shift timestamps
+// from the API are occasionally malformed (or absent), so format defensively —
+// a single bad value must not crash the whole page.
+const safeFormat = (value: string | null | undefined, pattern: string): string => {
+  if (!value) return "";
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? "" : format(d, pattern);
 };
 
 const calculateRemainingMinutes = (endTime: string, date: string): number => {
@@ -272,7 +285,7 @@ function ShiftCard({
             <div className="flex flex-col gap-0.5">
               <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Date</p>
               <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">
-                {format(new Date(shift.date), "dd MMMM")}
+                {safeFormat(shift.date, "dd MMMM")}
               </p>
             </div>
           ) : (
@@ -291,7 +304,7 @@ function ShiftCard({
             </p>
             <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">
               {shift.clockedInAt
-                ? format(new Date(shift.clockedInAt), 'hh:mm a')
+                ? safeFormat(shift.clockedInAt, 'hh:mm a')
                 : shift.startTime
               }
             </p>
@@ -311,7 +324,7 @@ function ShiftCard({
               <div className="flex flex-col gap-0.5">
                 <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked In</p>
                 <p
-                  className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{format(new Date(shift.clockedInAt), 'hh:mm a')}</p>
+                  className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{safeFormat(shift.clockedInAt, 'hh:mm a')}</p>
               </div>
             )}
 
@@ -319,7 +332,7 @@ function ShiftCard({
               <div className="flex flex-col gap-0.5">
                 <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked Out</p>
                 <p
-                  className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{format(new Date(shift.clockedOutAt), 'hh:mm a')}</p>
+                  className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{safeFormat(shift.clockedOutAt, 'hh:mm a')}</p>
               </div>
             )}
           </div>
@@ -426,7 +439,7 @@ function ShiftCard({
               <div className="flex flex-col shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Date</p>
                 <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">
-                  {format(new Date(shift.date), "dd MMMM")}
+                  {safeFormat(shift.date, "dd MMMM")}
                 </p>
               </div>
             )}
@@ -446,10 +459,10 @@ function ShiftCard({
                 </p>
                 <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">
                   {shift.clockedInAt
-                    ? format(new Date(shift.clockedInAt), 'hh:mm a')
+                    ? safeFormat(shift.clockedInAt, 'hh:mm a')
                     : panel === 'today'
                       ? shift.startTime
-                      : `${format(new Date(shift.date), 'dd MMMM yyyy')} ${shift.startTime}`
+                      : `${safeFormat(shift.date, 'dd MMMM yyyy')} ${shift.startTime}`
                   }
                 </p>
               </div>
@@ -461,7 +474,7 @@ function ShiftCard({
                   {panel === 'previous' ? "Clocked In" : (shift.clockedOutAt ? "Clocked In" : "Started at")}
                 </p>
                 <p
-                  className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{format(new Date(shift.clockedInAt), 'hh:mm a')}</p>
+                  className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{safeFormat(shift.clockedInAt, 'hh:mm a')}</p>
               </div>
             )}
 
@@ -469,7 +482,7 @@ function ShiftCard({
               <div className="flex flex-col shrink-0 gap-1">
                 <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked Out</p>
                 <p
-                  className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{format(new Date(shift.clockedOutAt), 'hh:mm a')}</p>
+                  className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{safeFormat(shift.clockedOutAt, 'hh:mm a')}</p>
               </div>
             )}
           </div>
@@ -609,7 +622,7 @@ function ShiftSection({
 
   return (
     <div
-      className={`${backgroundColor} backdrop-blur border border-white/30 rounded-[30px] p-5 relative`}
+      className={`${backgroundColor} rounded-[20px] border border-white p-5 lg:p-6 shadow-sm relative`}
     >
       <div className="flex flex-col items-start justify-between gap-3 mb-6 sm:flex-row">
         <div>
@@ -693,6 +706,8 @@ export default function ShiftManagementPage() {
   const [clockInShiftId, setClockInShiftId] = useState<string | null>(null);
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [clockOutShiftId, setClockOutShiftId] = useState<string | null>(null);
+  const [showPersonalCareModal, setShowPersonalCareModal] = useState(false);
+  const [personalCareActivityLogId, setPersonalCareActivityLogId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<string>("Getting location...");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState(false);
@@ -894,6 +909,47 @@ export default function ShiftManagementPage() {
     }
   };
 
+  // Opens the personal-care checklist for a clocked-out shift. The backend
+  // upserts by shiftId, so this returns the log created at scheduling time (or
+  // creates one as a fallback if that ever failed) — the note is always reachable.
+  const openPersonalCareNote = async (
+    shift: Shift,
+    clockedInAt?: string | null,
+    clockedOutAt?: string | null,
+  ) => {
+    try {
+      const info = getClientBasicInfo(shift.client);
+      const res = await createEmployeeActivityLog({
+        activityType: HHA_PERSONAL_CARE,
+        shiftId: shift.id,
+        employeeId: shift.employeeId || user?.profile?.id || "",
+        agencyId: shift.agencyId || user?.agencyId || "",
+        description: "",
+        metadata: {
+          individual: info.name,
+          clientName: info.name,
+          clientDob: info.dob,
+          clientAddress: info.address,
+          clientPhone: info.phone,
+          serviceCode: shift.serviceCode || "",
+          agencyName: user?.agency?.name || "",
+          shiftDate: safeFormat(shift.date, "MMM d, yyyy"),
+          shiftStartTime: shift.startTime || "",
+          shiftEndTime: shift.endTime || "",
+          clockedInAt: safeFormat(clockedInAt ?? shift.clockedInAt, "hh:mm a"),
+          clockedOutAt: safeFormat(clockedOutAt ?? shift.clockedOutAt, "hh:mm a"),
+        },
+      });
+      const activityLogId = res?.data?.id;
+      if (activityLogId) {
+        setPersonalCareActivityLogId(activityLogId);
+        setShowPersonalCareModal(true);
+      }
+    } catch (error) {
+      console.error('Failed to open personal care note for shift:', shift.id, error);
+    }
+  };
+
   const handleClockOutConfirm = async () => {
     if (!clockOutShiftId) return;
 
@@ -915,6 +971,8 @@ export default function ShiftManagementPage() {
       });
 
       if (response?.success) {
+        const isPersonalCareShift = shiftToClockOut.notesType === HHA_PERSONAL_CARE;
+
         setPreviousShifts((prev) => [response.shift, ...prev]);
         setTodayShift(null);
         setShowClockOutModal(false);
@@ -925,6 +983,15 @@ export default function ShiftManagementPage() {
         const employeeId = user?.profile?.id;
         if (agencyId && employeeId) {
           await loadShifts();
+        }
+
+        // Personal-care shifts prompt the aide to fill the checklist right away.
+        if (isPersonalCareShift) {
+          await openPersonalCareNote(
+            shiftToClockOut,
+            shiftToClockOut.clockedInAt,
+            response.shift?.clockedOutAt,
+          );
         }
       }
     } catch (error: any) {
@@ -968,7 +1035,7 @@ export default function ShiftManagementPage() {
         </div>
       </div>
 
-      <div className="bg-white/30 backdrop-blur border border-white/30 rounded-[20px] p-3 lg:p-5 relative">
+      <div className="bg-[#FFFFFF4D] border border-white shadow-sm rounded-[20px] p-3 lg:p-6 relative">
         <div
           className="flex bg-white/0 backdrop-blur rounded-[20px] min-h-[46px] mb-4 lg:mb-6 items-start flex-wrap gap-3 sm:gap-4 lg:gap-6">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -1018,7 +1085,7 @@ export default function ShiftManagementPage() {
         <div className="space-y-6">
           {shiftsLoading ? (
             <div
-              className="bg-[rgba(14,175,82,0.1)] backdrop-blur border border-white/30 rounded-[30px] p-5 min-h-[200px] flex items-center justify-center">
+              className="bg-[#FFFFFF4D] border border-white shadow-sm rounded-[20px] p-6 min-h-[200px] flex items-center justify-center">
               <div className="flex flex-col items-center gap-4">
                 <Loader2 className="w-10 h-10 animate-spin text-[#0eaf52]" />
                 <p className="text-[14px] text-[#808081]">Loading shifts...</p>
@@ -1075,6 +1142,19 @@ export default function ShiftManagementPage() {
         onConfirm={handleClockOutConfirm}
         onCancel={() => setShowClockOutModal(false)}
         isLoading={shiftsLoading}
+      />
+
+      <PersonalCareNoteModal
+        isOpen={showPersonalCareModal}
+        activityLogId={personalCareActivityLogId}
+        onClose={() => {
+          setShowPersonalCareModal(false);
+          setPersonalCareActivityLogId(null);
+        }}
+        onSubmitted={() => {
+          setShowPersonalCareModal(false);
+          setPersonalCareActivityLogId(null);
+        }}
       />
 
       <ClockInModal

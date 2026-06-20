@@ -32,8 +32,20 @@ interface WeekData {
 }
 
 /**
+ * Manual timesheets capture check in/out as display times (e.g. "08:00 AM"), but
+ * the API stores clockedInAt/clockedOutAt as ISO 8601 datetimes that consumers
+ * parse with `new Date()`. Combine the shift date with the time-of-day string and
+ * normalize to ISO; returns undefined when either part is missing or unparseable.
+ */
+function toClockIso(dateStr?: string, timeStr?: string): string | undefined {
+  if (!dateStr || !timeStr) return undefined;
+  const dt = new Date(`${dateStr} ${timeStr}`);
+  return Number.isNaN(dt.getTime()) ? undefined : dt.toISOString();
+}
+
+/**
  * Helper function to transform week data into CreateShiftRequest[]
- * 
+ *
  * Note: Signatures are uploaded separately via POST /signature endpoint before shift submission.
  * Signature information (type and status) is included in signatureInfo field for reference.
  * The backend stores the full signature data in the signatures collection.
@@ -86,9 +98,10 @@ function buildManualShiftRequests(
           startTime: dayData.checkIn,
           endTime: dayData.checkOut,
           // Manual timesheets have no live clock punch, so the entered check in/out
-          // times are the source of truth for both the shift times and the clocked times.
-          clockedInAt: dayData.checkIn,
-          clockedOutAt: dayData.checkOut,
+          // times are the source of truth for both the shift times and the clocked
+          // times — stored as ISO datetimes so consumers can parse them.
+          clockedInAt: toClockIso(dateStr, dayData.checkIn),
+          clockedOutAt: toClockIso(dateStr, dayData.checkOut),
           status: ShiftStatus.PENDING, // Default to PENDING, will be overridden by caller
           type: ShiftType.MANUAL,
           submissionStatus: SubmissionStatus.DRAFT, // Default to DRAFT, will be overridden by caller
@@ -641,8 +654,8 @@ export default function ManualShiftManagementPage() {
         submissionStatus: SubmissionStatus.DRAFT,
         status: ShiftStatus.PENDING, // Use PENDING for drafts instead of COMPLETED
         type: ShiftType.MANUAL, // Ensure type is set to manual
-        clockedInAt: request.startTime, // Set clockedInAt from startTime
-        clockedOutAt: request.endTime, // Set clockedOutAt from endTime
+        clockedInAt: toClockIso(request.date, request.startTime),
+        clockedOutAt: toClockIso(request.date, request.endTime),
       }));
 
       if (draftRequests.length === 0) {
@@ -872,8 +885,8 @@ export default function ManualShiftManagementPage() {
         status: ShiftStatus.COMPLETED, // Set to COMPLETED only on submit
         submissionStatus: SubmissionStatus.SUBMITTED, // Set to SUBMITTED only on submit
         actionStatus: ShiftActionStatus.CLOCK_IN,
-        clockedInAt: request.startTime, // Set clockedInAt from startTime
-        clockedOutAt: request.endTime, // Set clockedOutAt from endTime
+        clockedInAt: toClockIso(request.date, request.startTime),
+        clockedOutAt: toClockIso(request.date, request.endTime),
         type: ShiftType.MANUAL, // Ensure type is set to manual
       }));
 

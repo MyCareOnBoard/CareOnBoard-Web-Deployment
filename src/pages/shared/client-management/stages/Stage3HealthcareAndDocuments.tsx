@@ -859,10 +859,18 @@ export function Stage3HealthcareAndDocuments({
                     <Suspense fallback={null}>
                       <GenerateForm485Panel
                         formData={formData}
-                        setFormData={setFormData}
                         clientId={clientId}
                       />
                     </Suspense>
+                  ) : null}
+
+                  {doc.key === "form485" &&
+                  formData.type === "hha" &&
+                  !(doc.file || (doc.files && doc.files.length > 0) || doc.url?.trim()) ? (
+                    <p className="mb-2 text-[12px] font-medium text-[#b54708]">
+                      Required to activate this client — upload the signed Form 485 before the
+                      client can be set active.
+                    </p>
                   ) : null}
 
                   <label

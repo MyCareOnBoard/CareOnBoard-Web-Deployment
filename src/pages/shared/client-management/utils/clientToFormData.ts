@@ -409,6 +409,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                         rate: a.rate ?? "",
                         unitType: a.unitType ?? "",
                         serviceType: a.serviceType,
+                        goal: a.goal,
                         modifier: a.modifier,
                         clientPayType: a.clientPayType,
                         staffRate: a.staffRate ?? "",

@@ -50,6 +50,8 @@ export function hhaAuthorizationToClientService(
     staffRate: auth.staffRate?.trim() || undefined,
     payType: resolveHhaStaffPayType(auth),
     modifier: auth.modifier?.trim() || undefined,
+    serviceType: auth.serviceType?.trim() || undefined,
+    serviceGoal: auth.goal?.trim() || undefined,
     unitType: auth.unitType?.trim() || undefined,
     startAuthDate: auth.startDate,
     endAuthDate: auth.endDate,
