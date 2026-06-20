@@ -8,6 +8,7 @@ import {UserType} from "@/utils/auth/types";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import CustomDatePicker from "@/components/ui/datePicker";
+import { NOTE_TYPES } from "@/lib/notes/noteTypes";
 
 
 interface GenerateReportFormProps {
@@ -91,36 +92,7 @@ export default function GenerateReport() {
     {id: "all", label: "All"},
   ];
 
-  const notesTypes = [
-    {
-      id: "community-based",
-      title: "Community Based / Individual Supports",
-    },
-    {
-      id: "community-inclusion",
-      title: "Community Inclusion Services – Activities Log",
-    },
-    {
-      id: "day-habilitation",
-      title: "Day Habilitation Services – Activities Log",
-    },
-    {
-      id: "prevocational-training",
-      title: "Prevocational Training Services – Activities Log",
-    },
-    {
-      id: "supported-employment-intervention",
-      title: "Supported Employment Services – Intervention Plan and Service Log",
-    },
-    {
-      id: "supported-employment-pre",
-      title: "Supported Employment Services – Pre‐Employment Service Log",
-    },
-    {
-      id: "respite-log",
-      title: "Respite Log",
-    },
-  ];
+  const notesTypes = NOTE_TYPES.map(({ id, title }) => ({ id, title }));
 
   const filters: Record<string, any> = {
     "clients": statusTypes,

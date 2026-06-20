@@ -61,6 +61,7 @@ export type HhaAuthorization = {
     unitType?: string;
     assignedDsps?: Dsp[];
     serviceType?: string;
+    goal?: string;
     modifier?: string;
     clientPayType?: ServicePayType;
     staffRate?: string;

@@ -48,6 +48,8 @@ const PrevocationalTrainingPage = lazy(() => import("@/pages/userPanel/notes/pre
 const RespiteLogPage = lazy(() => import("@/pages/userPanel/notes/respite-log"));
 const SupportedEmploymentInterventionPage = lazy(() => import("@/pages/userPanel/notes/supported-employment-intervention"));
 const SupportedEmploymentPrePage = lazy(() => import("@/pages/userPanel/notes/supported-employment-pre"));
+const HhaPersonalCareNotePage = lazy(() => import("@/pages/userPanel/notes/hha-personal-care"));
+const HhaServiceActivityLogPage = lazy(() => import("@/pages/userPanel/notes/hha-service-activity-log"));
 const Expenses = lazy(() => import("@/pages/userPanel/expenses"));
 const UserPanelCommunityInclusionPage = lazy(() => import("@/pages/userPanel/community-inclusion"));
 const AgencyDashboardPage = lazy(() => import("@/pages/agency/dashboard"));
@@ -630,6 +632,14 @@ export const router = createBrowserRouter([
             {
                 path: Routes.userPanel.notes.supportedEmploymentPre,
                 Component: SupportedEmploymentPrePage,
+            },
+            {
+                path: Routes.userPanel.notes.hhaPersonalCare,
+                Component: HhaPersonalCareNotePage,
+            },
+            {
+                path: Routes.userPanel.notes.hhaServiceActivityLog,
+                Component: HhaServiceActivityLogPage,
             },
             {
                 path: Routes.userPanel.expenses,

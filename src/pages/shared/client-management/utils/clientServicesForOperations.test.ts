@@ -106,4 +106,20 @@ describe("HHA normalization parity fixtures", () => {
   it("leaves payType undefined when neither payType nor unitType is set", () => {
     expect(normalizeOne({ ...baseAuth }).payType).toBeUndefined();
   });
+
+  it("carries serviceType and serviceGoal from the authorization", () => {
+    const svc = normalizeOne({
+      ...baseAuth,
+      serviceType: "Personal Care",
+      goal: "Maintain independence at home",
+    });
+    expect(svc.serviceType).toBe("Personal Care");
+    expect(svc.serviceGoal).toBe("Maintain independence at home");
+  });
+
+  it("omits serviceType and serviceGoal when absent or blank", () => {
+    const svc = normalizeOne({ ...baseAuth, serviceType: "  ", goal: "" });
+    expect(svc.serviceType).toBeUndefined();
+    expect(svc.serviceGoal).toBeUndefined();
+  });
 });

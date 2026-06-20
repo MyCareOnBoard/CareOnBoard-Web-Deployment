@@ -163,6 +163,10 @@ export interface ClientService {
   claimsSource?: string;
   /** Billing modifier from the HHA authorization (e.g. EPSDT/UA on PDN variants). */
   modifier?: string;
+  /** Service catalog category (e.g. "Personal Care"); drives HHA note-type selection. */
+  serviceType?: string;
+  /** Goal for this service, sourced from the HHA authorization. */
+  serviceGoal?: string;
   unitType?: string;
   frequency?: string;
   totalUnits?: string;
@@ -305,6 +309,8 @@ export interface ClientHhaAuthorization {
   rate?: string;
   unitType?: string;
   serviceType?: string;
+  /** Goal for this service, shown on the HHA Service Activity Log note. */
+  goal?: string;
   modifier?: string;
   clientPayType?: ClientService["payType"];
   staffRate?: string;

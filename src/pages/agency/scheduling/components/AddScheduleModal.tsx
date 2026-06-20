@@ -9,10 +9,13 @@ import { useAuth } from "@/utils/auth";
 import { Routes } from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
 import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation, ShiftResponse } from "@/lib/api/shifts";
-import { createEmployeeActivityLog } from "@/lib/api/employees";
+import { createEmployeeActivityLog, CreateActivityLogRequest } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
 import { createGoalDocument, DocumentType, CreateGoalDocumentRequest } from "@/lib/api/goals-and-documents";
+import { noteTypesForClientType, getNoteTitle, HHA_PERSONAL_CARE, HHA_SERVICE_LOG } from "@/lib/notes/noteTypes";
+import { resolveHhaNoteType } from "@/pages/agency/scheduling/utils/resolveHhaNoteType";
+import { getClientBasicInfo } from "@/lib/notes/clientBasicInfo";
 import {
   ispOutcomesToDisplayText,
   parseIspOutcomesFromDisplayText,
@@ -243,36 +246,9 @@ const WEEKDAY_LABEL_BY_INDEX = Object.fromEntries(
   WEEKDAY_OPTIONS.map((option) => [option.dayIndex, option.label]),
 ) as Record<number, string>;
 
-const noteTypes: { id: string, title: string }[] = [
-  {
-    id: "community-based",
-    title: "Community Based / Individual Supports",
-  },
-  {
-    id: "community-inclusion",
-    title: "Community Inclusion Services – Activities Log",
-  },
-  {
-    id: "day-habilitation",
-    title: "Day Habilitation Services – Activities Log",
-  },
-  {
-    id: "prevocational-training",
-    title: "Prevocational Training Services – Activities Log",
-  },
-  {
-    id: "supported-employment-intervention",
-    title: "Supported Employment Services – Intervention Plan and Service Log",
-  },
-  {
-    id: "supported-employment-pre",
-    title: "Supported Employment Services – Pre‐Employment Service Log",
-  },
-  {
-    id: "respite-log",
-    title: "Respite Log",
-  },
-];
+// HHA shifts auto-resolve their note type from the service, so the scheduler
+// only picks a note type for DDD clients.
+const noteTypes: { id: string, title: string }[] = noteTypesForClientType("ddd");
 
 const goalsTypes: { id: string; title: string }[] = [
   { id: DocumentType.COMMUNITY_INCLUSION_SERVICES, title: "Community Inclusion Services" },
@@ -684,6 +660,37 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     () => selectedClientServices.some((s) => !isServiceAuthorizationEndDatePast(s)),
     [selectedClientServices],
   );
+
+  // HHA shifts auto-resolve their note type from the selected service instead of
+  // the scheduler picking one. Personal Care services get the checklist note;
+  // every other HHA service gets the activity-log note.
+  const resolvedHhaNoteType = useMemo(
+    () =>
+      isHhaClient && selectedService
+        ? resolveHhaNoteType(selectedService.serviceType, selectedService.code)
+        : "",
+    [isHhaClient, selectedService],
+  );
+
+  // Persist the resolved note type onto formData.notesType so it flows into the
+  // shift request (shift.notesType, read at clock-out) and the activity log.
+  // Only clear a stale HHA type once a DDD client is actually loaded — guarding
+  // against the async gap on edit, where selectedClient is briefly null.
+  useEffect(() => {
+    if (isHhaClient) {
+      setFormData((prev) =>
+        prev.notesType === resolvedHhaNoteType
+          ? prev
+          : { ...prev, notesType: resolvedHhaNoteType },
+      );
+    } else if (selectedClient && selectedClient.type !== "hha") {
+      setFormData((prev) =>
+        prev.notesType === HHA_PERSONAL_CARE || prev.notesType === HHA_SERVICE_LOG
+          ? { ...prev, notesType: "" }
+          : prev,
+      );
+    }
+  }, [isHhaClient, resolvedHhaNoteType, selectedClient]);
 
   const serviceTriggerLabel = useMemo(() => {
     if (selectedClientServices.length === 0) return "No services available";
@@ -1313,6 +1320,67 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     getWeeklyDistributionValidationError,
   ]);
 
+  // Builds the activity-log payload for a shift. The backend upserts by shiftId,
+  // so this is safe to call on both create and edit (edit keeps the note in sync
+  // when the service / note type changes).
+  const buildShiftActivityLogPayload = (
+    shiftId: string,
+    startTime: string,
+    endTime: string,
+    shiftDate: Date,
+  ): CreateActivityLogRequest => {
+    const effectiveNotesType = isHhaClient ? resolvedHhaNoteType : formData.notesType;
+    const clientBasicInfo = getClientBasicInfo(selectedClient);
+    return {
+      activityType: effectiveNotesType,
+      shiftId,
+      employeeId: formData.assignedDspId,
+      agencyId: user?.agencyId || "",
+      description: "",
+      metadata: {
+        employee: formData.assignedDsp,
+        individual: formData.client || "Unknown Client",
+        clientId: formData.clientId || "",
+        agency: user?.fullName || "",
+        agencyName: user?.agency?.name || "",
+        serviceYear: shiftDate.getFullYear(),
+        serviceCode: formData.serviceCode || "",
+        ISPOutcome: resolveIspOutcomeActivityLabel(selectedClient, selectedClientServices, formData),
+        strategies: [],
+        ...(isHhaClient
+          ? {
+              clientName: clientBasicInfo.name,
+              clientDob: clientBasicInfo.dob,
+              clientAddress: clientBasicInfo.address,
+              clientPhone: clientBasicInfo.phone,
+              serviceType: selectedService?.serviceType || "",
+              serviceGoal: selectedService?.serviceGoal || "",
+              shiftStartTime: startTime || "",
+              shiftEndTime: endTime || "",
+            }
+          : {}),
+      },
+    };
+  };
+
+  // Keeps the shift's activity log in sync after an edit (upsert by shiftId).
+  const reconcileShiftActivityLog = async (shiftId: string) => {
+    const effectiveNotesType = isHhaClient ? resolvedHhaNoteType : formData.notesType;
+    if (!shiftId || !effectiveNotesType) return;
+    // DDD: only reconcile when the note type actually changed (avoids an extra
+    // read+write per edit). HHA may also have updated service-derived metadata
+    // (goal, times, service code), so always reconcile.
+    if (!isHhaClient && editData?.notesType === effectiveNotesType) return;
+    const shiftDate = formData.date ? new Date(formData.date) : new Date();
+    try {
+      await createEmployeeActivityLog(
+        buildShiftActivityLogPayload(shiftId, formData.clockInTime, formData.clockOutTime, shiftDate),
+      );
+    } catch (error) {
+      console.error("Failed to reconcile activity log for shift:", shiftId, error);
+    }
+  };
+
   // Handle saving schedule as draft
   const handleSaveDraft = async () => {
     if (!user?.agencyId) {
@@ -1366,6 +1434,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           }
 
           await updateShift(formData.shiftId, updatePayload);
+          await reconcileShiftActivityLog(formData.shiftId);
 
           setSavedShiftInfo({
             clientName: formData.client || "Client",
@@ -1536,6 +1605,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         }
 
         await updateShift(formData.shiftId, updatePayload);
+        await reconcileShiftActivityLog(formData.shiftId);
 
         setUpdatedShiftInfo({
           clientName: formData.client || "Client",
@@ -1609,25 +1679,15 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               const shiftDate = finalShiftRequests[index].date
                 ? new Date(finalShiftRequests[index].date)
                 : new Date();
-              const clientName = formData.client || "Unknown Client";
 
-              return createEmployeeActivityLog({
-                activityType: formData.notesType,
-                shiftId: shiftId,
-                employeeId: formData.assignedDspId,
-                agencyId: user?.agencyId || "",
-                description: "",
-                metadata: {
-                  employee: formData.assignedDsp,
-                  individual: clientName,
-                  clientId: formData.clientId || "",
-                  agency: user?.fullName || "",
-                  serviceYear: shiftDate.getFullYear(),
-                  serviceCode: formData.serviceCode || "",
-                  ISPOutcome: resolveIspOutcomeActivityLabel(selectedClient, selectedClientServices, formData),
-                  strategies: [],
-                },
-              }).catch((error) => {
+              return createEmployeeActivityLog(
+                buildShiftActivityLogPayload(
+                  shiftId,
+                  createdShift.shift?.startTime || "",
+                  createdShift.shift?.endTime || "",
+                  shiftDate,
+                ),
+              ).catch((error) => {
                 console.error("Failed to create activity log for shift:", shiftId, error);
                 return null;
               });
@@ -1641,8 +1701,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         await Promise.allSettled(activityLogPromises as Promise<unknown>[]);
       }
 
-      // Create goal documents if goalsType is set
-      if (formData.goalsType) {
+      // Create goal documents if goalsType is set (DDD only; HHA uses the
+      // authorization goal carried on the note, not a DDD goal document).
+      if (!isHhaClient && formData.goalsType) {
         const successfulShifts = results
           .filter((r): r is PromiseFulfilledResult<ShiftResponse> =>
             r.status === "fulfilled" && r.value.success
@@ -1999,25 +2060,37 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   )}
                 </div>
 
-                {/* Notes Type */}
+                {/* Notes Type — DDD picks manually; HHA auto-selects from the service (read-only) */}
                 <div className="flex flex-col gap-1 relative">
                   <label className="text-[12px] font-normal text-[#10141a]">Notes Type</label>
                   <button
+                    type="button"
+                    disabled={isHhaClient}
                     onClick={() => {
+                      if (isHhaClient) return;
                       setShowNotesTypeDropdown(!showNotesTypeDropdown);
                     }}
-                    className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer"
+                    className={`bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-3 ${
+                      isHhaClient ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+                    }`}
                   >
                     <span className="flex-1 text-left text-[14px] font-normal text-black">
                       {formData.notesType
-                        ? noteTypes.find((elt) => elt.id === formData.notesType)?.title
-                        : "Select notes type"
+                        ? getNoteTitle(formData.notesType)
+                        : isHhaClient
+                          ? "Auto-selected from service"
+                          : "Select notes type"
                       }
                     </span>
-                    <ChevronDown className="w-5 h-5 text-[#10141a]" />
+                    {!isHhaClient && <ChevronDown className="w-5 h-5 text-[#10141a]" />}
                   </button>
+                  {isHhaClient && (
+                    <span className="text-[12px] font-normal text-[#808081]">
+                      Automatically set from the selected service.
+                    </span>
+                  )}
 
-                  {showNotesTypeDropdown && (
+                  {!isHhaClient && showNotesTypeDropdown && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-10">
                       {noteTypes.map((notesType) => (
                         <button
@@ -2035,7 +2108,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   )}
                 </div>
 
-                {/* Goals Type */}
+                {/* Goals Type — hidden for HHA clients (no DDD goal documents) */}
+                {!isHhaClient && (
                 <div className="flex flex-col gap-1 relative">
                   <label className="text-[12px] font-normal text-[#10141a]">Goals Type</label>
                   <button
@@ -2070,6 +2144,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                     </div>
                   )}
                 </div>
+                )}
 
                 {showWeeklyDistributionPicker && (
                   <div className="flex flex-col gap-1">

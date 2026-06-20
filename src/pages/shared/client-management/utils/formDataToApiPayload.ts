@@ -279,6 +279,7 @@ export function formDataToApiPayload(
           rate: a.rate?.trim() || undefined,
           unitType: a.unitType?.trim() || undefined,
           serviceType: a.serviceType?.trim() || undefined,
+          goal: a.goal?.trim() || undefined,
           modifier: a.modifier?.trim() || undefined,
           clientPayType: a.clientPayType || undefined,
           staffRate: a.staffRate?.trim() || undefined,
