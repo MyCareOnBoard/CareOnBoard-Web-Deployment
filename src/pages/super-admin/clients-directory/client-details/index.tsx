@@ -10,7 +10,17 @@ import { ProfileTab } from "@/pages/shared/client-details/tabs/ProfileTab";
 import { ServicesTab } from "@/pages/super-admin/clients-directory/client-details/tabs/ServicesTab";
 import { DocumentsTab } from "@/pages/super-admin/clients-directory/client-details/tabs/DocumentsTab";
 import { UploadClientDocumentModal } from "@/pages/super-admin/clients-directory/client-details/components/UploadClientDocumentModal";
-import { getClientById, type Client, type ClientDocument } from "@/lib/api/clients";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { getClientById, updateClient, type Client, type ClientDocument } from "@/lib/api/clients";
 
 type ClientDetailsTab = "activity" | "profile" | "services" | "documents";
 
@@ -31,6 +41,8 @@ export default function ClientDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [documentToEdit, setDocumentToEdit] = useState<ClientDocument | undefined>(undefined);
+  const [activate485Open, setActivate485Open] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
   const itemsPerPage = 6;
 
   // Format client name from firstName, lastName, middleName
@@ -143,6 +155,22 @@ export default function ClientDetailsPage() {
     fetchClient();
     window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
   }, [fetchClient]);
+
+  // Activate the client after its Form 485 is uploaded (HHA clients are held
+  // non-active until then). The backend gate now passes since the 485 exists.
+  const handleActivateClient = useCallback(async () => {
+    if (!clientId) return;
+    try {
+      setIsActivating(true);
+      await updateClient(clientId, { status: "active" });
+      setActivate485Open(false);
+      await fetchClient();
+    } catch (err) {
+      console.error("Failed to activate client:", err);
+    } finally {
+      setIsActivating(false);
+    }
+  }, [clientId, fetchClient]);
 
   const clientDisplay = useMemo(
     () => ({
@@ -354,10 +382,16 @@ export default function ClientDetailsPage() {
           }}
           clientId={clientId}
           documentToEdit={documentToEdit}
-          onComplete={() => {
+          onComplete={(info) => {
             setIsUploadModalOpen(false);
             setDocumentToEdit(undefined);
+            // Offer to activate when a Form 485 lands on a non-active HHA client.
+            const offerActivate =
+              info?.uploadedKey === "form485" &&
+              client?.type === "hha" &&
+              client?.status !== "active";
             fetchClient();
+            if (offerActivate) setActivate485Open(true);
           }}
           onError={(error) => {
             console.error("Upload error:", error);
@@ -365,6 +399,37 @@ export default function ClientDetailsPage() {
           }}
         />
       )}
+
+      <AlertDialog open={activate485Open} onOpenChange={setActivate485Open}>
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Activate this client?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The Form 485 has been uploaded. Activating this client lets you schedule
+              shifts, rides, and other services. You can do this later instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isActivating}>Not now</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleActivateClient();
+              }}
+              disabled={isActivating}
+            >
+              {isActivating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Activating&hellip;
+                </>
+              ) : (
+                "Activate client"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

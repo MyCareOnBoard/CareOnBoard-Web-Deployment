@@ -115,8 +115,11 @@ export default function AddMileageModal({
       setIsSearchingClients(true);
       try {
         const results = await searchClients(query);
-        setClientSearchResults(results);
-        setShowClientDropdown(results.length > 0);
+        // Only active clients can have rides logged (HHA clients without an
+        // approved Form 485 are kept non-active). Mirrors the backend gate.
+        const schedulable = results.filter((c) => !c.status || c.status === "active");
+        setClientSearchResults(schedulable);
+        setShowClientDropdown(schedulable.length > 0);
       } finally {
         setIsSearchingClients(false);
       }

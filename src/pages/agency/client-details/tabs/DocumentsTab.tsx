@@ -3,6 +3,7 @@ import { FileText, Plus } from "lucide-react";
 import { Client, ClientDocument } from "@/lib/api/clients";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { isForm485Required } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
 
 export function DocumentsTab({
   client,
@@ -75,6 +76,15 @@ export function DocumentsTab({
           Add Document
         </Button>
       </div>
+
+      {isForm485Required(client) && (
+        <div className="rounded-[12px] border border-[#fdb022] bg-[#fffaeb] px-4 py-3">
+          <p className="text-[13px] font-medium text-[#b54708]">
+            Form 485 required to activate this client. Upload the signed Form 485
+            (CMS-485 Plan of Care) — you&apos;ll be prompted to activate once it&apos;s added.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3">
         {documents.length === 0 ? (

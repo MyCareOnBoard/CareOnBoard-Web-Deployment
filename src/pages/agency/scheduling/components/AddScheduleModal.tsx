@@ -574,8 +574,11 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       try {
         setIsSearchingClients(true);
         const results = await searchClients(query, user?.agencyId);
-        setClientSearchResults(results);
-        setShowClientDropdown(results.length > 0);
+        // Only active clients can be scheduled (HHA clients without an approved
+        // Form 485 are kept non-active). Mirrors the backend CLIENT_INACTIVE gate.
+        const schedulable = results.filter((c) => !c.status || c.status === "active");
+        setClientSearchResults(schedulable);
+        setShowClientDropdown(schedulable.length > 0);
       } catch (error) {
         console.error("Failed to search clients:", error);
         setClientSearchResults([]);
@@ -1355,6 +1358,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
               clientPhone: clientBasicInfo.phone,
               serviceType: selectedService?.serviceType || "",
               serviceGoal: selectedService?.serviceGoal || "",
+              shiftDate: format(shiftDate, "MMM d, yyyy"),
               shiftStartTime: startTime || "",
               shiftEndTime: endTime || "",
             }

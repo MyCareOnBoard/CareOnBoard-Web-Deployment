@@ -48,7 +48,7 @@ interface UploadClientDocumentModalProps {
   isOpen: boolean;
   setIsOpen: (value: boolean) => void;
   clientId: string;
-  onComplete: () => void;
+  onComplete: (info?: { uploadedKey?: string }) => void;
   onError: (error: string) => void;
   documentToEdit?: ClientDocument;
 }
@@ -202,7 +202,7 @@ export function UploadClientDocumentModal({
       });
 
       setIsOpen(false);
-      onComplete();
+      onComplete({ uploadedKey: documentKey });
     } catch (error: any) {
       console.error("Error uploading document:", error);
       onError(error?.message || "Failed to upload document. Please try again.");

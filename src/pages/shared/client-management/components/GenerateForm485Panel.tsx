@@ -11,7 +11,6 @@ import Form485PrintTemplate from "./Form485PrintTemplate";
 import Form485EditForm from "./Form485EditForm";
 import { generateFormPdfBlob } from "../utils/generateFormPdfBlob";
 import { downloadPocPdfFromBlob } from "../utils/generatePocPdf";
-import { withGeneratedForm485File } from "../utils/withGeneratedForm485File";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
 
 type ModalStep = "confirm" | "generating" | "preview";
 type Form485Tab = "edit" | "preview";
@@ -34,18 +32,13 @@ const FORM485_TABS: ReadonlyArray<{ id: Form485Tab; label: string }> = [
 
 type GenerateForm485PanelProps = {
   formData: AddClientFormData;
-  setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
   clientId?: string;
-  onApplied?: (nextFormData: AddClientFormData) => void;
 };
 
 export default function GenerateForm485Panel({
   formData,
-  setFormData,
   clientId,
-  onApplied,
 }: GenerateForm485PanelProps) {
-  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<ModalStep>("confirm");
   const [activeTab, setActiveTab] = useState<Form485Tab>("edit");
@@ -55,6 +48,7 @@ export default function GenerateForm485Panel({
   const deferredForm485 = useDeferredValue(editedForm485);
   const printRef = useRef<HTMLDivElement>(null);
   const blobCacheRef = useRef<{ key: string; blob: Blob } | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const { busy, error, result, generate, cancel, reset } = useGenerateForm485(
     formData,
@@ -125,8 +119,8 @@ export default function GenerateForm485Panel({
 
   const buildBlob = useCallback(async (): Promise<Blob | null> => {
     if (!printRef.current || !result) return null;
-    // Cache by result identity so "Download PDF" then "Use as Form 485" doesn't
-    // run the html2canvas + jsPDF pipeline twice for the same generated form.
+    // Cache by result identity so repeated downloads of the same generated form
+    // don't re-run the html2canvas + jsPDF pipeline (cleared whenever edits change).
     const key = `${result.generationJobId ?? ""}|${result.fileName}`;
     if (blobCacheRef.current?.key === key) return blobCacheRef.current.blob;
     const blob = await generateFormPdfBlob(printRef.current);
@@ -135,46 +129,22 @@ export default function GenerateForm485Panel({
   }, [result]);
 
   const handleDownload = useCallback(async () => {
-    if (!result) return;
-    const blob = await buildBlob();
-    if (blob) downloadPocPdfFromBlob(blob, result.fileName || "form-485.pdf");
-  }, [result, buildBlob]);
-
-  const handleUseAsForm485 = useCallback(async () => {
-    if (!result) return;
+    if (!result || downloading) return;
+    setDownloading(true);
     try {
       const blob = await buildBlob();
-      if (!blob) throw new Error("template not ready");
-      const fileName = result.fileName || "form-485.pdf";
-      const file = new File([blob], fileName, { type: "application/pdf" });
-      const nextFormData = withGeneratedForm485File(formData, {
-        file,
-        fileName,
-        issuedOnDate: new Date(),
-      });
-      setFormData(nextFormData);
-      toast({
-        title: "Form 485 added",
-        description: "It will upload when you save the client.",
-        variant: "success",
-      });
-      onApplied?.(nextFormData);
-      closeModal();
-    } catch {
-      toast({
-        title: "Couldn't prepare the PDF",
-        description: "Try again or upload a Form 485 manually.",
-        variant: "destructive",
-      });
+      if (blob) downloadPocPdfFromBlob(blob, result.fileName || "form-485.pdf");
+    } finally {
+      setDownloading(false);
     }
-  }, [result, formData, setFormData, toast, onApplied, closeModal, buildBlob]);
+  }, [result, downloading, buildBlob]);
 
   return (
     <>
       <div className="mb-3 rounded-[12px] border border-[#cceeee] bg-[#f0fbfb] p-4">
         <p className="mb-3 text-[13px] text-[#10141a]">
           Generate the CMS-485 (Form 485) from the Plan of Care and Clinical Assessment, then
-          review before saving.
+          review and download it to sign and upload as the client&apos;s Form 485.
         </p>
         <Button
           type="button"
@@ -225,8 +195,8 @@ export default function GenerateForm485Panel({
             </div>
             {step === "confirm" ? (
               <DialogDescription className="text-left text-[13px] leading-relaxed text-[#808081]">
-                AI will draft a CMS-485 from the Plan of Care and Clinical Assessment. Review the
-                result before saving it to the client record.
+                AI will draft a CMS-485 from the Plan of Care and Clinical Assessment. Review and
+                download it to sign, then upload it as the client&apos;s Form 485.
               </DialogDescription>
             ) : step === "generating" ? (
               <DialogDescription className="text-left text-[13px] leading-relaxed text-[#808081]">
@@ -269,7 +239,8 @@ export default function GenerateForm485Panel({
             {step === "preview" && result && editedForm485 ? (
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
                 <DialogDescription className="text-left text-[13px] leading-relaxed text-[#808081]">
-                  Review and edit the generated CMS-485, then attach it as the client&apos;s Form 485.
+                  Review and edit the generated CMS-485, then download it to sign and upload as the
+                  client&apos;s Form 485.
                 </DialogDescription>
                 {result.warnings.length > 0 ? (
                   <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
@@ -360,17 +331,19 @@ export default function GenerateForm485Panel({
 
           {step === "preview" && result ? (
             <DialogFooter className="flex shrink-0 flex-row items-center justify-between gap-2 border-t border-[#e6e7e8] px-5 py-4">
-              <Button type="button" variant="outline" onClick={closeModal}>
+              <Button type="button" variant="outline" onClick={closeModal} disabled={downloading}>
                 Cancel
               </Button>
-              <div className="flex flex-row gap-2">
-                <Button type="button" variant="outline" onClick={() => void handleDownload()}>
-                  Download PDF
-                </Button>
-                <Button type="button" onClick={() => void handleUseAsForm485()}>
-                  Use as Form 485
-                </Button>
-              </div>
+              <Button type="button" onClick={() => void handleDownload()} disabled={downloading}>
+                {downloading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Preparing PDF&hellip;
+                  </>
+                ) : (
+                  "Download PDF"
+                )}
+              </Button>
             </DialogFooter>
           ) : null}
         </DialogContent>

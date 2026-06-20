@@ -7,6 +7,7 @@ import { CreateClientRequest } from "@/lib/api/clients";
 import {
   wizardOutcomesToApiOutcomes,
 } from "./outcomeServices";
+import { hasForm485Document } from "./form485GenerationEligibility";
 
 const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
 
@@ -443,7 +444,17 @@ export function formDataToApiPayload(
             contact: t.contact?.trim() || undefined,
           }))
         : undefined,
-    ...(markComplete ? { status: "active" as const } : {}),
+    // On the final save, HHA clients can only go "active" once an approved
+    // Form 485 is attached; otherwise they're saved "pending" until it's
+    // uploaded. The backend re-checks this against the uploaded documents.
+    ...(markComplete
+      ? {
+          status:
+            formData.type === "hha" && !hasForm485Document(formData)
+              ? ("pending" as const)
+              : ("active" as const),
+        }
+      : {}),
   };
 
   return payload;
