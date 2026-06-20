@@ -3,8 +3,7 @@ import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { SubmittedNoteDetails } from "@/pages/agency/notes/apiTypes";
 import { getNoteTitle } from "@/lib/notes/noteTypes";
-import type { ClientBasicInfo } from "@/lib/notes/clientBasicInfo";
-import HhaNoteHeader from "@/pages/userPanel/notes/components/HhaNoteHeader";
+import HhaNoteHeader, { HhaNoteInfoItem } from "@/pages/userPanel/notes/components/HhaNoteHeader";
 
 interface AgencyHhaServiceActivityLogProps {
   submissionId: string | null;
@@ -25,13 +24,13 @@ export default function AgencyHhaServiceActivityLog({
   isLoading,
   submittedNote,
 }: AgencyHhaServiceActivityLogProps) {
-  const clientInfo = useMemo<ClientBasicInfo>(
-    () => ({
-      name: submittedNote?.metadata?.clientName || submittedNote?.metadata?.individual || "",
-      dob: submittedNote?.metadata?.clientDob || "",
-      address: submittedNote?.metadata?.clientAddress || "",
-      phone: submittedNote?.metadata?.clientPhone || "",
-    }),
+  const infoItems = useMemo<HhaNoteInfoItem[]>(
+    () => [
+      { label: "Client name", value: submittedNote?.metadata?.clientName || submittedNote?.metadata?.individual || "" },
+      { label: "Date of birth", value: submittedNote?.metadata?.clientDob || "" },
+      { label: "Address", value: submittedNote?.metadata?.clientAddress || "" },
+      { label: "Phone", value: submittedNote?.metadata?.clientPhone || "" },
+    ],
     [submittedNote?.metadata],
   );
 
@@ -50,7 +49,7 @@ export default function AgencyHhaServiceActivityLog({
       <HhaNoteHeader
         agencyName={submittedNote?.metadata?.agencyName ?? ""}
         title={getNoteTitle("hha-service-log")}
-        client={clientInfo}
+        items={infoItems}
       />
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

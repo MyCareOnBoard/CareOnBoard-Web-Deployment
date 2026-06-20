@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Input } from "@/components/ui/input";
+import { Check } from "lucide-react";
 import { useUpdateSubmittedNoteMutation } from "@/pages/agency/notes/api";
 import { SubmittedNoteDetails } from "@/pages/agency/notes/apiTypes";
 import { CHHA_PERSONAL_CARE_ACTIVITIES } from "@/lib/notes/hhaPersonalCareActivities";
 import { getNoteTitle } from "@/lib/notes/noteTypes";
-import type { ClientBasicInfo } from "@/lib/notes/clientBasicInfo";
-import HhaNoteHeader from "@/pages/userPanel/notes/components/HhaNoteHeader";
+import HhaNoteHeader, { HhaNoteInfoItem } from "@/pages/userPanel/notes/components/HhaNoteHeader";
 
 interface AgencyPersonalCareNoteProps {
   submissionId: string | null;
@@ -26,13 +25,15 @@ export default function AgencyPersonalCareNote({
 
   const isEditable = submittedNote?.status === "submitted";
 
-  const clientInfo = useMemo<ClientBasicInfo>(
-    () => ({
-      name: submittedNote?.metadata?.clientName || submittedNote?.metadata?.individual || "",
-      dob: submittedNote?.metadata?.clientDob || "",
-      address: submittedNote?.metadata?.clientAddress || "",
-      phone: submittedNote?.metadata?.clientPhone || "",
-    }),
+  const infoItems = useMemo<HhaNoteInfoItem[]>(
+    () => [
+      { label: "Client name", value: submittedNote?.metadata?.clientName || submittedNote?.metadata?.individual || "" },
+      { label: "Address", value: submittedNote?.metadata?.clientAddress || "" },
+      { label: "Service code", value: submittedNote?.metadata?.serviceCode || "" },
+      { label: "Shift date", value: submittedNote?.metadata?.shiftDate || "" },
+      { label: "Clocked in", value: submittedNote?.metadata?.clockedInAt || submittedNote?.metadata?.shiftStartTime || "" },
+      { label: "Clocked out", value: submittedNote?.metadata?.clockedOutAt || submittedNote?.metadata?.shiftEndTime || "" },
+    ],
     [submittedNote?.metadata],
   );
 
@@ -79,20 +80,25 @@ export default function AgencyPersonalCareNote({
       <HhaNoteHeader
         agencyName={submittedNote?.metadata?.agencyName ?? ""}
         title={getNoteTitle("hha-personal-care")}
-        client={clientInfo}
+        items={infoItems}
       />
 
-      <div className="mt-6">
-        <p className="mb-3 text-[14px] font-semibold text-[#10141a] font-['Urbanist',sans-serif]">
-          Personal care activities performed
-        </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="mt-6 rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <p className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
+            Personal care activities performed
+          </p>
+          <span className="shrink-0 rounded-full bg-[rgba(0,180,184,0.1)] px-3 py-1 text-[13px] font-semibold text-[#00b4b8]">
+            {checkedActivities.length}/{CHHA_PERSONAL_CARE_ACTIVITIES.length}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {CHHA_PERSONAL_CARE_ACTIVITIES.map((activity) => {
             const checked = checkedActivities.includes(activity);
             return (
               <label
                 key={activity}
-                className={`flex items-center gap-3 rounded-[10px] border p-3 text-[14px] font-medium font-['Urbanist',sans-serif] ${
+                className={`flex items-center gap-3 rounded-[12px] border px-4 py-3 text-[14px] font-medium ${
                   checked ? "border-[#00b4b8] bg-[rgba(0,180,184,0.08)]" : "border-[#e1e3e8] bg-white"
                 } ${isEditable ? "cursor-pointer" : "pointer-events-none opacity-90"}`}
               >
@@ -101,8 +107,17 @@ export default function AgencyPersonalCareNote({
                   checked={checked}
                   disabled={!isEditable}
                   onChange={() => toggleActivity(activity)}
-                  className="h-4 w-4 accent-[#00b4b8]"
+                  className="sr-only"
                 />
+                <span
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                    checked
+                      ? "border-[#00b4b8] bg-[#00b4b8] text-white"
+                      : "border-[#cccccd] bg-white text-transparent"
+                  }`}
+                >
+                  <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                </span>
                 <span className="text-[#10141a]">{activity}</span>
               </label>
             );
@@ -110,12 +125,12 @@ export default function AgencyPersonalCareNote({
         </div>
       </div>
 
-      <div className="mt-8">
-        <label className="mb-1 block text-[12px] font-normal text-[#10141a] font-['Urbanist',sans-serif]">
-          Submitted by
-        </label>
-        <Input type="text" value={submittedNote?.employee?.fullName || ""} disabled className="max-w-md" />
-        <p className="mt-2 text-[12px] font-normal text-black font-['Urbanist',sans-serif]">
+      <div className="mt-6 rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
+        <p className="mb-1.5 text-[12px] font-medium leading-[1.4] text-[#808081]">Submitted by</p>
+        <p className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
+          {submittedNote?.employee?.fullName || "—"}
+        </p>
+        <p className="mt-1 text-[13px] font-medium leading-[1.4] text-[#808081]">
           {submittedNote?.submittedAt
             ? new Date(submittedNote.submittedAt).toLocaleDateString("en-US", {
                 month: "long",

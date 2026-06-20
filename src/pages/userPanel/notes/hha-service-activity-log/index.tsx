@@ -13,8 +13,7 @@ import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { toast } from "sonner";
 import { getNoteTitle } from "@/lib/notes/noteTypes";
-import type { ClientBasicInfo } from "@/lib/notes/clientBasicInfo";
-import HhaNoteHeader from "@/pages/userPanel/notes/components/HhaNoteHeader";
+import HhaNoteHeader, { HhaNoteInfoItem } from "@/pages/userPanel/notes/components/HhaNoteHeader";
 import {
   useCreateOrUpdateActivityLogMutation,
   useGetSingleActivityLogQuery,
@@ -49,6 +48,7 @@ export default function HhaServiceActivityLogPage() {
 
   const [rows, setRows] = useState<ServiceRow[]>(emptyRows());
   const [openDateRow, setOpenDateRow] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
   const { data: activityLog, isLoading } = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId,
@@ -56,19 +56,23 @@ export default function HhaServiceActivityLogPage() {
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
   const [submitNotes, { isLoading: isSubmitting }] = useSubmitActivityLogNotesMutation();
 
-  const clientInfo = useMemo<ClientBasicInfo>(
-    () => ({
-      name: activityLog?.metadata?.clientName || activityLog?.metadata?.individual || "",
-      dob: activityLog?.metadata?.clientDob || "",
-      address: activityLog?.metadata?.clientAddress || "",
-      phone: activityLog?.metadata?.clientPhone || "",
-    }),
+  const infoItems = useMemo<HhaNoteInfoItem[]>(
+    () => [
+      { label: "Client name", value: activityLog?.metadata?.clientName || activityLog?.metadata?.individual || "" },
+      { label: "Date of birth", value: activityLog?.metadata?.clientDob || "" },
+      { label: "Address", value: activityLog?.metadata?.clientAddress || "" },
+      { label: "Phone", value: activityLog?.metadata?.clientPhone || "" },
+    ],
     [activityLog?.metadata],
   );
 
+  // Lock the form once submitted (log status stays "active" server-side, so a
+  // local flag is the reliable in-session signal).
   const readOnly = Boolean(activityLog?.status && activityLog.status !== "active");
+  const locked = submitted || readOnly;
 
   const updateRow = async (id: string, index: number, field: keyof ServiceRow, value: any) => {
+    if (locked) return;
     const current = rows.find((row, i) => (id ? row.id === id : i === index));
     if (!current) return;
     const nextRow: ServiceRow = { ...current, [field]: value };
@@ -100,6 +104,7 @@ export default function HhaServiceActivityLogPage() {
     }
     try {
       await submitNotes({ activityLog: activityLogId!, logNoteIds: noteIds }).unwrap();
+      setSubmitted(true);
       toast.success("HHA Service Activity Log submitted.");
     } catch (error: any) {
       console.error("Error submitting service activity log:", error);
@@ -147,7 +152,7 @@ export default function HhaServiceActivityLogPage() {
         <HhaNoteHeader
           agencyName={activityLog?.metadata?.agencyName ?? user?.agency?.name ?? ""}
           title={TITLE}
-          client={clientInfo}
+          items={infoItems}
         />
 
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -180,8 +185,8 @@ export default function HhaServiceActivityLogPage() {
                     <PopoverTrigger asChild>
                       <button
                         type="button"
-                        disabled={readOnly}
-                        className="flex h-full w-full items-center justify-center text-[14px] text-[#10141a] focus:outline-none"
+                        disabled={locked}
+                        className="flex h-full w-full items-center justify-center text-[14px] text-[#10141a] focus:outline-none disabled:cursor-not-allowed"
                       >
                         {row.date ? format(row.date, "dd.MM.yy") : "Select"}
                       </button>
@@ -233,18 +238,19 @@ export default function HhaServiceActivityLogPage() {
           </p>
         </div>
 
-        {!readOnly && (
-          <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex items-center justify-end gap-3">
+            {locked ? (
+              <span className="text-[13px] font-medium text-[#0eaf52]">This note has been submitted.</span>
+            ) : null}
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex h-auto items-center gap-2 rounded-full bg-[#00b4b8] px-6 py-3 font-semibold text-white shadow-sm hover:bg-[#009da1]"
+              disabled={locked || isSubmitting}
+              className="flex h-auto items-center gap-2 rounded-full bg-[#00b4b8] px-6 py-3 font-semibold text-white shadow-sm hover:bg-[#009da1] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isSubmitting ? "Submitting..." : "Submit"}
+              {locked ? "Submitted" : isSubmitting ? "Submitting..." : "Submit"}
             </Button>
           </div>
-        )}
 
         <VoiceInputButton minimal={false} />
       </div>

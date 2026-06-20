@@ -622,7 +622,7 @@ function ShiftSection({
 
   return (
     <div
-      className={`${backgroundColor} backdrop-blur border border-white/30 rounded-[30px] p-5 relative`}
+      className={`${backgroundColor} rounded-[20px] border border-white p-5 lg:p-6 shadow-sm relative`}
     >
       <div className="flex flex-col items-start justify-between gap-3 mb-6 sm:flex-row">
         <div>
@@ -912,7 +912,11 @@ export default function ShiftManagementPage() {
   // Opens the personal-care checklist for a clocked-out shift. The backend
   // upserts by shiftId, so this returns the log created at scheduling time (or
   // creates one as a fallback if that ever failed) — the note is always reachable.
-  const openPersonalCareNote = async (shift: Shift) => {
+  const openPersonalCareNote = async (
+    shift: Shift,
+    clockedInAt?: string | null,
+    clockedOutAt?: string | null,
+  ) => {
     try {
       const info = getClientBasicInfo(shift.client);
       const res = await createEmployeeActivityLog({
@@ -929,8 +933,11 @@ export default function ShiftManagementPage() {
           clientPhone: info.phone,
           serviceCode: shift.serviceCode || "",
           agencyName: user?.agency?.name || "",
+          shiftDate: safeFormat(shift.date, "MMM d, yyyy"),
           shiftStartTime: shift.startTime || "",
           shiftEndTime: shift.endTime || "",
+          clockedInAt: safeFormat(clockedInAt ?? shift.clockedInAt, "hh:mm a"),
+          clockedOutAt: safeFormat(clockedOutAt ?? shift.clockedOutAt, "hh:mm a"),
         },
       });
       const activityLogId = res?.data?.id;
@@ -980,7 +987,11 @@ export default function ShiftManagementPage() {
 
         // Personal-care shifts prompt the aide to fill the checklist right away.
         if (isPersonalCareShift) {
-          await openPersonalCareNote(shiftToClockOut);
+          await openPersonalCareNote(
+            shiftToClockOut,
+            shiftToClockOut.clockedInAt,
+            response.shift?.clockedOutAt,
+          );
         }
       }
     } catch (error: any) {
@@ -1024,7 +1035,7 @@ export default function ShiftManagementPage() {
         </div>
       </div>
 
-      <div className="bg-white/30 backdrop-blur border border-white/30 rounded-[20px] p-3 lg:p-5 relative">
+      <div className="bg-[#FFFFFF4D] border border-white shadow-sm rounded-[20px] p-3 lg:p-6 relative">
         <div
           className="flex bg-white/0 backdrop-blur rounded-[20px] min-h-[46px] mb-4 lg:mb-6 items-start flex-wrap gap-3 sm:gap-4 lg:gap-6">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -1074,7 +1085,7 @@ export default function ShiftManagementPage() {
         <div className="space-y-6">
           {shiftsLoading ? (
             <div
-              className="bg-[rgba(14,175,82,0.1)] backdrop-blur border border-white/30 rounded-[30px] p-5 min-h-[200px] flex items-center justify-center">
+              className="bg-[#FFFFFF4D] border border-white shadow-sm rounded-[20px] p-6 min-h-[200px] flex items-center justify-center">
               <div className="flex flex-col items-center gap-4">
                 <Loader2 className="w-10 h-10 animate-spin text-[#0eaf52]" />
                 <p className="text-[14px] text-[#808081]">Loading shifts...</p>
