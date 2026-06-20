@@ -7,6 +7,7 @@ import {
     limit,
     onSnapshot,
     doc,
+    getDocs,
     updateDoc,
     writeBatch,
     Timestamp,
@@ -23,6 +24,7 @@ export interface Notification {
     category: string;
     priority: 'low' | 'normal' | 'high' | 'urgent';
     status: 'unread' | 'read' | 'archived' | 'deleted';
+    cleared: boolean;
     createdAt: string; // ISO string for UI
     readAt?: string | null;
     actionUrl?: string;
@@ -35,6 +37,7 @@ interface UseNotificationsReturn {
     error: Error | null;
     markAsRead: (notificationId: string) => Promise<void>;
     markAllAsRead: () => Promise<void>;
+    clearAll: () => Promise<void>;
 }
 
 /**
@@ -57,6 +60,7 @@ function parseNotificationDoc(docId: string, data: Record<string, unknown>): Not
         category: (data.category as string) ?? 'general',
         priority: (data.priority as Notification['priority']) ?? 'normal',
         status: (data.status as Notification['status']) ?? 'unread',
+        cleared: (data.cleared as boolean) ?? false,
         createdAt,
         readAt,
         actionUrl: data.actionUrl as string | undefined,
@@ -96,10 +100,11 @@ export function useNotifications(): UseNotificationsReturn {
 
         const notificationsRef = collection(db, "notifications");
 
-        // Query: specific user, order by newest first, limit to 50
+        // Query: specific user, exclude cleared, order by newest first, limit to 50
         const q = query(
             notificationsRef,
             where("uid", "==", user.uid),
+            where("cleared", "==", false),
             orderBy("createdAt", "desc"),
             limit(50)
         );
@@ -201,12 +206,55 @@ export function useNotifications(): UseNotificationsReturn {
         }
     }, [user?.uid, notifications]);
 
+    /**
+     * Clear every uncleared notification for the user (not just the loaded page)
+     * by setting `cleared: true`. The Firestore listener filters out cleared
+     * notifications, so they leave the list.
+     */
+    const clearAll = useCallback(async () => {
+        if (!user?.uid || notifications.length === 0) return;
+
+        const previousNotifications = [...notifications];
+
+        // Optimistic update - the listener filters cleared, so remove them locally now
+        setNotifications([]);
+
+        try {
+            // Clear all uncleared docs, not just the <=50 currently loaded in the popover
+            const clearQuery = query(
+                collection(db, "notifications"),
+                where("uid", "==", user.uid),
+                where("cleared", "==", false)
+            );
+            const snapshot = await getDocs(clearQuery);
+
+            // writeBatch is capped at 500 ops, so commit in chunks
+            for (let i = 0; i < snapshot.docs.length; i += 500) {
+                const batch = writeBatch(db);
+                snapshot.docs.slice(i, i + 500).forEach(docSnap => {
+                    batch.update(docSnap.ref, {
+                        cleared: true,
+                        clearedAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+                });
+                await batch.commit();
+            }
+        } catch (err) {
+            // Rollback optimistic update on error
+            console.error("Error clearing notifications:", err);
+            setNotifications(previousNotifications);
+            throw err;
+        }
+    }, [user?.uid, notifications]);
+
     return {
         notifications,
         unreadCount,
         loading,
         error,
         markAsRead,
-        markAllAsRead
+        markAllAsRead,
+        clearAll
     };
 }
