@@ -13,7 +13,16 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
-import type { Reminder, ReminderDraft, ReminderType } from "../types";
+import type { Reminder, ReminderDraft, ReminderRecurrence, ReminderType } from "../types";
+import { RECURRENCE_LABELS } from "../types";
+
+const RECURRENCE_OPTIONS: Array<{ value: ReminderRecurrence; label: string }> = [
+  { value: "none",     label: "One-time (no repeat)" },
+  { value: "daily",    label: "Daily" },
+  { value: "weekly",   label: "Weekly" },
+  { value: "biweekly", label: "Bi-weekly" },
+  { value: "monthly",  label: "Monthly" },
+];
 
 interface ReminderModalProps {
   open: boolean;
@@ -79,6 +88,7 @@ export default function ReminderModal({
   const [message, setMessage] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [recurrence, setRecurrence] = useState<ReminderRecurrence>("none");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -88,6 +98,7 @@ export default function ReminderModal({
     setMessage(reminder?.message ?? "");
     setDate(reminder?.scheduledDate ?? defaults.date);
     setTime(reminder?.scheduledTime ?? defaults.time);
+    setRecurrence(reminder?.recurrence ?? "none");
     setError("");
   }, [open, reminder]);
 
@@ -101,7 +112,7 @@ export default function ReminderModal({
       );
       return;
     }
-    onSave({ type, message: message.trim(), scheduledDate: date, scheduledTime: time });
+    onSave({ type, message: message.trim(), scheduledDate: date, scheduledTime: time, recurrence });
     onOpenChange(false);
   };
 
@@ -219,6 +230,27 @@ export default function ReminderModal({
                 </button>
               </TimePicker>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="reminder-recurrence" className="text-[14px] font-semibold text-[#10141a]">
+              Repeat
+            </label>
+            <select
+              id="reminder-recurrence"
+              value={recurrence}
+              onChange={(e) => setRecurrence(e.target.value as ReminderRecurrence)}
+              className="h-11 w-full rounded-xl border border-[#cccccd] bg-white px-4 text-[14px] text-[#10141a] outline-none focus:border-[#00b4b8] focus:ring-2 focus:ring-[#00b4b8]/20"
+            >
+              {RECURRENCE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            {recurrence !== "none" && (
+              <p className="text-[12px] text-[#9ca3af]">
+                This reminder will repeat {RECURRENCE_LABELS[recurrence].toLowerCase()} after each firing.
+              </p>
+            )}
           </div>
 
           {error && <p className="text-[13px] font-medium text-[#d53411]">{error}</p>}

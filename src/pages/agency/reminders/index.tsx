@@ -24,7 +24,7 @@ import {
 import { Routes } from "@/routes/constants";
 
 import ReminderModal from "./components/ReminderModal";
-import { getReminderDateTime, type Reminder, type ReminderDraft, type ReminderStatus } from "./types";
+import { getReminderDateTime, RECURRENCE_LABELS, type Reminder, type ReminderDraft, type ReminderStatus } from "./types";
 import {
   useGetRemindersQuery,
   useCreateReminderMutation,
@@ -114,6 +114,15 @@ function TypeBadge({ type }: { type: Reminder["type"] }) {
   );
 }
 
+function RecurrenceBadge({ recurrence }: { recurrence: Reminder["recurrence"] }) {
+  if (!recurrence || recurrence === "none") return null;
+  return (
+    <span className="inline-flex items-center rounded-full bg-[#fff7ed] px-2 py-0.5 text-[11px] font-semibold text-[#c2410c]">
+      ↺ {RECURRENCE_LABELS[recurrence]}
+    </span>
+  );
+}
+
 interface ReminderRowProps {
   reminder: Reminder;
   onView: (reminder: Reminder) => void;
@@ -129,10 +138,17 @@ function ReminderRow({ reminder, onView, onEdit, onDelete }: ReminderRowProps) {
     <div className="grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f9fafb] md:grid-cols-[minmax(200px,2fr)_80px_minmax(140px,1fr)_100px_110px_minmax(200px,auto)] md:items-center">
       <div className="min-w-0">
         <div className="flex items-start gap-2.5 md:items-center">
-          <span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${STATUS_BADGE_CONFIG[reminder.status].dot}`} />
-          <p className="whitespace-pre-wrap break-words text-[14px] font-semibold leading-6 text-[#10141a] line-clamp-2">
-            {reminder.message}
-          </p>
+          <span className={`mt-2 h-2 w-2 shrink-0 rounded-full md:mt-0 ${STATUS_BADGE_CONFIG[reminder.status].dot}`} />
+          <div className="min-w-0">
+            <p className="whitespace-pre-wrap break-words text-[14px] font-semibold leading-6 text-[#10141a] line-clamp-2">
+              {reminder.message}
+            </p>
+            {reminder.recurrence && reminder.recurrence !== "none" && (
+              <p className="mt-0.5 text-[12px] text-[#c2410c]">
+                ↺ Repeats {RECURRENCE_LABELS[reminder.recurrence].toLowerCase()}
+              </p>
+            )}
+          </div>
         </div>
       </div>
       <div className="hidden md:block">
@@ -444,6 +460,7 @@ export default function RemindersPage() {
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge status={viewingReminder.status} />
                   <TypeBadge type={viewingReminder.type} />
+                  <RecurrenceBadge recurrence={viewingReminder.recurrence} />
                 </div>
               </DialogHeader>
 
@@ -469,13 +486,35 @@ export default function RemindersPage() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="mb-0.5 text-[12px] font-semibold uppercase text-[#808081]">Date</p>
+                  <p className="mb-0.5 text-[12px] font-semibold uppercase text-[#808081]">
+                    {viewingReminder.recurrence !== "none" && viewingReminder.status === "pending" ? "Next firing date" : "Date"}
+                  </p>
                   <p className="text-[14px] text-[#6b7280]">{formatDate(viewingReminder)}</p>
                 </div>
                 <div>
                   <p className="mb-0.5 text-[12px] font-semibold uppercase text-[#808081]">Time</p>
                   <p className="text-[14px] text-[#6b7280]">{formatTime(viewingReminder)}</p>
                 </div>
+                {viewingReminder.recurrence && viewingReminder.recurrence !== "none" && (
+                  <div>
+                    <p className="mb-0.5 text-[12px] font-semibold uppercase text-[#808081]">Recurrence</p>
+                    <p className="text-[14px] text-[#6b7280]">{RECURRENCE_LABELS[viewingReminder.recurrence]}</p>
+                  </div>
+                )}
+                {viewingReminder.lastSentAt && (
+                  <div>
+                    <p className="mb-0.5 text-[12px] font-semibold uppercase text-[#808081]">Last sent</p>
+                    <p className="text-[14px] text-[#6b7280]">
+                      {new Intl.DateTimeFormat(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      }).format(new Date(viewingReminder.lastSentAt))}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <DialogFooter className="flex flex-wrap justify-end gap-2 pt-1">
