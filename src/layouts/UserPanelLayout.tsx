@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, { NavItem } from "@/components/DashboardSidebar";
+import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
 import QuestionIcon from "@/assets/icons/question-mark-circle.svg?react";
 import CogIcon from "@/assets/icons/cog.svg?react";
@@ -53,6 +54,7 @@ const navItems: NavItem[] = [
 export default function UserPanelDashboardLayout({ children }: { children?: ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [collapsed] = useSidebarCollapsed();
 
   const handleLogout = async () => {
     try {
@@ -80,7 +82,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
         onLogout={handleLogout}
       />
       <DashboardSidebar navItems={navItems} />
-      <main className="ml-[240px] pt-[130px] pb-10">
+      <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
         <div className="px-8">{children ?? <Outlet />}</div>
       </main>
     </div>
