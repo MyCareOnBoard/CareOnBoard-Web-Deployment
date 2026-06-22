@@ -1,9 +1,8 @@
-import React, { useMemo } from "react";
-import { format } from "date-fns";
+import React from "react";
 import { Input } from "@/components/ui/input";
 import { SubmittedNoteDetails } from "@/pages/agency/notes/apiTypes";
 import { getNoteTitle } from "@/lib/notes/noteTypes";
-import HhaNoteHeader, { HhaNoteInfoItem } from "@/pages/userPanel/notes/components/HhaNoteHeader";
+import HhaNoteHeader, { InfoField } from "@/pages/userPanel/notes/components/HhaNoteHeader";
 
 interface AgencyHhaServiceActivityLogProps {
   submissionId: string | null;
@@ -24,16 +23,6 @@ export default function AgencyHhaServiceActivityLog({
   isLoading,
   submittedNote,
 }: AgencyHhaServiceActivityLogProps) {
-  const infoItems = useMemo<HhaNoteInfoItem[]>(
-    () => [
-      { label: "Client name", value: submittedNote?.metadata?.clientName || submittedNote?.metadata?.individual || "" },
-      { label: "Date of birth", value: submittedNote?.metadata?.clientDob || "" },
-      { label: "Address", value: submittedNote?.metadata?.clientAddress || "" },
-      { label: "Phone", value: submittedNote?.metadata?.clientPhone || "" },
-    ],
-    [submittedNote?.metadata],
-  );
-
   const rows = submittedNote?.notes ?? [];
 
   if (isLoading) {
@@ -49,28 +38,31 @@ export default function AgencyHhaServiceActivityLog({
       <HhaNoteHeader
         agencyName={submittedNote?.metadata?.agencyName ?? ""}
         title={getNoteTitle("hha-service-log")}
-        items={infoItems}
+        items={[]}
       />
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 flex flex-col gap-4">
+        <InfoField
+          label="Client name"
+          value={submittedNote?.metadata?.clientName || submittedNote?.metadata?.individual || ""}
+        />
+        <InfoField label="Address" value={submittedNote?.metadata?.clientAddress || ""} />
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <ReadOnlyField label="Service code" value={submittedNote?.metadata?.serviceCode ?? ""} />
         <ReadOnlyField label="Shift start time" value={submittedNote?.metadata?.shiftStartTime ?? ""} />
         <ReadOnlyField label="Shift end time" value={submittedNote?.metadata?.shiftEndTime ?? ""} />
+      </div>
+
+      <div className="mt-4">
         <ReadOnlyField label="Service goal" value={submittedNote?.metadata?.serviceGoal ?? ""} />
       </div>
 
-      <div className="mt-8 overflow-x-auto">
-        <div className="min-w-[700px] rounded-[6px] border border-[#b2b2b3]">
-          <div className="grid grid-cols-[140px_220px_1fr] bg-[#eef4f5]">
-            <div className="border-b border-r border-[#b2b2b3] px-4 py-3 text-center text-[14px] text-black font-['Urbanist',sans-serif]">
-              Date
-            </div>
-            <div className="border-b border-r border-[#b2b2b3] px-4 py-3 text-center text-[14px] text-black font-['Urbanist',sans-serif]">
-              Activity
-            </div>
-            <div className="border-b border-[#b2b2b3] px-4 py-3 text-center text-[14px] text-black font-['Urbanist',sans-serif]">
-              Description
-            </div>
+      <div className="mt-8">
+        <div className="rounded-[6px] border border-[#b2b2b3]">
+          <div className="border-b border-[#b2b2b3] bg-[#eef4f5] px-4 py-3 text-center text-[14px] text-black font-['Urbanist',sans-serif]">
+            Describe the day and how the activities helped the individual work toward the service goal above.
           </div>
           {rows.length === 0 ? (
             <div className="px-4 py-6 text-center text-[13px] text-[#808081] font-['Urbanist',sans-serif]">
@@ -78,16 +70,11 @@ export default function AgencyHhaServiceActivityLog({
             </div>
           ) : (
             rows.map((note) => (
-              <div key={note.id} className="grid grid-cols-[140px_220px_1fr] bg-white">
-                <div className="border-b border-r border-[#b2b2b3] px-4 py-3 text-[14px] text-[#10141a] font-['Urbanist',sans-serif]">
-                  {note.startDate ? format(new Date(note.startDate), "dd.MM.yy") : ""}
-                </div>
-                <div className="border-b border-r border-[#b2b2b3] px-4 py-3 text-[14px] text-[#10141a] font-['Urbanist',sans-serif]">
-                  {note.metadata?.activity ?? ""}
-                </div>
-                <div className="border-b border-[#b2b2b3] px-4 py-3 text-[14px] text-[#10141a] font-['Urbanist',sans-serif]">
-                  {note.metadata?.description ?? ""}
-                </div>
+              <div
+                key={note.id}
+                className="border-b border-[#b2b2b3] px-4 py-3 text-[14px] text-[#10141a] font-['Urbanist',sans-serif] whitespace-pre-wrap"
+              >
+                {[note.metadata?.activity, note.metadata?.description].filter(Boolean).join(" — ")}
               </div>
             ))
           )}

@@ -1,11 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import ContentEditableCell from "@/components/ContentEditableCell";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
@@ -13,7 +11,7 @@ import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { toast } from "sonner";
 import { getNoteTitle } from "@/lib/notes/noteTypes";
-import HhaNoteHeader, { HhaNoteInfoItem } from "@/pages/userPanel/notes/components/HhaNoteHeader";
+import HhaNoteHeader, { InfoField } from "@/pages/userPanel/notes/components/HhaNoteHeader";
 import {
   useCreateOrUpdateActivityLogMutation,
   useGetSingleActivityLogQuery,
@@ -22,15 +20,13 @@ import {
 
 type ServiceRow = {
   id: string;
-  date: Date | undefined;
-  activity: string;
-  description: string;
+  content: string;
 };
 
 const TITLE = getNoteTitle("hha-service-log");
 
-const emptyRows = (): ServiceRow[] =>
-  Array.from({ length: 6 }, () => ({ id: "", date: undefined, activity: "", description: "" }));
+const ACTIVITY_COLUMN_HEADER =
+  "Describe the day and how the activities helped the individual work toward the service goal above.";
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
@@ -46,9 +42,15 @@ export default function HhaServiceActivityLogPage() {
   const { user } = useAuth();
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
 
-  const [rows, setRows] = useState<ServiceRow[]>(emptyRows());
-  const [openDateRow, setOpenDateRow] = useState<string | null>(null);
+  const [row, setRow] = useState<ServiceRow>({ id: "", content: "" });
   const [submitted, setSubmitted] = useState(false);
+  // Latest row for the debounced/serialized autosave (avoids stale closures).
+  const rowRef = useRef(row);
+  rowRef.current = row;
+  const hydratedRef = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Serialize saves so rapid edits never create duplicate notes server-side.
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
 
   const { data: activityLog, isLoading } = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId,
@@ -56,54 +58,62 @@ export default function HhaServiceActivityLogPage() {
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
   const [submitNotes, { isLoading: isSubmitting }] = useSubmitActivityLogNotesMutation();
 
-  const infoItems = useMemo<HhaNoteInfoItem[]>(
-    () => [
-      { label: "Client name", value: activityLog?.metadata?.clientName || activityLog?.metadata?.individual || "" },
-      { label: "Date of birth", value: activityLog?.metadata?.clientDob || "" },
-      { label: "Address", value: activityLog?.metadata?.clientAddress || "" },
-      { label: "Phone", value: activityLog?.metadata?.clientPhone || "" },
-    ],
-    [activityLog?.metadata],
-  );
-
   // Lock the form once submitted (log status stays "active" server-side, so a
   // local flag is the reliable in-session signal).
   const readOnly = Boolean(activityLog?.status && activityLog.status !== "active");
   const locked = submitted || readOnly || Boolean(activityLog?.hasSubmittedNotes);
 
-  const updateRow = async (id: string, index: number, field: keyof ServiceRow, value: any) => {
-    if (locked) return;
-    const current = rows.find((row, i) => (id ? row.id === id : i === index));
-    if (!current) return;
-    const nextRow: ServiceRow = { ...current, [field]: value };
-    setRows((prev) => prev.map((row, i) => ((id && row.id === id) || (!id && i === index) ? nextRow : row)));
-    if (!nextRow.date) return;
-    try {
-      const { data } = await mutateNote({
-        activityLog: activityLogId!,
-        data: {
-          id: nextRow.id,
-          startDate: format(nextRow.date, "yyyy-MM-dd"),
-          endDate: format(nextRow.date, "yyyy-MM-dd"),
-          metadata: { activity: nextRow.activity, description: nextRow.description },
-        },
-      }).unwrap();
-      if (!nextRow.id && data?.id) {
-        setRows((prev) => prev.map((row, i) => (i === index ? { ...row, id: data.id } : row)));
-      }
-    } catch (error) {
-      console.error("Failed to save activity row:", error);
-    }
+  // Persist the current draft once. Chained so concurrent saves can't create
+  // duplicate notes, and the new id is captured immediately for the next save.
+  const saveNow = () => {
+    saveChain.current = saveChain.current
+      .catch(() => {})
+      .then(async () => {
+        const current = rowRef.current;
+        if (locked || !current.content.trim()) return;
+        const today = format(new Date(), "yyyy-MM-dd");
+        const { data } = await mutateNote({
+          activityLog: activityLogId!,
+          data: {
+            id: current.id,
+            startDate: today,
+            endDate: today,
+            metadata: { description: current.content },
+          },
+        }).unwrap();
+        if (!current.id && data?.id) {
+          rowRef.current = { ...rowRef.current, id: data.id };
+          setRow((prev) => ({ ...prev, id: data.id }));
+        }
+      });
+    return saveChain.current;
   };
 
+  const updateContent = (value: string) => {
+    if (locked) return;
+    setRow((prev) => ({ ...prev, content: value }));
+    rowRef.current = { ...rowRef.current, content: value };
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(saveNow, 800);
+  };
+
+  // Cancel a pending debounced save on unmount.
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
+
   const handleSubmit = async () => {
-    const noteIds = rows.filter((r) => !!r.id).map((r) => r.id);
-    if (noteIds.length === 0) {
-      toast.error("Add at least one activity (with a date) before submitting.");
+    if (!rowRef.current.content.trim()) {
+      toast.error("Write the activity note before submitting.");
       return;
     }
+    clearTimeout(saveTimer.current);
     try {
-      await submitNotes({ activityLog: activityLogId!, logNoteIds: noteIds }).unwrap();
+      await saveNow(); // flush the latest content and ensure the note exists
+      const noteId = rowRef.current.id;
+      if (!noteId) {
+        toast.error("Couldn't save the note. Please try again.");
+        return;
+      }
+      await submitNotes({ activityLog: activityLogId!, logNoteIds: [noteId] }).unwrap();
       setSubmitted(true);
       toast.success("HHA Service Activity Log submitted.");
     } catch (error: any) {
@@ -113,20 +123,23 @@ export default function HhaServiceActivityLogPage() {
   };
 
   useEffect(() => {
+    // Hydrate once from the server; ignore later refetches (triggered by autosave
+    // invalidation) so they can't clobber what the user is currently typing.
+    if (isLoading || hydratedRef.current || !activityLog) return;
+    hydratedRef.current = true;
     // Prefer active (editable) notes; fall back to submitted notes so a locked
-    // log still renders its rows after a reload.
-    const sourceNotes = activityLog?.notes?.length
+    // log still renders after a reload. Legacy multi-row notes only surface their
+    // first entry — acceptable for this redesigned single-field note.
+    const sourceNotes = activityLog.notes?.length
       ? activityLog.notes
-      : activityLog?.submittedNotes ?? [];
-    if (!isLoading && sourceNotes.length > 0) {
-      const mapped = sourceNotes.map((note) => ({
-        id: note.id,
-        date: note.startDate ? new Date(note.startDate) : undefined,
-        activity: note.metadata?.activity ?? "",
-        description: note.metadata?.description ?? "",
-      }));
-      const blanks = emptyRows();
-      setRows([...mapped, ...blanks.slice(Math.min(mapped.length, blanks.length))]);
+      : activityLog.submittedNotes ?? [];
+    const note = sourceNotes[0];
+    if (note) {
+      const content = [note.metadata?.activity, note.metadata?.description]
+        .filter(Boolean)
+        .join(" — ");
+      setRow({ id: note.id, content });
+      rowRef.current = { id: note.id, content };
     }
   }, [isLoading, activityLog]);
 
@@ -157,79 +170,41 @@ export default function HhaServiceActivityLogPage() {
         <HhaNoteHeader
           agencyName={activityLog?.metadata?.agencyName ?? user?.agency?.name ?? ""}
           title={TITLE}
-          items={infoItems}
+          items={[]}
         />
 
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 flex flex-col gap-4">
+          <InfoField
+            label="Client name"
+            value={activityLog?.metadata?.clientName || activityLog?.metadata?.individual || ""}
+          />
+          <InfoField label="Address" value={activityLog?.metadata?.clientAddress || ""} />
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <ReadOnlyField label="Service code" value={activityLog?.metadata?.serviceCode ?? ""} />
           <ReadOnlyField label="Shift start time" value={activityLog?.metadata?.shiftStartTime ?? ""} />
           <ReadOnlyField label="Shift end time" value={activityLog?.metadata?.shiftEndTime ?? ""} />
+        </div>
+
+        <div className="mt-4">
           <ReadOnlyField label="Service goal" value={activityLog?.metadata?.serviceGoal ?? ""} />
         </div>
 
-        <div className="mt-8 overflow-x-auto">
-          <div className="min-w-[760px] rounded-[6px] border border-[#b2b2b3]">
-            <div className="grid grid-cols-[140px_240px_1fr] bg-[#eef4f5]">
-              <div className="border-b border-r border-[#b2b2b3] px-4 py-3 text-center text-[14px] font-normal text-black font-['Urbanist',sans-serif]">
-                Date
-              </div>
-              <div className="border-b border-r border-[#b2b2b3] px-4 py-3 text-center text-[14px] font-normal text-black font-['Urbanist',sans-serif]">
-                Activity
-              </div>
-              <div className="border-b border-[#b2b2b3] px-4 py-3 text-center text-[14px] font-normal text-black font-['Urbanist',sans-serif]">
-                Description
-              </div>
+        <div className="mt-8">
+          <div className="rounded-[6px] border border-[#b2b2b3]">
+            <div className="border-b border-[#b2b2b3] bg-[#eef4f5] px-4 py-3 text-center text-[14px] font-normal text-black font-['Urbanist',sans-serif]">
+              {ACTIVITY_COLUMN_HEADER}
             </div>
-            {rows.map((row, index) => (
-              <div key={index} className="grid grid-cols-[140px_240px_1fr] bg-white">
-                <div className="flex items-center justify-center border-b border-r border-[#b2b2b3] px-2 py-2">
-                  <Popover
-                    open={openDateRow === String(index)}
-                    onOpenChange={(open) => setOpenDateRow(open ? String(index) : null)}
-                  >
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        disabled={locked}
-                        className="flex h-full w-full items-center justify-center text-[14px] text-[#10141a] focus:outline-none disabled:cursor-not-allowed"
-                      >
-                        {row.date ? format(row.date, "dd.MM.yy") : "Select"}
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent align="start" className="mt-2 w-auto border-none bg-white p-0 shadow-lg">
-                      <Calendar
-                        mode="single"
-                        selected={row.date}
-                        defaultMonth={row.date ?? new Date()}
-                        disabled={{ after: new Date() }}
-                        onSelect={async (date) => {
-                          if (date) {
-                            await updateRow(row.id, index, "date", date);
-                            setOpenDateRow(null);
-                          }
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="flex items-center border-b border-r border-[#b2b2b3] px-3 py-2">
-                  <ContentEditableCell
-                    value={row.activity}
-                    onChange={(value) => updateRow(row.id, index, "activity", value)}
-                    fieldName="Activity"
-                    pageTitle={TITLE}
-                  />
-                </div>
-                <div className="flex items-center border-b border-[#b2b2b3] px-3 py-2">
-                  <ContentEditableCell
-                    value={row.description}
-                    onChange={(value) => updateRow(row.id, index, "description", value)}
-                    fieldName="Description"
-                    pageTitle={TITLE}
-                  />
-                </div>
-              </div>
-            ))}
+            <div className="flex items-stretch px-3 py-2 transition-colors hover:bg-white focus-within:bg-white">
+              <ContentEditableCell
+                value={row.content}
+                onChange={updateContent}
+                style={{ minHeight: 260, textAlign: "left" }}
+                fieldName="Activity"
+                pageTitle={TITLE}
+              />
+            </div>
           </div>
         </div>
 
