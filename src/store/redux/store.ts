@@ -34,6 +34,7 @@ import { planOfCareApi } from "@/pages/userPanel/planOfCare/api";
 import { userMessagingApi } from "@/lib/api/userMessaging";
 import { aiAutomationApi } from "@/pages/agency/ai-automation/api";
 import { agencyStaffTasksApi } from "@/pages/agency/staff-tasks/api";
+import { remindersApi } from "@/pages/agency/reminders/api";
 
 const rootReducer = combineReducers({
     auth: authReducer,
@@ -60,6 +61,7 @@ const rootReducer = combineReducers({
     [userMessagingApi.reducerPath]: userMessagingApi.reducer,
     [aiAutomationApi.reducerPath]: aiAutomationApi.reducer,
     [agencyStaffTasksApi.reducerPath]: agencyStaffTasksApi.reducer,
+    [remindersApi.reducerPath]: remindersApi.reducer,
 });
 
 const persistConfig = {
@@ -100,7 +102,8 @@ export const store = configureStore({
             .concat(planOfCareApi.middleware)
             .concat(userMessagingApi.middleware)
             .concat(aiAutomationApi.middleware)
-            .concat(agencyStaffTasksApi.middleware),
+            .concat(agencyStaffTasksApi.middleware)
+            .concat(remindersApi.middleware),
     devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
 

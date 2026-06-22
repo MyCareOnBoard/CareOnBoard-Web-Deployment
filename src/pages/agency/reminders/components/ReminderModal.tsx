@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Clock3, X } from "lucide-react";
+import { BrainCircuit, Bell, Clock3, X } from "lucide-react";
 
 import TimePicker from "@/components/TimePicker";
 import { Button } from "@/components/ui/button";
@@ -13,13 +13,14 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
-import type { Reminder, ReminderDraft } from "../types";
+import type { Reminder, ReminderDraft, ReminderType } from "../types";
 
 interface ReminderModalProps {
   open: boolean;
   reminder?: Reminder | null;
   onOpenChange: (open: boolean) => void;
-  onSave: (reminder: ReminderDraft) => void;
+  onSave: (draft: ReminderDraft) => void;
+  isSaving?: boolean;
 }
 
 function toLocalDateInput(date: Date) {
@@ -32,7 +33,6 @@ function toLocalDateInput(date: Date) {
 function getDefaultDateTime() {
   const nextHour = new Date();
   nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
-
   return {
     date: toLocalDateInput(nextHour),
     time: `${String(nextHour.getHours()).padStart(2, "0")}:00`,
@@ -53,12 +53,29 @@ function formatTimeDisplay(value: string) {
   return `${displayHours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")} ${period}`;
 }
 
+const TYPE_OPTIONS: Array<{ value: ReminderType; label: string; icon: React.ReactNode; desc: string }> = [
+  {
+    value: "normal",
+    label: "Normal Reminder",
+    icon: <Bell className="h-4 w-4" />,
+    desc: "Sends you a notification at the scheduled time",
+  },
+  {
+    value: "ai_prompt",
+    label: "AI Prompt",
+    icon: <BrainCircuit className="h-4 w-4" />,
+    desc: "Runs a Gemini prompt and delivers the result as a notification",
+  },
+];
+
 export default function ReminderModal({
   open,
   reminder,
   onOpenChange,
   onSave,
+  isSaving = false,
 }: ReminderModalProps) {
+  const [type, setType] = useState<ReminderType>("normal");
   const [message, setMessage] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -66,31 +83,35 @@ export default function ReminderModal({
 
   useEffect(() => {
     if (!open) return;
-
     const defaults = getDefaultDateTime();
+    setType(reminder?.type ?? "normal");
     setMessage(reminder?.message ?? "");
-    setDate(reminder?.date ?? defaults.date);
-    setTime(reminder?.time ?? defaults.time);
+    setDate(reminder?.scheduledDate ?? defaults.date);
+    setTime(reminder?.scheduledTime ?? defaults.time);
     setError("");
   }, [open, reminder]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     if (!message.trim() || !date || !time) {
-      setError("Enter a reminder message, date, and time.");
+      setError(
+        type === "ai_prompt"
+          ? "Enter an AI prompt, date, and time."
+          : "Enter a reminder message, date, and time."
+      );
       return;
     }
-
-    onSave({ message: message.trim(), date, time });
+    onSave({ type, message: message.trim(), scheduledDate: date, scheduledTime: time });
     onOpenChange(false);
   };
+
+  const isAiPrompt = type === "ai_prompt";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="w-[min(560px,calc(100vw-32px))] rounded-[24px] border border-[#e5e7eb] bg-white p-6"
+        className="w-[min(580px,calc(100vw-32px))] rounded-[24px] border border-[#e5e7eb] bg-white p-6"
       >
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="flex items-start justify-between gap-4">
@@ -100,8 +121,8 @@ export default function ReminderModal({
               </DialogTitle>
               <DialogDescription className="mt-1 text-[14px] text-[#6b7280]">
                 {reminder
-                  ? "Update the message or schedule for this reminder."
-                  : "Choose when you want this reminder to appear."}
+                  ? "Update the type, message, or schedule for this reminder."
+                  : "Choose a type and schedule for your reminder."}
               </DialogDescription>
             </div>
             <button
@@ -114,19 +135,59 @@ export default function ReminderModal({
             </button>
           </div>
 
+          {/* Type toggle */}
+          <div className="grid grid-cols-2 gap-2">
+            {TYPE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  setType(opt.value);
+                  setMessage("");
+                  setError("");
+                }}
+                disabled={!!reminder}
+                className={`flex items-start gap-2.5 rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  type === opt.value
+                    ? "border-[#00b4b8] bg-[#f0fbfb] text-[#008f93]"
+                    : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
+                }`}
+              >
+                <span className={`mt-0.5 shrink-0 ${type === opt.value ? "text-[#00b4b8]" : "text-[#9ca3af]"}`}>
+                  {opt.icon}
+                </span>
+                <div>
+                  <p className={`text-[13px] font-semibold ${type === opt.value ? "text-[#008f93]" : "text-[#10141a]"}`}>
+                    {opt.label}
+                  </p>
+                  <p className="mt-0.5 text-[12px] leading-snug text-[#9ca3af]">{opt.desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+
           <div className="space-y-2">
             <label htmlFor="reminder-message" className="text-[14px] font-semibold text-[#10141a]">
-              Reminder message
+              {isAiPrompt ? "AI Prompt" : "Reminder message"}
             </label>
             <Textarea
               id="reminder-message"
               value={message}
               onChange={(event) => setMessage(event.target.value)}
-              placeholder="What do you need to remember?"
+              placeholder={
+                isAiPrompt
+                  ? "e.g. Generate a weekly care summary for my agency"
+                  : "What do you need to remember?"
+              }
               rows={5}
               className="min-h-[120px] resize-none rounded-xl border-[#cccccd] bg-white px-4 py-3 text-[14px] text-[#10141a] focus-visible:border-[#00b4b8] focus-visible:ring-[#00b4b8]/20"
               autoFocus
             />
+            {isAiPrompt && (
+              <p className="text-[12px] text-[#9ca3af]">
+                Gemini will run this prompt at the scheduled time and deliver the result as a notification.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -163,11 +224,11 @@ export default function ReminderModal({
           {error && <p className="text-[13px] font-medium text-[#d53411]">{error}</p>}
 
           <DialogFooter className="flex justify-end gap-3 pt-1">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button type="submit">
-              {reminder ? "Save changes" : "Add reminder"}
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? "Saving…" : reminder ? "Save changes" : "Add reminder"}
             </Button>
           </DialogFooter>
         </form>

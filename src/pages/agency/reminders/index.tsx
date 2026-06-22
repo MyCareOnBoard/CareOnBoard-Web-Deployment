@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowLeft,
+  Bell,
   BellRing,
+  BrainCircuit,
   Pencil,
   Plus,
   RotateCcw,
@@ -21,49 +22,42 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Routes } from "@/routes/constants";
-import { selectUser } from "@/utils/auth/store/authSelectors";
 
 import ReminderModal from "./components/ReminderModal";
-import { getReminderDateTime, type Reminder, type ReminderDraft } from "./types";
+import { getReminderDateTime, type Reminder, type ReminderDraft, type ReminderStatus } from "./types";
+import {
+  useGetRemindersQuery,
+  useCreateReminderMutation,
+  useUpdateReminderMutation,
+  useDeleteReminderMutation,
+} from "./api";
 
-type StatusFilter = "all" | "current" | "past";
-type ReminderStatus = "Current" | "Past";
+type StatusFilter = "all" | "pending" | "sent" | "failed";
 
 const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
   { value: "all", label: "All" },
-  { value: "current", label: "Current" },
-  { value: "past", label: "Past" },
+  { value: "pending", label: "Upcoming" },
+  { value: "sent", label: "Sent" },
+  { value: "failed", label: "Failed" },
 ];
 
-function isReminder(value: unknown): value is Reminder {
-  if (!value || typeof value !== "object") return false;
-  const reminder = value as Partial<Reminder>;
-  return Boolean(
-    reminder.id &&
-    typeof reminder.message === "string" &&
-    typeof reminder.date === "string" &&
-    typeof reminder.time === "string"
-  );
-}
-
-function loadReminders(storageKey: string) {
-  try {
-    const stored = window.localStorage.getItem(storageKey);
-    if (!stored) return [];
-    const parsed: unknown = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed.filter(isReminder) : [];
-  } catch {
-    return [];
-  }
-}
-
-function createReminderId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
+const STATUS_BADGE_CONFIG: Record<ReminderStatus, { label: string; dot: string; badge: string }> = {
+  pending: {
+    label: "Upcoming",
+    dot: "bg-[#00b4b8]",
+    badge: "border-[#00b4b8] text-[#008f93]",
+  },
+  sent: {
+    label: "Sent",
+    dot: "bg-[#22c55e]",
+    badge: "border-[#22c55e] text-[#15803d]",
+  },
+  failed: {
+    label: "Failed",
+    dot: "bg-[#ef4444]",
+    badge: "border-[#ef4444] text-[#dc2626]",
+  },
+};
 
 function toDateInput(date: Date) {
   const year = date.getFullYear();
@@ -80,8 +74,7 @@ function fromDateInput(value: string) {
 
 function formatDate(reminder: Reminder) {
   const date = getReminderDateTime(reminder);
-  if (Number.isNaN(date.getTime())) return reminder.date;
-
+  if (Number.isNaN(date.getTime())) return reminder.scheduledDate;
   return new Intl.DateTimeFormat(undefined, {
     weekday: "short",
     month: "short",
@@ -92,47 +85,58 @@ function formatDate(reminder: Reminder) {
 
 function formatTime(reminder: Reminder) {
   const date = getReminderDateTime(reminder);
-  if (Number.isNaN(date.getTime())) return reminder.time;
-
+  if (Number.isNaN(date.getTime())) return reminder.scheduledTime;
   return new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
 }
 
-function getStatus(reminder: Reminder, now: number): ReminderStatus {
-  return getReminderDateTime(reminder).getTime() < now ? "Past" : "Current";
+function StatusBadge({ status }: { status: ReminderStatus }) {
+  const cfg = STATUS_BADGE_CONFIG[status];
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-semibold ${cfg.badge}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+}
+
+function TypeBadge({ type }: { type: Reminder["type"] }) {
+  const isAi = type === "ai_prompt";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+      isAi ? "bg-[#f5f3ff] text-[#7c3aed]" : "bg-[#f3f4f6] text-[#6b7280]"
+    }`}>
+      {isAi ? <BrainCircuit className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
+      {isAi ? "AI Prompt" : "Normal"}
+    </span>
+  );
 }
 
 interface ReminderRowProps {
   reminder: Reminder;
-  status: ReminderStatus;
   onView: (reminder: Reminder) => void;
   onEdit: (reminder: Reminder) => void;
   onDelete: (reminder: Reminder) => void;
 }
 
-function StatusBadge({ status }: { status: ReminderStatus }) {
-  const isCurrent = status === "Current";
+function ReminderRow({ reminder, onView, onEdit, onDelete }: ReminderRowProps) {
+  const isPending = reminder.status === "pending";
+  const hasResult = reminder.type === "ai_prompt" && reminder.status === "sent" && !!reminder.result;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-semibold ${
-      isCurrent ? "border-[#00b4b8] text-[#008f93]" : "border-[#d1d5db] text-[#6b7280]"
-    }`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${isCurrent ? "bg-[#00b4b8]" : "bg-[#9ca3af]"}`} />
-      {status}
-    </span>
-  );
-}
-
-function ReminderRow({ reminder, status, onView, onEdit, onDelete }: ReminderRowProps) {
-  return (
-    <div className="grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f9fafb] md:grid-cols-[minmax(220px,2fr)_minmax(150px,1fr)_100px_110px_minmax(190px,auto)] md:items-center">
+    <div className="grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f9fafb] md:grid-cols-[minmax(200px,2fr)_80px_minmax(140px,1fr)_100px_110px_minmax(200px,auto)] md:items-center">
       <div className="min-w-0">
         <div className="flex items-start gap-2.5 md:items-center">
-          <span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${status === "Current" ? "bg-[#00b4b8]" : "bg-[#9ca3af]"}`} />
-          <p className="whitespace-pre-wrap break-words text-[14px] font-semibold leading-6 text-[#10141a]">{reminder.message}</p>
+          <span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${STATUS_BADGE_CONFIG[reminder.status].dot}`} />
+          <p className="whitespace-pre-wrap break-words text-[14px] font-semibold leading-6 text-[#10141a] line-clamp-2">
+            {reminder.message}
+          </p>
         </div>
+      </div>
+      <div className="hidden md:block">
+        <TypeBadge type={reminder.type} />
       </div>
       <div className="text-[14px] text-[#6b7280]">
         <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Date</span>
@@ -142,23 +146,35 @@ function ReminderRow({ reminder, status, onView, onEdit, onDelete }: ReminderRow
         <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Time</span>
         {formatTime(reminder)}
       </div>
-      <div><StatusBadge status={status} /></div>
+      <div><StatusBadge status={reminder.status} /></div>
       <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-        <button
-          type="button"
-          onClick={() => onView(reminder)}
-          className="rounded-full border border-[#00b4b8] px-4 py-1.5 text-[13px] font-medium text-[#00b4b8] transition-colors hover:bg-[#00b4b8] hover:text-white"
-        >
-          View
-        </button>
-        <button
-          type="button"
-          title="Edit"
-          onClick={() => onEdit(reminder)}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] transition-colors hover:bg-[#f3f4f6] hover:text-[#10141a]"
-        >
-          <Pencil className="w-4 h-4" />
-        </button>
+        {hasResult ? (
+          <button
+            type="button"
+            onClick={() => onView(reminder)}
+            className="rounded-full border border-[#7c3aed] px-4 py-1.5 text-[13px] font-medium text-[#7c3aed] transition-colors hover:bg-[#7c3aed] hover:text-white"
+          >
+            View Result
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onView(reminder)}
+            className="rounded-full border border-[#00b4b8] px-4 py-1.5 text-[13px] font-medium text-[#00b4b8] transition-colors hover:bg-[#00b4b8] hover:text-white"
+          >
+            View
+          </button>
+        )}
+        {isPending && (
+          <button
+            type="button"
+            title="Edit"
+            onClick={() => onEdit(reminder)}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] transition-colors hover:bg-[#f3f4f6] hover:text-[#10141a]"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        )}
         <button
           type="button"
           title="Delete"
@@ -172,16 +188,22 @@ function ReminderRow({ reminder, status, onView, onEdit, onDelete }: ReminderRow
   );
 }
 
+const GROUP_CONFIG: Array<{ status: ReminderStatus; label: string; filter: StatusFilter }> = [
+  { status: "pending", label: "Upcoming", filter: "pending" },
+  { status: "sent",    label: "Sent",     filter: "sent" },
+  { status: "failed",  label: "Failed",   filter: "failed" },
+];
+
 export default function RemindersPage() {
   const navigate = useNavigate();
-  const currentUser = useSelector(selectUser);
-  const storageKey = useMemo(
-    () => `care-on-board:reminders:${currentUser?.agencyId ?? currentUser?.uid ?? "default"}`,
-    [currentUser?.agencyId, currentUser?.uid],
-  );
 
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [loadedStorageKey, setLoadedStorageKey] = useState("");
+  const { data, isLoading, isError, refetch } = useGetRemindersQuery();
+  const [createReminder, { isLoading: isCreating }] = useCreateReminderMutation();
+  const [updateReminder, { isLoading: isUpdating }] = useUpdateReminderMutation();
+  const [deleteReminder] = useDeleteReminderMutation();
+
+  const reminders = data?.data ?? [];
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [dateFilter, setDateFilter] = useState("");
@@ -189,61 +211,33 @@ export default function RemindersPage() {
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [viewingReminder, setViewingReminder] = useState<Reminder | null>(null);
   const [deletingReminder, setDeletingReminder] = useState<Reminder | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    setReminders(loadReminders(storageKey));
-    setLoadedStorageKey(storageKey);
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (loadedStorageKey !== storageKey) return;
-    window.localStorage.setItem(storageKey, JSON.stringify(reminders));
-  }, [loadedStorageKey, reminders, storageKey]);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => setNow(Date.now()), 60_000);
-    return () => window.clearInterval(intervalId);
-  }, []);
 
   const visibleReminders = useMemo(() => {
-    const normalizedSearch = searchQuery.trim().toLowerCase();
-
-    return reminders.filter((reminder) => {
-      const status = getStatus(reminder, now).toLowerCase();
-      if (statusFilter !== "all" && status !== statusFilter) return false;
-      if (dateFilter && reminder.date !== dateFilter) return false;
-      if (normalizedSearch && !reminder.message.toLowerCase().includes(normalizedSearch)) return false;
+    const q = searchQuery.trim().toLowerCase();
+    return reminders.filter((r) => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (dateFilter && r.scheduledDate !== dateFilter) return false;
+      if (q && !r.message.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [dateFilter, now, reminders, searchQuery, statusFilter]);
-
-  const currentReminders = useMemo(
-    () => visibleReminders
-      .filter((reminder) => getStatus(reminder, now) === "Current")
-      .sort((a, b) => getReminderDateTime(a).getTime() - getReminderDateTime(b).getTime()),
-    [now, visibleReminders],
-  );
-
-  const pastReminders = useMemo(
-    () => visibleReminders
-      .filter((reminder) => getStatus(reminder, now) === "Past")
-      .sort((a, b) => getReminderDateTime(b).getTime() - getReminderDateTime(a).getTime()),
-    [now, visibleReminders],
-  );
+  }, [reminders, searchQuery, statusFilter, dateFilter]);
 
   const groups = useMemo(() => {
-    if (statusFilter === "current") {
-      return [{ label: "Current reminders", status: "Current" as const, reminders: currentReminders }];
-    }
-    if (statusFilter === "past") {
-      return [{ label: "Past reminders", status: "Past" as const, reminders: pastReminders }];
-    }
-    return [
-      { label: "Current reminders", status: "Current" as const, reminders: currentReminders },
-      { label: "Past reminders", status: "Past" as const, reminders: pastReminders },
-    ];
-  }, [currentReminders, pastReminders, statusFilter]);
+    const activeGroups = statusFilter === "all"
+      ? GROUP_CONFIG
+      : GROUP_CONFIG.filter((g) => g.filter === statusFilter);
+
+    return activeGroups.map((g) => ({
+      ...g,
+      reminders: visibleReminders
+        .filter((r) => r.status === g.status)
+        .sort((a, b) => {
+          const aTime = getReminderDateTime(a).getTime();
+          const bTime = getReminderDateTime(b).getTime();
+          return g.status === "pending" ? aTime - bTime : bTime - aTime;
+        }),
+    })).filter((g) => g.reminders.length > 0);
+  }, [visibleReminders, statusFilter]);
 
   const openAddModal = () => {
     setEditingReminder(null);
@@ -255,35 +249,28 @@ export default function RemindersPage() {
     setModalOpen(true);
   };
 
-  const deleteReminder = () => {
-    if (!deletingReminder) return;
-    setReminders((current) => current.filter((reminder) => reminder.id !== deletingReminder.id));
-    if (viewingReminder?.id === deletingReminder.id) setViewingReminder(null);
-    setDeletingReminder(null);
+  const handleSave = async (draft: ReminderDraft) => {
+    try {
+      if (editingReminder) {
+        await updateReminder({ reminderId: editingReminder.id, data: draft }).unwrap();
+      } else {
+        await createReminder(draft).unwrap();
+      }
+    } catch {
+      // error handled by RTK Query; toast can be wired here if needed
+    }
   };
 
-  const saveReminder = (draft: ReminderDraft) => {
-    const timestamp = new Date().toISOString();
-
-    setReminders((current) => {
-      if (editingReminder) {
-        return current.map((reminder) =>
-          reminder.id === editingReminder.id
-            ? { ...reminder, ...draft, updatedAt: timestamp }
-            : reminder
-        );
-      }
-
-      return [
-        {
-          id: createReminderId(),
-          ...draft,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        },
-        ...current,
-      ];
-    });
+  const handleDelete = async () => {
+    if (!deletingReminder) return;
+    try {
+      await deleteReminder(deletingReminder.id).unwrap();
+      if (viewingReminder?.id === deletingReminder.id) setViewingReminder(null);
+    } catch {
+      // error handled by RTK Query
+    } finally {
+      setDeletingReminder(null);
+    }
   };
 
   const clearFilters = () => {
@@ -293,11 +280,17 @@ export default function RemindersPage() {
   };
 
   const hasFilters = Boolean(searchQuery || dateFilter || statusFilter !== "all");
+  const isSaving = isCreating || isUpdating;
 
   return (
     <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
       <div className="flex flex-wrap items-center gap-2 mb-4 sm:mb-6">
-        <Button type="button" variant="outline" onClick={() => navigate(Routes.agency.tasks)} className="cursor-pointer border-0 flex items-center justify-center rounded-full bg-white backdrop-blur-sm transition-colors hover:bg-[#f0fbfb]">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => navigate(Routes.agency.tasks)}
+          className="cursor-pointer border-0 flex items-center justify-center rounded-full bg-white backdrop-blur-sm transition-colors hover:bg-[#f0fbfb]"
+        >
           <ArrowLeft className="w-6 h-6" />
         </Button>
         <h1 className="text-[28px] font-bold leading-[1.4] text-[#10141a] sm:text-[32px] lg:text-[40px]">
@@ -311,7 +304,7 @@ export default function RemindersPage() {
             <div>
               <h2 className="text-[20px] font-bold text-[#10141a] sm:text-[22px]">All Reminders</h2>
               <p className="mt-0.5 text-[13px] text-[#6b7280] sm:text-[14px]">
-                Schedule reminders and update past reminders with new dates.
+                Schedule normal reminders or AI-powered prompt reminders.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -328,7 +321,7 @@ export default function RemindersPage() {
               <input
                 type="search"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search reminders..."
                 className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] text-[#10141a] outline-none placeholder:text-[#808081] focus:ring-0"
               />
@@ -357,7 +350,7 @@ export default function RemindersPage() {
               <div className="min-w-[190px] flex-1 sm:flex-none">
                 <CustomDatePicker
                   date={fromDateInput(dateFilter)}
-                  setDate={(selectedDate) => setDateFilter(selectedDate ? toDateInput(selectedDate) : "")}
+                  setDate={(d) => setDateFilter(d ? toDateInput(d) : "")}
                   placeholder="Filter by date"
                   startMonth={new Date(2000, 0)}
                   endMonth={new Date(2100, 11)}
@@ -379,7 +372,22 @@ export default function RemindersPage() {
           </div>
         </div>
 
-        {visibleReminders.length === 0 ? (
+        {isLoading ? (
+          <div className="p-8 text-center sm:p-12">
+            <p className="text-[14px] text-[#6b7280]">Loading reminders…</p>
+          </div>
+        ) : isError ? (
+          <div className="p-8 text-center sm:p-12">
+            <p className="text-[14px] font-semibold text-[#ef4444]">Failed to load reminders</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-2 text-[13px] text-[#00b4b8] underline"
+            >
+              Try again
+            </button>
+          </div>
+        ) : visibleReminders.length === 0 ? (
           <div className="p-8 text-center sm:p-12">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f3f4f6]">
               <BellRing className="h-7 w-7 text-[#b2b2b3]" />
@@ -388,25 +396,21 @@ export default function RemindersPage() {
               {reminders.length === 0 ? "No reminders yet" : "No reminders match your filters"}
             </p>
             <p className="mt-1 text-[13px] text-[#6b7280]">
-              {reminders.length === 0 ? "Click Add Reminder to create your first reminder" : "Try changing your search, status, or date filter"}
+              {reminders.length === 0
+                ? "Click Add Reminder to create your first reminder"
+                : "Try changing your search, status, or date filter"}
             </p>
           </div>
         ) : (
           <div>
-            <div className="hidden grid-cols-[minmax(220px,2fr)_minmax(150px,1fr)_100px_110px_minmax(190px,auto)] border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 md:grid">
-              {[
-                { label: "Reminder", align: "" },
-                { label: "Date", align: "" },
-                { label: "Time", align: "" },
-                { label: "Status", align: "" },
-                { label: "", align: "text-right" },
-              ].map((header, index) => (
-                <div key={`${header.label}-${index}`} className={`text-[12px] font-semibold uppercase text-[#808081] ${header.align}`}>
-                  {header.label}
+            <div className="hidden grid-cols-[minmax(200px,2fr)_80px_minmax(140px,1fr)_100px_110px_minmax(200px,auto)] border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 md:grid">
+              {["Reminder", "Type", "Date", "Time", "Status", ""].map((label, i) => (
+                <div key={i} className={`text-[12px] font-semibold uppercase text-[#808081] ${i === 5 ? "text-right" : ""}`}>
+                  {label}
                 </div>
               ))}
             </div>
-            {groups.map((group) => group.reminders.length > 0 && (
+            {groups.map((group) => (
               <div key={group.status}>
                 <div className="border-b border-[#e5e7eb] bg-[#fcfcfd] px-4 py-2.5 text-[12px] font-bold uppercase text-[#6b7280]">
                   {group.label} ({group.reminders.length})
@@ -415,7 +419,6 @@ export default function RemindersPage() {
                   <ReminderRow
                     key={reminder.id}
                     reminder={reminder}
-                    status={group.status}
                     onView={setViewingReminder}
                     onEdit={openEditModal}
                     onDelete={setDeletingReminder}
@@ -427,23 +430,42 @@ export default function RemindersPage() {
         )}
       </div>
 
+      {/* View / Result modal */}
       <Dialog open={!!viewingReminder} onOpenChange={(open) => { if (!open) setViewingReminder(null); }}>
-        <DialogContent className="flex w-[min(520px,calc(100vw-32px))] flex-col gap-4 rounded-[30px] border border-[rgba(255,255,255,0.3)] bg-white p-5 backdrop-blur">
+        <DialogContent className="flex w-[min(560px,calc(100vw-32px))] flex-col gap-4 rounded-[30px] border border-[rgba(255,255,255,0.3)] bg-white p-5 backdrop-blur">
           {viewingReminder && (
             <>
               <DialogHeader className="items-start gap-2 text-left">
                 <DialogTitle className="pr-6 text-[20px] font-bold leading-snug text-[#10141a]">
-                  Reminder details
+                  {viewingReminder.type === "ai_prompt" && viewingReminder.status === "sent"
+                    ? "AI Prompt Result"
+                    : "Reminder details"}
                 </DialogTitle>
-                <StatusBadge status={getStatus(viewingReminder, now)} />
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge status={viewingReminder.status} />
+                  <TypeBadge type={viewingReminder.type} />
+                </div>
               </DialogHeader>
 
               <div>
-                <p className="mb-1 text-[12px] font-semibold uppercase text-[#808081]">Message</p>
+                <p className="mb-1 text-[12px] font-semibold uppercase text-[#808081]">
+                  {viewingReminder.type === "ai_prompt" ? "Prompt" : "Message"}
+                </p>
                 <p className="whitespace-pre-wrap break-words text-[14px] leading-relaxed text-[#10141a]">
                   {viewingReminder.message}
                 </p>
               </div>
+
+              {viewingReminder.type === "ai_prompt" && viewingReminder.result && (
+                <div>
+                  <p className="mb-1 text-[12px] font-semibold uppercase text-[#7c3aed]">AI Result</p>
+                  <div className="max-h-60 overflow-y-auto rounded-xl bg-[#f5f3ff] p-3">
+                    <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-[#1e1b4b]">
+                      {viewingReminder.result}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
@@ -458,16 +480,18 @@ export default function RemindersPage() {
 
               <DialogFooter className="flex flex-wrap justify-end gap-2 pt-1">
                 <Button variant="outline" onClick={() => setViewingReminder(null)}>Close</Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    openEditModal(viewingReminder);
-                    setViewingReminder(null);
-                  }}
-                >
-                  <Pencil className="w-4 h-4" />
-                  Edit
-                </Button>
+                {viewingReminder.status === "pending" && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      openEditModal(viewingReminder);
+                      setViewingReminder(null);
+                    }}
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Edit
+                  </Button>
+                )}
                 <Button
                   className="bg-[#ef4444] text-white hover:bg-[#dc2626]"
                   onClick={() => {
@@ -491,9 +515,11 @@ export default function RemindersPage() {
           setModalOpen(open);
           if (!open) setEditingReminder(null);
         }}
-        onSave={saveReminder}
+        onSave={handleSave}
+        isSaving={isSaving}
       />
 
+      {/* Delete confirmation */}
       <Dialog open={!!deletingReminder} onOpenChange={(open) => { if (!open) setDeletingReminder(null); }}>
         <DialogContent className="flex w-[min(400px,calc(100vw-32px))] flex-col gap-4 rounded-[30px] border border-[rgba(255,255,255,0.3)] bg-white p-5 backdrop-blur">
           <DialogHeader>
@@ -504,7 +530,7 @@ export default function RemindersPage() {
           </p>
           <DialogFooter className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDeletingReminder(null)}>Cancel</Button>
-            <Button className="bg-[#ef4444] text-white hover:bg-[#dc2626]" onClick={deleteReminder}>
+            <Button className="bg-[#ef4444] text-white hover:bg-[#dc2626]" onClick={handleDelete}>
               Delete
             </Button>
           </DialogFooter>
