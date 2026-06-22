@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {Routes} from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, {NavItem} from "@/components/DashboardSidebar";
+import {useSidebarCollapsed} from "@/hooks/useSidebarCollapsed";
 import {UserType} from "@/utils/auth/types/user.types";
 import {
   Home,
@@ -44,6 +45,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
   const {user, logout} = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [collapsed] = useSidebarCollapsed();
 
   const handleLogout = async () => {
     try {
@@ -105,7 +107,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
         onLogout={handleLogout}
       />
       <DashboardSidebar navItems={navItems}/>
-      <main className="ml-[240px] pt-[130px] pb-10">
+      <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
         <div className="px-8">{children ?? <Outlet/>}</div>
       </main>
     </div>

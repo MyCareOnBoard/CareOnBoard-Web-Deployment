@@ -100,6 +100,10 @@ export const HhaAuthorizationFields = React.memo(function HhaAuthorizationFields
 }: HhaAuthorizationFieldsProps) {
   const hasService = Boolean(row.serviceId || row.serviceCode);
   const payTypeLabel = payTypeToLabel(row.clientPayType);
+  // The backend requires staff rate + pay type once a row has a service (incl.
+  // imported/matched rows, which the catalog can't supply). Flag it so the user
+  // isn't surprised by a save-time validation error.
+  const staffPayIncomplete = hasService && (!(row.staffRate ?? "").trim() || !row.payType);
 
   return (
     <div className="space-y-6">
@@ -236,6 +240,11 @@ export const HhaAuthorizationFields = React.memo(function HhaAuthorizationFields
             onPayTypeChange={(v) => onChange({ payType: v })}
           />
         </div>
+        {staffPayIncomplete ? (
+          <p className="mt-3 text-[13px] font-medium text-red-600" role="alert">
+            Staff rate and pay type are required before this client can be saved.
+          </p>
+        ) : null}
       </div>
 
       <ServiceAssignedDspsSection

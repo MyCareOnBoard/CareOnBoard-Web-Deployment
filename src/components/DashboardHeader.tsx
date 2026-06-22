@@ -15,8 +15,10 @@ import {
 import BellIcon from "@/assets/icons/bell.svg?react";
 import CogIcon from "@/assets/icons/cog.svg?react";
 import LogoNameIcon from "@/assets/icons/green-green-logo.svg?react";
-import { ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle } from "lucide-react";
+import LogoMarkIcon from "@/assets/icons/logo.svg?react";
+import { ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toggleDrawer } from "@/hooks/useSidebarDrawer";
 import { UserType } from "@/utils/auth/types/user.types";
 
 
@@ -163,7 +165,16 @@ export default function DashboardHeader(
     <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5]">
       <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between px-8">
         <div className="flex items-center gap-3">
-          <LogoNameIcon className="w-[226px]" />
+          <button
+            type="button"
+            aria-label="Open navigation menu"
+            onClick={toggleDrawer}
+            className="grid h-[42px] w-[42px] place-items-center rounded-[50px] text-[#808081] cursor-pointer hover:bg-white/50 transition-colors md:hidden"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+          <LogoNameIcon className="hidden w-[226px] md:block" />
+          <LogoMarkIcon className="h-9 w-auto md:hidden" />
         </div>
 
         {actions ?? (
@@ -277,9 +288,13 @@ export default function DashboardHeader(
             </DropdownMenu>
             <DropdownMenu open={isUserDropdownOpen} onOpenChange={setIsUserDropdownOpen}>
               <DropdownMenuTrigger asChild>
-                <div className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer">
+                <div
+                  role="button"
+                  aria-label={`Account menu for ${userName || 'User'}`}
+                  className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer"
+                >
                   <UserAvatar userName={userName} userImage={userImage} />
-                  <p className="pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a]">{userName || 'User'}</p>
+                  <p className="hidden pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a] md:block">{userName || 'User'}</p>
                   {isUserDropdownOpen ? (
                     <ChevronUp className="h-4 w-4 text-[#808081] mr-2" />
                   ) : (

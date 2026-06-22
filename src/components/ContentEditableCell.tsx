@@ -6,6 +6,7 @@ interface ContentEditableCellProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  style?: React.CSSProperties;
   placeholder?: string;
   fieldName?: string;
   pageTitle?: string;
@@ -15,6 +16,7 @@ const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
   value,
   onChange,
   className = "",
+  style,
   placeholder = "",
   fieldName,
   pageTitle,
@@ -64,6 +66,7 @@ const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
         contentEditable
         suppressContentEditableWarning
         onInput={handleInput}
+        style={style}
         className={`w-full min-h-[71px] border-0 bg-transparent text-center focus:outline-none text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] py-6 ${className}`}
         data-placeholder={placeholder}
       />
