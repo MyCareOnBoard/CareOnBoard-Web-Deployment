@@ -5,6 +5,7 @@ import {
   Bell,
   BellRing,
   BrainCircuit,
+  ExternalLink,
   Pencil,
   Plus,
   RotateCcw,
@@ -128,11 +129,13 @@ interface ReminderRowProps {
   onView: (reminder: Reminder) => void;
   onEdit: (reminder: Reminder) => void;
   onDelete: (reminder: Reminder) => void;
+  onOpenConversation: (conversationId: string) => void;
 }
 
-function ReminderRow({ reminder, onView, onEdit, onDelete }: ReminderRowProps) {
+function ReminderRow({ reminder, onView, onEdit, onDelete, onOpenConversation }: ReminderRowProps) {
   const isPending = reminder.status === "pending";
-  const hasResult = reminder.type === "ai_prompt" && reminder.status === "sent" && !!reminder.result;
+  const hasConversation = reminder.type === "ai_prompt" && !!reminder.conversationId;
+  const hasResult = reminder.type === "ai_prompt" && !!reminder.result;
 
   return (
     <div className="grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f9fafb] md:grid-cols-[minmax(200px,2fr)_80px_minmax(140px,1fr)_100px_110px_minmax(200px,auto)] md:items-center">
@@ -164,7 +167,16 @@ function ReminderRow({ reminder, onView, onEdit, onDelete }: ReminderRowProps) {
       </div>
       <div><StatusBadge status={reminder.status} /></div>
       <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-        {hasResult ? (
+        {hasConversation ? (
+          <button
+            type="button"
+            onClick={() => onOpenConversation(reminder.conversationId!)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[#7c3aed] px-4 py-1.5 text-[13px] font-medium text-[#7c3aed] transition-colors hover:bg-[#7c3aed] hover:text-white"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View Conversation
+          </button>
+        ) : hasResult ? (
           <button
             type="button"
             onClick={() => onView(reminder)}
@@ -254,6 +266,10 @@ export default function RemindersPage() {
         }),
     })).filter((g) => g.reminders.length > 0);
   }, [visibleReminders, statusFilter]);
+
+  const openConversation = (conversationId: string) => {
+    navigate(`/agency/automations/${conversationId}`);
+  };
 
   const openAddModal = () => {
     setEditingReminder(null);
@@ -438,6 +454,7 @@ export default function RemindersPage() {
                     onView={setViewingReminder}
                     onEdit={openEditModal}
                     onDelete={setDeletingReminder}
+                    onOpenConversation={openConversation}
                   />
                 ))}
               </div>
@@ -519,6 +536,18 @@ export default function RemindersPage() {
 
               <DialogFooter className="flex flex-wrap justify-end gap-2 pt-1">
                 <Button variant="outline" onClick={() => setViewingReminder(null)}>Close</Button>
+                {viewingReminder.conversationId && (
+                  <Button
+                    className="bg-[#7c3aed] text-white hover:bg-[#6d28d9]"
+                    onClick={() => {
+                      setViewingReminder(null);
+                      openConversation(viewingReminder.conversationId!);
+                    }}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    View Conversation
+                  </Button>
+                )}
                 {viewingReminder.status === "pending" && (
                   <Button
                     variant="outline"

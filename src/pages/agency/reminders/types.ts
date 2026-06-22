@@ -15,6 +15,7 @@ export interface Reminder {
   lastSentAt?: string | null;  // ISO string — last time this reminder fired
   status: ReminderStatus;
   result?: string | null;
+  conversationId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
