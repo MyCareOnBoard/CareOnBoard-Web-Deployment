@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 import { extractClientHhaPocClinicalViaApi } from "@/lib/api/gemini";
+import { useListServicesQuery } from "@/lib/api/services";
 import type { ClientExtractionResponse } from "../types/clientExtraction";
 import type { AddClientFormData } from "../types/formData";
 import { mergeExtractionDraft } from "../utils/mergeExtractionDraft";
@@ -20,6 +21,11 @@ export default function HhaImportFromFilePanel({
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
 }) {
+  // Same query args as Stage 2 so this reuses the cached HHA catalog. Imported
+  // authorizations are resolved against it (matched rows kept, unmatched dropped).
+  const { data: hhaServicesData } = useListServicesQuery({ program: "hha", limit: 200 });
+  const hhaServices = useMemo(() => hhaServicesData?.services ?? [], [hhaServicesData]);
+
   const onExtract = useCallback(
     (files: Record<string, File>) =>
       extractClientHhaPocClinicalViaApi({
@@ -34,7 +40,7 @@ export default function HhaImportFromFilePanel({
       extraction: ClientExtractionResponse,
       { overwrite, files }: { overwrite: boolean; files: Record<string, File> },
     ) => {
-      let merged = mergeExtractionDraft(formData, extraction, { overwrite }).formData;
+      let merged = mergeExtractionDraft(formData, extraction, { overwrite, hhaServices }).formData;
       // Attach each uploaded file to its own Stage 3 slot (these keys are not part of
       // the merge's single-detectedDocumentType auto-attach).
       if (files.poc) merged = attachImportFileToDoc(merged, "poc", files.poc);
@@ -43,13 +49,13 @@ export default function HhaImportFromFilePanel({
       }
       setFormData(merged);
     },
-    [formData, setFormData],
+    [formData, setFormData, hhaServices],
   );
 
   const computePreviewWarnings = useCallback(
     (extraction: ClientExtractionResponse, { overwrite }: { overwrite: boolean }) =>
-      mergeExtractionDraft(formData, extraction, { overwrite }).localWarnings,
-    [formData],
+      mergeExtractionDraft(formData, extraction, { overwrite, hhaServices }).localWarnings,
+    [formData, hhaServices],
   );
 
   // Show files already attached to the POC / Clinical Assessment slots when the

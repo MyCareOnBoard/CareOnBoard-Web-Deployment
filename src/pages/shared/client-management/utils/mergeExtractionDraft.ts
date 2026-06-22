@@ -35,6 +35,8 @@ import type {
 } from "../types/formData";
 import { groupLoadedServicesIntoOutcomes, type ServiceLoadRow } from "./outcomeServices";
 import { applyExtractedAuthorizationFields } from "./normalizeExtractedServiceAuthorization";
+import { applyHhaCatalogIdentity } from "./applyHhaCatalogService";
+import type { Service as CatalogService } from "@/lib/api/services";
 import { seedTopLevelFrequencyIntoSdrDetails } from "./mapExtractionSdrFields";
 import { EMERGENCY_CONTACT_RELATIONSHIP_VALUES, GUARDIAN_RELATIONSHIP_VALUES } from "../types/formData";
 
@@ -43,6 +45,12 @@ export type MergeExtractionOptions = {
   overwrite?: boolean;
   /** Same file used for extraction; attached to the detected docs[…] slot. */
   importFile?: File | null;
+  /**
+   * HHA service catalog. When provided, imported `hhaAuthorizations` are resolved
+   * against it (by serviceId, then exact serviceCode) and rows matching no
+   * catalog service are dropped with a warning. Omit to keep rows as-is.
+   */
+  hhaServices?: CatalogService[];
 };
 
 export type MergeExtractionResult = {
@@ -1109,26 +1117,84 @@ export function mergeExtractionDraft(
       };
     }
     if (Array.isArray(s2.hhaAuthorizations) && (s2.hhaAuthorizations.length || overwrite)) {
-      next.stage2.hhaAuthorizations = s2.hhaAuthorizations.map((row: ExtractionHhaAuthorization, idx: number) => ({
-        id: `hha-auth-${idx}`,
-        authorizationNumber: row.authorizationNumber ?? "",
-        serviceId: row.serviceId,
-        serviceName: row.serviceName ?? "",
-        serviceCode: row.serviceCode ?? "",
-        approvedHours: row.approvedHours ?? "",
-        startDate: parseIsoOrUsDate(row.startDate),
-        endDate: parseIsoOrUsDate(row.endDate),
-        payerSource: row.payerSource ?? "",
-        rate: row.rate ?? "",
-        unitType: row.unitType ?? "",
-        serviceType: row.serviceType,
-        modifier: row.modifier,
-        clientPayType: row.clientPayType as HhaAuthorization["clientPayType"],
-        assignedDsps: row.assignedDsps?.length
-          ? row.assignedDsps.map((d) => ({ id: d.id, name: d.name ?? "" }))
-          : [],
-      }));
-      localWarnings.push("Review imported HHA authorizations before saving.");
+      const mapped: HhaAuthorization[] = s2.hhaAuthorizations.map(
+        (row: ExtractionHhaAuthorization, idx: number) => ({
+          id: `hha-auth-${idx}`,
+          authorizationNumber: row.authorizationNumber ?? "",
+          serviceId: row.serviceId,
+          serviceName: row.serviceName ?? "",
+          serviceCode: row.serviceCode ?? "",
+          approvedHours: row.approvedHours ?? "",
+          startDate: parseIsoOrUsDate(row.startDate),
+          endDate: parseIsoOrUsDate(row.endDate),
+          payerSource: row.payerSource ?? "",
+          rate: row.rate ?? "",
+          unitType: row.unitType ?? "",
+          serviceType: row.serviceType,
+          modifier: row.modifier,
+          clientPayType: row.clientPayType as HhaAuthorization["clientPayType"],
+          assignedDsps: row.assignedDsps?.length
+            ? row.assignedDsps.map((d) => ({ id: d.id, name: d.name ?? "" }))
+            : [],
+        }),
+      );
+
+      const catalog = options.hhaServices ?? [];
+      if (catalog.length) {
+        // Resolve each row to a catalog service (by serviceId, then exact HCPCS
+        // code, then exact service name) and apply the canonical catalog identity;
+        // drop rows that match no catalog service so only linked authorizations remain.
+        const byId = new Map(catalog.map((s) => [s.id, s]));
+        const byCode = new Map(
+          catalog
+            .filter((s) => (s.code ?? "").trim())
+            .map((s) => [(s.code as string).trim().toLowerCase(), s]),
+        );
+        const byName = new Map(
+          catalog
+            .filter((s) => (s.name ?? "").trim())
+            .map((s) => [(s.name as string).trim().toLowerCase(), s]),
+        );
+        const kept: HhaAuthorization[] = [];
+        let dropped = 0;
+        let codeChanged = 0;
+        for (const row of mapped) {
+          const svc =
+            (row.serviceId ? byId.get(row.serviceId) : undefined) ??
+            byCode.get((row.serviceCode ?? "").trim().toLowerCase()) ??
+            byName.get((row.serviceName ?? "").trim().toLowerCase());
+          if (!svc) {
+            dropped += 1;
+            continue;
+          }
+          // Flag rows the catalog canonicalization moved to a different code (i.e.
+          // a name/id match, not an exact-code match) so a wrong match is visible.
+          const printedCode = (row.serviceCode ?? "").trim().toLowerCase();
+          const catalogCode = (svc.code ?? "").trim().toLowerCase();
+          if (printedCode && catalogCode && printedCode !== catalogCode) {
+            codeChanged += 1;
+          }
+          kept.push({ ...applyHhaCatalogIdentity(row, svc), id: `hha-auth-${kept.length}` });
+        }
+        next.stage2.hhaAuthorizations = kept;
+        if (kept.length) {
+          localWarnings.push("Review imported HHA authorizations before saving.");
+        }
+        if (codeChanged > 0) {
+          localWarnings.push(
+            `${codeChanged} imported authorization${codeChanged === 1 ? " was" : "s were"} matched to a catalog service with a different code — verify the match${codeChanged === 1 ? "" : "es"}.`,
+          );
+        }
+        if (dropped > 0) {
+          localWarnings.push(
+            `Dropped ${dropped} authorization${dropped === 1 ? "" : "s"} that couldn't be matched to a catalog service — add ${dropped === 1 ? "it" : "them"} manually.`,
+          );
+        }
+      } else {
+        // No catalog available: keep rows as-is (pass-through) rather than dropping.
+        next.stage2.hhaAuthorizations = mapped;
+        localWarnings.push("Review imported HHA authorizations before saving.");
+      }
     }
 
     if (s2.outcomes?.length) {
