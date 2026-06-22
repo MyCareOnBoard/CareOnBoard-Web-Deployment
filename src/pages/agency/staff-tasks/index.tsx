@@ -202,7 +202,7 @@ export default function StaffTasksPage() {
                 className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-[#00b4b8] bg-white text-[#008f93] text-[14px] font-semibold hover:bg-[#f0fbfb] transition-colors cursor-pointer"
               >
                 <BellRing className="w-4 h-4" />
-                Add Reminder
+                Reminders
               </button>
               <button
                 onClick={() => setShowAddModal(true)}
