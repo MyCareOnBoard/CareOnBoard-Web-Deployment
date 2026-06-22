@@ -4,12 +4,12 @@ import { useNavigate } from "react-router";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { useListAgencyClientsQuery, useGetClientStatsQuery, type Client } from "@/lib/api/clients";
 import { countUniqueAssignedDspsForClient } from "@/lib/countUniqueAssignedDsps";
+import { isForm485Required } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
 
 interface DisplayClient {
   id: string;
@@ -118,9 +118,20 @@ export default function ClientsPage() {
   // Transform API clients to display format
   const displayClients: DisplayClient[] = useMemo(() => {
     return clients.map((client) => {
-      const status = client.status || "active";
-      const statusCapitalized = status.charAt(0).toUpperCase() + status.slice(1) as DisplayClient["status"];
-      const statusLabel = status === "pending" ? "Pending Setup" : statusCapitalized;
+      // HHA clients can't be activated until an approved Form 485 is uploaded, so
+      // one without it must never read as "Active" here — force it to pending and
+      // surface why. Existing active-but-485-less clients reflect this on sight.
+      const requires485 = isForm485Required(client);
+      const rawStatus = client.status || "active";
+      const effectiveStatus =
+        requires485 && rawStatus === "active" ? "pending" : rawStatus;
+      const statusCapitalized = effectiveStatus.charAt(0).toUpperCase() + effectiveStatus.slice(1) as DisplayClient["status"];
+      const statusLabel =
+        requires485 && effectiveStatus === "pending"
+          ? "Form 485 required"
+          : effectiveStatus === "pending"
+            ? "Pending Setup"
+            : statusCapitalized;
 
       const dspCount = countUniqueAssignedDspsForClient(client);
 
@@ -330,50 +341,68 @@ export default function ClientsPage() {
             paginatedClients.map((client) => (
               <div
                 key={client.id}
-                className="flex items-center gap-4 rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white"
+                className="flex flex-col gap-4 rounded-[20px] bg-[#FFFFFF4D] p-5 shadow-sm border border-white sm:p-6 md:flex-row md:items-center md:gap-6 lg:gap-8"
               >
-                <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-                  {client.avatarUrl && (
-                    <AvatarImage
-                      src={client.avatarUrl}
-                      alt={client.name}
-                      className="w-full h-full object-cover aspect-auto rounded-[8px]"
-                    />
-                  )}
-                  <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-                    {client.name
-                      .split(" ")
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((w) => w[0]?.toUpperCase())
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
+                {/* Avatar + name / type · status */}
+                <div className="flex items-center gap-4 min-w-0 md:w-[220px] md:shrink-0 lg:w-[240px]">
+                  <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
+                    {client.avatarUrl && (
+                      <AvatarImage
+                        src={client.avatarUrl}
+                        alt={client.name}
+                        className="w-full h-full object-cover aspect-auto rounded-[8px]"
+                      />
+                    )}
+                    <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
+                      {client.name
+                        .split(" ")
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((w) => w[0]?.toUpperCase())
+                        .join("")}
+                    </AvatarFallback>
+                  </Avatar>
 
-                <div className="flex flex-1 items-center gap-16 min-w-0">
-                  <div className="min-w-[220px]">
+                  <div className="min-w-0">
                     <p className="text-[16px] font-semibold leading-[1.6] text-black truncate">
                       {client.name}
                     </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span
+                        className={
+                          "text-[13px] font-bold uppercase leading-[1.4] " +
+                          (client.type === "hha"
+                            ? "text-[#2B82FF]"
+                            : "text-[#7c3aed]")
+                        }
+                      >
+                        {client.type}
+                      </span>
+
+                      <span className="text-[15px] leading-none text-[#808081]">
+                        •
+                      </span>
+
+                      <span
+                        className={
+                          "text-[13px] font-bold leading-[1.4] " +
+                          (client.status === "Active"
+                            ? "text-[#0eaf52]"
+                            : client.status === "Pending"
+                              ? "text-amber-700"
+                              : client.status === "Inactive"
+                                ? "text-[#d92d20]"
+                                : "text-[#808081]")
+                        }
+                      >
+                        {client.statusLabel}
+                      </span>
+                    </div>
                   </div>
+                </div>
 
-                  <Badge
-                    variant={client.status === "Active" ? "confirmed" : "pending"}
-                    className={
-                      client.status === "Active"
-                        ? "bg-[rgba(14,175,82,0.05)] border-[0.5px] border-[#0eaf52] text-[#0eaf52] px-[10px] py-[10px]"
-                        : client.status === "Pending"
-                          ? "bg-amber-50 border-[0.5px] border-amber-500 text-amber-700 px-[10px] py-[10px]"
-                          : "px-[10px] py-[10px]"
-                    }
-                  >
-                    {client.statusLabel}
-                  </Badge>
-
-                  <Badge variant="outline" className="hidden uppercase sm:inline-flex">
-                    {client.type}
-                  </Badge>
-
+                {/* Meta: role + account created */}
+                <div className="flex flex-wrap items-center gap-x-8 gap-y-2 md:flex-1 md:flex-nowrap lg:gap-x-12">
                   <div className="w-[75px] text-[14px] font-medium leading-[1.4]">
                     <p className="mb-0 text-[#808081]">{client.roleLabel}</p>
                     <p className="text-[#10141a]">{client.roleValue}</p>
@@ -386,7 +415,7 @@ export default function ClientsPage() {
                 </div>
 
                 <Button
-                  className="h-9 w-[140px] px-4 py-2 text-[14px] font-semibold"
+                  className="h-9 w-full shrink-0 px-4 py-2 text-[14px] font-semibold md:w-[140px]"
                   onClick={() =>
                     navigate(
                       Routes.agency.clientDetails.replace(":clientId", client.id)

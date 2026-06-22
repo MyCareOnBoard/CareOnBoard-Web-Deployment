@@ -170,6 +170,18 @@ export const HhaAuthorizationFields = React.memo(function HhaAuthorizationFields
             Billing details are loaded from the service catalog and can&apos;t be edited here.
           </p>
         ) : null}
+        {hasService ? (
+          <div className="mt-6 flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Service goal</label>
+            <textarea
+              value={row.goal ?? ""}
+              onChange={(e) => onChange({ goal: e.target.value })}
+              rows={3}
+              className="rounded-[12px] border border-[#cccccd] bg-white p-3 text-[14px] text-[#10141a] focus:outline-none focus:ring-2 focus:ring-[#00b4b8]"
+              placeholder="Goal for this service (shown on the HHA Service Activity Log)"
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-[12px] border border-[#e1e3e8] bg-[#fafbfc]/50 p-4">

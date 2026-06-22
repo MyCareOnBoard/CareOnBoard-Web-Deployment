@@ -16,6 +16,7 @@ import {
     DSPApprovedNote
 } from "@/lib/api/reports";
 import AgencyEditNote from "@/pages/agency/notes/editNote";
+import { NOTE_TYPES } from "@/lib/notes/noteTypes";
 
 export default function NoteReport() {
     const {user} = useAuth();
@@ -164,13 +165,9 @@ export default function NoteReport() {
                             className="h-[44px] px-4 rounded-3xl border border-[#808081] bg-white text-[#10141a] focus:outline-none focus:ring-2 focus:ring-[#00b4b8]"
                         >
                             <option value="all">All Note Types</option>
-                            <option value="community-based">Community Based</option>
-                            <option value="community-inclusion">Community Inclusion</option>
-                            <option value="day-habilitation">Day Habilitation</option>
-                            <option value="prevocational-training">Prevocational Training</option>
-                            <option value="supported-employment-intervention">Supported Employment Intervention</option>
-                            <option value="supported-employment-pre">Supported Employment Pre</option>
-                            <option value="respite-log">Respite Log</option>
+                            {NOTE_TYPES.map((noteType) => (
+                                <option key={noteType.id} value={noteType.id}>{noteType.shortLabel}</option>
+                            ))}
                         </select>
                     </div>
                 </div>

@@ -1,8 +1,9 @@
 import { useState, useCallback } from "react";
 import { AddClientFormData } from "../types/formData";
-import { createClient, updateClient } from "@/lib/api/clients";
+import { createClient, updateClient, type ClientDocument } from "@/lib/api/clients";
 import { formDataToApiPayload } from "../utils/formDataToApiPayload";
 import { handleDocumentUploads } from "../utils/documentUploadHandler";
+import { hasUploadedForm485 } from "../utils/form485GenerationEligibility";
 
 export function useClientSave() {
   const [isSaving, setIsSaving] = useState(false);
@@ -30,6 +31,16 @@ export function useClientSave() {
     try {
       const payload = formDataToApiPayload(formData, includeAgencyId, progressive, markComplete);
 
+      // The 485 file uploads in the second pass below, so its URL doesn't exist
+      // when the first status write happens. Once uploads finish we finalize the
+      // status: HHA clients only go "active" if the uploaded set now has a 485.
+      const finalStatusFor = (docs: ClientDocument[]): "active" | "pending" | undefined => {
+        if (!markComplete) return undefined;
+        return formData.type === "hha" && !hasUploadedForm485(docs)
+          ? "pending"
+          : "active";
+      };
+
       // Update whenever we already have a client doc (e.g. created by an earlier
       // progressive save) — the final non-progressive save must not re-create.
       const useUpdatePath = isEditMode || Boolean(clientId);
@@ -44,7 +55,11 @@ export function useClientSave() {
 
         setSaveStage(2);
         const finalDocuments = await handleDocumentUploads(clientId, formData);
-        await updateClient(clientId, { documents: finalDocuments });
+        const finalStatus = finalStatusFor(finalDocuments);
+        await updateClient(clientId, {
+          documents: finalDocuments,
+          ...(finalStatus ? { status: finalStatus } : {}),
+        });
 
         setIsSaving(false);
         setShowSavingModal(false);
@@ -60,7 +75,11 @@ export function useClientSave() {
 
         setSaveStage(2);
         const finalDocuments = await handleDocumentUploads(created.id, formData);
-        await updateClient(created.id, { documents: finalDocuments });
+        const finalStatus = finalStatusFor(finalDocuments);
+        await updateClient(created.id, {
+          documents: finalDocuments,
+          ...(finalStatus ? { status: finalStatus } : {}),
+        });
 
         setIsSaving(false);
         setShowSavingModal(false);

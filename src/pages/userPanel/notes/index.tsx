@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { ArrowLeft, Search, FileText, ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { getNoteShortLabel } from "@/lib/notes/noteTypes";
 
 export type NoteCardType = {
   id: string;
@@ -75,17 +76,21 @@ const noteTypes: NoteCardType[] = [
     description: "A section where users can provide input on current features and suggest improvements.",
     path: Routes.userPanel.notes.respiteLog,
   },
+  {
+    id: "hha-personal-care",
+    icon: UserIcon,
+    title: "Personal Care Service Note",
+    description: "Record the personal care activities performed during a home-care shift.",
+    path: Routes.userPanel.notes.hhaPersonalCare,
+  },
+  {
+    id: "hha-service-log",
+    icon: WrenchIcon,
+    title: "HHA Service Activity Log",
+    description: "Log the services and activities performed during a home-care shift.",
+    path: Routes.userPanel.notes.hhaServiceActivityLog,
+  },
 ];
-
-const noteTypeLabels: Record<string, string> = {
-  "community-based": "Community Based",
-  "community-inclusion": "Community Inclusion",
-  "day-habilitation": "Day Habilitation",
-  "prevocational-training": "Prevocational",
-  "supported-employment-intervention": "Supported Employment",
-  "supported-employment-pre": "Employment Pre",
-  "respite-log": "Respite Log",
-};
 
 export function NoteCard({ note, noteId }: { note: NoteCardType; noteId: string | undefined }) {
   const Icon = note.icon;
@@ -209,7 +214,7 @@ function ClientCard({ clientName, logs, client, onSelect }: ClientCardProps) {
               key={type}
               className="px-2.5 py-0.5 rounded-full bg-[rgba(0,180,184,0.1)] text-[#00b4b8] text-[11px] font-medium font-['Urbanist',sans-serif] border border-[rgba(0,180,184,0.2)]"
             >
-              {noteTypeLabels[type] || type}
+              {getNoteShortLabel(type)}
             </span>
           ))}
           {noteTypesList.length > 3 && (

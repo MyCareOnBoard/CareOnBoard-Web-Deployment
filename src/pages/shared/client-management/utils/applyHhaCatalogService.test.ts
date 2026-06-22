@@ -49,6 +49,19 @@ describe("applyHhaCatalogService", () => {
     expect(cleared.serviceType).toBeUndefined();
   });
 
+  it("preserves the user-entered service goal when applying or clearing a catalog service", () => {
+    const row = {
+      ...createEmptyHhaAuthorization(),
+      goal: "Improve mobility",
+    };
+
+    const applied = applyHhaCatalogService(row, catalogService);
+    expect(applied.goal).toBe("Improve mobility");
+
+    const cleared = applyHhaCatalogService(applied, undefined);
+    expect(cleared.goal).toBe("Improve mobility");
+  });
+
   it("unitTypeToPayType normalizes catalog unit types", () => {
     expect(unitTypeToPayType("15-min")).toBe("15-min");
     expect(unitTypeToPayType("daily")).toBe("daily");

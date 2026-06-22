@@ -83,7 +83,7 @@ export default function DashboardHeader(
   const location = useLocation();
   const { toast } = useToast();
 
-  const { notifications, unreadCount, loading, error, markAllAsRead, markAsRead } = useNotifications();
+  const { notifications, unreadCount, loading, error, markAllAsRead, markAsRead, clearAll } = useNotifications();
 
   // Track previous notification IDs to detect new ones
   const previousNotificationIdsRef = useRef<Set<string>>(new Set());
@@ -264,13 +264,13 @@ export default function DashboardHeader(
                 {/* Footer */}
                 <div className="border-t border-[rgba(239,239,239,0.08)] shrink-0 p-2">
                   <button
-                    className="w-full px-4 py-2 text-[13px] font-medium text-[#5e636e] hover:bg-white/50 hover:text-[#10141a] transition-colors rounded-lg"
-                    onClick={() => {
-                      setIsNotificationDropdownOpen(false);
-                      // Navigate to full notifications page if/when implemented
-                    }}
+                    disabled={notifications.length === 0}
+                    className="w-full px-4 py-2 text-[13px] font-medium text-[#5e636e] hover:bg-white/50 hover:text-[#10141a] transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#5e636e]"
+                    onClick={() => clearAll().catch(() => {
+                      // Error already logged in hook, UI rolled back optimistically
+                    })}
                   >
-                    View all notifications
+                    Clear notifications
                   </button>
                 </div>
               </DropdownMenuContent>

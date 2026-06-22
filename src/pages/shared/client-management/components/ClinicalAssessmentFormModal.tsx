@@ -16,7 +16,9 @@ import {
   CA_ASSESSMENT_TYPES,
   CA_ASSESSOR_DISCIPLINES,
   CA_DME_ITEMS,
+  CA_GENDERS,
   CA_HHA_ASSISTANCE,
+  CA_MARITAL_STATUSES,
   CA_PAIN_LEVELS,
   CA_RISK_LEVELS,
   CA_SKILLED_NURSING_REASONS,
@@ -96,6 +98,9 @@ const CA_REQUIRED_FIELDS: Array<{
   { label: "Assessor Name", id: "ca-assessor-name", filled: (ca) => ca.assessorName.trim() !== "" },
   { label: "Assessor Discipline", id: "ca-assessor-discipline", filled: (ca) => !!ca.assessorDiscipline },
   { label: "Location of Assessment", id: "ca-assessment-location", filled: (ca) => ca.locationOfAssessment.trim() !== "" },
+  { label: "Client First Name", id: "ca-client-first-name", filled: (ca) => ca.clientFirstName.trim() !== "" },
+  { label: "Client Last Name", id: "ca-client-last-name", filled: (ca) => ca.clientLastName.trim() !== "" },
+  { label: "Date of Birth", id: "ca-client-dob", filled: (ca) => !!ca.clientDob },
   { label: "Primary Diagnosis", id: "ca-primary-diagnosis", filled: (ca) => ca.primaryDiagnosis.trim() !== "" },
   { label: "Assessor Name (Approval)", id: "ca-approval-assessor-name", filled: (ca) => ca.approvalAssessorName.trim() !== "" },
   { label: "Nurse Signature", id: "ca-nurse-signature", filled: (ca) => ca.nurseSignature.trim() !== "" },
@@ -245,11 +250,25 @@ export default function ClinicalAssessmentFormModal({
   useEffect(() => {
     if (!open) return;
     const fd = formDataRef.current;
+    const s1 = fd.stage1;
     const base = fd.clinicalAssessmentDraft ?? createEmptyClinicalAssessmentForm();
     setCa({
       ...base,
       primaryDiagnosis: base.primaryDiagnosis || (fd.stage3.diagnosis ?? ""),
       drugAllergies: base.drugAllergies || (fd.stage3.allergies ?? []).join(", "),
+      clientFirstName: base.clientFirstName || (s1.firstName ?? ""),
+      clientLastName: base.clientLastName || (s1.lastName ?? ""),
+      clientMiddleName: base.clientMiddleName || (s1.middleName ?? ""),
+      clientPreferredName: base.clientPreferredName || (s1.preferredName ?? ""),
+      clientDob: base.clientDob ?? s1.dob,
+      clientGender: base.clientGender || (s1.gender ?? ""),
+      clientMaritalStatus: base.clientMaritalStatus || (s1.maritalStatus ?? ""),
+      clientPhone: base.clientPhone || (s1.phone ?? ""),
+      clientEmail: base.clientEmail || (s1.email ?? ""),
+      clientAddress: base.clientAddress || (s1.address ?? ""),
+      clientMedicaidId: base.clientMedicaidId || (s1.medicaidId ?? ""),
+      clientMedicareId: base.clientMedicareId || (s1.medicareId ?? ""),
+      clientSsn: base.clientSsn || (s1.ssn ?? ""),
     });
   }, [open]);
 
@@ -477,8 +496,97 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 2. Medical History */}
-              <FormSection title="Section 2 · Medical History">
+              {/* 2. Client Basic Information */}
+              <FormSection title="Section 2 · Client Basic Information">
+                <div className="flex flex-col gap-4">
+                  <div className={GRID_2}>
+                    <TextField
+                      label="First Name"
+                      id="ca-client-first-name"
+                      required
+                      value={ca.clientFirstName}
+                      onChange={(v) => setField("clientFirstName", v)}
+                    />
+                    <TextField
+                      label="Last Name"
+                      id="ca-client-last-name"
+                      required
+                      value={ca.clientLastName}
+                      onChange={(v) => setField("clientLastName", v)}
+                    />
+                  </div>
+                  <div className={GRID_2}>
+                    <TextField
+                      label="Middle Name"
+                      value={ca.clientMiddleName}
+                      onChange={(v) => setField("clientMiddleName", v)}
+                    />
+                    <TextField
+                      label="Preferred Name"
+                      value={ca.clientPreferredName}
+                      onChange={(v) => setField("clientPreferredName", v)}
+                    />
+                  </div>
+                  <div className={GRID_2}>
+                    <DatePickerField
+                      id="ca-client-dob"
+                      label="Date of Birth"
+                      required
+                      value={ca.clientDob}
+                      onChange={(d) => setField("clientDob", d)}
+                    />
+                    <ChoiceField
+                      label="Gender"
+                      value={ca.clientGender}
+                      options={CA_GENDERS}
+                      onChange={(v) => setField("clientGender", v)}
+                    />
+                  </div>
+                  <ChoiceField
+                    label="Marital Status"
+                    value={ca.clientMaritalStatus}
+                    options={CA_MARITAL_STATUSES}
+                    onChange={(v) => setField("clientMaritalStatus", v)}
+                  />
+                  <div className={GRID_2}>
+                    <TextField
+                      label="Phone"
+                      value={ca.clientPhone}
+                      onChange={(v) => setField("clientPhone", v)}
+                    />
+                    <TextField
+                      label="Email"
+                      value={ca.clientEmail}
+                      onChange={(v) => setField("clientEmail", v)}
+                    />
+                  </div>
+                  <TextField
+                    label="Home Address"
+                    value={ca.clientAddress}
+                    onChange={(v) => setField("clientAddress", v)}
+                  />
+                  <div className={GRID_3}>
+                    <TextField
+                      label="Medicaid ID"
+                      value={ca.clientMedicaidId}
+                      onChange={(v) => setField("clientMedicaidId", v)}
+                    />
+                    <TextField
+                      label="Medicare ID"
+                      value={ca.clientMedicareId}
+                      onChange={(v) => setField("clientMedicareId", v)}
+                    />
+                    <TextField
+                      label="SSN"
+                      value={ca.clientSsn}
+                      onChange={(v) => setField("clientSsn", v)}
+                    />
+                  </div>
+                </div>
+              </FormSection>
+
+              {/* 3. Medical History */}
+              <FormSection title="Section 3 · Medical History">
                 <div className="flex flex-col gap-4">
                   <TextField
                     id="ca-primary-diagnosis"
@@ -522,8 +630,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 3. Vital Signs & Physical Health */}
-              <FormSection title="Section 3 · Vital Signs & Physical Health">
+              {/* 4. Vital Signs & Physical Health */}
+              <FormSection title="Section 4 · Vital Signs & Physical Health">
                 <div className="flex flex-col gap-4">
                   <div className={GRID_3}>
                     <TextField label="Blood Pressure" value={ca.bloodPressure} onChange={(v) => setField("bloodPressure", v)} placeholder="e.g. 120/80" />
@@ -544,8 +652,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 4. Medication Assessment */}
-              <FormSection title="Section 4 · Medication Assessment">
+              {/* 5. Medication Assessment */}
+              <FormSection title="Section 5 · Medication Assessment">
                 <div className="flex flex-col gap-4">
                   {ca.medications.length === 0 ? (
                     <p className="text-[13px] text-[#5c6368]">No medications added yet.</p>
@@ -599,8 +707,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 5. Allergy Assessment */}
-              <FormSection title="Section 5 · Allergy Assessment">
+              {/* 6. Allergy Assessment */}
+              <FormSection title="Section 6 · Allergy Assessment">
                 <div className={GRID_2}>
                   <TextField label="Drug Allergies" value={ca.drugAllergies} onChange={(v) => setField("drugAllergies", v)} />
                   <TextField label="Food Allergies" value={ca.foodAllergies} onChange={(v) => setField("foodAllergies", v)} />
@@ -609,8 +717,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 6. Functional Assessment (ADL) */}
-              <FormSection title="Section 6 · Functional Assessment (ADL)">
+              {/* 7. Functional Assessment (ADL) */}
+              <FormSection title="Section 7 · Functional Assessment (ADL)">
                 <div className="flex flex-col gap-4">
                   {CA_ADL_ACTIVITIES.map((activity) => (
                     <ChoiceField
@@ -624,8 +732,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 7. Cognitive & Mental Status */}
-              <FormSection title="Section 7 · Cognitive & Mental Status">
+              {/* 8. Cognitive & Mental Status */}
+              <FormSection title="Section 8 · Cognitive & Mental Status">
                 <div className="flex flex-col gap-4">
                   <div className={GRID_3}>
                     <YesNoField label="Alert and Oriented" value={ca.alertAndOriented} onChange={(v) => setField("alertAndOriented", v)} />
@@ -639,8 +747,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 8. Skin & Wound */}
-              <FormSection title="Section 8 · Skin & Wound Assessment">
+              {/* 9. Skin & Wound */}
+              <FormSection title="Section 9 · Skin & Wound Assessment">
                 <div className="flex flex-col gap-4">
                   <div className={GRID_2}>
                     <ChoiceField label="Skin Condition" value={ca.skinCondition} options={SKIN_OPTIONS} onChange={(v) => setField("skinCondition", v as CaSkinCondition)} />
@@ -654,8 +762,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 9. Fall & Safety */}
-              <FormSection title="Section 9 · Fall & Safety Assessment">
+              {/* 10. Fall & Safety */}
+              <FormSection title="Section 10 · Fall & Safety Assessment">
                 <div className="flex flex-col gap-4">
                   <div className={GRID_3}>
                     <YesNoField label="History of Falls" value={ca.historyOfFalls} onChange={(v) => setField("historyOfFalls", v)} />
@@ -670,8 +778,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 10. Respiratory & Cardiovascular */}
-              <FormSection title="Section 10 · Respiratory & Cardiovascular">
+              {/* 11. Respiratory & Cardiovascular */}
+              <FormSection title="Section 11 · Respiratory & Cardiovascular">
                 <div className="flex flex-col gap-4">
                   <p className="text-[13px] font-semibold text-[#10141a]">Respiratory</p>
                   <div className={GRID_3}>
@@ -692,8 +800,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 11. Nutritional */}
-              <FormSection title="Section 11 · Nutritional Assessment">
+              {/* 12. Nutritional */}
+              <FormSection title="Section 12 · Nutritional Assessment">
                 <div className="flex flex-col gap-4">
                   <div className={GRID_2}>
                     <TextField label="Current Diet" value={ca.currentDiet} onChange={(v) => setField("currentDiet", v)} />
@@ -706,8 +814,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 12. DME */}
-              <FormSection title="Section 12 · Durable Medical Equipment (DME)">
+              {/* 13. DME */}
+              <FormSection title="Section 13 · Durable Medical Equipment (DME)">
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1.5">
                     <FieldLabel>Equipment Used</FieldLabel>
@@ -728,8 +836,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 13. Home Environment & Support System */}
-              <FormSection title="Section 13 · Home Environment & Support System">
+              {/* 14. Home Environment & Support System */}
+              <FormSection title="Section 14 · Home Environment & Support System">
                 <div className="flex flex-col gap-4">
                   <ChoiceField label="Living Situation" value={ca.livingSituation} options={LIVING_OPTIONS} onChange={(v) => setField("livingSituation", v as CaLivingSituation)} />
                   <div className={GRID_2}>
@@ -744,8 +852,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 14. Skilled Care Needs */}
-              <FormSection title="Section 14 · Skilled Care Needs Assessment">
+              {/* 15. Skilled Care Needs */}
+              <FormSection title="Section 15 · Skilled Care Needs Assessment">
                 <div className="flex flex-col gap-4">
                   <YesNoField label="Skilled Nursing" value={ca.skilledNursingNeeded} onChange={(v) => setField("skilledNursingNeeded", v)} />
                   <div className="flex flex-col gap-1.5">
@@ -778,8 +886,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 15. Clinical Summary & Recommendations */}
-              <FormSection title="Section 15 · Clinical Summary & Recommendations">
+              {/* 16. Clinical Summary & Recommendations */}
+              <FormSection title="Section 16 · Clinical Summary & Recommendations">
                 <div className="flex flex-col gap-4">
                   <AreaField label="Clinical Findings" value={ca.clinicalFindings} onChange={(v) => setField("clinicalFindings", v)} />
                   <AreaField label="Risk Factors" value={ca.riskFactors} onChange={(v) => setField("riskFactors", v)} />
@@ -791,8 +899,8 @@ export default function ClinicalAssessmentFormModal({
                 </div>
               </FormSection>
 
-              {/* 16. Nurse Assessment & Approval */}
-              <FormSection title="Section 16 · Nurse Assessment & Approval">
+              {/* 17. Nurse Assessment & Approval */}
+              <FormSection title="Section 17 · Nurse Assessment & Approval">
                 <div className="flex flex-col gap-4">
                   <div className={GRID_2}>
                     <TextField

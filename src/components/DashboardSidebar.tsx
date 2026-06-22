@@ -121,7 +121,7 @@ function NavLinkButton({
       )}
     >
       <Icon className={iconClassName(isActive)} />
-      {label}
+      <span className="flex-1 text-left">{label}</span>
     </button>
   );
 }

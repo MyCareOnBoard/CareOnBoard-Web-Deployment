@@ -1,4 +1,5 @@
 import type { AddClientFormData, DocState } from "../types/formData";
+import type { ClientDocument, ClientType } from "@/lib/api/clients";
 import { buildPocFormContext } from "./buildPocFormContext";
 import { stableJsonStringify } from "./stableJsonStringify";
 import { getDocByKey, hasDocSource } from "./pocGenerationEligibility";
@@ -17,6 +18,30 @@ export function canGenerateForm485(formData: AddClientFormData): boolean {
 
 export function hasForm485Document(formData: AddClientFormData): boolean {
   return hasDocSource(getDocByKey(formData.stage3.docs, "form485"));
+}
+
+/**
+ * True when a saved client has an uploaded Form 485 — a persisted document with
+ * a real URL. Operates on the Client.documents shape (unlike hasForm485Document,
+ * which inspects the wizard's in-progress stage3 docs).
+ */
+export function hasUploadedForm485(
+  documents?: ClientDocument[] | null,
+): boolean {
+  return Boolean(
+    documents?.some((d) => d.key === "form485" && Boolean(d.url?.trim())),
+  );
+}
+
+/**
+ * HHA clients can only be activated once an approved Form 485 is uploaded, so an
+ * HHA client without one is "Form 485 required" — and must never read as active.
+ */
+export function isForm485Required(client: {
+  type?: ClientType;
+  documents?: ClientDocument[] | null;
+}): boolean {
+  return client.type === "hha" && !hasUploadedForm485(client.documents);
 }
 
 /** Labels of the source documents still missing (for the disabled-button hint). */

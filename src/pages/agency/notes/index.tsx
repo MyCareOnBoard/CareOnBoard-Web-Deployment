@@ -7,17 +7,10 @@ import AgencyEditNote from "@/pages/agency/notes/editNote";
 import {useLocation, useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {useAuth} from "@/utils/auth";
+import {NOTE_TYPES, NoteTypeId, getNoteShortLabel} from "@/lib/notes/noteTypes";
 
 type NoteStatus = "submitted" | "approved" | "rejected";
-type FilterType =
-  "all"
-  | "community-based"
-  | "community-inclusion"
-  | "day-habilitation"
-  | "prevocational-training"
-  | "respite-log"
-  | "supported-employment-pre"
-  | "supported-employment-intervention";
+type FilterType = "all" | NoteTypeId;
 type TimeIntervalType = "all" | "today" | "this-month" | "this-year";
 type StatusTabType = "submitted" | "approved";
 
@@ -71,18 +64,7 @@ export default function AgencyNotesPage() {
   };
 
   // Helper function to format activity type display names
-  const formatActivityType = (activityType: string) => {
-    const typeMap: Record<string, string> = {
-      "community-based": "Community Based",
-      "community-inclusion": "Community Inclusion Services",
-      "day-habilitation": "Day Habilitation Services",
-      "prevocational-training": "Prevocational Training Services",
-      "respite-log": "Respite Log",
-      "supported-employment-pre": "Supported Employment Services – Pre‐Employment",
-      "supported-employment-intervention": "Supported Employment Services – Intervention Plan"
-    };
-    return typeMap[activityType] || activityType;
-  };
+  const formatActivityType = (activityType: string) => getNoteShortLabel(activityType);
 
   useEffect(() => {
     if (currentPage) {
@@ -216,86 +198,19 @@ export default function AgencyNotesPage() {
               className="flex items-center gap-3 overflow-x-auto scrollbar-hide flex-1 min-w-0"
               style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}
             >
-              <button
-                onClick={() => setActiveFilter("all")}
-                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                  activeFilter === "all"
-                    ? "bg-[#2B82FF] text-white"
-                    : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setActiveFilter("community-based")}
-                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                  activeFilter === "community-based"
-                    ? "bg-[#2B82FF] text-white"
-                    : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
-                }`}
-              >
-                Community Based
-              </button>
-              <button
-                onClick={() => setActiveFilter("community-inclusion")}
-                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                  activeFilter === "community-inclusion"
-                    ? "bg-[#2B82FF] text-white"
-                    : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
-                }`}
-              >
-                Community Inclusion Services
-              </button>
-              <button
-                onClick={() => setActiveFilter("day-habilitation")}
-                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                  activeFilter === "day-habilitation"
-                    ? "bg-[#2B82FF] text-white"
-                    : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
-                }`}
-              >
-                Day Habilitation Services
-              </button>
-              <button
-                onClick={() => setActiveFilter("prevocational-training")}
-                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                  activeFilter === "prevocational-training"
-                    ? "bg-[#2B82FF] text-white"
-                    : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
-                }`}
-              >
-                Prevocational Training Services
-              </button>
-              <button
-                onClick={() => setActiveFilter("respite-log")}
-                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                  activeFilter === "respite-log"
-                    ? "bg-[#2B82FF] text-white"
-                    : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
-                }`}
-              >
-                Respite Log
-              </button>
-              <button
-                onClick={() => setActiveFilter("supported-employment-pre")}
-                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                  activeFilter === "supported-employment-pre"
-                    ? "bg-[#2B82FF] text-white"
-                    : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
-                }`}
-              >
-                Supported Employment – Pre-Employment
-              </button>
-              <button
-                onClick={() => setActiveFilter("supported-employment-intervention")}
-                className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
-                  activeFilter === "supported-employment-intervention"
-                    ? "bg-[#2B82FF] text-white"
-                    : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
-                }`}
-              >
-                Supported Employment – Intervention Plan
-              </button>
+              {[{id: "all" as FilterType, label: "All"}, ...NOTE_TYPES.map((n) => ({id: n.id as FilterType, label: n.shortLabel}))].map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setActiveFilter(filter.id)}
+                  className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-semibold transition-colors whitespace-nowrap ${
+                    activeFilter === filter.id
+                      ? "bg-[#2B82FF] text-white"
+                      : "bg-white text-[#10141a] border border-[#e5e5e6] hover:border-[#2B82FF]"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
             </div>
             <button
               onClick={() => handleFilterScroll("right")}

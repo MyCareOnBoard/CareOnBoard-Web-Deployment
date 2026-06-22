@@ -108,6 +108,8 @@ export const Routes = {
             respiteLog: "/user-panel/notes/respite-log",
             supportedEmploymentIntervention: "/user-panel/notes/supported-employment-intervention",
             supportedEmploymentPre: "/user-panel/notes/supported-employment-pre",
+            hhaPersonalCare: "/user-panel/notes/hha-personal-care",
+            hhaServiceActivityLog: "/user-panel/notes/hha-service-activity-log",
         },
         mileage: "/user-panel/mileage",
         expenses: "/user-panel/expenses",
