@@ -158,8 +158,6 @@ export default function ClientsPage() {
     });
   }, [clients, formatClientName, formatDate]);
 
-  // Client-side filtering (already done by API, but keeping for search suggestions)
-  // Note: API already filters, but we keep this for instant UI feedback
   const filteredClients = useMemo(() => {
     return displayClients;
   }, [displayClients]);
