@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router";
+import { useSelector, useDispatch } from "react-redux";
 import { useAuth } from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
@@ -11,6 +12,9 @@ import { resolveActiveNavItem } from "@/lib/nav-utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sparkles } from "lucide-react";
 import { staffLabels } from "@/lib/roleLabel";
+import { cn } from "@/lib/utils";
+import type { RootState } from "@/store/redux/store";
+import { setAgencyMode, type AgencyMode } from "@/store/redux/agencyModeSlice";
 import HomeIcon from "@/assets/icons/home.svg?react";
 import AiIcon from "@/assets/icons/ai.svg?react";
 import SupportIcon from "@/assets/icons/support.svg?react";
@@ -33,6 +37,8 @@ import {
     Sun,
     Megaphone,
     ClipboardList,
+    Brain,
+    Heart,
 } from "lucide-react";
 
 /** Canonical scope for the scheduling hub; legacy token "Scheduling" still honored in accessList. */
@@ -45,7 +51,10 @@ function hasAgencyStaffAccess(accessList: string[], accessKey: string | undefine
     return false;
 }
 
-function filterNavItemsByAccess(items: NavItem[], userType: UserType | undefined, accessList?: string[]): NavItem[] {
+/** Extended NavItem with optional program-type restriction. */
+type AgencyNavItem = NavItem & { programTypes?: AgencyMode[] };
+
+function filterNavItemsByAccess(items: AgencyNavItem[], userType: UserType | undefined, accessList?: string[]): AgencyNavItem[] {
     if (userType === UserType.AGENCY) {
         return items;
     }
@@ -60,8 +69,13 @@ function filterNavItemsByAccess(items: NavItem[], userType: UserType | undefined
     });
 }
 
-const allNavItems: NavItem[] = [
-    { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon }, // Always accessible
+function filterNavItemsByMode(items: AgencyNavItem[], mode: AgencyMode | null): NavItem[] {
+    if (!mode) return items;
+    return items.filter((item) => !item.programTypes || item.programTypes.includes(mode));
+}
+
+const allNavItems: AgencyNavItem[] = [
+    { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon },
     { label: "Shift Management", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: SHIFT_MANAGEMENT_ACCESS_KEY },
     {
         label: "DSP Management",
@@ -73,8 +87,8 @@ const allNavItems: NavItem[] = [
     { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
     { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
-    { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion" },
-    { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun },
+    { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion", programTypes: ["ddd"] },
+    { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun, programTypes: ["ddd"] },
     { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
     {
         label: "Billing",
@@ -91,7 +105,7 @@ const allNavItems: NavItem[] = [
     { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
     { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
     { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },
-    { label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: GoaslAndDocumentsIcon, accessKey: "Goals & Documents" },
+    { label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: GoaslAndDocumentsIcon, accessKey: "Goals & Documents", programTypes: ["ddd"] },
     { label: "Trainings", path: Routes.agency.trainings, icon: Network, accessKey: "Trainings" },
     { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon, accessKey: "Mileage" },
     { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon, accessKey: "Incident" },
@@ -99,57 +113,174 @@ const allNavItems: NavItem[] = [
     { label: "Settings", path: Routes.agency.agencySettings, icon: Settings },
 ];
 
+// ─── Mode Toggle ──────────────────────────────────────────────────────────────
+
+function AgencyModeToggle({ mode, onSelect }: { mode: AgencyMode; onSelect: (m: AgencyMode) => void }) {
+    return (
+        <div className="flex items-center gap-0.5 rounded-full bg-white/60 p-1 border border-white/40 backdrop-blur-sm shadow-sm">
+            <button
+                type="button"
+                onClick={() => onSelect("ddd")}
+                className={cn(
+                    "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-200",
+                    mode === "ddd"
+                        ? "bg-[#00b4b8] text-white shadow-sm"
+                        : "text-[#808081] hover:text-[#10141a]"
+                )}
+            >
+                <Brain className="h-3.5 w-3.5" />
+                DDD
+            </button>
+            <button
+                type="button"
+                onClick={() => onSelect("hha")}
+                className={cn(
+                    "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-200",
+                    mode === "hha"
+                        ? "bg-[#00b4b8] text-white shadow-sm"
+                        : "text-[#808081] hover:text-[#10141a]"
+                )}
+            >
+                <Heart className="h-3.5 w-3.5" />
+                HHA
+            </button>
+        </div>
+    );
+}
+
+// ─── Mode Selection Overlay ───────────────────────────────────────────────────
+
+function ModeSelectionScreen({ onSelect }: { onSelect: (mode: AgencyMode) => void }) {
+    return (
+        <div className="flex min-h-[calc(100vh-98px)] items-center justify-center mt-[98px]">
+            <div className="w-full max-w-2xl px-8 text-center">
+                <h1 className="text-[28px] font-bold text-[#10141a] mb-2">Select Your Care Program</h1>
+                <p className="text-[15px] text-[#808081] mb-10">
+                    Choose how you'd like to manage your agency. You can switch between programs at any time.
+                </p>
+                <div className="grid grid-cols-2 gap-6">
+                    {/* DDD Card */}
+                    <button
+                        type="button"
+                        onClick={() => onSelect("ddd")}
+                        className="group flex flex-col items-center gap-4 rounded-2xl bg-white border-2 border-transparent p-8 text-left shadow-sm transition-all duration-200 hover:border-[#00b4b8] hover:shadow-md cursor-pointer"
+                    >
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#e6f8f8] group-hover:bg-[#00b4b8] transition-colors duration-200">
+                            <Brain className="h-8 w-8 text-[#00b4b8] group-hover:text-white transition-colors duration-200" />
+                        </div>
+                        <div className="text-center">
+                            <h2 className="text-[18px] font-bold text-[#10141a] mb-1">DDD Program</h2>
+                            <p className="text-[13px] text-[#808081] leading-relaxed">
+                                Manage Direct Support Professionals for individuals with developmental disabilities
+                            </p>
+                        </div>
+                        <span className="mt-1 inline-flex items-center rounded-full bg-[#e6f8f8] px-3 py-1 text-[12px] font-semibold text-[#00b4b8] group-hover:bg-[#00b4b8] group-hover:text-white transition-colors duration-200">
+                            DSP Management
+                        </span>
+                    </button>
+
+                    {/* HHA Card */}
+                    <button
+                        type="button"
+                        onClick={() => onSelect("hha")}
+                        className="group flex flex-col items-center gap-4 rounded-2xl bg-white border-2 border-transparent p-8 text-left shadow-sm transition-all duration-200 hover:border-[#00b4b8] hover:shadow-md cursor-pointer"
+                    >
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#e6f8f8] group-hover:bg-[#00b4b8] transition-colors duration-200">
+                            <Heart className="h-8 w-8 text-[#00b4b8] group-hover:text-white transition-colors duration-200" />
+                        </div>
+                        <div className="text-center">
+                            <h2 className="text-[18px] font-bold text-[#10141a] mb-1">HHA Program</h2>
+                            <p className="text-[13px] text-[#808081] leading-relaxed">
+                                Manage Home Health Aides providing in-home care services to patients
+                            </p>
+                        </div>
+                        <span className="mt-1 inline-flex items-center rounded-full bg-[#e6f8f8] px-3 py-1 text-[12px] font-semibold text-[#00b4b8] group-hover:bg-[#00b4b8] group-hover:text-white transition-colors duration-200">
+                            Caregiver Management
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
 
 export default function AgencyDashboardLayout({ children }: { children?: ReactNode }) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const dispatch = useDispatch();
+
+    const agencyId = user?.agencyId || user?.agency?.id || "";
+    const supportedTypes = user?.agency?.supportedClientTypes ?? [];
+    const supportsBoth = supportedTypes.includes("ddd") && supportedTypes.includes("hha");
+
+    const storedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+
+    // Effective mode: use stored value, or auto-derive from agency's single supported type.
+    const effectiveMode = useMemo<AgencyMode | null>(() => {
+        if (supportsBoth) return storedMode ?? null;
+        if (supportedTypes.includes("hha")) return "hha";
+        return "ddd";
+    }, [supportsBoth, supportedTypes, storedMode]);
+
+    const needsModeSelection = supportsBoth && !effectiveMode;
+
+    const handleModeSelect = (mode: AgencyMode) => {
+        if (agencyId) dispatch(setAgencyMode({ agencyId, mode }));
+    };
+
+    const handleModeToggle = (mode: AgencyMode) => {
+        if (agencyId) dispatch(setAgencyMode({ agencyId, mode }));
+        // Redirect away from DDD-only pages when switching to HHA.
+        const dddOnlyPaths = [
+            Routes.agency.communityInclusions,
+            Routes.agency.communityInclusionHistory,
+            Routes.agency.dayProgram,
+            Routes.agency.dayProgramHistory,
+            Routes.agency.goalsAndDocuments.index,
+        ];
+        if (mode === "hha" && dddOnlyPaths.some((p) => location.pathname.startsWith(p.replace(/\/:[^/]+/, "")))) {
+            navigate(Routes.agency.dashboard, { replace: true });
+        }
+    };
 
     const handleLogout = async () => {
         try {
             await logout();
             navigate(Routes.auth.login, { replace: true });
         } catch (error) {
-            console.error('[AgencyLayout] Logout failed:', error);
+            console.error("[AgencyLayout] Logout failed:", error);
         }
     };
 
-    // Staff-management label reflects the agency's supported client types
-    // (DSP Management / Caregivers Management / DSP/Caregiver Management).
-    const dspManagementLabel = `${staffLabels(user?.agency?.supportedClientTypes).title} Management`;
+    // Staff-management label reflects the selected mode (or agency's types when mode is null).
+    const dspManagementLabel = useMemo(() => {
+        const typesForLabel = effectiveMode ? [effectiveMode] : supportedTypes;
+        return `${staffLabels(typesForLabel).title} Management`;
+    }, [effectiveMode, supportedTypes]);
 
-    // Filter navigation items based on user access
-    const navItems = useMemo(
-        () =>
-            filterNavItemsByAccess(allNavItems, user?.userType, user?.profile?.accessList).map(
-                (item) =>
-                    item.path === Routes.agency.dspManagement
-                        ? { ...item, label: dspManagementLabel }
-                        : item
-            ),
-        [user?.userType, user?.profile?.accessList, dspManagementLabel]
-    );
+    // Build filtered nav items.
+    const navItems = useMemo(() => {
+        const accessFiltered = filterNavItemsByAccess(allNavItems, user?.userType, user?.profile?.accessList);
+        const modeFiltered = filterNavItemsByMode(accessFiltered, effectiveMode);
+        return modeFiltered.map((item) =>
+            item.path === Routes.agency.dspManagement ? { ...item, label: dspManagementLabel } : item
+        );
+    }, [user?.userType, user?.profile?.accessList, effectiveMode, dspManagementLabel]);
 
-    // Protect routes - redirect if user tries to access unauthorized page
+    // Protect routes - redirect if user tries to access unauthorized page.
     useEffect(() => {
         if (!user) return;
-
-        // Agency owners have full access, no need to check
         if (user.userType === UserType.AGENCY) return;
 
         const currentNavItem = resolveActiveNavItem(location.pathname, allNavItems);
+        if (!currentNavItem || !currentNavItem.accessKey) return;
 
-        // If no nav item found or no access key required, allow access
-        if (!currentNavItem || !currentNavItem.accessKey) {
-            return;
-        }
-
-        // Check if user has access to this page
         const userAccessList = user.profile?.accessList || [];
         const hasAccess = hasAgencyStaffAccess(userAccessList, currentNavItem.accessKey);
-
         if (!hasAccess) {
-            console.warn(`[AgencyLayout] Access denied to ${currentNavItem.label}. Redirecting to dashboard.`);
             navigate(Routes.agency.dashboard, { replace: true });
         }
     }, [user, location.pathname, navigate]);
@@ -160,61 +291,69 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         }
     }, [user]);
 
+    const modeToggle =
+        supportsBoth && effectiveMode ? (
+            <AgencyModeToggle mode={effectiveMode} onSelect={handleModeToggle} />
+        ) : null;
+
     return (
         <ProtectedRoute>
-        <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
-            <DashboardHeader
-                userName={user?.fullName}
-                userImage={(user as any)?.profileImage || user?.photoURL}
-                userRole={(user as any)?.role || 'Agency Staff'}
-                userType={user?.userType || UserType.APPLICANT}
-                onLogout={handleLogout}
-            />
-            <DashboardSidebar navItems={navItems} />
-            <main className="ml-[240px] pt-[130px] pb-10">
-                <div className="px-8">{children ?? <Outlet />}</div>
-            </main>
-            {/* Floating Icon */}
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                    <Link
-                        to={Routes.agency.tasks}
-                        className="
-                        fixed bottom-6 right-6 md:bottom-8 md:right-8 z-40
-                        flex h-12 w-12 items-center justify-center
-                        rounded-full
-                        border border-[#12B5B0] bg-white
-                        shadow-[0_10px_30px_rgba(0,0,0,0.12)]
-                        transition-all duration-200
-                        hover:scale-105
-                        hover:shadow-[0_16px_40px_rgba(0,0,0,0.16)]
-                        "
-                    >
-                        <Sparkles
-                        className="h-7 w-7 text-[#12B5B0]"
-                        strokeWidth={2.5}
-                        />
-                    </Link>
-                    </TooltipTrigger>
+            <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
+                <DashboardHeader
+                    userName={user?.fullName}
+                    userImage={(user as any)?.profileImage || user?.photoURL}
+                    userRole={(user as any)?.role || "Agency Staff"}
+                    userType={user?.userType || UserType.APPLICANT}
+                    onLogout={handleLogout}
+                    centerContent={modeToggle}
+                />
 
-                    <TooltipContent
-                    side="left"
-                    className="
-                        rounded-4xl
-                        border border-[#12B5B0]
-                        bg-white
-                        px-3 py-2
-                        text-[13px]
-                        font-semibold
-                        text-black
-                    "
-                    >
-                    Smart Manager
-                    </TooltipContent>
-                </Tooltip>
-                </TooltipProvider>
-        </div>
+                {needsModeSelection ? (
+                    <ModeSelectionScreen onSelect={handleModeSelect} />
+                ) : (
+                    <>
+                        <DashboardSidebar navItems={navItems} />
+                        <main className="ml-[240px] pt-[130px] pb-10">
+                            <div className="px-8">{children ?? <Outlet />}</div>
+                        </main>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Link
+                                        to={Routes.agency.tasks}
+                                        className="
+                                        fixed bottom-6 right-6 md:bottom-8 md:right-8 z-40
+                                        flex h-12 w-12 items-center justify-center
+                                        rounded-full
+                                        border border-[#12B5B0] bg-white
+                                        shadow-[0_10px_30px_rgba(0,0,0,0.12)]
+                                        transition-all duration-200
+                                        hover:scale-105
+                                        hover:shadow-[0_16px_40px_rgba(0,0,0,0.16)]
+                                        "
+                                    >
+                                        <Sparkles className="h-7 w-7 text-[#12B5B0]" strokeWidth={2.5} />
+                                    </Link>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                    side="left"
+                                    className="
+                                        rounded-4xl
+                                        border border-[#12B5B0]
+                                        bg-white
+                                        px-3 py-2
+                                        text-[13px]
+                                        font-semibold
+                                        text-black
+                                    "
+                                >
+                                    Smart Manager
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </>
+                )}
+            </div>
         </ProtectedRoute>
     );
 }

@@ -11,6 +11,7 @@ import {
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import authReducer from "@/utils/auth/store/authSlice";
+import agencyModeReducer from "@/store/redux/agencyModeSlice";
 import { applicationApi } from "@/pages/applicant/application/api";
 import { documentsApi } from "@/pages/applicant/documents/api";
 import { userPanelDashboardApi } from "@/pages/userPanel/dashboard/api";
@@ -38,6 +39,7 @@ import { remindersApi } from "@/pages/agency/reminders/api";
 
 const rootReducer = combineReducers({
     auth: authReducer,
+    agencyMode: agencyModeReducer,
     [applicationApi.reducerPath]: applicationApi.reducer,
     [documentsApi.reducerPath]: documentsApi.reducer,
     [userPanelDashboardApi.reducerPath]: userPanelDashboardApi.reducer,
@@ -67,7 +69,7 @@ const rootReducer = combineReducers({
 const persistConfig = {
     key: "root",
     storage,
-    whitelist: ['auth']
+    whitelist: ['auth', 'agencyMode']
 };
 
 // @ts-ignore - persistReducer type mismatch with transforms

@@ -69,8 +69,9 @@ export function UserAvatar({ userName, userImage }: { userName?: string; userIma
 }
 
 export default function DashboardHeader(
-  { actions, userName, userImage, onLogout, userType }: {
+  { actions, centerContent, userName, userImage, onLogout, userType }: {
     actions?: ReactNode;
+    centerContent?: ReactNode;
     userName?: string;
     userImage?: string;
     userRole?: string;
@@ -165,6 +166,10 @@ export default function DashboardHeader(
         <div className="flex items-center gap-3">
           <LogoNameIcon className="w-[226px]" />
         </div>
+
+        {centerContent && (
+          <div className="flex items-center">{centerContent}</div>
+        )}
 
         {actions ?? (
           <div className="flex items-center gap-[10px]">
