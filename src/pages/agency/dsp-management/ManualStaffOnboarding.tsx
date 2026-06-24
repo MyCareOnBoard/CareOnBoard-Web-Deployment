@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,10 +14,10 @@ import { cn } from "@/lib/utils";
 import { StageFooter } from "@/pages/shared/client-management/components/StageFooter";
 import { useToast } from "@/hooks/use-toast";
 import { Routes } from "@/routes/constants";
-import { CalendarDays, Eye, EyeOff, Loader2 } from "lucide-react";
+import { AlertCircle, CalendarDays, CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
 import { differenceInYears, subYears } from "date-fns";
-import { uploadTempDocument, completeManualOnboarding } from "@/lib/api/manual-onboarding";
+import { checkEmailExists, uploadTempDocument, completeManualOnboarding } from "@/lib/api/manual-onboarding";
 
 const STORAGE_KEY = "agencyManualStaffOnboarding";
 
@@ -192,6 +192,10 @@ export default function ManualStaffOnboarding() {
   const [showPassword, setShowPassword] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
+  type EmailCheckStatus = "idle" | "checking" | "taken" | "available";
+  const [emailCheckStatus, setEmailCheckStatus] = useState<EmailCheckStatus>("idle");
+  const emailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
@@ -200,6 +204,33 @@ export default function ManualStaffOnboarding() {
     d.setFullYear(d.getFullYear() + 10);
     return d;
   }, []);
+
+  // Debounced email existence check
+  useEffect(() => {
+    const email = profileData.email.trim();
+    const isValidFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+    if (emailDebounceRef.current) clearTimeout(emailDebounceRef.current);
+
+    if (!email || !isValidFormat) {
+      setEmailCheckStatus("idle");
+      return;
+    }
+
+    setEmailCheckStatus("checking");
+    emailDebounceRef.current = setTimeout(async () => {
+      try {
+        const exists = await checkEmailExists(email.toLowerCase());
+        setEmailCheckStatus(exists ? "taken" : "available");
+      } catch {
+        setEmailCheckStatus("idle");
+      }
+    }, 600);
+
+    return () => {
+      if (emailDebounceRef.current) clearTimeout(emailDebounceRef.current);
+    };
+  }, [profileData.email]);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -355,6 +386,8 @@ export default function ManualStaffOnboarding() {
     if (!profileData.fullName.trim()) return "Full name is required";
     if (!profileData.email.trim()) return "Email is required";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileData.email)) return "Enter a valid email address";
+    if (emailCheckStatus === "checking") return "Please wait — verifying email availability";
+    if (emailCheckStatus === "taken") return "An account with this email already exists";
     if (!profileData.dateOfBirth) return "Date of birth is required";
     if (!profileData.address.trim()) return "Address is required";
     if (!profileData.gender) return "Gender is required";
@@ -481,8 +514,40 @@ export default function ManualStaffOnboarding() {
         </div>
         <div className="space-y-4">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" value={profileData.email} placeholder="Enter email"
-            onChange={(e) => setProfileData({ ...profileData, email: e.target.value })} />
+          <div className="relative">
+            <Input
+              id="email"
+              type="email"
+              value={profileData.email}
+              placeholder="Enter email"
+              className={cn(
+                emailCheckStatus === "taken" && "border-red-500 focus-visible:ring-red-500",
+                emailCheckStatus === "available" && "border-green-500 focus-visible:ring-green-500",
+              )}
+              onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+            />
+            {emailCheckStatus === "checking" && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[#808081]" />
+            )}
+            {emailCheckStatus === "available" && (
+              <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-600" />
+            )}
+            {emailCheckStatus === "taken" && (
+              <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500" />
+            )}
+          </div>
+          {emailCheckStatus === "taken" && (
+            <p className="flex items-center gap-1.5 text-[13px] font-medium text-red-600">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              An account with this email already exists
+            </p>
+          )}
+          {emailCheckStatus === "available" && (
+            <p className="flex items-center gap-1.5 text-[13px] font-medium text-green-700">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              Email is available
+            </p>
+          )}
         </div>
         <div className="space-y-4">
           <Label htmlFor="date-of-birth">Date of Birth</Label>

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, Plus, Search, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
+import { useSelector } from "react-redux";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { useAuth } from "@/utils/auth";
 import { useListAgencyClientsQuery, useGetClientStatsQuery, type Client } from "@/lib/api/clients";
 import { countUniqueAssignedDspsForClient } from "@/lib/countUniqueAssignedDsps";
 import { isForm485Required } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
+import type { RootState } from "@/store/redux/store";
 
 interface DisplayClient {
   id: string;
@@ -26,6 +28,8 @@ interface DisplayClient {
 export default function ClientsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const agencyId = user?.agencyId || "";
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,11 +42,12 @@ export default function ClientsPage() {
 
   const { data: clientsData, isLoading: isLoadingClients, isFetching: isSearching } = useListAgencyClientsQuery(
     {
-      agencyId: user?.agencyId || "",
+      agencyId,
       search: debouncedSearchQuery.trim() || undefined,
+      type: selectedMode,
       limit: 100,
     },
-    { skip: !user?.agencyId }
+    { skip: !agencyId }
   );
 
   const { data: statsData } = useGetClientStatsQuery(
@@ -98,6 +103,10 @@ export default function ClientsPage() {
       return "N/A";
     }
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedMode]);
 
   useEffect(() => {
     if (debounceTimeoutRef.current) {
