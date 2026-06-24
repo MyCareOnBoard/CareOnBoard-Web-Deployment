@@ -13,6 +13,7 @@ import UserIcon from "@/assets/icons/user.svg?react";
 import FileIcon from "@/assets/icons/file.svg?react";
 import CogIcon from "@/assets/icons/cog.svg?react";
 import HomeIcon from "@/assets/icons/home.svg?react";
+import { Megaphone } from "lucide-react";
 
 
 export default function ApplicantDashboardLayout({children}: { children?: ReactNode }) {
@@ -33,6 +34,7 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
     {label: "Dashboard", path: Routes.applicant.dashboard, icon: HomeIcon},
     {label: "Application", path: Routes.applicant.application, icon: UserIcon},
     {label: "Documents", path: Routes.applicant.documents, icon: FileIcon},
+    {label: "Announcements", path: Routes.applicant.announcements, icon: Megaphone},
     {
       label: "Help Center",
       path: Routes.applicant.helpCenter,

@@ -20,7 +20,7 @@ import UserRoadsideIcon from "@/assets/icons/user-roadside.svg?react";
 import BellIcon from "@/assets/icons/bell.svg?react";
 import SupportIcon from "@/assets/icons/support.svg?react";
 import CommunityInclusionIcon from "@/assets/icons/community-inclusion.svg?react";
-import { Sun } from "lucide-react";
+import { Sun, Megaphone } from "lucide-react";
 
 const navItems: NavItem[] = [
   { label: "Dashboard", path: Routes.userPanel.dashboard, icon: HomeIcon },
@@ -31,6 +31,7 @@ const navItems: NavItem[] = [
   { label: "Mileage", path: Routes.userPanel.mileage, icon: UserRoadsideIcon },
   { label: "Expenses", path: Routes.userPanel.expenses, icon: InvoiceIcon },
   { label: "Incident", path: Routes.userPanel.incident, icon: BellIcon },
+  { label: "Announcements", path: Routes.userPanel.announcements, icon: Megaphone },
   { label: "Support", path: Routes.userPanel.messages, icon: SupportIcon },
   {
     label: "Community Inclusion",
