@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ButtonLoader } from '@/components/ui/loader'
 import { MFA_COPY } from '@/utils/auth/copy/mfaCopy'
+import OtpBoxInput from '@/pages/auth/family-login/OtpBoxInput'
 import {
   authGhostLinkClass,
-  authInputClass,
   authPrimaryButtonClass,
 } from '@/pages/auth/components/authFormStyles'
 
@@ -43,6 +42,7 @@ export default function MfaCodeForm({
 }: MfaCodeFormProps) {
   const [code, setCode] = useState('')
   const [resendSeconds, setResendSeconds] = useState(0)
+  const submittedRef = useRef('')
 
   useEffect(() => {
     if (!codeSent) return
@@ -53,6 +53,14 @@ export default function MfaCodeForm({
     return () => window.clearInterval(timer)
   }, [codeSent])
 
+  // Auto-submit once the 6 digits are in. Guard skips re-firing the same code after a failure.
+  useEffect(() => {
+    if (code.length === 6 && code !== submittedRef.current && !verifying) {
+      submittedRef.current = code
+      void onVerify(code)
+    }
+  }, [code, verifying, onVerify])
+
   const handleResend = async () => {
     if (resendSeconds > 0 || sending) return
     await onResend()
@@ -62,6 +70,7 @@ export default function MfaCodeForm({
     e.preventDefault()
     const trimmed = code.trim()
     if (trimmed.length < 6) return
+    submittedRef.current = trimmed
     await onVerify(trimmed)
   }
 
@@ -69,25 +78,10 @@ export default function MfaCodeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="space-y-2">
-        <Label htmlFor="mfa-code" className="text-sm font-medium text-slate-700">
-          {MFA_COPY.form.codeLabel}
-        </Label>
-        <Input
-          id="mfa-code"
-          type="text"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          placeholder={MFA_COPY.form.codePlaceholder}
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          autoFocus={autoFocus}
-          required
-          className={`${authInputClass} tracking-[0.3em] text-center placeholder:tracking-normal placeholder:text-slate-400`}
-          aria-describedby={error ? 'mfa-code-error' : 'mfa-code-hint'}
-        />
-        <p id="mfa-code-hint" className="text-xs text-slate-500">
+      <div className="space-y-3">
+        <Label className="text-sm font-medium text-slate-700">{MFA_COPY.form.codeLabel}</Label>
+        <OtpBoxInput value={code} onChange={setCode} disabled={verifying} autoFocus={autoFocus} />
+        <p id="mfa-code-hint" className="text-center text-xs text-slate-500">
           Codes expire after a few minutes.
         </p>
       </div>
