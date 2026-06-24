@@ -1145,6 +1145,7 @@ export const clientsApi = createApi({
         if (params?.status) queryParams.append('status', params.status);
         if (params?.service) queryParams.append('service', params.service);
         if (params?.search) queryParams.append('search', params.search);
+        if (params?.type) queryParams.append('type', params.type);
         if (params?.limit) queryParams.append('limit', params.limit.toString());
 
         return {
