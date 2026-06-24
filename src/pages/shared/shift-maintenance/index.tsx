@@ -68,7 +68,7 @@ function AnomalyShiftTableSection({
     <section className="mb-10 last:mb-0">
       <h2 className="text-base font-semibold text-gray-900">{title}</h2>
       {description ? (
-        <p className="mt-1 max-w-2xl text-sm text-gray-600">{description}</p>
+        <p className="max-w-2xl mt-1 text-sm text-gray-600">{description}</p>
       ) : null}
       {rows.length === 0 ? (
         <p className="mt-3 text-sm text-gray-500">{emptyHint}</p>
@@ -76,7 +76,7 @@ function AnomalyShiftTableSection({
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-500">
+              <tr className="text-left text-gray-500 border-b border-gray-200">
                 <th className="pb-3 font-medium">Date</th>
                 <th className="pb-3 font-medium">Time</th>
                 <th className="pb-3 font-medium">DSP</th>
@@ -88,7 +88,7 @@ function AnomalyShiftTableSection({
             </thead>
             <tbody>
               {rows.map((a) => (
-                <tr key={a.id} className="border-b border-gray-100 transition-colors hover:bg-white/40">
+                <tr key={a.id} className="transition-colors border-b border-gray-100 hover:bg-white/40">
                   <td className="py-3">{a.date}</td>
                   <td className="py-3">
                     {a.startTime || "-"} - {a.endTime || "-"}
@@ -120,11 +120,11 @@ function AnomalyShiftTableSection({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0"
+                      className="w-8 h-8 p-0"
                       title="Review and fix this shift"
                       onClick={() => onEditRow(a)}
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="w-4 h-4" />
                     </Button>
                   </td>
                 </tr>
@@ -332,7 +332,7 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
   return (
     <div className="min-h-[calc(100vh-200px)]">
       {/* Page header — match agency client-details pattern */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           {!isSuperAdmin && (
             <button
@@ -355,7 +355,7 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-4 mb-6">
           {isSuperAdmin && (
-            <div className="flex flex-col gap-1 w-64">
+            <div className="flex flex-col w-64 gap-1">
               <span className="text-xs font-medium text-gray-600">Agency</span>
               <SearchSelect
                 options={agencySelectOptions}
@@ -366,7 +366,7 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
                 placeholder={agenciesLoading ? "Loading agencies…" : "Search by agency name…"}
                 searchPlaceholder="Type to search by name, email, or ID…"
                 emptyMessage="No agencies found. Try a different search."
-                className="w-full border-gray-200 bg-white"
+                className="w-full bg-white border-gray-200"
               />
             </div>
           )}
@@ -398,12 +398,12 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
             disabled={!fromDate || !toDate || (!isSuperAdmin ? false : !agencyFilter)}
             onClick={() => { loadAnomalies(null); setAnomaliesPage(0); setAuditsFetched(false); }}
           >
-            Refresh scan
+            Refresh
           </Button>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-gray-100 rounded-2xl p-1 w-fit">
+        <div className="flex gap-1 p-1 mb-6 bg-gray-100 rounded-2xl w-fit">
           <button
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-colors ${
               activeTab === "anomalies" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
@@ -429,10 +429,10 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
           <div>
             {anomaliesLoading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
               </div>
             ) : anomalies.length === 0 ? (
-              <div className="text-center py-20 text-gray-500 max-w-md mx-auto space-y-2">
+              <div className="max-w-md py-20 mx-auto space-y-2 text-center text-gray-500">
                 <p className="font-medium text-gray-700">No problem shifts in this range</p>
                 <p className="text-sm">
                   Try different dates, or pick a wider range. Shifts only appear here when the system flags an issue.
@@ -486,10 +486,10 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
           <div>
             {auditsLoading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
               </div>
             ) : audits.length === 0 ? (
-              <div className="text-center py-20 text-gray-500 max-w-md mx-auto space-y-2">
+              <div className="max-w-md py-20 mx-auto space-y-2 text-center text-gray-500">
                 <p className="font-medium text-gray-700">No activity yet</p>
                 <p className="text-sm">
                   When people create shifts, clock in or out, or change schedules, those events show up here.
@@ -500,7 +500,7 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-200 text-left text-gray-500">
+                      <tr className="text-left text-gray-500 border-b border-gray-200">
                         <th className="pb-3 font-medium">Timestamp</th>
                         <th className="pb-3 font-medium">Who</th>
                         <th className="pb-3 font-medium">Role</th>
@@ -518,7 +518,7 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
                             color: "bg-gray-100 text-gray-600",
                           };
                         return (
-                          <tr key={a.id} className="border-b border-gray-100 hover:bg-white/40 transition-colors">
+                          <tr key={a.id} className="transition-colors border-b border-gray-100 hover:bg-white/40">
                             <td className="py-3 whitespace-nowrap">{formatShiftAuditTimestamp(a.timestamp)}</td>
                             <td className="py-3">{a.actorName || a.actorUid}</td>
                             <td className="py-3 text-xs text-gray-500">{ROLE_LABELS[a.actorUserType] || a.actorUserType}</td>

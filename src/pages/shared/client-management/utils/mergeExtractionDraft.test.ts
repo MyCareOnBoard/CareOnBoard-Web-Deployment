@@ -2,6 +2,30 @@ import { describe, it, expect } from "vitest";
 import { createInitialAddClientFormData } from "../types/formData";
 import { mergeExtractionDraft } from "./mergeExtractionDraft";
 import type { ClientExtractionResponse } from "../types/clientExtraction";
+import type { Service } from "@/lib/api/services";
+
+const HHA_CATALOG: Service[] = [
+  {
+    id: "T1019",
+    program: "hha",
+    type: "Personal Care",
+    name: "Personal Care Assistant (Individual Services)",
+    code: "T1019",
+    unitType: "15-min",
+    defaultRate: "6.67",
+    modifier: null,
+  },
+  {
+    id: "T1002 EP",
+    program: "hha",
+    type: "Private Duty Nursing",
+    name: "Private Duty Nursing RN - EPSDT ages 0-20",
+    code: "T1002 EP",
+    unitType: "15-min",
+    defaultRate: "15.50",
+    modifier: "EP",
+  },
+];
 
 function makeExtraction(partial: Partial<ClientExtractionResponse>): ClientExtractionResponse {
   return {
@@ -465,5 +489,153 @@ describe("mergeExtractionDraft", () => {
     const { formData } = mergeExtractionDraft(initial, extraction, { overwrite: true });
     expect(formData.stage2.insuranceInfo?.[0].authorizationRequired).toBe("yes");
     expect(formData.stage3.fallRisk).toBe("yes");
+  });
+
+  describe("HHA authorization catalog matching", () => {
+    it("matches by serviceId, applies catalog identity, and keeps document auth-specifics", () => {
+      const initial = createInitialAddClientFormData();
+      const extraction = makeExtraction({
+        draft: {
+          stage2: {
+            hhaAuthorizations: [
+              {
+                serviceId: "T1019",
+                serviceName: "PCA (as printed)",
+                serviceCode: "T1019",
+                approvedHours: "20",
+                rate: "10.00",
+                unitType: "hourly",
+                payerSource: "Medicaid",
+                startDate: "2026-01-01",
+              },
+            ],
+          },
+        },
+      });
+      const { formData, localWarnings } = mergeExtractionDraft(initial, extraction, {
+        hhaServices: HHA_CATALOG,
+      });
+      const rows = formData.stage2.hhaAuthorizations ?? [];
+      expect(rows).toHaveLength(1);
+      const auth = rows[0];
+      // Catalog is canonical for identity.
+      expect(auth.serviceId).toBe("T1019");
+      expect(auth.serviceName).toBe("Personal Care Assistant (Individual Services)");
+      expect(auth.unitType).toBe("15-min");
+      expect(auth.clientPayType).toBe("15-min");
+      // Document wins for auth-specifics; doc rate kept over catalog defaultRate.
+      expect(auth.rate).toBe("10.00");
+      expect(auth.approvedHours).toBe("20");
+      expect(auth.payerSource).toBe("Medicaid");
+      expect(localWarnings.some((w) => w.includes("Dropped"))).toBe(false);
+    });
+
+    it("falls back to an exact HCPCS code match when serviceId is empty and fills a blank rate from the catalog", () => {
+      const initial = createInitialAddClientFormData();
+      const extraction = makeExtraction({
+        draft: {
+          stage2: {
+            hhaAuthorizations: [
+              {
+                serviceId: "",
+                serviceName: "PDN",
+                serviceCode: "t1002 ep",
+                approvedHours: "40",
+                rate: "",
+              },
+            ],
+          },
+        },
+      });
+      const { formData } = mergeExtractionDraft(initial, extraction, {
+        hhaServices: HHA_CATALOG,
+      });
+      const rows = formData.stage2.hhaAuthorizations ?? [];
+      expect(rows).toHaveLength(1);
+      expect(rows[0].serviceId).toBe("T1002 EP");
+      expect(rows[0].rate).toBe("15.50");
+      expect(rows[0].approvedHours).toBe("40");
+    });
+
+    it("warns when an id match canonicalizes the row to a different code", () => {
+      const initial = createInitialAddClientFormData();
+      const extraction = makeExtraction({
+        draft: {
+          stage2: {
+            hhaAuthorizations: [
+              { serviceId: "T1019", serviceName: "PCA", serviceCode: "T1018-misprint" },
+            ],
+          },
+        },
+      });
+      const { formData, localWarnings } = mergeExtractionDraft(initial, extraction, {
+        hhaServices: HHA_CATALOG,
+      });
+      const rows = formData.stage2.hhaAuthorizations ?? [];
+      expect(rows).toHaveLength(1);
+      expect(rows[0].serviceCode).toBe("T1019"); // canonicalized from catalog
+      expect(localWarnings.some((w) => w.includes("different code"))).toBe(true);
+    });
+
+    it("falls back to an exact service-name match when serviceId and code are absent", () => {
+      const initial = createInitialAddClientFormData();
+      const extraction = makeExtraction({
+        draft: {
+          stage2: {
+            hhaAuthorizations: [
+              // Inferred row: name only, no serviceId, no serviceCode.
+              { serviceName: "Personal Care Assistant (Individual Services)", approvedHours: "20 hours/week" },
+            ],
+          },
+        },
+      });
+      const { formData } = mergeExtractionDraft(initial, extraction, {
+        hhaServices: HHA_CATALOG,
+      });
+      const rows = formData.stage2.hhaAuthorizations ?? [];
+      expect(rows).toHaveLength(1);
+      expect(rows[0].serviceId).toBe("T1019");
+      expect(rows[0].serviceCode).toBe("T1019"); // canonicalized from catalog
+      expect(rows[0].approvedHours).toBe("20 hours/week"); // doc value preserved
+    });
+
+    it("drops authorizations that match no catalog service and warns", () => {
+      const initial = createInitialAddClientFormData();
+      const extraction = makeExtraction({
+        draft: {
+          stage2: {
+            hhaAuthorizations: [
+              { serviceId: "", serviceCode: "Z9999", serviceName: "Unknown" },
+            ],
+          },
+        },
+      });
+      const { formData, localWarnings } = mergeExtractionDraft(initial, extraction, {
+        hhaServices: HHA_CATALOG,
+      });
+      expect(formData.stage2.hhaAuthorizations ?? []).toHaveLength(0);
+      expect(localWarnings.some((w) => w.startsWith("Dropped 1 authorization"))).toBe(true);
+    });
+
+    it("keeps rows as-is when no catalog is provided (pass-through guard)", () => {
+      const initial = createInitialAddClientFormData();
+      const extraction = makeExtraction({
+        draft: {
+          stage2: {
+            hhaAuthorizations: [
+              { serviceId: "", serviceCode: "Z9999", serviceName: "Unknown", rate: "5" },
+            ],
+          },
+        },
+      });
+      const { formData, localWarnings } = mergeExtractionDraft(initial, extraction);
+      const rows = formData.stage2.hhaAuthorizations ?? [];
+      expect(rows).toHaveLength(1);
+      expect(rows[0].serviceCode).toBe("Z9999");
+      expect(localWarnings.some((w) => w.includes("Dropped"))).toBe(false);
+      expect(
+        localWarnings.some((w) => w.includes("Review imported HHA authorizations")),
+      ).toBe(true);
+    });
   });
 });

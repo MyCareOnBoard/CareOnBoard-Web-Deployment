@@ -143,14 +143,13 @@ export default function AgencyEditNote(
         }
       `}</style>
       <div
-        className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur z-60"
-        onClick={() => setIsOpen(false)}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+        onClick={handleCancel}
       >
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
-          <div
-            className="bg-white rounded-lg shadow-2xl w-full max-w-7xl max-h-[90vh] relative animate-fadeIn p-6 flex flex-col print:max-w-none print:max-h-none print:shadow-none print:rounded-none print:p-0 print-content"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div
+          className="relative flex max-h-[90vh] w-full max-w-7xl flex-col rounded-lg bg-white p-6 shadow-2xl animate-fadeIn print:max-h-none print:max-w-none print:rounded-none print:p-0 print:shadow-none print-content"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Header */}
           <div className="flex space-x-3 items-center justify-end mb-3 shrink-0 print:hidden">
             <button
@@ -173,11 +172,16 @@ export default function AgencyEditNote(
 
           {/* Scrollable content area */}
           <div className="flex-1 overflow-y-auto print:overflow-visible">
-            {renderNoteComponent()}
+            {isLoading ? (
+              <div className="flex min-h-[400px] items-center justify-center">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent" />
+              </div>
+            ) : (
+              renderNoteComponent()
+            )}
           </div>
         </div>
       </div>
-    </div>
     </>
   )
 }

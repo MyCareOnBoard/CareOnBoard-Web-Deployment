@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, { NavItem } from "@/components/DashboardSidebar";
+import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
 import { resolveActiveNavItem } from "@/lib/nav-utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -211,6 +212,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     const navigate = useNavigate();
     const location = useLocation();
     const dispatch = useDispatch();
+    const [collapsed] = useSidebarCollapsed();
 
     const agencyId = user?.agencyId || user?.agency?.id || "";
     const supportedTypes = user?.agency?.supportedClientTypes ?? [];
@@ -313,7 +315,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                 ) : (
                     <>
                         <DashboardSidebar navItems={navItems} />
-                        <main className="ml-[240px] pt-[130px] pb-10">
+                        <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
                             <div className="px-8">{children ?? <Outlet />}</div>
                         </main>
                         <TooltipProvider>

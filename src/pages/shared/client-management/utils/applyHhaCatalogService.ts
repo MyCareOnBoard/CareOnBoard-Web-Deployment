@@ -50,3 +50,28 @@ export function applyHhaCatalogService(
     clientPayType: unitTypeToPayType(svc.unitType),
   };
 }
+
+/**
+ * Apply a matched catalog service to an *imported* authorization row.
+ *
+ * The catalog is canonical for service identity (id/code/name/unitType/type/
+ * modifier/payType), but the document keeps authorization-specifics
+ * (authorizationNumber, approvedHours, dates, payerSource, assignedDsps). The
+ * document rate wins; the catalog `defaultRate` only fills a blank rate.
+ */
+export function applyHhaCatalogIdentity(
+  row: HhaAuthorization,
+  svc: Service,
+): HhaAuthorization {
+  return {
+    ...row,
+    serviceId: svc.id,
+    serviceCode: svc.code ?? "",
+    serviceName: svc.name ?? "",
+    unitType: svc.unitType ?? "",
+    serviceType: svc.type || undefined,
+    modifier: svc.modifier || undefined,
+    clientPayType: unitTypeToPayType(svc.unitType),
+    rate: row.rate?.trim() ? row.rate : (svc.defaultRate ?? ""),
+  };
+}
