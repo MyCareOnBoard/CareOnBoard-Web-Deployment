@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router";
+import { useSelector } from "react-redux";
 import { Loader2 } from "lucide-react";
 import { Routes } from "@/routes/constants";
 import { getAgencyClientById, type Client } from "@/lib/api/clients";
-import { getAgencyById } from "@/lib/api/agencies";
 import { useAuth } from "@/utils/auth";
 import { ClientFormWizard } from "../ClientFormWizard";
 import { clientToFormData } from "../utils/clientToFormData";
 import { createInitialAddClientFormData, type ClientType } from "../types/formData";
 import { ClientFormConfig } from "../types/config";
+import type { RootState } from "@/store/redux/store";
 
 type AgencyClientFormWrapperProps = {
   isEditMode?: boolean;
@@ -18,13 +19,19 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const agencyId = user?.agencyId;
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+
+  // If the agency is operating in a specific mode (DDD or HHA), lock the
+  // client type to that mode so the picker is skipped entirely.
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const agencyTypes = (user?.agency?.supportedClientTypes || user?.profile?.supportedClientTypes || []) as ClientType[];
+  const supportedClientTypes: ClientType[] | undefined = selectedMode
+    ? [selectedMode as ClientType]
+    : agencyTypes.length ? agencyTypes : undefined;
+
   const [client, setClient] = useState<Client | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Agency-supported client types. On error/missing we leave this undefined so
-  // the wizard falls back to offering both DDD and HHA.
-  const [supportedClientTypes, setSupportedClientTypes] = useState<ClientType[] | undefined>(user?.agency?.supportedClientTypes || user?.profile?.supportedClientTypes || undefined);
 
   useEffect(() => {
     let cancelled = false;
