@@ -176,12 +176,21 @@ export default function AgencyDashboardPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {/* DSP Card */}
           <div
-            className="flex justify-between items-center rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(Routes.agency.dspManagement)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                navigate(Routes.agency.dspManagement);
+              }
+            }}
+            className="flex justify-between items-center rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white cursor-pointer transition-all hover:border-[#00b4b8] hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-[#10141a]">DSP</h2>
                 <p className="text-[16px] font-medium text-[#808081] mt-1">
-                  DSP overview who are managing shifts for clients
+                  Overview of Staff employed by the agency.
                 </p>
               </div>
             </div>
@@ -234,12 +243,21 @@ export default function AgencyDashboardPage() {
 
           {/* Clients Card */}
           <div
-            className="flex justify-between items-center rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(Routes.agency.clients)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                navigate(Routes.agency.clients);
+              }
+            }}
+            className="flex justify-between items-center rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white cursor-pointer transition-all hover:border-[#00b4b8] hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-[#10141a]">CLIENTS</h2>
                 <p className="text-[16px] font-medium text-[#808081] mt-1">
-                  Clients overview who are registered from a 3rd party
+                  Breakdown of Clients registered to this agency.
                 </p>
               </div>
             </div>
