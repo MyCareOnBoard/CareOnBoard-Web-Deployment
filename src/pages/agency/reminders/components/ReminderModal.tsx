@@ -11,6 +11,9 @@ import {
   DialogFooter,
   DialogTitle,
 } from "@/components/ui/dialog";
+import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
+import VoiceInputButton from "@/components/VoiceInputButton";
+import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import { Textarea } from "@/components/ui/textarea";
 
 import type { Reminder, ReminderDraft, ReminderRecurrence, ReminderType } from "../types";
@@ -66,13 +69,13 @@ const TYPE_OPTIONS: Array<{ value: ReminderType; label: string; icon: React.Reac
   {
     value: "normal",
     label: "Normal Reminder",
-    icon: <Bell className="h-4 w-4" />,
+    icon: <Bell className="w-4 h-4" />,
     desc: "Sends you a notification at the scheduled time",
   },
   {
     value: "ai_prompt",
     label: "AI Prompt",
-    icon: <BrainCircuit className="h-4 w-4" />,
+    icon: <BrainCircuit className="w-4 h-4" />,
     desc: "Runs a Gemini prompt and delivers the result as a notification",
   },
 ];
@@ -119,6 +122,7 @@ export default function ReminderModal({
   const isAiPrompt = type === "ai_prompt";
 
   return (
+    <VoiceRecordingProvider pageTitle="Reminder Modal">
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
@@ -181,10 +185,10 @@ export default function ReminderModal({
             <label htmlFor="reminder-message" className="text-[14px] font-semibold text-[#10141a]">
               {isAiPrompt ? "AI Prompt" : "Reminder message"}
             </label>
-            <Textarea
+            <VoiceEnabledTextarea
               id="reminder-message"
               value={message}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={setMessage}
               placeholder={
                 isAiPrompt
                   ? "e.g. Generate a weekly care summary for my agency"
@@ -192,7 +196,6 @@ export default function ReminderModal({
               }
               rows={5}
               className="min-h-[120px] resize-none rounded-xl border-[#cccccd] bg-white px-4 py-3 text-[14px] text-[#10141a] focus-visible:border-[#00b4b8] focus-visible:ring-[#00b4b8]/20"
-              autoFocus
             />
             {isAiPrompt && (
               <p className="text-[12px] text-[#9ca3af]">
@@ -264,7 +267,9 @@ export default function ReminderModal({
             </Button>
           </DialogFooter>
         </form>
+        <VoiceInputButton />
       </DialogContent>
     </Dialog>
+    </VoiceRecordingProvider>
   );
 }

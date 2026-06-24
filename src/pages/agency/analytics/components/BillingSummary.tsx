@@ -44,7 +44,7 @@ const FALLBACK_DATA: BillingSegment[] = [
       "Waiting for approval or payment processing",
   },
   {
-    label: "Not liable",
+    label: "Not billable",
     value: 4,
     color: "#3B82F6",
     description:
@@ -124,16 +124,16 @@ export default function BillingSummary({
     return (
       <div className="rounded-[32px] border border-[#E6EAEC] bg-[#FFFFFF66] p-6 animate-pulse">
         <div className="flex items-center justify-between mb-6">
-          <div className="h-6 w-40 rounded bg-gray-100" />
-          <div className="h-10 w-28 rounded-full bg-gray-100" />
+          <div className="w-40 h-6 bg-gray-100 rounded" />
+          <div className="h-10 bg-gray-100 rounded-full w-28" />
         </div>
         <div className="flex flex-col items-center gap-6">
           <div className="h-[190px] w-[190px] rounded-full bg-gray-100" />
           <div className="w-full space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="flex items-center justify-between">
-                <div className="h-4 w-40 rounded bg-gray-100" />
-                <div className="h-4 w-10 rounded bg-gray-100" />
+                <div className="w-40 h-4 bg-gray-100 rounded" />
+                <div className="w-10 h-4 bg-gray-100 rounded" />
               </div>
             ))}
           </div>
