@@ -131,6 +131,7 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
 
   return (
     <ClientFormWizard
+      key={selectedMode ?? "default"}
       initialFormData={initialFormData}
       clientId={clientId}
       isEditMode={isEditMode}
