@@ -143,7 +143,8 @@ export function mapReadyToClaimRowToRecentClaim(
     client: row.clientName?.trim() || MISSING_VALUE,
     clientId: row.clientId ?? undefined,
     clientAvatarUrl: row.clientAvatarUrl ?? undefined,
-    staffId: row.staffId?.slice(0, 6) || MISSING_VALUE,
+    // Keep the full id so the profile link resolves; display truncation happens in the row.
+    staffId: row.staffId ?? MISSING_VALUE,
     staffName: row.staffName ?? undefined,
     serviceCode: row.serviceCode?.trim() || MISSING_VALUE,
     paNumber: "—",
