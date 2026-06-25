@@ -45,6 +45,13 @@ export const uploadTempDocument = async (
   return response.data;
 };
 
+export const checkEmailExists = async (email: string): Promise<boolean> => {
+  const response = await axiosClient.get<{ success: boolean; exists: boolean }>(
+    `${BASE}/check-email?email=${encodeURIComponent(email)}`,
+  );
+  return response.data.exists;
+};
+
 export const completeManualOnboarding = async (
   data: CompleteOnboardingPayload,
 ): Promise<{ uid: string }> => {

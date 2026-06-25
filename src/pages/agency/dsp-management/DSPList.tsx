@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
+import { useSelector } from "react-redux";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { DSP } from "./types";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { roleLabel, staffLabels, programLabel } from "@/lib/roleLabel";
+import type { RootState } from "@/store/redux/store";
 
 interface DSPStats {
   active: number;
@@ -25,7 +27,10 @@ interface DSPListProps {
 export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const labels = staffLabels(user?.agency?.supportedClientTypes);
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
+  const labels = staffLabels(effectiveTypes);
   const navigateToProfile = (dsp: DSP) => {
     navigate(Routes.agency.dspProfile.replace(":dspId", dsp.id));
   };
@@ -260,12 +265,12 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
                         <p className="font-semibold text-gray-900 text-sm">{dsp.fullName}</p>
                         <span
                           className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            programLabel({ role: dsp.role }) === "HHA"
+                            (selectedMode ?? programLabel({ role: dsp.role })).toUpperCase() === "HHA"
                               ? "bg-teal-100 text-teal-700"
                               : "bg-indigo-100 text-indigo-700"
                           }`}
                         >
-                          {programLabel({ role: dsp.role })}
+                          {(selectedMode ?? programLabel({ role: dsp.role })).toUpperCase()}
                         </span>
                       </div>
                     </button>

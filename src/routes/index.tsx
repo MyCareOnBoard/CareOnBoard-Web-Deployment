@@ -155,6 +155,8 @@ const InternalUsersPage = lazy(() => import("@/pages/agency/agency-settings/user
 const DSPDirectoryPage = lazy(() => import("@/pages/agency/agency-settings/user-levels/DSPDirectoryPage"));
 const ClientDirectoryPage = lazy(() => import("@/pages/agency/agency-settings/user-levels/ClientDirectoryPage"));
 const MobileAppRedirect = lazy(() => import("@/pages/app/MobileAppRedirect"));
+const EmployeeAnnouncementsPage = lazy(() => import("@/pages/userPanel/announcements"));
+const ApplicantAnnouncementsPage = lazy(() => import("@/pages/applicant/announcements"));
 
 
 export const router = createBrowserRouter([
@@ -246,6 +248,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.applicant.documents,
                 Component: DocumentsPage,
+            },
+            {
+                path: Routes.applicant.announcements,
+                Component: ApplicantAnnouncementsPage,
             },
             {
                 path: Routes.applicant.helpCenter,
@@ -588,6 +594,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.userPanel.incident,
                 Component: UserPanelIncidentPage,
+            },
+            {
+                path: Routes.userPanel.announcements,
+                Component: EmployeeAnnouncementsPage,
             },
             {
                 path: Routes.userPanel.messagesConversation,

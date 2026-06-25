@@ -44,8 +44,8 @@ export const employeeTrainingsApi = createApi({
             void,
             { agencyId: string; trainingData: TrainingData }
         >({
-            query: ({ agencyId, trainingData }) => ({
-                url: `/agencies/${agencyId}/trainings`,
+            query: ({ trainingData }) => ({
+                url: `/agencies/trainings`,
                 method: "POST",
                 data: trainingData,
                 requiresAuth: true
@@ -64,8 +64,8 @@ export const employeeTrainingsApi = createApi({
             TrainingDataResponse[],
             { agencyId: string, trainingId: string, approved: boolean }
         >({
-            query: ({ agencyId, trainingId, approved }) => ({
-                url: `/agencies/${agencyId}/trainings/${trainingId}/approve`,
+            query: ({ trainingId, approved }) => ({
+                url: `/agencies/trainings/${trainingId}/approve`,
                 method: "PATCH",
                 data: { approved },
                 requiresAuth: true

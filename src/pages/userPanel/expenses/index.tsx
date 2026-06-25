@@ -143,13 +143,13 @@ export default function ExpensesPage() {
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
           Expenses
         </h1>
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <span className="text-sm text-[#808081]">Work Availibility</span>
           <label className="relative inline-flex items-center cursor-pointer">
             <input type="checkbox" className="sr-only peer" defaultChecked />
             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00b4b8]"></div>
           </label>
-        </div>
+        </div> */}
       </div>
 
       {/* Form Container */}
@@ -212,7 +212,7 @@ export default function ExpensesPage() {
         </div>
 
         {/* Expense Details */}
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
           <div>
             <label className="block text-base font-semibold text-[#10141a] mb-2">
               Amount

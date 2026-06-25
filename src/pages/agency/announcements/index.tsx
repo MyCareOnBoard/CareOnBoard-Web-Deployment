@@ -16,14 +16,23 @@ interface Announcement {
   expiresAt: { seconds: number } | string | null
 }
 
+type TargetUserType = "employee" | "applicant" | "family_member"
+
 interface FormState {
   title: string
   body: string
   type: "info" | "warning" | "urgent"
   expiresAt: string
+  targetUserTypes: TargetUserType[]
 }
 
-const EMPTY_FORM: FormState = { title: "", body: "", type: "info", expiresAt: "" }
+const EMPTY_FORM: FormState = { title: "", body: "", type: "info", expiresAt: "", targetUserTypes: [] }
+
+const TARGET_USER_TYPE_META: { value: TargetUserType; label: string }[] = [
+  { value: "employee",      label: "DSPs / Employees" },
+  { value: "applicant",     label: "Applicants" },
+  { value: "family_member", label: "Family Members" },
+]
 
 const TYPE_META = {
   info:    { label: "Info",    border: "border-[#2b82ff] text-[#2b82ff]",   left: "border-l-[#2b82ff]",   icon: Info },
@@ -96,6 +105,7 @@ export default function AgencyAnnouncementsPage() {
         ? new Date(typeof a.expiresAt === "string" ? a.expiresAt : a.expiresAt.seconds * 1000)
             .toISOString().slice(0, 10)
         : "",
+      targetUserTypes: (a as any).targetUserTypes || [],
     })
     setFormError(null)
     setShowForm(true)
@@ -109,10 +119,11 @@ export default function AgencyAnnouncementsPage() {
     setSubmitting(true)
     setFormError(null)
     const payload = {
-      title:     form.title.trim(),
-      body:      form.body.trim(),
-      type:      form.type,
-      expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
+      title:           form.title.trim(),
+      body:            form.body.trim(),
+      type:            form.type,
+      expiresAt:       form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
+      targetUserTypes: form.targetUserTypes,
     }
     try {
       if (editingId) {
@@ -176,7 +187,7 @@ export default function AgencyAnnouncementsPage() {
               <div>
                 <h2 className="text-[20px] sm:text-[22px] font-bold text-[#10141a]">All Announcements</h2>
                 <p className="mt-0.5 text-[13px] sm:text-[14px] text-[#6b7280]">
-                  Broadcast notices to all family portal users
+                  Broadcast notices to employees, applicants, and family portal users
                 </p>
               </div>
               <button
@@ -420,6 +431,35 @@ export default function AgencyAnnouncementsPage() {
                         {TYPE_META[t].label}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-semibold text-[#10141a]">
+                    Visible to <span className="font-normal text-[#b2b2b3]">(leave empty for all)</span>
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    {TARGET_USER_TYPE_META.map(({ value, label }) => {
+                      const checked = form.targetUserTypes.includes(value)
+                      return (
+                        <label key={value} className="flex items-center gap-2.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setForm((f) => ({
+                                ...f,
+                                targetUserTypes: checked
+                                  ? f.targetUserTypes.filter((t) => t !== value)
+                                  : [...f.targetUserTypes, value],
+                              }))
+                            }
+                            className="h-4 w-4 rounded border-[#cccccd] accent-[#00b4b8]"
+                          />
+                          <span className="text-[13px] text-[#10141a]">{label}</span>
+                        </label>
+                      )
+                    })}
                   </div>
                 </div>
 
