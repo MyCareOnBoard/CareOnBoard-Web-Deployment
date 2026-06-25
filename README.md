@@ -59,7 +59,7 @@ The build is structured around four milestones — onboarding, credential manage
 
 3. **Set up environment variables**
 
-   Create a `.env` file in the root directory with the following variables:
+   Create a `.env` or `.env.local` file in the root directory with the following variables:
 
    ```env
    # Backend API Configuration
