@@ -18,6 +18,7 @@ import SavedClaimsTable from "./components/SavedClaimsTable";
 import ClaimsWorkspaceTabs, { type ClaimsWorkspaceTab } from "./components/ClaimsWorkspaceTabs";
 import UpdateClaimStatusModal from "./components/UpdateClaimStatusModal";
 import CancelClaimDialog from "./components/CancelClaimDialog";
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import ClaimsActionLoadingOverlay, {
   getClaimsActionLoadingCopy,
 } from "./components/ClaimsActionLoadingOverlay";
@@ -106,6 +107,9 @@ export default function ClaimsDashboardPage() {
   const [mutationSaving, setMutationSaving] = useState(false);
   const [statusModalClaim, setStatusModalClaim] = useState<BillingClaimListItem | null>(null);
   const [cancelModalClaim, setCancelModalClaim] = useState<BillingClaimListItem | null>(null);
+  const [cancelModalInvoice, setCancelModalInvoice] = useState<OutOfPocketInvoiceListItem | null>(
+    null,
+  );
   const [claimReport, setClaimReport] = useState<{
     claim: RecentClaim;
     savedClaim: SavedBillingClaim;
@@ -412,22 +416,25 @@ export default function ClaimsDashboardPage() {
     [toast],
   );
 
-  const handleCancelInvoice = useCallback(
-    async (item: OutOfPocketInvoiceListItem) => {
-      try {
-        await cancelOutOfPocketInvoice(item.id);
-        toast({ title: "Invoice cancelled. Its items are billable again." });
-        await refreshAfterCreateOrCancel();
-      } catch (error) {
-        toast({
-          title: "Couldn't cancel invoice",
-          description: error instanceof Error ? error.message : undefined,
-          variant: "destructive",
-        });
-      }
-    },
-    [refreshAfterCreateOrCancel, toast],
-  );
+  const handleConfirmCancelInvoice = useCallback(async () => {
+    if (!cancelModalInvoice) return;
+
+    setMutationSaving(true);
+    try {
+      await cancelOutOfPocketInvoice(cancelModalInvoice.id);
+      setCancelModalInvoice(null);
+      toast({ title: "Invoice cancelled. Its items are billable again." });
+      await refreshAfterCreateOrCancel();
+    } catch (error) {
+      toast({
+        title: "Couldn't cancel invoice",
+        description: error instanceof Error ? error.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setMutationSaving(false);
+    }
+  }, [cancelModalInvoice, refreshAfterCreateOrCancel, toast]);
 
   const handleCloseReportModal = useCallback(() => {
     setClaimReport(null);
@@ -592,7 +599,7 @@ export default function ClaimsDashboardPage() {
           actionsDisabled={mutationSaving || openingReport !== null}
           invoices={filteredOopInvoices}
           onViewInvoice={(invoice) => void handleViewInvoice(invoice)}
-          onCancelInvoice={(invoice) => void handleCancelInvoice(invoice)}
+          onCancelInvoice={setCancelModalInvoice}
         />
       )}
 
@@ -651,6 +658,21 @@ export default function ClaimsDashboardPage() {
         saving={mutationSaving}
         onClose={() => !mutationSaving && setCancelModalClaim(null)}
         onConfirm={handleConfirmCancelClaim}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={Boolean(cancelModalInvoice)}
+        onClose={() => !mutationSaving && setCancelModalInvoice(null)}
+        onConfirm={() => void handleConfirmCancelInvoice()}
+        isDeleting={mutationSaving}
+        title="Cancel this invoice?"
+        message={
+          cancelModalInvoice
+            ? `Invoice ${cancelModalInvoice.invoiceNumber} will be deleted and its items will become billable again.`
+            : "This invoice will be deleted and its items will become billable again."
+        }
+        confirmText="Cancel invoice"
+        cancelText="Keep invoice"
       />
 
       {claimsActionOverlay && (
