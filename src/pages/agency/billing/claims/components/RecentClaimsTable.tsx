@@ -150,7 +150,7 @@ export default function RecentClaimsTable({
         <div className="overflow-x-auto">
           <div className={TABLE_MIN_WIDTH}>
             <div className={GROUPED_TABLE_HEADER_CLASS}>
-              <span>Staff ID</span>
+              <span>Staff</span>
               <span>Service code</span>
               <span>PA Number</span>
               <span>Service date</span>

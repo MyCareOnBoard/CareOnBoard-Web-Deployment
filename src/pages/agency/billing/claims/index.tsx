@@ -18,6 +18,7 @@ import SavedClaimsTable from "./components/SavedClaimsTable";
 import ClaimsWorkspaceTabs, { type ClaimsWorkspaceTab } from "./components/ClaimsWorkspaceTabs";
 import UpdateClaimStatusModal from "./components/UpdateClaimStatusModal";
 import CancelClaimDialog from "./components/CancelClaimDialog";
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import ClaimsActionLoadingOverlay, {
   getClaimsActionLoadingCopy,
 } from "./components/ClaimsActionLoadingOverlay";
@@ -49,8 +50,6 @@ const ClaimReportModal = lazy(() => import("./components/claim-report/ClaimRepor
 const OutOfPocketInvoiceModal = lazy(
   () => import("../out-of-pocket/components/OutOfPocketInvoiceModal"),
 );
-
-type InvoiceBundle = { serviceCode: string; shiftIds: string[]; rideIds: string[] };
 
 export default function ClaimsDashboardPage() {
   const { user } = useAuth();
@@ -101,11 +100,15 @@ export default function ClaimsDashboardPage() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generateInitialGroup, setGenerateInitialGroup] = useState<RecentClaimClientGroup | null>(null);
   const [savingClaim, setSavingClaim] = useState(false);
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [openingReport, setOpeningReport] = useState<{ claimNumber: string } | null>(null);
   const openingReportRequestIdRef = useRef(0);
   const [mutationSaving, setMutationSaving] = useState(false);
   const [statusModalClaim, setStatusModalClaim] = useState<BillingClaimListItem | null>(null);
   const [cancelModalClaim, setCancelModalClaim] = useState<BillingClaimListItem | null>(null);
+  const [cancelModalInvoice, setCancelModalInvoice] = useState<OutOfPocketInvoiceListItem | null>(
+    null,
+  );
   const [claimReport, setClaimReport] = useState<{
     claim: RecentClaim;
     savedClaim: SavedBillingClaim;
@@ -257,75 +260,38 @@ export default function ClaimsDashboardPage() {
     setGenerateInitialGroup(null);
   }, [savingClaim]);
 
-  // Out-of-pocket clients bill an invoice instead of a claim. Create one invoice per
-  // service-code bundle (shifts XOR rides per code), shared by the row action and the modal.
-  const createOutOfPocketInvoicesFromBundles = useCallback(
-    async (clientId: string, bundles: InvoiceBundle[]) => {
-      const list = bundles.filter((b) => b.shiftIds.length || b.rideIds.length);
-      if (!clientId || list.length === 0) return;
+  // Out-of-pocket clients bill an invoice instead of a claim. One invoice per client holds
+  // every approved item — shifts across any service code plus manual mileage — each itemized.
+  const createOutOfPocketInvoiceForClient = useCallback(
+    async (clientId: string, shiftIds: string[], rideIds: string[]) => {
+      if (!clientId || (shiftIds.length === 0 && rideIds.length === 0)) return;
 
       setSavingClaim(true);
       try {
-        // Bundles are independent, so create them in parallel and tolerate partial failure
-        // (one bad bundle must not hide the invoices that did succeed).
-        const results = await Promise.allSettled(
-          list.map((bundle) => {
-            const usingRides = bundle.rideIds.length > 0 && bundle.shiftIds.length === 0;
-            return createOutOfPocketInvoice({
-              clientId,
-              serviceCode: bundle.serviceCode,
-              ...(usingRides ? { rideIds: bundle.rideIds } : { shiftIds: bundle.shiftIds }),
-            });
-          }),
-        );
+        const invoice = await createOutOfPocketInvoice({ clientId, shiftIds, rideIds });
 
-        const created = results
-          .filter(
-            (r): r is PromiseFulfilledResult<OutOfPocketInvoiceDetail> => r.status === "fulfilled",
-          )
-          .map((r) => r.value);
-        const failures = results
-          .filter((r): r is PromiseRejectedResult => r.status === "rejected")
-          .map((r) => (r.reason instanceof Error ? r.reason.message : "Couldn't create invoice"));
-        const unrated = created.reduce(
-          (sum, inv) => sum + (inv.unratedLineCount ?? inv.invoice?.unratedLineCount ?? 0),
-          0,
-        );
+        setGenerateOpen(false);
+        setGenerateInitialGroup(null);
+        setActiveTab("saved");
+        await refreshAfterCreateOrCancel();
+        setOpenInvoice(invoice);
 
-        if (created.length > 0) {
-          setGenerateOpen(false);
-          setGenerateInitialGroup(null);
-          setActiveTab("saved");
-          await refreshAfterCreateOrCancel();
-          if (created.length === 1 && failures.length === 0) setOpenInvoice(created[0]);
-        }
-
-        if (failures.length > 0 && created.length > 0) {
+        const unrated = invoice.unratedLineCount ?? invoice.invoice?.unratedLineCount ?? 0;
+        if (unrated > 0) {
           toast({
-            title: `${created.length} invoice${created.length === 1 ? "" : "s"} created, ${failures.length} failed`,
-            description: failures[0],
-            variant: "destructive",
-          });
-        } else if (failures.length > 0) {
-          toast({
-            title: "Couldn't generate invoice",
-            description: failures[0],
-            variant: "destructive",
-          });
-        } else if (unrated > 0) {
-          toast({
-            title: `${created.length === 1 ? created[0].invoiceNumber : `${created.length} invoices`} created with $0 lines`,
+            title: `Invoice ${invoice.invoiceNumber} created with $0 lines`,
             description: `${unrated} line${unrated === 1 ? "" : "s"} have no client rate set. Add a client rate on the service to bill them.`,
             variant: "destructive",
           });
         } else {
-          toast({
-            title:
-              created.length === 1
-                ? `Invoice ${created[0].invoiceNumber} created.`
-                : `${created.length} invoices created.`,
-          });
+          toast({ title: `Invoice ${invoice.invoiceNumber} created.` });
         }
+      } catch (error) {
+        toast({
+          title: "Couldn't generate invoice",
+          description: error instanceof Error ? error.message : undefined,
+          variant: "destructive",
+        });
       } finally {
         setSavingClaim(false);
       }
@@ -343,31 +309,31 @@ export default function ClaimsDashboardPage() {
         });
         return;
       }
-      const bundleMap = new Map<string, InvoiceBundle>();
+      const shiftIds: string[] = [];
+      const rideIds: string[] = [];
       for (const claim of group.claims) {
-        const code = claim.serviceCode;
-        if (!claim.sourceId || !code) continue;
-        if (!bundleMap.has(code)) bundleMap.set(code, { serviceCode: code, shiftIds: [], rideIds: [] });
-        const bundle = bundleMap.get(code)!;
-        if (claim.sourceType === "ride") bundle.rideIds.push(claim.sourceId);
-        else bundle.shiftIds.push(claim.sourceId);
+        if (!claim.sourceId) continue;
+        if (claim.sourceType === "ride") rideIds.push(claim.sourceId);
+        else shiftIds.push(claim.sourceId);
       }
-      await createOutOfPocketInvoicesFromBundles(group.clientId, [...bundleMap.values()]);
+      setGeneratingInvoice(true);
+      try {
+        await createOutOfPocketInvoiceForClient(group.clientId, shiftIds, rideIds);
+      } finally {
+        setGeneratingInvoice(false);
+      }
     },
-    [createOutOfPocketInvoicesFromBundles, toast],
+    [createOutOfPocketInvoiceForClient, toast],
   );
 
   // Out-of-pocket confirm from the Generate modal — selections already carry shift/ride objects.
   const saveOutOfPocketBundles = useCallback(
     async (clientId: string, selections: ClaimConfirmSelection[]) => {
-      const bundles: InvoiceBundle[] = selections.map((selection) => ({
-        serviceCode: selection.serviceCode,
-        shiftIds: selection.shifts.map((shift) => shift.id),
-        rideIds: selection.rides.map((ride) => ride.id),
-      }));
-      await createOutOfPocketInvoicesFromBundles(clientId, bundles);
+      const shiftIds = selections.flatMap((selection) => selection.shifts.map((shift) => shift.id));
+      const rideIds = selections.flatMap((selection) => selection.rides.map((ride) => ride.id));
+      await createOutOfPocketInvoiceForClient(clientId, shiftIds, rideIds);
     },
-    [createOutOfPocketInvoicesFromBundles],
+    [createOutOfPocketInvoiceForClient],
   );
 
   const handleClientGroupGenerateClaim = useCallback(
@@ -412,22 +378,25 @@ export default function ClaimsDashboardPage() {
     [toast],
   );
 
-  const handleCancelInvoice = useCallback(
-    async (item: OutOfPocketInvoiceListItem) => {
-      try {
-        await cancelOutOfPocketInvoice(item.id);
-        toast({ title: "Invoice cancelled. Its items are billable again." });
-        await refreshAfterCreateOrCancel();
-      } catch (error) {
-        toast({
-          title: "Couldn't cancel invoice",
-          description: error instanceof Error ? error.message : undefined,
-          variant: "destructive",
-        });
-      }
-    },
-    [refreshAfterCreateOrCancel, toast],
-  );
+  const handleConfirmCancelInvoice = useCallback(async () => {
+    if (!cancelModalInvoice) return;
+
+    setMutationSaving(true);
+    try {
+      await cancelOutOfPocketInvoice(cancelModalInvoice.id);
+      setCancelModalInvoice(null);
+      toast({ title: "Invoice cancelled. Its items are billable again." });
+      await refreshAfterCreateOrCancel();
+    } catch (error) {
+      toast({
+        title: "Couldn't cancel invoice",
+        description: error instanceof Error ? error.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setMutationSaving(false);
+    }
+  }, [cancelModalInvoice, refreshAfterCreateOrCancel, toast]);
 
   const handleCloseReportModal = useCallback(() => {
     setClaimReport(null);
@@ -544,7 +513,9 @@ export default function ClaimsDashboardPage() {
 
   const claimsActionOverlay = openingReport
     ? getClaimsActionLoadingCopy(openingReport.claimNumber)
-    : null;
+    : generatingInvoice
+      ? { title: "Generating invoice", description: "Creating the out-of-pocket invoice…" }
+      : null;
 
   return (
     <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
@@ -592,7 +563,7 @@ export default function ClaimsDashboardPage() {
           actionsDisabled={mutationSaving || openingReport !== null}
           invoices={filteredOopInvoices}
           onViewInvoice={(invoice) => void handleViewInvoice(invoice)}
-          onCancelInvoice={(invoice) => void handleCancelInvoice(invoice)}
+          onCancelInvoice={setCancelModalInvoice}
         />
       )}
 
@@ -651,6 +622,21 @@ export default function ClaimsDashboardPage() {
         saving={mutationSaving}
         onClose={() => !mutationSaving && setCancelModalClaim(null)}
         onConfirm={handleConfirmCancelClaim}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={Boolean(cancelModalInvoice)}
+        onClose={() => !mutationSaving && setCancelModalInvoice(null)}
+        onConfirm={() => void handleConfirmCancelInvoice()}
+        isDeleting={mutationSaving}
+        title="Cancel this invoice?"
+        message={
+          cancelModalInvoice
+            ? `Invoice ${cancelModalInvoice.invoiceNumber} will be deleted and its items will become billable again.`
+            : "This invoice will be deleted and its items will become billable again."
+        }
+        confirmText="Cancel invoice"
+        cancelText="Keep invoice"
       />
 
       {claimsActionOverlay && (

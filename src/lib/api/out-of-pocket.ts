@@ -23,7 +23,6 @@ export type OutOfPocketInvoiceDocument = {
   payerEmail: string | null;
   clientName: string;
   agencyName: string;
-  serviceCode: string;
   periodStart: string | null;
   periodEnd: string | null;
   lines: OutOfPocketInvoiceLine[];
@@ -45,7 +44,7 @@ export type OutOfPocketInvoiceListItem = {
   clientName: string | null;
   payerName: string | null;
   payerEmail: string | null;
-  serviceCode: string;
+  serviceCode: string | null;
   serviceDate: string | null;
   shiftCount: number;
   rideCount: number;
@@ -63,7 +62,7 @@ export type OutOfPocketInvoiceDetail = OutOfPocketInvoiceListItem & {
 
 export type CreateOutOfPocketInvoicePayload = {
   clientId: string;
-  serviceCode: string;
+  /** One invoice per client may span any service codes + manual mileage. */
   shiftIds?: string[];
   rideIds?: string[];
 };

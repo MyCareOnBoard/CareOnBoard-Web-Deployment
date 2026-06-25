@@ -12,6 +12,8 @@ import {
 
 import AIInsightsCard from "./AIInsightsCard";
 import { useLazyGetAnalyticsInsightsQuery } from "@/lib/api/reports";
+import { useNavigate } from "react-router";
+import { Routes } from "@/routes/constants";
 
 export type BillingSegment = {
   label: string;
@@ -69,6 +71,7 @@ export default function BillingSummary({
   const [animatedProgress, setAnimatedProgress] = useState(0);
   const [showInsights, setShowInsights] = useState(false);
   const insightsBtnRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -300,6 +303,7 @@ export default function BillingSummary({
             <button
               key={item.label}
               type="button"
+              onClick={() => navigate(Routes.agency.billing.financialOverview)}
               onMouseEnter={() =>
                 setActiveIndex(index)
               }
@@ -311,7 +315,7 @@ export default function BillingSummary({
                 rounded-2xl border
                 px-4 py-4
                 text-left
-                transition-all duration-300
+                transition-all duration-300 cursor-pointer hover:bg-[#F9FAFB]
                 ${
                   activeIndex === index
                     ? "border-[#D8E1E5] bg-[#F8FAFB]"

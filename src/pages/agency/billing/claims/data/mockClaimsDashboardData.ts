@@ -4,6 +4,7 @@ export type RecentClaim = {
   clientId?: string;
   clientAvatarUrl?: string;
   staffId: string;
+  staffName?: string;
   serviceCode: string;
   paNumber: string;
   serviceDate: string;

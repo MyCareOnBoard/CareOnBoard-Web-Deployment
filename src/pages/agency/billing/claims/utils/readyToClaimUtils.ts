@@ -111,6 +111,7 @@ export function mapReadyToClaimRowToRecentClaim(
       clientId: row.clientId ?? undefined,
       clientAvatarUrl: row.clientAvatarUrl ?? undefined,
       staffId: row.staffId ?? MISSING_VALUE,
+      staffName: row.staffName ?? undefined,
       serviceCode: row.serviceCode?.trim() || MISSING_VALUE,
       paNumber: row.paNumber?.trim() || MISSING_VALUE,
       serviceDate: sortDate ? isoToServiceDateLabel(sortDate) : MISSING_VALUE,
@@ -142,7 +143,9 @@ export function mapReadyToClaimRowToRecentClaim(
     client: row.clientName?.trim() || MISSING_VALUE,
     clientId: row.clientId ?? undefined,
     clientAvatarUrl: row.clientAvatarUrl ?? undefined,
-    staffId: row.staffId?.slice(0, 6) || MISSING_VALUE,
+    // Keep the full id so the profile link resolves; display truncation happens in the row.
+    staffId: row.staffId ?? MISSING_VALUE,
+    staffName: row.staffName ?? undefined,
     serviceCode: row.serviceCode?.trim() || MISSING_VALUE,
     paNumber: "—",
     serviceDate: rideServiceDateLabel(row),
