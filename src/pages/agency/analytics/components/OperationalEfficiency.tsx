@@ -16,6 +16,8 @@ import {
 
 import AIInsightsCard from "./AIInsightsCard";
 import { useLazyGetAnalyticsInsightsQuery } from "@/lib/api/reports";
+import { useNavigate } from "react-router";
+import { Routes } from "@/routes/constants";
 
 type MetricPoint = {
   value: number;
@@ -29,6 +31,7 @@ export type OperationalMetric = {
   icon?: React.ElementType;
   chartColor: string;
   data?: MetricPoint[];
+  path: string;
 };
 
 interface OperationalEfficiencyProps {
@@ -43,6 +46,7 @@ const FALLBACK_METRICS: OperationalMetric[] = [
     id: "resolve",
     title: "Avg. time to resolve issues",
     value: "2.3 hrs",
+    path: Routes.agency.shifts,
     trend: 10.5,
     icon: Clock3,
     chartColor: "#12B5B0",
@@ -60,6 +64,7 @@ const FALLBACK_METRICS: OperationalMetric[] = [
     id: "auto",
     title: "Auto resolved issues",
     value: "40%",
+    path: Routes.agency.shifts,
     trend: 10.5,
     icon: WandSparkles,
     chartColor: "#12B5B0",
@@ -77,6 +82,7 @@ const FALLBACK_METRICS: OperationalMetric[] = [
     id: "manual",
     title: "Manual interventions",
     value: "60%",
+    path: Routes.agency.shifts,
     trend: -10.5,
     icon: UserRoundCog,
     chartColor: "#E5484D",
@@ -149,7 +155,8 @@ export default function OperationalEfficiency({
   const [showInsights, setShowInsights] = useState(false);
   const insightsBtnRef = useRef<HTMLDivElement>(null);
   const [fetchInsights, { data: insightsData, isLoading: insightsLoading }] = useLazyGetAnalyticsInsightsQuery();
-
+ const navigate = useNavigate();
+ 
   useEffect(() => {
     if (!showInsights) return;
     const handleClickOutside = (e: MouseEvent) => {
@@ -170,17 +177,17 @@ export default function OperationalEfficiency({
     return (
       <div className="rounded-[32px] border border-[#E8ECEF] bg-[#FFFFFF66] p-6 animate-pulse">
         <div className="flex items-center justify-between mb-6">
-          <div className="h-6 w-44 rounded bg-gray-100" />
-          <div className="h-10 w-28 rounded-full bg-gray-100" />
+          <div className="h-6 bg-gray-100 rounded w-44" />
+          <div className="h-10 bg-gray-100 rounded-full w-28" />
         </div>
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex items-center justify-between rounded-2xl border border-[#EEF2F4] bg-white/80 px-5 py-4">
               <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-gray-100" />
+                <div className="bg-gray-100 h-14 w-14 rounded-2xl" />
                 <div className="space-y-2">
-                  <div className="h-4 w-44 rounded bg-gray-100" />
-                  <div className="h-5 w-24 rounded bg-gray-100" />
+                  <div className="h-4 bg-gray-100 rounded w-44" />
+                  <div className="w-24 h-5 bg-gray-100 rounded" />
                 </div>
               </div>
               <div className="h-[56px] w-[120px] rounded bg-gray-100" />
@@ -237,11 +244,12 @@ export default function OperationalEfficiency({
           return (
             <div
               key={metric.id}
+              onClick={() => navigate(metric.path)}
               className="
                 flex items-center justify-between
                 rounded-2xl border border-[#EEF2F4]
                 bg-white/80
-                px-5 py-4
+                px-5 py-4 cursor-pointer hover:bg-[#F9FAFB] transition-colors
               "
             >
               <div className="flex items-center gap-4">
