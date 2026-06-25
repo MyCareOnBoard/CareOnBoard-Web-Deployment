@@ -123,6 +123,7 @@ export type ReadyToClaimRow = {
   clientName: string | null;
   clientAvatarUrl?: string | null;
   staffId: string | null;
+  staffName?: string | null;
   serviceCode: string;
   sortDate: string | null;
   weekRange: string | null;

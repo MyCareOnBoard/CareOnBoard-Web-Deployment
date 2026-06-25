@@ -21,11 +21,12 @@ function formatStaffIdDisplay(staffId: string): string {
   return staffId.slice(0, STAFF_ID_DISPLAY_LENGTH);
 }
 
-function StaffIdLink({ staffId }: { staffId: string }) {
-  const displayId = formatStaffIdDisplay(staffId);
+function StaffLink({ staffId, staffName }: { staffId: string; staffName?: string }) {
+  // Prefer the resolved staff name; fall back to the (truncated) id when it's missing.
+  const label = staffName?.trim() || formatStaffIdDisplay(staffId);
 
   if (!isStaffIdLinkable(staffId)) {
-    return <span className="text-[13px] text-[#808081]">{displayId}</span>;
+    return <span className="text-[13px] text-[#808081]">{label}</span>;
   }
 
   return (
@@ -33,7 +34,7 @@ function StaffIdLink({ staffId }: { staffId: string }) {
       to={Routes.agency.dspProfile.replace(":dspId", staffId.trim())}
       className="text-[13px] font-medium text-[#10141a] transition-colors hover:text-[#00b4b8] hover:underline"
     >
-      {displayId}
+      {label}
     </Link>
   );
 }
@@ -70,8 +71,8 @@ function RecentClaimRow({ claim, variant, showClient = true }: RecentClaimRowPro
 
         <div className={showClient ? "mt-4 space-y-3" : "space-y-3"}>
           <div className="flex justify-between gap-4">
-            <span className="text-[13px] text-[#808081]">Staff ID</span>
-            <StaffIdLink staffId={claim.staffId} />
+            <span className="text-[13px] text-[#808081]">Staff</span>
+            <StaffLink staffId={claim.staffId} staffName={claim.staffName} />
           </div>
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">Service date</span>
@@ -114,7 +115,7 @@ function RecentClaimRow({ claim, variant, showClient = true }: RecentClaimRowPro
           className="text-[14px] font-medium text-[#10141a]"
         />
       ) : null}
-      <StaffIdLink staffId={claim.staffId} />
+      <StaffLink staffId={claim.staffId} staffName={claim.staffName} />
       <span className="text-[13px] text-[#10141a]">{claim.serviceCode}</span>
       <span className="text-[13px] text-[#10141a]">{claim.paNumber}</span>
       <span className="text-[13px] text-[#10141a]">{claim.serviceDate}</span>

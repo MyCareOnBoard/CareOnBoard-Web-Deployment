@@ -130,7 +130,6 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
               <div className="min-w-0 text-right">
                 <p className={cn("mb-1 font-bold", TEXT)}>For</p>
                 <p className={cn("font-bold leading-tight", TEXT)}>{doc.clientName}</p>
-                <p className={cn("mt-1", MUTED)}>{doc.serviceCode}</p>
               </div>
             </div>
 
