@@ -108,9 +108,27 @@ export function formDataToApiPayload(
     }
   }
 
+  if (!progressive && s2.billingDirection === "out-of-pocket") {
+    if (!s2.outOfPocketPayerName?.trim() || !sanitizeOptionalEmail(s2.outOfPocketPayerEmail)) {
+      throw new Error(
+        "Enter a payor name and a valid payer email for out-of-pocket billing.",
+      );
+    }
+  }
+
   const payload: CreateClientRequest = {
     ...(includeAgencyId && formData.agencyId ? { agencyId: formData.agencyId } : {}),
     type: formData.type || "ddd",
+    billingDirection: s2.billingDirection || "claims",
+    // Out-of-pocket bills the payer directly; authorization comes from the service authorizations.
+    ...(s2.billingDirection === "out-of-pocket"
+      ? {
+          outOfPocketPayer: {
+            name: s2.outOfPocketPayerName?.trim() || undefined,
+            email: sanitizeOptionalEmail(s2.outOfPocketPayerEmail),
+          },
+        }
+      : {}),
     firstName: s1.firstName || undefined,
     lastName: s1.lastName || undefined,
     middleName: s1.middleName || undefined,

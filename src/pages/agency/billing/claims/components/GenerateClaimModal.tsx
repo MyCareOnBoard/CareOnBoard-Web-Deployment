@@ -37,6 +37,7 @@ import {
 } from "../utils/claimSelectionUtils";
 import type { RecentClaimClientGroup } from "../utils/groupRecentClaimsByClient";
 import ClaimPreviewSection from "./claimPreviewSection";
+import OutOfPocketBadge from "./OutOfPocketBadge";
 
 type GenerateClaimModalProps = {
   open: boolean;
@@ -46,6 +47,8 @@ type GenerateClaimModalProps = {
   mileageRate?: number;
   onClose: () => void;
   onConfirm: (selections: ClaimConfirmSelection[]) => void;
+  /** Out-of-pocket clients bill an invoice instead of a state claim. */
+  onConfirmInvoice?: (clientId: string, selections: ClaimConfirmSelection[]) => void;
 };
 
 function getClientDisplayName(client: Client) {
@@ -69,6 +72,7 @@ export default function GenerateClaimModal({
   mileageRate = 0,
   onClose,
   onConfirm,
+  onConfirmInvoice,
 }: GenerateClaimModalProps) {
   const { user } = useAuth();
   const [clientQuery, setClientQuery] = useState("");
@@ -84,6 +88,8 @@ export default function GenerateClaimModal({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const clientSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefillRequestIdRef = useRef(0);
+
+  const isOutOfPocketClient = selectedClient?.billingDirection === "out-of-pocket";
 
   const services = useMemo(
     () => flattenClientServices(selectedClient ?? undefined),
@@ -419,7 +425,13 @@ export default function GenerateClaimModal({
 
     const selectedRows = displayRows.filter((row) => selectedIds.has(row.id));
     const bundles = splitRowsIntoClaimBundles(selectedRows);
-    onConfirm(mapBundlesToClaimConfirmSelections(bundles, selectedClient.id));
+    const selections = mapBundlesToClaimConfirmSelections(bundles, selectedClient.id);
+
+    if (isOutOfPocketClient && onConfirmInvoice) {
+      onConfirmInvoice(selectedClient.id, selections);
+      return;
+    }
+    onConfirm(selections);
   };
 
   return (
@@ -429,7 +441,7 @@ export default function GenerateClaimModal({
         className={`${BILLING_CORNER_MODAL_TALL_CLASS} ${BILLING_CORNER_MODAL_SHELL_CLASS}`}
       >
         <BillingCornerModalHeader
-          title="Generate claim"
+          title={isOutOfPocketClient ? "Generate invoice" : "Generate claim"}
           description="Search for a client, select services, then review approved shifts and rides to bill."
           onClose={onClose}
           closeDisabled={saving}
@@ -462,9 +474,10 @@ export default function GenerateClaimModal({
                       key={client.id}
                       type="button"
                       onClick={() => void handleClientSelect(client)}
-                      className="w-full cursor-pointer border-b border-[#f0f0f0] px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
+                      className="flex w-full cursor-pointer items-center justify-between gap-2 border-b border-[#f0f0f0] px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
                     >
-                      <p className="text-[14px] text-[#10141a]">{getClientDisplayName(client)}</p>
+                      <span className="text-[14px] text-[#10141a]">{getClientDisplayName(client)}</span>
+                      {client.billingDirection === "out-of-pocket" && <OutOfPocketBadge />}
                     </button>
                   ))}
                 </div>
@@ -535,13 +548,19 @@ export default function GenerateClaimModal({
             disabled={!canConfirm}
             className={cn(BILLING_PRIMARY_BUTTON_CLASS, "w-full gap-2 sm:w-auto")}
             aria-busy={saving}
-            aria-label={canConfirm ? undefined : "Select at least one item to generate a claim."}
+            aria-label={
+              canConfirm
+                ? undefined
+                : `Select at least one item to generate ${isOutOfPocketClient ? "an invoice" : "a claim"}.`
+            }
           >
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                Generating claim…
+                {isOutOfPocketClient ? "Generating invoice…" : "Generating claim…"}
               </>
+            ) : isOutOfPocketClient ? (
+              "Generate invoice"
             ) : (
               "Generate claim"
             )}

@@ -1,13 +1,16 @@
 import { Fragment, useMemo } from "react";
 import type { BillingClaimListItem, BillingClaimStatus } from "@/lib/api/claims";
+import type { OutOfPocketInvoiceListItem } from "@/lib/api/out-of-pocket";
 import ClaimsClientSearch from "./ClaimsClientSearch";
 import SavedClaimRow from "./SavedClaimRow";
+import SavedInvoiceRow from "./SavedInvoiceRow";
 import SavedClaimsClientGroupHeader from "./SavedClaimsClientGroupHeader";
 import {
   GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS,
   SAVED_CLAIMS_TABLE_MIN_WIDTH,
 } from "./tableColumns";
 import { groupSavedClaimsByClient } from "../utils/groupSavedClaimsByClient";
+import { groupInvoicesByClient } from "../utils/groupInvoicesByClient";
 import { STATUS_FILTER_OPTIONS } from "../utils/savedClaimUtils";
 
 const SKELETON_ROW_COUNT = 8;
@@ -23,6 +26,10 @@ type SavedClaimsTableProps = {
   onUpdateStatus: (claim: BillingClaimListItem) => void;
   onCancelClaim: (claim: BillingClaimListItem) => void;
   actionsDisabled?: boolean;
+  /** Out-of-pocket invoices mixed into this tab, badged and grouped by client. */
+  invoices?: OutOfPocketInvoiceListItem[];
+  onViewInvoice?: (invoice: OutOfPocketInvoiceListItem) => void;
+  onCancelInvoice?: (invoice: OutOfPocketInvoiceListItem) => void;
 };
 
 function SavedClaimSkeletonRow({ grouped = false }: { grouped?: boolean }) {
@@ -64,21 +71,25 @@ export default function SavedClaimsTable({
   onUpdateStatus,
   onCancelClaim,
   actionsDisabled = false,
+  invoices = [],
+  onViewInvoice,
+  onCancelInvoice,
 }: SavedClaimsTableProps) {
+  const groupedClaims = useMemo(() => groupSavedClaimsByClient(claims), [claims]);
+  const groupedInvoices = useMemo(() => groupInvoicesByClient(invoices), [invoices]);
+
   const emptyMessage = loading
     ? ""
-    : totalCount === 0
-      ? "No generated claims found for this date range."
-      : claims.length === 0
-        ? "No claims match your filters."
+    : totalCount === 0 && invoices.length === 0
+      ? "No generated claims or invoices found for this date range."
+      : groupedClaims.length === 0 && groupedInvoices.length === 0
+        ? "No claims or invoices match your filters."
         : "";
-
-  const groupedClaims = useMemo(() => groupSavedClaimsByClient(claims), [claims]);
 
   return (
     <section>
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-[18px] font-semibold text-[#10141a]">Generated Claims</h2>
+        <h2 className="text-[18px] font-semibold text-[#10141a]">Claims &amp; invoices</h2>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex items-center gap-2 text-[13px] text-[#10141a]">
             <span className="whitespace-nowrap text-[#808081]">Status</span>
@@ -117,24 +128,53 @@ export default function SavedClaimsTable({
               Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
                 <SavedClaimSkeletonRow key={`saved-skeleton-desktop-${index}`} grouped />
               ))
-            ) : groupedClaims.length > 0 ? (
-              groupedClaims.map((group) => (
-                <Fragment key={group.clientKey}>
-                  <SavedClaimsClientGroupHeader group={group} variant="desktop" />
-                  {group.claims.map((claim) => (
-                    <SavedClaimRow
-                      key={claim.id}
+            ) : groupedClaims.length > 0 || groupedInvoices.length > 0 ? (
+              <>
+                {groupedClaims.map((group) => (
+                  <Fragment key={`claim-${group.clientKey}`}>
+                    <SavedClaimsClientGroupHeader
+                      clientName={group.clientName}
+                      clientId={group.clientId}
+                      count={group.claims.length}
                       variant="desktop"
-                      showClient={false}
-                      claim={claim}
-                      onViewReport={onViewReport}
-                      onUpdateStatus={onUpdateStatus}
-                      onCancelClaim={onCancelClaim}
-                      actionsDisabled={actionsDisabled}
                     />
-                  ))}
-                </Fragment>
-              ))
+                    {group.claims.map((claim) => (
+                      <SavedClaimRow
+                        key={claim.id}
+                        variant="desktop"
+                        showClient={false}
+                        claim={claim}
+                        onViewReport={onViewReport}
+                        onUpdateStatus={onUpdateStatus}
+                        onCancelClaim={onCancelClaim}
+                        actionsDisabled={actionsDisabled}
+                      />
+                    ))}
+                  </Fragment>
+                ))}
+                {groupedInvoices.map((group) => (
+                  <Fragment key={`invoice-${group.clientKey}`}>
+                    <SavedClaimsClientGroupHeader
+                      clientName={group.clientName}
+                      clientId={group.clientId}
+                      count={group.invoices.length}
+                      variant="desktop"
+                      itemNoun="invoice"
+                      outOfPocket
+                    />
+                    {group.invoices.map((invoice) => (
+                      <SavedInvoiceRow
+                        key={invoice.id}
+                        variant="desktop"
+                        invoice={invoice}
+                        onViewInvoice={onViewInvoice ?? (() => {})}
+                        onCancelInvoice={onCancelInvoice ?? (() => {})}
+                        actionsDisabled={actionsDisabled}
+                      />
+                    ))}
+                  </Fragment>
+                ))}
+              </>
             ) : (
               <div className="px-4 py-10 text-center">
                 <p className="text-[14px] font-medium text-[#808081]">{emptyMessage}</p>
@@ -149,24 +189,53 @@ export default function SavedClaimsTable({
           Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
             <SavedClaimMobileSkeletonCard key={`saved-skeleton-mobile-${index}`} />
           ))
-        ) : groupedClaims.length > 0 ? (
-          groupedClaims.map((group) => (
-            <div key={group.clientKey} className="space-y-2">
-              <SavedClaimsClientGroupHeader group={group} variant="mobile" />
-              {group.claims.map((claim) => (
-                <SavedClaimRow
-                  key={claim.id}
+        ) : groupedClaims.length > 0 || groupedInvoices.length > 0 ? (
+          <>
+            {groupedClaims.map((group) => (
+              <div key={`claim-${group.clientKey}`} className="space-y-2">
+                <SavedClaimsClientGroupHeader
+                  clientName={group.clientName}
+                  clientId={group.clientId}
+                  count={group.claims.length}
                   variant="mobile"
-                  showClient={false}
-                  claim={claim}
-                  onViewReport={onViewReport}
-                  onUpdateStatus={onUpdateStatus}
-                  onCancelClaim={onCancelClaim}
-                  actionsDisabled={actionsDisabled}
                 />
-              ))}
-            </div>
-          ))
+                {group.claims.map((claim) => (
+                  <SavedClaimRow
+                    key={claim.id}
+                    variant="mobile"
+                    showClient={false}
+                    claim={claim}
+                    onViewReport={onViewReport}
+                    onUpdateStatus={onUpdateStatus}
+                    onCancelClaim={onCancelClaim}
+                    actionsDisabled={actionsDisabled}
+                  />
+                ))}
+              </div>
+            ))}
+            {groupedInvoices.map((group) => (
+              <div key={`invoice-${group.clientKey}`} className="space-y-2">
+                <SavedClaimsClientGroupHeader
+                  clientName={group.clientName}
+                  clientId={group.clientId}
+                  count={group.invoices.length}
+                  variant="mobile"
+                  itemNoun="invoice"
+                  outOfPocket
+                />
+                {group.invoices.map((invoice) => (
+                  <SavedInvoiceRow
+                    key={invoice.id}
+                    variant="mobile"
+                    invoice={invoice}
+                    onViewInvoice={onViewInvoice ?? (() => {})}
+                    onCancelInvoice={onCancelInvoice ?? (() => {})}
+                    actionsDisabled={actionsDisabled}
+                  />
+                ))}
+              </div>
+            ))}
+          </>
         ) : (
           <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-10 text-center">
             <p className="text-[14px] font-medium text-[#808081]">{emptyMessage}</p>

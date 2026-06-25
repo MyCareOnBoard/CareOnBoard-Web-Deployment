@@ -47,6 +47,12 @@ const SECTION_COPY: Record<
     title: "Expenses to include",
     empty: "No approved expenses for this pay period.",
   },
+  // Travel time is rendered as a read-only section (not via PreviewSection), but the
+  // Record must cover every item type.
+  travel: {
+    title: "Travel time",
+    empty: "No travel time for this pay period.",
+  },
 };
 
 function formatPreviewDate(value: string | null) {
@@ -235,6 +241,7 @@ export default function CreatePayrollInvoiceModal({
       shift: [],
       ride: [],
       expense: [],
+      travel: [],
     };
 
     for (const item of preview?.items ?? []) {
@@ -402,6 +409,32 @@ export default function CreatePayrollInvoiceModal({
                 onToggleItem={toggleItem}
                 onToggleAll={toggleSection}
               />
+              {itemsByType.travel.length > 0 ? (
+                <div>
+                  <p className="mb-3 text-[14px] font-semibold text-[#10141a]">
+                    Travel time ({itemsByType.travel.length})
+                  </p>
+                  <div className="space-y-2">
+                    {itemsByType.travel.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-[12px] border border-[#e5e5e6] bg-white px-4 py-3"
+                      >
+                        <p className="text-[14px] font-medium text-[#10141a]">
+                          {item.description}
+                          <span className="ml-2 text-[12px] font-normal text-[#808081]">
+                            {item.typeLabel}
+                          </span>
+                        </p>
+                        <p className="mt-1 text-[13px] text-[#808081]">{buildItemMetaLine(item)}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[12px] text-[#808081]">
+                    Travel time between shifts ≤ 1 hour apart is always included.
+                  </p>
+                </div>
+              ) : null}
             </div>
           )}
         </div>

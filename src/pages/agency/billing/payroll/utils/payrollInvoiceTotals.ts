@@ -5,6 +5,7 @@ export type PayrollInvoiceComputedTotals = {
   shiftPayTotal: number;
   ridePayTotal: number;
   expenseTotal: number;
+  travelPayTotal: number;
   mileageMiles: number;
   grossAmount: number;
 };
@@ -39,8 +40,15 @@ export function computePayrollTotalsFromItems(
   let expenseTotal = 0;
   let totalHours = 0;
   let mileageMiles = 0;
+  // Travel time is derived (paid ≤1h gaps), not a toggleable item — always counted.
+  let travelPayTotal = 0;
 
   for (const item of items) {
+    if (item.type === "travel") {
+      travelPayTotal += Number(item.amount) || 0;
+      continue;
+    }
+
     if (selectedIds && !selectedIds.has(item.id)) {
       continue;
     }
@@ -59,20 +67,22 @@ export function computePayrollTotalsFromItems(
   expenseTotal = Math.round(expenseTotal * 100) / 100;
   totalHours = Math.round(totalHours * 100) / 100;
   mileageMiles = Math.round(mileageMiles * 100) / 100;
+  travelPayTotal = Math.round(travelPayTotal * 100) / 100;
 
   const ridePayTotal = computeMileagePayAmount(mileageMiles, mileageRate);
-  const grossAmount = computePayrollGrossAmount({
-    shiftPayTotal,
-    expenseTotal,
-    mileageMiles,
-    mileageRate,
-  });
+  const grossAmount =
+    Math.round(
+      (computePayrollGrossAmount({ shiftPayTotal, expenseTotal, mileageMiles, mileageRate }) +
+        travelPayTotal) *
+        100,
+    ) / 100;
 
   return {
     totalHours,
     shiftPayTotal,
     ridePayTotal,
     expenseTotal,
+    travelPayTotal,
     mileageMiles,
     grossAmount,
   };
@@ -84,11 +94,13 @@ export function computeSelectedPayrollTotals(
   mileageRate: number,
 ) {
   const totals = computePayrollTotalsFromItems(items, mileageRate, selectedIds);
-  const selectedCount = items.filter((item) => selectedIds.has(item.id)).length;
+  // Travel items are read-only (derived), so they don't count toward the selectable item tally.
+  const selectable = items.filter((item) => item.type !== "travel");
+  const selectedCount = selectable.filter((item) => selectedIds.has(item.id)).length;
 
   return {
     ...totals,
     selectedCount,
-    totalCount: items.length,
+    totalCount: selectable.length,
   };
 }

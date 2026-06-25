@@ -132,6 +132,7 @@ export default function AgencyInfoTab() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [letterheadFile, setLetterheadFile] = useState<File | null>(null);
   const [addressFocused, setAddressFocused] = useState(false);
+  const [supportedClientTypes, setSupportedClientTypes] = useState<string[] | null>(null);
 
   const addressInputRef = useRef<HTMLDivElement>(null);
   const {
@@ -176,6 +177,7 @@ export default function AgencyInfoTab() {
     setError("");
     try {
       const agency = await getAgencyById(agencyId);
+      setSupportedClientTypes(agency.supportedClientTypes ?? null);
       const values = agencyToFormValues(agency);
       setInitialValues(values);
       setInitialLogo(agency.logo || "");
@@ -871,6 +873,7 @@ export default function AgencyInfoTab() {
                     onChange={handleOperationalChange}
                     disabled={disabled}
                     variant="stacked"
+                    showTravelTimeRate={!supportedClientTypes || supportedClientTypes.includes("hha")}
                   />
                 </SettingsFormFieldRow>
               </AccordionContent>

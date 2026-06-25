@@ -1,8 +1,13 @@
 import type { Agency, UpdateAgencyProfileRequest } from "@/lib/api/agencies";
 
+/** Default travel-time rate ($/hr) — US federal minimum wage; editable per agency. */
+export const DEFAULT_TRAVEL_TIME_RATE = 7.25;
+
 export type OperationalFormSlice = {
   maxShiftPerDay: string;
   travelTimeRules: string;
+  /** HHA only: paid rate for ≤1h gaps between consecutive shifts. */
+  travelTimeRate: number;
   mileageRate: number;
   whoReceivesNotifications: string;
   allowedFileTypes: string[];
@@ -15,6 +20,7 @@ export type OperationalFormSlice = {
 export const OPERATIONAL_FIELD_KEYS: (keyof OperationalFormSlice)[] = [
   "maxShiftPerDay",
   "travelTimeRules",
+  "travelTimeRate",
   "mileageRate",
   "whoReceivesNotifications",
   "allowedFileTypes",
@@ -27,6 +33,7 @@ export const OPERATIONAL_FIELD_KEYS: (keyof OperationalFormSlice)[] = [
 export const OPERATIONAL_FORM_DEFAULTS: OperationalFormSlice = {
   maxShiftPerDay: "5",
   travelTimeRules: "",
+  travelTimeRate: DEFAULT_TRAVEL_TIME_RATE,
   mileageRate: 0,
   whoReceivesNotifications: "",
   allowedFileTypes: [],
@@ -54,6 +61,7 @@ export function pickOperationalFormValues(
   return {
     maxShiftPerDay: source?.maxShiftPerDay ?? OPERATIONAL_FORM_DEFAULTS.maxShiftPerDay,
     travelTimeRules: source?.travelTimeRules ?? OPERATIONAL_FORM_DEFAULTS.travelTimeRules,
+    travelTimeRate: parseMileageRate(source?.travelTimeRate ?? OPERATIONAL_FORM_DEFAULTS.travelTimeRate),
     mileageRate: parseMileageRate(source?.mileageRate ?? OPERATIONAL_FORM_DEFAULTS.mileageRate),
     whoReceivesNotifications:
       source?.whoReceivesNotifications ?? OPERATIONAL_FORM_DEFAULTS.whoReceivesNotifications,
@@ -84,6 +92,7 @@ export function agencyOperationalToForm(
     Agency,
     | "maxShiftPerDay"
     | "travelTimeRules"
+    | "travelTimeRate"
     | "mileageRate"
     | "whoReceivesNotifications"
     | "allowedFileTypes"
@@ -96,6 +105,7 @@ export function agencyOperationalToForm(
   return {
     maxShiftPerDay: String(agency.maxShiftPerDay ?? 5),
     travelTimeRules: agency.travelTimeRules ?? "",
+    travelTimeRate: parseMileageRate(agency.travelTimeRate ?? DEFAULT_TRAVEL_TIME_RATE),
     mileageRate: parseMileageRate(agency.mileageRate ?? 0),
     whoReceivesNotifications: agency.whoReceivesNotifications ?? "",
     allowedFileTypes: normalizeAllowedFileTypes(agency.allowedFileTypes ?? []),
@@ -122,6 +132,7 @@ export function operationalFormToUpdatePayload(
   UpdateAgencyProfileRequest,
   | "maxShiftPerDay"
   | "travelTimeRules"
+  | "travelTimeRate"
   | "mileageRate"
   | "whoReceivesNotifications"
   | "allowedFileTypes"
@@ -137,6 +148,7 @@ export function operationalFormToUpdatePayload(
   return {
     maxShiftPerDay: parseMaxShiftPerDay(values.maxShiftPerDay),
     travelTimeRules: travelTime === "" ? null : travelTime,
+    travelTimeRate: parseMileageRate(values.travelTimeRate),
     mileageRate: parseMileageRate(values.mileageRate),
     whoReceivesNotifications: notificationRole === "" ? null : notificationRole,
     allowedFileTypes: normalizeAllowedFileTypes(values.allowedFileTypes),

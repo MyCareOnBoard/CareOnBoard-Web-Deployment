@@ -36,6 +36,11 @@ export interface MileageRide {
   claimId?: string | null;
   payrollInvoiceId?: string | null;
   approved?: boolean;
+  /** Client rides bill both legs (payroll + out-of-pocket); agency rides pay staff only. */
+  rideBillingType?: "client" | "agency";
+  /** Per-mile rates imputed at approval. staffRate → payroll; clientAgreedRate → out-of-pocket invoice. */
+  staffRate?: number | null;
+  clientAgreedRate?: number | null;
   startLocation?: Coordinates | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -119,6 +124,8 @@ export interface UpdateAgencyRideRequest {
   scheduledStartTime?: string;
   notes?: string;
   approved?: boolean;
+  staffRate?: number | null;
+  clientAgreedRate?: number | null;
 }
 
 export interface CreateOneTimeMileageRideRequest

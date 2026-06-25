@@ -10,6 +10,15 @@ import { customBaseQuery } from "@/lib/baseQuery";
 
 export type ClientType = "ddd" | "hha";
 
+/** Whether a client's services bill the provider (claims) or the payer/family (out of pocket). */
+export type ClientBillingDirection = "claims" | "out-of-pocket";
+
+/** Out-of-pocket bill-to: who pays and where the invoice is emailed. */
+export interface ClientOutOfPocketPayer {
+  name?: string | null;
+  email?: string | null;
+}
+
 /**
  * Client interface
  * Represents a client/consumer in the care system
@@ -18,6 +27,8 @@ export interface Client {
   // Core identifiers
   id: string;
   type?: ClientType;
+  billingDirection?: ClientBillingDirection;
+  outOfPocketPayer?: ClientOutOfPocketPayer | null;
   firstName?: string;
   lastName?: string;
   middleName?: string;
@@ -584,6 +595,8 @@ export interface Address {
 export interface CreateClientRequest {
   agencyId?: string;
   type?: ClientType;
+  billingDirection?: ClientBillingDirection;
+  outOfPocketPayer?: ClientOutOfPocketPayer | null;
   /** Sent on the wizard's final save so completed onboardings activate immediately. */
   status?: 'active' | 'inactive' | 'pending' | 'archived';
   firstName?: string;
@@ -720,6 +733,8 @@ export interface CreateClientRequest {
 export interface UpdateClientRequest {
   agencyId?: string;
   type?: ClientType;
+  billingDirection?: ClientBillingDirection;
+  outOfPocketPayer?: ClientOutOfPocketPayer | null;
   firstName?: string;
   lastName?: string;
   middleName?: string;

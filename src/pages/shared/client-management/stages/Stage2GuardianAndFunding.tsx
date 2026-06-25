@@ -553,6 +553,12 @@ export function Stage2GuardianAndFunding({
     [setFormData],
   );
 
+  const handleBillingDirectionChange = useCallback(
+    (value: string) =>
+      updateStage2({ billingDirection: value === "out-of-pocket" ? "out-of-pocket" : "claims" }),
+    [updateStage2],
+  );
+
   const guardianPickerOptions = useMemo(
     () =>
       (stage2.guardians ?? []).map((g, i) => ({
@@ -649,6 +655,58 @@ export function Stage2GuardianAndFunding({
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
           {pageTitle}
         </h1>
+      </div>
+
+      <div className="mb-10">
+        <div className="mb-4">
+          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+            Billing direction
+          </p>
+          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+            Claims bill the provider; out of pocket bills the payer as an invoice. Applies to all of
+            this client&apos;s services. Authorization comes from the service authorizations below.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]">Billing type</label>
+            <Select
+              value={stage2.billingDirection ?? "claims"}
+              onValueChange={handleBillingDirectionChange}
+            >
+              <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="claims">Claims (provider-paid)</SelectItem>
+                <SelectItem value="out-of-pocket">Out of pocket (family-paid)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {stage2.billingDirection === "out-of-pocket" && (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Payor name *</label>
+                <Input
+                  value={stage2.outOfPocketPayerName ?? ""}
+                  onChange={(e) => updateStage2({ outOfPocketPayerName: e.target.value })}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Who pays for these services"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]">Payer email *</label>
+                <Input
+                  type="email"
+                  value={stage2.outOfPocketPayerEmail ?? ""}
+                  onChange={(e) => updateStage2({ outOfPocketPayerEmail: e.target.value })}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                  placeholder="Where invoices are sent"
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {isHhaClient ? (

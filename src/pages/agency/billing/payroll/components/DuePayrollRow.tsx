@@ -129,8 +129,9 @@ function grossPayBreakdown(entry: DuePayrollEntry) {
   const shiftPayTotal = entry.shiftPayTotal ?? 0;
   const ridePayTotal = entry.ridePayTotal ?? 0;
   const expenseTotal = entry.expenseTotal ?? 0;
+  const travelPayTotal = entry.travelPayTotal ?? 0;
 
-  if (shiftPayTotal <= 0 && ridePayTotal <= 0 && expenseTotal <= 0) {
+  if (shiftPayTotal <= 0 && ridePayTotal <= 0 && expenseTotal <= 0 && travelPayTotal <= 0) {
     return null;
   }
 
@@ -140,6 +141,9 @@ function grossPayBreakdown(entry: DuePayrollEntry) {
   }
   if (ridePayTotal > 0) {
     parts.push(`mileage ${formatCurrency(ridePayTotal)}`);
+  }
+  if (travelPayTotal > 0) {
+    parts.push(`travel time ${formatCurrency(travelPayTotal)}`);
   }
   if (expenseTotal > 0) {
     parts.push(`reimbursements ${formatCurrency(expenseTotal)}`);

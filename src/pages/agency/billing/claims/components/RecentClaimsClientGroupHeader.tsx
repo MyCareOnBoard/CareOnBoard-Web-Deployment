@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import ClientNameLink from "./ClientNameLink";
+import OutOfPocketBadge from "./OutOfPocketBadge";
 import type { RecentClaimClientGroup } from "../utils/groupRecentClaimsByClient";
 
 function DotGridIcon() {
@@ -37,6 +38,8 @@ export default function RecentClaimsClientGroupHeader({
 }: RecentClaimsClientGroupHeaderProps) {
   const itemLabel = group.claims.length === 1 ? "1 item" : `${group.claims.length} items`;
   const isMobile = variant === "mobile";
+  const isOutOfPocket = group.billingDirection === "out-of-pocket";
+  const generateLabel = isOutOfPocket ? "Generate invoice" : "Generate claim";
 
   const actionsMenu = (
     <DropdownMenu>
@@ -66,7 +69,7 @@ export default function RecentClaimsClientGroupHeader({
           disabled={generateDisabled}
           onSelect={() => onGenerateClaim(group)}
         >
-          Generate claim
+          {generateLabel}
           <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -77,11 +80,14 @@ export default function RecentClaimsClientGroupHeader({
     return (
       <div className="flex items-center justify-between gap-3 px-1 pb-1 pt-3">
         <div className="min-w-0 flex-1">
-          <ClientNameLink
-            name={group.clientName}
-            clientId={group.clientId}
-            className="text-[16px] font-semibold text-[#10141a]"
-          />
+          <div className="flex items-center gap-2">
+            <ClientNameLink
+              name={group.clientName}
+              clientId={group.clientId}
+              className="text-[16px] font-semibold text-[#10141a]"
+            />
+            {isOutOfPocket && <OutOfPocketBadge />}
+          </div>
           <p className="mt-1 text-[13px] text-[#808081]">{itemLabel}</p>
         </div>
         {actionsMenu}
@@ -97,6 +103,7 @@ export default function RecentClaimsClientGroupHeader({
           clientId={group.clientId}
           className="text-[14px] font-semibold text-[#10141a]"
         />
+        {isOutOfPocket && <OutOfPocketBadge />}
         <span className="shrink-0 text-[13px] text-[#808081]">{itemLabel}</span>
       </div>
       {actionsMenu}

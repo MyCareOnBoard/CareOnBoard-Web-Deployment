@@ -15,4 +15,6 @@ export type RecentClaim = {
   sourceType?: "shift" | "ride";
   sourceId?: string;
   weekRange?: string | null;
+  /** Out-of-pocket clients bill an invoice instead of a state claim. */
+  billingDirection?: "claims" | "out-of-pocket";
 };
