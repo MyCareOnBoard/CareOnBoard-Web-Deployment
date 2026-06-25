@@ -12,6 +12,8 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
+import { useNavigate } from "react-router";
+import { Routes } from "@/routes/constants";
 
 export type ComplianceSegment = {
   label: string;
@@ -76,7 +78,8 @@ export default function ComplianceInsights({
   const [animatedProgress, setAnimatedProgress] = useState(0);
   const [showInsights, setShowInsights] = useState(false);
   const insightsBtnRef = useRef<HTMLDivElement>(null);
-
+  const navigate = useNavigate();
+ 
   useEffect(() => {
     const timeout = setTimeout(() => setAnimatedProgress(1), 150);
     return () => clearTimeout(timeout);
@@ -129,16 +132,16 @@ export default function ComplianceInsights({
     return (
       <div className="rounded-[32px] border border-[#E6EAEC] bg-[#FFFFFF66] p-6 animate-pulse">
         <div className="flex items-center justify-between mb-6">
-          <div className="h-6 w-40 rounded bg-gray-100" />
-          <div className="h-10 w-28 rounded-full bg-gray-100" />
+          <div className="w-40 h-6 bg-gray-100 rounded" />
+          <div className="h-10 bg-gray-100 rounded-full w-28" />
         </div>
         <div className="flex flex-col items-center gap-6">
           <div className="h-[190px] w-[190px] rounded-full bg-gray-100" />
           <div className="w-full space-y-3">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="flex items-center justify-between">
-                <div className="h-4 w-40 rounded bg-gray-100" />
-                <div className="h-4 w-10 rounded bg-gray-100" />
+                <div className="w-40 h-4 bg-gray-100 rounded" />
+                <div className="w-10 h-4 bg-gray-100 rounded" />
               </div>
             ))}
           </div>
@@ -317,12 +320,13 @@ export default function ComplianceInsights({
               onMouseLeave={() =>
                 setActiveIndex(null)
               }
+              onClick={() => navigate(Routes.agency.complianceAlerts)}
               className={`
                 flex w-full items-center justify-between
                 rounded-2xl border
                 px-4 py-4
                 text-left
-                transition-all duration-300
+                transition-all duration-300 cursor-pointer hover:bg-[#F9FAFB]
                 ${
                   activeIndex === index
                     ? "border-[#D8E1E5] bg-[#F8FAFB]"
