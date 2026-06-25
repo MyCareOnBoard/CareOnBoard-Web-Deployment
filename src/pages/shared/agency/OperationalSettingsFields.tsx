@@ -32,6 +32,8 @@ export type OperationalSettingsFieldsProps = {
   fieldsWithErrors?: string[];
   variant?: "grid" | "stacked";
   className?: string;
+  /** Travel-time rate is HHA-only; hide for DDD-only agencies. Defaults to shown. */
+  showTravelTimeRate?: boolean;
 };
 
 function FieldError({ show, message }: { show: boolean; message: string }) {
@@ -46,6 +48,7 @@ export default function OperationalSettingsFields({
   fieldsWithErrors = [],
   variant = "grid",
   className,
+  showTravelTimeRate = true,
 }: OperationalSettingsFieldsProps) {
   const hasError = (field: string) => fieldsWithErrors.includes(field);
   const inputClass = cn(
@@ -60,6 +63,11 @@ export default function OperationalSettingsFields({
   const handleMileageRateChange = (raw: string) => {
     const parsed = parseFloat(raw);
     onChange("mileageRate", parseMileageRate(parsed));
+  };
+
+  const handleTravelTimeRateChange = (raw: string) => {
+    const parsed = parseFloat(raw);
+    onChange("travelTimeRate", parseMileageRate(parsed));
   };
 
   const gridClass =
@@ -131,6 +139,31 @@ export default function OperationalSettingsFields({
         />
         <FieldError show={hasError("mileageRate")} message="Mileage rate is required." />
       </div>
+
+      {showTravelTimeRate && (
+        <div>
+          <Label htmlFor="travelTimeRate" className="mb-2 text-[14px] font-medium text-[#10141a]">
+            Travel time rate ($/hr)
+          </Label>
+          <Input
+            id="travelTimeRate"
+            type="number"
+            step="0.01"
+            min={0}
+            value={values.travelTimeRate === 0 ? "" : values.travelTimeRate}
+            onChange={(e) => handleTravelTimeRateChange(e.target.value)}
+            onBlur={(e) => {
+              if (e.target.value.trim() === "") {
+                onChange("travelTimeRate", 0);
+              }
+            }}
+            placeholder="Paid for ≤1h gaps between shifts (HHA)"
+            disabled={disabled}
+            className={cn(inputClass, hasError("travelTimeRate") && "border-red-500")}
+          />
+          <FieldError show={hasError("travelTimeRate")} message="Travel time rate is required." />
+        </div>
+      )}
 
       <div>
         <Label

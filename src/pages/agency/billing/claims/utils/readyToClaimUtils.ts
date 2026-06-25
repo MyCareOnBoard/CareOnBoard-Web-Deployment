@@ -95,6 +95,7 @@ function rideTimeLabel(row: ReadyToClaimRow): string {
 export function mapReadyToClaimRowToRecentClaim(
   row: ReadyToClaimRow,
   mileageRate = 0,
+  billingDirection: "claims" | "out-of-pocket" = "claims",
 ): RecentClaim {
   if (row.sourceType === "shift") {
     const duration = resolveShiftDuration(row);
@@ -123,6 +124,7 @@ export function mapReadyToClaimRowToRecentClaim(
         endTime: row.endTime ?? undefined,
       } as Shift),
       rate: formatShiftRateForDisplay(row.clientRate, row.clientPayType),
+      billingDirection,
     };
   }
 
@@ -148,12 +150,14 @@ export function mapReadyToClaimRowToRecentClaim(
     durationEnd: distance,
     totalHours: distance,
     rate: formatAgencyMileageRate(mileageRate),
+    billingDirection,
   };
 }
 
 export function mapReadyToClaimRowsToRecentClaims(
   rows: ReadyToClaimRow[],
   mileageRate = 0,
+  billingDirection: "claims" | "out-of-pocket" = "claims",
 ): RecentClaim[] {
-  return rows.map((row) => mapReadyToClaimRowToRecentClaim(row, mileageRate));
+  return rows.map((row) => mapReadyToClaimRowToRecentClaim(row, mileageRate, billingDirection));
 }

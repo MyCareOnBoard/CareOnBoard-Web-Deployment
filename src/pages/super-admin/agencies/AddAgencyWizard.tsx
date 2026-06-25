@@ -60,6 +60,7 @@ interface AgencyFormData {
     schedulingRules: string;
     maxShiftPerDay: string;
     travelTimeRules: string;
+    travelTimeRate: number;
     mileageSettings: string;
     mileageRate: number;
     incidentReportingSettings: string;
@@ -273,6 +274,7 @@ export default function AddAgencyWizard() {
         schedulingRules: "",
         maxShiftPerDay: "5",
         travelTimeRules: "",
+        travelTimeRate: 7.25,
         mileageSettings: "",
         mileageRate: 0,
         incidentReportingSettings: "",
@@ -358,6 +360,7 @@ export default function AddAgencyWizard() {
             schedulingRules: responseData.agencyData?.schedulingRules || "",
             maxShiftPerDay: responseData.agencyData?.maxShiftPerDay?.toString() || "",
             travelTimeRules: responseData.agencyData?.travelTimeRules || "",
+            travelTimeRate: responseData.agencyData?.travelTimeRate ?? 7.25,
             mileageSettings: responseData.agencyData?.mileageSettings || "",
             mileageRate: responseData.agencyData?.mileageRate || 0,
             incidentReportingSettings: responseData.agencyData?.incidentReportingSettings || "",
@@ -483,6 +486,7 @@ export default function AddAgencyWizard() {
         schedulingRules: formData.schedulingRules,
         maxShiftPerDay: parseInt(formData.maxShiftPerDay),
         travelTimeRules: formData.travelTimeRules,
+        travelTimeRate: formData.travelTimeRate,
         mileageSettings: formData.mileageSettings,
         mileageRate: formData.mileageRate,
         incidentReportingSettings: formData.incidentReportingSettings,

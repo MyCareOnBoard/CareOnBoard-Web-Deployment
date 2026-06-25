@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { Routes } from '@/routes/constants'
@@ -130,7 +131,12 @@ export default function MfaChallengePage() {
 
   return (
     <div className="relative flex w-full min-w-0 flex-col gap-8 overflow-x-hidden">
-      <AuthStepHeader title={MFA_COPY.challenge.title} description={headerDescription} />
+      <div className="space-y-4">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00B4B8]/10 text-[#00B4B8]">
+          <ShieldCheck className="h-7 w-7" aria-hidden />
+        </div>
+        <AuthStepHeader title={MFA_COPY.challenge.title} description={headerDescription} />
+      </div>
 
       <RecaptchaAnchor id={RECAPTCHA_CONTAINER_ID} />
 

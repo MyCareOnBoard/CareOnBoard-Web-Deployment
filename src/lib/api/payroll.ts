@@ -22,6 +22,7 @@ export type DuePayrollEntry = {
   shiftPayTotal?: number;
   ridePayTotal?: number;
   expenseTotal?: number;
+  travelPayTotal?: number;
   grossAmount?: number;
   shiftIds?: string[];
   rideIds?: string[];
@@ -148,7 +149,7 @@ export type CreatePayrollInvoicePayload = {
   rideIds?: string[];
 };
 
-export type PayrollInvoicePreviewItemType = "shift" | "ride" | "expense";
+export type PayrollInvoicePreviewItemType = "shift" | "ride" | "expense" | "travel";
 
 export type PayrollRateStatus = "ok" | "no-service-match" | "missing-staff-rate";
 

@@ -354,6 +354,10 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             }
 
             return {
+                billingDirection:
+                    client.billingDirection === "out-of-pocket" ? "out-of-pocket" : "claims",
+                outOfPocketPayerName: client.outOfPocketPayer?.name ?? "",
+                outOfPocketPayerEmail: client.outOfPocketPayer?.email ?? "",
                 guardianName: "",
                 guardianRelationship: undefined,
                 guardianEmail: "",

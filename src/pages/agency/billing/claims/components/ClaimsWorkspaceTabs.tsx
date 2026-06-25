@@ -8,8 +8,8 @@ type ClaimsWorkspaceTabsProps = {
 };
 
 const tabs: Array<{ id: ClaimsWorkspaceTab; label: string }> = [
-  { id: "shifts", label: "Shifts to claim" },
-  { id: "saved", label: "Generated Claims" },
+  { id: "shifts", label: "Ready to bill" },
+  { id: "saved", label: "Claims & invoices" },
 ];
 
 export default function ClaimsWorkspaceTabs({

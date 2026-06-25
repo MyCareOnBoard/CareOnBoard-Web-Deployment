@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import CustomDatePicker from "@/components/ui/datePicker";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
@@ -12,7 +13,7 @@ export default function ExpensesPage() {
   const [message, setMessage] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState<Date | null>(new Date());
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -101,7 +102,7 @@ export default function ExpensesPage() {
         message: message.trim(),
         amount: Number(amount),
         category: category.trim(),
-        date: new Date(date).toISOString(),
+        date: date.toISOString(),
       });
 
       toast({
@@ -113,7 +114,7 @@ export default function ExpensesPage() {
       setMessage("");
       setAmount("");
       setCategory("");
-      setDate("");
+      setDate(new Date());
       setSelectedFile(null);
       // Reset file input
       const fileInput = document.getElementById('receipt-upload') as HTMLInputElement;
@@ -241,11 +242,11 @@ export default function ExpensesPage() {
             <label className="block text-base font-semibold text-[#10141a] mb-2">
               Date
             </label>
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="border-[#e5e5e6] rounded-xl focus:border-[#00b4b8] focus:ring-[#00b4b8] text-[#10141a]"
+            <CustomDatePicker
+              date={date}
+              setDate={setDate}
+              placeholder="Select date"
+              className="border-[#e5e5e6] focus-within:border-[#00b4b8]"
             />
           </div>
         </div>

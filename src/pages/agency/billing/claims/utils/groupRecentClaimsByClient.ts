@@ -5,6 +5,8 @@ export type RecentClaimClientGroup = {
   clientName: string;
   clientId?: string;
   claims: RecentClaim[];
+  /** A client is wholly claims or out-of-pocket; drives the badge + generate action. */
+  billingDirection: "claims" | "out-of-pocket";
 };
 
 function getClientKey(claim: RecentClaim) {
@@ -28,6 +30,7 @@ export function groupRecentClaimsByClient(claims: RecentClaim[]): RecentClaimCli
       clientName: claim.client,
       clientId: claim.clientId,
       claims: [claim],
+      billingDirection: claim.billingDirection === "out-of-pocket" ? "out-of-pocket" : "claims",
     });
   }
 

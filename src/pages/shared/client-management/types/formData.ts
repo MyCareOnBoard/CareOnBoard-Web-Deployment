@@ -126,6 +126,9 @@ export type Stage1ClientIdentityAndContactData = {
 /** Client pay type may include per-mile billing; staff pay type uses only hourly / 15-min / daily in the UI. */
 export type ServicePayType = "hourly" | "15-min" | "daily" | "mile";
 
+/** Whether a client's services bill the state (claims) or the family (out of pocket). */
+export type BillingDirection = "claims" | "out-of-pocket";
+
 /** Wizard Stage 2 guardian / representative relationship — keep in sync with Gemini `GUARDIAN_RELATIONSHIP_ENUM`. */
 export const GUARDIAN_RELATIONSHIP_VALUES = [
     "mother",
@@ -291,6 +294,11 @@ export type CareTeamContact = {
 };
 
 export type Stage2GuardianAndFundingData = {
+    /** Bills the provider (claims) or the payer/family (out of pocket). Applies to all this client's services. */
+    billingDirection: BillingDirection;
+    /** Out-of-pocket only: who pays (bill-to) and where invoices are emailed. Required for out-of-pocket. */
+    outOfPocketPayerName?: string;
+    outOfPocketPayerEmail?: string;
     guardianName: string;
     guardianRelationship?: GuardianRelationship;
     guardianEmail: string;
@@ -788,6 +796,9 @@ export function createInitialAddClientFormData(): AddClientFormData {
             },
         },
         stage2: {
+            billingDirection: "claims",
+            outOfPocketPayerName: "",
+            outOfPocketPayerEmail: "",
             guardianName: "",
             guardianRelationship: undefined,
             guardianEmail: "",

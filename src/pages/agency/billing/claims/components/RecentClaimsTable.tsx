@@ -62,6 +62,7 @@ export default function RecentClaimsTable({
 }: RecentClaimsTableProps) {
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
+  const [typeFilter, setTypeFilter] = useState<"all" | "claims" | "out-of-pocket">("all");
 
   const sortedClaims = useMemo(
     () =>
@@ -72,17 +73,22 @@ export default function RecentClaimsTable({
   );
 
   const filteredClaims = useMemo(() => {
+    const byType =
+      typeFilter === "all"
+        ? sortedClaims
+        : sortedClaims.filter((claim) => (claim.billingDirection ?? "claims") === typeFilter);
+
     if (selectedClientName) {
-      return sortedClaims.filter(
+      return byType.filter(
         (claim) => claim.client.toLowerCase() === selectedClientName.toLowerCase(),
       );
     }
 
     const query = filterQuery.trim().toLowerCase();
-    if (!query) return sortedClaims;
+    if (!query) return byType;
 
-    return sortedClaims.filter((claim) => claim.client.toLowerCase().includes(query));
-  }, [sortedClaims, filterQuery, selectedClientName]);
+    return byType.filter((claim) => claim.client.toLowerCase().includes(query));
+  }, [sortedClaims, filterQuery, selectedClientName, typeFilter]);
 
   const groupedClaims = useMemo(
     () => groupRecentClaimsByClient(filteredClaims),
@@ -107,14 +113,30 @@ export default function RecentClaimsTable({
     if (claims.length === 0) {
       return "No approved shifts or transportation mileage found.";
     }
-    return "No items match your search.";
+    return "No items match your filters.";
   }, [claims.length, loading]);
 
   return (
     <section>
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-[18px] font-semibold text-[#10141a]">Ready to claim</h2>
-        <ClaimsClientSearch onFilterChange={handleFilterChange} />
+        <h2 className="text-[18px] font-semibold text-[#10141a]">Ready to bill</h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className="flex items-center gap-2 text-[13px] text-[#10141a]">
+            <span className="whitespace-nowrap text-[#808081]">Type</span>
+            <select
+              value={typeFilter}
+              onChange={(event) =>
+                setTypeFilter(event.target.value as "all" | "claims" | "out-of-pocket")
+              }
+              className="rounded-md border border-[#e5e5e6] bg-white px-3 py-2 text-[13px] text-[#10141a]"
+            >
+              <option value="all">All</option>
+              <option value="claims">Claims</option>
+              <option value="out-of-pocket">Out of pocket</option>
+            </select>
+          </label>
+          <ClaimsClientSearch onFilterChange={handleFilterChange} />
+        </div>
       </div>
 
       {truncated && !loading ? (

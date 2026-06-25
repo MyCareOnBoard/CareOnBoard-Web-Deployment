@@ -23,7 +23,7 @@ export default function UserIncidentPage() {
   // Form state
   const [clientName, setClientName] = useState("");
   const [clientId, setClientId] = useState("");
-  const [date, setDate] = useState<Date | null>(null);
+  const [date, setDate] = useState<Date | null>(new Date());
   const [time, setTime] = useState("12:00");
   const [whatHappened, setWhatHappened] = useState("");
   const [actionsTaken, setActionsTaken] = useState("");
@@ -183,7 +183,7 @@ export default function UserIncidentPage() {
         // Reset form
         setClientName("");
         setClientId("");
-        setDate(null);
+        setDate(new Date());
         setTime("12:00");
         setWhatHappened("");
         setActionsTaken("");

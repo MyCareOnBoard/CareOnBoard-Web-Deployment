@@ -1,27 +1,38 @@
 import ClientNameLink from "./ClientNameLink";
-import type { SavedClaimClientGroup } from "../utils/groupSavedClaimsByClient";
+import OutOfPocketBadge from "./OutOfPocketBadge";
 
 type SavedClaimsClientGroupHeaderProps = {
-  group: SavedClaimClientGroup;
+  clientName: string;
+  clientId?: string;
+  count: number;
   variant: "mobile" | "desktop";
+  /** "claim" or "invoice" — pluralized for the count label. */
+  itemNoun?: string;
+  outOfPocket?: boolean;
 };
 
 export default function SavedClaimsClientGroupHeader({
-  group,
+  clientName,
+  clientId,
+  count,
   variant,
+  itemNoun = "claim",
+  outOfPocket = false,
 }: SavedClaimsClientGroupHeaderProps) {
-  const claimLabel =
-    group.claims.length === 1 ? "1 claim" : `${group.claims.length} claims`;
+  const label = count === 1 ? `1 ${itemNoun}` : `${count} ${itemNoun}s`;
 
   if (variant === "mobile") {
     return (
       <div className="px-1 pb-1 pt-3">
-        <ClientNameLink
-          name={group.clientName}
-          clientId={group.clientId}
-          className="text-[16px] font-semibold text-[#10141a]"
-        />
-        <p className="mt-1 text-[13px] text-[#808081]">{claimLabel}</p>
+        <div className="flex items-center gap-2">
+          <ClientNameLink
+            name={clientName}
+            clientId={clientId}
+            className="text-[16px] font-semibold text-[#10141a]"
+          />
+          {outOfPocket && <OutOfPocketBadge />}
+        </div>
+        <p className="mt-1 text-[13px] text-[#808081]">{label}</p>
       </div>
     );
   }
@@ -29,11 +40,12 @@ export default function SavedClaimsClientGroupHeader({
   return (
     <div className="flex items-center gap-3 border-b border-[#e5e5e6] bg-[#eef4f5] px-4 py-3 pr-8">
       <ClientNameLink
-        name={group.clientName}
-        clientId={group.clientId}
+        name={clientName}
+        clientId={clientId}
         className="text-[14px] font-semibold text-[#10141a]"
       />
-      <span className="shrink-0 text-[13px] text-[#808081]">{claimLabel}</span>
+      {outOfPocket && <OutOfPocketBadge />}
+      <span className="shrink-0 text-[13px] text-[#808081]">{label}</span>
     </div>
   );
 }

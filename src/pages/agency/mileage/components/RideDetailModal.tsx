@@ -3,7 +3,7 @@ import { X, MapPin, Clock, Navigation } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { mileageApi, MileageRide, MileageSegment } from "@/lib/api/mileage";
+import { mileageApi, MileageRide, MileageSegment, UpdateAgencyRideRequest } from "@/lib/api/mileage";
 import { formatRideServiceLabel } from "@/pages/agency/mileage/utils/transportationClientService";
 
 interface RideDetailModalProps {
@@ -82,10 +82,14 @@ export default function RideDetailModal({ ride, isOpen, onClose, onRideUpdated }
   const [loading, setLoading] = useState(false);
   const [approved, setApproved] = useState(false);
   const [approvalSaving, setApprovalSaving] = useState(false);
+  const [staffRate, setStaffRate] = useState("");
+  const [clientAgreedRate, setClientAgreedRate] = useState("");
 
   useEffect(() => {
     if (!isOpen || !ride) return;
     setApproved(Boolean(ride.approved));
+    setStaffRate(ride.staffRate != null ? String(ride.staffRate) : "");
+    setClientAgreedRate(ride.clientAgreedRate != null ? String(ride.clientAgreedRate) : "");
     setSegments([]);
     setLoading(true);
     mileageApi
@@ -98,8 +102,16 @@ export default function RideDetailModal({ ride, isOpen, onClose, onRideUpdated }
   if (!isOpen || !ride) return null;
 
   const displayName = ride.clientName ?? ride.purpose ?? "Manual Trip";
-  const showApproveForBilling = ride.status === "completed" && Boolean(ride.serviceCode);
+  const isManualRide = Boolean(ride.isManual);
+  const isClientRide = Boolean(ride.clientId);
+  // Manual rides have no serviceCode but still need a billing/payroll decision.
+  const showApproveForBilling =
+    ride.status === "completed" && (Boolean(ride.serviceCode) || isManualRide);
   const billingLocked = Boolean(ride.claimId || ride.payrollInvoiceId);
+  // Staff rate (→ payroll) is required to approve a manual ride; client rides also need the agreed rate (→ invoice).
+  const ratesValid =
+    !isManualRide ||
+    (Number(staffRate) > 0 && (!isClientRide || Number(clientAgreedRate) > 0));
 
   const handleApprovalToggle = async (next: boolean) => {
     if (billingLocked) {
@@ -113,12 +125,37 @@ export default function RideDetailModal({ ride, isOpen, onClose, onRideUpdated }
       return;
     }
 
+    if (next && isManualRide && !ratesValid) {
+      toast({
+        title: "Enter rates first",
+        description: isClientRide
+          ? "A staff rate and a client agreed rate are required to approve this ride."
+          : "A staff rate is required to approve this ride.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const payload: UpdateAgencyRideRequest = { approved: next };
+    if (isManualRide) {
+      payload.staffRate = staffRate === "" ? null : Number(staffRate);
+      if (isClientRide) {
+        payload.clientAgreedRate = clientAgreedRate === "" ? null : Number(clientAgreedRate);
+      }
+    }
+
     setApprovalSaving(true);
     const previous = approved;
     setApproved(next);
     try {
-      await mileageApi.updateAgency(ride.id, { approved: next });
-      onRideUpdated?.({ ...ride, approved: next });
+      await mileageApi.updateAgency(ride.id, payload);
+      onRideUpdated?.({
+        ...ride,
+        approved: next,
+        ...(isManualRide
+          ? { staffRate: payload.staffRate, clientAgreedRate: payload.clientAgreedRate ?? ride.clientAgreedRate }
+          : {}),
+      });
       toast({
         title: next ? "Ride approved for billing." : "Ride removed from billing approval.",
         variant: "success",
@@ -252,19 +289,59 @@ export default function RideDetailModal({ ride, isOpen, onClose, onRideUpdated }
           )}
 
           {showApproveForBilling && (
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e5e7eb] bg-white p-4">
-              <div className="min-w-0">
-                <p className="text-[14px] font-semibold text-[#10141a]">Approve for billing</p>
-                <p className="text-[11px] text-[#808081]">
-                  Included in Billing &amp; Approvals when turned on.
-                </p>
+            <div className="space-y-3 rounded-xl border border-[#e5e7eb] bg-white p-4">
+              {isManualRide && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[12px] font-medium text-[#10141a]">
+                      Staff rate ($/mile) *
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={staffRate}
+                      disabled={billingLocked}
+                      onChange={(e) => setStaffRate(e.target.value)}
+                      placeholder="Paid to staff (payroll)"
+                      className="h-[40px] rounded-[10px] border border-[#e5e7eb] px-3 text-[13px] text-[#10141a] focus:border-[#00b4b8] focus:outline-none disabled:opacity-60"
+                    />
+                  </div>
+                  {isClientRide && (
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-medium text-[#10141a]">
+                        Client agreed rate ($/mile) *
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={clientAgreedRate}
+                        disabled={billingLocked}
+                        onChange={(e) => setClientAgreedRate(e.target.value)}
+                        placeholder="Billed to client (invoice)"
+                        className="h-[40px] rounded-[10px] border border-[#e5e7eb] px-3 text-[13px] text-[#10141a] focus:border-[#00b4b8] focus:outline-none disabled:opacity-60"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold text-[#10141a]">Approve for billing</p>
+                  <p className="text-[11px] text-[#808081]">
+                    {isManualRide
+                      ? "Enter the rate(s), then approve. Staff rate goes to payroll; client rate goes to the out-of-pocket invoice."
+                      : "Included in Billing & Approvals when turned on."}
+                  </p>
+                </div>
+                <Switch
+                  checked={approved}
+                  disabled={approvalSaving || billingLocked || (!approved && !ratesValid)}
+                  onCheckedChange={handleApprovalToggle}
+                  aria-label="Approve for billing"
+                />
               </div>
-              <Switch
-                checked={approved}
-                disabled={approvalSaving || billingLocked}
-                onCheckedChange={handleApprovalToggle}
-                aria-label="Approve for billing"
-              />
             </div>
           )}
 

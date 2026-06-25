@@ -56,6 +56,7 @@ export interface Agency {
     // Operational settings
     maxShiftPerDay?: number;
     travelTimeRules?: string;
+    travelTimeRate?: number;
     mileageRate?: number;
     whoReceivesNotifications?: "admin" | "manager" | "supervisor" | string;
     allowedFileTypes?: string[];
@@ -167,6 +168,7 @@ export interface UpdateAgencyProfileRequest {
     licenseNumber?: string | null;
     maxShiftPerDay?: number;
     travelTimeRules?: string | null;
+    travelTimeRate?: number;
     mileageRate?: number;
     whoReceivesNotifications?: "admin" | "manager" | "supervisor" | string | null;
     allowedFileTypes?: string[];

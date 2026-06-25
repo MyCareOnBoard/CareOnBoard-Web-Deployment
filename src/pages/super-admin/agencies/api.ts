@@ -39,6 +39,7 @@ export interface CreateAgencyWithUserPayloadAgency {
   schedulingRules?: string;
   maxShiftPerDay?: number;
   travelTimeRules?: string;
+  travelTimeRate?: number;
   mileageSettings?: string;
   mileageRate?: number;
   incidentReportingSettings?: string;
