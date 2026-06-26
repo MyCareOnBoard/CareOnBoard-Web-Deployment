@@ -6,6 +6,8 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, eachDayOfInterval 
 import { searchClients, Client, ClientService, ClientDsp, getAgencyClientById } from "@/lib/api/clients";
 import { getEmployeeById } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/store/redux/store";
 import { Routes } from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
 import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation, ShiftResponse } from "@/lib/api/shifts";
@@ -246,11 +248,7 @@ const WEEKDAY_LABEL_BY_INDEX = Object.fromEntries(
   WEEKDAY_OPTIONS.map((option) => [option.dayIndex, option.label]),
 ) as Record<number, string>;
 
-// HHA shifts auto-resolve their note type from the service, so the scheduler
-// only picks a note type for DDD clients.
-const noteTypes: { id: string, title: string }[] = noteTypesForClientType("ddd");
-
-const goalsTypes: { id: string; title: string }[] = [
+const DDD_GOALS_TYPES: { id: string; title: string }[] = [
   { id: DocumentType.COMMUNITY_INCLUSION_SERVICES, title: "Community Inclusion Services" },
   { id: DocumentType.COMMUNITY_INCLUSION_INDIVIDUALIZED_GOALS, title: "Community Inclusion – Individualized Goals" },
   { id: DocumentType.DAY_HABILITATION_SERVICES, title: "Day Habilitation Services" },
@@ -326,6 +324,9 @@ const convertTo12Hour = (time24h: string): string => {
 export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, editData, mode = "create" }: AddScheduleModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const agencyMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const isHhaAgencyMode = agencyMode === "hha";
   const [formData, setFormData] = useState<ScheduleFormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -633,6 +634,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       assignedDspId: "",
       billingRate: "",
       ispOutcome: "",
+      notesType: "",
+      goalsType: "",
     }));
     setSelectedClient(client);
     setSelectedClientServices(getClientServicesForOperations(client));
@@ -653,6 +656,17 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   }, [currentMonth]);
 
   const isHhaClient = selectedClient?.type === "hha";
+  const notesAutoResolved = isHhaClient || isHhaAgencyMode;
+
+  const effectiveClientType = agencyMode ?? selectedClient?.type;
+  const noteTypes = useMemo(
+    () => (effectiveClientType ? noteTypesForClientType(effectiveClientType) : []),
+    [effectiveClientType],
+  );
+  const goalsTypes = useMemo(
+    () => (effectiveClientType === "ddd" ? DDD_GOALS_TYPES : []),
+    [effectiveClientType],
+  );
 
   const selectedService = useMemo(
     () => pickSelectedServiceRow(selectedClientServices, formData),
@@ -2064,37 +2078,36 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   )}
                 </div>
 
-                {/* Notes Type — DDD picks manually; HHA auto-selects from the service (read-only) */}
                 <div className="flex flex-col gap-1 relative">
                   <label className="text-[12px] font-normal text-[#10141a]">Notes Type</label>
                   <button
                     type="button"
-                    disabled={isHhaClient}
+                    disabled={notesAutoResolved}
                     onClick={() => {
-                      if (isHhaClient) return;
+                      if (notesAutoResolved) return;
                       setShowNotesTypeDropdown(!showNotesTypeDropdown);
                     }}
                     className={`bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-3 ${
-                      isHhaClient ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+                      notesAutoResolved ? "cursor-not-allowed opacity-70" : "cursor-pointer"
                     }`}
                   >
                     <span className="flex-1 text-left text-[14px] font-normal text-black">
                       {formData.notesType
                         ? getNoteTitle(formData.notesType)
-                        : isHhaClient
+                        : notesAutoResolved
                           ? "Auto-selected from service"
                           : "Select notes type"
                       }
                     </span>
-                    {!isHhaClient && <ChevronDown className="w-5 h-5 text-[#10141a]" />}
+                    {!notesAutoResolved && <ChevronDown className="w-5 h-5 text-[#10141a]" />}
                   </button>
-                  {isHhaClient && (
+                  {notesAutoResolved && (
                     <span className="text-[12px] font-normal text-[#808081]">
                       Automatically set from the selected service.
                     </span>
                   )}
 
-                  {!isHhaClient && showNotesTypeDropdown && (
+                  {!notesAutoResolved && showNotesTypeDropdown && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-10">
                       {noteTypes.map((notesType) => (
                         <button
@@ -2112,8 +2125,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   )}
                 </div>
 
-                {/* Goals Type — hidden for HHA clients (no DDD goal documents) */}
-                {!isHhaClient && (
+                {!isHhaClient && !isHhaAgencyMode && (
                 <div className="flex flex-col gap-1 relative">
                   <label className="text-[12px] font-normal text-[#10141a]">Goals Type</label>
                   <button

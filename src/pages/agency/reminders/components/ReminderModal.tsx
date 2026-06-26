@@ -76,7 +76,7 @@ const TYPE_OPTIONS: Array<{ value: ReminderType; label: string; icon: React.Reac
     value: "ai_prompt",
     label: "AI Prompt",
     icon: <BrainCircuit className="w-4 h-4" />,
-    desc: "Runs a Gemini prompt and delivers the result as a notification",
+    desc: "Type in a task and recieve the result as a notification",
   },
 ];
 
@@ -199,7 +199,7 @@ export default function ReminderModal({
             />
             {isAiPrompt && (
               <p className="text-[12px] text-[#9ca3af]">
-                Gemini will run this prompt at the scheduled time and deliver the result as a notification.
+                Gemini will run this prompt at the scheduled time and deliver the results as a notification.
               </p>
             )}
           </div>

@@ -21,7 +21,7 @@ import AiIcon from "@/assets/icons/ai.svg?react";
 import SupportIcon from "@/assets/icons/support.svg?react";
 import AnalyticsIcon from "@/assets/icons/analytics.svg?react";
 import ApplicantDirectoryIcon from "@/assets/icons/search-list.svg?react";
-import ReportIcon from "@/assets/icons/analysis-text-line.svg?react";
+// import ReportIcon from "@/assets/icons/analysis-text-line.svg?react";
 import IncidentIcon from "@/assets/icons/incident.svg?react";
 import NotesIcon from "@/assets/icons/notes.svg?react";
 import BillingIcon from "@/assets/icons/billing.svg?react";
@@ -87,10 +87,11 @@ const allNavItems: AgencyNavItem[] = [
     { label: "Staff Task Management", path: Routes.agency.tasks, icon: ClipboardList, accessKey: "DSP Management" },
     { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
     { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
+    { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
+    { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
     { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion", programTypes: ["ddd"] },
     { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun, programTypes: ["ddd"] },
-    { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
     {
         label: "Billing",
         path: Routes.agency.billing.index,
@@ -103,13 +104,12 @@ const allNavItems: AgencyNavItem[] = [
             { label: "DSP expenses", path: Routes.agency.billing.expenses },
         ],
     },
-    { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
-    { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
-    { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },
+    // { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },
     { label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: GoaslAndDocumentsIcon, accessKey: "Goals & Documents", programTypes: ["ddd"] },
     { label: "Trainings", path: Routes.agency.trainings, icon: Network, accessKey: "Trainings" },
     { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon, accessKey: "Mileage" },
     { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon, accessKey: "Incident" },
+    { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
     { label: "Announcements", path: Routes.agency.announcements, icon: Megaphone },
     { label: "Settings", path: Routes.agency.agencySettings, icon: Settings },
 ];
