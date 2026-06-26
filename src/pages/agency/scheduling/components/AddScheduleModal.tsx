@@ -853,7 +853,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         });
       }
     },
-    [toast, staffNoun],
+    [toast, labels.noun],
   );
 
   const handleServiceRowChange = useCallback(
