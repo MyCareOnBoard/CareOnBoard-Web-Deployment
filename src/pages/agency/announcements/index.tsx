@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { useSelector } from "react-redux"
 import {
   Megaphone, Plus, Pencil, Trash2, Loader2, ToggleLeft, ToggleRight,
   X, AlertTriangle, Info, Siren, ChevronDown, ChevronUp,
 } from "lucide-react"
 import axiosClient from "@/lib/axios"
+import { useAuth } from "@/utils/auth"
+import { staffLabels } from "@/lib/roleLabel"
+import type { RootState } from "@/store/redux/store"
 
 interface Announcement {
   id: string
@@ -28,11 +32,6 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { title: "", body: "", type: "info", expiresAt: "", targetUserTypes: [] }
 
-const TARGET_USER_TYPE_META: { value: TargetUserType; label: string }[] = [
-  { value: "employee",      label: "DSPs / Employees" },
-  { value: "applicant",     label: "Applicants" },
-  { value: "family_member", label: "Family Members" },
-]
 
 const TYPE_META = {
   info:    { label: "Info",    border: "border-[#2b82ff] text-[#2b82ff]",   left: "border-l-[#2b82ff]",   icon: Info },
@@ -51,6 +50,19 @@ type TypeFilter   = "all" | "info" | "warning" | "urgent"
 type StatusFilter = "all" | "active" | "inactive"
 
 export default function AgencyAnnouncementsPage() {
+  const { user } = useAuth()
+  const agencyId = user?.agencyId || user?.agency?.id || ""
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId])
+  const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes
+  const staffLabel = staffLabels(effectiveTypes)
+  const employeeLabel = `${staffLabel.plural.charAt(0).toUpperCase() + staffLabel.plural.slice(1)} / Employees`
+
+  const TARGET_USER_TYPE_META: { value: TargetUserType; label: string }[] = [
+    { value: "employee",      label: employeeLabel },
+    { value: "applicant",     label: "Applicants" },
+    { value: "family_member", label: "Family Members" },
+  ]
+
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading]             = useState(true)
   const [error, setError]                 = useState<string | null>(null)

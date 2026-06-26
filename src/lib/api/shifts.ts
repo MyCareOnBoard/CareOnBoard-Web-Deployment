@@ -249,6 +249,8 @@ export interface ListShiftsParams {
     approved?: boolean;
     /** When true, attach billing claim summary for shifts with claimId */
     billingClaim?: boolean;
+    /** Filter shifts by client type ('hha' or 'ddd'); requires client:true on backend */
+    clientType?: 'hha' | 'ddd';
 }
 
 /**

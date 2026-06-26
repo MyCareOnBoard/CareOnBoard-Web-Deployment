@@ -29,6 +29,9 @@ import AddScheduleModal, { ScheduleFormData } from "./components/AddScheduleModa
 import { shiftToScheduleFormData } from "./shift-to-schedule-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/utils/auth";
+import { useSelector } from "react-redux";
+import { staffLabels } from "@/lib/roleLabel";
+import type { RootState } from "@/store/redux/store";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import { ANOMALY_LABELS } from "@/pages/shared/shift-maintenance/audit-display";
@@ -57,6 +60,10 @@ function clientDisplayName(c: { firstName?: string; lastName?: string }): string
 export default function SchedulingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
+  const labels = staffLabels(effectiveTypes);
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
@@ -96,6 +103,7 @@ export default function SchedulingPage() {
         agencyId,
         client: true,
         employee: true,
+        clientType: selectedMode,
       };
       if (personFilter?.kind === "client") params.clientId = personFilter.id;
       if (personFilter?.kind === "dsp") params.employeeId = personFilter.id;
@@ -112,7 +120,7 @@ export default function SchedulingPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.agencyId, personFilter, toast]);
+  }, [user?.agencyId, personFilter, toast, selectedMode]);
 
   useEffect(() => {
     if (!user?.agencyId) return;
@@ -573,7 +581,7 @@ export default function SchedulingPage() {
                     >
                       <span className="min-w-0 truncate font-medium text-[#10141a]">{row.label}</span>
                       <span className="shrink-0 rounded-full bg-black/[0.06] px-2 py-0.5 text-[12px] font-semibold text-[#808081]">
-                        {row.kind === "client" ? "Client" : "DSP"}
+                        {row.kind === "client" ? "Client" : labels.noun}
                       </span>
                     </button>
                   ))}

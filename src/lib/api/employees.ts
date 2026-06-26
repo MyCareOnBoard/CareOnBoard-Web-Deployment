@@ -85,6 +85,7 @@ export interface ListEmployeesParams {
     role?: string;
     workAvailability?: boolean;
     status?: 'active' | 'inactive' | 'pending' | 'suspended' | 'terminated';
+    applicantType?: 'hha' | 'dsp';
     search?: string;
     limit?: number;
     page?: number;
@@ -187,6 +188,7 @@ export async function listEmployees(params?: ListEmployeesParams): Promise<ListE
                 status: params?.status,
                 role: params?.role,
                 workAvailability: params?.workAvailability,
+                applicantType: params?.applicantType,
                 search: params?.search,
                 limit: params?.limit || 50,
                 page: params?.page,

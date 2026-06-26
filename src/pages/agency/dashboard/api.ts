@@ -10,12 +10,16 @@ export const agencyDashboardApi = createApi({
   tagTypes: ['SubmittedNotes', 'SubmittedNoteDetails'],
   keepUnusedDataFor: 300,
   endpoints: (builder) => ({
-    getDSPStats: builder.query<EmployeeStatsResponse, string>({
-      query: (agencyId) => ({
-        url: `/employees/stats?agencyId=${agencyId}`,
-        method: "GET",
-        requiresAuth: true
-      })
+    getDSPStats: builder.query<EmployeeStatsResponse, { agencyId: string; type?: string }>({
+      query: ({ agencyId, type }) => {
+        const params = new URLSearchParams({ agencyId });
+        if (type) params.append('type', type);
+        return {
+          url: `/employees/stats?${params.toString()}`,
+          method: "GET",
+          requiresAuth: true
+        };
+      }
     }),
     getShiftStats: builder.query<ShiftStatsResponse, { agencyId: string, range?: string, date?: string }>({
       query: ({ agencyId, range = 'lastWeek', date }) => {
@@ -28,12 +32,16 @@ export const agencyDashboardApi = createApi({
         };
       }
     }),
-    getClientStats: builder.query<ClientStatsResponse, string>({
-      query: (agencyId) => ({
-        url: `/clients/stats?agencyId=${agencyId}`,
-        method: "GET",
-        requiresAuth: true
-      })
+    getClientStats: builder.query<ClientStatsResponse, { agencyId: string; type?: string }>({
+      query: ({ agencyId, type }) => {
+        const params = new URLSearchParams({ agencyId });
+        if (type) params.append('type', type);
+        return {
+          url: `/clients/stats?${params.toString()}`,
+          method: "GET",
+          requiresAuth: true
+        };
+      }
     })
   }),
 });

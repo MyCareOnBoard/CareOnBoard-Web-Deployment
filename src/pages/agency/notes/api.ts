@@ -15,6 +15,7 @@ export const agencyNotesApi = createApi({
         if (params.page) queryParams.append('page', params.page.toString());
         if (params.limit) queryParams.append('limit', params.limit.toString());
         if (params.activityType) queryParams.append('activityType', params.activityType);
+        if (params.clientType) queryParams.append('clientType', params.clientType);
         if (params.search) queryParams.append('search', params.search);
         if (params.timeInterval) queryParams.append('timeInterval', params.timeInterval);
         if (params.status) queryParams.append('status', params.status);

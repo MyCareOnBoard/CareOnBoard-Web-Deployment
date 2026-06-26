@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ChevronRight, ArrowUpRight, ChevronLeft, Clock3, WandSparkles, UserRoundCog } from "lucide-react";
+import { useSelector } from "react-redux";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
@@ -10,6 +11,8 @@ import { useAuth } from "@/utils/auth";
 import { useGetClientStatsQuery, useGetDSPStatsQuery, useGetShiftStatsQuery } from "@/pages/agency/dashboard/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { staffLabels } from "@/lib/roleLabel";
+import type { RootState } from "@/store/redux/store";
 
 import OperationReportHeader from "../analytics/components/AnalyticsReportHeader";
 import AnalyticsDateRangeModal from "../analytics/components/AnalyticsDateRangeModal";
@@ -61,6 +64,10 @@ function buildOperationalMetrics(data: AnalyticsSummaryData["operationalEfficien
 export default function AgencyDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
+  const labels = staffLabels(effectiveTypes);
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = React.useState({ startDate: "", endDate: "" });
   const [showDateModal, setShowDateModal] = React.useState(false);
@@ -83,14 +90,16 @@ export default function AgencyDashboardPage() {
   });
   const expiredDocuments = expiredDocsData?.data || [];
 
-  const { data: clientStatsData, isLoading: isLoadingClients } = useGetClientStatsQuery(user?.agencyId || "", {
-    skip: !user?.agencyId,
-  });
+  const { data: clientStatsData, isLoading: isLoadingClients } = useGetClientStatsQuery(
+    { agencyId: user?.agencyId || "", type: selectedMode },
+    { skip: !user?.agencyId }
+  );
   const clients = clientStatsData?.stats || { active: 0, inactive: 0, total: 0 };
 
-  const { data: dspStatsData, isLoading: isLoadingDsp } = useGetDSPStatsQuery(user?.agencyId || "", {
-    skip: !user?.agencyId,
-  });
+  const { data: dspStatsData, isLoading: isLoadingDsp } = useGetDSPStatsQuery(
+    { agencyId: user?.agencyId || "", type: selectedMode },
+    { skip: !user?.agencyId }
+  );
   const dspStats = dspStatsData?.stats || { active: 0, inactive: 0, total: 0 };
 
   const { data: shiftStatsData, isLoading: isLoadingShifts } = useGetShiftStatsQuery(
@@ -165,7 +174,7 @@ export default function AgencyDashboardPage() {
           <Button
             onClick={copyToClipboard}
             className="bg-[#00b4b8] text-white px-4 py-2 rounded-full"
-          >Copy DSP Agency URL</Button>
+          >Copy {labels.noun} Agency URL</Button>
           <Button
             onClick={copyMobileAppUrl}
             className="bg-[#00b4b8] text-white px-4 py-2 rounded-full"
@@ -191,7 +200,7 @@ export default function AgencyDashboardPage() {
             className="flex justify-between items-center rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white cursor-pointer transition-all hover:border-[#00b4b8] hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-[#10141a]">DSP</h2>
+                <h2 className="text-xl font-semibold text-[#10141a]">{labels.noun}</h2>
                 <p className="text-[16px] font-medium text-[#808081] mt-1">
                   Overview of Staff employed by the agency.
                 </p>
