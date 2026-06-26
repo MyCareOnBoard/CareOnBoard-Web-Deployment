@@ -327,6 +327,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   const agencyId = user?.agencyId || user?.agency?.id || "";
   const agencyMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
   const isHhaAgencyMode = agencyMode === "hha";
+  const staffNoun = isHhaAgencyMode ? "Caregiver" : "DSP";
+  const staffNounPlural = isHhaAgencyMode ? "Caregivers" : "DSPs";
   const [formData, setFormData] = useState<ScheduleFormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -833,9 +835,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         if (emp.workAvailability !== true) {
           setFormData((prev) => ({ ...prev, assignedDsp: "", assignedDspId: "" }));
           toast({
-            title: "Assigned DSP unavailable",
+            title: `Assigned ${staffNoun} unavailable`,
             description:
-              "The DSP assigned to this service is currently unavailable, please select another.",
+              `The ${staffNoun} assigned to this service is currently unavailable, please select another.`,
             variant: "destructive",
           });
           return;
@@ -845,13 +847,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         if (token !== dspVerifyTokenRef.current) return;
         setFormData((prev) => ({ ...prev, assignedDsp: "", assignedDspId: "" }));
         toast({
-          title: "Could not verify assigned DSP",
-          description: "Choose another DSP from this service's assigned list, or update staff on the client record.",
+          title: `Could not verify assigned ${staffNoun}`,
+          description: `Choose another ${staffNoun} from this service's assigned list, or update staff on the client record.`,
           variant: "destructive",
         });
       }
     },
-    [toast],
+    [toast, staffNoun],
   );
 
   const handleServiceRowChange = useCallback(
@@ -1184,7 +1186,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
     // Assigned DSP validation
     if (!formData.assignedDsp.trim()) {
-      newErrors.assignedDsp = "Assigned DSP is required";
+      newErrors.assignedDsp = `Assigned ${staffNoun} is required`;
     }
 
     // Scheduling type validation
@@ -1252,7 +1254,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
     if (!formData.assignedDspId.trim() && formData.assignedDsp.trim()) {
       newErrors.assignedDsp =
-        "Select an assigned DSP from the service list. The chosen DSP must be linked to an employee record.";
+        `Select an assigned ${staffNoun} from the service list. The chosen ${staffNoun} must be linked to an employee record.`;
     }
 
     setErrors(newErrors);
@@ -2019,11 +2021,11 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
                 {/* Assign DSP */}
                 <div className="flex flex-col gap-1 relative">
-                  <label className="text-[12px] font-normal text-[#10141a]">Assign DSP</label>
+                  <label className="text-[12px] font-normal text-[#10141a]">Assign {staffNoun}</label>
                   {!formData.serviceCode ? (
                     <>
                       <span className="text-[12px] font-normal text-[#808081]">
-                        Select a service first to choose an assigned DSP.
+                        Select a service first to choose an assigned {staffNoun}.
                       </span>
                       {errors.assignedDsp ? (
                         <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
@@ -2038,7 +2040,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                           className={`flex h-11 w-full cursor-pointer items-center gap-3 rounded-xl border bg-white px-4 ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}
                         >
                           <span className="flex-1 text-left text-[14px] font-normal text-black">
-                            {formData.assignedDsp || "Select DSP"}
+                            {formData.assignedDsp || `Select ${staffNoun}`}
                           </span>
                           <ChevronDown className="h-5 w-5 shrink-0 text-[#10141a]" />
                         </button>
@@ -2068,7 +2070,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                   ) : (
                     <>
                       <span className="text-[12px] font-normal text-[#808081]">
-                        No DSPs are assigned to this service on the client record. Assign staff in client management,
+                        No {staffNounPlural} are assigned to this service on the client record. Assign staff in client management,
                         then schedule.
                       </span>
                       {errors.assignedDsp ? (
