@@ -1200,11 +1200,14 @@ export const clientsApi = createApi({
     }),
     getClientStats: builder.query<
       ClientStatsResponse,
-      string | void
+      { agencyId?: string; type?: string } | string | void
     >({
-      query: (agencyId) => {
+      query: (arg) => {
+        const agencyId = typeof arg === 'string' ? arg : arg?.agencyId;
+        const type = typeof arg === 'object' && arg !== null ? arg.type : undefined;
         const queryParams = new URLSearchParams();
         if (agencyId) queryParams.append('agencyId', agencyId);
+        if (type) queryParams.append('type', type);
 
         return {
           url: `/clients/stats${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,

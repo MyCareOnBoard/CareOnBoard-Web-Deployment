@@ -1,15 +1,20 @@
 import { useNavigate } from "react-router";
+import { useSelector } from "react-redux";
 import { useDSPList } from "./useDSPManagement";
 import { DSPList } from "./DSPList";
 import { Button } from "@/components/ui/button";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { staffLabels } from "@/lib/roleLabel";
+import type { RootState } from "@/store/redux/store";
 
 export default function DSPManagementPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const labels = staffLabels(user?.agency?.supportedClientTypes);
+  const agencyId = user?.agencyId || "";
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
+  const labels = staffLabels(effectiveTypes);
   const { dsps, stats, isLoading, error } = useDSPList();
 
   if (error) {

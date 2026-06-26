@@ -3,21 +3,24 @@ import { createContext, useContext, useEffect, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { setUser } from "@/utils/auth"
 import type { AppDispatch, RootState } from "@/store/redux/store"
+import { persistor } from "@/store/redux/store"
 import {
   loginWithEmail,
   registerWithEmail,
   sendPasswordResetEmail,
-  logout as logoutUser,
   getIdToken,
   deleteCurrentUser,
+  removeUserData,
   type LoginResponse,
 } from "../services/authService"
+import { logoutUser } from "../store/authSlice"
 import type { LoginResult } from "../types/login.types"
 import { createUser as createBackendUser } from "../api/client"
 import { PageLoader } from "@/components/ui/loader"
 import { auth } from "@/lib/firebase";
 import { reload } from "firebase/auth";
 import { clearAuthCache } from "@/lib/axios";
+import { clearMfaResolverSession } from "@/utils/auth/services/mfaSessionStore";
 import type { User } from "../types/user.types"
 
 interface AuthContextType {
@@ -180,10 +183,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Logout current user
    */
   const logout = async () => {
-    await logoutUser()
+    clearMfaResolverSession()
+    const { clearRecaptchaVerifier } = await import('@/utils/auth/services/mfaService')
+    clearRecaptchaVerifier()
+    await dispatch(logoutUser())  // Firebase signOut + triggers root reducer reset (clears all RTK Query caches)
     clearAuthCache()
+    removeUserData()
+    await persistor.purge()       // clears redux-persist localStorage keys (auth + agencyMode)
     setUserState(null)
-    dispatch(setUser(null))
   }
 
   /**

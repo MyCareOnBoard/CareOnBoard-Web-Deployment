@@ -54,12 +54,12 @@ export default function ClientsPage() {
   );
 
   const { data: statsData } = useGetClientStatsQuery(
-    user?.agencyId || "",
+    { agencyId: user?.agencyId || "", type: selectedMode || undefined },
     { skip: !user?.agencyId || !!debouncedSearchQuery.trim() }
   );
 
   const clients = clientsData?.clients || [];
-  const totalClients = statsData?.stats?.total || 0;
+  const totalClients = statsData?.stats?.total ?? 0;
   const isLoading = isLoadingClients && clients.length === 0;
   const error = null;
 
