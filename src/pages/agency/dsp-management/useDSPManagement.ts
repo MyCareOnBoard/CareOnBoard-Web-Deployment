@@ -119,6 +119,8 @@ export function useDSPList() {
 
     const user = useSelector((state: RootState) => state.auth.user);
     const agencyId = user?.agencyId;
+    const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId || ""]);
+    const applicantType = selectedMode === "hha" ? "hha" : selectedMode === "ddd" ? "dsp" : undefined;
 
     const fetchDSPs = useCallback(async () => {
         if (!agencyId) {
@@ -142,6 +144,7 @@ export function useDSPList() {
                     limit: pageSize,
                     includeStats: true,
                     page,
+                    applicantType,
                 });
 
                 const batch = employeesResponse.employees || [];
@@ -173,7 +176,7 @@ export function useDSPList() {
         } finally {
             setIsLoading(false);
         }
-    }, [agencyId]);
+    }, [agencyId, applicantType]);
 
     useEffect(() => {
         fetchDSPs();

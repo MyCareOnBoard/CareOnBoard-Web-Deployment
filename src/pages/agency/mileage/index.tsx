@@ -14,6 +14,9 @@ import RideDetailModal from "./components/RideDetailModal";
 import AddManualMileageModal from "../../userPanel/mileage/components/AddManualMileageModal";
 import BillingDateRangeModal from "@/pages/agency/billing/components/BillingDateRangeModal";
 import { mileageApi, MileageRide } from "@/lib/api/mileage";
+import { useAuth } from "@/utils/auth";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/store/redux/store";
 
 const LIMIT = 10;
 
@@ -36,6 +39,9 @@ function parseScheduledDate(v: unknown): Date | null {
 }
 
 export default function MileagePage() {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRide, setEditingRide] = useState<MileageRide | null>(null);
   const [viewingRide, setViewingRide] = useState<MileageRide | null>(null);
@@ -65,6 +71,7 @@ export default function MileagePage() {
         startDate: dateRange.startDate || undefined,
         endDate: dateRange.endDate || undefined,
         isManual: manualFilter === "manual" ? true : manualFilter === "tracked" ? false : undefined,
+        clientType: selectedMode,
       });
       setRides(res.data ?? []);
       setTotalCount(res.pagination?.count ?? 0);
@@ -74,7 +81,7 @@ export default function MileagePage() {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, manualFilter]);
+  }, [dateRange, manualFilter, selectedMode]);
 
   useEffect(() => {
     fetchRides(offset);

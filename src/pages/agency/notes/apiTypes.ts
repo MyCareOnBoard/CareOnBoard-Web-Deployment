@@ -39,6 +39,7 @@ export interface SubmittedNotesQueryParams {
   page?: number;
   limit?: number;
   activityType?: string;
+  clientType?: 'hha' | 'ddd';
   search?: string;
   timeInterval?: 'today' | 'this-month' | 'this-year' | 'all';
   status?: 'submitted' | 'approved';

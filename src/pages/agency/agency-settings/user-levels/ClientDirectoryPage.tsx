@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { useSelector } from "react-redux";
 import { Search, Trash2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
+import { useAuth } from "@/utils/auth";
+import { staffLabels } from "@/lib/roleLabel";
+import type { RootState } from "@/store/redux/store";
 
 interface Client {
   id: string;
@@ -17,6 +21,11 @@ interface Client {
 
 export default function ClientDirectoryPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
+  const labels = staffLabels(effectiveTypes);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"Active" | "Inactive">("Active");
 
@@ -101,7 +110,7 @@ export default function ClientDirectoryPage() {
       <div className="flex flex-col gap-4 shadow-sm p-6 bg-[#f7f7f7] rounded-[16px] mb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-[16px] font-semibold text-[#10141a]">Client Overview</h2>
-          <p className="mt-1 text-[12px] text-[#808081]">Overview of clients assigned to DSP</p>
+          <p className="mt-1 text-[12px] text-[#808081]">Overview of clients assigned to {labels.noun}</p>
         </div>
         <div className="text-right">
           <div className="text-[32px] font-bold text-[#10141a]">35</div>
@@ -191,7 +200,7 @@ export default function ClientDirectoryPage() {
 
             {/* Third Column: DSP */}
             <div className="min-w-[80px]">
-              <p className="text-[11px] text-[#808081]">DSP</p>
+              <p className="text-[11px] text-[#808081]">{labels.noun}</p>
               <p className="font-semibold text-[14px] text-[#10141a]">{client.dsp}</p>
             </div>
 

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Loader2, Plus, Search, ArrowRight } from "lu
 import { useNavigate } from "react-router";
 import { useSelector } from "react-redux";
 import { format } from "date-fns";
+import { staffLabels } from "@/lib/roleLabel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -30,6 +31,8 @@ export default function ClientsPage() {
   const { user } = useAuth();
   const agencyId = user?.agencyId || "";
   const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
+  const labels = staffLabels(effectiveTypes);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -149,7 +152,7 @@ export default function ClientsPage() {
         name: formatClientName(client),
         status: statusCapitalized,
         statusLabel,
-        roleLabel: "DSP",
+        roleLabel: labels.noun,
         roleValue: dspCount,
         type: client.type === "hha" ? "hha" : "ddd",
         accountCreated: formatDate(client.createdAt),

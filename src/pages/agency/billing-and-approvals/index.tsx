@@ -1,5 +1,6 @@
 import React, {useState, useEffect, useCallback} from "react";
 import {ChevronLeft, ChevronRight} from "lucide-react";
+import {useSelector} from "react-redux";
 import {Button} from "@/components/ui/button";
 import {useAuth} from "@/utils/auth";
 import {useNavigate} from "react-router";
@@ -7,6 +8,8 @@ import {Routes} from "@/routes/constants";
 import {useGetBillingRecordsQuery} from "./api";
 import {formatCurrency, buildServiceByCodeMap, getClientRate} from "./billingUtils";
 import type {ClientServiceDefinition} from "./api";
+import {staffLabels} from "@/lib/roleLabel";
+import type {RootState} from "@/store/redux/store";
 
 interface BillingStatusFilter {
   value: string;
@@ -21,6 +24,10 @@ interface ServiceTypeFilter {
 export default function BillingAndApprovalsPage() {
   const {user} = useAuth();
   const navigate = useNavigate();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
+  const labels = staffLabels(effectiveTypes);
   const [activeTab, setActiveTab] = useState<"client" | "dsp">("client");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBillingStatus, setSelectedBillingStatus] = useState<string>("all");
@@ -116,7 +123,7 @@ export default function BillingAndApprovalsPage() {
                 : "bg-white border border-[#808081] text-[#10141A]"
             } rounded-full px-6 py-2.5 h-auto font-medium shadow-sm transition-all duration-200`}
           >
-            DSP
+            {labels.noun}
           </Button>
         </div>
       </div>
@@ -127,7 +134,7 @@ export default function BillingAndApprovalsPage() {
           <div className="mb-6">
             <h2 className="text-[24px] font-bold text-[#10141a] mb-2">Billing</h2>
             <p className="text-[14px] text-[#808081]">
-              {activeTab === "client" ? "List of clients" : "List of DSPs"}
+              {activeTab === "client" ? "List of clients" : `List of ${labels.plural}`}
             </p>
           </div>
 
@@ -231,7 +238,7 @@ export default function BillingAndApprovalsPage() {
                               <p className="text-[16px] font-semibold text-[#10141a]">
                                 {employee.fullName || 'Unknown DSP'}
                               </p>
-                              <p className="text-[14px] text-[#808081]">DSP</p>
+                              <p className="text-[14px] text-[#808081]">{labels.noun}</p>
                             </div>
                           </div>
                         ))}

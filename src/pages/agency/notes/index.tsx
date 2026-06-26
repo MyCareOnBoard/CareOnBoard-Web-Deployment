@@ -7,7 +7,9 @@ import AgencyEditNote from "@/pages/agency/notes/editNote";
 import {useLocation, useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {useAuth} from "@/utils/auth";
-import {NOTE_TYPES, NoteTypeId, getNoteShortLabel} from "@/lib/notes/noteTypes";
+import {useSelector} from "react-redux";
+import type {RootState} from "@/store/redux/store";
+import {NOTE_TYPES, NoteTypeId, getNoteShortLabel, noteTypesForClientType} from "@/lib/notes/noteTypes";
 
 type NoteStatus = "submitted" | "approved" | "rejected";
 type FilterType = "all" | NoteTypeId;
@@ -16,6 +18,9 @@ type StatusTabType = "submitted" | "approved";
 
 export default function AgencyNotesPage() {
   const {user} = useAuth();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const visibleNoteTypes = selectedMode ? noteTypesForClientType(selectedMode) : NOTE_TYPES;
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -40,11 +45,17 @@ export default function AgencyNotesPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    setActiveFilter("all");
+    setCurrentPage(1);
+  }, [selectedMode]);
+
   const {data, isLoading, isFetching, isError, refetch} = useGetAllSubmittedNotesQuery({
     agencyId: user?.agencyId || "",
     page: currentPage,
     limit: itemsPerPage,
     activityType: activeFilter,
+    clientType: selectedMode,
     search: debouncedSearch,
     timeInterval: timeInterval,
     status: statusTab
@@ -198,7 +209,7 @@ export default function AgencyNotesPage() {
               className="flex items-center gap-3 overflow-x-auto scrollbar-hide flex-1 min-w-0"
               style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}
             >
-              {[{id: "all" as FilterType, label: "All"}, ...NOTE_TYPES.map((n) => ({id: n.id as FilterType, label: n.shortLabel}))].map((filter) => (
+              {[{id: "all" as FilterType, label: "All"}, ...visibleNoteTypes.map((n) => ({id: n.id as FilterType, label: n.shortLabel}))].map((filter) => (
                 <button
                   key={filter.id}
                   onClick={() => setActiveFilter(filter.id)}
