@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from "react-router"
-import { useDispatch, useSelector } from "react-redux"
+import { useSelector } from "react-redux"
 import { useEffect, useState } from "react"
 import {
   LayoutDashboard,
@@ -15,9 +15,8 @@ import {
 import { Routes } from "@/routes/constants"
 import { UserType } from "@/utils/auth/types/user.types"
 import { selectUser, selectIsAuthenticated } from "@/utils/auth/store/authSelectors"
-import { logoutUser } from "@/utils/auth/store/authSlice"
+import { useAuth } from "@/utils/auth"
 import axiosClient from "@/lib/axios"
-import type { AppDispatch } from "@/store/redux/store"
 
 function getGreeting(): { text: string; emoji: string } {
   const h = new Date().getHours()
@@ -63,7 +62,7 @@ const BADGE_EVENT = "family_ann_badge_change"
 
 export default function FamilyLayout() {
   const navigate = useNavigate()
-  const dispatch = useDispatch<AppDispatch>()
+  const { logout } = useAuth()
   const user = useSelector(selectUser)
   const isAuthenticated = useSelector(selectIsAuthenticated)
   const [client, setClient] = useState<ClientInfo | null>(null)
@@ -93,7 +92,7 @@ export default function FamilyLayout() {
   }, [isAuthenticated, user])
 
   const handleLogout = async () => {
-    await dispatch(logoutUser())
+    await logout()
     navigate(Routes.auth.familyLogin, { replace: true })
   }
 

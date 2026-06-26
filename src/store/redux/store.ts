@@ -10,7 +10,7 @@ import {
     REGISTER,
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
-import authReducer from "@/utils/auth/store/authSlice";
+import authReducer, { logoutUser } from "@/utils/auth/store/authSlice";
 import agencyModeReducer from "@/store/redux/agencyModeSlice";
 import { applicationApi } from "@/pages/applicant/application/api";
 import { documentsApi } from "@/pages/applicant/documents/api";
@@ -37,7 +37,7 @@ import { aiAutomationApi } from "@/pages/agency/ai-automation/api";
 import { agencyStaffTasksApi } from "@/pages/agency/staff-tasks/api";
 import { remindersApi } from "@/pages/agency/reminders/api";
 
-const rootReducer = combineReducers({
+const appReducer = combineReducers({
     auth: authReducer,
     agencyMode: agencyModeReducer,
     [applicationApi.reducerPath]: applicationApi.reducer,
@@ -65,6 +65,14 @@ const rootReducer = combineReducers({
     [agencyStaffTasksApi.reducerPath]: agencyStaffTasksApi.reducer,
     [remindersApi.reducerPath]: remindersApi.reducer,
 });
+
+// Root reducer resets ALL slice state (including every RTK Query cache) on logout
+const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: any) => {
+    if (action.type === logoutUser.fulfilled.type) {
+        return appReducer(undefined, action);
+    }
+    return appReducer(state, action);
+};
 
 const persistConfig = {
     key: "root",
