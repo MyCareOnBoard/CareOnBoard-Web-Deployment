@@ -11,9 +11,10 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Conversation, ConversationParticipant } from "@/lib/hooks/useMessaging";
 import { format } from "date-fns";
 import { formatRoleLabel, getInitials, sanitizeSearchQuery, validateImageUrl } from "@/lib/utils/string-utils";
-import { roleLabel } from "@/lib/roleLabel";
+import { roleLabel, matchesAgencyMode, isProgramScopedRole } from "@/lib/roleLabel";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMultiplePresence } from "@/lib/hooks/usePresence";
+import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 
 export interface ConversationListProps {
   conversations: Conversation[];
@@ -27,6 +28,11 @@ export interface ConversationListProps {
   onFilterChange?: (tab: "all" | "dsp" | "staff" | "administration" | "agency") => void;
   /** Show agency name alongside role (for super admin) */
   showAgencyName?: boolean;
+  /**
+   * Active DDD/HHA program mode. When set, direct chats with the other program's
+   * field staff are hidden and the field-staff tab is relabelled. Omit to disable.
+   */
+  programMode?: AgencyMode | null;
 }
 
 /** Helper to check if conversation is a group chat */
@@ -160,6 +166,7 @@ export const ConversationList = React.memo(function ConversationList({
   filterTab = "all",
   onFilterChange,
   showAgencyName = false,
+  programMode = null,
 }: ConversationListProps) {
   // Debounce search query to avoid filtering on every keystroke
   const sanitizedSearchQuery = useMemo(() => sanitizeSearchQuery(searchQuery), [searchQuery]);
@@ -213,8 +220,15 @@ export const ConversationList = React.memo(function ConversationList({
 
   // Memoize filtered conversations
   const filteredConversations = useMemo(() => {
-    return conversationsWithParticipants.filter(({ otherParticipants, isGroup, name }) => {
+    return conversationsWithParticipants.filter(({ otherParticipants, isGroup, name, primaryParticipant }) => {
       if (otherParticipants.length === 0) return false;
+
+      // Program scope (agency Support): hide direct chats with the other
+      // program's field staff. Runs before search so search stays scoped too.
+      // Groups are always shown (a mixed group's program is ambiguous).
+      if (programMode && !isGroup && !matchesAgencyMode(primaryParticipant?.role, programMode)) {
+        return false;
+      }
 
       // Apply search filter
       if (debouncedSearchQuery) {
@@ -236,7 +250,10 @@ export const ConversationList = React.memo(function ConversationList({
         const role = primaryParticipant.role || "";
 
         if (filterTab === "dsp") {
-          return isDspRole(role);
+          // Under a program mode the gate above already restricts to the current
+          // program, so the field-staff tab matches that program's field staff
+          // (DSPs in DDD, caregivers in HHA).
+          return programMode ? isProgramScopedRole(role) : isDspRole(role);
         }
         if (filterTab === "staff" || filterTab === "agency") {
           return isStaffRole(role);
@@ -248,7 +265,7 @@ export const ConversationList = React.memo(function ConversationList({
 
       return true;
     });
-  }, [conversationsWithParticipants, debouncedSearchQuery, filterTab]);
+  }, [conversationsWithParticipants, debouncedSearchQuery, filterTab, programMode]);
 
   // Get unread count (handle both number and object formats)
   const getUnreadCount = (conversation: Conversation): number => {
@@ -302,7 +319,7 @@ export const ConversationList = React.memo(function ConversationList({
                 : "bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]"
                 }`}
             >
-              DSP
+              {programMode ? roleLabel({ role: programMode === "hha" ? "hha" : "dsp" }) : "DSP"}
             </button>
             <button
               onClick={() => onFilterChange("staff")}
@@ -439,7 +456,8 @@ export const ConversationList = React.memo(function ConversationList({
     prevProps.loading === nextProps.loading &&
     prevProps.currentUserId === nextProps.currentUserId &&
     prevProps.filterTab === nextProps.filterTab &&
-    prevProps.showAgencyName === nextProps.showAgencyName
+    prevProps.showAgencyName === nextProps.showAgencyName &&
+    prevProps.programMode === nextProps.programMode
   );
 });
 

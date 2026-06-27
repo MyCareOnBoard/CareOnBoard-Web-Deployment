@@ -34,6 +34,25 @@ export function programLabel(input: { applicantType?: string; role?: string }): 
   return isHha ? "HHA" : "DDD";
 }
 
+/** Field staff carry a program; agency/admin/super roles are shared across both. */
+export function isProgramScopedRole(role?: string): boolean {
+  const r = (role || "").toLowerCase();
+  return r.includes("dsp") || r === "employee" || r === "hha" || r === "caregiver";
+}
+
+/**
+ * Whether a person with this role belongs in the given program mode's view.
+ * Shared (non-field) roles always pass; `null` mode means no filtering.
+ */
+export function matchesAgencyMode(
+  role: string | undefined,
+  mode: "ddd" | "hha" | null
+): boolean {
+  if (!mode) return true;
+  if (!isProgramScopedRole(role)) return true;
+  return programLabel({ role }) === (mode === "hha" ? "HHA" : "DDD");
+}
+
 /**
  * Agency-level (aggregate) staff labels derived from the agency's supported
  * client types. Used for the staff-management page/sidebar headings.

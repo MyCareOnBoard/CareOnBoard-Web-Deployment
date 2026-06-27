@@ -17,6 +17,8 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { AgencyContact } from "@/lib/api/userMessaging";
 import { NewMessageModal } from "@/components/chat/NewMessageModal";
 import { getInitials } from "@/lib/utils/string-utils";
+import { matchesAgencyMode } from "@/lib/roleLabel";
+import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 
 export type FilterTab = "all" | "dsp" | "staff" | "administration" | "agency";
 
@@ -33,6 +35,12 @@ export interface MessagingPageProps {
     showFilterTabs?: boolean;
     /** Whether to show agency name alongside role in conversation list */
     showAgencyName?: boolean;
+    /**
+     * Active DDD/HHA program mode. When set (agency Support), the conversation
+     * list and contact picker are scoped to that program's field staff; shared
+     * roles (staff/admin/super) always appear. Omit to disable scoping.
+     */
+    programMode?: AgencyMode | null;
 }
 
 export function MessagingPage({
@@ -42,6 +50,7 @@ export function MessagingPage({
     containerClassName = "",
     showFilterTabs = false,
     showAgencyName = false,
+    programMode = null,
 }: MessagingPageProps) {
     const { conversationId } = useParams<{ conversationId?: string }>();
     const { user } = useAuth();
@@ -192,16 +201,18 @@ export function MessagingPage({
         setIsDeleteDialogOpen(false);
     }, []);
 
-    // Memoize contacts for NewMessageModal
+    // Memoize contacts for NewMessageModal (scoped to active program when set)
     const mappedContacts = useMemo(() =>
-        contacts.map(contact => ({
-            id: contact.uid,
-            name: contact.name,
-            role: contact.role,
-            agency: contact?.agencyName,
-            avatar: getInitials(contact.name),
-            image: contact.avatar
-        })), [contacts]);
+        contacts
+            .filter(contact => matchesAgencyMode(contact.role, programMode))
+            .map(contact => ({
+                id: contact.uid,
+                name: contact.name,
+                role: contact.role,
+                agency: contact?.agencyName,
+                avatar: getInitials(contact.name),
+                image: contact.avatar
+            })), [contacts, programMode]);
 
     // Generate button hover color (slightly darker)
     const buttonHoverColor = useMemo(() => {
@@ -248,6 +259,7 @@ export function MessagingPage({
                             filterTab={showFilterTabs ? activeTab : undefined}
                             onFilterChange={showFilterTabs ? handleFilterChange : undefined}
                             showAgencyName={showAgencyName}
+                            programMode={programMode}
                         />
                     </div>
 
