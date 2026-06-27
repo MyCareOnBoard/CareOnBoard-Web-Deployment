@@ -7,6 +7,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSam
 import { listShifts, Shift, deleteShift, updateShift, ShiftType, SubmissionStatus, formatShiftLocation } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
 import { shiftToScheduleFormData } from "../shift-to-schedule-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +29,7 @@ export default function ShiftsListPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { mode, labels } = useStaffLabels();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -66,6 +68,7 @@ export default function ShiftsListPage() {
           agencyId: user?.agencyId,
           client: true,
           employee: true,
+          clientType: mode ?? undefined,
         });
         // Filter out shifts with type="manual" and submissionStatus="draft"
         const filteredShifts = (response.shifts || []).filter(shift =>
@@ -92,7 +95,7 @@ export default function ShiftsListPage() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.agencyId]);
+  }, [user?.agencyId, mode]);
 
   // Calendar days calculation
   const calendarDays = useMemo(() => {
@@ -149,7 +152,7 @@ export default function ShiftsListPage() {
         const clientName = shiftToCancel.client
           ? `${shiftToCancel.client.firstName || ""} ${shiftToCancel.client.lastName || ""}`.trim() || "Unknown Client"
           : "Unknown Client";
-        const dspName = shiftToCancel.employee?.fullName || "Unknown DSP";
+        const dspName = shiftToCancel.employee?.fullName || `Unknown ${labels.noun}`;
         const duration = calculateDuration(
           shiftToCancel.date,
           shiftToCancel.startTime,
@@ -434,7 +437,7 @@ export default function ShiftsListPage() {
                     ? `${apiShift.client.firstName || ""} ${apiShift.client.lastName || ""}`.trim() || "Unknown Client"
                     : "Unknown Client";
                   const clientAvatar = apiShift.client?.profileImage;
-                  const employeeName = apiShift.employee?.fullName || "Unknown DSP";
+                  const employeeName = apiShift.employee?.fullName || `Unknown ${labels.noun}`;
                   const employeeAvatar = apiShift.employee?.profilePicture;
                   const location = formatShiftLocation(apiShift.location?.address || "") || "Unknown Location";
                   const duration = calculateDuration(apiShift.date, apiShift.startTime, apiShift.endTime);
@@ -622,7 +625,7 @@ export default function ShiftsListPage() {
         <ConfirmDialogContent
           title="Cancelled"
           description={cancelledShiftInfo
-            ? `You have cancelled a shift between ${cancelledShiftInfo.clientName} (Client) & ${cancelledShiftInfo.dspName} (DSP) for ${cancelledShiftInfo.duration} on ${cancelledShiftInfo.date}`
+            ? `You have cancelled a shift between ${cancelledShiftInfo.clientName} (Client) & ${cancelledShiftInfo.dspName} (${labels.noun}) for ${cancelledShiftInfo.duration} on ${cancelledShiftInfo.date}`
             : ""}
           confirmText="Close"
           cancelText=""

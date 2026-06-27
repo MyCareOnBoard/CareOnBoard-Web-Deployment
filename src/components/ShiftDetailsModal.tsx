@@ -270,7 +270,7 @@ export default function ShiftDetailsModal({
   const callout = resolvedShift ? getStatusCallout(resolvedShift, anomalyCodes) : null;
   const showResolveLateClockIn =
     Boolean(resolvedShift?.estimatedEndTime) || anomalyCodes.includes("late_clock_in");
-  const showApproveForBilling = resolvedShift?.status === ShiftStatus.COMPLETED;
+  const showApproveForBilling = draftCompleted;
 
   const handleUpdateChanges = async () => {
     if (!resolvedShift || !reason.trim()) {

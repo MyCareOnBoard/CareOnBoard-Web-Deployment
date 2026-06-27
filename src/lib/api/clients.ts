@@ -1082,12 +1082,17 @@ export async function deleteClient(clientId: string, agencyId?: string): Promise
  * Endpoint: GET /clients/search
  * @param query - Search query string
  * @param agencyId - Optional agency ID filter
+ * @param type - Optional program filter ("ddd" | "hha") to scope by agency mode
  * @returns Promise with matching clients
  */
-export async function searchClients(query: string, agencyId?: string): Promise<Client[]> {
+export async function searchClients(
+  query: string,
+  agencyId?: string,
+  type?: "ddd" | "hha",
+): Promise<Client[]> {
   try {
     const response = await axiosClient.get<{ success: boolean; clients: Client[] }>('/clients', {
-      params: { search: query, agencyId }
+      params: { search: query, agencyId, type }
     });
 
     if (!response.data.success) {

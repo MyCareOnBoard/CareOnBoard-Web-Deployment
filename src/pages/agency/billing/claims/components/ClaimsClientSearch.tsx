@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { searchClients, type Client } from "@/lib/api/clients";
 import { formatShiftLocation, type ShiftLocation } from "@/lib/api/shifts";
 import { useAuth } from "@/utils/auth";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 type ClaimsClientSearchProps = {
   onFilterChange: (query: string, selectedClientName?: string) => void;
@@ -40,6 +41,7 @@ function getClientDisplayName(client: Client) {
 
 export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearchProps) {
   const { user } = useAuth();
+  const agencyMode = useEffectiveAgencyMode();
   const [query, setQuery] = useState("");
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
@@ -69,7 +71,7 @@ export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearc
       clientSearchTimeoutRef.current = setTimeout(async () => {
         try {
           setIsSearchingClients(true);
-          const results = await searchClients(searchQuery, user?.agencyId);
+          const results = await searchClients(searchQuery, user?.agencyId, agencyMode ?? undefined);
           setClientSearchResults(results);
           setShowClientDropdown(results.length > 0);
         } catch (error) {
@@ -81,7 +83,7 @@ export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearc
         }
       }, 300);
     },
-    [user?.agencyId]
+    [user?.agencyId, agencyMode]
   );
 
   const handleClientSelect = (client: Client) => {

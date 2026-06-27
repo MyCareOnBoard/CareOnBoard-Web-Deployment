@@ -5,6 +5,7 @@ import {
 } from "@/lib/api/incidents";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
+import { programLabel } from "@/lib/roleLabel";
 import { Input } from "@/components/ui/input";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import VoiceInputButton from "@/components/VoiceInputButton";
@@ -18,6 +19,9 @@ import { Loader2 } from "lucide-react";
 
 export default function UserIncidentPage() {
   const { user } = useAuth();
+  // Field staff carry one program; scope client search to it (DSP→ddd / Caregiver→hha).
+  const clientType = programLabel({ applicantType: user?.applicantType, role: user?.role })
+    .toLowerCase() as "ddd" | "hha";
   const { toast } = useToast();
 
   // Form state
@@ -56,7 +60,7 @@ export default function UserIncidentPage() {
     clientSearchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearchingClients(true);
-        const results = await searchClients(query, user?.agencyId);
+        const results = await searchClients(query, user?.agencyId, clientType);
         setClientSearchResults(results);
         setShowClientDropdown(results.length > 0);
       } catch (error) {
@@ -66,7 +70,7 @@ export default function UserIncidentPage() {
         setIsSearchingClients(false);
       }
     }, 300);
-  }, [user?.agencyId]);
+  }, [user?.agencyId, clientType]);
 
   const handleClientSelect = (client: Client) => {
     const fullName = client.firstName && client.lastName 
