@@ -50,7 +50,7 @@ export default function SplashScreen() {
               <div className="relative animate-float-gentle">
                 <img
                   src="/logo.svg"
-                  alt="CareOnBoard Logo"
+                  alt="CareOnboard Logo"
                   className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 animate-rotate-slow"
                 />
               </div>
