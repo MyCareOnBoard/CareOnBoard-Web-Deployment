@@ -213,7 +213,7 @@ export default function FamilyLoginPage() {
                             className="text-[18px] font-semibold text-primary"
                             style={{color: "#00B4B8"}}
                         >
-                Care on Board
+                CareOnBoard
             </span>
                     </div>
 
