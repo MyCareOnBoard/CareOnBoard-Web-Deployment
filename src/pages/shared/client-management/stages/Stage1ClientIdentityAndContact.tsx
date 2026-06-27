@@ -41,7 +41,6 @@ export function Stage1ClientIdentityAndContact({
   clientId,
   isEditMode = false,
   headerRightAction,
-  onChangeClientType,
 }: {
   showAgencySelection?: boolean;
   agencies?: Agency[];
@@ -55,7 +54,6 @@ export function Stage1ClientIdentityAndContact({
   clientId?: string;
   isEditMode?: boolean;
   headerRightAction?: React.ReactNode;
-  onChangeClientType?: () => void;
 }) {
   const stage1 = formData.stage1;
   const isHhaClient = formData.type === "hha";
@@ -340,15 +338,6 @@ const maskSSN = (value: string) => {
               These fields uniquely identify the client in the system.
             </p>
           </div>
-          {onChangeClientType ? (
-            <button
-              type="button"
-              onClick={onChangeClientType}
-              className="shrink-0 cursor-pointer text-[13px] font-semibold text-[#007f83] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2"
-            >
-              Change type
-            </button>
-          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
