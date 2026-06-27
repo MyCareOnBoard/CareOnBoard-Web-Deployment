@@ -10,11 +10,13 @@ import {
   formatRateLabel,
   buildServiceByCodeMap,
 } from "./billingUtils";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
 
 export default function ClientClaimsPage() {
   const {clientId} = useParams();
   const navigate = useNavigate();
   const {user} = useAuth();
+  const { labels } = useStaffLabels();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const printContentRef = useRef<HTMLDivElement>(null);
 
@@ -237,7 +239,7 @@ export default function ClientClaimsPage() {
               <div className="overflow-hidden">
                 {/* Table Header */}
                 <div className="grid grid-cols-5 gap-4 px-4 py-3">
-                  <div className="font-semibold text-[14px] text-[#808081]">Staff</div>
+                  <div className="font-semibold text-[14px] text-[#808081]">{labels.noun}</div>
                   <div className="font-semibold text-[14px] text-[#808081]">Service Code</div>
                   <div className="font-semibold text-[14px] text-[#808081]">Hours</div>
                   <div className="font-semibold text-[14px] text-[#808081]">Rate</div>

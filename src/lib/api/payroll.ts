@@ -1,4 +1,5 @@
 import axiosClient from "../axios";
+import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 
 export type PayrollInvoiceStatus = "pending" | "paid";
 
@@ -120,6 +121,8 @@ export type PayrollInvoiceDetail = {
 export type PayrollDashboardQuery = {
   startDate: string;
   endDate: string;
+  /** Active agency program; omitted ⇒ unfiltered (back-compat). */
+  mode?: AgencyMode;
 };
 
 export type StaffToPayQuery = {
@@ -129,6 +132,8 @@ export type StaffToPayQuery = {
   dueLimit?: number;
   /** Server returns only staff with approved, uninvoiced completed shifts. */
   approved?: true;
+  /** Active agency program; omitted ⇒ unfiltered (back-compat). */
+  mode?: AgencyMode;
 };
 
 export type PayrollInvoicesListQuery = {
@@ -137,6 +142,8 @@ export type PayrollInvoicesListQuery = {
   status?: PayrollInvoiceStatus;
   employeeId?: string;
   limit?: number;
+  /** Active agency program; omitted ⇒ unfiltered (back-compat). */
+  mode?: AgencyMode;
 };
 
 export type CreatePayrollInvoicePayload = {

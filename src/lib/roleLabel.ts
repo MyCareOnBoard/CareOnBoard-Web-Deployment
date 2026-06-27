@@ -61,27 +61,29 @@ export function matchesAgencyMode(
  * - DDD only             -> "DSP"
  * - HHA only             -> "Caregivers"
  *
- * `title`  : management heading noun (e.g. `${title} Management`)
- * `noun`   : section heading noun (stats card, directory header)
- * `plural` : descriptive plural (e.g. "manage your {plural}")
+ * `title`      : management heading noun (e.g. `${title} Management`)
+ * `noun`       : section heading noun (stats card, directory header)
+ * `nounPlural` : short plural noun for table headings (e.g. "{nounPlural} to pay")
+ * `plural`     : descriptive plural (e.g. "manage your {plural}")
  */
 export function staffLabels(
   supportedClientTypes?: string[] | null
-): { title: string; noun: string; plural: string } {
+): { title: string; noun: string; nounPlural: string; plural: string } {
   const types = (supportedClientTypes ?? []).map((t) => t?.toLowerCase());
   const ddd = types.includes("ddd");
   const hha = types.includes("hha");
 
   if (hha && !ddd) {
-    return { title: "Caregivers", noun: "Caregiver", plural: "caregivers" };
+    return { title: "Caregivers", noun: "Caregiver", nounPlural: "Caregivers", plural: "caregivers" };
   }
   if (ddd && !hha) {
-    return { title: "DSP", noun: "DSP", plural: "direct support professionals" };
+    return { title: "DSP", noun: "DSP", nounPlural: "DSPs", plural: "direct support professionals" };
   }
   // Both supported, or unset (treated as both, matching the app-wide fallback).
   return {
     title: "DSP/Caregiver",
     noun: "DSP/Caregiver",
+    nounPlural: "DSPs/Caregivers",
     plural: "direct support professionals & caregivers",
   };
 }

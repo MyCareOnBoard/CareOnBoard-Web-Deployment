@@ -2,6 +2,7 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import { Client } from "@/lib/api/clients";
 import { Employee } from "@/lib/api/employees";
+import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 
 export interface EmployeeWithHours extends Employee {
   totalHours?: number;
@@ -49,6 +50,8 @@ export interface ListBillingRecordsParams {
   limit?: number;
   page?: number;
   groupBy?: 'client' | 'dsp';
+  /** Active agency program; omitted ⇒ unfiltered (back-compat). */
+  mode?: AgencyMode;
 }
 
 export interface ListBillingRecordsResponse {
@@ -252,7 +255,7 @@ export const billingApi = createApi({
   keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getBillingRecords: builder.query<ListBillingRecordsResponse, ListBillingRecordsParams>({
-      query: ({ agencyId, billingStatus, date, serviceType, limit = 10, page = 1, groupBy = 'client' }) => {
+      query: ({ agencyId, billingStatus, date, serviceType, limit = 10, page = 1, groupBy = 'client', mode }) => {
         const params = new URLSearchParams({ agencyId });
         if (billingStatus && billingStatus !== 'all') params.append('billingStatus', billingStatus);
         if (date && date !== 'all') params.append('date', date);
@@ -260,6 +263,7 @@ export const billingApi = createApi({
         params.append('limit', limit.toString());
         params.append('page', page.toString());
         params.append('groupBy', groupBy);
+        if (mode) params.append('mode', mode);
 
         return {
           url: `/billing?${params.toString()}`,

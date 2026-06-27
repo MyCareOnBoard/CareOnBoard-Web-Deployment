@@ -18,6 +18,7 @@ type RejectExpenseModalProps = {
   saving?: boolean;
   onClose: () => void;
   onConfirm: (reviewerNotes: string) => void;
+  noun?: string;
 };
 
 export default function RejectExpenseModal({
@@ -26,6 +27,7 @@ export default function RejectExpenseModal({
   saving = false,
   onClose,
   onConfirm,
+  noun = "DSP",
 }: RejectExpenseModalProps) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export default function RejectExpenseModal({
     const trimmed = reason.trim();
     if (trimmed.length < MIN_REJECTION_REASON_LENGTH) {
       setError(
-        `Add at least ${MIN_REJECTION_REASON_LENGTH} characters so the DSP understands why.`,
+        `Add at least ${MIN_REJECTION_REASON_LENGTH} characters so the ${noun} understands why.`,
       );
       return;
     }
@@ -52,14 +54,14 @@ export default function RejectExpenseModal({
     onConfirm(trimmed);
   };
 
-  const staffName = expense?.employeeName ?? "this DSP";
+  const staffName = expense?.employeeName ?? "this " + noun;
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !saving && onClose()}>
       <DialogContent showCloseButton={false} className={BILLING_CORNER_MODAL_CLASS}>
         <BillingCornerModalHeader
           title={`Decline expense for ${staffName}?`}
-          description="The DSP will see your reason in their app."
+          description={"The " + noun + " will see your reason in their app."}
           onClose={onClose}
           closeDisabled={saving}
         />
@@ -104,7 +106,7 @@ export default function RejectExpenseModal({
               <p className="mt-2 text-[13px] text-[#808081]">
                 {trimmedLength < MIN_REJECTION_REASON_LENGTH
                   ? `${MIN_REJECTION_REASON_LENGTH - trimmedLength} more characters needed`
-                  : "Ready to send to the DSP"}
+                  : "Ready to send to the " + noun}
               </p>
               {error ? <p className="mt-2 text-[13px] text-[#ef4444]">{error}</p> : null}
             </div>

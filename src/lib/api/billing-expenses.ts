@@ -1,6 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import { invalidatePayrollData } from "@/pages/agency/billing/shared/billingInvalidation";
+import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 
 export type ExpenseStatus = "pending" | "approved" | "rejected";
 
@@ -42,6 +43,8 @@ export type AgencyExpenseListItem = {
 export type ExpensesDashboardQuery = {
   startDate: string;
   endDate: string;
+  /** Active agency program; omitted ⇒ unfiltered (back-compat). */
+  mode?: AgencyMode;
 };
 
 export type ExpensesListQuery = ExpensesDashboardQuery & {
@@ -64,8 +67,8 @@ export const billingExpensesApi = createApi({
   tagTypes: ["ExpensesDashboard", "ExpensesList"],
   endpoints: (builder) => ({
     getExpensesDashboard: builder.query<ExpensesDashboardSummary, ExpensesDashboardQuery>({
-      query: ({ startDate, endDate }) => ({
-        url: `/billing/expenses/dashboard?startDate=${startDate}&endDate=${endDate}`,
+      query: ({ startDate, endDate, mode }) => ({
+        url: `/billing/expenses/dashboard?startDate=${startDate}&endDate=${endDate}${mode ? `&mode=${mode}` : ""}`,
         method: "GET",
         requiresAuth: true,
       }),
@@ -74,7 +77,7 @@ export const billingExpensesApi = createApi({
       providesTags: ["ExpensesDashboard"],
     }),
     getAgencyExpenses: builder.query<ExpensesListResponse, ExpensesListQuery>({
-      query: ({ startDate, endDate, status = "all", page = 1, limit = 25 }) => {
+      query: ({ startDate, endDate, status = "all", page = 1, limit = 25, mode }) => {
         const params = new URLSearchParams({
           startDate,
           endDate,
@@ -82,6 +85,9 @@ export const billingExpensesApi = createApi({
           page: String(page),
           limit: String(limit),
         });
+        if (mode) {
+          params.set("mode", mode);
+        }
         return {
           url: `/billing/expenses?${params.toString()}`,
           method: "GET",
@@ -91,8 +97,8 @@ export const billingExpensesApi = createApi({
       transformResponse: (response: { success: boolean; data: ExpensesListResponse }) =>
         response.data,
       serializeQueryArgs: ({ queryArgs }) => {
-        const { startDate, endDate, status = "all" } = queryArgs;
-        return { startDate, endDate, status };
+        const { startDate, endDate, status = "all", mode } = queryArgs;
+        return { startDate, endDate, status, mode };
       },
       merge: (currentCache, incoming, { arg }) => {
         if (!arg.page || arg.page <= 1) {
@@ -112,7 +118,8 @@ export const billingExpensesApi = createApi({
         return (
           currentArg.startDate !== previousArg.startDate ||
           currentArg.endDate !== previousArg.endDate ||
-          currentArg.status !== previousArg.status
+          currentArg.status !== previousArg.status ||
+          currentArg.mode !== previousArg.mode
         );
       },
       providesTags: ["ExpensesList"],

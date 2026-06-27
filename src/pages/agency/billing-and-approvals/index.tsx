@@ -9,6 +9,7 @@ import {useGetBillingRecordsQuery} from "./api";
 import {formatCurrency, buildServiceByCodeMap, getClientRate} from "./billingUtils";
 import type {ClientServiceDefinition} from "./api";
 import {staffLabels} from "@/lib/roleLabel";
+import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
 import type {RootState} from "@/store/redux/store";
 
 interface BillingStatusFilter {
@@ -28,6 +29,7 @@ export default function BillingAndApprovalsPage() {
   const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
   const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
   const labels = staffLabels(effectiveTypes);
+  const effectiveMode = useEffectiveAgencyMode();
   const [activeTab, setActiveTab] = useState<"client" | "dsp">("client");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBillingStatus, setSelectedBillingStatus] = useState<string>("all");
@@ -58,6 +60,7 @@ export default function BillingAndApprovalsPage() {
       limit: itemsPerPage,
       page: currentPage,
       groupBy: activeTab === "client" ? "client" : "dsp",
+      mode: effectiveMode ?? undefined,
     },
     {
       skip: !user?.agencyId,
@@ -199,7 +202,7 @@ export default function BillingAndApprovalsPage() {
                 ? `${record.client.firstName || ''} ${record.client.lastName || ''}`.trim() || 'Unknown Client'
                 : 'Unknown Client';
 
-              const dspName = record.employee?.fullName || 'Unknown DSP';
+              const dspName = record.employee?.fullName || `Unknown ${labels.noun}`;
 
               const serviceByCode = buildServiceByCodeMap(
                 record.client?.services as unknown as ClientServiceDefinition[] | undefined
@@ -236,7 +239,7 @@ export default function BillingAndApprovalsPage() {
                             </div>
                             <div>
                               <p className="text-[16px] font-semibold text-[#10141a]">
-                                {employee.fullName || 'Unknown DSP'}
+                                {employee.fullName || `Unknown ${labels.noun}`}
                               </p>
                               <p className="text-[14px] text-[#808081]">{labels.noun}</p>
                             </div>
@@ -256,7 +259,7 @@ export default function BillingAndApprovalsPage() {
                           <p className="text-[16px] font-semibold text-[#10141a]">
                             {dspName}
                           </p>
-                          <p className="text-[14px] text-[#808081]">DSP</p>
+                          <p className="text-[14px] text-[#808081]">{labels.noun}</p>
                         </div>
                       </div>
 

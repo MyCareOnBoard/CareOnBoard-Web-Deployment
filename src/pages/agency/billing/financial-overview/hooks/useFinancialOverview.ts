@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRangeValues } from "@/pages/agency/billing/shared/types";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import {
   getClaimsDashboard,
   listBillingClaims,
@@ -39,10 +41,12 @@ type PrimaryFetchResult = {
 
 async function fetchPrimaryBatch(
   dateRange: DateRangeValues,
+  mode: AgencyMode | null,
 ): Promise<PrimaryFetchResult> {
   const query = {
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
+    ...(mode ? { mode } : {}),
   };
 
   const [claimsDashboardResult, payrollDashboardResult, claimsListResult, invoicesListResult] =
@@ -129,6 +133,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
   const [partialErrors, setPartialErrors] = useState<string[]>([]);
   const requestIdRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
+  const mode = useEffectiveAgencyMode();
 
   const fetchTrends = useCallback(
     async (range: DateRangeValues, requestId: number) => {
@@ -145,6 +150,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
         const previousData = await getClaimsDashboard({
           startDate: previousRange.startDate,
           endDate: previousRange.endDate,
+          ...(mode ? { mode } : {}),
         });
 
         if (requestIdRef.current !== requestId) {
@@ -164,7 +170,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
         }
       }
     },
-    [],
+    [mode],
   );
 
   const refetch = useCallback(async () => {
@@ -212,7 +218,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
     setPreviousClaimsDashboard(null);
 
     try {
-      const result = await fetchPrimaryBatch(dateRange);
+      const result = await fetchPrimaryBatch(dateRange, mode);
 
       if (requestIdRef.current !== requestId) {
         return;
@@ -261,7 +267,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
         setIsRefetching(false);
       }
     }
-  }, [dateRange.endDate, dateRange.startDate, fetchTrends]);
+  }, [dateRange.endDate, dateRange.startDate, fetchTrends, mode]);
 
   useEffect(() => {
     void refetch();

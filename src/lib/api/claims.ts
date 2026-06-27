@@ -2,6 +2,7 @@ import axiosClient from "../axios";
 import type { ClaimReportPrefillSnapshot } from "@/pages/agency/billing/claims/utils/claimReportPrefillUtils";
 import type { Shift } from "@/lib/api/shifts";
 import type { MileageRide } from "@/lib/api/mileage";
+import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 
 export type BillingClaimStatus = "pending" | "paid" | "rejected";
 
@@ -46,6 +47,8 @@ export type ClaimsDashboardSummary = {
 export type ClaimsDashboardQuery = {
   startDate: string;
   endDate: string;
+  /** Active agency program; omitted ⇒ unfiltered (back-compat). */
+  mode?: AgencyMode;
 };
 
 export type BillingClaimsListQuery = ClaimsDashboardQuery & {
@@ -210,6 +213,7 @@ type ReadyToClaimApiResponse = {
 
 export async function listReadyToClaim(params?: {
   limit?: number;
+  mode?: AgencyMode;
 }): Promise<ReadyToClaimResponse> {
   const response = await axiosClient.get<ReadyToClaimApiResponse>(
     "/billing/claims/ready-to-claim",

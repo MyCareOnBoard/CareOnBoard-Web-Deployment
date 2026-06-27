@@ -10,6 +10,7 @@ import {
   useRejectExpenseMutation,
 } from "@/lib/api/billing-expenses";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import {
   mapExpenseMutationError,
@@ -47,6 +48,8 @@ export default function ExpensesDashboardPage() {
 
   const hasAgency = Boolean(user?.agencyId);
   const hasDateRange = Boolean(dateRange.startDate && dateRange.endDate);
+  const { mode, labels } = useStaffLabels();
+  const staffNoun = labels.noun;
 
   const {
     data: dashboardData,
@@ -54,7 +57,7 @@ export default function ExpensesDashboardPage() {
     isError: dashboardError,
     error: dashboardErrorPayload,
   } = useGetExpensesDashboardQuery(
-    { startDate: dateRange.startDate, endDate: dateRange.endDate },
+    { startDate: dateRange.startDate, endDate: dateRange.endDate, mode: mode ?? undefined },
     { skip: !hasDateRange },
   );
 
@@ -65,6 +68,7 @@ export default function ExpensesDashboardPage() {
       status: "pending",
       page: 1,
       limit: 50,
+      mode: mode ?? undefined,
     },
     { skip: !hasDateRange || activeTab !== "pending" },
   );
@@ -76,6 +80,7 @@ export default function ExpensesDashboardPage() {
       status: statusFilter,
       page: listPage,
       limit: LIST_PAGE_SIZE,
+      mode: mode ?? undefined,
     },
     { skip: !hasDateRange || activeTab !== "all" },
   );
@@ -106,8 +111,7 @@ export default function ExpensesDashboardPage() {
         setApproveTarget(null);
         toast({
           title: "Expense approved",
-          description:
-            "Included in this DSP's next payroll for the expense date.",
+          description: `Included in this ${staffNoun}'s next payroll for the expense date.`,
         });
       } catch (error) {
         toast({
@@ -117,7 +121,7 @@ export default function ExpensesDashboardPage() {
         });
       }
     },
-    [approveExpense, hasAgency, toast],
+    [approveExpense, hasAgency, toast, staffNoun],
   );
 
   const handleRequestApprove = useCallback((expense: AgencyExpenseListItem) => {
@@ -192,7 +196,7 @@ export default function ExpensesDashboardPage() {
         setDeclineTarget(null);
         toast({
           title: "Expense declined",
-          description: "The DSP will see your reason in their app.",
+          description: `The ${staffNoun} will see your reason in their app.`,
         });
       } catch (error) {
         toast({
@@ -202,7 +206,7 @@ export default function ExpensesDashboardPage() {
         });
       }
     },
-    [declineTarget, hasAgency, rejectExpense, toast],
+    [declineTarget, hasAgency, rejectExpense, toast, staffNoun],
   );
 
   const handleStatusSegmentClick = useCallback((segmentLabel: string) => {
@@ -227,6 +231,11 @@ export default function ExpensesDashboardPage() {
     },
     [],
   );
+
+  // Reset pagination when the agency mode changes (the list re-filters server-side).
+  useEffect(() => {
+    setListPage(1);
+  }, [mode]);
 
   useEffect(() => {
     if (!dashboardError) {
@@ -270,7 +279,7 @@ export default function ExpensesDashboardPage() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
-      <ExpensesDashboardHeader dateRange={dateRange} onDateRangeChange={handleDateRangeChange} />
+      <ExpensesDashboardHeader dateRange={dateRange} onDateRangeChange={handleDateRangeChange} noun={staffNoun} />
       <ExpensesOverviewCards stats={overviewStats} loading={dashboardLoading} />
       <ExpensesByStatusChart
         chart={statusChart}
@@ -288,6 +297,7 @@ export default function ExpensesDashboardPage() {
           onDecline={setDeclineTarget}
           onDelete={handleRequestDelete}
           actionsDisabled={actionsDisabled}
+          noun={staffNoun}
         />
       ) : (
         <ExpensesHistoryTable
@@ -302,6 +312,7 @@ export default function ExpensesDashboardPage() {
             setListPage(1);
           }}
           onLoadMore={() => setListPage((page) => page + 1)}
+          noun={staffNoun}
         />
       )}
 
@@ -321,7 +332,7 @@ export default function ExpensesDashboardPage() {
         }
         message={
           approveTarget
-            ? `${formatCurrency(approveTarget.amount)} will be included in this DSP's next payroll for the expense date.`
+            ? `${formatCurrency(approveTarget.amount)} will be included in this ${staffNoun}'s next payroll for the expense date.`
             : "This expense will be included in payroll."
         }
         confirmText="Approve expense"
@@ -345,7 +356,7 @@ export default function ExpensesDashboardPage() {
         }
         message={
           deleteTarget
-            ? `This will permanently remove the ${formatCurrency(deleteTarget.amount)} pending expense. The DSP can submit a new one if needed.`
+            ? `This will permanently remove the ${formatCurrency(deleteTarget.amount)} pending expense. The ${staffNoun} can submit a new one if needed.`
             : "This will permanently remove the pending expense."
         }
         confirmText="Delete expense"
@@ -360,6 +371,7 @@ export default function ExpensesDashboardPage() {
             saving={isDeclining}
             onClose={() => !isDeclining && setDeclineTarget(null)}
             onConfirm={(notes) => void handleConfirmDecline(notes)}
+            noun={staffNoun}
           />
         </Suspense>
       ) : null}

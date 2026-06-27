@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listReadyToClaim, type ReadyToClaimRow } from "@/lib/api/claims";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 type RefetchOptions = {
   force?: boolean;
@@ -16,6 +17,7 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(async ({ force = false }: RefetchOptions = {}) => {
     if (!enabled && !force) {
@@ -28,7 +30,7 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
     setError(null);
 
     try {
-      const response = await listReadyToClaim({ limit: 100 });
+      const response = await listReadyToClaim({ limit: 100, ...(mode ? { mode } : {}) });
 
       if (requestIdRef.current !== requestId) {
         return;
@@ -55,7 +57,7 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
         setLoading(false);
       }
     }
-  }, [enabled]);
+  }, [enabled, mode]);
 
   useEffect(() => {
     void refetch();
