@@ -121,7 +121,7 @@ export default function FamilyLayout() {
               />
             </svg>
           </div>
-          <span className="text-[13px] font-semibold text-white">Care on Board</span>
+          <span className="text-[13px] font-semibold text-white">CareOnBoard</span>
         </div>
 
         {/* Client chip */}

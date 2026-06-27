@@ -2,7 +2,7 @@
 
 ## Overview
 
-Care On Board supports **dictation into narrative fields** on selected DSP, agency, and documentation screens. Staff can speak instead of typing; the product **streams speech to text** in real time, optionally **translates non-English speech to English** before inserting the result into the active field, and does **not** expose third-party API keys in the browser for translation.
+CareOnBoard supports **dictation into narrative fields** on selected DSP, agency, and documentation screens. Staff can speak instead of typing; the product **streams speech to text** in real time, optionally **translates non-English speech to English** before inserting the result into the active field, and does **not** expose third-party API keys in the browser for translation.
 
 **Primary goals:**
 
@@ -313,6 +313,6 @@ The table below reflects the **React** codebase integration pattern: **`VoiceRec
 
 ## Document history
 
-- **Initial version:** Documents server-side Gemini translation, ElevenLabs realtime STT, provider/textarea/button integration, and screen inventory as implemented in the Care On Board monorepo layout described above.
+- **Initial version:** Documents server-side Gemini translation, ElevenLabs realtime STT, provider/textarea/button integration, and screen inventory as implemented in the CareOnBoard monorepo layout described above.
 
 For workflow context across the wider product, see **`docs/care-on-board-workflow-guide.md`**.

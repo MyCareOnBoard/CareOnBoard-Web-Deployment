@@ -1,6 +1,6 @@
-# Care On Board: Process and Workflow Guide
+# CareOnBoard: Process and Workflow Guide
 
-**Purpose:** This document describes how major processes work in Care On Board—for applicants, caregivers (DSPs), agency office staff, and (in one section) the team that first sets up an agency on the platform. It is intended for \*\*program managers, billing staff, trainers, quality staff, and
+**Purpose:** This document describes how major processes work in CareOnBoard—for applicants, caregivers (DSPs), agency office staff, and (in one section) the team that first sets up an agency on the platform. It is intended for \*\*program managers, billing staff, trainers, quality staff, and
 
 **Scope:** The guide reflects the product workflows documented for internal use.
 
@@ -41,7 +41,7 @@
 
 ## How this guide is organized
 
-The sections below follow the **same order as the table of contents**. Each section explains **what happens** in plain language, then includes a **diagram** you can use in training or handouts. Where you see “the app” or “the system,” that means Care On Board.
+The sections below follow the **same order as the table of contents**. Each section explains **what happens** in plain language, then includes a **diagram** you can use in training or handouts. Where you see “the app” or “the system,” that means CareOnBoard.
 
 ---
 

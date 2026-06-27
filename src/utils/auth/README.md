@@ -345,4 +345,4 @@ These pages import from `@/utils/auth` for all auth functionality.
 ---
 
 **Last Updated:** October 28, 2025  
-**Maintained by:** Care on Board Team
+**Maintained by:** CareOnBoard Team
