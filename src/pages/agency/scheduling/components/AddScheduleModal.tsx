@@ -576,10 +576,14 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     clientSearchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearchingClients(true);
-        const results = await searchClients(query, user?.agencyId);
+        const results = await searchClients(query, user?.agencyId, agencyMode ?? undefined);
         // Only active clients can be scheduled (HHA clients without an approved
         // Form 485 are kept non-active). Mirrors the backend CLIENT_INACTIVE gate.
-        const schedulable = results.filter((c) => !c.status || c.status === "active");
+        const schedulable = results.filter(
+          (c) =>
+            (!c.status || c.status === "active") &&
+            (!agencyMode || (c.type ?? "ddd") === agencyMode),
+        );
         setClientSearchResults(schedulable);
         setShowClientDropdown(schedulable.length > 0);
       } catch (error) {
@@ -589,7 +593,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         setIsSearchingClients(false);
       }
     }, 300);
-  }, [user?.agencyId]);
+  }, [user?.agencyId, agencyMode]);
 
   const getClientPrimaryAddress = (client: Client): ShiftLocation | null => {
     if (client.primaryAddress) {
@@ -853,7 +857,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         });
       }
     },
-    [toast],
+    [toast, labels.noun],
   );
 
   const handleServiceRowChange = useCallback(
@@ -1458,7 +1462,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
           setSavedShiftInfo({
             clientName: formData.client || "Client",
-            dspName: formData.assignedDsp || "DSP",
+            dspName: formData.assignedDsp || labels.noun,
             date: getDisplayDate(),
           });
           setShowSavedModal(true);
@@ -1534,7 +1538,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       if (successes.length > 0) {
         setSavedShiftInfo({
           clientName: formData.client || "Client",
-          dspName: formData.assignedDsp || "DSP",
+          dspName: formData.assignedDsp || labels.noun,
           date: getDisplayDate(),
         });
         setShowSavedModal(true);
@@ -1629,7 +1633,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
         setUpdatedShiftInfo({
           clientName: formData.client || "Client",
-          dspName: formData.assignedDsp || "DSP",
+          dspName: formData.assignedDsp || labels.noun,
           duration: durationFromShiftRequests([
             {
               startTime: formData.clockInTime,
@@ -1797,7 +1801,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       if (successes.length > 0) {
         setScheduledShiftInfo({
           clientName: formData.client || "Client",
-          dspName: formData.assignedDsp || "DSP",
+          dspName: formData.assignedDsp || labels.noun,
           duration: durationFromShiftRequests(finalShiftRequests),
           date: getDisplayDate(),
         });

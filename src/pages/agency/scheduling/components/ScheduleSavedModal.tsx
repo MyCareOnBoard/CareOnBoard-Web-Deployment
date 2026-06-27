@@ -1,6 +1,7 @@
 import React from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
 
 interface ScheduleSavedModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export default function ScheduleSavedModal({
   dspName,
   date,
 }: ScheduleSavedModalProps) {
+  const { labels } = useStaffLabels();
   if (!isOpen) return null;
 
   return (
@@ -46,7 +48,7 @@ export default function ScheduleSavedModal({
             Saved
           </h2>
           <p className="text-[16px] font-medium leading-[1.6] text-[#808081] max-w-[304px]">
-            Your schedule draft for {clientName} (Client) & {dspName} (DSP) on {date} has been saved. You can continue editing later.
+            Your schedule draft for {clientName} (Client) & {dspName} ({labels.noun}) on {date} has been saved. You can continue editing later.
           </p>
         </div>
 

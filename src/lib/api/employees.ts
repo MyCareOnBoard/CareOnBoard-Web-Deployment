@@ -56,6 +56,7 @@ export interface ListEmployeesResponse {
     success: boolean;
     count: number;
     total: number;
+    nextCursor?: string | null;
     employees: Employee[];
 }
 
@@ -88,7 +89,7 @@ export interface ListEmployeesParams {
     applicantType?: 'hha' | 'dsp';
     search?: string;
     limit?: number;
-    page?: number;
+    cursor?: string;
     includeStats?: boolean;
     signal?: AbortSignal;
 }
@@ -191,7 +192,7 @@ export async function listEmployees(params?: ListEmployeesParams): Promise<ListE
                 applicantType: params?.applicantType,
                 search: params?.search,
                 limit: params?.limit || 50,
-                page: params?.page,
+                cursor: params?.cursor,
                 includeStats: params?.includeStats,
             },
             signal: params?.signal,
@@ -326,7 +327,7 @@ export async function getEmployeeTrainings(
 export async function searchEmployees(
     query: string,
     agencyId?: string,
-    options?: { workAvailability?: boolean },
+    options?: { workAvailability?: boolean; role?: 'hha' | 'dsp' },
 ): Promise<Employee[]> {
     try {
         const response = await listEmployees({
@@ -334,6 +335,7 @@ export async function searchEmployees(
             agencyId,
             limit: 50,
             workAvailability: options?.workAvailability,
+            role: options?.role,
         });
 
         return response.employees;

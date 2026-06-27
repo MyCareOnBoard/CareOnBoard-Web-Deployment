@@ -9,6 +9,7 @@ import {
   type UpdateBillingClaimStatusPayload,
 } from "@/lib/api/claims";
 import { filterClaimsByClientSearch } from "../utils/savedClaimUtils";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
@@ -38,6 +39,7 @@ export function useGeneratedClaims(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
@@ -59,6 +61,7 @@ export function useGeneratedClaims(
           startDate: dateRange.startDate,
           endDate: dateRange.endDate,
           ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+          ...(mode ? { mode } : {}),
         });
 
         if (requestIdRef.current !== requestId) {
@@ -81,7 +84,7 @@ export function useGeneratedClaims(
         }
       }
     },
-    [dateRange.endDate, dateRange.startDate, enabled, statusFilter],
+    [dateRange.endDate, dateRange.startDate, enabled, statusFilter, mode],
   );
 
   useEffect(() => {

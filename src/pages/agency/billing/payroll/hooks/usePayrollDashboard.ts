@@ -4,6 +4,7 @@ import {
   getPayrollDashboard,
   type PayrollDashboardSummary,
 } from "@/lib/api/payroll";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import {
   mapDashboardToOverviewStats,
   mapDashboardToStatusChart,
@@ -21,6 +22,7 @@ export function usePayrollDashboard(dateRange: DateRangeValues) {
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
+  const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(async () => {
     if (!hasCompleteDateRange(dateRange)) {
@@ -46,6 +48,7 @@ export function usePayrollDashboard(dateRange: DateRangeValues) {
       const data = await getPayrollDashboard({
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
+        ...(mode ? { mode } : {}),
       });
 
       if (requestIdRef.current !== requestId) {
@@ -71,7 +74,7 @@ export function usePayrollDashboard(dateRange: DateRangeValues) {
         setIsRefetching(false);
       }
     }
-  }, [dateRange.endDate, dateRange.startDate]);
+  }, [dateRange.endDate, dateRange.startDate, mode]);
 
   useEffect(() => {
     void refetch();

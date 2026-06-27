@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import IncidentDetailModal from "./components/IncidentDetailModal";
 import { 
@@ -10,9 +10,13 @@ import {
 import { Client, getClientById } from "@/lib/api/clients";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/store/redux/store";
 
 export default function IncidentPage() {
   const { user } = useAuth();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
   const [selectedIncident, setSelectedIncident] = useState<IncidentReport | null>(null);
   const [incidents, setIncidents] = useState<IncidentReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,14 +25,23 @@ export default function IncidentPage() {
   const itemsPerPage = 10;
   const { toast } = useToast();
 
-  // Fetch incidents on mount and page change
+  // Fetch on mount, page change, and program switch. A program switch resets to page 1
+  // first (when not already there) so the switch triggers a single fetch, not two.
+  const prevModeRef = useRef(selectedMode);
   useEffect(() => {
-    if (user?.agencyId) {
-      fetchIncidents();
-    } else {
+    if (!user?.agencyId) {
       setLoading(false);
+      return;
     }
-  }, [user?.agencyId, currentPage]);
+    if (prevModeRef.current !== selectedMode) {
+      prevModeRef.current = selectedMode;
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+        return;
+      }
+    }
+    fetchIncidents();
+  }, [user?.agencyId, currentPage, selectedMode]);
 
   // Helper function to enrich incidents with full client data
   const enrichIncidentsWithClientData = async (incidentsList: IncidentReport[]) => {
@@ -73,6 +86,7 @@ export default function IncidentPage() {
       const response = await getAllIncidents(user.agencyId, {
         page: currentPage,
         limit: itemsPerPage,
+        clientType: selectedMode,
       });
 
       if (response.success && response.data) {

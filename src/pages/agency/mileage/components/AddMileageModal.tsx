@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import TimePicker from "@/components/TimePicker";
 import { searchClients, Client, ClientDsp, ClientService, getAgencyClientById } from "@/lib/api/clients";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import { getEmployeeById } from "@/lib/api/employees";
 import { listEmployeeDocuments } from "@/lib/api/employee-documents";
 import { useToast } from "@/hooks/use-toast";
@@ -87,6 +88,7 @@ export default function AddMileageModal({
   initialRide = null,
 }: AddMileageModalProps) {
   const { toast } = useToast();
+  const agencyMode = useEffectiveAgencyMode();
 
   const [formData, setFormData] = useState<MileageFormData>(initialFormData);
   const [transportationService, setTransportationService] = useState<ClientService | null>(null);
@@ -114,7 +116,7 @@ export default function AddMileageModal({
     clientSearchTimeoutRef.current = setTimeout(async () => {
       setIsSearchingClients(true);
       try {
-        const results = await searchClients(query);
+        const results = await searchClients(query, undefined, agencyMode ?? undefined);
         // Only active clients can have rides logged (HHA clients without an
         // approved Form 485 are kept non-active). Mirrors the backend gate.
         const schedulable = results.filter((c) => !c.status || c.status === "active");

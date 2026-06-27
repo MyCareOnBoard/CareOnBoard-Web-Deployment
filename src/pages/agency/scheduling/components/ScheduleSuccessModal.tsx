@@ -1,6 +1,7 @@
 import React from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
 
 interface ScheduleSuccessModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export default function ScheduleSuccessModal({
   duration,
   date,
 }: ScheduleSuccessModalProps) {
+  const { labels } = useStaffLabels();
   if (!isOpen) return null;
 
   return (
@@ -50,7 +52,7 @@ export default function ScheduleSuccessModal({
             Scheduled
           </h2>
           <p className="text-[16px] font-medium leading-[1.6] text-[#808081] max-w-[304px]">
-            You have scheduled a shift between {clientName} (Client) & {dspName} (DSP) for {duration} on {date}
+            You have scheduled a shift between {clientName} (Client) & {dspName} ({labels.noun}) for {duration} on {date}
           </p>
         </div>
 

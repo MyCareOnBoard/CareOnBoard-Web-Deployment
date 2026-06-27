@@ -2,14 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
-import type { Applicant } from "@/lib/api/applicants";
+import type { Applicant, PeriodFilter } from "@/lib/api/applicants";
 
 interface ApplicantsListProps {
   applicants: Applicant[];
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  filterPeriod: "today" | "week" | "month";
-  onFilterChange: (period: "today" | "week" | "month") => void;
+  filterPeriod: PeriodFilter;
+  onFilterChange: (period: PeriodFilter) => void;
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
@@ -170,7 +170,7 @@ export function ApplicantsList({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {(["today", "week", "month"] as const).map((period) => (
+            {(["all", "today", "week", "month"] as const).map((period) => (
               <Button
                 key={period}
                 onClick={() => onFilterChange(period)}
@@ -179,6 +179,7 @@ export function ApplicantsList({
                   : "bg-transparent text-[#808081] border border-[#e5e5e6] hover:bg-[#f8f9fa]"
                   }`}
               >
+                {period === "all" && "All"}
                 {period === "today" && "Today"}
                 {period === "week" && "This Week"}
                 {period === "month" && "This month"}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listOutOfPocketInvoices, type OutOfPocketInvoiceListItem } from "@/lib/api/out-of-pocket";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 type RefetchOptions = { force?: boolean };
 type Options = { enabled?: boolean };
@@ -10,6 +11,7 @@ export function useOutOfPocketInvoices({ enabled = true }: Options = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
@@ -19,7 +21,7 @@ export function useOutOfPocketInvoices({ enabled = true }: Options = {}) {
       setLoading(true);
       setError(null);
       try {
-        const list = await listOutOfPocketInvoices({ limit: 100 });
+        const list = await listOutOfPocketInvoices({ limit: 100, ...(mode ? { mode } : {}) });
         if (requestIdRef.current !== requestId) return;
         setInvoices(list);
       } catch (e) {
@@ -30,7 +32,7 @@ export function useOutOfPocketInvoices({ enabled = true }: Options = {}) {
         if (requestIdRef.current === requestId) setLoading(false);
       }
     },
-    [enabled],
+    [enabled, mode],
   );
 
   useEffect(() => {

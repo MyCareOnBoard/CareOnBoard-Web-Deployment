@@ -90,7 +90,7 @@ export default function MileagePage() {
   // Reset to first page when server-side filters change
   useEffect(() => {
     setOffset(0);
-  }, [dateRange, manualFilter]);
+  }, [dateRange, manualFilter, selectedMode]);
 
   const handleMileageCreated = () => {
     fetchRides(offset);

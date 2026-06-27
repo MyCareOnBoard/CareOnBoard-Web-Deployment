@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRangeValues } from "@/pages/agency/billing/shared/types";
 import { getClaimsDashboard, type ClaimsDashboardSummary } from "@/lib/api/claims";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import {
   mapDashboardToOverviewStats,
   mapDashboardToRejectionChart,
@@ -16,6 +17,7 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(async () => {
     if (!hasCompleteDateRange(dateRange)) {
@@ -34,6 +36,7 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
       const data = await getClaimsDashboard({
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
+        ...(mode ? { mode } : {}),
       });
 
       if (requestIdRef.current !== requestId) {
@@ -55,7 +58,7 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
         setLoading(false);
       }
     }
-  }, [dateRange.endDate, dateRange.startDate]);
+  }, [dateRange.endDate, dateRange.startDate, mode]);
 
   useEffect(() => {
     void refetch();

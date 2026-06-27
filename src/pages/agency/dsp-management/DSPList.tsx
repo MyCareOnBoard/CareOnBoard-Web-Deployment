@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DSP } from "./types";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
-import { roleLabel, staffLabels, programLabel } from "@/lib/roleLabel";
+import { roleLabel, staffLabels } from "@/lib/roleLabel";
 import type { RootState } from "@/store/redux/store";
 
 interface DSPStats {
@@ -263,15 +263,7 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
                       </Avatar>
                       <div onClick={() => navigateToProfile(dsp)} className="text-left cursor-pointer">
                         <p className="font-semibold text-gray-900 text-sm">{dsp.fullName}</p>
-                        <span
-                          className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            (selectedMode ?? programLabel({ role: dsp.role })).toUpperCase() === "HHA"
-                              ? "bg-teal-100 text-teal-700"
-                              : "bg-indigo-100 text-indigo-700"
-                          }`}
-                        >
-                          {(selectedMode ?? programLabel({ role: dsp.role })).toUpperCase()}
-                        </span>
+                        <p className="mt-1 text-xs text-gray-500">{dsp.email}</p>
                       </div>
                     </button>
                   </div>

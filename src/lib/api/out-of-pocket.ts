@@ -1,5 +1,6 @@
 import axiosClient from "../axios";
 import type { ReadyToClaimRow } from "./claims";
+import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 
 export type OutOfPocketReadyRow = ReadyToClaimRow;
 
@@ -69,7 +70,7 @@ export type CreateOutOfPocketInvoicePayload = {
 
 type ApiEnvelope<T> = { success: boolean; data: T; message?: string; error?: string };
 
-export async function listOutOfPocketReady(params?: { limit?: number }): Promise<OutOfPocketReadyResponse> {
+export async function listOutOfPocketReady(params?: { limit?: number; mode?: AgencyMode }): Promise<OutOfPocketReadyResponse> {
   const res = await axiosClient.get<ApiEnvelope<OutOfPocketReadyResponse>>(
     "/billing/out-of-pocket/ready-to-bill",
     { params },
@@ -93,7 +94,7 @@ export async function createOutOfPocketInvoice(
   return res.data.data;
 }
 
-export async function listOutOfPocketInvoices(params?: { limit?: number }): Promise<OutOfPocketInvoiceListItem[]> {
+export async function listOutOfPocketInvoices(params?: { limit?: number; mode?: AgencyMode }): Promise<OutOfPocketInvoiceListItem[]> {
   const res = await axiosClient.get<ApiEnvelope<{ invoices: OutOfPocketInvoiceListItem[] }>>(
     "/billing/out-of-pocket/invoices",
     { params },

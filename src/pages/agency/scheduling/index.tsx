@@ -265,12 +265,14 @@ export default function SchedulingPage() {
           listClients({
             search: q,
             agencyId,
+            type: selectedMode,
             limit: PERSON_TYPEAHEAD_LIMIT,
             signal: ac.signal,
           }),
           listEmployees({
             search: q,
             agencyId,
+            role: selectedMode === "hha" ? "hha" : selectedMode === "ddd" ? "dsp" : undefined,
             limit: PERSON_TYPEAHEAD_LIMIT,
             signal: ac.signal,
           }),
@@ -295,7 +297,7 @@ export default function SchedulingPage() {
             rows.push({
               kind: "dsp",
               id: e.id,
-              label: e.fullName?.trim() || "Unknown DSP",
+              label: e.fullName?.trim() || `Unknown ${labels.noun}`,
             });
           }
         }
@@ -332,7 +334,7 @@ export default function SchedulingPage() {
       window.clearTimeout(timer);
       ac.abort();
     };
-  }, [personSearchInput, user?.agencyId, personFilter, toast]);
+  }, [personSearchInput, user?.agencyId, personFilter, toast, selectedMode, labels.noun]);
 
   useEffect(() => {
     if (!personSearchOpen) return;
@@ -506,7 +508,7 @@ export default function SchedulingPage() {
                 Recent Shifts
               </h2>
               <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                Filter by date, search for a client or DSP to narrow the list.
+                Filter by date, search for a client or {labels.noun} to narrow the list.
               </p>
             </div>
 
@@ -519,8 +521,8 @@ export default function SchedulingPage() {
                 <Input
                   type="search"
                   autoComplete="off"
-                  placeholder="Search by client or DSP name"
-                  aria-label="Search by client or DSP name to filter shifts"
+                  placeholder={`Search by client or ${labels.noun} name`}
+                  aria-label={`Search by client or ${labels.noun} name to filter shifts`}
                   aria-expanded={showPersonDropdown}
                   aria-controls="recent-shifts-person-results"
                   aria-autocomplete="list"
@@ -702,7 +704,7 @@ export default function SchedulingPage() {
                 const clientName = shift.client
                   ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "Unknown Client"
                   : "Unknown Client";
-                const employeeName = shift.employee?.fullName || "Unknown DSP";
+                const employeeName = shift.employee?.fullName || `Unknown ${labels.noun}`;
 
                 return (
                   <div
@@ -752,7 +754,7 @@ export default function SchedulingPage() {
                           {employeeName}
                         </span>
                         <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                          DSP
+                          {labels.noun}
                         </span>
                       </div>
                     </div>

@@ -3,6 +3,10 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { searchEmployees, type Employee } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
+import {
+  useEffectiveAgencyMode,
+  agencyModeToApplicantType,
+} from "@/hooks/useEffectiveAgencyMode";
 
 export type AssignedDsp = { id: string; name: string };
 
@@ -22,6 +26,9 @@ function DspSearchSlotRow({
   onRemoveSlot: () => void;
 }) {
   const { user } = useAuth();
+  // Scope the staff search to the active program (DDD→dsp / HHA→hha) so caregiver
+  // and DSP searches only surface employees for the current agency mode.
+  const role = agencyModeToApplicantType(useEffectiveAgencyMode());
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Employee[]>([]);
   const [open, setOpen] = useState(false);
@@ -42,7 +49,7 @@ function DspSearchSlotRow({
       timeoutRef.current = setTimeout(async () => {
         try {
           setSearching(true);
-          const res = await searchEmployees(q, agencyId);
+          const res = await searchEmployees(q, agencyId, { role });
           const filtered = res.filter((e) => !assignedIds.has(e.id));
           setResults(filtered);
           setOpen(filtered.length > 0);
@@ -54,7 +61,7 @@ function DspSearchSlotRow({
         }
       }, 300);
     },
-    [user?.agencyId, user?.uid, assigned],
+    [user?.agencyId, user?.uid, assigned, role],
   );
 
   useEffect(() => {

@@ -7,6 +7,7 @@ import ContentEditableCell from "@/components/ContentEditableCell";
 import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
 import {Button} from "@/components/ui/button";
 import {useAuth} from "@/utils/auth";
+import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
 import {toast} from "sonner";
 import {useDebouncedCallback} from "@/hooks/useDebouncedCallback";
 import {searchClients, Client} from "@/lib/api/clients";
@@ -29,6 +30,7 @@ export default function IndividualizedGoalsTemplate(
     const navigate = useNavigate();
     const location = useLocation();
     const {user} = useAuth();
+    const agencyMode = useEffectiveAgencyMode();
     const documentId = new URLSearchParams(location.search).get("id");
     const firebaseId = new URLSearchParams(location.search).get("firebaseId");
     const isUserPanel = location.pathname.startsWith("/user-panel/");
@@ -167,7 +169,7 @@ export default function IndividualizedGoalsTemplate(
         clientSearchTimeoutRef.current = setTimeout(async () => {
             try {
                 setIsSearchingClients(true);
-                const results = await searchClients(query, user?.agencyId);
+                const results = await searchClients(query, user?.agencyId, agencyMode ?? undefined);
                 setClientSearchResults(results);
                 setShowClientDropdown(results.length > 0);
             } catch (error) {
@@ -177,7 +179,7 @@ export default function IndividualizedGoalsTemplate(
                 setIsSearchingClients(false);
             }
         }, 300);
-    }, [user?.agencyId]);
+    }, [user?.agencyId, agencyMode]);
 
     const handleClientSelect = (client: Client) => {
         const clientName = client.firstName && client.lastName

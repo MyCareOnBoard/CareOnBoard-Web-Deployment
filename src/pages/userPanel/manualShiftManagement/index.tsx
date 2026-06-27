@@ -14,6 +14,7 @@ import { format, parse } from "date-fns";
 import { useSignDocumentMutation, useCheckSignatureStatusQuery } from "@/pages/applicant/application/api";
 import { searchClients, Client } from "@/lib/api/clients";
 import { useAuth } from "@/utils/auth";
+import { programLabel } from "@/lib/roleLabel";
 import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 
@@ -155,6 +156,9 @@ export default function ManualShiftManagementPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
+  // Field staff carry one program; scope client search to it (DSP→ddd / Caregiver→hha).
+  const clientType = programLabel({ applicantType: user?.applicantType, role: user?.role })
+    .toLowerCase() as "ddd" | "hha";
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -392,7 +396,7 @@ export default function ManualShiftManagementPage() {
           setShowClientDropdown(false);
           return;
         }
-        const clients = await searchClients(query, user?.agencyId);
+        const clients = await searchClients(query, user?.agencyId, clientType);
         setClientSearchResults(clients);
         setShowClientDropdown(clients.length > 0);
       } catch (error) {
@@ -403,7 +407,7 @@ export default function ManualShiftManagementPage() {
         setIsSearchingClients(false);
       }
     }, 300); // 300ms debounce
-  }, [user?.agencyId]);
+  }, [user?.agencyId, clientType]);
 
   // Handle client selection
   const handleClientSelect = (client: Client) => {

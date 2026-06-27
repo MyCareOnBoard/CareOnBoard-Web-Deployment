@@ -5,6 +5,7 @@ import { Routes } from "@/routes/constants";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import ClientNameLink from "./ClientNameLink";
 import { GROUPED_TABLE_ROW_CLASS, TABLE_ROW_CLASS } from "./tableColumns";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
 
 const MISSING_STAFF_ID = "—";
 const STAFF_ID_DISPLAY_LENGTH = 6;
@@ -58,6 +59,7 @@ function DurationRange({ start, end }: { start: string; end: string }) {
 }
 
 function RecentClaimRow({ claim, variant, showClient = true }: RecentClaimRowProps) {
+  const { labels } = useStaffLabels();
   if (variant === "mobile") {
     return (
       <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
@@ -71,7 +73,7 @@ function RecentClaimRow({ claim, variant, showClient = true }: RecentClaimRowPro
 
         <div className={showClient ? "mt-4 space-y-3" : "space-y-3"}>
           <div className="flex justify-between gap-4">
-            <span className="text-[13px] text-[#808081]">Staff</span>
+            <span className="text-[13px] text-[#808081]">{labels.noun}</span>
             <StaffLink staffId={claim.staffId} staffName={claim.staffName} />
           </div>
           <div className="flex justify-between gap-4">

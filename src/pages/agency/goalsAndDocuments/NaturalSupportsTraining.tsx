@@ -7,6 +7,7 @@ import {Textarea} from "@/components/ui/textarea";
 import {Button} from "@/components/ui/button";
 import {searchClients, Client} from "@/lib/api/clients";
 import {useAuth} from "@/utils/auth";
+import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
 import {toast} from "sonner";
 import {useDebouncedCallback} from "@/hooks/useDebouncedCallback";
 import {
@@ -25,6 +26,7 @@ export default function NaturalSupportsTraining() {
     const navigate = useNavigate();
     const location = useLocation();
     const {user} = useAuth();
+    const agencyMode = useEffectiveAgencyMode();
     const documentId = new URLSearchParams(location.search).get("id");
     const firebaseId = new URLSearchParams(location.search).get("firebaseId");
     const fromList = new URLSearchParams(location.search).get("fromList") === "true";
@@ -183,7 +185,7 @@ export default function NaturalSupportsTraining() {
         clientSearchTimeoutRef.current = setTimeout(async () => {
             try {
                 setIsSearchingClients(true);
-                const results = await searchClients(query, user?.agencyId);
+                const results = await searchClients(query, user?.agencyId, agencyMode ?? undefined);
                 setClientSearchResults(results);
                 setShowClientDropdown(results.length > 0);
             } catch (error) {
@@ -193,7 +195,7 @@ export default function NaturalSupportsTraining() {
                 setIsSearchingClients(false);
             }
         }, 300);
-    }, [user?.agencyId]);
+    }, [user?.agencyId, agencyMode]);
 
     const handleClientSelect = (client: Client) => {
         const clientName = client.firstName && client.lastName 

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router";
-import { useSelector, useDispatch } from "react-redux";
+import { useDispatch } from "react-redux";
 import { useAuth } from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
@@ -14,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Sparkles } from "lucide-react";
 import { staffLabels } from "@/lib/roleLabel";
 import { cn } from "@/lib/utils";
-import type { RootState } from "@/store/redux/store";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import { setAgencyMode, type AgencyMode } from "@/store/redux/agencyModeSlice";
 import HomeIcon from "@/assets/icons/home.svg?react";
 import AiIcon from "@/assets/icons/ai.svg?react";
@@ -130,7 +130,7 @@ function AgencyModeToggle({ mode, onSelect }: { mode: AgencyMode; onSelect: (m: 
                 )}
             >
                 <Brain className="h-3.5 w-3.5" />
-                DDD
+                <span className="hidden sm:inline">DDD</span>
             </button>
             <button
                 type="button"
@@ -143,7 +143,7 @@ function AgencyModeToggle({ mode, onSelect }: { mode: AgencyMode; onSelect: (m: 
                 )}
             >
                 <Heart className="h-3.5 w-3.5" />
-                HHA
+                <span className="hidden sm:inline">HHA</span>
             </button>
         </div>
     );
@@ -218,14 +218,9 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     const supportedTypes = user?.agency?.supportedClientTypes ?? [];
     const supportsBoth = supportedTypes.includes("ddd") && supportedTypes.includes("hha");
 
-    const storedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
-
-    // Effective mode: use stored value, or auto-derive from agency's single supported type.
-    const effectiveMode = useMemo<AgencyMode | null>(() => {
-        if (supportsBoth) return storedMode ?? null;
-        if (supportedTypes.includes("hha")) return "hha";
-        return "ddd";
-    }, [supportsBoth, supportedTypes, storedMode]);
+    // Effective mode: stored toggle, or auto-derived from the agency's single
+    // supported type. Shared with the applicant directory's data fetch.
+    const effectiveMode = useEffectiveAgencyMode();
 
     const needsModeSelection = supportsBoth && !effectiveMode;
 

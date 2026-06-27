@@ -17,12 +17,14 @@ import {
 } from "./billingUtils";
 import { useToast } from "@/hooks/use-toast";
 import { mapExpenseMutationError } from "@/pages/agency/billing/shared/billingErrorCopy";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
 
 export default function DSPClaimsPage() {
   const {dsp} = useParams();
   const navigate = useNavigate();
   const {user} = useAuth();
   const {toast} = useToast();
+  const { labels } = useStaffLabels();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const printContentRef = useRef<HTMLDivElement>(null);
 
@@ -62,7 +64,7 @@ export default function DSPClaimsPage() {
 
       toast({
         title: "Expense approved",
-        description: "Included in this DSP's next payroll for the expense date.",
+        description: `Included in this ${labels.noun}'s next payroll for the expense date.`,
       });
     } catch (error: unknown) {
       toast({
@@ -75,7 +77,7 @@ export default function DSPClaimsPage() {
 
   const handleRejectExpense = async (expenseId: string) => {
     const reason = window.prompt(
-      "Reason for declining (the DSP will see this in their notification, at least 10 characters):",
+      `Reason for declining (the ${labels.noun} will see this in their notification, at least 10 characters):`,
     );
     if (reason === null) {
       return;
@@ -84,7 +86,7 @@ export default function DSPClaimsPage() {
     if (trimmed.length < 10) {
       toast({
         title: "Reason required",
-        description: "Add at least 10 characters so the DSP understands why.",
+        description: `Add at least 10 characters so the ${labels.noun} understands why.`,
         variant: "destructive",
       });
       return;
@@ -98,7 +100,7 @@ export default function DSPClaimsPage() {
 
       toast({
         title: "Expense declined",
-        description: "The DSP will see your reason in their app.",
+        description: `The ${labels.noun} will see your reason in their app.`,
       });
     } catch (error: unknown) {
       toast({
@@ -252,8 +254,9 @@ export default function DSPClaimsPage() {
         heightLeft -= pageHeight - 1;
       }
 
-      const dspName = dspInfo?.fullName?.replace(/\s+/g, '_') || 'DSP';
-      const filename = `DSP_Claims_${dspName}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const safeNoun = labels.noun.replace(/[^A-Za-z]/g, '') || 'Staff';
+      const dspName = dspInfo?.fullName?.replace(/\s+/g, '_') || safeNoun;
+      const filename = `${safeNoun}_Claims_${dspName}_${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
 
       // Cleanup on success
@@ -289,7 +292,7 @@ export default function DSPClaimsPage() {
       <div className="min-h-screen bg-[#eef4f5] px-8 flex items-center justify-center">
         <div className="text-center">
           <p className="text-[18px] font-semibold text-[#10141a] mb-2">
-            Failed to load DSP claims
+            Failed to load {labels.noun} claims
           </p>
           <p className="text-[14px] text-[#808081] mb-4">
             Please try again later
@@ -351,7 +354,7 @@ export default function DSPClaimsPage() {
                 to={Routes.agency.billing.expenses}
                 className="text-[13px] font-medium text-[#00b4b8] hover:underline"
               >
-                Review all DSP expenses
+                Review all {labels.noun} expenses
               </Link>
             </div>
             <div className="space-y-3">
@@ -401,7 +404,7 @@ export default function DSPClaimsPage() {
         )}
         <div ref={printContentRef} className="bg-white p-8 rounded-lg forced-colors:none no-oklch">
           <h2 className="text-[18px] font-semibold text-[#10141a] mb-4">
-            Staff Member
+            {labels.noun}
           </h2>
 
           {/* Staff Profile */}

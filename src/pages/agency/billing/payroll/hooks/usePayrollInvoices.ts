@@ -7,6 +7,7 @@ import {
   type PayrollInvoiceListItem,
   type PayrollInvoiceStatus,
 } from "@/lib/api/payroll";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 type RefetchOptions = {
   force?: boolean;
@@ -27,6 +28,7 @@ export function usePayrollInvoices(
   const [error, setError] = useState<string | null>(null);
   const [mutating, setMutating] = useState(false);
   const requestIdRef = useRef(0);
+  const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
@@ -53,6 +55,7 @@ export function usePayrollInvoices(
           endDate: dateRange.endDate,
           status: statusFilter === "all" ? undefined : statusFilter,
           limit: 50,
+          ...(mode ? { mode } : {}),
         });
 
         if (requestIdRef.current !== requestId) {
@@ -77,7 +80,7 @@ export function usePayrollInvoices(
         }
       }
     },
-    [dateRange.endDate, dateRange.startDate, enabled, statusFilter],
+    [dateRange.endDate, dateRange.startDate, enabled, statusFilter, mode],
   );
 
   useEffect(() => {

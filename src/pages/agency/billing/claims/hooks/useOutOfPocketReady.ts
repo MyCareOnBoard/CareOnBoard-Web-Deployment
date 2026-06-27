@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listOutOfPocketReady, type OutOfPocketReadyRow } from "@/lib/api/out-of-pocket";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 type RefetchOptions = { force?: boolean };
 type Options = { enabled?: boolean };
@@ -11,6 +12,7 @@ export function useOutOfPocketReady({ enabled = true }: Options = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
@@ -20,7 +22,7 @@ export function useOutOfPocketReady({ enabled = true }: Options = {}) {
       setLoading(true);
       setError(null);
       try {
-        const response = await listOutOfPocketReady({ limit: 100 });
+        const response = await listOutOfPocketReady({ limit: 100, ...(mode ? { mode } : {}) });
         if (requestIdRef.current !== requestId) return;
         setRows(response.rows);
         setMileageRate(response.mileageRate ?? 0);
@@ -33,7 +35,7 @@ export function useOutOfPocketReady({ enabled = true }: Options = {}) {
         if (requestIdRef.current === requestId) setLoading(false);
       }
     },
-    [enabled],
+    [enabled, mode],
   );
 
   useEffect(() => {

@@ -17,6 +17,7 @@ import {
 } from "@/pages/agency/billing/components/billingModalStyles";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/utils/auth";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import {
   buildClaimableRowsForClient,
   buildCombinedPreviewListTitle,
@@ -75,6 +76,7 @@ export default function GenerateClaimModal({
   onConfirmInvoice,
 }: GenerateClaimModalProps) {
   const { user } = useAuth();
+  const agencyMode = useEffectiveAgencyMode();
   const [clientQuery, setClientQuery] = useState("");
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
@@ -241,7 +243,7 @@ export default function GenerateClaimModal({
       clientSearchTimeoutRef.current = setTimeout(async () => {
         try {
           setIsSearchingClients(true);
-          const results = await searchClients(searchQuery, user?.agencyId);
+          const results = await searchClients(searchQuery, user?.agencyId, agencyMode ?? undefined);
           setClientSearchResults(results);
           setShowClientDropdown(results.length > 0);
         } catch (error) {
@@ -253,7 +255,7 @@ export default function GenerateClaimModal({
         }
       }, 300);
     },
-    [user?.agencyId],
+    [user?.agencyId, agencyMode],
   );
 
   const handleClientSelect = useCallback(

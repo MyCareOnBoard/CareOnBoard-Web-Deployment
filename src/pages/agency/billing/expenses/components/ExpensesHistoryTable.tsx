@@ -18,6 +18,7 @@ type ExpensesHistoryTableProps = {
   statusFilter: ExpenseStatus | "all";
   onStatusFilterChange: (status: ExpenseStatus | "all") => void;
   onLoadMore?: () => void;
+  noun?: string;
 };
 
 function SkeletonRow() {
@@ -39,6 +40,7 @@ export default function ExpensesHistoryTable({
   statusFilter,
   onStatusFilterChange,
   onLoadMore,
+  noun = "DSP",
 }: ExpensesHistoryTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -83,7 +85,7 @@ export default function ExpensesHistoryTable({
             type="search"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search by DSP name"
+            placeholder={"Search by " + noun + " name"}
             className="w-full rounded-md border border-[#e5e5e6] bg-white px-3 py-2 text-[13px] text-[#10141a] sm:w-64"
           />
         </div>
@@ -93,7 +95,7 @@ export default function ExpensesHistoryTable({
         <div className="overflow-x-auto">
           <div className={EXPENSES_TABLE_MIN_WIDTH}>
             <div className={EXPENSES_TABLE_HEADER_CLASS}>
-              <span>DSP</span>
+              <span>{noun}</span>
               <span>Amount</span>
               <span>Category</span>
               <span>Description</span>

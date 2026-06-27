@@ -120,7 +120,7 @@ export function useDSPList() {
     const user = useSelector((state: RootState) => state.auth.user);
     const agencyId = user?.agencyId;
     const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId || ""]);
-    const applicantType = selectedMode === "hha" ? "hha" : selectedMode === "ddd" ? "dsp" : undefined;
+    const role = selectedMode === "hha" ? "hha" : selectedMode === "ddd" ? "dsp" : undefined;
 
     const fetchDSPs = useCallback(async () => {
         if (!agencyId) {
@@ -134,8 +134,8 @@ export function useDSPList() {
             setError(null);
 
             const pageSize = 100;
-            let page = 1;
-            let total = 0;
+            let cursor: string | undefined;
+            let pages = 0;
             let allEmployees: Employee[] = [];
 
             do {
@@ -143,26 +143,18 @@ export function useDSPList() {
                     agencyId,
                     limit: pageSize,
                     includeStats: true,
-                    page,
-                    applicantType,
+                    role,
+                    cursor,
                 });
 
-                const batch = employeesResponse.employees || [];
-                allEmployees = allEmployees.concat(batch);
-                total = employeesResponse.total || allEmployees.length;
-
-                if (batch.length === 0) {
-                    break;
-                }
-
-                page += 1;
-            } while (allEmployees.length < total && page <= 20);
+                allEmployees = allEmployees.concat(employeesResponse.employees || []);
+                cursor = employeesResponse.nextCursor ?? undefined;
+                pages += 1;
+            } while (cursor && pages <= 50); // ponytail: 50 pages = 5000 staff ceiling
 
             const employees = uniqueEmployeesById(allEmployees);
 
-            const transformedDSPs = employees.map((employee) => {
-                return transformEmployeeToDSP(employee);
-            });
+            const transformedDSPs = employees.map((employee) => transformEmployeeToDSP(employee));
             setDsps(transformedDSPs);
             setStats(computeDSPStats(transformedDSPs));
         } catch (err: any) {
@@ -176,7 +168,7 @@ export function useDSPList() {
         } finally {
             setIsLoading(false);
         }
-    }, [agencyId, applicantType]);
+    }, [agencyId, role]);
 
     useEffect(() => {
         fetchDSPs();

@@ -9,6 +9,7 @@ import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import { searchClients, type Client } from "@/lib/api/clients";
 import { formatShiftLocation, type ShiftLocation } from "@/lib/api/shifts";
 import { useAuth } from "@/utils/auth";
+import { programLabel } from "@/lib/roleLabel";
 
 const NOTES_MAX = 1000;
 
@@ -54,6 +55,9 @@ export default function AddManualMileageModal({
 }: AddManualMileageModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  // Field staff carry one program; scope client search to it (DSP→ddd / Caregiver→hha).
+  const clientType = programLabel({ applicantType: user?.applicantType, role: user?.role })
+    .toLowerCase() as "ddd" | "hha";
 
   const [mileageType, setMileageType] = useState<MileageType>("agency");
 
@@ -92,7 +96,7 @@ export default function AddManualMileageModal({
     clientSearchTimeoutRef.current = setTimeout(async () => {
       setIsSearchingClients(true);
       try {
-        const results = await searchClients(query, user?.agencyId);
+        const results = await searchClients(query, user?.agencyId, clientType);
         setClientSearchResults(results);
         setShowClientDropdown(results.length > 0);
       } catch {

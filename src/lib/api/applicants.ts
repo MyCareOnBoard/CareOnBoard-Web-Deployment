@@ -1,6 +1,6 @@
 import axiosClient from '../axios';
 
-export type PeriodFilter = "today" | "week" | "month";
+export type PeriodFilter = "all" | "today" | "week" | "month";
 
 // ===== Type Definitions =====
 
@@ -74,7 +74,8 @@ interface ApiResponse<T = unknown> {
 
 interface ListParams {
   tab?: "all" | "clearance" | "pending" | "approved" | "rejected";
-  period?: PeriodFilter | string;
+  applicantType?: "dsp" | "hha";
+  dateFilter?: "today" | "week" | "month";
   search?: string;
   limit?: number;
   offset?: number;

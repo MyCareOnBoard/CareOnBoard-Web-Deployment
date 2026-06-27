@@ -13,6 +13,7 @@ import {
   TABLE_MIN_WIDTH,
   TABLE_ROW_CLASS,
 } from "./tableColumns";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
 
 const SKELETON_ROW_COUNT = 10;
 
@@ -63,6 +64,7 @@ export default function RecentClaimsTable({
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
   const [typeFilter, setTypeFilter] = useState<"all" | "claims" | "out-of-pocket">("all");
+  const { labels } = useStaffLabels();
 
   const sortedClaims = useMemo(
     () =>
@@ -150,7 +152,7 @@ export default function RecentClaimsTable({
         <div className="overflow-x-auto">
           <div className={TABLE_MIN_WIDTH}>
             <div className={GROUPED_TABLE_HEADER_CLASS}>
-              <span>Staff</span>
+              <span>{labels.noun}</span>
               <span>Service code</span>
               <span>PA Number</span>
               <span>Service date</span>

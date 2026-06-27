@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { applicantsApi, Applicant, PeriodFilter } from "@/lib/api/applicants";
+import {
+  useEffectiveAgencyMode,
+  agencyModeToApplicantType,
+} from "@/hooks/useEffectiveAgencyMode";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -25,12 +29,13 @@ interface UseApplicantDirectoryDataParams {
 
 export function useApplicantDirectoryData({
   tab = "all",
-  dateFilter = "today",
+  dateFilter = "all",
   limit = ITEMS_PER_PAGE,
   offset = 0,
 }: UseApplicantDirectoryDataParams = {}): UseApplicantDirectoryDataResult {
   const { toast } = useToast();
   const toastRef = useRef(toast);
+  const applicantType = agencyModeToApplicantType(useEffectiveAgencyMode());
   const [currentPage, setCurrentPage] = useState(Math.floor(offset / limit) + 1);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
@@ -60,7 +65,8 @@ export function useApplicantDirectoryData({
     try {
       const res = await applicantsApi.directory({
         tab,
-        period: activeTab,
+        applicantType,
+        dateFilter: activeTab === "all" ? undefined : activeTab,
         search: debouncedSearchQuery,
         limit,
         offset: startIndex,
@@ -97,7 +103,7 @@ export function useApplicantDirectoryData({
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, debouncedSearchQuery, startIndex]);
+  }, [activeTab, debouncedSearchQuery, startIndex, applicantType]);
 
   // Debounce search query to avoid excessive API calls
   useEffect(() => {
@@ -108,10 +114,10 @@ export function useApplicantDirectoryData({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Reset page when search query or tab changes
+  // Reset page when search query, tab, or program mode changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchQuery, activeTab]);
+  }, [debouncedSearchQuery, activeTab, applicantType]);
 
   // Fetch applicants when debounced search, tab, or page changes
   useEffect(() => {

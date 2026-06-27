@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DateRangeValues } from "@/pages/agency/billing/shared/types";
 import { subscribePayrollInvalidation } from "@/pages/agency/billing/shared/billingInvalidation";
 import { getStaffToPay, type DuePayrollEntry } from "@/lib/api/payroll";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
@@ -28,6 +29,7 @@ export function useStaffToPay(
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
+  const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
@@ -62,6 +64,7 @@ export function useStaffToPay(
           duePage,
           dueLimit,
           approved: true,
+          ...(mode ? { mode } : {}),
         });
 
         if (requestIdRef.current !== requestId) {
@@ -90,7 +93,7 @@ export function useStaffToPay(
         }
       }
     },
-    [dateRange.endDate, dateRange.startDate, dueLimit, duePage, enabled],
+    [dateRange.endDate, dateRange.startDate, dueLimit, duePage, enabled, mode],
   );
 
   useEffect(() => {
