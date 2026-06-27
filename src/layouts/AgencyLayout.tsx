@@ -262,9 +262,19 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     const navItems = useMemo(() => {
         const accessFiltered = filterNavItemsByAccess(allNavItems, user?.userType, user?.profile?.accessList);
         const modeFiltered = filterNavItemsByMode(accessFiltered, effectiveMode);
-        return modeFiltered.map((item) =>
-            item.path === Routes.agency.dspManagement ? { ...item, label: dspManagementLabel } : item
-        );
+        const expensesLabel = effectiveMode === "hha" ? "Caregiver expenses" : "DSP expenses";
+        return modeFiltered.map((item) => {
+            if (item.path === Routes.agency.dspManagement) return { ...item, label: dspManagementLabel };
+            if (item.children) {
+                return {
+                    ...item,
+                    children: item.children.map((child) =>
+                        child.path === Routes.agency.billing.expenses ? { ...child, label: expensesLabel } : child
+                    ),
+                };
+            }
+            return item;
+        });
     }, [user?.userType, user?.profile?.accessList, effectiveMode, dspManagementLabel]);
 
     // Protect routes - redirect if user tries to access unauthorized page.
