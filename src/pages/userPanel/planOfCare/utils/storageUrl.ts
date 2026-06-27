@@ -1,5 +1,5 @@
 /**
- * Keep in sync with CareOnBoard-BackEnd functions/utils/storage-url.js
+ * Keep in sync with CareOnboard-BackEnd functions/utils/storage-url.js
  */
 const ALLOWED_HOSTS = new Set([
   "storage.googleapis.com",

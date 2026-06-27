@@ -2,7 +2,7 @@
 
 ## Overview
 
-CareOnBoard creates **in-app notification records** in Firestore, sends **email** for many notification types (via **Mailgun**), and sends **mobile push** to devices that register an **Expo push token**. **Compliance and certification reminders** are driven by **scheduled** Cloud Functions so expiring or expired items are surfaced on a daily cadence without spamming the same person every run.
+CareOnboard creates **in-app notification records** in Firestore, sends **email** for many notification types (via **Mailgun**), and sends **mobile push** to devices that register an **Expo push token**. **Compliance and certification reminders** are driven by **scheduled** Cloud Functions so expiring or expired items are surfaced on a daily cadence without spamming the same person every run.
 
 **Audience:** Engineers, DevOps, security reviewers, and technical staff who need to operate, test, or extend notification delivery, compliance scanning, and related data fields.
 

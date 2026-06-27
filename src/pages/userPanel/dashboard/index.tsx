@@ -595,7 +595,7 @@ export default function UserPanelDashboardPage() {
                             className="px-10 py-4 text-center bg-white shadow-lg rounded-xl max-w-sm flex flex-col justify-center"
                         >
                             <h4 className="text-2xl font-semibold">
-                                CareOnBoard would like to access your location
+                                CareOnboard would like to access your location
                             </h4>
                             <p className="mt-1 text-sm text-gray-500">
                                 The device will use location in the background
