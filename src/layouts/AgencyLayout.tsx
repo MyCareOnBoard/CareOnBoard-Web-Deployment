@@ -130,7 +130,7 @@ function AgencyModeToggle({ mode, onSelect }: { mode: AgencyMode; onSelect: (m: 
                 )}
             >
                 <Brain className="h-3.5 w-3.5" />
-                DDD
+                <span className="hidden sm:inline">DDD</span>
             </button>
             <button
                 type="button"
@@ -143,7 +143,7 @@ function AgencyModeToggle({ mode, onSelect }: { mode: AgencyMode; onSelect: (m: 
                 )}
             >
                 <Heart className="h-3.5 w-3.5" />
-                HHA
+                <span className="hidden sm:inline">HHA</span>
             </button>
         </div>
     );
