@@ -130,10 +130,6 @@ export function ClientFormWizard({
     }
   }, [config.backNavigate, navigate]);
 
-  const handleChangeClientType = useCallback(() => {
-    setTypeSelected(false);
-  }, []);
-
   const skipPocGuardRef = useRef(false);
   const generatePocRef = useRef<GeneratePocPanelHandle>(null);
 
@@ -278,7 +274,6 @@ export function ClientFormWizard({
           pageTitle={pageTitle}
           backNavigate={config.backNavigate}
           clientId={clientId ?? config.clientId}
-          onChangeClientType={!isEditMode && !clientId ? handleChangeClientType : undefined}
           isEditMode={config.isEditMode}
           headerRightAction={
             !isEditMode ? (
@@ -360,7 +355,6 @@ export function ClientFormWizard({
     typeSelected,
     handleTypeSelect,
     handlePickerBack,
-    handleChangeClientType,
     clientId,
     isDddClient,
     allowed,
