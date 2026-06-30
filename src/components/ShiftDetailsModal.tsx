@@ -11,6 +11,8 @@ import {
 } from "@/lib/api/shifts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
+import { CoverageFields, type CoverageFieldsValue } from "@/components/CoverageFields";
+import { COVERAGE, resolveLineCoverage } from "@/lib/coverage";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import TimePicker from "@/components/TimePicker";
@@ -188,6 +190,11 @@ export default function ShiftDetailsModal({
   const [draftResolveLateClockIn, setDraftResolveLateClockIn] = useState(false);
   const [draftCompleted, setDraftCompleted] = useState(false);
   const [draftApproved, setDraftApproved] = useState(false);
+  const [draftCoverage, setDraftCoverage] = useState<CoverageFieldsValue>({
+    coverage: COVERAGE.PAYER,
+    splitMode: null,
+    splitValue: null,
+  });
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -209,6 +216,8 @@ export default function ShiftDetailsModal({
     setDraftResolveLateClockIn(false);
     setDraftCompleted(s.status === ShiftStatus.COMPLETED);
     setDraftApproved(Boolean(s.approved));
+    const c = resolveLineCoverage(s, s.client ?? null);
+    setDraftCoverage({ coverage: c.coverage, splitMode: c.splitMode, splitValue: c.splitValue });
   }, []);
 
   useEffect(() => {
@@ -282,6 +291,19 @@ export default function ShiftDetailsModal({
       return;
     }
 
+    if (draftApproved && draftCoverage.coverage === COVERAGE.BOTH) {
+      const v = Number(draftCoverage.splitValue);
+      if (!Number.isFinite(v) || v < 0 || (draftCoverage.splitMode === "percentage" && v > 100)) {
+        toast({
+          title: "Set the split",
+          description:
+            "Enter how much the payer covers (0–100% or a dollar amount) before approving a split shift.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     const maintenanceReason = reason.trim();
     const serverIn = clockedAtToHHmm(resolvedShift.clockedInAt);
     const serverOut = clockedAtToHHmm(resolvedShift.clockedOutAt);
@@ -324,12 +346,29 @@ export default function ShiftDetailsModal({
       payload.approved = draftApproved;
     }
 
+    const serverCoverage = resolveLineCoverage(resolvedShift, resolvedShift.client ?? null);
+    const coverageChanged =
+      draftCoverage.coverage !== serverCoverage.coverage ||
+      (draftCoverage.coverage === COVERAGE.BOTH &&
+        (draftCoverage.splitMode !== serverCoverage.splitMode ||
+          Number(draftCoverage.splitValue) !== Number(serverCoverage.splitValue)));
+    if (coverageChanged) {
+      payload.coverage = draftCoverage.coverage;
+      payload.splitMode =
+        draftCoverage.coverage === COVERAGE.BOTH
+          ? draftCoverage.splitMode ?? "percentage"
+          : null;
+      payload.splitValue =
+        draftCoverage.coverage === COVERAGE.BOTH ? draftCoverage.splitValue : null;
+    }
+
     const hasMeaningfulChange =
       inNorm !== serverIn ||
       outNorm !== serverOut ||
       draftCompleted !== serverCompleted ||
       shouldResolveLateClockIn ||
-      draftApproved !== serverApproved;
+      draftApproved !== serverApproved ||
+      coverageChanged;
     if (!hasMeaningfulChange && Object.keys(payload).length === 1) {
       toast({
         title: "Nothing to update",
@@ -504,19 +543,25 @@ export default function ShiftDetailsModal({
                 />
               </div>
               {showApproveForBilling ? (
-                <div className="mt-3 flex items-center justify-between gap-3 border-t border-[rgba(0,0,0,0.06)] pt-3">
-                  <div className="min-w-0">
-                    <p className="text-[14px] font-semibold text-[#10141a]">Approve for billing</p>
-                    <p className="text-[11px] text-[#808081]">
-                      Shows as Approved in Billing &amp; Approvals when you save.
-                    </p>
+                <>
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-[rgba(0,0,0,0.06)] pt-3">
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-semibold text-[#10141a]">Approve for billing</p>
+                      <p className="text-[11px] text-[#808081]">
+                        Shows as Approved in Billing &amp; Approvals when you save.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={draftApproved}
+                      onCheckedChange={setDraftApproved}
+                      aria-label="Approve for billing"
+                    />
                   </div>
-                  <Switch
-                    checked={draftApproved}
-                    onCheckedChange={setDraftApproved}
-                    aria-label="Approve for billing"
-                  />
-                </div>
+                  <div className="mt-3 flex flex-col gap-2">
+                    <p className="text-[14px] font-semibold text-[#10141a]">Billing coverage</p>
+                    <CoverageFields value={draftCoverage} onChange={setDraftCoverage} />
+                  </div>
+                </>
               ) : null}
             </div>
 

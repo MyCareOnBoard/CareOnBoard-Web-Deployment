@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { AddressAutocompleteInput } from "@/pages/shared/client-management/components/AddressAutocompleteInput";
 import { CalendarDays, Plus, Trash2, FileUp } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import {
   GUARDIAN_RELATIONSHIP_LABELS,
   GUARDIAN_RELATIONSHIP_VALUES,
   createEmptyOutcome,
+  createEmptyCareTeamContact,
   createEmptyGuardianContact,
   createEmptyHhaAuthorization,
   createEmptyHhaInsuranceInfo,
@@ -43,6 +45,8 @@ import type { HhaAuthorization } from "@/pages/shared/client-management/types/fo
 import { deriveAuthorizedHoursPerWeek } from "@/pages/shared/client-management/utils/deriveAuthorizedHoursPerWeek";
 import { stripExtractedMoney } from "@/pages/shared/client-management/utils/normalizeExtractedServiceAuthorization";
 import { weeklyDistributionFingerprintFromWd, normalizeWeeklyDistributionUpdate } from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
+import { OptionTiles } from "@/pages/shared/client-management/components/forms/formControls";
+import { COVERAGE, SPLIT_MODE, type Coverage, type SplitMode } from "@/lib/coverage";
 const RATE_INPUT_CLASS = "h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SELECT_TRIGGER_CLASS = "w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SECTION_HEADER_ACTION_BTN =
@@ -553,10 +557,17 @@ export function Stage2GuardianAndFunding({
     [setFormData],
   );
 
-  const handleBillingDirectionChange = useCallback(
-    (value: string) =>
-      updateStage2({ billingDirection: value === "out-of-pocket" ? "out-of-pocket" : "claims" }),
-    [updateStage2],
+  const handleDefaultCoverageChange = useCallback(
+    (next: Coverage) =>
+      updateStage2(
+        next === COVERAGE.BOTH
+          ? {
+              defaultCoverage: next,
+              defaultSplitMode: stage2.defaultSplitMode ?? SPLIT_MODE.PERCENTAGE,
+            }
+          : { defaultCoverage: next },
+      ),
+    [updateStage2, stage2.defaultSplitMode],
   );
 
   const guardianPickerOptions = useMemo(
@@ -657,55 +668,136 @@ export function Stage2GuardianAndFunding({
         </h1>
       </div>
 
-      <div className="mb-10">
-        <div className="mb-4">
-          <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-            Billing direction
-          </p>
-          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            Claims bill the provider; out of pocket bills the payer as an invoice. Applies to all of
-            this client&apos;s services. Authorization comes from the service authorizations below.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Billing type</label>
-            <Select
-              value={stage2.billingDirection ?? "claims"}
-              onValueChange={handleBillingDirectionChange}
-            >
-              <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="claims">Claims (provider-paid)</SelectItem>
-                <SelectItem value="out-of-pocket">Out of pocket (family-paid)</SelectItem>
-              </SelectContent>
-            </Select>
+      <div className="mb-10 space-y-8">
+        {/* Default coverage — seeds the coverage selector on new shifts/rides and approvals. */}
+        <div>
+          <div className="mb-4">
+            <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+              Default coverage
+            </p>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              Applied automatically to new shifts and rides. You can change it for any individual
+              service.
+            </p>
           </div>
-          {stage2.billingDirection === "out-of-pocket" && (
-            <>
-              <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-normal text-[#10141a]">Payor name *</label>
-                <Input
-                  value={stage2.outOfPocketPayerName ?? ""}
-                  onChange={(e) => updateStage2({ outOfPocketPayerName: e.target.value })}
-                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                  placeholder="Who pays for these services"
-                />
+          <div className="flex flex-col gap-3">
+            <OptionTiles<Coverage>
+              value={(stage2.defaultCoverage ?? COVERAGE.PAYER) as Coverage}
+              options={[
+                { value: COVERAGE.PAYER, label: "Payer / Insurance" },
+                { value: COVERAGE.OUT_OF_POCKET, label: "Out of pocket" },
+                { value: COVERAGE.BOTH, label: "Both" },
+              ]}
+              onChange={handleDefaultCoverageChange}
+              ariaLabel="Default billing coverage"
+            />
+            {stage2.defaultCoverage === COVERAGE.BOTH && (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">Split type</label>
+                  <Select
+                    value={stage2.defaultSplitMode ?? SPLIT_MODE.PERCENTAGE}
+                    onValueChange={(v) => updateStage2({ defaultSplitMode: v as SplitMode })}
+                  >
+                    <SelectTrigger className="h-[44px] rounded-[12px] border-[#cccccd] bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={SPLIT_MODE.PERCENTAGE}>Percentage (%)</SelectItem>
+                      <SelectItem value={SPLIT_MODE.FLAT}>Flat amount ($)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]">
+                    {stage2.defaultSplitMode === SPLIT_MODE.FLAT ? "Payer pays ($)" : "Payer covers (%)"}
+                  </label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={stage2.defaultSplitMode === SPLIT_MODE.FLAT ? undefined : 100}
+                    step="0.01"
+                    value={stage2.defaultSplitValue ?? ""}
+                    onChange={(e) =>
+                      updateStage2({
+                        defaultSplitValue:
+                          e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                    className={RATE_INPUT_CLASS}
+                    placeholder={stage2.defaultSplitMode === SPLIT_MODE.FLAT ? "0.00" : "0–100"}
+                  />
+                  <p className="text-[11px] text-[#808081]">
+                    The payer covers this
+                    {stage2.defaultSplitMode === SPLIT_MODE.FLAT
+                      ? " amount per service"
+                      : " percentage"}
+                    ; the remainder is billed out of pocket.
+                  </p>
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-normal text-[#10141a]">Payer email *</label>
-                <Input
-                  type="email"
-                  value={stage2.outOfPocketPayerEmail ?? ""}
-                  onChange={(e) => updateStage2({ outOfPocketPayerEmail: e.target.value })}
-                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                  placeholder="Where invoices are sent"
-                />
-              </div>
-            </>
-          )}
+            )}
+          </div>
+        </div>
+
+        {/* Out-of-pocket payer — optional bill-to for out-of-pocket / both coverage. */}
+        <div>
+          <div className="mb-4">
+            <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+              Out-of-pocket payer (optional)
+            </p>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              Where to send invoices for services the family pays directly.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Full name</label>
+              <Input
+                value={stage2.outOfPocketPayerName ?? ""}
+                onChange={(e) => updateStage2({ outOfPocketPayerName: e.target.value })}
+                className={RATE_INPUT_CLASS}
+                placeholder="Who pays out of pocket"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Email</label>
+              <Input
+                type="email"
+                value={stage2.outOfPocketPayerEmail ?? ""}
+                onChange={(e) => updateStage2({ outOfPocketPayerEmail: e.target.value })}
+                className={RATE_INPUT_CLASS}
+                placeholder="Where invoices are sent"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Phone</label>
+              <Input
+                value={stage2.outOfPocketPayerPhone ?? ""}
+                onChange={(e) => updateStage2({ outOfPocketPayerPhone: e.target.value })}
+                className={RATE_INPUT_CLASS}
+                placeholder="Contact number"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Billing address</label>
+              <AddressAutocompleteInput
+                value={stage2.outOfPocketPayerAddress ?? ""}
+                onChange={(v) => updateStage2({ outOfPocketPayerAddress: v })}
+                placeholder="Mailing address"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]">Relationship to client</label>
+              <Input
+                value={stage2.outOfPocketPayerRelationship ?? ""}
+                onChange={(e) => updateStage2({ outOfPocketPayerRelationship: e.target.value })}
+                className={RATE_INPUT_CLASS}
+                placeholder="e.g. Parent, Spouse"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1102,14 +1194,13 @@ export function Stage2GuardianAndFunding({
                   <label className="text-[12px] font-normal text-[#10141a]">
                     Address (If different from client)
                   </label>
-                  <Input
+                  <AddressAutocompleteInput
                     value={g.address ?? ""}
-                    onChange={(e) => {
+                    onChange={(v) => {
                       const next = [...(stage2.guardians ?? [])];
-                      next[gi] = { ...next[gi], address: e.target.value };
+                      next[gi] = { ...next[gi], address: v };
                       updateStage2({ guardians: next });
                     }}
-                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                     placeholder="Enter address"
                   />
                 </div>
@@ -1244,7 +1335,7 @@ export function Stage2GuardianAndFunding({
           ) : null}
           {(stage2.careTeam ?? []).map((c, ci) => (
             <div
-              key={ci}
+              key={c.id ?? ci}
               className="group mb-4 rounded-[12px] border border-[#cccccd]/80 bg-white/50 p-4"
             >
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1316,15 +1407,15 @@ export function Stage2GuardianAndFunding({
                   }}
                   className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                 />
-                <Input
+                <AddressAutocompleteInput
                   placeholder="Address"
                   value={c.address ?? ""}
-                  onChange={(e) => {
+                  onChange={(v) => {
                     const next = [...(stage2.careTeam ?? [])];
-                    next[ci] = { ...next[ci], address: e.target.value };
+                    next[ci] = { ...next[ci], address: v };
                     updateStage2({ careTeam: next });
                   }}
-                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white lg:col-span-2"
+                  className="lg:col-span-2"
                 />
               </div>
             </div>
@@ -1335,10 +1426,7 @@ export function Stage2GuardianAndFunding({
             className="w-full border-dashed border-[#808081] text-[#10141a] sm:w-auto mt-2"
             onClick={() =>
               updateStage2({
-                careTeam: [
-                  ...(stage2.careTeam ?? []),
-                  { role: "", name: "", agency: "", phone: "", email: "", address: "" },
-                ],
+                careTeam: [...(stage2.careTeam ?? []), createEmptyCareTeamContact()],
               })
             }
           >

@@ -11,6 +11,7 @@ import {
 import { resolveWeekRangeForShift } from "./claimShiftBillingUtils";
 import { rideDateYmd, serviceCodesMatch } from "./claimSelectionUtils";
 import { mapReadyToClaimRowToRecentClaim } from "./readyToClaimUtils";
+import { splitCharge } from "@/lib/coverage";
 
 export type ClaimConfirmSelection = {
   shifts: Shift[];
@@ -132,6 +133,16 @@ function formatPreviewCharge(charge: number): string | null {
   return charge > 0 ? formatClaimCharge(charge) : null;
 }
 
+function billedChargeForRow(charge: number, row: ReadyToClaimRow): number {
+  const { payer, outOfPocket } = splitCharge(
+    charge,
+    row.coverage,
+    row.splitMode,
+    row.splitValue,
+  );
+  return Math.round((payer + outOfPocket) * 100) / 100;
+}
+
 function computeShiftPreviewChargeAmount(row: ReadyToClaimRow, claim: RecentClaim): number {
   const hours = parsePreviewHours(claim.totalHours);
   const rate =
@@ -140,7 +151,8 @@ function computeShiftPreviewChargeAmount(row: ReadyToClaimRow, claim: RecentClai
   if (!hours || !rate) {
     return 0;
   }
-  return computeClaimBilling(hours, rate, row.clientPayType ?? "hourly").charge;
+  const charge = computeClaimBilling(hours, rate, row.clientPayType ?? "hourly").charge;
+  return billedChargeForRow(charge, row);
 }
 
 function computeRidePreviewChargeAmount(row: ReadyToClaimRow, mileageRate: number): number {
@@ -149,7 +161,8 @@ function computeRidePreviewChargeAmount(row: ReadyToClaimRow, mileageRate: numbe
   if (!Number.isFinite(miles) || miles <= 0 || !Number.isFinite(rate) || rate <= 0) {
     return 0;
   }
-  return computeClaimBilling(miles, rate, "mile").charge;
+  const charge = computeClaimBilling(miles, rate, "mile").charge;
+  return billedChargeForRow(charge, row);
 }
 
 function buildShiftPreviewItem(
@@ -396,6 +409,9 @@ function shiftsAndRidesToReadyRows(
     endTime: shift.endTime ?? null,
     clientRate: null,
     clientPayType: null,
+    coverage: shift.coverage,
+    splitMode: shift.splitMode ?? null,
+    splitValue: shift.splitValue ?? null,
   }));
 
   const rideRows: ReadyToClaimRow[] = rides.map((ride) => {
@@ -413,6 +429,9 @@ function shiftsAndRidesToReadyRows(
       completedAt: ride.completedAt ?? null,
       scheduledStartTime: ride.scheduledStartTime ?? null,
       actualDistance: ride.actualDistance ?? null,
+      coverage: ride.coverage,
+      splitMode: ride.splitMode ?? null,
+      splitValue: ride.splitValue ?? null,
     };
   });
 

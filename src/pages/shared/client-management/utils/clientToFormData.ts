@@ -1,6 +1,7 @@
 import { Client } from "@/lib/api/clients";
 import {
     AddClientFormData,
+    createEmptyCareTeamContact,
     createEmptyGuardianContact,
     createEmptyServiceAuthorization,
     createInitialAddClientFormData,
@@ -354,10 +355,16 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             }
 
             return {
-                billingDirection:
-                    client.billingDirection === "out-of-pocket" ? "out-of-pocket" : "claims",
+                defaultCoverage:
+                    client.defaultCoverage ??
+                    (client.billingDirection === "out-of-pocket" ? "out_of_pocket" : "payer"),
+                defaultSplitMode: client.defaultSplitMode ?? "percentage",
+                defaultSplitValue: client.defaultSplitValue ?? null,
                 outOfPocketPayerName: client.outOfPocketPayer?.name ?? "",
                 outOfPocketPayerEmail: client.outOfPocketPayer?.email ?? "",
+                outOfPocketPayerPhone: client.outOfPocketPayer?.phone ?? "",
+                outOfPocketPayerAddress: client.outOfPocketPayer?.address ?? "",
+                outOfPocketPayerRelationship: client.outOfPocketPayer?.relationshipToClient ?? "",
                 guardianName: "",
                 guardianRelationship: undefined,
                 guardianEmail: "",
@@ -372,6 +379,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                     ((client.careTeam && client.careTeam.length > 0
                         ? client.careTeam
                         : client.guardianInfo?.careTeam) ?? []).map((c) => ({
+                        id: createEmptyCareTeamContact().id,
                         role: c.role ?? "",
                         name: c.name ?? "",
                         agency: c.agency ?? "",
@@ -484,6 +492,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                             issuedOnDate: existingDoc.issuedOnDate ? parseDate(existingDoc.issuedOnDate) : undefined,
                             expiryDate: existingDoc.expiryDate ? parseDate(existingDoc.expiryDate) : undefined,
                             autoReminder: existingDoc.autoReminder ?? defaultDoc.autoReminder,
+                            signed: existingDoc.signed ?? defaultDoc.signed,
                         };
                     }
                     return defaultDoc;
@@ -503,6 +512,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                         issuedOnDate: d.issuedOnDate ? parseDate(d.issuedOnDate) : undefined,
                         expiryDate: d.expiryDate ? parseDate(d.expiryDate) : undefined,
                         autoReminder: d.autoReminder ?? true,
+                        signed: d.signed,
                     }));
 
                 return [...mapped, ...legacy];

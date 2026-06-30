@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Routes } from "@/routes/constants";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import ClientNameLink from "./ClientNameLink";
+import CoverageBadge from "./CoverageBadge";
 import { GROUPED_TABLE_ROW_CLASS, TABLE_ROW_CLASS } from "./tableColumns";
 import { useStaffLabels } from "@/hooks/useStaffLabels";
 
@@ -88,6 +89,14 @@ function RecentClaimRow({ claim, variant, showClient = true }: RecentClaimRowPro
             <span className="text-[13px] text-[#808081]">Rate</span>
             <span className="text-[13px] font-medium text-[#10141a] tabular-nums">{claim.rate}</span>
           </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-[13px] text-[#808081]">Coverage</span>
+            <CoverageBadge
+              coverage={claim.coverage}
+              needsClaim={claim.needsClaim}
+              needsInvoice={claim.needsInvoice}
+            />
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#e5e5e6] pt-4">
@@ -124,6 +133,13 @@ function RecentClaimRow({ claim, variant, showClient = true }: RecentClaimRowPro
       <DurationRange start={claim.durationStart} end={claim.durationEnd} />
       <span className="text-[13px] text-[#10141a] tabular-nums">{claim.totalHours}</span>
       <span className="text-[13px] text-[#10141a] tabular-nums">{claim.rate}</span>
+      {!showClient && (
+        <CoverageBadge
+          coverage={claim.coverage}
+          needsClaim={claim.needsClaim}
+          needsInvoice={claim.needsInvoice}
+        />
+      )}
     </div>
   );
 }

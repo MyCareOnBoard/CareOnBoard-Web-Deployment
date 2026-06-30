@@ -8,6 +8,7 @@ import { ApiResponse } from '../api-types';
 import { Employee } from './employees';
 import { Client } from './clients';
 import { Agency } from '@/lib/api/agencies';
+import type { Coverage, SplitMode } from '@/lib/coverage';
 
 // API endpoint constants
 const SHIFT_BASE = '/shifts';
@@ -93,6 +94,14 @@ export interface Shift {
     approved?: boolean; // Whether the shift is approved for scheduling and billing
     /** Set when shift is included on a saved billing claim */
     claimId?: string;
+    /** Set when shift is included on a saved out-of-pocket invoice */
+    outOfPocketInvoiceId?: string | null;
+    /** Set when shift is included on a payroll invoice */
+    payrollInvoiceId?: string | null;
+    /** Per-line billing coverage; a per-line value overrides the client default. */
+    coverage?: Coverage;
+    splitMode?: SplitMode | null;
+    splitValue?: number | null;
     billingClaim?: ShiftBillingClaimSummary | null;
     timeRemaining?: number; // minutes remaining
     sessionDuration?: string; // e.g., "2 hour session"
@@ -158,6 +167,10 @@ export interface CreateShiftRequest {
     serviceAuthorizationId?: string;
     serviceAuthStartDate?: string;
     serviceAuthEndDate?: string;
+    /** Per-line billing coverage (payer / out_of_pocket / both + split). */
+    coverage?: Coverage;
+    splitMode?: SplitMode | null;
+    splitValue?: number | null;
 }
 
 /**
@@ -198,6 +211,10 @@ export interface UpdateShiftRequest {
     serviceAuthorizationId?: string;
     serviceAuthStartDate?: string;
     serviceAuthEndDate?: string;
+    /** Per-line billing coverage (payer / out_of_pocket / both + split). */
+    coverage?: Coverage;
+    splitMode?: SplitMode | null;
+    splitValue?: number | null;
 }
 
 /**

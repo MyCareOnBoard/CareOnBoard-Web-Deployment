@@ -264,8 +264,10 @@ export const ProfileSectionCard = memo(function ProfileSectionCard({
               hasInsurance && "mb-0",
             )}
           >
-            {section.fields.map((f) => (
-              <ProfileFieldRow key={`${section.id}-${f.label}`} field={f} />
+            {section.fields.map((f, i) => (
+              // Index disambiguates repeated labels (e.g. "Member ID" across multiple
+              // insurance rows / authorizations), which otherwise collide as React keys.
+              <ProfileFieldRow key={`${section.id}-${i}-${f.label}`} field={f} />
             ))}
           </div>
         ) : null}

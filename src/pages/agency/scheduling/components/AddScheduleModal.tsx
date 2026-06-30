@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import TimePicker from "@/components/TimePicker";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, eachDayOfInterval as eachDayOfIntervalDateFns, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO, isValid } from "date-fns";
 import { searchClients, Client, ClientService, ClientDsp, getAgencyClientById } from "@/lib/api/clients";
+import { CoverageFields } from "@/components/CoverageFields";
+import { COVERAGE, isValidSplit, resolveLineCoverage, type Coverage, type SplitMode } from "@/lib/coverage";
 import { getEmployeeById } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
 import { useSelector } from "react-redux";
@@ -200,6 +202,9 @@ export interface ScheduleFormData {
   assignedDsp: string;
   assignedDspId: string;
   billingRate: string;
+  coverage?: Coverage;
+  splitMode?: SplitMode | null;
+  splitValue?: number | null;
   serviceCode: string;
   /** ClientService row id when authorizations are outcome-flattened (disambiguates duplicate codes). */
   serviceAuthorizationId?: string;
@@ -267,6 +272,9 @@ const initialFormData: ScheduleFormData = {
   assignedDsp: "",
   assignedDspId: "",
   billingRate: "",
+  coverage: "payer",
+  splitMode: null,
+  splitValue: null,
   serviceCode: "",
   serviceAuthorizationId: "",
   notesType: "",
@@ -457,6 +465,12 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
     const ispOutcomePayload = resolveIspOutcomeShiftPayload(selectedClient, selectedClientServices, data);
     const authFields = serviceAuthorizationFieldsForApi(selectedClientServices, data);
+    const coverageFields: Pick<CreateShiftRequest, "coverage" | "splitMode" | "splitValue"> = {
+      coverage: data.coverage ?? COVERAGE.PAYER,
+      ...(data.coverage === COVERAGE.BOTH
+        ? { splitMode: data.splitMode ?? "percentage", splitValue: data.splitValue ?? null }
+        : {}),
+    };
     const requests: CreateShiftRequest[] = [];
 
     if (data.schedulingType === "recurring" && data.startDate && data.endDate) {
@@ -555,7 +569,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       requests.push(baseShiftData);
     }
 
-    return requests;
+    return requests.map((r) => ({ ...r, ...coverageFields }));
   };
 
   // Search clients with debouncing
@@ -639,6 +653,11 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       assignedDsp: "",
       assignedDspId: "",
       billingRate: "",
+      // Seed coverage from the client's default; the user can change it before saving.
+      ...(() => {
+        const c = resolveLineCoverage(null, client);
+        return { coverage: c.coverage, splitMode: c.splitMode, splitValue: c.splitValue };
+      })(),
       ispOutcome: "",
       notesType: "",
       goalsType: "",
@@ -1579,6 +1598,16 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       return;
     }
 
+    if (!isValidSplit(formData.coverage, formData.splitMode, formData.splitValue)) {
+      toast({
+        title: "Set the split",
+        description:
+          "Enter how much the payer covers (0–100% or a dollar amount) before scheduling a split shift.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const getDisplayDate = () => {
@@ -2020,6 +2049,21 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                                 : selectedService.clientPayType
                         }`}
                     </span>
+                  )}
+                  {selectedClient && mode !== "edit" && (
+                    <div className="mt-2 flex flex-col gap-2">
+                      <label className="text-[12px] font-normal text-[#10141a]">
+                        Billing coverage
+                      </label>
+                      <CoverageFields
+                        value={{
+                          coverage: formData.coverage ?? COVERAGE.PAYER,
+                          splitMode: formData.splitMode ?? null,
+                          splitValue: formData.splitValue ?? null,
+                        }}
+                        onChange={(next) => setFormData((prev) => ({ ...prev, ...next }))}
+                      />
+                    </div>
                   )}
                 </div>
 

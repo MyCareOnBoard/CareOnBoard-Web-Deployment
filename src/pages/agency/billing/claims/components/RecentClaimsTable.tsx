@@ -31,7 +31,7 @@ function RecentClaimSkeletonRow({ grouped = false }: { grouped?: boolean }) {
       className={`${grouped ? GROUPED_TABLE_ROW_CLASS : TABLE_ROW_CLASS} animate-pulse`}
       aria-hidden="true"
     >
-      {Array.from({ length: grouped ? 7 : 9 }).map((_, index) => (
+      {Array.from({ length: grouped ? 8 : 9 }).map((_, index) => (
         <span key={index} className="h-4 rounded bg-[#eef4f5]" />
       ))}
     </div>
@@ -63,7 +63,7 @@ export default function RecentClaimsTable({
 }: RecentClaimsTableProps) {
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
-  const [typeFilter, setTypeFilter] = useState<"all" | "claims" | "out-of-pocket">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "payer" | "out_of_pocket" | "both">("all");
   const { labels } = useStaffLabels();
 
   const sortedClaims = useMemo(
@@ -78,7 +78,7 @@ export default function RecentClaimsTable({
     const byType =
       typeFilter === "all"
         ? sortedClaims
-        : sortedClaims.filter((claim) => (claim.billingDirection ?? "claims") === typeFilter);
+        : sortedClaims.filter((claim) => (claim.coverage ?? "payer") === typeFilter);
 
     if (selectedClientName) {
       return byType.filter(
@@ -128,13 +128,16 @@ export default function RecentClaimsTable({
             <select
               value={typeFilter}
               onChange={(event) =>
-                setTypeFilter(event.target.value as "all" | "claims" | "out-of-pocket")
+                setTypeFilter(
+                  event.target.value as "all" | "payer" | "out_of_pocket" | "both",
+                )
               }
               className="rounded-md border border-[#e5e5e6] bg-white px-3 py-2 text-[13px] text-[#10141a]"
             >
               <option value="all">All</option>
-              <option value="claims">Claims</option>
-              <option value="out-of-pocket">Out of pocket</option>
+              <option value="payer">Payer / Insurance</option>
+              <option value="out_of_pocket">Out of pocket</option>
+              <option value="both">Both</option>
             </select>
           </label>
           <ClaimsClientSearch onFilterChange={handleFilterChange} />
@@ -159,6 +162,7 @@ export default function RecentClaimsTable({
               <span>Duration/Distance</span>
               <span>Total hours/miles</span>
               <span>Rate</span>
+              <span>Coverage</span>
             </div>
 
             {loading ? (

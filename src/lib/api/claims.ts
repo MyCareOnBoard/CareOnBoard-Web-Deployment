@@ -3,6 +3,7 @@ import type { ClaimReportPrefillSnapshot } from "@/pages/agency/billing/claims/u
 import type { Shift } from "@/lib/api/shifts";
 import type { MileageRide } from "@/lib/api/mileage";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import type { Coverage, SplitMode } from "@/lib/coverage";
 
 export type BillingClaimStatus = "pending" | "paid" | "rejected";
 
@@ -141,6 +142,15 @@ export type ReadyToClaimRow = {
   completedAt?: string | null;
   scheduledStartTime?: string | null;
   actualDistance?: number | null;
+  /** Per-line coverage + split, resolved server-side (see src/lib/coverage.ts). */
+  coverage?: Coverage;
+  splitMode?: SplitMode | null;
+  splitValue?: number | null;
+  claimId?: string | null;
+  outOfPocketInvoiceId?: string | null;
+  /** Derived: this line still has an unbilled claim / invoice leg. */
+  needsClaim?: boolean;
+  needsInvoice?: boolean;
 };
 
 export type ReadyToClaimResponse = {

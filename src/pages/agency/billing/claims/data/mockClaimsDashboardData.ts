@@ -18,4 +18,8 @@ export type RecentClaim = {
   weekRange?: string | null;
   /** Out-of-pocket clients bill an invoice instead of a state claim. */
   billingDirection?: "claims" | "out-of-pocket";
+  /** Per-line billing coverage + which legs still need billing (see src/lib/coverage.ts). */
+  coverage?: import("@/lib/coverage").Coverage;
+  needsClaim?: boolean;
+  needsInvoice?: boolean;
 };

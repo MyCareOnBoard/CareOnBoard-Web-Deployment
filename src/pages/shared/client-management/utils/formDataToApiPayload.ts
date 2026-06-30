@@ -108,27 +108,42 @@ export function formDataToApiPayload(
     }
   }
 
-  if (!progressive && s2.billingDirection === "out-of-pocket") {
-    if (!s2.outOfPocketPayerName?.trim() || !sanitizeOptionalEmail(s2.outOfPocketPayerEmail)) {
+  const defaultCoverage = s2.defaultCoverage;
+  const payerEmail = sanitizeOptionalEmail(s2.outOfPocketPayerEmail);
+  if (!progressive && s2.outOfPocketPayerEmail?.trim() && !payerEmail) {
+    throw new Error("Enter a valid out-of-pocket payer email, or leave it blank.");
+  }
+  if (!progressive && defaultCoverage === "both") {
+    const v = Number(s2.defaultSplitValue);
+    if (!Number.isFinite(v) || v < 0 || (s2.defaultSplitMode === "percentage" && v > 100)) {
       throw new Error(
-        "Enter a payor name and a valid payer email for out-of-pocket billing.",
+        "Enter how much the payer covers (0–100% or a dollar amount) for split billing.",
       );
     }
   }
+  const outOfPocketPayer = {
+    name: s2.outOfPocketPayerName?.trim() || undefined,
+    email: payerEmail,
+    phone: s2.outOfPocketPayerPhone?.trim() || undefined,
+    address: s2.outOfPocketPayerAddress?.trim() || undefined,
+    relationshipToClient: s2.outOfPocketPayerRelationship?.trim() || undefined,
+  };
+  const hasOutOfPocketPayer = Object.values(outOfPocketPayer).some(
+    (v) => v !== undefined && v !== "",
+  );
 
   const payload: CreateClientRequest = {
     ...(includeAgencyId && formData.agencyId ? { agencyId: formData.agencyId } : {}),
     type: formData.type || "ddd",
-    billingDirection: s2.billingDirection || "claims",
-    // Out-of-pocket bills the payer directly; authorization comes from the service authorizations.
-    ...(s2.billingDirection === "out-of-pocket"
+    // Coverage drives per-line billing; billingDirection is deprecated (resolver falls back to it).
+    ...(defaultCoverage ? { defaultCoverage } : {}),
+    ...(defaultCoverage === "both"
       ? {
-          outOfPocketPayer: {
-            name: s2.outOfPocketPayerName?.trim() || undefined,
-            email: sanitizeOptionalEmail(s2.outOfPocketPayerEmail),
-          },
+          defaultSplitMode: s2.defaultSplitMode ?? "percentage",
+          defaultSplitValue: s2.defaultSplitValue ?? null,
         }
       : {}),
+    ...(hasOutOfPocketPayer ? { outOfPocketPayer } : {}),
     firstName: s1.firstName || undefined,
     lastName: s1.lastName || undefined,
     middleName: s1.middleName || undefined,
@@ -349,6 +364,7 @@ export function formDataToApiPayload(
         issuedOnDate: toIso(d.issuedOnDate),
         expiryDate: toIso(d.expiryDate),
         autoReminder: d.autoReminder,
+        ...(d.key === "form485" ? { signed: d.signed } : {}),
       })) ?? [],
     evvRequirement: s4.evvRequirement,
     primaryVisitLocationGps: s4.primaryVisitLocationGps,
