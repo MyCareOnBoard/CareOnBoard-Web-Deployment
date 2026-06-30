@@ -14,6 +14,7 @@ import BillingSummary from "./components/BillingSummary";
 
 import { useGetAnalyticsSummaryQuery } from "@/lib/api/reports";
 import type { AnalyticsSummaryData } from "@/lib/api/reports";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 function buildOperationalMetrics(data: AnalyticsSummaryData["operationalEfficiency"]): OperationalMetric[] {
   return [
@@ -54,11 +55,13 @@ export default function AnalyticsPage() {
   const [dateRange, setDateRange] = React.useState({ startDate: "", endDate: "" });
   const [showDateModal, setShowDateModal] = React.useState(false);
   const [showShareModal, setShowShareModal] = React.useState(false);
+  const mode = useEffectiveAgencyMode();
 
   const { data: analyticsResponse, isLoading, isFetching } = useGetAnalyticsSummaryQuery(
     {
       startDate: dateRange.startDate || undefined,
       endDate: dateRange.endDate || undefined,
+      mode: mode ?? undefined,
     },
     { refetchOnMountOrArgChange: true }
   );
