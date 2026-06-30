@@ -17,6 +17,7 @@ import { mileageApi, MileageRide } from "@/lib/api/mileage";
 import { useAuth } from "@/utils/auth";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store/redux/store";
+import { staffLabels } from "@/lib/roleLabel";
 
 const LIMIT = 10;
 
@@ -42,6 +43,7 @@ export default function MileagePage() {
   const { user } = useAuth();
   const agencyId = user?.agencyId || user?.agency?.id || "";
   const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const staffLabel = staffLabels(selectedMode ? [selectedMode] : undefined).noun;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRide, setEditingRide] = useState<MileageRide | null>(null);
   const [viewingRide, setViewingRide] = useState<MileageRide | null>(null);
@@ -309,7 +311,7 @@ export default function MileagePage() {
               <div className="hidden overflow-hidden border border-[#e5e7eb]/60 bg-white/40 lg:block">
                 <div className="overflow-x-auto">
                   <div className={MILEAGE_TABLE_MIN_WIDTH}>
-                    <MileageTableHeader />
+                    <MileageTableHeader staffLabel={staffLabel} />
                     {Array.from({ length: 5 }).map((_, i) => (
                       <MileageRideRowSkeleton key={`desktop-${i}`} variant="desktop" />
                     ))}
@@ -331,12 +333,13 @@ export default function MileagePage() {
               <div className="hidden overflow-hidden border border-[#e5e7eb]/60 bg-white/40 lg:block">
                 <div className="overflow-x-auto">
                   <div className={MILEAGE_TABLE_MIN_WIDTH}>
-                    <MileageTableHeader />
+                    <MileageTableHeader staffLabel={staffLabel} />
                     {filteredRides.map((entry) => (
                       <MileageRideRow
                         key={entry.id}
                         variant="desktop"
                         entry={entry}
+                        staffLabel={staffLabel}
                         onView={() => setViewingRide(entry)}
                         onEdit={() => handleEditRide(entry)}
                         onCancel={
@@ -356,6 +359,7 @@ export default function MileagePage() {
                     key={entry.id}
                     variant="mobile"
                     entry={entry}
+                    staffLabel={staffLabel}
                     onView={() => setViewingRide(entry)}
                     onEdit={() => handleEditRide(entry)}
                     onCancel={

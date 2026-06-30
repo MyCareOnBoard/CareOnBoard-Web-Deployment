@@ -6,8 +6,8 @@ import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
 import { createDayProgram, type Attendee } from "@/lib/api/day-programs";
 import { Routes } from "@/routes/constants";
-
-import { useNavigate } from "react-router";
+import { Navigate, useNavigate } from "react-router";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 interface AttendanceRow {
   id: string;
@@ -17,9 +17,14 @@ interface AttendanceRow {
 }
 
 export default function DayProgramPage() {
+  const mode = useEffectiveAgencyMode();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+
+  if (mode === "hha") {
+    return <Navigate to={Routes.agency.dashboard} replace />;
+  }
 
   const [attendanceRows, setAttendanceRows] = useState<AttendanceRow[]>([
     { id: "1", name: "", signIn: "", signOut: "" },
