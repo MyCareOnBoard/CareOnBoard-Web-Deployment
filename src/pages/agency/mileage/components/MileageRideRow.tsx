@@ -134,7 +134,7 @@ function RideClientCell({ entry }: { entry: MileageRide }) {
   );
 }
 
-function RideDspCell({ entry }: { entry: MileageRide }) {
+function RideDspCell({ entry, staffLabel = "DSP" }: { entry: MileageRide; staffLabel?: string }) {
   const avatar = (
     <Avatar className="h-10 w-10 shrink-0 rounded-[8px]">
       {entry.caregiverAvatarUrl && (
@@ -145,7 +145,7 @@ function RideDspCell({ entry }: { entry: MileageRide }) {
         />
       )}
       <AvatarFallback className="flex h-full w-full items-center justify-center rounded-[8px] bg-gradient-to-br from-[#6366f1] to-[#4f46e5] text-xs font-medium text-white">
-        {getInitials(entry.caregiverName || "DSP")}
+        {getInitials(entry.caregiverName || staffLabel)}
       </AvatarFallback>
     </Avatar>
   );
@@ -154,7 +154,7 @@ function RideDspCell({ entry }: { entry: MileageRide }) {
     <PersonBlock
       avatar={avatar}
       name={entry.caregiverName || "—"}
-      role="DSP"
+      role={staffLabel}
     />
   );
 }
@@ -250,6 +250,7 @@ function MileageRideActions({
 type MileageRideRowProps = {
   entry: MileageRide;
   variant: "desktop" | "mobile";
+  staffLabel?: string;
   onView: () => void;
   onEdit: () => void;
   onCancel?: () => void;
@@ -259,6 +260,7 @@ type MileageRideRowProps = {
 function MileageRideRow({
   entry,
   variant,
+  staffLabel = "DSP",
   onView,
   onEdit,
   onCancel,
@@ -272,7 +274,7 @@ function MileageRideRow({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-3">
             <RideClientCell entry={entry} />
-            <RideDspCell entry={entry} />
+            <RideDspCell entry={entry} staffLabel={staffLabel} />
           </div>
           <MileageRideActions
             entry={entry}
@@ -334,7 +336,7 @@ function MileageRideRow({
   return (
     <div className={MILEAGE_TABLE_ROW_CLASS}>
       <RideClientCell entry={entry} />
-      <RideDspCell entry={entry} />
+      <RideDspCell entry={entry} staffLabel={staffLabel} />
       <div className="min-w-0">
         <p className="whitespace-nowrap text-[13px] font-medium text-[#10141a]">
           {scheduledDate}
@@ -361,11 +363,11 @@ function MileageRideRow({
   );
 }
 
-export function MileageTableHeader() {
+export function MileageTableHeader({ staffLabel = "DSP" }: { staffLabel?: string }) {
   return (
     <div className={MILEAGE_TABLE_HEADER_CLASS}>
       <span>Client</span>
-      <span>DSP</span>
+      <span>{staffLabel}</span>
       <span>Scheduled</span>
       <span>Service</span>
       <span>Segments</span>

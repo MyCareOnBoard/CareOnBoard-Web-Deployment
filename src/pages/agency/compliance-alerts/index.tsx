@@ -8,9 +8,12 @@ import {ExpiredDocument} from "./apiTypes";
 import {useAuth} from "@/utils/auth";
 import {sendDocumentAlert} from "@/lib/api/employee-documents";
 import {useToast} from "@/hooks/use-toast";
+import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
+import {matchesAgencyMode} from "@/lib/roleLabel";
 
 export default function ComplianceAlertsPage() {
   const navigate = useNavigate();
+  const mode = useEffectiveAgencyMode();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("active");
@@ -26,16 +29,18 @@ export default function ComplianceAlertsPage() {
   });
   const expiredDocuments = data?.data || [];
 
-  // Transform to match component structure
-  const complianceAlerts = expiredDocuments.map(doc => ({
-    id: doc.id,
-    name: doc.employee.fullName,
-    role: doc.employee.role,
-    status: doc.employee.status.charAt(0).toUpperCase() + doc.employee.status.slice(1),
-    document: doc.documentType,
-    documentStatus: `Expired (${doc.daysExpired} day${doc.daysExpired !== 1 ? 's' : ''} ago)`,
-    training: "N/A"
-  }));
+  // Transform to match component structure, filtering by active agency mode
+  const complianceAlerts = expiredDocuments
+    .filter(doc => matchesAgencyMode(doc.employee.role, mode))
+    .map(doc => ({
+      id: doc.id,
+      name: doc.employee.fullName,
+      role: doc.employee.role,
+      status: doc.employee.status.charAt(0).toUpperCase() + doc.employee.status.slice(1),
+      document: doc.documentType,
+      documentStatus: `Expired (${doc.daysExpired} day${doc.daysExpired !== 1 ? 's' : ''} ago)`,
+      training: "N/A"
+    }));
 
   // Reset to page 1 when filters change
   useEffect(() => {

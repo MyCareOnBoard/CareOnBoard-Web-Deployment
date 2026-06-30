@@ -266,6 +266,7 @@ export interface AnalyticsSummaryData {
 export interface AnalyticsFilters {
     startDate?: string;
     endDate?: string;
+    mode?: string;
 }
 
 export interface AnalyticsInsightSection {

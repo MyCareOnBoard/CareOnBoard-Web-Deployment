@@ -319,7 +319,7 @@ export const ConversationList = React.memo(function ConversationList({
                 : "bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]"
                 }`}
             >
-              {programMode ? roleLabel({ role: programMode === "hha" ? "hha" : "dsp" }) : "DSP"}
+              {roleLabel({ role: programMode === "hha" ? "hha" : "dsp" })}
             </button>
             <button
               onClick={() => onFilterChange("staff")}

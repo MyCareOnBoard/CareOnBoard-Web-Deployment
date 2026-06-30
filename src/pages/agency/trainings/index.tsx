@@ -12,6 +12,7 @@ import {
 import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";
 import {AnimatePresence, motion} from "framer-motion";
+import {useStaffLabels} from "@/hooks/useStaffLabels";
 
 export default function AgencyTrainings() {
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -26,6 +27,8 @@ export default function AgencyTrainings() {
     trainings: TrainingData[];
   } | null>(null);
 
+  const { labels } = useStaffLabels();
+  const staffLabel = labels.noun;
   const {user} = useAuth();
   const [saveTraining, {isLoading}] = useSaveTrainingMutation();
   const {data: trainings, isLoading: trainingsLoading} = useGetTrainingsQuery(user?.agencyId!, {
@@ -146,7 +149,7 @@ export default function AgencyTrainings() {
                           ? (
                             <img
                               src={item?.profilePictureUrl}
-                              alt={"DSP"}
+                              alt={staffLabel}
                               className="object-cover w-full h-full"
                             />
                           ) : (
@@ -270,7 +273,7 @@ export default function AgencyTrainings() {
         employee={selectedEmployee ? {
           id: selectedEmployee.id,
           fullName: selectedEmployee.fullName,
-          role: "DSP",
+          role: staffLabel,
           profilePictureUrl: selectedEmployee.profilePictureUrl
         } : null}
         trainings={selectedEmployee?.trainings || []}

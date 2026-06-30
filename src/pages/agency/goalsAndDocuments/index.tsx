@@ -1,6 +1,7 @@
 import React from "react";
-import {useNavigate} from "react-router";
+import {Navigate, useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
+import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
 import {NoteCard, NoteCardType} from "@/pages/userPanel/notes";
 import {Button} from "@/components/ui/button";
 import {List} from "lucide-react";
@@ -10,7 +11,12 @@ import WrenchIcon from "@/assets/icons/wrench-heroicon.svg?react";
 import PhoneIcon from "@/assets/icons/phone-heroicon.svg?react";
 
 export default function GoalsAndDocumentsPage() {
+    const mode = useEffectiveAgencyMode();
     const navigate = useNavigate();
+
+    if (mode === "hha") {
+        return <Navigate to={Routes.agency.dashboard} replace />;
+    }
 
     const documentCards: NoteCardType[] = [
         {
