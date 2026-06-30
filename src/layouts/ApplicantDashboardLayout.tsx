@@ -13,7 +13,8 @@ import UserIcon from "@/assets/icons/user.svg?react";
 import FileIcon from "@/assets/icons/file.svg?react";
 import CogIcon from "@/assets/icons/cog.svg?react";
 import HomeIcon from "@/assets/icons/home.svg?react";
-import { Megaphone } from "lucide-react";
+import { Megaphone } from "lucide-react"
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 
 
 export default function ApplicantDashboardLayout({children}: { children?: ReactNode }) {
@@ -65,6 +66,7 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
       />
       <DashboardSidebar navItems={navItems}/>
       <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
+        <AnnouncementBanner endpoint="/applicantPortal/announcements" viewAllPath={Routes.applicant.announcements} />
         <div className="px-8">{children ?? <Outlet/>}</div>
       </main>
     </div>

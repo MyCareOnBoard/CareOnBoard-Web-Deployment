@@ -20,7 +20,8 @@ import UserRoadsideIcon from "@/assets/icons/user-roadside.svg?react";
 import BellIcon from "@/assets/icons/bell.svg?react";
 import SupportIcon from "@/assets/icons/support.svg?react";
 import CommunityInclusionIcon from "@/assets/icons/community-inclusion.svg?react";
-import { Sun, Megaphone } from "lucide-react";
+import { Sun, Megaphone } from "lucide-react"
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 
 const navItems: NavItem[] = [
   { label: "Dashboard", path: Routes.userPanel.dashboard, icon: HomeIcon },
@@ -84,6 +85,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
       />
       <DashboardSidebar navItems={navItems} />
       <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
+        <AnnouncementBanner endpoint="/employeePortal/announcements" viewAllPath={Routes.userPanel.announcements} />
         <div className="px-8">{children ?? <Outlet />}</div>
       </main>
     </div>
