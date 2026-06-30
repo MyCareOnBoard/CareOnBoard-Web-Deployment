@@ -17,6 +17,7 @@ import { UserType } from "@/utils/auth/types/user.types"
 import { selectUser, selectIsAuthenticated } from "@/utils/auth/store/authSelectors"
 import { useAuth } from "@/utils/auth"
 import axiosClient from "@/lib/axios"
+import AnnouncementBanner from "@/components/AnnouncementBanner"
 
 function getGreeting(): { text: string; emoji: string } {
   const h = new Date().getHours()
@@ -253,6 +254,11 @@ export default function FamilyLayout() {
 
         {/* Scrollable page area */}
         <main className="flex-1 overflow-y-auto p-6 bg-white">
+          <AnnouncementBanner
+            endpoint="/familyPortal/announcements"
+            viewAllPath={Routes.family.announcements}
+            className="mb-4"
+          />
           <Outlet />
         </main>
       </div>
