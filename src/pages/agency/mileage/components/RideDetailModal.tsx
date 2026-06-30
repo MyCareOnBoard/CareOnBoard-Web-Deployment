@@ -4,6 +4,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { mileageApi, MileageRide, MileageSegment, UpdateAgencyRideRequest } from "@/lib/api/mileage";
+import { CoverageFields, type CoverageFieldsValue } from "@/components/CoverageFields";
+import { COVERAGE, resolveLineCoverage } from "@/lib/coverage";
 import { formatRideServiceLabel } from "@/pages/agency/mileage/utils/transportationClientService";
 
 interface RideDetailModalProps {
@@ -84,12 +86,19 @@ export default function RideDetailModal({ ride, isOpen, onClose, onRideUpdated }
   const [approvalSaving, setApprovalSaving] = useState(false);
   const [staffRate, setStaffRate] = useState("");
   const [clientAgreedRate, setClientAgreedRate] = useState("");
+  const [draftCoverage, setDraftCoverage] = useState<CoverageFieldsValue>({
+    coverage: COVERAGE.PAYER,
+    splitMode: null,
+    splitValue: null,
+  });
 
   useEffect(() => {
     if (!isOpen || !ride) return;
     setApproved(Boolean(ride.approved));
     setStaffRate(ride.staffRate != null ? String(ride.staffRate) : "");
     setClientAgreedRate(ride.clientAgreedRate != null ? String(ride.clientAgreedRate) : "");
+    const cov = resolveLineCoverage(ride, null);
+    setDraftCoverage({ coverage: cov.coverage, splitMode: cov.splitMode, splitValue: cov.splitValue });
     setSegments([]);
     setLoading(true);
     mileageApi
@@ -107,7 +116,9 @@ export default function RideDetailModal({ ride, isOpen, onClose, onRideUpdated }
   // Manual rides have no serviceCode but still need a billing/payroll decision.
   const showApproveForBilling =
     ride.status === "completed" && (Boolean(ride.serviceCode) || isManualRide);
-  const billingLocked = Boolean(ride.claimId || ride.payrollInvoiceId);
+  const billingLocked = Boolean(
+    ride.claimId || ride.payrollInvoiceId || ride.outOfPocketInvoiceId,
+  );
   // Staff rate (→ payroll) is required to approve a manual ride; client rides also need the agreed rate (→ invoice).
   const ratesValid =
     !isManualRide ||
@@ -136,7 +147,25 @@ export default function RideDetailModal({ ride, isOpen, onClose, onRideUpdated }
       return;
     }
 
+    if (next && draftCoverage.coverage === COVERAGE.BOTH) {
+      const v = Number(draftCoverage.splitValue);
+      if (!Number.isFinite(v) || v < 0 || (draftCoverage.splitMode === "percentage" && v > 100)) {
+        toast({
+          title: "Set the split",
+          description:
+            "Enter how much the payer covers (0–100% or a dollar amount) before approving a split ride.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     const payload: UpdateAgencyRideRequest = { approved: next };
+    payload.coverage = draftCoverage.coverage;
+    payload.splitMode =
+      draftCoverage.coverage === COVERAGE.BOTH ? draftCoverage.splitMode ?? "percentage" : null;
+    payload.splitValue =
+      draftCoverage.coverage === COVERAGE.BOTH ? draftCoverage.splitValue : null;
     if (isManualRide) {
       payload.staffRate = staffRate === "" ? null : Number(staffRate);
       if (isClientRide) {
@@ -326,6 +355,14 @@ export default function RideDetailModal({ ride, isOpen, onClose, onRideUpdated }
                   )}
                 </div>
               )}
+              <div className="flex flex-col gap-2">
+                <p className="text-[14px] font-semibold text-[#10141a]">Billing coverage</p>
+                <CoverageFields
+                  value={draftCoverage}
+                  onChange={setDraftCoverage}
+                  disabled={billingLocked}
+                />
+              </div>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[14px] font-semibold text-[#10141a]">Approve for billing</p>

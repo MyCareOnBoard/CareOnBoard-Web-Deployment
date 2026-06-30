@@ -1,4 +1,5 @@
 import type { ClientDocumentKey } from "@/lib/api/clients";
+import type { Coverage, SplitMode } from "@/lib/coverage";
 import type { PlanOfCareFormData } from "./planOfCare";
 import type { ClinicalAssessmentFormData } from "./clinicalAssessment";
 
@@ -285,6 +286,8 @@ export type GuardianContact = {
 };
 
 export type CareTeamContact = {
+    /** Stable client-side id for React keys (server doesn't require it). */
+    id?: string;
     role?: string;
     name?: string;
     agency?: string;
@@ -294,11 +297,18 @@ export type CareTeamContact = {
 };
 
 export type Stage2GuardianAndFundingData = {
-    /** Bills the provider (claims) or the payer/family (out of pocket). Applies to all this client's services. */
-    billingDirection: BillingDirection;
-    /** Out-of-pocket only: who pays (bill-to) and where invoices are emailed. Required for out-of-pocket. */
+    /** @deprecated Superseded by defaultCoverage; retained for back-compat reads of older clients. */
+    billingDirection?: BillingDirection;
+    /** Optional out-of-pocket payer (bill-to): who pays and where invoices are emailed. */
     outOfPocketPayerName?: string;
     outOfPocketPayerEmail?: string;
+    outOfPocketPayerPhone?: string;
+    outOfPocketPayerAddress?: string;
+    outOfPocketPayerRelationship?: string;
+    /** Default coverage for this client's new shifts/rides; a per-line value can override it. */
+    defaultCoverage?: Coverage;
+    defaultSplitMode?: SplitMode | null;
+    defaultSplitValue?: number | null;
     guardianName: string;
     guardianRelationship?: GuardianRelationship;
     guardianEmail: string;
@@ -354,6 +364,8 @@ export type DocState = {
     issuedOnDate?: Date;
     expiryDate?: Date;
     autoReminder: boolean;
+    /** Form 485 only: whether the uploaded/attached copy is signed. */
+    signed?: boolean;
 };
 
 export type AdlSupportNeed = {
@@ -592,6 +604,18 @@ export function createEmptyGuardianContact(): GuardianContact {
     };
 }
 
+export function createEmptyCareTeamContact(): CareTeamContact {
+    return {
+        id: newId("care-team"),
+        role: "",
+        name: "",
+        agency: "",
+        phone: "",
+        email: "",
+        address: "",
+    };
+}
+
 export function createEmptyHhaInsuranceInfo(type: HhaInsuranceType = "primary"): HhaInsuranceInfo {
     return {
         id: newId("insurance"),
@@ -646,6 +670,7 @@ export function createInitialDocs(type: ClientType = "ddd"): DocState[] {
                 title: "Form 485",
                 uploadLabel: "Upload Form 485 (CMS-485 Plan of Care)",
                 autoReminder: true,
+                signed: false,
             },
             {
                 key: "insuranceCards",
@@ -796,9 +821,14 @@ export function createInitialAddClientFormData(): AddClientFormData {
             },
         },
         stage2: {
-            billingDirection: "claims",
+            defaultCoverage: "payer",
+            defaultSplitMode: "percentage",
+            defaultSplitValue: null,
             outOfPocketPayerName: "",
             outOfPocketPayerEmail: "",
+            outOfPocketPayerPhone: "",
+            outOfPocketPayerAddress: "",
+            outOfPocketPayerRelationship: "",
             guardianName: "",
             guardianRelationship: undefined,
             guardianEmail: "",

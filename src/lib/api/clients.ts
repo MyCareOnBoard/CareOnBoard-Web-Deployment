@@ -7,6 +7,7 @@ import axiosClient from '../axios';
 import { ApiResponse } from '@/lib/api-types';
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
+import type { Coverage, SplitMode } from "@/lib/coverage";
 
 export type ClientType = "ddd" | "hha";
 
@@ -17,6 +18,9 @@ export type ClientBillingDirection = "claims" | "out-of-pocket";
 export interface ClientOutOfPocketPayer {
   name?: string | null;
   email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  relationshipToClient?: string | null;
 }
 
 /**
@@ -29,6 +33,10 @@ export interface Client {
   type?: ClientType;
   billingDirection?: ClientBillingDirection;
   outOfPocketPayer?: ClientOutOfPocketPayer | null;
+  /** Default coverage for this client's new shifts/rides; a per-line value overrides it. */
+  defaultCoverage?: Coverage;
+  defaultSplitMode?: SplitMode | null;
+  defaultSplitValue?: number | null;
   firstName?: string;
   lastName?: string;
   middleName?: string;
@@ -129,6 +137,10 @@ export interface Client {
   status?: 'active' | 'inactive' | 'pending' | 'archived';
   createdAt?: string | { _seconds?: number; _nanoseconds?: number } | Date;
   updatedAt?: string | { _seconds?: number; _nanoseconds?: number } | Date;
+
+  // HHA Form 485 grace tracking (server-managed; see backend utils/form485.js)
+  form485UnsignedActivatedAt?: string | { _seconds?: number; _nanoseconds?: number } | Date;
+  form485DeactivatedAt?: string | { _seconds?: number; _nanoseconds?: number } | Date;
 }
 
 /**
@@ -397,6 +409,8 @@ export interface ClientDocument {
   issuedOnDate?: string;
   expiryDate?: string;
   autoReminder?: boolean;
+  /** Form 485 only: whether the uploaded copy is signed (default false/unsigned). */
+  signed?: boolean;
 }
 
 /**
@@ -597,6 +611,10 @@ export interface CreateClientRequest {
   type?: ClientType;
   billingDirection?: ClientBillingDirection;
   outOfPocketPayer?: ClientOutOfPocketPayer | null;
+  /** Default coverage for this client's new shifts/rides; a per-line value overrides it. */
+  defaultCoverage?: Coverage;
+  defaultSplitMode?: SplitMode | null;
+  defaultSplitValue?: number | null;
   /** Sent on the wizard's final save so completed onboardings activate immediately. */
   status?: 'active' | 'inactive' | 'pending' | 'archived';
   firstName?: string;
@@ -735,6 +753,10 @@ export interface UpdateClientRequest {
   type?: ClientType;
   billingDirection?: ClientBillingDirection;
   outOfPocketPayer?: ClientOutOfPocketPayer | null;
+  /** Default coverage for this client's new shifts/rides; a per-line value overrides it. */
+  defaultCoverage?: Coverage;
+  defaultSplitMode?: SplitMode | null;
+  defaultSplitValue?: number | null;
   firstName?: string;
   lastName?: string;
   middleName?: string;

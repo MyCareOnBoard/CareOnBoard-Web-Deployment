@@ -1,4 +1,5 @@
 import axiosClient from '../axios';
+import type { Coverage, SplitMode } from '@/lib/coverage';
 
 export type RideStatus = "scheduled" | "in_progress" | "paused" | "completed" | "cancelled";
 
@@ -35,12 +36,17 @@ export interface MileageRide {
   assignedDsp?: string | null;
   claimId?: string | null;
   payrollInvoiceId?: string | null;
+  outOfPocketInvoiceId?: string | null;
   approved?: boolean;
   /** Client rides bill both legs (payroll + out-of-pocket); agency rides pay staff only. */
   rideBillingType?: "client" | "agency";
   /** Per-mile rates imputed at approval. staffRate → payroll; clientAgreedRate → out-of-pocket invoice. */
   staffRate?: number | null;
   clientAgreedRate?: number | null;
+  /** Per-line billing coverage; a per-line value overrides the client default. */
+  coverage?: Coverage;
+  splitMode?: SplitMode | null;
+  splitValue?: number | null;
   startLocation?: Coordinates | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -111,6 +117,10 @@ export interface MileageServiceFields {
   serviceAuthStartDate?: string;
   serviceAuthEndDate?: string;
   assignedDsp?: string;
+  /** Coverage chosen at ride creation (defaults from the client). */
+  coverage?: Coverage;
+  splitMode?: SplitMode | null;
+  splitValue?: number | null;
 }
 
 export interface CreateMileageRideBase {
@@ -126,6 +136,10 @@ export interface UpdateAgencyRideRequest {
   approved?: boolean;
   staffRate?: number | null;
   clientAgreedRate?: number | null;
+  /** Coverage can be confirmed/changed at approval. */
+  coverage?: Coverage;
+  splitMode?: SplitMode | null;
+  splitValue?: number | null;
 }
 
 export interface CreateOneTimeMileageRideRequest

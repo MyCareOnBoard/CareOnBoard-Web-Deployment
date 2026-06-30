@@ -3,6 +3,7 @@ import { CalendarDays, Upload, FileText, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { AddressAutocompleteInput } from "@/pages/shared/client-management/components/AddressAutocompleteInput";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
@@ -18,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AddClientFormData, DocKey, DocState, createInitialDocs } from "@/pages/shared/client-management/types/formData";
 import { canGeneratePoc } from "@/pages/shared/client-management/utils/pocGenerationEligibility";
-import { canShowForm485Generate } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
+import { canShowForm485Generate, FORM485_GRACE_DAYS } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
 
 const GeneratePocPanel = lazy(
   () => import("@/pages/shared/client-management/components/GeneratePocPanel"),
@@ -331,10 +332,10 @@ export function Stage3HealthcareAndDocuments({
                 </div>
                 <div className="flex flex-col gap-1 @lg:col-span-2 @4xl:col-span-4">
                   <label className="text-[12px] font-normal text-[#10141a]">Physician address</label>
-                  <Input
+                  <AddressAutocompleteInput
                     value={stage3.physicianInfo?.address ?? ""}
-                    onChange={(e) => updatePhysicianInfo({ address: e.target.value })}
-                    className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
+                    onChange={(v) => updatePhysicianInfo({ address: v })}
+                    placeholder="Enter physician address"
                   />
                 </div>
               </div>
@@ -859,18 +860,36 @@ export function Stage3HealthcareAndDocuments({
                     <Suspense fallback={null}>
                       <GenerateForm485Panel
                         formData={formData}
+                        setFormData={setFormData}
                         clientId={clientId}
                       />
                     </Suspense>
                   ) : null}
 
-                  {doc.key === "form485" &&
-                  formData.type === "hha" &&
-                  !(doc.file || (doc.files && doc.files.length > 0) || doc.url?.trim()) ? (
-                    <p className="mb-2 text-[12px] font-medium text-[#b54708]">
-                      Required to activate this client — upload the signed Form 485 before the
-                      client can be set active.
-                    </p>
+                  {doc.key === "form485" && formData.type === "hha" ? (
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        {!(doc.file || (doc.files && doc.files.length > 0) || doc.url?.trim()) ? (
+                          <p className="text-[12px] font-medium text-[#b54708]">
+                            Required to activate this client — upload the signed Form 485 before the
+                            client can be set active.
+                          </p>
+                        ) : doc.signed === false ? (
+                          <p className="text-[12px] font-medium text-[#b54708]">
+                            Attached unsigned — the client will be active for {FORM485_GRACE_DAYS}{" "}
+                            days until a signed Form 485 is uploaded. Toggle “Signed” once the signed
+                            copy is attached.
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <p className="text-[14px] font-normal text-[#10141a]">Signed</p>
+                        <Switch
+                          checked={Boolean(doc.signed)}
+                          onCheckedChange={(checked) => updateDoc("form485", { signed: checked })}
+                        />
+                      </div>
+                    </div>
                   ) : null}
 
                   <label

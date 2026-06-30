@@ -3,15 +3,28 @@ import { FileText, Plus } from "lucide-react";
 import { Client, ClientDocument } from "@/lib/api/clients";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { isForm485Required } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
+import {
+  isForm485Required,
+  hasSignedForm485,
+  form485GraceInfo,
+} from "@/pages/shared/client-management/utils/form485GenerationEligibility";
 
 export function DocumentsTab({
   client,
   onOpenUploadModal,
+  onActivateClient,
 }: {
   client: Client;
   onOpenUploadModal?: (document?: ClientDocument) => void;
+  onActivateClient?: () => void;
 }) {
+  const grace = form485GraceInfo(client);
+  const canReactivate =
+    Boolean(onActivateClient) &&
+    client.status === "pending" &&
+    hasSignedForm485(client.documents);
+  const formatDeadline = (d?: Date) =>
+    d ? d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
 
   const documents = useMemo(() => {
     if (!client.documents || client.documents.length === 0) {
@@ -48,6 +61,8 @@ export function DocumentsTab({
         issuedOnDate: doc.issuedOnDate,
         expiryDate: doc.expiryDate,
         isExpired,
+        isForm485: doc.key === "form485",
+        signed: doc.signed !== false, // legacy (no field) reads as signed
         document: doc, // Include the full document object for editing
       };
     });
@@ -83,6 +98,44 @@ export function DocumentsTab({
             Form 485 required to activate this client. Upload the signed Form 485
             (CMS-485 Plan of Care) — you&apos;ll be prompted to activate once it&apos;s added.
           </p>
+        </div>
+      )}
+
+      {grace.state === "unsigned-grace" && (
+        <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#fdb022] bg-[#fffaeb] px-4 py-3">
+          <p className="text-[13px] font-medium text-[#b54708]">
+            Active on an <strong>unsigned</strong> Form 485.{" "}
+            {grace.deadline
+              ? `Upload the signed copy by ${formatDeadline(grace.deadline)}${
+                  typeof grace.daysLeft === "number"
+                    ? ` (${grace.daysLeft} day${grace.daysLeft === 1 ? "" : "s"} left)`
+                    : ""
+                } to keep the client active.`
+              : "Upload the signed copy to keep the client active."}
+          </p>
+        </div>
+      )}
+
+      {grace.state === "expired" && (
+        <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#f97066] bg-[#fef3f2] px-4 py-3">
+          <p className="text-[13px] font-medium text-[#b42318]">
+            Form 485 grace period expired — this client was deactivated. Upload a
+            signed Form 485 to reactivate.
+          </p>
+        </div>
+      )}
+
+      {canReactivate && (
+        <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#12b76a] bg-[#ecfdf3] px-4 py-3">
+          <p className="text-[13px] font-medium text-[#027a48]">
+            A signed Form 485 is on file. This client can be activated.
+          </p>
+          <Button
+            className="h-9 shrink-0 rounded-[60px] bg-[#12b76a] px-5 text-white hover:bg-[#039855]"
+            onClick={() => onActivateClient?.()}
+          >
+            Activate client
+          </Button>
         </div>
       )}
 
@@ -127,6 +180,11 @@ export function DocumentsTab({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {doc.isForm485 && doc.url ? (
+                    <Badge variant={doc.signed ? "success" : "pending"}>
+                      {doc.signed ? "Signed" : "Unsigned"}
+                    </Badge>
+                  ) : null}
                   <Badge
                     variant={
                       doc.status === "Expired"
