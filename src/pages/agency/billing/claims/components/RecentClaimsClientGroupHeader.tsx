@@ -5,19 +5,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DotGridIcon } from "@/components/ui/dot-grid-menu";
 import { cn } from "@/lib/utils";
 import ClientNameLink from "./ClientNameLink";
 import type { RecentClaimClientGroup } from "../utils/groupRecentClaimsByClient";
-
-function DotGridIcon() {
-  return (
-    <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <span key={index} className="h-[4px] w-[4px] rounded-full bg-[#808081]" />
-      ))}
-    </span>
-  );
-}
 
 const menuItemClassName =
   "flex min-h-[44px] w-full cursor-pointer items-center justify-between rounded-none px-4 py-3 text-[14px] font-medium text-[#10141a] hover:bg-[#eef4f5] focus:bg-[#eef4f5]";

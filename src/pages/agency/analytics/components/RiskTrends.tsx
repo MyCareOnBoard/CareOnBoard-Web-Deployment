@@ -20,20 +20,21 @@ interface RiskTrendsProps {
   isLoading?: boolean;
   startDate?: string;
   endDate?: string;
+  mode?: string;
 }
 
 const FALLBACK_DATA: RiskTrendPoint[] = [
-  { month: "Jan", expired: 4, overtime: 7, missing: 0 },
-  { month: "Feb", expired: 8, overtime: 12, missing: 4 },
-  { month: "Mar", expired: 10, overtime: 13, missing: 9 },
-  { month: "Apr", expired: 8, overtime: 12, missing: 10 },
-  { month: "May", expired: 6, overtime: 10, missing: 4 },
-  { month: "Jun", expired: 6, overtime: 9, missing: 4 },
-  { month: "Jul", expired: 8, overtime: 7, missing: 4 },
-  { month: "Aug", expired: 10, overtime: 6, missing: 4 },
+  { month: "Jan", expired: 4, overtime: 7, missing: 0, unsignedForm485: 0 },
+  { month: "Feb", expired: 8, overtime: 12, missing: 4, unsignedForm485: 0 },
+  { month: "Mar", expired: 10, overtime: 13, missing: 9, unsignedForm485: 0 },
+  { month: "Apr", expired: 8, overtime: 12, missing: 10, unsignedForm485: 0 },
+  { month: "May", expired: 6, overtime: 10, missing: 4, unsignedForm485: 0 },
+  { month: "Jun", expired: 6, overtime: 9, missing: 4, unsignedForm485: 0 },
+  { month: "Jul", expired: 8, overtime: 7, missing: 4, unsignedForm485: 0 },
+  { month: "Aug", expired: 10, overtime: 6, missing: 4, unsignedForm485: 0 },
 ];
 
-export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate, endDate }: RiskTrendsProps) {
+export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate, endDate, mode }: RiskTrendsProps) {
   const [showInsights, setShowInsights] = useState(false);
   const insightsBtnRef = useRef<HTMLDivElement>(null);
   const [fetchInsights, { data: insightsData, isLoading: insightsLoading }] = useLazyGetAnalyticsInsightsQuery();
@@ -50,7 +51,7 @@ export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate,
   }, [showInsights]);
 
   const handleInsightsClick = () => {
-    if (!showInsights) fetchInsights({ startDate, endDate });
+    if (!showInsights) fetchInsights({ startDate, endDate, mode });
     setShowInsights((p) => !p);
   };
 
@@ -129,8 +130,15 @@ export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate,
 
         <div className="flex items-center gap-2">
           <div className="h-4 w-4 rounded-full bg-[#3B82F6]" />
-          <span className="text-[16px] text-[#111827]">Missing document</span>
+          <span className="text-[14px] text-[#111827]">Missing document</span>
         </div>
+
+        {mode !== "ddd" && (
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 rounded-full bg-[#8B5CF6]" />
+            <span className="text-[14px] text-[#111827]">Unsigned Form 485</span>
+          </div>
+        )}
       </div>
 
       {/* Graph */}
@@ -166,6 +174,9 @@ export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate,
             <Line type="monotone" dataKey="expired" stroke="#E5390A" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
             <Line type="monotone" dataKey="overtime" stroke="#FF7A00" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
             <Line type="monotone" dataKey="missing" stroke="#3B82F6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+            {mode !== "ddd" && (
+              <Line type="monotone" dataKey="unsignedForm485" stroke="#8B5CF6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+            )}
           </LineChart>
         </ResponsiveContainer>
       </div>

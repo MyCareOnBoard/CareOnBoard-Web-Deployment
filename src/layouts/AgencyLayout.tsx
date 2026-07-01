@@ -40,6 +40,7 @@ import {
     ClipboardList,
     Brain,
     Heart,
+    ShieldAlert,
 } from "lucide-react";
 
 /** Canonical scope for the scheduling hub; legacy token "Scheduling" still honored in accessList. */
@@ -84,10 +85,11 @@ const allNavItems: AgencyNavItem[] = [
         icon: DSPManagementIcon,
         accessKey: "DSP Management",
     },
-    { label: "Staff Task Management", path: Routes.agency.tasks, icon: ClipboardList, accessKey: "DSP Management" },
+    { label: "Task Management", path: Routes.agency.tasks, icon: ClipboardList, accessKey: "DSP Management" },
     { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
     { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
     { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
+    { label: "Compliance Alerts", path: Routes.agency.complianceAlerts, icon: ShieldAlert, accessKey: "Compliance Alerts" },
     { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
     { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion", programTypes: ["ddd"] },

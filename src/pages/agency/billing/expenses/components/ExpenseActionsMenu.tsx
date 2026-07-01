@@ -5,6 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DotGridIcon } from "@/components/ui/dot-grid-menu";
 import { cn } from "@/lib/utils";
 import type { AgencyExpenseListItem } from "@/lib/api/billing-expenses";
 
@@ -22,15 +23,6 @@ const declineMenuItemClassName =
 const deleteMenuItemClassName =
   `${menuItemBaseClassName} text-[#ef4444] hover:bg-[#fef2f2] focus:bg-[#fef2f2] focus:text-[#ef4444]`;
 
-function DotGridIcon() {
-  return (
-    <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <span key={index} className="h-[4px] w-[4px] rounded-full bg-[#808081]" />
-      ))}
-    </span>
-  );
-}
 
 type ExpenseActionsMenuProps = {
   expense: AgencyExpenseListItem;
