@@ -85,7 +85,7 @@ const allNavItems: AgencyNavItem[] = [
         icon: DSPManagementIcon,
         accessKey: "DSP Management",
     },
-    { label: "Staff Task Management", path: Routes.agency.tasks, icon: ClipboardList, accessKey: "DSP Management" },
+    { label: "Task Management", path: Routes.agency.tasks, icon: ClipboardList, accessKey: "DSP Management" },
     { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
     { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
     { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },

@@ -186,7 +186,7 @@ export default function StaffTasksPage() {
       {/* Page header */}
       <div className="mb-4 sm:mb-6">
         <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.4] text-[#10141a]">
-          Smart Manager
+          Task Manager
         </h1>
       </div>
 
