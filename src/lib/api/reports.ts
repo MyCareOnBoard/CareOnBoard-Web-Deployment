@@ -232,6 +232,7 @@ export interface RiskTrendPoint {
     expired: number;
     overtime: number;
     missing: number;
+    unsignedForm485: number;
 }
 
 export interface OperationalMetricData {

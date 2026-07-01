@@ -25,6 +25,7 @@ import BillingSummary from "../analytics/components/BillingSummary";
 
 import { useGetAnalyticsSummaryQuery } from "@/lib/api/reports";
 import type { AnalyticsSummaryData } from "@/lib/api/reports";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 function buildOperationalMetrics(data: AnalyticsSummaryData["operationalEfficiency"]): OperationalMetric[] {
   return [
@@ -68,6 +69,8 @@ export default function AgencyDashboardPage() {
   const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
   const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
   const labels = staffLabels(effectiveTypes);
+  // Scope analytics to the active DDD/HHA view, matching the compliance-alerts page.
+  const effectiveMode = useEffectiveAgencyMode();
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = React.useState({ startDate: "", endDate: "" });
   const [showDateModal, setShowDateModal] = React.useState(false);
@@ -85,9 +88,10 @@ export default function AgencyDashboardPage() {
   ];
 
   const [hoveredShift, setHoveredShift] = useState<number | null>(null);
-  const { data: expiredDocsData, isLoading: isLoadingAlerts } = useGetExpiredDocumentsQuery(user?.agencyId || "", {
-    skip: !user?.agencyId,
-  });
+  const { data: expiredDocsData, isLoading: isLoadingAlerts } = useGetExpiredDocumentsQuery(
+    { agencyId: user?.agencyId || "", mode: effectiveMode ?? undefined },
+    { skip: !user?.agencyId }
+  );
   const expiredDocuments = expiredDocsData?.data || [];
 
   const { data: clientStatsData, isLoading: isLoadingClients } = useGetClientStatsQuery(
@@ -112,6 +116,7 @@ export default function AgencyDashboardPage() {
     {
       startDate: dateRange.startDate || undefined,
       endDate: dateRange.endDate || undefined,
+      mode: effectiveMode ?? undefined,
     },
     { refetchOnMountOrArgChange: true }
   );
@@ -578,6 +583,7 @@ export default function AgencyDashboardPage() {
                 isLoading={isAnalyticsLoading}
                 startDate={dateRange.startDate || undefined}
                 endDate={dateRange.endDate || undefined}
+                mode={effectiveMode ?? undefined}
               />
             </div>
 
@@ -587,6 +593,7 @@ export default function AgencyDashboardPage() {
                 isLoading={isAnalyticsLoading}
                 startDate={dateRange.startDate || undefined}
                 endDate={dateRange.endDate || undefined}
+                mode={effectiveMode ?? undefined}
               />
             </div>
           </div>
