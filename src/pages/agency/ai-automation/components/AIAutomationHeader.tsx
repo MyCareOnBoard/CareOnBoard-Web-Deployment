@@ -7,6 +7,8 @@ interface AIAutomationHeaderProps {
   onOpenConversations: () => void;
   // onNewConversation: () => void;
   userName?: string;
+  /** Program view the open conversation is pinned to; hidden when agency-wide. */
+  conversationMode?: string | null;
   // onNew: () => void;
   // selectedArea: string;
   // onSelectArea: (area: string) => void;
@@ -17,14 +19,22 @@ export default function AIAutomationHeader({
   // onNewConversation,
   // onNew,
   userName,
+  conversationMode,
   // selectedArea,
   // onSelectArea,
 }: AIAutomationHeaderProps) {
   return (
     <div className="flex flex-col gap-2 sm:gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-[28px] sm:text-[36px] md:text-[40px] font-bold text-[#10141a] leading-tight">
+        <h1 className="flex items-center gap-3 text-[28px] sm:text-[36px] md:text-[40px] font-bold text-[#10141a] leading-tight">
           AI Automation
+          {conversationMode && (
+            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-semibold uppercase tracking-wide ${
+              conversationMode === "hha" ? "bg-[#e6f7f7] text-[#008f93]" : "bg-[#eef2ff] text-[#4f46e5]"
+            }`}>
+              {conversationMode}
+            </span>
+          )}
         </h1>
 
         <div className="flex flex-wrap gap-2 sm:gap-3">

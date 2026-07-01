@@ -22,10 +22,11 @@ export const remindersApi = createApi({
   baseQuery: customBaseQuery,
   tagTypes: ["Reminders"],
   endpoints: (builder) => ({
-    getReminders: builder.query<RemindersResponse, void>({
-      query: () => ({
+    getReminders: builder.query<RemindersResponse, { mode?: string }>({
+      query: ({ mode } = {}) => ({
         url: "/agencyReminders/reminders",
         method: "GET",
+        params: { ...(mode ? { mode } : {}) },
         requiresAuth: true,
       }),
       providesTags: ["Reminders"],

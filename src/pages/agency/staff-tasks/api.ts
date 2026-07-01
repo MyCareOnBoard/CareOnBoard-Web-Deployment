@@ -18,6 +18,8 @@ export interface StaffTaskData {
   priority: "High" | "Medium" | "Low";
   status: "Open" | "In Progress" | "Completed";
   activities: TaskActivity[];
+  /** Program view the task was created in; absent = shows in both views. */
+  mode?: "ddd" | "hha";
 }
 
 interface TasksResponse {
@@ -37,6 +39,7 @@ interface CreateTaskInput {
   staffMember: string;
   dueDate: string;
   priority: "High" | "Medium" | "Low";
+  mode?: "ddd" | "hha";
 }
 
 interface UpdateTaskInput {
@@ -54,10 +57,11 @@ export const agencyStaffTasksApi = createApi({
   baseQuery: customBaseQuery,
   tagTypes: ["StaffTasks"],
   endpoints: (builder) => ({
-    getTasks: builder.query<TasksResponse, void>({
-      query: () => ({
+    getTasks: builder.query<TasksResponse, { mode?: string }>({
+      query: ({ mode } = {}) => ({
         url: "/agencyStaffTasks/tasks",
         method: "GET",
+        params: { ...(mode ? { mode } : {}) },
         requiresAuth: true,
       }),
       providesTags: ["StaffTasks"],

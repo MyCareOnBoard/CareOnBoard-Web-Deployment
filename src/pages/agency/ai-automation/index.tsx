@@ -18,6 +18,7 @@ import VoiceInputButton from "@/components/VoiceInputButton";
 import { MessageBubble } from "./components/MessageBubble";
 import EmptyState from "./components/EmptyState";
 import type { LocalMessage } from "./types";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 const MAX_CHARS = 500;
 
@@ -28,8 +29,12 @@ function AIAutomationContent() {
   const { startRecording, isRecording, registerActiveTarget, committedTranscripts } =
     useVoiceRecording();
   const { acceptSession, cancelSession, recordingUi } = useVoiceSessionActions();
+  const mode = useEffectiveAgencyMode();
   const [selectedArea, setSelectedArea] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(urlConversationId ?? null);
+  // Program view the OPEN conversation is pinned to (from its stored context);
+  // seeded from the toggle for brand-new conversations.
+  const [conversationMode, setConversationMode] = useState<string | null>(null);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [showConversations, setShowConversations] = useState(false);
@@ -52,11 +57,28 @@ function AIAutomationContent() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  // Switching the DDD/HHA toggle while a conversation is open sends you back to
+  // the automations home (a pinned conversation shouldn't be viewed under a
+  // mismatched toggle). Skip the initial mount — only react to actual changes.
+  const prevModeRef = useRef(mode);
+  useEffect(() => {
+    if (prevModeRef.current !== mode) {
+      prevModeRef.current = mode;
+      if (urlConversationId) {
+        toast.info(
+          `Switched to the ${mode ? mode.toUpperCase() : "agency-wide"} view — returned to AI Automation home`
+        );
+        navigate("/agency/automations", { replace: true });
+      }
+    }
+  }, [mode, urlConversationId, navigate]);
+
   useEffect(() => {
     if (urlConversationId) {
       loadConversation(urlConversationId);
     } else {
       setActiveConversationId(null);
+      setConversationMode(null);
       setMessages([]);
       setIsLoadingConversation(false);
     }
@@ -65,6 +87,7 @@ function AIAutomationContent() {
 
   const startNewConversation = useCallback(() => {
     setActiveConversationId(null);
+    setConversationMode(null);
     setMessages([]);
     setInputValue("");
     navigate("/agency/automations", { replace: true });
@@ -80,6 +103,7 @@ function AIAutomationContent() {
 
       try {
         const result = await fetchConversation(id).unwrap();
+        setConversationMode(result.context?.mode ?? null);
         if (result.messages) {
           setMessages(
             result.messages.map((message: AIMessage) => ({
@@ -112,9 +136,11 @@ function AIAutomationContent() {
       let conversationId = activeConversationId;
       if (!conversationId) {
         try {
-          const result = await createConversation({}).unwrap();
+          // New conversations are pinned to the active DDD/HHA view at creation.
+          const result = await createConversation(mode ? { context: { mode } } : {}).unwrap();
           conversationId = result.id;
           setActiveConversationId(conversationId);
+          setConversationMode(mode ?? null);
           navigate(`/agency/automations/${conversationId}`, { replace: true });
         } catch {
           toast.error("Failed to start conversation");
@@ -140,11 +166,18 @@ function AIAutomationContent() {
 
       setMessages((prev) => [...prev, userMessage, loadingMessage]);
 
+      // Merge area + mode; send undefined (never {}) so an empty context can't
+      // clobber the conversation's stored context on the first message.
+      const messageContext = {
+        ...(selectedArea ? { area: selectedArea } : {}),
+        ...(mode ? { mode } : {}),
+      };
+
       try {
         const response = await sendMessage({
           conversationId,
           message: content,
-          context: selectedArea ? { area: selectedArea } : undefined,
+          context: Object.keys(messageContext).length ? messageContext : undefined,
           attachments: attachmentsSnapshot.length ? attachmentsSnapshot : undefined,
         }).unwrap();
         setMessages((prev) =>
@@ -171,7 +204,7 @@ function AIAutomationContent() {
         );
       }
     },
-    [activeConversationId, createConversation, inputValue, isSending, navigate, pendingAttachments, sendMessage]
+    [activeConversationId, createConversation, inputValue, isSending, mode, navigate, pendingAttachments, selectedArea, sendMessage]
   );
 
   const handleAssignDSP = useCallback(
@@ -189,6 +222,7 @@ function AIAutomationContent() {
           onOpenConversations={() => setShowConversations(true)}
           // onNewConversation={startNewConversation}
           userName={user?.fullName || user?.email || undefined}
+          conversationMode={activeConversationId ? conversationMode : null}
           // selectedArea={selectedArea}
           // onSelectArea={setSelectedArea}
         />

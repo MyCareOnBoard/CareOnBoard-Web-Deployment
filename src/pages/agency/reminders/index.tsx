@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import { Routes } from "@/routes/constants";
 
 import ReminderModal from "./components/ReminderModal";
@@ -125,6 +126,18 @@ function TypeBadge({ type }: { type: Reminder["type"] }) {
   );
 }
 
+// Program view a reminder is scoped to; nothing rendered for agency-wide reminders.
+function ModeBadge({ mode }: { mode?: Reminder["mode"] }) {
+  if (!mode) return null;
+  return (
+    <span className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${
+      mode === "hha" ? "bg-[#e6f7f7] text-[#008f93]" : "bg-[#eef2ff] text-[#4f46e5]"
+    }`}>
+      {mode}
+    </span>
+  );
+}
+
 function RecurrenceBadge({ recurrence }: { recurrence: Reminder["recurrence"] }) {
   if (!recurrence || recurrence === "none") return null;
   return (
@@ -164,8 +177,9 @@ function ReminderRow({ reminder, onView, onEdit, onDelete, onOpenConversation }:
           </div>
         </div>
       </div>
-      <div className="hidden md:block">
+      <div className="hidden md:flex md:flex-col md:items-start md:gap-1">
         <TypeBadge type={reminder.type} />
+        <ModeBadge mode={reminder.mode} />
       </div>
       <div className="text-[14px] text-[#6b7280]">
         <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Date</span>
@@ -252,8 +266,14 @@ function ReminderRowsSkeleton() {
 
 export default function RemindersPage() {
   const navigate = useNavigate();
+  const mode = useEffectiveAgencyMode();
 
-  const { data, isLoading, isError, refetch } = useGetRemindersQuery();
+  // refetchOnMountOrArgChange + isFetching keep the skeleton showing on every
+  // DDD/HHA toggle, even when that view's data is already cached.
+  const { data, isFetching: isLoading, isError, refetch } = useGetRemindersQuery(
+    { mode: mode ?? undefined },
+    { refetchOnMountOrArgChange: true },
+  );
   const [createReminder, { isLoading: isCreating }] = useCreateReminderMutation();
   const [updateReminder, { isLoading: isUpdating }] = useUpdateReminderMutation();
   const [deleteReminder] = useDeleteReminderMutation();
@@ -310,11 +330,14 @@ export default function RemindersPage() {
   };
 
   const handleSave = async (draft: ReminderDraft) => {
+    // Stamp the active program view on create AND edit (an edit re-stamps the
+    // editor's current view); no mode = agency-wide, shows in both views.
+    const payload = mode ? { ...draft, mode } : draft;
     try {
       if (editingReminder) {
-        await updateReminder({ reminderId: editingReminder.id, data: draft }).unwrap();
+        await updateReminder({ reminderId: editingReminder.id, data: payload }).unwrap();
       } else {
-        await createReminder(draft).unwrap();
+        await createReminder(payload).unwrap();
       }
     } catch {
       // error handled by RTK Query; toast can be wired here if needed
@@ -512,6 +535,7 @@ export default function RemindersPage() {
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge status={viewingReminder.status} />
                   <TypeBadge type={viewingReminder.type} />
+                  <ModeBadge mode={viewingReminder.mode} />
                   <RecurrenceBadge recurrence={viewingReminder.recurrence} />
                 </div>
               </DialogHeader>

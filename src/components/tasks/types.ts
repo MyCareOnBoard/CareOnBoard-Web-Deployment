@@ -27,4 +27,6 @@ export type StaffTask = {
   status: "Open" | "In Progress" | "Completed";
   activities: TaskActivity[];
   createdBy?: string;
+  /** Program view the task was created in; absent = shows in both views. */
+  mode?: "ddd" | "hha";
 };

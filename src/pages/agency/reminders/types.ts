@@ -1,6 +1,7 @@
 export type ReminderType = "normal" | "ai_prompt";
 export type ReminderStatus = "pending" | "sent" | "failed";
 export type ReminderRecurrence = "none" | "daily" | "weekly" | "biweekly" | "monthly";
+export type ReminderMode = "ddd" | "hha";
 
 export interface Reminder {
   id: string;
@@ -16,6 +17,8 @@ export interface Reminder {
   status: ReminderStatus;
   result?: string | null;
   conversationId?: string | null;
+  /** Program view the reminder was created in; absent = shows in both views. */
+  mode?: ReminderMode | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,6 +29,7 @@ export interface ReminderDraft {
   scheduledDate: string;
   scheduledTime: string;
   recurrence: ReminderRecurrence;
+  mode?: ReminderMode;
 }
 
 export const RECURRENCE_LABELS: Record<ReminderRecurrence, string> = {

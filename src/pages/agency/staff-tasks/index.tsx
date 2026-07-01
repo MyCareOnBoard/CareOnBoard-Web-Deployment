@@ -30,6 +30,7 @@ import {
   useDeleteTaskMutation,
 } from "./api";
 import { useListAgencyStaffQuery } from "@/lib/api/agency-staff";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 const departments: Department[] = [
   { value: "hr", label: "HR" },
@@ -86,6 +87,7 @@ function SkeletonRow() {
 export default function StaffTasksPage() {
   const navigate = useNavigate();
   const currentUser = useSelector(selectUser);
+  const mode = useEffectiveAgencyMode();
 
   const [searchQuery,    setSearchQuery]   = useState("");
   const [staffFilter,    setStaffFilter]   = useState("");
@@ -98,7 +100,12 @@ export default function StaffTasksPage() {
   const [isDeleting,       setIsDeleting]       = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
-  const { data: tasksResponse, isLoading: tasksLoading } = useGetTasksQuery();
+  // refetchOnMountOrArgChange + isFetching keep the skeleton showing on every
+  // DDD/HHA toggle, even when that view's data is already cached.
+  const { data: tasksResponse, isFetching: tasksLoading } = useGetTasksQuery(
+    { mode: mode ?? undefined },
+    { refetchOnMountOrArgChange: true },
+  );
   const { data: staffResponse, isLoading: staffLoading } = useListAgencyStaffQuery({ limit: 200 });
   const [createTask] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
@@ -138,7 +145,7 @@ export default function StaffTasksPage() {
   const handleCreateTask = async (task: {
     title: string; description: string; department: string;
     staffMember: string; dueDate: string; priority: "High" | "Medium" | "Low";
-  }) => { await createTask(task); };
+  }) => { await createTask({ ...task, ...(mode ? { mode } : {}) }); };
 
   const handleUpdateTask = async (
     taskId: string,

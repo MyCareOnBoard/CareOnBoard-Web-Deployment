@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MessageSquare, Plus, Trash2, X } from "lucide-react";
 import { useDeleteConversationMutation, useListConversationsQuery } from "../api";
 import { cn } from "@/lib/utils";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 interface ConversationsSidebarProps {
   open: boolean;
@@ -20,7 +21,12 @@ export default function ConversationsSidebar({
   onSelect,
   onNew,
 }: ConversationsSidebarProps) {
-  const { data, isLoading } = useListConversationsQuery(undefined, { skip: !open });
+  const mode = useEffectiveAgencyMode();
+  // Backend scopes the list to the active DDD/HHA view (unpinned conversations show in both).
+  const { data, isLoading } = useListConversationsQuery(
+    { mode: mode ?? undefined },
+    { skip: !open, refetchOnMountOrArgChange: true },
+  );
   const [deleteConversation] = useDeleteConversationMutation();
 
   const handleDelete = async (e: React.MouseEvent<HTMLButtonElement>, id: string) => {

@@ -187,7 +187,7 @@ function ConversationsSidebar({
   onSelect: (id: string) => void;
   onNew: () => void;
 }) {
-  const { data, isLoading } = useListConversationsQuery(undefined, { skip: !open });
+  const { data, isLoading } = useListConversationsQuery({}, { skip: !open });
   const [deleteConversation] = useDeleteConversationMutation();
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
