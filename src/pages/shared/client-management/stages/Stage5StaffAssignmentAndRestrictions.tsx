@@ -208,7 +208,7 @@ export function Stage5StaffAssignmentAndRestrictions({
             onChange={(v) => updateStage5({ medicalRestrictionsTrained: v })}
           />
 
-          <div className="pt-2">
+          {/* <div className="pt-2">
             <p className="text-[14px] font-normal text-[#10141a]">
               Assignments auto-check DSP:
             </p>
@@ -234,7 +234,7 @@ export function Stage5StaffAssignmentAndRestrictions({
                 );
               })}
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 

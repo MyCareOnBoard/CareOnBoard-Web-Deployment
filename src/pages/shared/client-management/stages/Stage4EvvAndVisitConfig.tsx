@@ -105,7 +105,7 @@ export function Stage4EvvAndVisitConfig({
           </p>
         </div>
 
-        <div className="max-w-[720px] space-y-6">
+        {/* <div className="max-w-[720px] space-y-6">
           <YesNoRadio
             label="EVV Requirement"
             value={stage4.evvRequirement}
@@ -121,7 +121,7 @@ export function Stage4EvvAndVisitConfig({
             value={stage4.allowedSecondaryLocations}
             onChange={(v) => updateStage4({ allowedSecondaryLocations: v })}
           />
-        </div>
+        </div> */}
       </div>
 
       <div className="mb-10">
@@ -132,7 +132,7 @@ export function Stage4EvvAndVisitConfig({
         </div>
 
         <div className="max-w-[720px] space-y-6">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="flex flex-col gap-1">
               <label className="text-[12px] font-normal text-[#10141a]">
                 Minimum shift length
@@ -232,7 +232,7 @@ export function Stage4EvvAndVisitConfig({
             label="Back-to-back visits allowed?"
             value={stage4.backToBackAllowed}
             onChange={(v) => updateStage4({ backToBackAllowed: v })}
-          />
+          /> */}
 
           <YesNoRadio
             label="Travel time allowed?"

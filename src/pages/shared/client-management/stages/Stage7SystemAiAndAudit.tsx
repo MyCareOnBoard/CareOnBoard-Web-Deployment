@@ -73,7 +73,8 @@ export function Stage7SystemAiAndAudit({
         </h1>
       </div>
 
-      <div className="mb-10">
+     {/* AI Toggles removed */}
+      {/* <div className="mb-10">
         <div className="mb-4">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
             11. System &amp; AI Settings
@@ -91,12 +92,13 @@ export function Stage7SystemAiAndAudit({
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
 
-      <div className="mb-10">
+        {/* Audit step removed */}
+      {/* <div className="mb-10">
         <div className="mb-4">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-            12. Audit &amp; Monitoring Setup
+            11. Audit &amp; Monitoring Setup
           </p>
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
             Used by compliance and QA teams.
@@ -181,13 +183,13 @@ export function Stage7SystemAiAndAudit({
               placeholder=""
             />
           </div> */}
-        </div>
-      </div>
+        {/* </div>
+      </div> */}
 
       <div className="mb-10">
         <div className="mb-4">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-            Team members (ISP)
+            11. Team members (ISP)
           </p>
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
             Coordinators, nurses, or other people named on the plan who are not the main guardian.
