@@ -26,6 +26,7 @@ import {
   needsSupplementalFetch,
   splitRowsIntoClaimBundles,
   sumSelectedPreviewCharges,
+  sumSelectedPreviewSplit,
   type ClaimConfirmSelection,
 } from "../utils/claimBundleUtils";
 import {
@@ -37,7 +38,7 @@ import {
   resolveServiceIdsFromCodes,
 } from "../utils/claimSelectionUtils";
 import type { RecentClaimClientGroup } from "../utils/groupRecentClaimsByClient";
-import ClaimPreviewSection from "./claimPreviewSection";
+import ClaimPreviewSection, { CoverageLegend } from "./claimPreviewSection";
 import OutOfPocketBadge from "./OutOfPocketBadge";
 import { COVERAGE } from "@/lib/coverage";
 
@@ -160,10 +161,9 @@ export default function GenerateClaimModal({
     [previewItems, selectedIds],
   );
 
-  // A `both` line bills both legs; surface that so the single total reads correctly.
-  const hasBothLines = useMemo(
-    () => displayRows.some((row) => row.coverage === COVERAGE.BOTH),
-    [displayRows],
+  const selectedSplitTotals = useMemo(
+    () => sumSelectedPreviewSplit(previewItems, selectedIds),
+    [previewItems, selectedIds],
   );
 
   const resetWizard = useCallback(() => {
@@ -439,9 +439,15 @@ export default function GenerateClaimModal({
     const selectedRows = displayRows.filter((row) => selectedIds.has(row.id));
     // Claim leg: payer + both lines. Invoice leg: out-of-pocket + both lines. A `both` line is in
     // both, so generating produces both a claim (payer portion) and an invoice (out-of-pocket).
-    const claimRows = selectedRows.filter((row) => row.coverage !== COVERAGE.OUT_OF_POCKET);
+    // A leg already billed (needs* === false) is skipped so a half-billed line never re-POSTs;
+    // undefined means the row came from the supplemental unclaimed fetch and is safe to bill.
+    const claimRows = selectedRows.filter(
+      (row) => row.coverage !== COVERAGE.OUT_OF_POCKET && row.needsClaim !== false,
+    );
     const invoiceRows = selectedRows.filter(
-      (row) => row.coverage === COVERAGE.OUT_OF_POCKET || row.coverage === COVERAGE.BOTH,
+      (row) =>
+        (row.coverage === COVERAGE.OUT_OF_POCKET || row.coverage === COVERAGE.BOTH) &&
+        row.needsInvoice !== false,
     );
     const claimSelections = mapBundlesToClaimConfirmSelections(
       splitRowsIntoClaimBundles(claimRows),
@@ -541,18 +547,14 @@ export default function GenerateClaimModal({
                 </p>
               ) : (
                 <>
-                  {hasBothLines && (
-                    <p className="rounded-[10px] border border-[#cfeeee] bg-[#f0fafa] px-3 py-2 text-[12px] text-[#0c5d5f]">
-                      Split-coverage lines bill the payer (claim) and the family (out-of-pocket
-                      invoice). The total below is the full amount billed; each line's split is
-                      itemized on the generated claim and invoice.
-                    </p>
-                  )}
+                  <CoverageLegend />
                   <ClaimPreviewSection
                     title={previewListTitle}
                     items={previewItems}
                     selectedIds={selectedIds}
                     totalAmount={selectedTotalAmount}
+                    payerSubtotal={selectedSplitTotals.payer}
+                    outOfPocketSubtotal={selectedSplitTotals.outOfPocket}
                     onToggleItem={toggleItem}
                     onToggleAll={toggleSection}
                   />

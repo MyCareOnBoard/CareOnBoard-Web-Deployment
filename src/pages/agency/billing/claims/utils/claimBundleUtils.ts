@@ -5,7 +5,6 @@ import type { MileageRide } from "@/lib/api/mileage";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import {
   computeClaimBilling,
-  formatClaimCharge,
   parseRateToNumber,
 } from "./claimReportPrefillUtils";
 import { resolveWeekRangeForShift } from "./claimShiftBillingUtils";
@@ -27,6 +26,8 @@ export type ClaimBundlePreviewItem = {
   title: string;
   metaLine: string;
   chargeAmount: number;
+  payerAmount: number;
+  outOfPocketAmount: number;
 };
 
 function normalizeServiceCode(value?: string | null) {
@@ -129,40 +130,42 @@ function parsePreviewHours(totalHours: string): number {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-function formatPreviewCharge(charge: number): string | null {
-  return charge > 0 ? formatClaimCharge(charge) : null;
-}
+type PreviewChargeSplit = {
+  payer: number;
+  outOfPocket: number;
+  total: number;
+};
 
-function billedChargeForRow(charge: number, row: ReadyToClaimRow): number {
+function splitChargeForRow(charge: number, row: ReadyToClaimRow): PreviewChargeSplit {
   const { payer, outOfPocket } = splitCharge(
     charge,
     row.coverage,
     row.splitMode,
     row.splitValue,
   );
-  return Math.round((payer + outOfPocket) * 100) / 100;
+  return { payer, outOfPocket, total: Math.round((payer + outOfPocket) * 100) / 100 };
 }
 
-function computeShiftPreviewChargeAmount(row: ReadyToClaimRow, claim: RecentClaim): number {
+function computeShiftPreviewCharge(row: ReadyToClaimRow, claim: RecentClaim): PreviewChargeSplit {
   const hours = parsePreviewHours(claim.totalHours);
   const rate =
     parseRateToNumber(row.clientRate ?? undefined) ??
     parseRateToNumber(claim.rate);
   if (!hours || !rate) {
-    return 0;
+    return { payer: 0, outOfPocket: 0, total: 0 };
   }
   const charge = computeClaimBilling(hours, rate, row.clientPayType ?? "hourly").charge;
-  return billedChargeForRow(charge, row);
+  return splitChargeForRow(charge, row);
 }
 
-function computeRidePreviewChargeAmount(row: ReadyToClaimRow, mileageRate: number): number {
+function computeRidePreviewCharge(row: ReadyToClaimRow, mileageRate: number): PreviewChargeSplit {
   const miles = Number(row.actualDistance);
   const rate = Number(mileageRate);
   if (!Number.isFinite(miles) || miles <= 0 || !Number.isFinite(rate) || rate <= 0) {
-    return 0;
+    return { payer: 0, outOfPocket: 0, total: 0 };
   }
   const charge = computeClaimBilling(miles, rate, "mile").charge;
-  return billedChargeForRow(charge, row);
+  return splitChargeForRow(charge, row);
 }
 
 function buildShiftPreviewItem(
@@ -171,12 +174,10 @@ function buildShiftPreviewItem(
 ): ClaimBundlePreviewItem {
   const serviceCode = row.serviceCode?.trim();
   const dateLabel = isMissingDisplayValue(claim.serviceDate) ? null : claim.serviceDate;
-  const chargeAmount = computeShiftPreviewChargeAmount(row, claim);
-  const chargeLabel = formatPreviewCharge(chargeAmount);
+  const charge = computeShiftPreviewCharge(row, claim);
   const titleParts = [
     serviceCode || null,
     dateLabel ? `Shift on ${dateLabel}` : "Shift",
-    chargeLabel,
   ].filter(Boolean);
 
   const duration =
@@ -196,7 +197,9 @@ function buildShiftPreviewItem(
     sourceType: row.sourceType,
     title: titleParts.join(" · "),
     metaLine: metaParts.join(" · "),
-    chargeAmount,
+    chargeAmount: charge.total,
+    payerAmount: charge.payer,
+    outOfPocketAmount: charge.outOfPocket,
   };
 }
 
@@ -207,12 +210,10 @@ function buildRidePreviewItem(
 ): ClaimBundlePreviewItem {
   const serviceCode = row.serviceCode?.trim();
   const dateLabel = isMissingDisplayValue(claim.serviceDate) ? null : claim.serviceDate;
-  const chargeAmount = computeRidePreviewChargeAmount(row, mileageRate);
-  const chargeLabel = formatPreviewCharge(chargeAmount);
+  const charge = computeRidePreviewCharge(row, mileageRate);
   const titleParts = [
     serviceCode || null,
     dateLabel ? `Ride on ${dateLabel}` : "Ride",
-    chargeLabel,
   ].filter(Boolean);
 
   const duration =
@@ -233,7 +234,9 @@ function buildRidePreviewItem(
     sourceType: row.sourceType,
     title: titleParts.join(" · "),
     metaLine: metaParts.join(" · "),
-    chargeAmount,
+    chargeAmount: charge.total,
+    payerAmount: charge.payer,
+    outOfPocketAmount: charge.outOfPocket,
   };
 }
 
@@ -259,6 +262,23 @@ export function sumSelectedPreviewCharges(
     return sum + item.chargeAmount;
   }, 0);
   return Math.round(total * 100) / 100;
+}
+
+export function sumSelectedPreviewSplit(
+  items: ClaimBundlePreviewItem[],
+  selectedIds: Set<string>,
+): { payer: number; outOfPocket: number } {
+  let payer = 0;
+  let outOfPocket = 0;
+  for (const item of items) {
+    if (!selectedIds.has(item.id)) continue;
+    payer += item.payerAmount;
+    outOfPocket += item.outOfPocketAmount;
+  }
+  return {
+    payer: Math.round(payer * 100) / 100,
+    outOfPocket: Math.round(outOfPocket * 100) / 100,
+  };
 }
 
 function getClientDisplayName(client: Client): string {

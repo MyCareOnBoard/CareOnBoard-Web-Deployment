@@ -1,5 +1,5 @@
 import ClientNameLink from "./ClientNameLink";
-import OutOfPocketBadge from "./OutOfPocketBadge";
+import OutOfPocketBadge, { PayerInsuranceBadge } from "./OutOfPocketBadge";
 
 type SavedClaimsClientGroupHeaderProps = {
   clientName: string;
@@ -30,7 +30,7 @@ export default function SavedClaimsClientGroupHeader({
             clientId={clientId}
             className="text-[16px] font-semibold text-[#10141a]"
           />
-          {outOfPocket && <OutOfPocketBadge />}
+          {outOfPocket ? <OutOfPocketBadge /> : <PayerInsuranceBadge />}
         </div>
         <p className="mt-1 text-[13px] text-[#808081]">{label}</p>
       </div>
@@ -44,7 +44,7 @@ export default function SavedClaimsClientGroupHeader({
         clientId={clientId}
         className="text-[14px] font-semibold text-[#10141a]"
       />
-      {outOfPocket && <OutOfPocketBadge />}
+      {outOfPocket ? <OutOfPocketBadge /> : <PayerInsuranceBadge />}
       <span className="shrink-0 text-[13px] text-[#808081]">{label}</span>
     </div>
   );

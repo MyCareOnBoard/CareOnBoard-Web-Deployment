@@ -107,13 +107,30 @@ describe("claimBundleUtils", () => {
 
   it("mapBundleRowsToPreviewItems builds display labels", () => {
     const items = mapBundleRowsToPreviewItems([rows[0]]);
-    expect(items[0]?.title).toBe("H2021HI · Shift on June 5, 2026 · $33.64");
+    expect(items[0]?.title).toBe("H2021HI · Shift on June 5, 2026");
+    expect(items[0]?.chargeAmount).toBe(33.64);
+    expect(items[0]?.payerAmount).toBe(33.64);
+    expect(items[0]?.outOfPocketAmount).toBe(0);
     expect(items[0]?.metaLine).toMatch(/–/);
     expect(items[0]?.metaLine).toContain("3.5 hrs");
     expect(items[0]?.metaLine).toContain("$9.61/hr");
     expect(items[0]?.metaLine).not.toContain("$33.64");
     expect(items[0]?.metaLine).not.toContain("Staff");
     expect(items[0]?.sourceId).toBe("shift-1");
+  });
+
+  it("mapBundleRowsToPreviewItems splits a both-coverage charge into payer and out-of-pocket", () => {
+    const items = mapBundleRowsToPreviewItems([
+      {
+        ...rows[0],
+        coverage: "both",
+        splitMode: "percentage",
+        splitValue: 60,
+      },
+    ]);
+    expect(items[0]?.payerAmount).toBe(20.18);
+    expect(items[0]?.outOfPocketAmount).toBe(13.46);
+    expect(items[0]?.chargeAmount).toBe(33.64);
   });
 
   it("mapBundleRowsToPreviewItems includes ride details", () => {
@@ -132,7 +149,9 @@ describe("claimBundleUtils", () => {
     };
 
     const items = mapBundleRowsToPreviewItems([rideRow], 10);
-    expect(items[0]?.title).toBe("A0090HI22 · Ride on Jun 5, 2026 · $50.00");
+    expect(items[0]?.title).toBe("A0090HI22 · Ride on Jun 5, 2026");
+    expect(items[0]?.chargeAmount).toBe(50);
+    expect(items[0]?.payerAmount).toBe(50);
     expect(items[0]?.metaLine).toContain("→ 5 km");
     expect(items[0]?.metaLine).not.toContain("Staff");
     expect(items[0]?.metaLine).toContain("$10.00/mi");
@@ -170,7 +189,7 @@ describe("claimBundleUtils", () => {
         clientPayType: "15-min",
       },
     ]);
-    expect(items[0]?.title).toContain("$134.54");
+    expect(items[0]?.chargeAmount).toBe(134.54);
   });
 
   it("needsSupplementalFetch returns false when cache covers selected service codes", () => {
