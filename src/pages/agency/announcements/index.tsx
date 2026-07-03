@@ -20,7 +20,7 @@ interface Announcement {
   expiresAt: { seconds: number } | string | null
 }
 
-type TargetUserType = "employee" | "applicant" | "family_member"
+type TargetUserType = "employee" | "applicant" | "family_member" | "agency_staff"
 
 interface FormState {
   title: string
@@ -61,6 +61,7 @@ export default function AgencyAnnouncementsPage() {
     { value: "employee",      label: employeeLabel },
     { value: "applicant",     label: "Applicants" },
     { value: "family_member", label: "Family Members" },
+    { value: "agency_staff",  label: "Agency Staff" },
   ]
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -199,7 +200,7 @@ export default function AgencyAnnouncementsPage() {
               <div>
                 <h2 className="text-[20px] sm:text-[22px] font-bold text-[#10141a]">All Announcements</h2>
                 <p className="mt-0.5 text-[13px] sm:text-[14px] text-[#6b7280]">
-                  Broadcast notices to employees, applicants, and family portal users
+                  Broadcast notices to employees, applicants, family portal users, and agency staff
                 </p>
               </div>
               <button
@@ -287,7 +288,7 @@ export default function AgencyAnnouncementsPage() {
               </p>
               <p className="mt-1 text-[13px] text-[#6b7280]">
                 {announcements.length === 0
-                  ? "Create one to notify family portal users"
+                  ? "Create one to notify your team and portal users"
                   : "Try changing the type or status filter"}
               </p>
             </div>
