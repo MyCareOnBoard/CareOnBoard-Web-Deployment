@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, { NavItem } from "@/components/DashboardSidebar";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
 import { resolveActiveNavItem } from "@/lib/nav-utils";
@@ -321,6 +322,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                     <>
                         <DashboardSidebar navItems={navItems} />
                         <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
+                            <AnnouncementBanner endpoint="/agencyAnnouncements/announcements/mine" viewAllPath={Routes.agency.announcements} className="mx-8 mb-4" />
                             <div className="px-8">{children ?? <Outlet />}</div>
                         </main>
                         <TooltipProvider>
