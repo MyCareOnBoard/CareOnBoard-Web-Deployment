@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DotGridIcon } from "@/components/ui/dot-grid-menu";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/routes/constants";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
@@ -60,16 +61,6 @@ function DateRange({ start, end }: { start: string; end: string }) {
       title={label}
     >
       {label}
-    </span>
-  );
-}
-
-function DotGridIcon() {
-  return (
-    <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <span key={index} className="h-[4px] w-[4px] rounded-full bg-[#808081]" />
-      ))}
     </span>
   );
 }

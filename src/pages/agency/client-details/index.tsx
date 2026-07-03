@@ -376,6 +376,7 @@ export default function ClientDetailsPage() {
             setDocumentToEdit(document);
             setIsUploadModalOpen(true);
           }}
+          onActivateClient={handleActivateClient}
         />
       )}
       {activeTab === "family-portal" && (

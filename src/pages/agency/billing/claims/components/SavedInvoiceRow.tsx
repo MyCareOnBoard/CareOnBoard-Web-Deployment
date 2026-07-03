@@ -5,13 +5,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import { cn } from "@/lib/utils";
 import type { OutOfPocketInvoiceListItem } from "@/lib/api/out-of-pocket";
 import { GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS } from "./tableColumns";
-
-const menuItemClassName =
-  "cursor-pointer rounded-none px-4 py-2.5 text-[14px] font-medium text-[#10141a] hover:bg-[#eef4f5] focus:bg-[#eef4f5]";
 
 type Props = {
   invoice: OutOfPocketInvoiceListItem;
@@ -20,16 +18,6 @@ type Props = {
   onCancelInvoice: (invoice: OutOfPocketInvoiceListItem) => void;
   actionsDisabled?: boolean;
 };
-
-function DotGridIcon() {
-  return (
-    <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <span key={index} className="h-[4px] w-[4px] rounded-full bg-[#808081]" />
-      ))}
-    </span>
-  );
-}
 
 function formatDate(value: string) {
   const date = new Date(value);

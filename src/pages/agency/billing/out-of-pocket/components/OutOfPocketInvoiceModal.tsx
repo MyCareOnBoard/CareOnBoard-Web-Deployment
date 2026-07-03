@@ -126,10 +126,12 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
                 <p className={cn("mb-1 font-bold uppercase tracking-[0.02em]", TEXT)}>Bill to</p>
                 <p className={cn("font-bold leading-tight", TEXT)}>{doc.payerName}</p>
                 {doc.payerEmail ? <p className={cn("mt-1", MUTED)}>{doc.payerEmail}</p> : null}
+                {doc.payerAddress ? <p className={cn("mt-1", MUTED)}>{doc.payerAddress}</p> : null}
               </div>
               <div className="min-w-0 text-right">
                 <p className={cn("mb-1 font-bold", TEXT)}>For</p>
                 <p className={cn("font-bold leading-tight", TEXT)}>{doc.clientName}</p>
+                {doc.clientAddress ? <p className={cn("mt-1", MUTED)}>{doc.clientAddress}</p> : null}
               </div>
             </div>
 

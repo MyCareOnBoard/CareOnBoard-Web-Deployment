@@ -5,20 +5,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DotGridIcon } from "@/components/ui/dot-grid-menu";
 import { cn } from "@/lib/utils";
 import ClientNameLink from "./ClientNameLink";
-import OutOfPocketBadge from "./OutOfPocketBadge";
 import type { RecentClaimClientGroup } from "../utils/groupRecentClaimsByClient";
-
-function DotGridIcon() {
-  return (
-    <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <span key={index} className="h-[4px] w-[4px] rounded-full bg-[#808081]" />
-      ))}
-    </span>
-  );
-}
 
 const menuItemClassName =
   "flex min-h-[44px] w-full cursor-pointer items-center justify-between rounded-none px-4 py-3 text-[14px] font-medium text-[#10141a] hover:bg-[#eef4f5] focus:bg-[#eef4f5]";
@@ -38,8 +28,8 @@ export default function RecentClaimsClientGroupHeader({
 }: RecentClaimsClientGroupHeaderProps) {
   const itemLabel = group.claims.length === 1 ? "1 item" : `${group.claims.length} items`;
   const isMobile = variant === "mobile";
-  const isOutOfPocket = group.billingDirection === "out-of-pocket";
-  const generateLabel = isOutOfPocket ? "Generate invoice" : "Generate claim";
+  // Coverage is now per line (shown in the row's Coverage column), so the group action is generic.
+  const generateLabel = "Generate bills";
 
   const actionsMenu = (
     <DropdownMenu>
@@ -86,7 +76,6 @@ export default function RecentClaimsClientGroupHeader({
               clientId={group.clientId}
               className="text-[16px] font-semibold text-[#10141a]"
             />
-            {isOutOfPocket && <OutOfPocketBadge />}
           </div>
           <p className="mt-1 text-[13px] text-[#808081]">{itemLabel}</p>
         </div>
@@ -103,7 +92,6 @@ export default function RecentClaimsClientGroupHeader({
           clientId={group.clientId}
           className="text-[14px] font-semibold text-[#10141a]"
         />
-        {isOutOfPocket && <OutOfPocketBadge />}
         <span className="shrink-0 text-[13px] text-[#808081]">{itemLabel}</span>
       </div>
       {actionsMenu}

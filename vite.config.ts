@@ -58,7 +58,7 @@ export default defineConfig(({ mode }) => {
     server: {
       // Firebase phone/MFA reCAPTCHA does not accept localhost; use 127.0.0.1 in the browser.
       host: "127.0.0.1",
-      port: 5173,
+      port: Number(process.env.PORT) || 5173,
     },
   };
 });

@@ -13,7 +13,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash2, Search, ClipboardList, ChevronDown, BellRing } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
+import { Plus, Pencil, Trash2, Search, ClipboardList, BellRing, Eye } from "lucide-react";
 import { Routes } from "@/routes/constants";
 import type { Department, StaffMember, StaffTask } from "@/components/tasks/types";
 import {
@@ -23,6 +30,7 @@ import {
   useDeleteTaskMutation,
 } from "./api";
 import { useListAgencyStaffQuery } from "@/lib/api/agency-staff";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 const departments: Department[] = [
   { value: "hr", label: "HR" },
@@ -48,36 +56,38 @@ const PRIORITY_META: Record<string, { border: string; dot: string }> = {
 
 type StatusFilter = "All" | "Open" | "In Progress" | "Completed";
 
+// Shared column template (header/rows/skeleton) — must stay a full, literal
+// class string (incl. the md: prefix) so Tailwind's JIT detects it.
+// All tracks are fixed or fr (no content-based `auto`) so the separate header and
+// row grids resolve to identical column widths and stay aligned.
+const TASK_GRID = "gap-2 md:grid-cols-[minmax(150px,2fr)_minmax(72px,0.9fr)_100px_95px_85px_100px_72px]";
+
 function SkeletonRow() {
   return (
-    <tr className="border-b border-[#e5e5e6]">
-      <td className="px-4 py-4">
-        <div className="flex items-center gap-2.5">
-          <Skeleton className="w-2 h-2 rounded-full shrink-0" />
-          <div className="space-y-1.5">
-            <Skeleton className="h-3.5 w-36" />
-            <Skeleton className="w-24 h-3" />
-          </div>
+    <div className={`grid grid-cols-1 border-b border-[#e5e5e6] px-4 py-4 md:items-center ${TASK_GRID}`}>
+      <div className="flex items-center gap-2.5">
+        <Skeleton className="w-2 h-2 rounded-full shrink-0" />
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <Skeleton className="h-3.5 w-36 max-w-full" />
+          <Skeleton className="w-24 h-3" />
         </div>
-      </td>
-      <td className="px-4 py-4"><Skeleton className="h-3.5 w-28" /></td>
-      <td className="px-4 py-4"><Skeleton className="w-20 h-6 rounded-full" /></td>
-      <td className="px-4 py-4"><Skeleton className="h-3.5 w-20" /></td>
-      <td className="px-4 py-4"><Skeleton className="w-16 h-6 rounded-full" /></td>
-      <td className="px-4 py-4"><Skeleton className="w-20 h-6 rounded-full" /></td>
-      <td className="px-4 py-4">
-        <div className="flex items-center justify-end gap-1">
-          <Skeleton className="rounded-full h-7 w-14" />
-          <Skeleton className="rounded-full h-9 w-9" />
-        </div>
-      </td>
-    </tr>
+      </div>
+      <Skeleton className="h-3.5 w-24" />
+      <Skeleton className="w-20 h-6 rounded-full" />
+      <Skeleton className="h-3.5 w-16" />
+      <Skeleton className="w-16 h-6 rounded-full" />
+      <Skeleton className="w-20 h-6 rounded-full" />
+      <div className="flex items-center md:justify-self-start">
+        <Skeleton className="rounded-md h-8 w-8" />
+      </div>
+    </div>
   );
 }
 
 export default function StaffTasksPage() {
   const navigate = useNavigate();
   const currentUser = useSelector(selectUser);
+  const mode = useEffectiveAgencyMode();
 
   const [searchQuery,    setSearchQuery]   = useState("");
   const [staffFilter,    setStaffFilter]   = useState("");
@@ -90,7 +100,12 @@ export default function StaffTasksPage() {
   const [isDeleting,       setIsDeleting]       = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
-  const { data: tasksResponse, isLoading: tasksLoading } = useGetTasksQuery();
+  // refetchOnMountOrArgChange + isFetching keep the skeleton showing on every
+  // DDD/HHA toggle, even when that view's data is already cached.
+  const { data: tasksResponse, isFetching: tasksLoading } = useGetTasksQuery(
+    { mode: mode ?? undefined },
+    { refetchOnMountOrArgChange: true },
+  );
   const { data: staffResponse, isLoading: staffLoading } = useListAgencyStaffQuery({ limit: 200 });
   const [createTask] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
@@ -130,7 +145,7 @@ export default function StaffTasksPage() {
   const handleCreateTask = async (task: {
     title: string; description: string; department: string;
     staffMember: string; dueDate: string; priority: "High" | "Medium" | "Low";
-  }) => { await createTask(task); };
+  }) => { await createTask({ ...task, ...(mode ? { mode } : {}) }); };
 
   const handleUpdateTask = async (
     taskId: string,
@@ -164,15 +179,13 @@ export default function StaffTasksPage() {
   };
 
   const tableHead = (
-    <thead>
-      <tr className="border-b border-[#e5e5e6] bg-[#f9fafb]">
-        {["Task", "Assigned to", "Department", "Due date", "Priority", "Status", ""].map((h) => (
-          <th key={h} className="text-left py-3 px-4 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">
-            {h}
-          </th>
-        ))}
-      </tr>
-    </thead>
+    <div className={`hidden border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 md:grid ${TASK_GRID}`}>
+      {["Task", "Assigned to", "Department", "Due date", "Priority", "Status", "Actions"].map((h) => (
+        <span key={h} className="text-left text-[12px] font-semibold text-[#808081] uppercase tracking-wide">
+          {h}
+        </span>
+      ))}
+    </div>
   );
 
   return (
@@ -180,7 +193,7 @@ export default function StaffTasksPage() {
       {/* Page header */}
       <div className="mb-4 sm:mb-6">
         <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.4] text-[#10141a]">
-          Smart Manager
+          Task Manager
         </h1>
       </div>
 
@@ -243,7 +256,7 @@ export default function StaffTasksPage() {
             <div className="h-5 w-px bg-[#e5e7eb]" />
 
             {/* Status pills */}
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
               {(["All", "Open", "In Progress", "Completed"] as const).map((s) => (
                 <button
                   key={s}
@@ -269,12 +282,10 @@ export default function StaffTasksPage() {
 
         {/* Table body */}
         {isLoading ? (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
             {tableHead}
-            <tbody>
-              {Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)}
-            </tbody>
-          </table>
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)}
+          </div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center sm:p-12">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f3f4f6]">
@@ -290,109 +301,106 @@ export default function StaffTasksPage() {
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
             {tableHead}
-            <tbody>
-              {filtered.map((task) => {
-                const isCreator  = task.createdBy === currentUser?.uid;
-                const deptLabel  = departments.find((d) => d.value === task.department)?.label ?? "—";
-                const staffName  = staffMap[task.staffMember] ?? "—";
-                const statusMeta = STATUS_META[task.status];
-                const priMeta    = PRIORITY_META[task.priority];
+            {filtered.map((task) => {
+              const isCreator  = task.createdBy === currentUser?.uid;
+              const deptLabel  = departments.find((d) => d.value === task.department)?.label ?? "—";
+              const staffName  = staffMap[task.staffMember] ?? "—";
+              const statusMeta = STATUS_META[task.status];
+              const priMeta    = PRIORITY_META[task.priority];
 
-                const isAssigned = task.staffMember === currentUser?.uid;
-
-                return (
-                  <tr key={task.id} className="border-b border-[#e5e5e6] hover:bg-[#f9fafb] transition-colors">
-                    {/* Title + description */}
-                    <td className="py-4 px-4 max-w-[260px]">
-                      <div className="flex items-start gap-2.5">
-                        <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${priMeta?.dot ?? "bg-[#b2b2b3]"}`} />
-                        <div className="min-w-0">
-                          <p className="text-[14px] font-semibold text-[#10141a] truncate">{task.title}</p>
-                          {task.description && (
-                            <p className="text-[13px] text-[#6b7280] truncate mt-0.5">{task.description}</p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="py-4 px-4 text-[14px] text-[#10141a] whitespace-nowrap">{staffName}</td>
-
-                    <td className="px-4 py-4">
-                      {task.department ? (
-                        <span className="px-3 py-1 rounded-full text-[13px] font-medium border border-[#e5e7eb] text-[#6b7280] bg-transparent">
-                          {deptLabel}
-                        </span>
-                      ) : (
-                        <span className="text-[13px] text-[#b2b2b3]">—</span>
-                      )}
-                    </td>
-
-                    <td className="py-4 px-4 text-[14px] text-[#6b7280] whitespace-nowrap">
-                      {task.dueDate || <span className="text-[#b2b2b3]">—</span>}
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${priMeta?.border ?? ""}`}>
-                        {task.priority}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${statusMeta?.border ?? ""}`}>
-                        {task.status}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {isAssigned && (
-                          <div className={`relative ${updatingStatusId === task.id ? "opacity-50" : ""}`}>
-                            <select
-                              value={task.status}
-                              disabled={updatingStatusId === task.id}
-                              onChange={(e) => void handleStatusChange(task.id, e.target.value as StaffTask["status"])}
-                              className={`appearance-none pl-3 pr-7 py-1.5 rounded-full text-[13px] font-medium border bg-transparent cursor-pointer outline-none transition-colors ${statusMeta?.border ?? ""}`}
-                            >
-                              <option value="Open">Open</option>
-                              <option value="In Progress">In Progress</option>
-                              <option value="Completed">Completed</option>
-                            </select>
-                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none h-3 w-3 text-[#808081]" />
-                          </div>
+              return (
+                <div
+                  key={task.id}
+                  className={`grid grid-cols-1 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f9fafb] md:items-center ${TASK_GRID}`}
+                >
+                  {/* Title + description */}
+                  <div className="min-w-0">
+                    <div className="flex items-start gap-2.5">
+                      <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${priMeta?.dot ?? "bg-[#b2b2b3]"}`} />
+                      <div className="min-w-0">
+                        <p className="text-[14px] font-semibold text-[#10141a] truncate">{task.title}</p>
+                        {task.description && (
+                          <p className="text-[13px] text-[#6b7280] truncate mt-0.5">{task.description}</p>
                         )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-[14px] text-[#10141a]">
+                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Assigned to</span>
+                    {staffName}
+                  </div>
+
+                  <div>
+                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Department</span>
+                    {task.department ? (
+                      <span className="rounded-full border border-[#e5e7eb] bg-transparent px-3 py-1 text-[13px] font-medium text-[#6b7280]">
+                        {deptLabel}
+                      </span>
+                    ) : (
+                      <span className="text-[13px] text-[#b2b2b3]">—</span>
+                    )}
+                  </div>
+
+                  <div className="text-[14px] text-[#6b7280]">
+                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Due date</span>
+                    {task.dueDate || <span className="text-[#b2b2b3]">—</span>}
+                  </div>
+
+                  <div>
+                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Priority</span>
+                    <span className={`rounded-full border bg-transparent px-3 py-1 text-[13px] font-medium ${priMeta?.border ?? ""}`}>
+                      {task.priority}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Status</span>
+                    <span className={`rounded-full border bg-transparent px-3 py-1 text-[13px] font-medium ${statusMeta?.border ?? ""}`}>
+                      {task.status}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center md:justify-self-start">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
                         <button
-                          onClick={() => setViewingTask(task)}
-                          className="px-4 py-1.5 rounded-full text-[13px] font-medium border border-[#00b4b8] text-[#00b4b8] hover:bg-[#00b4b8] hover:text-white transition-colors"
+                          type="button"
+                          aria-label="Task actions"
+                          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-white transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]"
                         >
-                          View
+                          <DotGridIcon />
                         </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="z-[100] min-w-[160px] rounded-xl border-0 bg-white p-0 shadow-lg">
+                        <DropdownMenuItem className={menuItemClassName} onClick={() => setViewingTask(task)}>
+                          <Eye className="mr-2 h-3.5 w-3.5" />
+                          View
+                        </DropdownMenuItem>
                         {isCreator && (
                           <>
-                            <button
-                              title="Edit"
-                              onClick={() => openEdit(task)}
-                              className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#f3f4f6] hover:text-[#10141a] transition-colors"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              title="Delete"
+                            <DropdownMenuItem className={menuItemClassName} onClick={() => openEdit(task)}>
+                              <Pencil className="mr-2 h-3.5 w-3.5" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className={`${menuItemClassName} text-[#ef4444] hover:bg-[#fef2f2] focus:bg-[#fef2f2] focus:text-[#ef4444]`}
                               onClick={() => setDeletingTaskId(task.id)}
-                              className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#fff0f0] hover:text-[#ef4444] transition-colors"
                             >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                              <Trash2 className="mr-2 h-3.5 w-3.5" />
+                              Delete
+                            </DropdownMenuItem>
                           </>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 

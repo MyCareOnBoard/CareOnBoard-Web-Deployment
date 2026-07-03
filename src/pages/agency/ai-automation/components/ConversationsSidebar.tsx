@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MessageSquare, Plus, Trash2, X } from "lucide-react";
 import { useDeleteConversationMutation, useListConversationsQuery } from "../api";
 import { cn } from "@/lib/utils";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 interface ConversationsSidebarProps {
   open: boolean;
@@ -20,7 +21,12 @@ export default function ConversationsSidebar({
   onSelect,
   onNew,
 }: ConversationsSidebarProps) {
-  const { data, isLoading } = useListConversationsQuery(undefined, { skip: !open });
+  const mode = useEffectiveAgencyMode();
+  // Backend scopes the list to the active DDD/HHA view (unpinned conversations show in both).
+  const { data, isLoading } = useListConversationsQuery(
+    { mode: mode ?? undefined },
+    { skip: !open, refetchOnMountOrArgChange: true },
+  );
   const [deleteConversation] = useDeleteConversationMutation();
 
   const handleDelete = async (e: React.MouseEvent<HTMLButtonElement>, id: string) => {
@@ -58,12 +64,10 @@ export default function ConversationsSidebar({
 
         {/* New Conversation Button */}
         <Button variant="outline" onClick={onNew} className="flex justify-between w-full rounded-xl my-3 sm:mt-4 text-[13px] border-2 border-gray-400 border-dashed p-5 sm:text-[14px] hover:bg-[#00b4b8] hover:text-white transition cursor-pointer">
-          Start a new conversation 
-            <button
-            type="button"
-            className="flex h-4 w-4 items-center justify-center rounded-full border">
+          Start a new conversation
+            <span className="flex h-4 w-4 items-center justify-center rounded-full border">
             <Plus className="h-3 w-3" />
-          </button>
+          </span>
         </Button>
 
         <div className="flex flex-col gap-1 max-h-[90vh] sm:max-h-[90vh] overflow-y-auto -mx-2 px-2">
@@ -79,15 +83,24 @@ export default function ConversationsSidebar({
           )}
 
           {data?.conversations.map((conversation) => (
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               key={conversation.id}
               onClick={() => {
                 onSelect(conversation.id);
                 onClose();
               }}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelect(conversation.id);
+                  onClose();
+                }
+              }}
               className={cn(
-                "flex w-full items-center gap-3 rounded-[12px] sm:rounded-xl px-3 py-2.5 sm:py-3 text-left transition-colors group",
+                "flex w-full cursor-pointer items-center gap-3 rounded-[12px] sm:rounded-xl px-3 py-2.5 sm:py-3 text-left transition-colors group",
                 activeId === conversation.id
                   ? "bg-[#e0f7f7] text-[#00b4b8]"
                   : "hover:bg-[#f3f4f6] text-[#10141a]"
@@ -105,11 +118,11 @@ export default function ConversationsSidebar({
               <button
                 type="button"
                 onClick={(event) => handleDelete(event, conversation.id)}
-                className="transition-opacity opacity-0 hover:text-red-500 group-hover:opacity-100"
+                className="transition-opacity opacity-0 hover:text-red-500 group-hover:opacity-100 focus:opacity-100 group-focus-within:opacity-100"
               >
                 <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
-            </button>
+            </div>
           ))}
         </div>
       </DialogContent>

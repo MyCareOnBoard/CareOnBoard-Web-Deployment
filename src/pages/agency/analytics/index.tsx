@@ -110,6 +110,7 @@ export default function AnalyticsPage() {
               isLoading={isLoading || isFetching}
               startDate={dateRange.startDate || undefined}
               endDate={dateRange.endDate || undefined}
+              mode={mode ?? undefined}
             />
           </div>
 
@@ -119,6 +120,7 @@ export default function AnalyticsPage() {
               isLoading={isLoading || isFetching}
               startDate={dateRange.startDate || undefined}
               endDate={dateRange.endDate || undefined}
+              mode={mode ?? undefined}
             />
           </div>
         </div>

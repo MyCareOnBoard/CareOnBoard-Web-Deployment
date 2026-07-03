@@ -71,13 +71,40 @@ export default function ClaimsDashboardPage() {
   });
   const oopReady = useOutOfPocketReady({ enabled: activeTab === "shifts" });
   const oopInvoices = useOutOfPocketInvoices({ enabled: activeTab === "saved" });
-  const readyClaims = useMemo(
-    () => [
+  const readyClaims = useMemo(() => {
+    const merged = [
       ...mapReadyToClaimRowsToRecentClaims(readyToClaim.rows, readyToClaim.mileageRate, "claims"),
       ...mapReadyToClaimRowsToRecentClaims(oopReady.rows, oopReady.mileageRate, "out-of-pocket"),
-    ],
-    [readyToClaim.mileageRate, readyToClaim.rows, oopReady.mileageRate, oopReady.rows],
-  );
+    ];
+    const byId = new Map<string, RecentClaim>();
+    for (const claim of merged) {
+      const existing = byId.get(claim.id);
+      if (existing) {
+        existing.needsClaim = existing.needsClaim || claim.needsClaim;
+        existing.needsInvoice = existing.needsInvoice || claim.needsInvoice;
+      } else {
+        byId.set(claim.id, { ...claim });
+      }
+    }
+    return [...byId.values()];
+  }, [readyToClaim.mileageRate, readyToClaim.rows, oopReady.mileageRate, oopReady.rows]);
+
+  // All ready rows across both legs (deduped) so the generate modal sees a client's claim AND
+  // out-of-pocket lines and can split a `both` selection into both legs.
+  const allReadyRows = useMemo(() => {
+    const byId = new Map<string, (typeof readyToClaim.rows)[number]>();
+    for (const row of [...readyToClaim.rows, ...oopReady.rows]) {
+      const existing = byId.get(row.id);
+      if (existing) {
+        existing.needsClaim = existing.needsClaim || row.needsClaim;
+        existing.needsInvoice = existing.needsInvoice || row.needsInvoice;
+      } else {
+        byId.set(row.id, { ...row });
+      }
+    }
+    return [...byId.values()];
+  }, [readyToClaim.rows, oopReady.rows]);
+  const modalMileageRate = readyToClaim.mileageRate || oopReady.mileageRate;
   const [openInvoice, setOpenInvoice] = useState<OutOfPocketInvoiceDetail | null>(null);
 
   // Out-of-pocket invoices should respect the Generated tab's filters too. A claim-specific
@@ -182,24 +209,28 @@ export default function ClaimsDashboardPage() {
     await Promise.all([dashboard.refetch(), generatedClaims.refetch()]);
   }, [dashboard, generatedClaims]);
 
-  const saveClaimBundles = useCallback(
-    async (selections: ClaimConfirmSelection[]) => {
-      if (!user?.agencyId || selections.length === 0) {
-        return;
-      }
+  // Coverage-aware generate: a `both` selection bills the payer claim leg AND the out-of-pocket
+  // invoice leg in one action, with per-leg outcome tracking so one can succeed while the other
+  // fails (the failed leg stays in Ready to bill and can be retried without duplicating the other).
+  const saveCoverageBundles = useCallback(
+    async (
+      clientId: string,
+      claimSelections: ClaimConfirmSelection[],
+      invoiceSelections: ClaimConfirmSelection[],
+    ) => {
+      if (!user?.agencyId) return;
+      if (claimSelections.length === 0 && invoiceSelections.length === 0) return;
 
       setSavingClaim(true);
-      try {
-        const results: Array<{
-          savedClaim: SavedBillingClaim;
-          anchorClaim: RecentClaim;
-        }> = [];
+      let claimError: unknown = null;
+      let invoiceError: unknown = null;
+      const claimResults: Array<{ savedClaim: SavedBillingClaim; anchorClaim: RecentClaim }> = [];
+      let createdInvoice: OutOfPocketInvoiceDetail | null = null;
 
-        for (const selection of selections) {
-          if (selection.shifts.length === 0 && selection.rides.length === 0) {
-            continue;
-          }
-
+      // Payer claim leg — one claim per bundle (shifts XOR rides, per service/week).
+      for (const selection of claimSelections) {
+        if (selection.shifts.length === 0 && selection.rides.length === 0) continue;
+        try {
           const result = await saveGeneratedClaim({
             agencyId: user.agencyId,
             selectedShifts: selection.shifts,
@@ -207,46 +238,70 @@ export default function ClaimsDashboardPage() {
             serviceCode: selection.serviceCode,
             weekRange: selection.weekRange,
           });
-          results.push({
-            savedClaim: result.savedClaim,
-            anchorClaim: result.anchorClaim,
+          claimResults.push({ savedClaim: result.savedClaim, anchorClaim: result.anchorClaim });
+        } catch (error) {
+          claimError = error;
+          break;
+        }
+      }
+
+      // Out-of-pocket invoice leg — one invoice across the selected items.
+      const invoiceShiftIds = invoiceSelections.flatMap((s) => s.shifts.map((x) => x.id));
+      const invoiceRideIds = invoiceSelections.flatMap((s) => s.rides.map((x) => x.id));
+      if (invoiceShiftIds.length > 0 || invoiceRideIds.length > 0) {
+        setGeneratingInvoice(true);
+        try {
+          createdInvoice = await createOutOfPocketInvoice({
+            clientId,
+            shiftIds: invoiceShiftIds,
+            rideIds: invoiceRideIds,
           });
+        } catch (error) {
+          invoiceError = error;
+        } finally {
+          setGeneratingInvoice(false);
         }
+      }
 
-        if (results.length === 0) {
-          return;
-        }
+      await refreshAfterCreateOrCancel();
+      setSavingClaim(false);
 
+      if (!claimError && !invoiceError) {
         setGenerateOpen(false);
         setGenerateInitialGroup(null);
         setActiveTab("saved");
-        await refreshAfterCreateOrCancel();
-
-        if (results.length === 1) {
-          const only = results[0];
-          setClaimReport({
-            claim: only.anchorClaim,
-            savedClaim: only.savedClaim,
-          });
-          toast({
-            title: `Claim ${only.savedClaim.claimNumber} saved.`,
-            description: "Opening report…",
-          });
-        } else {
-          toast({
-            title: `${results.length} claims saved.`,
-            description: "View them in Generated claims.",
-          });
+        if (createdInvoice) setOpenInvoice(createdInvoice);
+        const parts: string[] = [];
+        if (claimResults.length === 1) {
+          parts.push(`Claim ${claimResults[0].savedClaim.claimNumber} saved`);
+        } else if (claimResults.length > 1) {
+          parts.push(`${claimResults.length} claims saved`);
         }
-      } catch (error) {
-        console.error("Failed to save claim:", error);
+        if (createdInvoice) parts.push(`Invoice ${createdInvoice.invoiceNumber} created`);
+        toast({ title: parts.join(" · ") || "Nothing to bill" });
+      } else {
         toast({
-          title: "Couldn't save claim",
-          description: getCreateBillingClaimErrorMessage(error),
+          title: "Some bills weren't generated",
+          description: [
+            claimError
+              ? `${
+                  claimResults.length > 0
+                    ? `${claimResults.length} claim${claimResults.length === 1 ? "" : "s"} created, then a `
+                    : ""
+                }claim failed: ${getCreateBillingClaimErrorMessage(claimError)}`
+              : claimResults.length > 0
+                ? `${claimResults.length} claim${claimResults.length === 1 ? "" : "s"} created.`
+                : null,
+            invoiceError
+              ? `Invoice failed: ${invoiceError instanceof Error ? invoiceError.message : "unknown error"}`
+              : createdInvoice
+                ? "Invoice created."
+                : null,
+          ]
+            .filter(Boolean)
+            .join(" "),
           variant: "destructive",
         });
-      } finally {
-        setSavingClaim(false);
       }
     },
     [refreshAfterCreateOrCancel, toast, user?.agencyId],
@@ -260,97 +315,16 @@ export default function ClaimsDashboardPage() {
     setGenerateInitialGroup(null);
   }, [savingClaim]);
 
-  // Out-of-pocket clients bill an invoice instead of a claim. One invoice per client holds
-  // every approved item — shifts across any service code plus manual mileage — each itemized.
-  const createOutOfPocketInvoiceForClient = useCallback(
-    async (clientId: string, shiftIds: string[], rideIds: string[]) => {
-      if (!clientId || (shiftIds.length === 0 && rideIds.length === 0)) return;
-
-      setSavingClaim(true);
-      try {
-        const invoice = await createOutOfPocketInvoice({ clientId, shiftIds, rideIds });
-
-        setGenerateOpen(false);
-        setGenerateInitialGroup(null);
-        setActiveTab("saved");
-        await refreshAfterCreateOrCancel();
-        setOpenInvoice(invoice);
-
-        const unrated = invoice.unratedLineCount ?? invoice.invoice?.unratedLineCount ?? 0;
-        if (unrated > 0) {
-          toast({
-            title: `Invoice ${invoice.invoiceNumber} created with $0 lines`,
-            description: `${unrated} line${unrated === 1 ? "" : "s"} have no client rate set. Add a client rate on the service to bill them.`,
-            variant: "destructive",
-          });
-        } else {
-          toast({ title: `Invoice ${invoice.invoiceNumber} created.` });
-        }
-      } catch (error) {
-        toast({
-          title: "Couldn't generate invoice",
-          description: error instanceof Error ? error.message : undefined,
-          variant: "destructive",
-        });
-      } finally {
-        setSavingClaim(false);
-      }
-    },
-    [refreshAfterCreateOrCancel, toast],
-  );
-
-  const generateOutOfPocketInvoices = useCallback(
-    async (group: RecentClaimClientGroup) => {
-      if (!group.clientId) {
-        toast({
-          title: "Couldn't generate invoice",
-          description: "Refresh the list and try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-      const shiftIds: string[] = [];
-      const rideIds: string[] = [];
-      for (const claim of group.claims) {
-        if (!claim.sourceId) continue;
-        if (claim.sourceType === "ride") rideIds.push(claim.sourceId);
-        else shiftIds.push(claim.sourceId);
-      }
-      setGeneratingInvoice(true);
-      try {
-        await createOutOfPocketInvoiceForClient(group.clientId, shiftIds, rideIds);
-      } finally {
-        setGeneratingInvoice(false);
-      }
-    },
-    [createOutOfPocketInvoiceForClient, toast],
-  );
-
-  // Out-of-pocket confirm from the Generate modal — selections already carry shift/ride objects.
-  const saveOutOfPocketBundles = useCallback(
-    async (clientId: string, selections: ClaimConfirmSelection[]) => {
-      const shiftIds = selections.flatMap((selection) => selection.shifts.map((shift) => shift.id));
-      const rideIds = selections.flatMap((selection) => selection.rides.map((ride) => ride.id));
-      await createOutOfPocketInvoiceForClient(clientId, shiftIds, rideIds);
-    },
-    [createOutOfPocketInvoiceForClient],
-  );
-
   const handleClientGroupGenerateClaim = useCallback(
     (group: RecentClaimClientGroup) => {
-      if (group.billingDirection === "out-of-pocket") {
-        void generateOutOfPocketInvoices(group);
-        return;
-      }
-
-      const hasClaimableEntry = group.claims.some(
+      const hasBillableEntry = group.claims.some(
         (claim) => claim.sourceType && claim.sourceId && claim.clientId,
       );
 
-      if (!hasClaimableEntry) {
-        console.warn("Ready to claim client group missing source metadata", group.clientKey);
+      if (!hasBillableEntry) {
+        console.warn("Ready to bill client group missing source metadata", group.clientKey);
         toast({
-          title: "Couldn't generate claim",
+          title: "Couldn't open billing",
           description: "Refresh the list and try again.",
           variant: "destructive",
         });
@@ -360,7 +334,7 @@ export default function ClaimsDashboardPage() {
       setGenerateInitialGroup(group);
       setGenerateOpen(true);
     },
-    [generateOutOfPocketInvoices, toast],
+    [toast],
   );
 
   const handleViewInvoice = useCallback(
@@ -573,11 +547,10 @@ export default function ClaimsDashboardPage() {
             open
             initialClientGroup={generateInitialGroup}
             saving={savingClaim}
-            readyToClaimRows={readyToClaim.rows}
-            mileageRate={readyToClaim.mileageRate}
+            readyToClaimRows={allReadyRows}
+            mileageRate={modalMileageRate}
             onClose={closeGenerateModal}
-            onConfirm={saveClaimBundles}
-            onConfirmInvoice={saveOutOfPocketBundles}
+            onGenerate={saveCoverageBundles}
           />
         </Suspense>
       )}

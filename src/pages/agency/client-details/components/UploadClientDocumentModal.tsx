@@ -20,6 +20,7 @@ import {
   DOCUMENT_TYPE_OPTIONS,
   DOC_KEY_TO_SERVER_TYPE,
 } from "@/pages/shared/client-management/utils/documentTypeConstants";
+import { FORM485_GRACE_DAYS } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
 
 interface FormData {
   documentType: ClientDocumentKey | "other" | "";
@@ -27,6 +28,7 @@ interface FormData {
   issuedOnDate: Date | null;
   expiryDate: Date | null;
   autoReminder: boolean;
+  signed: boolean;
   customName?: string;
   customTitle?: string;
 }
@@ -67,6 +69,7 @@ export function UploadClientDocumentModal({
     issuedOnDate: null,
     expiryDate: null,
     autoReminder: true,
+    signed: false,
     customName: "",
     customTitle: "",
   });
@@ -87,6 +90,7 @@ export function UploadClientDocumentModal({
         issuedOnDate: documentToEdit.issuedOnDate ? new Date(documentToEdit.issuedOnDate) : null,
         expiryDate: documentToEdit.expiryDate ? new Date(documentToEdit.expiryDate) : null,
         autoReminder: documentToEdit.autoReminder ?? true,
+        signed: documentToEdit.signed ?? false,
         customName: isOther ? documentToEdit.key : "",
         customTitle: isOther ? (documentToEdit.title || "") : "",
       });
@@ -98,6 +102,7 @@ export function UploadClientDocumentModal({
         issuedOnDate: null,
         expiryDate: null,
         autoReminder: true,
+        signed: false,
         customName: "",
         customTitle: "",
       });
@@ -112,6 +117,7 @@ export function UploadClientDocumentModal({
       issuedOnDate: null,
       expiryDate: null,
       autoReminder: true,
+      signed: false,
       customName: "",
       customTitle: "",
     });
@@ -168,6 +174,7 @@ export function UploadClientDocumentModal({
         issuedOnDate: formData.issuedOnDate ? formData.issuedOnDate.toISOString() : undefined,
         expiryDate: formData.expiryDate ? formData.expiryDate.toISOString() : undefined,
         autoReminder: formData.autoReminder,
+        ...(documentKey === "form485" ? { signed: formData.signed } : {}),
       };
 
       // Update or append document
@@ -197,6 +204,7 @@ export function UploadClientDocumentModal({
         issuedOnDate: null,
         expiryDate: null,
         autoReminder: true,
+        signed: false,
         customName: "",
         customTitle: "",
       });
@@ -462,6 +470,19 @@ export function UploadClientDocumentModal({
                 onCheckedChange={(checked) => setFormData({ ...formData, autoReminder: checked })}
               />
             </div>
+
+            {formData.documentType === "form485" && (
+              <div className="mb-6 flex items-center gap-3">
+                <p className="text-sm">Signed Form 485</p>
+                <Switch
+                  checked={formData.signed}
+                  onCheckedChange={(checked) => setFormData({ ...formData, signed: checked })}
+                />
+                <span className="text-xs text-[#808081]">
+                  Unsigned keeps the client active for {FORM485_GRACE_DAYS} days until the signed copy is uploaded.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Footer */}

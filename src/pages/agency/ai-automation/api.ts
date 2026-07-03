@@ -63,8 +63,13 @@ export const aiAutomationApi = createApi({
   baseQuery: customBaseQuery,
   tagTypes: ["Conversation"],
   endpoints: (builder) => ({
-    listConversations: builder.query<{ conversations: Conversation[] }, void>({
-      query: () => ({ url: "/aiAutomation/conversations", method: "GET", requiresAuth: true }),
+    listConversations: builder.query<{ conversations: Conversation[] }, { mode?: string }>({
+      query: ({ mode } = {}) => ({
+        url: "/aiAutomation/conversations",
+        method: "GET",
+        params: { ...(mode ? { mode } : {}) },
+        requiresAuth: true,
+      }),
       providesTags: ["Conversation"],
     }),
     createConversation: builder.mutation<{ id: string }, { context?: Record<string, string> }>({

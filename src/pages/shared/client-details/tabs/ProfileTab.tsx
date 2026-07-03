@@ -2,7 +2,7 @@ import React, { memo, useCallback, useMemo, useState } from "react";
 import { CheckCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
-import { Client, updateClient, deleteClient } from "@/lib/api/clients";
+import { Client, updateClient, useDeleteClientMutation } from "@/lib/api/clients";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
@@ -157,6 +157,7 @@ export function ProfileTab({
 }: ProfileTabProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [deleteClientMutation] = useDeleteClientMutation();
   const [pendingAction, setPendingAction] = useState<PendingConfirmAction | null>(null);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
@@ -235,7 +236,10 @@ export function ProfileTab({
 
     try {
       setIsDeleting(true);
-      await deleteClient(clientId, agencyId);
+      // Use the RTK mutation (not the plain api fn) so it invalidates the
+      // 'Clients'/'ClientStats' tags and the management list refetches — otherwise
+      // the deleted client lingers in the list until a manual refresh.
+      await deleteClientMutation({ clientId, agencyId }).unwrap();
 
       toast({
         title: "Client deleted",
@@ -256,7 +260,7 @@ export function ProfileTab({
     } finally {
       setIsDeleting(false);
     }
-  }, [afterDeleteRoute, client.agencyId, clientId, navigate, toast]);
+  }, [afterDeleteRoute, client.agencyId, clientId, navigate, toast, deleteClientMutation]);
 
   const openDeactivateModal = useCallback(() => setPendingAction("deactivate"), []);
   const openDeleteModal = useCallback(() => setPendingAction("delete"), []);

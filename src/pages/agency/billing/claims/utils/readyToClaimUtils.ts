@@ -126,6 +126,9 @@ export function mapReadyToClaimRowToRecentClaim(
       } as Shift),
       rate: formatShiftRateForDisplay(row.clientRate, row.clientPayType),
       billingDirection,
+      coverage: row.coverage,
+      needsClaim: row.needsClaim,
+      needsInvoice: row.needsInvoice,
     };
   }
 
@@ -154,6 +157,9 @@ export function mapReadyToClaimRowToRecentClaim(
     totalHours: distance,
     rate: formatAgencyMileageRate(mileageRate),
     billingDirection,
+    coverage: row.coverage,
+    needsClaim: row.needsClaim,
+    needsInvoice: row.needsInvoice,
   };
 }
 

@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MileageRide } from "@/lib/api/mileage";
 import { cn } from "@/lib/utils";
@@ -24,9 +25,6 @@ const STATUS_COLORS: Record<string, string> = {
   completed: "bg-gray-100 text-gray-600",
   cancelled: "bg-red-100 text-red-600",
 };
-
-const menuItemClassName =
-  "cursor-pointer rounded-none px-4 py-2.5 text-[14px] font-medium text-[#10141a] hover:bg-[#eef4f5] focus:bg-[#eef4f5]";
 
 const destructiveMenuItemClassName = `${menuItemClassName} text-[#ef4444] hover:bg-[#fef2f2] focus:bg-[#fef2f2] focus:text-[#ef4444]`;
 
@@ -88,16 +86,6 @@ function PersonBlock({
         <p className="text-[11px] text-[#9ca3af]">{role}</p>
       </div>
     </div>
-  );
-}
-
-function DotGridIcon() {
-  return (
-    <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <span key={index} className="h-[4px] w-[4px] rounded-full bg-[#808081]" />
-      ))}
-    </span>
   );
 }
 

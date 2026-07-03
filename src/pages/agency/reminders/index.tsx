@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import CustomDatePicker from "@/components/ui/datePicker";
 import {
   Dialog,
@@ -22,6 +23,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import { Routes } from "@/routes/constants";
 
 import ReminderModal from "./components/ReminderModal";
@@ -93,6 +102,8 @@ function formatTime(reminder: Reminder) {
   }).format(date);
 }
 
+// Row-actions trigger icon — matches the billing claims / payout tables.
+
 function StatusBadge({ status }: { status: ReminderStatus }) {
   const cfg = STATUS_BADGE_CONFIG[status];
   return (
@@ -106,11 +117,23 @@ function StatusBadge({ status }: { status: ReminderStatus }) {
 function TypeBadge({ type }: { type: Reminder["type"] }) {
   const isAi = type === "ai_prompt";
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+    <span className={`inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${
       isAi ? "bg-[#f5f3ff] text-[#7c3aed]" : "bg-[#f3f4f6] text-[#6b7280]"
     }`}>
       {isAi ? <BrainCircuit className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
       {isAi ? "AI Prompt" : "Normal"}
+    </span>
+  );
+}
+
+// Program view a reminder is scoped to; nothing rendered for agency-wide reminders.
+function ModeBadge({ mode }: { mode?: Reminder["mode"] }) {
+  if (!mode) return null;
+  return (
+    <span className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${
+      mode === "hha" ? "bg-[#e6f7f7] text-[#008f93]" : "bg-[#eef2ff] text-[#4f46e5]"
+    }`}>
+      {mode}
     </span>
   );
 }
@@ -138,7 +161,7 @@ function ReminderRow({ reminder, onView, onEdit, onDelete, onOpenConversation }:
   const hasResult = reminder.type === "ai_prompt" && !!reminder.result;
 
   return (
-    <div className="grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f9fafb] md:grid-cols-[minmax(200px,2fr)_80px_minmax(140px,1fr)_100px_110px_minmax(200px,auto)] md:items-center">
+    <div className={`grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f9fafb] ${REMINDER_GRID} md:items-center`}>
       <div className="min-w-0">
         <div className="flex items-start gap-2.5 md:items-center">
           <span className={`mt-2 h-2 w-2 shrink-0 rounded-full md:mt-0 ${STATUS_BADGE_CONFIG[reminder.status].dot}`} />
@@ -154,8 +177,9 @@ function ReminderRow({ reminder, onView, onEdit, onDelete, onOpenConversation }:
           </div>
         </div>
       </div>
-      <div className="hidden md:block">
+      <div className="hidden md:flex md:flex-col md:items-start md:gap-1">
         <TypeBadge type={reminder.type} />
+        <ModeBadge mode={reminder.mode} />
       </div>
       <div className="text-[14px] text-[#6b7280]">
         <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Date</span>
@@ -166,51 +190,40 @@ function ReminderRow({ reminder, onView, onEdit, onDelete, onOpenConversation }:
         {formatTime(reminder)}
       </div>
       <div><StatusBadge status={reminder.status} /></div>
-      <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-        {hasConversation ? (
-          <button
-            type="button"
-            onClick={() => onOpenConversation(reminder.conversationId!)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-[#7c3aed] px-4 py-1.5 text-[13px] font-medium text-[#7c3aed] transition-colors hover:bg-[#7c3aed] hover:text-white"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            View Conversation
-          </button>
-        ) : hasResult ? (
-          <button
-            type="button"
-            onClick={() => onView(reminder)}
-            className="rounded-full border border-[#7c3aed] px-4 py-1.5 text-[13px] font-medium text-[#7c3aed] transition-colors hover:bg-[#7c3aed] hover:text-white"
-          >
-            View Result
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onView(reminder)}
-            className="rounded-full border border-[#00b4b8] px-4 py-1.5 text-[13px] font-medium text-[#00b4b8] transition-colors hover:bg-[#00b4b8] hover:text-white"
-          >
-            View
-          </button>
-        )}
-        {isPending && (
-          <button
-            type="button"
-            title="Edit"
-            onClick={() => onEdit(reminder)}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] transition-colors hover:bg-[#f3f4f6] hover:text-[#10141a]"
-          >
-            <Pencil className="w-4 h-4" />
-          </button>
-        )}
-        <button
-          type="button"
-          title="Delete"
-          onClick={() => onDelete(reminder)}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] transition-colors hover:bg-[#fff0f0] hover:text-[#ef4444]"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+      <div className="md:justify-self-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Reminder actions"
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-white transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]"
+            >
+              <DotGridIcon />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="z-[100] min-w-[160px] rounded-xl border-0 bg-white p-0 shadow-lg">
+            {hasConversation ? (
+              <DropdownMenuItem className={menuItemClassName} onClick={() => onOpenConversation(reminder.conversationId!)}>
+                View conversation
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem className={menuItemClassName} onClick={() => onView(reminder)}>
+                {hasResult ? "View result" : "View"}
+              </DropdownMenuItem>
+            )}
+            {isPending && (
+              <DropdownMenuItem className={menuItemClassName} onClick={() => onEdit(reminder)}>
+                Edit
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              className={`${menuItemClassName} text-[#ef4444] hover:bg-[#fef2f2] focus:bg-[#fef2f2] focus:text-[#ef4444]`}
+              onClick={() => onDelete(reminder)}
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -222,10 +235,45 @@ const GROUP_CONFIG: Array<{ status: ReminderStatus; label: string; filter: Statu
   { status: "failed",  label: "Failed",   filter: "failed" },
 ];
 
+// Shared column template (header/rows/skeleton) — kept compact so it fits within
+// the content width; wider rows fall back to horizontal scroll, never clipping.
+// NOTE: must be a full, literal class string (incl. the md: prefix) so Tailwind's
+// JIT detects it — building it via `md:${...}` would not be generated.
+const REMINDER_GRID = "md:grid-cols-[minmax(140px,2fr)_92px_minmax(90px,1fr)_72px_100px_72px]";
+
+function ReminderRowsSkeleton() {
+  return (
+    <div>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className={`grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 md:items-center ${REMINDER_GRID}`}
+        >
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="h-2 w-2 shrink-0 rounded-full" />
+            <Skeleton className="h-4 w-48 max-w-full" />
+          </div>
+          <Skeleton className="hidden h-5 w-16 rounded-full md:block" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="h-8 w-8 rounded-md md:justify-self-end" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function RemindersPage() {
   const navigate = useNavigate();
+  const mode = useEffectiveAgencyMode();
 
-  const { data, isLoading, isError, refetch } = useGetRemindersQuery();
+  // refetchOnMountOrArgChange + isFetching keep the skeleton showing on every
+  // DDD/HHA toggle, even when that view's data is already cached.
+  const { data, isFetching: isLoading, isError, refetch } = useGetRemindersQuery(
+    { mode: mode ?? undefined },
+    { refetchOnMountOrArgChange: true },
+  );
   const [createReminder, { isLoading: isCreating }] = useCreateReminderMutation();
   const [updateReminder, { isLoading: isUpdating }] = useUpdateReminderMutation();
   const [deleteReminder] = useDeleteReminderMutation();
@@ -282,11 +330,14 @@ export default function RemindersPage() {
   };
 
   const handleSave = async (draft: ReminderDraft) => {
+    // Stamp the active program view on create AND edit (an edit re-stamps the
+    // editor's current view); no mode = agency-wide, shows in both views.
+    const payload = mode ? { ...draft, mode } : draft;
     try {
       if (editingReminder) {
-        await updateReminder({ reminderId: editingReminder.id, data: draft }).unwrap();
+        await updateReminder({ reminderId: editingReminder.id, data: payload }).unwrap();
       } else {
-        await createReminder(draft).unwrap();
+        await createReminder(payload).unwrap();
       }
     } catch {
       // error handled by RTK Query; toast can be wired here if needed
@@ -405,8 +456,15 @@ export default function RemindersPage() {
         </div>
 
         {isLoading ? (
-          <div className="p-8 text-center sm:p-12">
-            <p className="text-[14px] text-[#6b7280]">Loading reminders…</p>
+          <div className="overflow-x-auto">
+            <div className={`hidden gap-3 border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 md:grid ${REMINDER_GRID}`}>
+              {["Reminder", "Type", "Date", "Time", "Status", "Actions"].map((label, i) => (
+                <div key={i} className={`text-[12px] font-semibold uppercase text-[#808081] ${i === 5 ? "text-right" : ""}`}>
+                  {label}
+                </div>
+              ))}
+            </div>
+            <ReminderRowsSkeleton />
           </div>
         ) : isError ? (
           <div className="p-8 text-center sm:p-12">
@@ -434,9 +492,9 @@ export default function RemindersPage() {
             </p>
           </div>
         ) : (
-          <div>
-            <div className="hidden grid-cols-[minmax(200px,2fr)_80px_minmax(140px,1fr)_100px_110px_minmax(200px,auto)] border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 md:grid">
-              {["Reminder", "Type", "Date", "Time", "Status", ""].map((label, i) => (
+          <div className="overflow-x-auto">
+            <div className={`hidden ${REMINDER_GRID} gap-3 border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 md:grid`}>
+              {["Reminder", "Type", "Date", "Time", "Status", "Actions"].map((label, i) => (
                 <div key={i} className={`text-[12px] font-semibold uppercase text-[#808081] ${i === 5 ? "text-right" : ""}`}>
                   {label}
                 </div>
@@ -477,6 +535,7 @@ export default function RemindersPage() {
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge status={viewingReminder.status} />
                   <TypeBadge type={viewingReminder.type} />
+                  <ModeBadge mode={viewingReminder.mode} />
                   <RecurrenceBadge recurrence={viewingReminder.recurrence} />
                 </div>
               </DialogHeader>

@@ -28,6 +28,7 @@ interface ComplianceInsightsProps {
   isLoading?: boolean;
   startDate?: string;
   endDate?: string;
+  mode?: string;
 }
 
 const FALLBACK_DATA: ComplianceSegment[] = [
@@ -53,6 +54,13 @@ const FALLBACK_DATA: ComplianceSegment[] = [
       "Required compliance documents missing",
   },
   {
+    label: "Unsigned Form 485",
+    value: 0,
+    color: "#8B5CF6",
+    description:
+      "HHA clients active on an unsigned Form 485",
+  },
+  {
     label: "Other",
     value: 0,
     color: "#BDBDBD",
@@ -72,6 +80,7 @@ export default function ComplianceInsights({
   isLoading,
   startDate,
   endDate,
+  mode,
 }: ComplianceInsightsProps) {
   const [fetchInsights, { data: insightsData, isLoading: insightsLoading }] = useLazyGetAnalyticsInsightsQuery();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -97,9 +106,11 @@ export default function ComplianceInsights({
   }, [showInsights]);
 
   const segments = useMemo(() => {
+    // Form 485 is HHA-only — never surface it in the DDD view (covers fallback data too).
+    const src = mode === "ddd" ? data.filter((d) => d.label !== "Unsigned Form 485") : data;
     let accumulatedLength = 0;
 
-    return data.map((item) => {
+    return src.map((item) => {
       const percentage =
         total > 0 ? item.value / total : 0;
 
@@ -121,10 +132,10 @@ export default function ComplianceInsights({
         dashOffset,
       };
     });
-  }, [data, total, animatedProgress]);
+  }, [data, total, animatedProgress, mode]);
 
   const handleInsightsClick = () => {
-    if (!showInsights) fetchInsights({ startDate, endDate });
+    if (!showInsights) fetchInsights({ startDate, endDate, mode });
     setShowInsights((p) => !p);
   };
 

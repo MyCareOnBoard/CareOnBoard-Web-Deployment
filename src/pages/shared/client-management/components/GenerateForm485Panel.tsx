@@ -5,12 +5,15 @@ import type { Form485Document } from "../types/clientForm485Generation";
 import {
   canGenerateForm485,
   getForm485MissingSources,
+  FORM485_GRACE_DAYS,
 } from "../utils/form485GenerationEligibility";
 import { useGenerateForm485 } from "../hooks/useGenerateForm485";
 import Form485PrintTemplate from "./Form485PrintTemplate";
 import Form485EditForm from "./Form485EditForm";
 import { generateFormPdfBlob } from "../utils/generateFormPdfBlob";
 import { downloadPocPdfFromBlob } from "../utils/generatePocPdf";
+import { withGeneratedForm485File } from "../utils/withGeneratedForm485File";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,13 +35,16 @@ const FORM485_TABS: ReadonlyArray<{ id: Form485Tab; label: string }> = [
 
 type GenerateForm485PanelProps = {
   formData: AddClientFormData;
+  setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
   clientId?: string;
 };
 
 export default function GenerateForm485Panel({
   formData,
+  setFormData,
   clientId,
 }: GenerateForm485PanelProps) {
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<ModalStep>("confirm");
   const [activeTab, setActiveTab] = useState<Form485Tab>("edit");
@@ -138,6 +144,41 @@ export default function GenerateForm485Panel({
       setDownloading(false);
     }
   }, [result, downloading, buildBlob]);
+
+  const handleUseAsForm485 = useCallback(async () => {
+    if (!result || downloading) return;
+    setDownloading(true);
+    try {
+      const blob = await buildBlob();
+      if (!blob) {
+        toast({
+          title: "Couldn't prepare the PDF",
+          description: "Try again or upload a Form 485 file manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const fileName = result.fileName || "form-485.pdf";
+      const file = new File([blob], fileName, { type: "application/pdf" });
+      setFormData((prev) =>
+        withGeneratedForm485File(prev, { file, fileName, issuedOnDate: new Date() }),
+      );
+      toast({
+        title: "Form 485 added (unsigned)",
+        description: `It will upload when you save the client. The client stays active for ${FORM485_GRACE_DAYS} days until the signed copy is uploaded.`,
+        variant: "success",
+      });
+      closeModal();
+    } catch {
+      toast({
+        title: "Couldn't prepare the PDF",
+        description: "Try again or upload a Form 485 file manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  }, [result, downloading, buildBlob, setFormData, toast, closeModal]);
 
   return (
     <>
@@ -334,16 +375,30 @@ export default function GenerateForm485Panel({
               <Button type="button" variant="outline" onClick={closeModal} disabled={downloading}>
                 Cancel
               </Button>
-              <Button type="button" onClick={() => void handleDownload()} disabled={downloading}>
-                {downloading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Preparing PDF&hellip;
-                  </>
-                ) : (
-                  "Download PDF"
-                )}
-              </Button>
+              <div className="flex flex-row items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleDownload()}
+                  disabled={downloading}
+                >
+                  {downloading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Preparing PDF&hellip;
+                    </>
+                  ) : (
+                    "Download PDF"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void handleUseAsForm485()}
+                  disabled={downloading}
+                >
+                  Use as Form 485
+                </Button>
+              </div>
             </DialogFooter>
           ) : null}
         </DialogContent>

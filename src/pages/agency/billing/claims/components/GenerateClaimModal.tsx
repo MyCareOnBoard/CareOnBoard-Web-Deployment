@@ -26,6 +26,7 @@ import {
   needsSupplementalFetch,
   splitRowsIntoClaimBundles,
   sumSelectedPreviewCharges,
+  sumSelectedPreviewSplit,
   type ClaimConfirmSelection,
 } from "../utils/claimBundleUtils";
 import {
@@ -37,8 +38,9 @@ import {
   resolveServiceIdsFromCodes,
 } from "../utils/claimSelectionUtils";
 import type { RecentClaimClientGroup } from "../utils/groupRecentClaimsByClient";
-import ClaimPreviewSection from "./claimPreviewSection";
+import ClaimPreviewSection, { CoverageLegend } from "./claimPreviewSection";
 import OutOfPocketBadge from "./OutOfPocketBadge";
+import { COVERAGE } from "@/lib/coverage";
 
 type GenerateClaimModalProps = {
   open: boolean;
@@ -47,9 +49,16 @@ type GenerateClaimModalProps = {
   readyToClaimRows?: ReadyToClaimRow[];
   mileageRate?: number;
   onClose: () => void;
-  onConfirm: (selections: ClaimConfirmSelection[]) => void;
-  /** Out-of-pocket clients bill an invoice instead of a state claim. */
-  onConfirmInvoice?: (clientId: string, selections: ClaimConfirmSelection[]) => void;
+  /**
+   * Coverage-aware generate: claim-leg selections (payer / both lines) bill a state claim;
+   * invoice-leg selections (out-of-pocket / both lines) bill an out-of-pocket invoice. A `both`
+   * line appears in both lists so generating produces both legs.
+   */
+  onGenerate: (
+    clientId: string,
+    claimSelections: ClaimConfirmSelection[],
+    invoiceSelections: ClaimConfirmSelection[],
+  ) => void;
 };
 
 function getClientDisplayName(client: Client) {
@@ -72,8 +81,7 @@ export default function GenerateClaimModal({
   readyToClaimRows = [],
   mileageRate = 0,
   onClose,
-  onConfirm,
-  onConfirmInvoice,
+  onGenerate,
 }: GenerateClaimModalProps) {
   const { user } = useAuth();
   const agencyMode = useEffectiveAgencyMode();
@@ -90,8 +98,6 @@ export default function GenerateClaimModal({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const clientSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefillRequestIdRef = useRef(0);
-
-  const isOutOfPocketClient = selectedClient?.billingDirection === "out-of-pocket";
 
   const services = useMemo(
     () => flattenClientServices(selectedClient ?? undefined),
@@ -152,6 +158,11 @@ export default function GenerateClaimModal({
 
   const selectedTotalAmount = useMemo(
     () => sumSelectedPreviewCharges(previewItems, selectedIds),
+    [previewItems, selectedIds],
+  );
+
+  const selectedSplitTotals = useMemo(
+    () => sumSelectedPreviewSplit(previewItems, selectedIds),
     [previewItems, selectedIds],
   );
 
@@ -426,14 +437,27 @@ export default function GenerateClaimModal({
     if (!canConfirm || !selectedClient) return;
 
     const selectedRows = displayRows.filter((row) => selectedIds.has(row.id));
-    const bundles = splitRowsIntoClaimBundles(selectedRows);
-    const selections = mapBundlesToClaimConfirmSelections(bundles, selectedClient.id);
-
-    if (isOutOfPocketClient && onConfirmInvoice) {
-      onConfirmInvoice(selectedClient.id, selections);
-      return;
-    }
-    onConfirm(selections);
+    // Claim leg: payer + both lines. Invoice leg: out-of-pocket + both lines. A `both` line is in
+    // both, so generating produces both a claim (payer portion) and an invoice (out-of-pocket).
+    // A leg already billed (needs* === false) is skipped so a half-billed line never re-POSTs;
+    // undefined means the row came from the supplemental unclaimed fetch and is safe to bill.
+    const claimRows = selectedRows.filter(
+      (row) => row.coverage !== COVERAGE.OUT_OF_POCKET && row.needsClaim !== false,
+    );
+    const invoiceRows = selectedRows.filter(
+      (row) =>
+        (row.coverage === COVERAGE.OUT_OF_POCKET || row.coverage === COVERAGE.BOTH) &&
+        row.needsInvoice !== false,
+    );
+    const claimSelections = mapBundlesToClaimConfirmSelections(
+      splitRowsIntoClaimBundles(claimRows),
+      selectedClient.id,
+    );
+    const invoiceSelections = mapBundlesToClaimConfirmSelections(
+      splitRowsIntoClaimBundles(invoiceRows),
+      selectedClient.id,
+    );
+    onGenerate(selectedClient.id, claimSelections, invoiceSelections);
   };
 
   return (
@@ -443,8 +467,8 @@ export default function GenerateClaimModal({
         className={`${BILLING_CORNER_MODAL_TALL_CLASS} ${BILLING_CORNER_MODAL_SHELL_CLASS}`}
       >
         <BillingCornerModalHeader
-          title={isOutOfPocketClient ? "Generate invoice" : "Generate claim"}
-          description="Search for a client, select services, then review approved shifts and rides to bill."
+          title="Generate bills"
+          description="Search for a client, select services, then review approved shifts and rides to bill. Coverage routes each line to a payer claim, an out-of-pocket invoice, or both."
           onClose={onClose}
           closeDisabled={saving}
         />
@@ -522,14 +546,19 @@ export default function GenerateClaimModal({
                   Billing or Mileage first.
                 </p>
               ) : (
-                <ClaimPreviewSection
-                  title={previewListTitle}
-                  items={previewItems}
-                  selectedIds={selectedIds}
-                  totalAmount={selectedTotalAmount}
-                  onToggleItem={toggleItem}
-                  onToggleAll={toggleSection}
-                />
+                <>
+                  <CoverageLegend />
+                  <ClaimPreviewSection
+                    title={previewListTitle}
+                    items={previewItems}
+                    selectedIds={selectedIds}
+                    totalAmount={selectedTotalAmount}
+                    payerSubtotal={selectedSplitTotals.payer}
+                    outOfPocketSubtotal={selectedSplitTotals.outOfPocket}
+                    onToggleItem={toggleItem}
+                    onToggleAll={toggleSection}
+                  />
+                </>
               )}
             </>
           )}
@@ -550,21 +579,15 @@ export default function GenerateClaimModal({
             disabled={!canConfirm}
             className={cn(BILLING_PRIMARY_BUTTON_CLASS, "w-full gap-2 sm:w-auto")}
             aria-busy={saving}
-            aria-label={
-              canConfirm
-                ? undefined
-                : `Select at least one item to generate ${isOutOfPocketClient ? "an invoice" : "a claim"}.`
-            }
+            aria-label={canConfirm ? undefined : "Select at least one item to generate bills."}
           >
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                {isOutOfPocketClient ? "Generating invoice…" : "Generating claim…"}
+                Generating…
               </>
-            ) : isOutOfPocketClient ? (
-              "Generate invoice"
             ) : (
-              "Generate claim"
+              "Generate"
             )}
           </button>
         </div>

@@ -9,6 +9,8 @@ import { getEmployeeById } from "@/lib/api/employees";
 import { listEmployeeDocuments } from "@/lib/api/employee-documents";
 import { useToast } from "@/hooks/use-toast";
 import { mileageApi, CreateMileageRideRequest, MileageRide, UpdateAgencyRideRequest } from "@/lib/api/mileage";
+import { CoverageFields } from "@/components/CoverageFields";
+import { COVERAGE, isValidSplit, resolveLineCoverage, type Coverage, type SplitMode } from "@/lib/coverage";
 import {
   clientServicesForMileage,
   findActiveTransportationService,
@@ -38,6 +40,9 @@ interface MileageFormData {
   selectDate: Date | null;
   selectTime: string;
   schedulingType: "one-time" | "recurring";
+  coverage?: Coverage;
+  splitMode?: SplitMode | null;
+  splitValue?: number | null;
 }
 
 const initialFormData: MileageFormData = {
@@ -49,6 +54,9 @@ const initialFormData: MileageFormData = {
   selectDate: null,
   selectTime: "",
   schedulingType: "one-time",
+  coverage: "payer",
+  splitMode: null,
+  splitValue: null,
 };
 
 type ScheduleGate = { ok: true } | { ok: false; reason: string };
@@ -197,6 +205,14 @@ export default function AddMileageModal({
 
   const applyClientForMileage = useCallback(
     (client: Client) => {
+      // Seed coverage from the client's default; the user can change it before saving.
+      const cov = resolveLineCoverage(null, client);
+      setFormData((prev) => ({
+        ...prev,
+        coverage: cov.coverage,
+        splitMode: cov.splitMode,
+        splitValue: cov.splitValue,
+      }));
       const services = clientServicesForMileage(client);
       const transport = findActiveTransportationService(services);
       setTransportationService(transport);
@@ -373,6 +389,16 @@ export default function AddMileageModal({
       return;
     }
 
+    if (!isValidSplit(formData.coverage, formData.splitMode, formData.splitValue)) {
+      toast({
+        title: "Set the split",
+        description:
+          "Enter how much the payer covers (0–100% or a dollar amount) before scheduling a split ride.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const clientId = formData.clientId!;
     const caregiverId = formData.assignDspId!;
     const serviceFields = mileageServiceFieldsForApi(
@@ -398,6 +424,13 @@ export default function AddMileageModal({
         caregiverId,
         notes: formData.notes || "",
         ...serviceFields,
+        coverage: formData.coverage ?? COVERAGE.PAYER,
+        ...(formData.coverage === COVERAGE.BOTH
+          ? {
+              splitMode: formData.splitMode ?? "percentage",
+              splitValue: formData.splitValue ?? null,
+            }
+          : {}),
       };
 
       if (mode === "edit" && initialRide?.id) {
@@ -561,6 +594,20 @@ export default function AddMileageModal({
                 </p>
               )}
             </div>
+
+            {transportationService && mode !== "edit" && (
+              <div className="flex flex-col gap-2">
+                <label className="text-[12px] font-normal text-[#10141a]">Billing coverage</label>
+                <CoverageFields
+                  value={{
+                    coverage: formData.coverage ?? COVERAGE.PAYER,
+                    splitMode: formData.splitMode ?? null,
+                    splitValue: formData.splitValue ?? null,
+                  }}
+                  onChange={(next) => setFormData((prev) => ({ ...prev, ...next }))}
+                />
+              </div>
+            )}
 
             {/* Assign DSP */}
             <div className="relative flex flex-col gap-1" id="mileage-assign-dsp-field">

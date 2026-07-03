@@ -41,6 +41,10 @@ export async function handleDocumentUploads(
     issuedOnDate: doc.issuedOnDate ? doc.issuedOnDate.toISOString() : undefined,
     expiryDate: doc.expiryDate ? doc.expiryDate.toISOString() : undefined,
     autoReminder: doc.autoReminder,
+    // Carry signed/unsigned for Form 485. Pass through undefined (legacy docs)
+    // rather than coercing to false, so re-saving a grandfathered 485 doesn't
+    // flip it to "unsigned" and start a grace clock.
+    ...(doc.key === "form485" ? { signed: doc.signed } : {}),
   }));
 
   for (const key in uploadResults) {
@@ -59,6 +63,7 @@ export async function handleDocumentUploads(
           ? matchingDoc.expiryDate.toISOString()
           : undefined,
         autoReminder: matchingDoc?.autoReminder,
+        ...(key === "form485" ? { signed: matchingDoc?.signed } : {}),
       });
     }
   }

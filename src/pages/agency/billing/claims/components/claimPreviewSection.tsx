@@ -9,14 +9,46 @@ import type { mapBundleRowsToPreviewItems } from "../utils/claimBundleUtils";
 
 type PreviewItem = ReturnType<typeof mapBundleRowsToPreviewItems>[number];
 
+// Coverage legend colors — match CoverageBadge (payer teal / out-of-pocket amber).
+const PAYER_TEXT_CLASS = "text-[#0c5d5f]";
+const OOP_TEXT_CLASS = "text-[#8A5A00]";
+
+function LegendEntry({ label, dotClass, textClass }: { label: string; dotClass: string; textClass: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 text-[13px] font-semibold", textClass)}>
+      <span className={cn("size-2 shrink-0 rounded-full", dotClass)} aria-hidden />
+      {label}
+    </span>
+  );
+}
+
+export function CoverageLegend() {
+  return (
+    <div className="rounded-[10px] border border-[#e5e5e6] bg-[#fafafa] px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <LegendEntry label="Payer / Insurance" dotClass="bg-[#0c5d5f]" textClass={PAYER_TEXT_CLASS} />
+        <LegendEntry label="Out of pocket" dotClass="bg-[#8A5A00]" textClass={OOP_TEXT_CLASS} />
+      </div>
+      <p className="mt-1.5 text-[12px] text-[#808081]">
+        Each amount is billed to the matching party — payer amounts go on a claim, out-of-pocket
+        amounts on a family invoice. A split-coverage line shows one amount of each.
+      </p>
+    </div>
+  );
+}
+
 const PreviewItemRow = memo(function PreviewItemRow({
   title,
   metaLine,
+  payerAmount,
+  outOfPocketAmount,
   checked,
   onToggle,
 }: {
   title: string;
   metaLine: string;
+  payerAmount: number;
+  outOfPocketAmount: number;
   checked: boolean;
   onToggle: () => void;
 }) {
@@ -32,6 +64,26 @@ const PreviewItemRow = memo(function PreviewItemRow({
         <p className="text-[14px] font-medium text-[#10141a]">{title}</p>
         <p className="mt-1 text-[13px] text-[#808081]">{metaLine}</p>
       </div>
+      <div className="flex shrink-0 flex-col items-end gap-0.5">
+        {payerAmount > 0 && (
+          <span
+            className={cn("text-[13px] font-semibold tabular-nums", PAYER_TEXT_CLASS)}
+            title="Payer / Insurance"
+            aria-label={`Payer / Insurance ${formatCurrency(payerAmount)}`}
+          >
+            {formatCurrency(payerAmount)}
+          </span>
+        )}
+        {outOfPocketAmount > 0 && (
+          <span
+            className={cn("text-[13px] font-semibold tabular-nums", OOP_TEXT_CLASS)}
+            title="Out of pocket"
+            aria-label={`Out of pocket ${formatCurrency(outOfPocketAmount)}`}
+          >
+            {formatCurrency(outOfPocketAmount)}
+          </span>
+        )}
+      </div>
     </label>
   );
 });
@@ -41,6 +93,8 @@ type ClaimPreviewSectionProps = {
   items: PreviewItem[];
   selectedIds: Set<string>;
   totalAmount: number;
+  payerSubtotal: number;
+  outOfPocketSubtotal: number;
   onToggleItem: (id: string) => void;
   onToggleAll: (itemIds: string[], checked: boolean) => void;
 };
@@ -50,6 +104,8 @@ export default function ClaimPreviewSection({
   items,
   selectedIds,
   totalAmount,
+  payerSubtotal,
+  outOfPocketSubtotal,
   onToggleItem,
   onToggleAll,
 }: ClaimPreviewSectionProps) {
@@ -86,16 +142,32 @@ export default function ClaimPreviewSection({
             key={item.id}
             title={item.title}
             metaLine={item.metaLine}
+            payerAmount={item.payerAmount}
+            outOfPocketAmount={item.outOfPocketAmount}
             checked={selectedIds.has(item.id)}
             onToggle={() => onToggleItem(item.id)}
           />
         ))}
       </div>
-      <div className="mt-4 flex items-center justify-between border-t border-[#e5e5e6] pt-4">
-        <span className="text-[14px] font-semibold text-[#10141a]">Total</span>
-        <span className="text-[14px] font-semibold tabular-nums text-[#10141a]">
-          {formatCurrency(totalAmount)}
-        </span>
+      <div className="mt-4 space-y-2 border-t border-[#e5e5e6] pt-4">
+        <div className="flex items-center justify-between">
+          <LegendEntry label="Payer / Insurance" dotClass="bg-[#0c5d5f]" textClass={PAYER_TEXT_CLASS} />
+          <span className={cn("text-[13px] font-semibold tabular-nums", PAYER_TEXT_CLASS)}>
+            {formatCurrency(payerSubtotal)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <LegendEntry label="Out of pocket" dotClass="bg-[#8A5A00]" textClass={OOP_TEXT_CLASS} />
+          <span className={cn("text-[13px] font-semibold tabular-nums", OOP_TEXT_CLASS)}>
+            {formatCurrency(outOfPocketSubtotal)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-[14px] font-semibold text-[#10141a]">Total</span>
+          <span className="text-[14px] font-semibold tabular-nums text-[#10141a]">
+            {formatCurrency(totalAmount)}
+          </span>
+        </div>
       </div>
     </div>
   );

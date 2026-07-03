@@ -22,7 +22,10 @@ export type OutOfPocketInvoiceLine = {
 export type OutOfPocketInvoiceDocument = {
   payerName: string;
   payerEmail: string | null;
+  /** Absent on invoices generated before addresses were captured. */
+  payerAddress?: string | null;
   clientName: string;
+  clientAddress?: string | null;
   agencyName: string;
   periodStart: string | null;
   periodEnd: string | null;
