@@ -33,6 +33,7 @@ import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import { Routes } from "@/routes/constants";
 
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import ReminderModal from "./components/ReminderModal";
 import { getReminderDateTime, RECURRENCE_LABELS, type Reminder, type ReminderDraft, type ReminderStatus } from "./types";
 import {
@@ -276,7 +277,7 @@ export default function RemindersPage() {
   );
   const [createReminder, { isLoading: isCreating }] = useCreateReminderMutation();
   const [updateReminder, { isLoading: isUpdating }] = useUpdateReminderMutation();
-  const [deleteReminder] = useDeleteReminderMutation();
+  const [deleteReminder, { isLoading: isDeleting }] = useDeleteReminderMutation();
 
   const reminders = data?.data ?? [];
 
@@ -647,22 +648,14 @@ export default function RemindersPage() {
       />
 
       {/* Delete confirmation */}
-      <Dialog open={!!deletingReminder} onOpenChange={(open) => { if (!open) setDeletingReminder(null); }}>
-        <DialogContent className="flex w-[min(400px,calc(100vw-32px))] flex-col gap-4 rounded-[30px] border border-[rgba(255,255,255,0.3)] bg-white p-5 backdrop-blur">
-          <DialogHeader>
-            <DialogTitle className="text-[18px] font-bold text-[#10141a]">Delete reminder?</DialogTitle>
-          </DialogHeader>
-          <p className="text-[14px] text-[#6b7280]">
-            This action cannot be undone. The reminder will be permanently removed.
-          </p>
-          <DialogFooter className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeletingReminder(null)}>Cancel</Button>
-            <Button className="bg-[#ef4444] text-white hover:bg-[#dc2626]" onClick={handleDelete}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmationModal
+        isOpen={!!deletingReminder}
+        onClose={() => { if (!isDeleting) setDeletingReminder(null); }}
+        onConfirm={handleDelete}
+        isDeleting={isDeleting}
+        title="Delete reminder?"
+        message="This action cannot be undone. The reminder will be permanently removed."
+      />
     </div>
   );
 }

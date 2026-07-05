@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { selectUser } from "@/utils/auth/store/authSelectors";
 import AddTaskModal from "@/components/tasks/AddTaskModal";
 import EditTaskModal from "@/components/tasks/EditTaskModal";
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -541,28 +542,14 @@ export default function StaffTasksPage() {
       />
 
       {/* ── Delete confirmation ── */}
-      <Dialog open={!!deletingTaskId} onOpenChange={(open) => { if (!open) setDeletingTaskId(null); }}>
-        <DialogContent className="w-[400px] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[16px]">
-          <DialogHeader>
-            <DialogTitle className="text-[18px] font-bold text-[#10141a]">Delete task?</DialogTitle>
-          </DialogHeader>
-          <p className="text-[14px] text-[#6b7280]">
-            This action cannot be undone. The task and all its activity notes will be permanently removed.
-          </p>
-          <DialogFooter className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeletingTaskId(null)} disabled={isDeleting}>
-              Cancel
-            </Button>
-            <Button
-              className="bg-[#ef4444] hover:bg-[#dc2626] text-white"
-              onClick={handleDeleteConfirm}
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Deleting…" : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmationModal
+        isOpen={!!deletingTaskId}
+        onClose={() => { if (!isDeleting) setDeletingTaskId(null); }}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+        title="Delete task?"
+        message="This action cannot be undone. The task and all its activity notes will be permanently removed."
+      />
     </div>
   );
 }
