@@ -36,6 +36,7 @@ export interface AgencyStaffMember {
     email: string;
     phone?: string;
     accessList: string[];
+    agencyModes?: ("ddd" | "hha")[];
     isActive: boolean;
     agencyId: string;
     createdAt: Date | string;
@@ -53,6 +54,7 @@ export interface CreateAgencyStaffRequest {
     password: string;
     phone?: string;
     accessList: string[];
+    agencyModes: ("ddd" | "hha")[];
 }
 
 /**
@@ -63,6 +65,7 @@ export interface UpdateAgencyStaffRequest {
     phone?: string;
     password?: string;
     accessList?: string[];
+    agencyModes?: ("ddd" | "hha")[];
 }
 
 /**
