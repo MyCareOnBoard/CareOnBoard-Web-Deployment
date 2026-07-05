@@ -315,10 +315,86 @@ export default function AddNewUserModal({
             </div>
           )}
 
+          {/* Program access (agency modes) — only shown when the agency supports both */}
+          {showModePicker && (
+            <div className="flex flex-col gap-[4px] w-full">
+              <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+                Program Access
+              </Label>
+              <Popover open={isModeOpen && !isSaving} onOpenChange={setIsModeOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    disabled={isSaving}
+                    aria-invalid={agencyModes.length === 0}
+                    aria-describedby={agencyModes.length === 0 ? "program-access-error" : undefined}
+                    className="flex items-center justify-between h-[44px] w-full rounded-[12px] border border-[#cccccd] bg-white px-[16px] hover:bg-[#fafafa] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                  >
+                    <span className="text-[14px] font-normal text-[#525253]">
+                      {agencyModes.length > 0
+                        ? MODE_OPTIONS.filter((o) => agencyModes.includes(o.value)).map((o) => o.label).join(", ")
+                        : "Select program access"}
+                    </span>
+                    <ChevronDown className="w-5 h-5 text-[#10141a]" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] bg-white border border-[#cccccd] rounded-[12px] p-0 shadow-lg"
+                  align="start"
+                >
+                  <div className="flex flex-col">
+                    <div className="px-[20px] pt-[12px] pb-0 shrink-0">
+                      <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
+                        Choose which program views this person can access
+                      </p>
+                    </div>
+                    <div className="flex flex-col mt-[8px]">
+                      {MODE_OPTIONS.filter((o) => agencyModeOptions.includes(o.value) || agencyModes.includes(o.value)).map((option) => {
+                        const isSelected = agencyModes.includes(option.value);
+                        return (
+                          <button
+                            key={option.value}
+                            onClick={() => toggleMode(option.value)}
+                            className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${isSelected ? "bg-[#e5effa]" : ""}`}
+                          >
+                            <span className={`text-[14px] leading-[1.4] ${isSelected ? "font-semibold text-[#00b4b8]" : "font-normal text-[#808081]"}`}>
+                              {option.label}
+                            </span>
+                            {isSelected && <Check className="w-5 h-5 text-[#00b4b8]" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {agencyModes.length === 0 ? (
+                <p id="program-access-error" className="text-[11px] text-[#ef4444]">Select at least one program.</p>
+              ) : (
+                <div className="flex flex-wrap gap-[8px] w-full mt-[4px]">
+                  {MODE_OPTIONS.filter((o) => agencyModes.includes(o.value)).map((option) => (
+                    <div
+                      key={option.value}
+                      className="group flex items-center gap-[6px] px-[10px] py-[6px] rounded-[6px] bg-[#00b4b8] border-[0.5px] border-[#808081] hover:bg-[#00a0a3] transition-colors"
+                    >
+                      <span className="text-[14px] font-medium leading-[1.4] text-white">{option.label}</span>
+                      <button
+                        onClick={() => toggleMode(option.value)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-white/20 rounded-full p-0.5"
+                        aria-label={`Remove ${option.label}`}
+                      >
+                        <X className="w-3.5 h-3.5 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Access Field with Popover */}
           <div className="flex flex-col gap-[4px] w-full">
             <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
-              Access
+              Access List
             </Label>
             <Popover open={isAccessOpen && !isSaving} onOpenChange={setIsAccessOpen}>
               <PopoverTrigger asChild>
@@ -397,82 +473,6 @@ export default function AddNewUserModal({
                   </button>
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* Program access (agency modes) — only shown when the agency supports both */}
-          {showModePicker && (
-            <div className="flex flex-col gap-[4px] w-full">
-              <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
-                Program access
-              </Label>
-              <Popover open={isModeOpen && !isSaving} onOpenChange={setIsModeOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    disabled={isSaving}
-                    aria-invalid={agencyModes.length === 0}
-                    aria-describedby={agencyModes.length === 0 ? "program-access-error" : undefined}
-                    className="flex items-center justify-between h-[44px] w-full rounded-[12px] border border-[#cccccd] bg-white px-[16px] hover:bg-[#fafafa] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-                  >
-                    <span className="text-[14px] font-normal text-[#525253]">
-                      {agencyModes.length > 0
-                        ? MODE_OPTIONS.filter((o) => agencyModes.includes(o.value)).map((o) => o.label).join(", ")
-                        : "Select program access"}
-                    </span>
-                    <ChevronDown className="w-5 h-5 text-[#10141a]" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[var(--radix-popover-trigger-width)] bg-white border border-[#cccccd] rounded-[12px] p-0 shadow-lg"
-                  align="start"
-                >
-                  <div className="flex flex-col">
-                    <div className="px-[20px] pt-[12px] pb-0 shrink-0">
-                      <p className="text-[12px] font-medium leading-[normal] text-[#808081]">
-                        Choose which program views this person can access
-                      </p>
-                    </div>
-                    <div className="flex flex-col mt-[8px]">
-                      {MODE_OPTIONS.filter((o) => agencyModeOptions.includes(o.value) || agencyModes.includes(o.value)).map((option) => {
-                        const isSelected = agencyModes.includes(option.value);
-                        return (
-                          <button
-                            key={option.value}
-                            onClick={() => toggleMode(option.value)}
-                            className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${isSelected ? "bg-[#e5effa]" : ""}`}
-                          >
-                            <span className={`text-[14px] leading-[1.4] ${isSelected ? "font-semibold text-[#00b4b8]" : "font-normal text-[#808081]"}`}>
-                              {option.label}
-                            </span>
-                            {isSelected && <Check className="w-5 h-5 text-[#00b4b8]" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              {agencyModes.length === 0 ? (
-                <p id="program-access-error" className="text-[11px] text-[#ef4444]">Select at least one program.</p>
-              ) : (
-                <div className="flex flex-wrap gap-[8px] w-full mt-[4px]">
-                  {MODE_OPTIONS.filter((o) => agencyModes.includes(o.value)).map((option) => (
-                    <div
-                      key={option.value}
-                      className="group flex items-center gap-[6px] px-[10px] py-[6px] rounded-[6px] bg-[#00b4b8] border-[0.5px] border-[#808081] hover:bg-[#00a0a3] transition-colors"
-                    >
-                      <span className="text-[14px] font-medium leading-[1.4] text-white">{option.label}</span>
-                      <button
-                        onClick={() => toggleMode(option.value)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-white/20 rounded-full p-0.5"
-                        aria-label={`Remove ${option.label}`}
-                      >
-                        <X className="w-3.5 h-3.5 text-white" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )}
         </div>
