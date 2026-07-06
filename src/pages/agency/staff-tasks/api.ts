@@ -39,7 +39,7 @@ interface CreateTaskInput {
   staffMember: string;
   dueDate: string;
   priority: "High" | "Medium" | "Low";
-  mode?: "ddd" | "hha";
+  mode?: "ddd" | "hha" | null;
 }
 
 interface UpdateTaskInput {
