@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, Plus, Search, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useSelector } from "react-redux";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import { format } from "date-fns";
 import { staffLabels } from "@/lib/roleLabel";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import { useAuth } from "@/utils/auth";
 import { useListAgencyClientsQuery, useGetClientStatsQuery, type Client } from "@/lib/api/clients";
 import { countUniqueAssignedDspsForClient } from "@/lib/countUniqueAssignedDsps";
 import { isForm485Required } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
-import type { RootState } from "@/store/redux/store";
 
 interface DisplayClient {
   id: string;
@@ -30,7 +29,7 @@ export default function ClientsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const agencyId = user?.agencyId || "";
-  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const selectedMode = useEffectiveAgencyMode() ?? undefined;
   const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
   const labels = staffLabels(effectiveTypes);
   const [searchQuery, setSearchQuery] = useState("");
