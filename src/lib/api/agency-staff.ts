@@ -26,6 +26,27 @@ export enum AgencyAccessScope {
     USER_LEVELS = "User Levels",
 }
 
+export type EmploymentType = "full_time" | "part_time";
+export type StaffBillingType = "hourly" | "monthly";
+
+/**
+ * Values the Add/Edit staff modal emits. HR fields are required at create time
+ * (enforced by the modal's Save gating) but optional on edit, so a legacy record
+ * can be saved without backfilling them.
+ */
+export interface StaffFormValues {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    accessList: string[];
+    agencyModes: ("ddd" | "hha")[];
+    role?: string;
+    employmentType?: EmploymentType;
+    billingType?: StaffBillingType;
+    billingRate?: number;
+}
+
 /**
  * Agency Staff Member interface
  */
@@ -37,6 +58,10 @@ export interface AgencyStaffMember {
     phone?: string;
     accessList: string[];
     agencyModes?: ("ddd" | "hha")[];
+    role?: string;
+    employmentType?: EmploymentType;
+    billingType?: StaffBillingType;
+    billingRate?: number;
     isActive: boolean;
     agencyId: string;
     createdAt: Date | string;
@@ -55,6 +80,10 @@ export interface CreateAgencyStaffRequest {
     phone?: string;
     accessList: string[];
     agencyModes: ("ddd" | "hha")[];
+    role: string;
+    employmentType: EmploymentType;
+    billingType: StaffBillingType;
+    billingRate: number;
 }
 
 /**
@@ -66,6 +95,10 @@ export interface UpdateAgencyStaffRequest {
     password?: string;
     accessList?: string[];
     agencyModes?: ("ddd" | "hha")[];
+    role?: string;
+    employmentType?: EmploymentType;
+    billingType?: StaffBillingType;
+    billingRate?: number;
 }
 
 /**

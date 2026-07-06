@@ -63,7 +63,7 @@ export default function AgencySettingsPage() {
 
     if (showTeamTab) {
 
-      items.push({ id: "userLevels", label: "Team" });
+      items.push({ id: "userLevels", label: "Staff Management" });
 
     }
 
@@ -93,7 +93,7 @@ export default function AgencySettingsPage() {
 
         <p className="mt-1 text-[14px] text-[#808081]">
 
-          Manage your account, agency profile, notifications, and team access.
+          Manage your account, agency profile, notifications, and staff access.
 
         </p>
 

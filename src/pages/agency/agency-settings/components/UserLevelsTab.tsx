@@ -15,8 +15,10 @@ import {
   type CreateAgencyStaffRequest,
   type UpdateAgencyStaffRequest,
   type AgencyStaffMember,
+  type StaffFormValues,
 } from "@/lib/api/agency-staff";
 import { useToast } from "@/hooks/use-toast";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { getInitials } from "@/lib/utils/string-utils";
 import { validateImageUrl } from "@/lib/utils/string-utils";
@@ -38,6 +40,13 @@ export default function InternalUsersPage() {
 
   const { toast } = useToast();
 
+  const { labels } = useStaffLabels();
+  const accessLabel = (key: string) => {
+    if (key === "Scheduling") return "Shift Management";
+    if (key === "DSP Management") return `${labels.title} Management`;
+    return key;
+  };
+
   // Fetch staff members with search
   const { data, isLoading, error } = useListAgencyStaffQuery({
     page: 1,
@@ -52,11 +61,12 @@ export default function InternalUsersPage() {
   const [resetPassword, { isLoading: isResettingPassword }] = useResetPasswordMutation();
   const [toggleActive, { isLoading: isTogglingActive }] = useToggleActiveMutation();
 
-  const handleCreateStaff = async (staffData: CreateAgencyStaffRequest) => {
+  const handleCreateStaff = async (staffData: StaffFormValues) => {
     try {
-      await createStaff(staffData).unwrap();
+      // Create-mode gating guarantees the HR fields are present, so this is safe.
+      await createStaff(staffData as CreateAgencyStaffRequest).unwrap();
       toast({
-        title: "Team member added",
+        title: "Staff member added",
         description: "They can now sign in with the email and password you set.",
       });
       setShowAddUserModal(false);
@@ -72,7 +82,7 @@ export default function InternalUsersPage() {
     }
   };
 
-  const handleUpdateStaff = async (staffData: CreateAgencyStaffRequest) => {
+  const handleUpdateStaff = async (staffData: StaffFormValues) => {
     if (!editingStaff) return;
 
     try {
@@ -81,6 +91,10 @@ export default function InternalUsersPage() {
         phone: staffData.phone,
         accessList: staffData.accessList,
         agencyModes: staffData.agencyModes,
+        role: staffData.role,
+        employmentType: staffData.employmentType,
+        billingType: staffData.billingType,
+        billingRate: staffData.billingRate,
       };
 
       // Only include password if it was changed
@@ -91,7 +105,7 @@ export default function InternalUsersPage() {
       await updateStaff({ id: editingStaff.id, data: updateData }).unwrap();
       toast({
         title: "Changes saved",
-        description: "Team member updated successfully.",
+        description: "Staff member updated successfully.",
       });
       setShowAddUserModal(false);
       setEditingStaff(null);
@@ -132,7 +146,7 @@ export default function InternalUsersPage() {
     try {
       await deleteStaff(selectedStaff.id).unwrap();
       toast({
-        title: "Team member removed",
+        title: "Staff member removed",
         description: "Their account has been permanently deleted.",
       });
       setShowDeleteDialog(false);
@@ -196,7 +210,7 @@ export default function InternalUsersPage() {
   return (
     <div className="min-w-0">
       <SettingsSectionCard
-        title="Team members"
+        title="Staff members"
         subtitle="Add and manage staff who can access the agency dashboard. Assign access levels to control what each person can see and do."
         bodyClassName="pt-0 sm:pt-0"
       >
@@ -222,7 +236,7 @@ export default function InternalUsersPage() {
               className="h-10 shrink-0 rounded-full px-5 text-[14px] font-medium whitespace-nowrap"
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add team member
+              Add staff member
             </Button>
           </div>
         </div>
@@ -231,7 +245,7 @@ export default function InternalUsersPage() {
         {!!error && (
           <div className="mt-6 rounded-[16px] border border-red-200 bg-red-50 p-4 text-center">
             <p className="text-[14px] text-red-600">
-              Could not load team members. Please try again.
+              Could not load staff members. Please try again.
             </p>
           </div>
         )}
@@ -275,17 +289,17 @@ export default function InternalUsersPage() {
           {isEmpty && (
             <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-[#e0e0e0] bg-white px-6 py-10 text-center">
               <h3 className="mb-2 text-[16px] font-semibold text-[#10141a]">
-                No team members yet
+                No staff members yet
               </h3>
               <p className="mb-4 max-w-md text-[13px] text-[#808081]">
-                Add your first team member to get started. Assign access levels to control what each person can see and do.
+                Add your first staff member to get started. Assign access levels to control what each person can see and do.
               </p>
               <Button
                 onClick={() => setShowAddUserModal(true)}
                 className="rounded-full px-5 text-[14px] font-medium"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Add first team member
+                Add first staff member
               </Button>
             </div>
           )}
@@ -317,23 +331,23 @@ export default function InternalUsersPage() {
                   </div>
                 </div>
 
-                {/* Second: Access pills */}
+                {/* Second: Role */}
+                <div className="flex min-w-0 flex-col gap-1.5 sm:min-w-[120px]">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#4b5563]">
+                    Role
+                  </p>
+                  <p className="truncate text-[13px] font-medium text-[#10141a]">
+                    {user.role || "—"}
+                  </p>
+                </div>
+
+                {/* Third: Access pills */}
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:min-w-[180px]">
                   <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#4b5563]">
                     Access
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {user.accessList.map((level) => (
-                      <span
-                        key={level}
-                        className="rounded-full bg-[#f5f5f5] px-3 py-1 text-[11px] font-medium text-[#525253]"
-                      >
-                        {level === "Scheduling" ? "Shift Management" : level}
-                      </span>
-                    ))}
-                  </div>
                   {!!user.agencyModes?.length && (
-                    <div className="mt-1 flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-1.5">
                       {user.agencyModes.map((m) => (
                         <span
                           key={m}
@@ -344,9 +358,19 @@ export default function InternalUsersPage() {
                       ))}
                     </div>
                   )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {user.accessList.map((level) => (
+                      <span
+                        key={level}
+                        className="rounded-full bg-[#f5f5f5] px-3 py-1 text-[11px] font-medium text-[#525253]"
+                      >
+                        {accessLabel(level)}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Third: Action Buttons */}
+                {/* Fourth: Action Buttons */}
                 <div className="flex w-full flex-shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:ml-auto">
                   <Button
                     variant="outline"
@@ -413,6 +437,10 @@ export default function InternalUsersPage() {
               phone: editingStaff.phone || "",
               accessList: editingStaff.accessList,
               agencyModes: editingStaff.agencyModes,
+              role: editingStaff.role,
+              employmentType: editingStaff.employmentType,
+              billingType: editingStaff.billingType,
+              billingRate: editingStaff.billingRate,
             }
             : undefined
         }
@@ -423,8 +451,8 @@ export default function InternalUsersPage() {
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <ConfirmDialogContent
-          title="Delete team member?"
-          description={`Permanently delete ${selectedStaff?.name || "this team member"}? Their account and all associated data will be removed. This cannot be undone.`}
+          title="Delete staff member?"
+          description={`Permanently delete ${selectedStaff?.name || "this staff member"}? Their account and all associated data will be removed. This cannot be undone.`}
           confirmText="Yes, Delete Permanently"
           cancelText="No, Keep It"
           onConfirm={confirmDelete}
@@ -438,7 +466,7 @@ export default function InternalUsersPage() {
       <ConfirmDialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
         <ConfirmDialogContent
           title="Reset password?"
-          description={`Send a password reset link to ${selectedStaff?.name || "this team member"}? The link will be sent to their email address.`}
+          description={`Send a password reset link to ${selectedStaff?.name || "this staff member"}? The link will be sent to their email address.`}
           confirmText="Yes, Reset Password"
           cancelText="Cancel"
           onConfirm={confirmResetPassword}
@@ -451,11 +479,11 @@ export default function InternalUsersPage() {
       {/* Activate/Deactivate Confirmation Dialog */}
       <ConfirmDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
         <ConfirmDialogContent
-          title={selectedStaff ? (filteredUsers.find(u => u.id === selectedStaff.id)?.isActive ? "Deactivate team member?" : "Activate team member?") : "Change status?"}
+          title={selectedStaff ? (filteredUsers.find(u => u.id === selectedStaff.id)?.isActive ? "Deactivate staff member?" : "Activate staff member?") : "Change status?"}
           description={selectedStaff ? (filteredUsers.find(u => u.id === selectedStaff.id)?.isActive
             ? `Deactivate ${selectedStaff.name}? They will no longer be able to sign in or access the agency dashboard.`
             : `Activate ${selectedStaff.name}? They will be able to sign in and access the agency dashboard again.`)
-            : "Change this team member's status?"}
+            : "Change this staff member's status?"}
           confirmText={selectedStaff ? (filteredUsers.find(u => u.id === selectedStaff.id)?.isActive ? "Deactivate" : "Activate") : "Continue"}
           cancelText="Cancel"
           onConfirm={confirmDeactivate}
