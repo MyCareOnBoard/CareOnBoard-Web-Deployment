@@ -23,13 +23,6 @@ export function useEffectiveAgencyMode(): AgencyMode | null {
   return "ddd";
 }
 
-/** Whether the agency supports both DDD and HHA and can toggle between them. */
-export function useAgencySupportsBothPrograms(): boolean {
-  const { user } = useAuth();
-  const supportedTypes = user?.agency?.supportedClientTypes ?? [];
-  return supportedTypes.includes("ddd") && supportedTypes.includes("hha");
-}
-
 /** Maps an agency mode to the applicant program type stored on user docs. */
 export function agencyModeToApplicantType(
   mode: AgencyMode | null

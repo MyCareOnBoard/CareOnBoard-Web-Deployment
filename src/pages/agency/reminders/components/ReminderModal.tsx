@@ -15,7 +15,6 @@ import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import { Textarea } from "@/components/ui/textarea";
-import ProgramModeSelect, { type ProgramMode } from "@/components/ui/program-mode-select";
 
 import type { Reminder, ReminderDraft, ReminderRecurrence, ReminderType } from "../types";
 import { RECURRENCE_LABELS } from "../types";
@@ -34,10 +33,6 @@ interface ReminderModalProps {
   onOpenChange: (open: boolean) => void;
   onSave: (draft: ReminderDraft) => void;
   isSaving?: boolean;
-  /** Whether the agency supports both DDD and HHA — shows the Program selector when true. */
-  supportsBothPrograms: boolean;
-  /** Program view currently active; used as the default for new reminders. */
-  activeMode: ProgramMode;
 }
 
 function toLocalDateInput(date: Date) {
@@ -91,15 +86,12 @@ export default function ReminderModal({
   onOpenChange,
   onSave,
   isSaving = false,
-  supportsBothPrograms,
-  activeMode,
 }: ReminderModalProps) {
   const [type, setType] = useState<ReminderType>("normal");
   const [message, setMessage] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [recurrence, setRecurrence] = useState<ReminderRecurrence>("none");
-  const [mode, setMode] = useState<ProgramMode>(activeMode);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -110,9 +102,8 @@ export default function ReminderModal({
     setDate(reminder?.scheduledDate ?? defaults.date);
     setTime(reminder?.scheduledTime ?? defaults.time);
     setRecurrence(reminder?.recurrence ?? "none");
-    setMode(reminder ? (reminder.mode ?? null) : activeMode);
     setError("");
-  }, [open, reminder, activeMode]);
+  }, [open, reminder]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -124,7 +115,7 @@ export default function ReminderModal({
       );
       return;
     }
-    onSave({ type, message: message.trim(), scheduledDate: date, scheduledTime: time, recurrence, mode });
+    onSave({ type, message: message.trim(), scheduledDate: date, scheduledTime: time, recurrence });
     onOpenChange(false);
   };
 
@@ -264,15 +255,6 @@ export default function ReminderModal({
               </p>
             )}
           </div>
-
-          {supportsBothPrograms && (
-            <div className="space-y-2">
-              <label htmlFor="reminder-program" className="text-[14px] font-semibold text-[#10141a]">
-                Program
-              </label>
-              <ProgramModeSelect id="reminder-program" value={mode} onChange={setMode} />
-            </div>
-          )}
 
           {error && <p className="text-[13px] font-medium text-[#d53411]">{error}</p>}
 

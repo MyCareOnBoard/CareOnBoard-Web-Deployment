@@ -29,7 +29,7 @@ export interface ReminderDraft {
   scheduledDate: string;
   scheduledTime: string;
   recurrence: ReminderRecurrence;
-  mode?: ReminderMode | null;
+  mode?: ReminderMode;
 }
 
 export const RECURRENCE_LABELS: Record<ReminderRecurrence, string> = {
