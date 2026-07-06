@@ -12,6 +12,18 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/utils/auth";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
+import type { EmploymentType, StaffBillingType, StaffFormValues } from "@/lib/api/agency-staff";
+import {
+  STAFF_ROLE_OPTIONS,
+  EMPLOYMENT_OPTIONS,
+  STAFF_BILLING_TYPE_OPTIONS,
+  isCustomRole,
+  isBillingRateValid,
+  isBillingPairComplete,
+  roundRate,
+  staffHrFieldsValid,
+} from "./staffForm";
 
 interface AddNewUserModalProps {
   open: boolean;
@@ -24,15 +36,12 @@ interface AddNewUserModalProps {
     phone?: string;
     accessList: string[];
     agencyModes?: ("ddd" | "hha")[];
+    role?: string;
+    employmentType?: EmploymentType;
+    billingType?: StaffBillingType;
+    billingRate?: number;
   };
-  onSave?: (data: {
-    name: string;
-    email: string;
-    password: string;
-    phone?: string;
-    accessList: string[];
-    agencyModes: ("ddd" | "hha")[];
-  }) => Promise<void>;
+  onSave?: (data: StaffFormValues) => Promise<void>;
 }
 
 function normalizeAgencyAccessListForUi(list: string[]): string[] {
@@ -75,6 +84,9 @@ export default function AddNewUserModal({
   onSave,
 }: AddNewUserModalProps) {
   const { user } = useAuth();
+  const { labels } = useStaffLabels();
+  const accessLabel = (key: string) =>
+    key === "DSP Management" ? `${labels.title} Management` : key;
   const agencyModeOptions: ("ddd" | "hha")[] = user?.agency?.supportedClientTypes ?? [];
   // Only make the admin pick when there's an actual choice (dual-program agency).
   const showModePicker = agencyModeOptions.length > 1;
@@ -92,6 +104,19 @@ export default function AddNewUserModal({
       : mode === "create" ? [] : agencyModeOptions
   );
   const [isModeOpen, setIsModeOpen] = useState(false);
+  const initialRole = initialData?.role ?? "";
+  const [role, setRole] = useState(initialRole);
+  const [roleIsCustom, setRoleIsCustom] = useState(isCustomRole(initialRole));
+  const [isRoleOpen, setIsRoleOpen] = useState(false);
+  const [employmentType, setEmploymentType] = useState<EmploymentType | "">(
+    initialData?.employmentType ?? ""
+  );
+  const [billingType, setBillingType] = useState<StaffBillingType | "">(
+    initialData?.billingType ?? ""
+  );
+  const [billingRate, setBillingRate] = useState(
+    initialData?.billingRate !== undefined ? String(initialData.billingRate) : ""
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showResetLinkMessage, setShowResetLinkMessage] = useState(false);
@@ -120,6 +145,24 @@ export default function AddNewUserModal({
     );
   };
 
+  const selectRole = (r: string) => {
+    setRole(r);
+    setRoleIsCustom(false);
+    setIsRoleOpen(false);
+  };
+
+  const selectCustomRole = () => {
+    setRoleIsCustom(true);
+    // Switching from a default label to custom starts with an empty text input.
+    if (STAFF_ROLE_OPTIONS.includes(role)) setRole("");
+    setIsRoleOpen(false);
+  };
+
+  const billingRateValid = isBillingRateValid(billingRate);
+  const billingPairComplete = isBillingPairComplete(billingType, billingRate);
+  // Create requires all HR fields; edit leaves them optional (legacy backfill).
+  const canSave = staffHrFieldsValid({ mode, role, employmentType, billingType, billingRate });
+
   const handleSendResetLink = async () => {
     // TODO: Implement actual reset link functionality
     setShowResetLinkMessage(true);
@@ -130,7 +173,7 @@ export default function AddNewUserModal({
     setIsSaving(true);
     try {
       if (onSave) {
-        await onSave({
+        const values: StaffFormValues = {
           name,
           email,
           password,
@@ -140,7 +183,16 @@ export default function AddNewUserModal({
           agencyModes: showModePicker
             ? agencyModes
             : agencyModeOptions.length ? agencyModeOptions : ["ddd"],
-        });
+        };
+        // HR fields are omitted when blank so an edit doesn't overwrite a legacy
+        // record with empties; create-mode gating guarantees they're all present.
+        if (role.trim()) values.role = role.trim();
+        if (employmentType) values.employmentType = employmentType;
+        if (billingType && billingRateValid) {
+          values.billingType = billingType;
+          values.billingRate = Number(roundRate(billingRate));
+        }
+        await onSave(values);
       } else {
         // Default mock save if no onSave provided
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -182,12 +234,25 @@ export default function AddNewUserModal({
         setAccessList(normalizeAgencyAccessListForUi(initialData.accessList));
         // Legacy staff (no modes) default to all agency modes so an edit isn't forced.
         setAgencyModes(initialData.agencyModes?.length ? initialData.agencyModes : agencyModeOptions);
+        const r = initialData.role ?? "";
+        setRole(r);
+        setRoleIsCustom(isCustomRole(r));
+        setEmploymentType(initialData.employmentType ?? "");
+        setBillingType(initialData.billingType ?? "");
+        setBillingRate(
+          initialData.billingRate !== undefined ? String(initialData.billingRate) : ""
+        );
       } else {
         setName("");
         setEmail("");
         setPassword("");
         setAccessList(mode === "create" ? CREATE_DEFAULTS : []);
         setAgencyModes(mode === "create" ? [] : agencyModeOptions);
+        setRole("");
+        setRoleIsCustom(false);
+        setEmploymentType("");
+        setBillingType("");
+        setBillingRate("");
       }
       setIsSaving(false);
       setShowPassword(false);
@@ -206,7 +271,7 @@ export default function AddNewUserModal({
         {/* Header */}
         <div className="flex items-center justify-between w-full h-[44px] shrink-0">
           <DialogTitle className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-            {mode === "create" ? "Add team member" : "Edit team member"}
+            {mode === "create" ? "Add staff member" : "Edit staff member"}
           </DialogTitle>
           <button
             onClick={handleClose}
@@ -314,6 +379,147 @@ export default function AddNewUserModal({
               )}
             </div>
           )}
+
+          {/* Role */}
+          <div className="flex flex-col gap-[4px] w-full">
+            <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+              Role
+            </Label>
+            <Popover open={isRoleOpen && !isSaving} onOpenChange={setIsRoleOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  disabled={isSaving}
+                  aria-invalid={!role.trim()}
+                  className="flex items-center justify-between h-[44px] w-full rounded-[12px] border border-[#cccccd] bg-white px-[16px] hover:bg-[#fafafa] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                >
+                  <span className={`text-[14px] font-normal ${role ? "text-black" : "text-[#525253]"}`}>
+                    {roleIsCustom ? (role || "Other (custom)") : (role || "Select role")}
+                  </span>
+                  <ChevronDown className="w-5 h-5 text-[#10141a]" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] bg-white border border-[#cccccd] rounded-[12px] p-0 shadow-lg"
+                align="start"
+              >
+                <div className="flex flex-col">
+                  {STAFF_ROLE_OPTIONS.map((option) => {
+                    const isSelected = !roleIsCustom && role === option;
+                    return (
+                      <button
+                        key={option}
+                        onClick={() => selectRole(option)}
+                        className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${isSelected ? "bg-[#e5effa]" : ""}`}
+                      >
+                        <span className={`text-[14px] leading-[1.4] ${isSelected ? "font-semibold text-[#00b4b8]" : "font-normal text-[#808081]"}`}>
+                          {option}
+                        </span>
+                        {isSelected && <Check className="w-5 h-5 text-[#00b4b8]" />}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={selectCustomRole}
+                    className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${roleIsCustom ? "bg-[#e5effa]" : ""}`}
+                  >
+                    <span className={`text-[14px] leading-[1.4] ${roleIsCustom ? "font-semibold text-[#00b4b8]" : "font-normal text-[#808081]"}`}>
+                      Other (custom)
+                    </span>
+                    {roleIsCustom && <Check className="w-5 h-5 text-[#00b4b8]" />}
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            {roleIsCustom && (
+              <Input
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="Enter role"
+                disabled={isSaving}
+                aria-invalid={!role.trim()}
+                className="mt-[4px] h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            )}
+            {mode === "create" && !role.trim() && (
+              <p className="text-[11px] text-[#ef4444]">Select or enter a role.</p>
+            )}
+          </div>
+
+          {/* Employment type */}
+          <div className="flex flex-col gap-[4px] w-full">
+            <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+              Employment Type
+            </Label>
+            <div className="flex gap-[8px] w-full">
+              {EMPLOYMENT_OPTIONS.map((option) => {
+                const isSelected = employmentType === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setEmploymentType(option.value)}
+                    disabled={isSaving}
+                    className={`flex-1 h-[44px] rounded-[12px] border text-[14px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isSelected ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#cccccd] bg-white text-[#525253] hover:bg-[#fafafa]"}`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            {mode === "create" && !employmentType && (
+              <p className="text-[11px] text-[#ef4444]">Select an employment type.</p>
+            )}
+          </div>
+
+          {/* Pay Rate */}
+          <div className="flex flex-col gap-[4px] w-full">
+            <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+              Pay Rate
+            </Label>
+            <div className="flex gap-[8px] w-full">
+              {STAFF_BILLING_TYPE_OPTIONS.map((option) => {
+                const isSelected = billingType === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setBillingType(option.value)}
+                    disabled={isSaving}
+                    className={`flex-1 h-[44px] rounded-[12px] border text-[14px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isSelected ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#cccccd] bg-white text-[#525253] hover:bg-[#fafafa]"}`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="relative mt-[4px]">
+              <span className="absolute left-[16px] top-1/2 -translate-y-1/2 text-[14px] text-[#525253] pointer-events-none">
+                $
+              </span>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                value={billingRate}
+                onChange={(e) => setBillingRate(e.target.value)}
+                onBlur={() => setBillingRate(roundRate(billingRate))}
+                placeholder="0.00"
+                disabled={isSaving}
+                aria-invalid={billingRate.trim() !== "" && !billingRateValid}
+                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white pl-[28px] pr-[60px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <span className="absolute right-[16px] top-1/2 -translate-y-1/2 text-[14px] text-[#525253] pointer-events-none">
+                {billingType === "monthly" ? "/mo" : billingType === "hourly" ? "/hr" : ""}
+              </span>
+            </div>
+            {mode === "create" && (!billingType || !billingRateValid) && (
+              <p className="text-[11px] text-[#ef4444]">Select a billing type and enter a rate.</p>
+            )}
+            {mode === "edit" && !billingPairComplete && (
+              <p className="text-[11px] text-[#ef4444]">Enter both a billing type and a rate.</p>
+            )}
+          </div>
 
           {/* Program access (agency modes) — only shown when the agency supports both */}
           {showModePicker && (
@@ -423,7 +629,10 @@ export default function AddNewUserModal({
                   </div>
 
                   {/* Options - Scrollable */}
-                  <div className="flex flex-col mt-[8px] overflow-y-auto">
+                  <div
+                    className="flex flex-col mt-[8px] overflow-y-auto"
+                    onWheel={(e) => e.stopPropagation()}
+                  >
                     {ACCESS_OPTIONS.map((option) => {
                       const isSelected = accessList.includes(option);
                       return (
@@ -439,7 +648,7 @@ export default function AddNewUserModal({
                               : "font-normal text-[#808081]"
                               }`}
                           >
-                            {option}
+                            {accessLabel(option)}
                           </span>
                           {isSelected && (
                             <Check className="w-5 h-5 text-[#00b4b8]" />
@@ -462,12 +671,12 @@ export default function AddNewUserModal({
                   className="group flex items-center gap-[6px] px-[10px] py-[6px] rounded-[6px] bg-[#00b4b8] border-[0.5px] border-[#808081] hover:bg-[#00a0a3] transition-colors"
                 >
                   <span className="text-[14px] font-medium leading-[1.4] text-white">
-                    {access}
+                    {accessLabel(access)}
                   </span>
                   <button
                     onClick={() => toggleAccess(access)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-white/20 rounded-full p-0.5"
-                    aria-label={`Remove ${access}`}
+                    aria-label={`Remove ${accessLabel(access)}`}
                   >
                     <X className="w-3.5 h-3.5 text-white" />
                   </button>
@@ -490,7 +699,7 @@ export default function AddNewUserModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || (showModePicker && agencyModes.length === 0)}
+            disabled={isSaving || (showModePicker && agencyModes.length === 0) || !canSave}
             className="flex-1 flex items-center justify-center gap-2 px-[16px] py-[12px] rounded-[60px] bg-[#2b82ff] backdrop-blur-[22px] hover:bg-[#2775e5] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving && (
@@ -502,7 +711,7 @@ export default function AddNewUserModal({
                   ? "Adding..."
                   : "Saving..."
                 : mode === "create"
-                  ? "Add team member"
+                  ? "Add staff member"
                   : "Save changes"}
             </span>
           </button>
