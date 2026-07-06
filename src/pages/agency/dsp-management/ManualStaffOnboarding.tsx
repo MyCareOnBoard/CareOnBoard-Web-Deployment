@@ -394,6 +394,12 @@ export default function ManualStaffOnboarding() {
     for (const q of BOOLEAN_QUESTIONS.slice(0, 4)) {
       if (!profileData.booleanQuestions[q.name]) return `Please answer: "${q.label}"`;
     }
+    if (profileData.booleanQuestions.eligibleToWork === "No") {
+      return "This applicant is not legally eligible to work in the U.S. and cannot be onboarded.";
+    }
+    if (profileData.booleanQuestions.hasDisqualifyingOffense === "Yes") {
+      return "This applicant has a disqualifying offense under NJ law and cannot be onboarded.";
+    }
     if (!generatedPassword || generatedPassword.length < 6) return "Password must be at least 6 characters";
     if (resumeIsUploading) return "Please wait for the resume upload to complete";
     return null;
@@ -618,6 +624,21 @@ export default function ManualStaffOnboarding() {
           </div>
         ))}
       </div>
+
+      {profileData.booleanQuestions.eligibleToWork === "No" && (
+        <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3">
+          <p className="text-sm text-[#dc2626]">
+            This applicant is not legally eligible to work in the U.S. and cannot be onboarded.
+          </p>
+        </div>
+      )}
+      {profileData.booleanQuestions.hasDisqualifyingOffense === "Yes" && (
+        <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3">
+          <p className="text-sm text-[#dc2626]">
+            This applicant has a disqualifying offense under NJ law and cannot be onboarded.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-4 rounded-2xl border border-[#d9d9d9] bg-white p-6">
         <p className="text-sm font-semibold text-[#10141a]">Upload Resume in PDF format (Optional)</p>

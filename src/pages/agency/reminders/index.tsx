@@ -30,7 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { useEffectiveAgencyMode, useAgencySupportsBothPrograms } from "@/hooks/useEffectiveAgencyMode";
 import { Routes } from "@/routes/constants";
 
 import ReminderModal from "./components/ReminderModal";
@@ -267,6 +267,7 @@ function ReminderRowsSkeleton() {
 export default function RemindersPage() {
   const navigate = useNavigate();
   const mode = useEffectiveAgencyMode();
+  const supportsBothPrograms = useAgencySupportsBothPrograms();
 
   // refetchOnMountOrArgChange + isFetching keep the skeleton showing on every
   // DDD/HHA toggle, even when that view's data is already cached.
@@ -283,6 +284,7 @@ export default function RemindersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [dateFilter, setDateFilter] = useState("");
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [viewingReminder, setViewingReminder] = useState<Reminder | null>(null);
@@ -293,10 +295,11 @@ export default function RemindersPage() {
     return reminders.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (dateFilter && r.scheduledDate !== dateFilter) return false;
+      if (unassignedOnly && r.mode) return false;
       if (q && !r.message.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [reminders, searchQuery, statusFilter, dateFilter]);
+  }, [reminders, searchQuery, statusFilter, dateFilter, unassignedOnly]);
 
   const groups = useMemo(() => {
     const activeGroups = statusFilter === "all"
@@ -330,14 +333,14 @@ export default function RemindersPage() {
   };
 
   const handleSave = async (draft: ReminderDraft) => {
-    // Stamp the active program view on create AND edit (an edit re-stamps the
-    // editor's current view); no mode = agency-wide, shows in both views.
-    const payload = mode ? { ...draft, mode } : draft;
+    // The modal always resolves an explicit mode (the editor's choice for
+    // dual-program agencies, or the agency's fixed single program otherwise);
+    // null means deliberately shared across both views.
     try {
       if (editingReminder) {
-        await updateReminder({ reminderId: editingReminder.id, data: payload }).unwrap();
+        await updateReminder({ reminderId: editingReminder.id, data: draft }).unwrap();
       } else {
-        await createReminder(payload).unwrap();
+        await createReminder(draft).unwrap();
       }
     } catch {
       // error handled by RTK Query; toast can be wired here if needed
@@ -360,9 +363,10 @@ export default function RemindersPage() {
     setSearchQuery("");
     setStatusFilter("all");
     setDateFilter("");
+    setUnassignedOnly(false);
   };
 
-  const hasFilters = Boolean(searchQuery || dateFilter || statusFilter !== "all");
+  const hasFilters = Boolean(searchQuery || dateFilter || statusFilter !== "all" || unassignedOnly);
   const isSaving = isCreating || isUpdating;
 
   return (
@@ -426,6 +430,20 @@ export default function RemindersPage() {
                 </button>
               ))}
             </div>
+
+            {supportsBothPrograms && (
+              <button
+                type="button"
+                onClick={() => setUnassignedOnly((prev) => !prev)}
+                className={`rounded-full border px-3 py-1 text-[13px] font-medium transition-colors ${
+                  unassignedOnly
+                    ? "border-[#00b4b8] bg-[#00b4b8] text-white"
+                    : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
+                }`}
+              >
+                Unassigned only
+              </button>
+            )}
 
             <div className="hidden h-5 w-px bg-[#e5e7eb] xl:block" />
 
@@ -644,6 +662,8 @@ export default function RemindersPage() {
         }}
         onSave={handleSave}
         isSaving={isSaving}
+        supportsBothPrograms={supportsBothPrograms}
+        activeMode={mode}
       />
 
       {/* Delete confirmation */}
