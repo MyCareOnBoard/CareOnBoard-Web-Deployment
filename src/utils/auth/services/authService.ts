@@ -26,6 +26,7 @@ import { getUser } from '@/lib/api/users'
 import { UserType } from '../types/user.types'
 import {
   getLoginProfileErrorMessage,
+  isMfaEnrollmentRequiredError,
   isMissingProfileError,
 } from '@/utils/auth/helpers/loginProfileError'
 
@@ -78,6 +79,12 @@ export async function loginWithEmail(
         return { status: 'success', user }
       }
     } catch (profileError) {
+      // The profile endpoint is MFA-gated: a staff account with no enrolled
+      // factor gets 403 MFA_ENROLLMENT_REQUIRED on its first /profile. Route to
+      // enrollment (not an error) — /profile loads once MFA is enrolled.
+      if (isMfaEnrollmentRequiredError(profileError)) {
+        return { status: 'mfa_enrollment_required', user }
+      }
       if (!isMissingProfileError(profileError)) {
         console.error('[loginWithEmail] Unexpected profile load failure:', profileError)
         return {
