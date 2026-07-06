@@ -10,6 +10,7 @@ import {
     type EmployeeTraining,
 } from "@/lib/api/employees";
 import {listShifts, type Shift} from "@/lib/api/shifts";
+import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
 import {DSP} from "./types";
 
 /**
@@ -119,7 +120,7 @@ export function useDSPList() {
 
     const user = useSelector((state: RootState) => state.auth.user);
     const agencyId = user?.agencyId;
-    const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId || ""]);
+    const selectedMode = useEffectiveAgencyMode();
     const role = selectedMode === "hha" ? "hha" : selectedMode === "ddd" ? "dsp" : undefined;
 
     const fetchDSPs = useCallback(async () => {

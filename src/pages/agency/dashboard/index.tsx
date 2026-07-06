@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { ChevronRight, ArrowUpRight, ChevronLeft, Clock3, WandSparkles, UserRoundCog } from "lucide-react";
-import { useSelector } from "react-redux";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
@@ -12,7 +11,6 @@ import { useGetClientStatsQuery, useGetDSPStatsQuery, useGetShiftStatsQuery } fr
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { staffLabels } from "@/lib/roleLabel";
-import type { RootState } from "@/store/redux/store";
 
 import OperationReportHeader from "../analytics/components/AnalyticsReportHeader";
 import AnalyticsDateRangeModal from "../analytics/components/AnalyticsDateRangeModal";
@@ -65,12 +63,10 @@ function buildOperationalMetrics(data: AnalyticsSummaryData["operationalEfficien
 export default function AgencyDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const agencyId = user?.agencyId || user?.agency?.id || "";
-  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
-  const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
-  const labels = staffLabels(effectiveTypes);
-  // Scope analytics to the active DDD/HHA view, matching the compliance-alerts page.
+  // Scope everything to the active DDD/HHA view, matching the compliance-alerts page.
   const effectiveMode = useEffectiveAgencyMode();
+  const effectiveTypes = effectiveMode ? [effectiveMode] : user?.agency?.supportedClientTypes;
+  const labels = staffLabels(effectiveTypes);
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = React.useState({ startDate: "", endDate: "" });
   const [showDateModal, setShowDateModal] = React.useState(false);
@@ -95,13 +91,13 @@ export default function AgencyDashboardPage() {
   const expiredDocuments = expiredDocsData?.data || [];
 
   const { data: clientStatsData, isLoading: isLoadingClients } = useGetClientStatsQuery(
-    { agencyId: user?.agencyId || "", type: selectedMode },
+    { agencyId: user?.agencyId || "", type: effectiveMode ?? undefined },
     { skip: !user?.agencyId }
   );
   const clients = clientStatsData?.stats || { active: 0, inactive: 0, total: 0 };
 
   const { data: dspStatsData, isLoading: isLoadingDsp } = useGetDSPStatsQuery(
-    { agencyId: user?.agencyId || "", type: selectedMode },
+    { agencyId: user?.agencyId || "", type: effectiveMode ?? undefined },
     { skip: !user?.agencyId }
   );
   const dspStats = dspStatsData?.stats || { active: 0, inactive: 0, total: 0 };

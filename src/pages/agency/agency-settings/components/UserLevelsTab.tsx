@@ -80,6 +80,7 @@ export default function InternalUsersPage() {
         name: staffData.name,
         phone: staffData.phone,
         accessList: staffData.accessList,
+        agencyModes: staffData.agencyModes,
       };
 
       // Only include password if it was changed
@@ -331,6 +332,18 @@ export default function InternalUsersPage() {
                       </span>
                     ))}
                   </div>
+                  {!!user.agencyModes?.length && (
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {user.agencyModes.map((m) => (
+                        <span
+                          key={m}
+                          className="rounded-full bg-[#e6f7f7] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#008f93]"
+                        >
+                          {m}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Third: Action Buttons */}
@@ -399,6 +412,7 @@ export default function InternalUsersPage() {
               password: "",
               phone: editingStaff.phone || "",
               accessList: editingStaff.accessList,
+              agencyModes: editingStaff.agencyModes,
             }
             : undefined
         }
