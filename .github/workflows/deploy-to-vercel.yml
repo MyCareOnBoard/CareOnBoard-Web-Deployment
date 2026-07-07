@@ -26,25 +26,21 @@ jobs:
         run: pnpm run build
 
   sync-and-deploy:
+    name: Mirror to Deployment Repo
     runs-on: ubuntu-latest
+    needs: build
     if: github.ref == 'refs/heads/main'
+    env:
+      GH_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Decrypt and set env vars
+      - name: Mirror to target repo
         run: |
-          openssl aes-256-cbc -d -in secrets.json.enc -out secrets.json -pass file:.encryption_key -pbkdf2 -iter 100000
-          echo "ENV_TOKEN=$(jq -r '.token' secrets.json)" >> $GITHUB_ENV
-
-      - name: Mirror to Target Repo
-        run: |
-          echo ${{ env.ENV_TOKEN }} | gh auth login --with-token
           gh auth setup-git
           gh repo clone https://github.com/MyCareOnBoardOrg/CareOnBoard-Web.git
           cd CareOnBoard-Web
           rm .github/workflows/deploy-to-vercel.yml
-          git config --global user.email "info@joincareonboard.com"
-          git config --global user.name "MyCareOnBoard"
+          git config user.email "info@joincareonboard.com"
+          git config user.name "MyCareOnBoard"
           git add .
           git commit -m "Remove GitHub Actions workflows"
           git remote add target https://github.com/MyCareOnBoard/CareOnBoard-Web-Deployment.git
