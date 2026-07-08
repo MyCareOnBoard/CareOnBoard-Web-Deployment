@@ -42,6 +42,7 @@ import {
     Brain,
     Heart,
     ShieldAlert,
+    CalendarClock,
 } from "lucide-react";
 
 /** Canonical scope for the scheduling hub; legacy token "Scheduling" still honored in accessList. */
@@ -93,6 +94,7 @@ const allNavItems: AgencyNavItem[] = [
     { label: "Compliance Alerts", path: Routes.agency.complianceAlerts, icon: ShieldAlert, accessKey: "Compliance Alerts" },
     { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
+    { label: "Timesheet", path: Routes.agency.staffTimesheet, icon: CalendarClock },
     { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion", programTypes: ["ddd"] },
     { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun, programTypes: ["ddd"] },
     {
@@ -105,6 +107,7 @@ const allNavItems: AgencyNavItem[] = [
             { label: "Payroll management", path: Routes.agency.billing.payrollManagement },
             { label: "Claims dashboard", path: Routes.agency.billing.claims },
             { label: "DSP expenses", path: Routes.agency.billing.expenses },
+            { label: "Submitted timesheets", path: Routes.agency.billing.staffTimesheets },
         ],
     },
     // { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },

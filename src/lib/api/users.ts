@@ -145,6 +145,12 @@ export async function getUser(): Promise<User> {
       user.profile = {
         ...user.profile,
         accessList: profileSource.accessList,
+        // Agency staff HR fields — used to prefill the staff timesheet (role) and
+        // shown read-only. Pay rate stays server-authoritative for actual payroll.
+        role: profileSource.role,
+        employmentType: profileSource.employmentType,
+        billingType: profileSource.billingType,
+        billingRate: profileSource.billingRate,
       } as User['profile'];
     }
 
