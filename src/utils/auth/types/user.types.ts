@@ -71,6 +71,11 @@ export interface Profile {
   // Super Admin specific
   accessList?: string[]  // List of access scopes for super admins
   supportedClientTypes?: ("ddd" | "hha")[]
+  // Agency staff HR fields (surfaced from the agencyStaff doc for the staff timesheet)
+  role?: string
+  employmentType?: "full_time" | "part_time"
+  billingType?: "hourly" | "monthly"
+  billingRate?: number
 }
 
 /**

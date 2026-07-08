@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useToast } from "@/hooks/use-toast";
 
@@ -65,6 +65,10 @@ import { usePayrollDashboard } from "./hooks/usePayrollDashboard";
 
 import { useStaffToPay } from "./hooks/useStaffToPay";
 
+import { useStaffTimesheetsToPay } from "./hooks/useStaffTimesheetsToPay";
+
+import { createStaffPayrollInvoice, getStaffTimesheetErrorMessage } from "@/lib/api/staff-timesheets";
+
 import { usePayrollInvoices } from "./hooks/usePayrollInvoices";
 
 import { getCurrentWeekDateRange } from "./utils/payrollDashboardUtils";
@@ -129,6 +133,8 @@ export default function PayrollDashboardPage() {
 
   const lastStaffToPayErrorRef = useRef<string | null>(null);
 
+  const lastStaffTimesheetsErrorRef = useRef<string | null>(null);
+
 
 
   const {
@@ -174,6 +180,19 @@ export default function PayrollDashboardPage() {
     dueLimit: 100,
 
   });
+
+  const {
+    entries: staffTimesheetEntries,
+    loading: staffTimesheetsLoading,
+    error: staffTimesheetsError,
+    refetch: refetchStaffTimesheets,
+  } = useStaffTimesheetsToPay({ enabled: activeTab === "staff" });
+
+  // Approved staff timesheets show at the top of "staff to pay", above shift-derived rows.
+  const dueEntries = useMemo(
+    () => [...staffTimesheetEntries, ...staffToPayEntries],
+    [staffTimesheetEntries, staffToPayEntries],
+  );
 
 
 
@@ -309,15 +328,34 @@ export default function PayrollDashboardPage() {
 
 
 
+  useEffect(() => {
+    if (!staffTimesheetsError) {
+      lastStaffTimesheetsErrorRef.current = null;
+      return;
+    }
+    if (lastStaffTimesheetsErrorRef.current === staffTimesheetsError) {
+      return;
+    }
+    lastStaffTimesheetsErrorRef.current = staffTimesheetsError;
+    toast({
+      title: "Couldn't load approved timesheets",
+      description: getPayrollListErrorMessage(staffTimesheetsError),
+      variant: "destructive",
+    });
+  }, [staffTimesheetsError, toast]);
+
+
+
   const refreshPayrollWorkspace = useCallback(
     async ({ refreshStaff = false }: { refreshStaff?: boolean } = {}) => {
       const tasks = [refetchDashboard(), refetchGeneratedInvoices({ force: true })];
       if (refreshStaff || activeTab === "staff") {
         tasks.push(refetchStaffToPay({ force: true }));
+        tasks.push(refetchStaffTimesheets({ force: true }));
       }
       await Promise.all(tasks);
     },
-    [activeTab, refetchDashboard, refetchGeneratedInvoices, refetchStaffToPay],
+    [activeTab, refetchDashboard, refetchGeneratedInvoices, refetchStaffToPay, refetchStaffTimesheets],
   );
 
 
@@ -376,9 +414,60 @@ export default function PayrollDashboardPage() {
 
 
 
-  const handleCreateInvoiceClick = useCallback((entry: DuePayrollEntry) => {
-    setCreateInvoiceEntry(entry);
-  }, []);
+  const handleCreateStaffTimesheetInvoice = useCallback(
+    async (entry: DuePayrollEntry) => {
+      if (!entry.staffUid || !entry.staffTimesheetIds?.length) return;
+
+      const requestId = openingInvoiceRequestIdRef.current + 1;
+      openingInvoiceRequestIdRef.current = requestId;
+      setCreatingInvoice(true);
+      setOpeningInvoice({ staffName: entry.staffName });
+
+      try {
+        const created = await createStaffPayrollInvoice({
+          staffUid: entry.staffUid,
+          periodStart: entry.dateRangeStart,
+          periodEnd: entry.dateRangeEnd,
+          staffTimesheetIds: entry.staffTimesheetIds,
+        });
+        if (openingInvoiceRequestIdRef.current !== requestId) return;
+
+        const detail = await getPayrollInvoiceById(created.id);
+        const agency = await fetchAgencyFallbackIfNeeded(detail.invoicePrefill);
+        await openInvoiceDetail(detail, agency);
+        setActiveTab("generated");
+        await refreshPayrollWorkspace({ refreshStaff: true });
+        toast({
+          title: "Payroll invoice created",
+          description: `Timesheet payroll for ${entry.staffName} is ready to review.`,
+        });
+      } catch (error) {
+        if (openingInvoiceRequestIdRef.current !== requestId) return;
+        toast({
+          title: "Couldn't create payroll invoice",
+          description: getStaffTimesheetErrorMessage(error),
+          variant: "destructive",
+        });
+      } finally {
+        if (openingInvoiceRequestIdRef.current === requestId) {
+          setCreatingInvoice(false);
+          setOpeningInvoice(null);
+        }
+      }
+    },
+    [fetchAgencyFallbackIfNeeded, openInvoiceDetail, refreshPayrollWorkspace, toast],
+  );
+
+  const handleCreateInvoiceClick = useCallback(
+    (entry: DuePayrollEntry) => {
+      if (entry.source === "staffTimesheet") {
+        void handleCreateStaffTimesheetInvoice(entry);
+        return;
+      }
+      setCreateInvoiceEntry(entry);
+    },
+    [handleCreateStaffTimesheetInvoice],
+  );
 
   const handleConfirmCreateInvoice = useCallback(
     async (preview: PayrollInvoicePreview, selectedIds: Set<string>) => {
@@ -669,11 +758,11 @@ export default function PayrollDashboardPage() {
 
           <DuePayrollTable
 
-            entries={staffToPayEntries}
+            entries={dueEntries}
 
-            dueTotal={staffToPayTotal}
+            dueTotal={staffToPayTotal + staffTimesheetEntries.length}
 
-            loading={staffToPayLoading}
+            loading={staffToPayLoading || staffTimesheetsLoading}
 
             isRefetching={staffToPayRefetching}
 

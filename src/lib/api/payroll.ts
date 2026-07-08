@@ -27,6 +27,11 @@ export type DuePayrollEntry = {
   grossAmount?: number;
   shiftIds?: string[];
   rideIds?: string[];
+  /** Distinguishes shift-derived rows from approved staff-timesheet rows (default: shift). */
+  source?: "shift" | "staffTimesheet";
+  /** Staff-timesheet rows only: the submitter and the approved timesheets to invoice. */
+  staffUid?: string;
+  staffTimesheetIds?: string[];
 };
 
 export type PayrollDashboardSummary = {
