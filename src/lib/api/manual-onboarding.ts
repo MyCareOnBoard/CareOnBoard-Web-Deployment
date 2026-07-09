@@ -8,6 +8,7 @@ export interface DocumentEntry {
 }
 
 export interface CompleteOnboardingPayload {
+  applicantType?: "dsp" | "hha";
   profile: {
     fullName: string;
     email: string;
