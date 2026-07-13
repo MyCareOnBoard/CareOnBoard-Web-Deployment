@@ -112,6 +112,14 @@ interface ReferenceData {
   relationship: string;
   phoneNumber: string;
   email: string;
+  emailConfirmation?: {
+    status?: string;
+    requestId?: string;
+    requestedAt?: string;
+    sentAt?: string | null;
+    confirmedAt?: string | null;
+    expiresAt?: string;
+  };
 }
 
 export interface PreScreeningData {
