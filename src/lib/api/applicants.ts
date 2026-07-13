@@ -107,7 +107,7 @@ interface DocumentFile {
   expiryDate?: string;
 }
 
-interface ReferenceData {
+export interface ReferenceData {
   name: string;
   relationship: string;
   phoneNumber: string;
@@ -119,6 +119,8 @@ interface ReferenceData {
     sentAt?: string | null;
     confirmedAt?: string | null;
     expiresAt?: string;
+    confirmationMethod?: string;
+    confirmedBy?: string;
   };
 }
 

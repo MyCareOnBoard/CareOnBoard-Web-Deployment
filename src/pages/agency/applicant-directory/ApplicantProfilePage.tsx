@@ -12,8 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { Routes } from "@/routes/constants";
-import { applicantsApi, type ComplianceData } from "@/lib/api/applicants";
-import type { EligibilityData } from "@/lib/api/applicants";
+import {
+  applicantsApi,
+  type ComplianceData,
+  type EligibilityData,
+  type ReferenceData,
+} from "@/lib/api/applicants";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
 import { useMessaging } from "@/contexts/MessagingContext";
@@ -21,7 +25,7 @@ import { agencyApplicantsExtraApi, ApplicantDocumentItem } from "@/lib/api/agenc
 import { officialHireApi, OfficialHireStatusResponse } from "@/lib/api/officialHire";
 import { authorizationsApi } from "@/lib/api/authorizations";
 import { ProfileTab } from "./components/ProfileTab";
-import { DocumentsTab } from "./components/DocumentsTab";
+import { DocumentsTab, type ReferenceItem } from "./components/DocumentsTab";
 import { ConditionalHireTab } from "./components/ConditionalHireTab";
 import { OfficialHireTab } from "./components/OfficialHireTab";
 import { FinalReviewTab, type ReviewStepsState } from "./components/FinalReviewTab";
@@ -98,15 +102,10 @@ export default function ApplicantProfilePage() {
   };
 
 
-  type ReferenceItem = {
-    name: string;
-    relation: string;
-    mobile: string;
-    email: string;
-    emailConfirmation?: { status?: string };
-  };
 
   const [references, setReferences] = useState<ReferenceItem[]>([]);
+  const [referenceActionLoading, setReferenceActionLoading] = useState<string | null>(null);
+  const [pendingManualReference, setPendingManualReference] = useState<ReferenceItem | null>(null);
   const [showAdvanceDocumentsDialog, setShowAdvanceDocumentsDialog] = useState(false);
   const [showRejectDocumentDialog, setShowRejectDocumentDialog] = useState(false);
   const [pendingRejectDocumentId, setPendingRejectDocumentId] = useState<string | null>(null);
@@ -563,6 +562,68 @@ export default function ApplicantProfilePage() {
     }
   };
 
+  const toReferenceItem = (reference: ReferenceData): ReferenceItem => ({
+    name: reference.name || "",
+    relation: reference.relationship || "",
+    mobile: reference.phoneNumber || "",
+    email: reference.email || "",
+    emailConfirmation: reference.emailConfirmation,
+  });
+
+  const replaceReference = (reference: ReferenceData) => {
+    const normalizedEmail = reference.email.trim().toLowerCase();
+    setReferences((current) => current.map((item) =>
+      item.email.trim().toLowerCase() === normalizedEmail
+        ? toReferenceItem(reference)
+        : item,
+    ));
+  };
+
+  const handleSendReferenceConfirmation = async (email: string) => {
+    if (!id) return;
+    const normalizedEmail = email.trim().toLowerCase();
+    setReferenceActionLoading(`send:${normalizedEmail}`);
+    try {
+      const response = await agencyApplicantsExtraApi.sendReferenceConfirmation(id, email);
+      replaceReference(response.reference);
+      toast({
+        title: "Reference Email Queued",
+        description: "A confirmation email will be sent to the reference.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.error || "Failed to send the reference confirmation email.",
+        variant: "destructive",
+      });
+    } finally {
+      setReferenceActionLoading(null);
+    }
+  };
+
+  const handleConfirmReferenceManually = async () => {
+    if (!id || !pendingManualReference) return;
+    const reference = pendingManualReference;
+    const normalizedEmail = reference.email.trim().toLowerCase();
+    setReferenceActionLoading(`confirm:${normalizedEmail}`);
+    try {
+      const response = await agencyApplicantsExtraApi.confirmReferenceManually(id, reference.email);
+      replaceReference(response.reference);
+      setPendingManualReference(null);
+      toast({
+        title: "Reference Confirmed",
+        description: "The reference email has been manually confirmed.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.error || "Failed to manually confirm the reference.",
+        variant: "destructive",
+      });
+    } finally {
+      setReferenceActionLoading(null);
+    }
+  };
   const statusByType = new Map(documentsData.map((document) => [document.type, document.status]));
   // Required-docs affordance uses only the config-required defs (not optional uploads).
   const requiredDocumentTypes = applicantDocDefs
@@ -949,6 +1010,9 @@ export default function ApplicantProfilePage() {
               getDocumentUrlByType={getDocumentUrlByType}
               references={references}
               actionLoading={actionLoading}
+              referenceActionLoading={referenceActionLoading}
+              onSendReferenceConfirmation={handleSendReferenceConfirmation}
+              onConfirmReferenceManually={setPendingManualReference}
               onVerifyDocument={handleVerifyDocument}
               onRejectDocument={handleOpenRejectDocumentDialog}
               onRequestDocument={handleRequestDocument}
@@ -992,6 +1056,31 @@ export default function ApplicantProfilePage() {
               onConfirmHire={handleConfirmHire}
             />
           )}
+
+          <ConfirmDialog
+            open={Boolean(pendingManualReference)}
+            onOpenChange={(open) => {
+              if (!open && !referenceActionLoading?.startsWith("confirm:")) {
+                setPendingManualReference(null);
+              }
+            }}
+          >
+            <ConfirmDialogContent
+              title="Manually Confirm Reference?"
+              description={pendingManualReference
+                ? `Confirm ${pendingManualReference.name || pendingManualReference.email}'s reference email (${pendingManualReference.email}) manually? This records an agency override.`
+                : undefined}
+              confirmText="Confirm Reference"
+              cancelText="Cancel"
+              onConfirm={handleConfirmReferenceManually}
+              onCancel={() => setPendingManualReference(null)}
+              isLoading={Boolean(
+                pendingManualReference &&
+                referenceActionLoading === `confirm:${pendingManualReference.email.trim().toLowerCase()}`,
+              )}
+              loadingText="Confirming..."
+            />
+          </ConfirmDialog>
 
           <ConfirmDialog
             open={showAdvanceDocumentsDialog}

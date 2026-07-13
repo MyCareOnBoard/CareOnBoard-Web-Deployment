@@ -6,12 +6,21 @@ type DocumentDefinition = {
   label: string;
 };
 
-type ReferenceItem = {
+export type ReferenceItem = {
   name: string;
   relation: string;
   mobile: string;
   email: string;
-  emailConfirmation?: { status?: string };
+  emailConfirmation?: {
+    status?: string;
+    requestId?: string;
+    requestedAt?: string;
+    sentAt?: string | null;
+    confirmedAt?: string | null;
+    expiresAt?: string | null;
+    confirmationMethod?: string;
+    confirmedBy?: string;
+  };
 };
 
 function getReferenceConfirmationPresentation(status?: string) {
@@ -36,6 +45,9 @@ interface DocumentsTabProps {
   getDocumentUrlByType: (type: string) => string | undefined;
   references: ReferenceItem[];
   actionLoading: string | null;
+  referenceActionLoading: string | null;
+  onSendReferenceConfirmation: (email: string) => void;
+  onConfirmReferenceManually: (reference: ReferenceItem) => void;
   onVerifyDocument: (docId: string) => void;
   onRejectDocument: (docId: string) => void;
   onRequestDocument: (docType: string) => void;
@@ -50,6 +62,9 @@ export function DocumentsTab({
   getDocumentUrlByType,
   references,
   actionLoading,
+  referenceActionLoading,
+  onSendReferenceConfirmation,
+  onConfirmReferenceManually,
   onVerifyDocument,
   onRejectDocument,
   onRequestDocument,
@@ -213,37 +228,70 @@ export function DocumentsTab({
         </h3>
         {references.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2">
-            {references.map((ref, index) => (
-              <div
-                key={index}
-                className="rounded-[20px] bg-[rgba(255,255,255,0.8)] px-4 py-4 space-y-1"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-[15px] font-semibold text-[#10141a]">
-                    {ref.name}
-                  </p>
-                  {(() => {
-                    const presentation = getReferenceConfirmationPresentation(ref.emailConfirmation?.status);
-                    return (
-                      <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${presentation.className}`}>
-                        {presentation.label}
-                      </span>
-                    );
-                  })()}
-                </div>
-                <p className="text-[13px] text-[#808081]">{ref.relation}</p>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
-                  <div className="space-y-1">
-                    <p className="text-[#808081]">Mobile</p>
-                    <p className="font-medium text-[#10141a]">{ref.mobile || "-"}</p>
+            {references.map((ref, index) => {
+              const status = ref.emailConfirmation?.status;
+              const presentation = getReferenceConfirmationPresentation(status);
+              const emailKey = ref.email.trim().toLowerCase();
+              const sendLoading = referenceActionLoading === `send:${emailKey}`;
+              const confirmLoading = referenceActionLoading === `confirm:${emailKey}`;
+              const isQueued = status === "pending" || status === "sending";
+              const isConfirmed = status === "confirmed";
+              const canSendEmail = !isConfirmed && status !== "sent";
+
+              return (
+                <div
+                  key={emailKey || `${ref.name}-${index}`}
+                  className="rounded-[20px] bg-[rgba(255,255,255,0.8)] px-4 py-4 space-y-1"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[15px] font-semibold text-[#10141a]">
+                          {ref.name}
+                        </p>
+                        <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${presentation.className}`}>
+                          {presentation.label}
+                        </span>
+                      </div>
+                      <p className="text-[13px] text-[#808081]">{ref.relation}</p>
+                    </div>
+
+                    {!isConfirmed && (
+                      <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                        {canSendEmail && (
+                          <Button
+                            variant="outline"
+                            onClick={() => onSendReferenceConfirmation(ref.email)}
+                            disabled={isQueued || Boolean(referenceActionLoading)}
+                            className="h-8 rounded-[60px] border-[#2563eb] px-3 text-[11px] font-semibold text-[#2563eb] hover:bg-[rgba(37,99,235,0.08)] disabled:opacity-60"
+                          >
+                            {isQueued || sendLoading ? "Sending..." : "Send Email"}
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          onClick={() => onConfirmReferenceManually(ref)}
+                          disabled={Boolean(referenceActionLoading)}
+                          className="h-8 rounded-[60px] border-[#0eaf52] px-3 text-[11px] font-semibold text-[#087f3e] hover:bg-[rgba(14,175,82,0.08)] disabled:opacity-60"
+                        >
+                          {confirmLoading ? "Confirming..." : "Manually Confirm"}
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[#808081]">Email</p>
-                    <p className="font-medium text-[#10141a]">{ref.email || "-"}</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
+                    <div className="space-y-1">
+                      <p className="text-[#808081]">Mobile</p>
+                      <p className="font-medium text-[#10141a]">{ref.mobile || "-"}</p>
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-[#808081]">Email</p>
+                      <p className="break-words font-medium text-[#10141a]">{ref.email || "-"}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="rounded-[20px] bg-[rgba(255,255,255,0.8)] px-4 py-5 text-[14px] text-[#808081]">
@@ -251,7 +299,6 @@ export function DocumentsTab({
           </div>
         )}
       </div>
-
       {showAdvanceDocumentsAction && (
         <div className="flex justify-end">
           <Button
@@ -266,4 +313,3 @@ export function DocumentsTab({
     </div>
   );
 }
-
