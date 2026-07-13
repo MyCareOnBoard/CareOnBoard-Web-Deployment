@@ -49,10 +49,17 @@ export const authorizationsApi = {
     return res.data;
   },
   
-  async sendAlert(applicantId: string, authId: string, payload: { message?: string; recipients?: string[] }) {
+  async sendAlert(
+    applicantId: string,
+    authorizationType: string,
+    payload: { message?: string; severity?: "low" | "medium" | "high" | "critical" },
+  ) {
     const res = await axiosClient.post(
-      `/agencyApplicants/${encodeURIComponent(applicantId)}/authorizations/${encodeURIComponent(authId)}/send-alert`,
-      payload
+      `/agencyApplicants/${encodeURIComponent(applicantId)}/authorizations/${encodeURIComponent(authorizationType)}/send-alert`,
+      {
+        message: payload.message,
+        severity: payload.severity ?? "high",
+      },
     );
     return res.data;
   },

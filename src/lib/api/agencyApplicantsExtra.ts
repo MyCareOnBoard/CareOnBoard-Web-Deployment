@@ -98,9 +98,12 @@ export const agencyApplicantsExtraApi = {
     return res.data;
   },
   
-  // Authorization alerts
+  // Authorization alerts (legacy wrapper for the canonical authorization endpoint)
   async createAuthorizationAlert(uid: string, payload: { authorizationType: string; severity: 'low' | 'medium' | 'high'; message: string; details?: any }) {
-    const res = await axiosClient.post(`/agencyApplicants/${encodeURIComponent(uid)}/authorization-alert`, payload);
+    const res = await axiosClient.post(
+      `/agencyApplicants/${encodeURIComponent(uid)}/authorizations/${encodeURIComponent(payload.authorizationType)}/send-alert`,
+      { message: payload.message, severity: payload.severity },
+    );
     return res.data;
   },
 };
