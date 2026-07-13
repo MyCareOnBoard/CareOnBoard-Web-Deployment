@@ -1,4 +1,5 @@
 import axiosClient from '../axios';
+import type { ReferenceData } from './applicants';
 
 export type ApplicantDocumentItem = {
   id: string;
@@ -32,6 +33,12 @@ export type ApplicantProgressResponse = {
     verifiedDocs: number;
     missingRequired?: string[];
   };
+};
+
+export type ReferenceActionResponse = {
+  success: boolean;
+  message: string;
+  reference: ReferenceData;
 };
 
 export const agencyApplicantsExtraApi = {
@@ -78,6 +85,20 @@ export const agencyApplicantsExtraApi = {
   // References
   async getReferences(uid: string) {
     const res = await axiosClient.get(`/agencyApplicants/${encodeURIComponent(uid)}/references`);
+    return res.data;
+  },
+  async sendReferenceConfirmation(uid: string, email: string) {
+    const res = await axiosClient.post<ReferenceActionResponse>(
+      `/agencyApplicants/${encodeURIComponent(uid)}/references/send-confirmation`,
+      { email },
+    );
+    return res.data;
+  },
+  async confirmReferenceManually(uid: string, email: string) {
+    const res = await axiosClient.post<ReferenceActionResponse>(
+      `/agencyApplicants/${encodeURIComponent(uid)}/references/confirm-manually`,
+      { email },
+    );
     return res.data;
   },
   
