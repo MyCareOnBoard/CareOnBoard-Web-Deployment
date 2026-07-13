@@ -18,6 +18,7 @@ import { AlertCircle, CalendarDays, CheckCircle2, Eye, EyeOff, Loader2 } from "l
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
 import { differenceInYears, subYears } from "date-fns";
 import { checkEmailExists, uploadTempDocument, completeManualOnboarding } from "@/lib/api/manual-onboarding";
+import { useEffectiveAgencyMode, agencyModeToApplicantType } from "@/hooks/useEffectiveAgencyMode";
 
 const STORAGE_KEY = "agencyManualStaffOnboarding";
 
@@ -163,6 +164,8 @@ function getInitialSessionKey(): string {
 export default function ManualStaffOnboarding() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const agencyMode = useEffectiveAgencyMode();
+  const applicantType = agencyModeToApplicantType(agencyMode);
 
   const [sessionKey] = useState(getInitialSessionKey);
   const [activeStep, setActiveStep] = useState(0);
@@ -472,6 +475,7 @@ export default function ManualStaffOnboarding() {
         persistToStorage({ activeStep: 2, maxSavedStep: newMax });
 
         await completeManualOnboarding({
+          applicantType,
           profile: {
             fullName: profileData.fullName.trim(),
             email: profileData.email.trim().toLowerCase(),
