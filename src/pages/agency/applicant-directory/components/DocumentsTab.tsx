@@ -11,8 +11,25 @@ type ReferenceItem = {
   relation: string;
   mobile: string;
   email: string;
+  emailConfirmation?: { status?: string };
 };
 
+function getReferenceConfirmationPresentation(status?: string) {
+  switch (status) {
+    case "confirmed":
+      return { label: "Email confirmed", className: "bg-[rgba(8,127,62,0.1)] text-[#087f3e]" };
+    case "pending":
+    case "sent":
+    case "sending":
+      return { label: "Confirmation pending", className: "bg-[rgba(37,99,235,0.08)] text-[#2563eb]" };
+    case "expired":
+      return { label: "Link expired", className: "bg-[rgba(245,158,11,0.12)] text-[#b45309]" };
+    case "failed":
+      return { label: "Delivery failed", className: "bg-[rgba(213,52,17,0.08)] text-[#d53411]" };
+    default:
+      return { label: "Not sent", className: "bg-[rgba(95,99,104,0.08)] text-[#5f6368]" };
+  }
+}
 interface DocumentsTabProps {
   documentDefinitions: readonly DocumentDefinition[];
   documents: ApplicantDocumentItem[];
@@ -201,9 +218,19 @@ export function DocumentsTab({
                 key={index}
                 className="rounded-[20px] bg-[rgba(255,255,255,0.8)] px-4 py-4 space-y-1"
               >
-                <p className="text-[15px] font-semibold text-[#10141a]">
-                  {ref.name}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[15px] font-semibold text-[#10141a]">
+                    {ref.name}
+                  </p>
+                  {(() => {
+                    const presentation = getReferenceConfirmationPresentation(ref.emailConfirmation?.status);
+                    return (
+                      <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${presentation.className}`}>
+                        {presentation.label}
+                      </span>
+                    );
+                  })()}
+                </div>
                 <p className="text-[13px] text-[#808081]">{ref.relation}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
                   <div className="space-y-1">

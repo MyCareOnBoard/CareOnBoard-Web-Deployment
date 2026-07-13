@@ -103,6 +103,7 @@ export default function ApplicantProfilePage() {
     relation: string;
     mobile: string;
     email: string;
+    emailConfirmation?: { status?: string };
   };
 
   const [references, setReferences] = useState<ReferenceItem[]>([]);
@@ -394,6 +395,7 @@ export default function ApplicantProfilePage() {
             relation: r.relationship || '',
             mobile: r.phoneNumber || '',
             email: r.email || '',
+            emailConfirmation: r.emailConfirmation,
           }));
           setReferences(refs);
         }
