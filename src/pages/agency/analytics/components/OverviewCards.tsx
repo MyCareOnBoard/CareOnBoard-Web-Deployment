@@ -1,16 +1,12 @@
-import React from "react";
-
 import {
   Area,
   AreaChart,
   ResponsiveContainer,
 } from "recharts";
 
-import {
-  ArrowDown,
-  ArrowUp,
-} from "lucide-react";
-
+import AnalyticsMetricCard, {
+  AnalyticsMetricCardSkeleton,
+} from "@/components/analytics/AnalyticsMetricCard";
 import type { KpiMetric } from "@/lib/api/reports";
 
 type OverviewCard = {
@@ -120,25 +116,14 @@ function MiniGraph({ data, color, id }: { data: { value: number }[]; color: stri
   );
 }
 
-function SkeletonCard() {
-  return (
-    <div className="rounded-2xl border border-[#E6EAEC] bg-white/80 px-5 py-4 shadow-[0_2px_10px_rgba(15,23,42,0.02)] animate-pulse">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 space-y-3">
-          <div className="h-7 w-24 rounded bg-gray-100" />
-          <div className="h-4 w-32 rounded bg-gray-100" />
-        </div>
-        <div className="h-[52px] w-[92px] rounded bg-gray-100" />
-      </div>
-    </div>
-  );
-}
 
 export default function OverviewCards({ data, isLoading }: OverviewCardsProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
-        {FALLBACK_CARDS.map((c) => <SkeletonCard key={c.id} />)}
+        {FALLBACK_CARDS.map((card) => (
+          <AnalyticsMetricCardSkeleton key={card.id} />
+        ))}
       </div>
     );
   }
@@ -148,36 +133,16 @@ export default function OverviewCards({ data, isLoading }: OverviewCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
       {cards.map((card) => (
-        <div
+        <AnalyticsMetricCard
           key={card.id}
-          className="
-            rounded-2xl
-            border border-[#E6EAEC]
-            bg-white/80
-            px-5 py-4
-            shadow-[0_2px_10px_rgba(15,23,42,0.02)]
-          "
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="text-[28px] font-semibold leading-none tracking-[-1px] text-[#111827]">
-                  {card.value}
-                </h3>
-                <span
-                  className={`flex items-center gap-1 rounded-full text-[14px] font-medium ${
-                    card.positive ? "text-[#12B5B0]" : "text-[#E5484D]"
-                  }`}
-                >
-                  {card.positive ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
-                  {Math.abs(card.trend)}%
-                </span>
-              </div>
-              <p className="mt-3 text-[13px] font-semibold leading-[18px] text-[#111827]">{card.label}</p>
-            </div>
+          value={card.value}
+          label={card.label}
+          trend={card.trend}
+          sentiment={card.positive ? "improvement" : "regression"}
+          graph={
             <MiniGraph id={card.id} color={card.color} data={card.data} />
-          </div>
-        </div>
+          }
+        />
       ))}
     </div>
   );

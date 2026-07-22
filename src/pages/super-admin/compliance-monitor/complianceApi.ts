@@ -4,6 +4,8 @@ import { customBaseQuery } from "@/lib/baseQuery";
 export interface ComplianceIssue {
     id: string;
     userId: string;
+    subjectType?: "user" | "client";
+    clientId?: string;
     userName: string;
     userEmail: string;
     agencyId: string;
@@ -60,9 +62,11 @@ export interface ComplianceStatsResponse {
     stats: ComplianceStats;
 }
 
+export type ComplianceCategory = "documents" | "notes" | "evv" | "others";
+
 export interface SendAlertRequest {
     userId: string;
-    category: "documents" | "notes" | "evv" | "others";
+    category: ComplianceCategory;
     issueType: string;
     documentType?: string;
     details?: string;
@@ -76,6 +80,18 @@ export interface SendAlertResponse {
         sentTo: string;
         category: string;
         issueType: string;
+    };
+}
+
+export interface SendClientComplianceAlertResponse {
+    success: boolean;
+    message: string;
+    data: {
+        clientId: string;
+        agencyId: string;
+        notifiedCount: number;
+        skippedCount: number;
+        notificationType: string;
     };
 }
 
@@ -146,6 +162,14 @@ export const complianceApi = createApi({
             }),
             invalidatesTags: ["ComplianceDocuments", "ComplianceNotes", "ComplianceEvv", "ComplianceOthers", "ComplianceStats"],
         }),
+        sendClientComplianceAlert: builder.mutation<SendClientComplianceAlertResponse, { clientId: string }>({
+            query: ({ clientId }) => ({
+                url: `/superAdminCompliance/clients/${encodeURIComponent(clientId)}/send-alert`,
+                method: "POST",
+                requiresAuth: true,
+            }),
+            invalidatesTags: ["ComplianceDocuments", "ComplianceStats"],
+        }),
     }),
 });
 
@@ -156,4 +180,5 @@ export const {
     useGetComplianceOthersQuery,
     useGetComplianceStatsQuery,
     useSendComplianceAlertMutation,
+    useSendClientComplianceAlertMutation,
 } = complianceApi;
