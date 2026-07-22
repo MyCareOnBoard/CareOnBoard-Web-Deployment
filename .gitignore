@@ -55,3 +55,6 @@ tsconfig.tsbuildinfo
 package-lock.json
 
 .claude/
+.superpowers/
+
+docs/superpowers/
