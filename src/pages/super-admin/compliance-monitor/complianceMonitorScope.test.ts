@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildComplianceMonitorLocationSearch,
   buildScopedComplianceQuery,
   parseComplianceMonitorScope,
+  parseComplianceMonitorTextSearch,
 } from "./complianceMonitorScope";
 
-describe("compliance monitor agency scope", () => {
+describe("compliance monitor filters", () => {
   it("reads the selected agency from the dashboard link", () => {
     expect(
       parseComplianceMonitorScope(
@@ -21,17 +23,38 @@ describe("compliance monitor agency scope", () => {
     expect(parseComplianceMonitorScope("?agencyName=Bright+Care")).toBeNull();
   });
 
-  it("adds the selected agency to every compliance query", () => {
+  it("reads and trims the persisted issue search", () => {
+    expect(
+      parseComplianceMonitorTextSearch("?search=%20Avery%20Johnson%20"),
+    ).toBe("Avery Johnson");
+    expect(parseComplianceMonitorTextSearch("?search=%20%20")).toBe("");
+  });
+
+  it("adds the selected agency and search to every compliance query", () => {
     expect(
       buildScopedComplianceQuery(
-        { page: 2, limit: 10, search: "license" },
+        { page: 2, limit: 10 },
         { agencyId: "agency-1", agencyName: "Bright Care" },
+        " Avery ",
       ),
     ).toEqual({
       page: 2,
       limit: 10,
-      search: "license",
+      search: "Avery",
       agencyId: "agency-1",
     });
+  });
+
+  it("builds a shareable filter location and omits empty values", () => {
+    expect(
+      buildComplianceMonitorLocationSearch({
+        scope: { agencyId: "agency-1", agencyName: "Bright Care" },
+        search: " Avery ",
+      }),
+    ).toBe("?agencyId=agency-1&agencyName=Bright+Care&search=Avery");
+
+    expect(
+      buildComplianceMonitorLocationSearch({ scope: null, search: "  " }),
+    ).toBe("");
   });
 });

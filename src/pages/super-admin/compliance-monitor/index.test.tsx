@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 
 import {
@@ -11,6 +11,7 @@ import {
   useSendClientComplianceAlertMutation,
   useSendComplianceAlertMutation,
 } from "./complianceApi";
+import { useListAllAgenciesQuery } from "@/pages/super-admin/agencies/api";
 import ComplianceMonitor from "./index";
 
 const { routerSearch, navigate } = vi.hoisted(() => ({
@@ -42,6 +43,10 @@ vi.mock("./complianceApi", () => ({
   useGetComplianceOthersQuery: vi.fn(),
   useSendClientComplianceAlertMutation: vi.fn(),
   useSendComplianceAlertMutation: vi.fn(),
+}));
+
+vi.mock("@/pages/super-admin/agencies/api", () => ({
+  useListAllAgenciesQuery: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -91,6 +96,18 @@ describe("ComplianceMonitor", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useListAllAgenciesQuery).mockReturnValue({
+      data: {
+        agencies: [
+          { id: "agency-1", name: "Bright Care", status: "active" },
+          { id: "agency-2", name: "Anchor Health", status: "active" },
+          { id: "agency-3", name: "Inactive Care", status: "inactive" },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
     vi.mocked(useGetComplianceDocumentsQuery).mockReturnValue(successResult());
     vi.mocked(useGetComplianceNotesQuery).mockReturnValue(successResult([]));
     vi.mocked(useGetComplianceEvvQuery).mockReturnValue(successResult([]));
@@ -113,6 +130,10 @@ describe("ComplianceMonitor", () => {
       sendClientAlert,
       {},
     ] as never);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   function renderPage(search = "") {
@@ -146,6 +167,94 @@ describe("ComplianceMonitor", () => {
     expect(useGetComplianceNotesQuery).toHaveBeenLastCalledWith(
       { page: 1, limit: 10, agencyId: "agency-1" },
       { skip: true },
+    );
+  });
+
+  it("restores URL filters and applies them to every category query", () => {
+    renderPage(
+      "?agencyId=agency-1&agencyName=Bright+Care&search=Avery",
+    );
+
+    expect(
+      screen.getByRole("searchbox", { name: "Search compliance issues" }),
+    ).toHaveValue("Avery");
+    expect(useListAllAgenciesQuery).toHaveBeenCalledWith({
+      limit: 100,
+      status: "active",
+    });
+    expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+      {
+        page: 1,
+        limit: 10,
+        agencyId: "agency-1",
+        search: "Avery",
+      },
+      { skip: false },
+    );
+  });
+
+  it("debounces issue search and persists it in the URL", () => {
+    vi.useFakeTimers();
+    renderPage();
+
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Search compliance issues" }),
+      { target: { value: " Avery " } },
+    );
+    act(() => vi.advanceTimersByTime(350));
+
+    expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+      { page: 1, limit: 10, search: "Avery" },
+      { skip: false },
+    );
+    expect(navigate).toHaveBeenCalledWith(
+      "/super-admin/compliance-monitor?search=Avery",
+      { replace: true },
+    );
+  });
+
+  it("offers only active agencies and preserves search when one is selected", () => {
+    renderPage("?search=Avery");
+
+    fireEvent.click(screen.getByRole("button", { name: "All agencies" }));
+    expect(
+      screen.getByRole("button", { name: "Bright Care" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Anchor Health" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Inactive Care" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Bright Care" }));
+    expect(navigate).toHaveBeenCalledWith(
+      "/super-admin/compliance-monitor?agencyId=agency-1&agencyName=Bright+Care&search=Avery",
+      { replace: true },
+    );
+  });
+
+  it("clears all filters and retries an unavailable agency selector", () => {
+    const retryAgencies = vi.fn();
+    vi.mocked(useListAllAgenciesQuery).mockReturnValue({
+      isLoading: false,
+      isError: true,
+      refetch: retryAgencies,
+    } as never);
+    renderPage(
+      "?agencyId=agency-1&agencyName=Bright+Care&search=Avery",
+    );
+
+    expect(screen.getByText("Couldn't load agencies.")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry agency filter" }),
+    );
+    expect(retryAgencies).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(navigate).toHaveBeenCalledWith(
+      "/super-admin/compliance-monitor",
+      { replace: true },
     );
   });
 

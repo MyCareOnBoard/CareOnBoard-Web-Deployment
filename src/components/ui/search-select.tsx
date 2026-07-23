@@ -134,7 +134,7 @@ export function SearchSelect({
             const highlightedElement = listRef.current.children[
                 highlightedIndex
                 ] as HTMLElement
-            if (highlightedElement) {
+            if (typeof highlightedElement?.scrollIntoView === "function") {
                 highlightedElement.scrollIntoView({
                     block: "nearest",
                     behavior: "smooth",
@@ -168,6 +168,7 @@ export function SearchSelect({
                     "hover:border-[var(--main-color)] hover:shadow-sm",
                     "focus-visible:border-[var(--main-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--main-color)]/20",
                     "disabled:cursor-not-allowed disabled:opacity-60",
+                    selectedOption && !disabled && "pr-20",
                     isOpen && "border-[var(--main-color)] ring-2 ring-[var(--main-color)]/20",
                     className
                 )}
@@ -198,24 +199,24 @@ export function SearchSelect({
                     </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2">
-                    {selectedOption && !disabled && (
-                        <button
-                            type="button"
-                            onClick={handleClear}
-                            className="rounded p-0.5 hover:bg-[var(--input-border)] focus:outline-none"
-                        >
-                            <X className="h-4 w-4 text-[var(--input-placeholder)]" />
-                        </button>
+                <ChevronDown
+                    className={cn(
+                        "h-5 w-5 shrink-0 text-[var(--input-text)] transition-transform duration-200",
+                        isOpen && "rotate-180"
                     )}
-                    <ChevronDown
-                        className={cn(
-                            "h-5 w-5 text-[var(--input-text)] transition-transform duration-200",
-                            isOpen && "rotate-180"
-                        )}
-                    />
-                </div>
+                />
             </button>
+
+            {selectedOption && !disabled && (
+                <button
+                    type="button"
+                    aria-label={`Clear ${selectedOption.label} selection`}
+                    onClick={handleClear}
+                    className="absolute right-10 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full hover:bg-[var(--input-border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--main-color)]/30"
+                >
+                    <X className="h-4 w-4 text-[var(--input-placeholder)]" />
+                </button>
+            )}
 
             {/* Dropdown */}
             {isOpen && (

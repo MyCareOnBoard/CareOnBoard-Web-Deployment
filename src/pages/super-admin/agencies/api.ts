@@ -167,13 +167,20 @@ export const superAdminApi = createApi({
         };
       },
     }),
-    listAllAgencies: builder.query<ListAgenciesResponse, { limit?: number }>({
-      query: ({limit}) => ({
-        url: `/agencies` + (limit ? `?limit=${limit}` : ""),
+    listAllAgencies: builder.query<
+      ListAgenciesResponse,
+      { limit?: number; status?: Agency["status"] }
+    >({
+      query: ({ limit, status }) => ({
+        url: "/agencies",
         method: "GET",
-        requiresAuth: true
+        params: {
+          ...(limit ? { limit } : {}),
+          ...(status ? { status } : {}),
+        },
+        requiresAuth: true,
       }),
-      providesTags: ['Agencies']
+      providesTags: ["Agencies"],
     }),
     saveDraft: builder.mutation<void, SaveAgencyDraftPayload>({
       query: (data) => ({
