@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { SearchSelect } from "@/components/ui/search-select";
+import { useListAllAgenciesQuery } from "@/pages/super-admin/agencies/api";
 import { Routes } from "@/routes/constants";
 import {
   type ComplianceCategory,
@@ -16,8 +18,10 @@ import {
   useSendComplianceAlertMutation,
 } from "./complianceApi";
 import {
+  buildComplianceMonitorLocationSearch,
   buildScopedComplianceQuery,
   parseComplianceMonitorScope,
+  parseComplianceMonitorTextSearch,
 } from "./complianceMonitorScope";
 import ComplianceIssueRow from "./components/ComplianceIssueRow";
 import {
@@ -60,6 +64,10 @@ const CATEGORY_META: Record<
 const CATEGORIES = Object.keys(CATEGORY_META) as ComplianceCategory[];
 
 export default function ComplianceMonitor() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const agencyScope = parseComplianceMonitorScope(location.search);
+  const urlTextSearch = parseComplianceMonitorTextSearch(location.search);
   const [activeTab, setActiveTab] =
     useState<ComplianceCategory>("documents");
   const [currentPage, setCurrentPage] = useState(1);
@@ -67,12 +75,72 @@ export default function ComplianceMonitor() {
   const [sendingIssueIds, setSendingIssueIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const location = useLocation();
-  const navigate = useNavigate();
-  const agencyScope = parseComplianceMonitorScope(location.search);
+  const [searchInput, setSearchInput] = useState(urlTextSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(urlTextSearch);
+  const agencyQuery = useListAllAgenciesQuery({
+    limit: 100,
+    status: "active",
+  });
+  const agencyOptions = useMemo(() => {
+    const options = (agencyQuery.data?.agencies ?? [])
+      .filter((agency) => agency.status === "active")
+      .map((agency) => ({ value: agency.id, label: agency.name }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+
+    if (
+      agencyScope &&
+      !options.some((option) => option.value === agencyScope.agencyId)
+    ) {
+      options.unshift({
+        value: agencyScope.agencyId,
+        label: agencyScope.agencyName,
+      });
+    }
+
+    return options;
+  }, [
+    agencyQuery.data?.agencies,
+    agencyScope?.agencyId,
+    agencyScope?.agencyName,
+  ]);
+
+  useEffect(() => {
+    setSearchInput(urlTextSearch);
+    setDebouncedSearch(urlTextSearch);
+  }, [urlTextSearch]);
+
+  useEffect(() => {
+    const normalizedSearch = searchInput.trim();
+    if (normalizedSearch === debouncedSearch) return;
+
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(normalizedSearch);
+      setCurrentPage(1);
+      setExpandedIssueId(null);
+      const nextSearch = buildComplianceMonitorLocationSearch({
+        scope: agencyScope,
+        search: normalizedSearch,
+      });
+      if (nextSearch !== location.search) {
+        navigate(`${location.pathname}${nextSearch}`, { replace: true });
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    agencyScope?.agencyId,
+    agencyScope?.agencyName,
+    debouncedSearch,
+    location.pathname,
+    location.search,
+    navigate,
+    searchInput,
+  ]);
+
   const queryParams = buildScopedComplianceQuery(
     { page: currentPage, limit: ITEMS_PER_PAGE },
     agencyScope,
+    debouncedSearch,
   );
 
   const documentsQuery = useGetComplianceDocumentsQuery(queryParams, {
@@ -112,11 +180,50 @@ export default function ComplianceMonitor() {
     setExpandedIssueId(null);
   };
 
+  const navigateWithFilters = (
+    scope: typeof agencyScope,
+    search = searchInput,
+  ) => {
+    const nextSearch = buildComplianceMonitorLocationSearch({ scope, search });
+    navigate(`${location.pathname}${nextSearch}`, { replace: true });
+  };
+
+  const handleAgencyChange = (agencyId: string) => {
+    const selectedAgency = agencyOptions.find(
+      (option) => option.value === agencyId,
+    );
+    const nextScope = selectedAgency
+      ? { agencyId: selectedAgency.value, agencyName: selectedAgency.label }
+      : null;
+
+    setCurrentPage(1);
+    setExpandedIssueId(null);
+    navigateWithFilters(nextScope);
+  };
+
   const clearAgencyScope = () => {
+    setCurrentPage(1);
+    setExpandedIssueId(null);
+    navigateWithFilters(null);
+  };
+
+  const clearSearch = () => {
+    setSearchInput("");
+    setDebouncedSearch("");
+    setCurrentPage(1);
+    setExpandedIssueId(null);
+    navigateWithFilters(agencyScope, "");
+  };
+
+  const clearFilters = () => {
+    setSearchInput("");
+    setDebouncedSearch("");
     setCurrentPage(1);
     setExpandedIssueId(null);
     navigate(location.pathname, { replace: true });
   };
+
+  const hasFilters = Boolean(agencyScope || searchInput.trim());
 
   const handleSendAlert = async (issue: ComplianceIssue) => {
     if (sendingIssueIds.has(issue.id)) return;
@@ -192,31 +299,107 @@ export default function ComplianceMonitor() {
         </p>
       </header>
 
-      {agencyScope && (
-        <section
-          aria-label="Applied agency filter"
-          className="flex flex-col gap-4 rounded-2xl border border-[#99E0E2] bg-[#EDFAFA] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
-        >
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#007F83]">
-              Agency filter applied
-            </p>
-            <p className="mt-1 font-semibold text-[#10141A]">
+      <section
+        aria-label="Compliance filters"
+        className="rounded-2xl border border-[#E6EAEC] bg-white p-4 shadow-sm sm:p-5"
+      >
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.72fr)_auto] lg:items-end">
+          <div className="min-w-0">
+            <label
+              htmlFor="compliance-search"
+              className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[#6B7280]"
+            >
+              Search issues
+            </label>
+            <div className="relative">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#808081]"
+              />
+              <input
+                id="compliance-search"
+                type="search"
+                aria-label="Search compliance issues"
+                value={searchInput}
+                onChange={(event) => {
+                  setSearchInput(event.target.value);
+                  setCurrentPage(1);
+                  setExpandedIssueId(null);
+                }}
+                placeholder="Search by name, email, or agency"
+                className="h-12 w-full rounded-xl border border-[#DCE3E5] bg-[#F8FAFA] py-3 pl-10 pr-11 text-sm text-[#10141A] outline-none transition placeholder:text-[#9AA1A6] focus:border-[#00B4B8] focus:bg-white focus:ring-2 focus:ring-[#00B4B8]/15"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  aria-label="Clear compliance search"
+                  onClick={clearSearch}
+                  className="absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#E8F7F7] hover:text-[#007F83] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00B4B8]"
+                >
+                  <X aria-hidden="true" className="size-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[#6B7280]">
+              Agency
+            </label>
+            <SearchSelect
+              options={agencyOptions}
+              value={agencyScope?.agencyId || ""}
+              onChange={handleAgencyChange}
+              placeholder={
+                agencyQuery.isLoading ? "Loading agencies..." : "All agencies"
+              }
+              searchPlaceholder="Search active agencies"
+              emptyMessage="No active agencies found"
+              disabled={agencyQuery.isLoading || agencyQuery.isError}
+            />
+            {agencyQuery.isError && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#A13D2D]">
+                <span>Couldn't load agencies.</span>
+                <button
+                  type="button"
+                  aria-label="Retry agency filter"
+                  onClick={() => void agencyQuery.refetch()}
+                  className="font-semibold text-[#007F83] underline decoration-[#99E0E2] underline-offset-2"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+          </div>
+
+          {hasFilters && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={clearFilters}
+              className="h-12 w-full border-[#CFE4E5] bg-white text-[#007F83] hover:bg-[#EDFAFA] lg:w-auto"
+            >
+              <X aria-hidden="true" />
+              Clear filters
+            </Button>
+          )}
+        </div>
+
+        {agencyScope && (
+          <div className="mt-4 flex flex-col gap-3 border-t border-[#E6EAEC] pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium text-[#36595A]" aria-live="polite">
               Showing compliance issues for {agencyScope.agencyName}
             </p>
+            <button
+              type="button"
+              onClick={clearAgencyScope}
+              className="w-fit text-sm font-semibold text-[#007F83] underline decoration-[#99E0E2] underline-offset-4"
+            >
+              Clear agency only
+            </button>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={clearAgencyScope}
-            className="h-11 w-full border-[#99E0E2] bg-white text-[#007F83] hover:bg-[#E5F8F8] sm:w-auto"
-          >
-            <X aria-hidden="true" />
-            Clear agency filter
-          </Button>
-        </section>
-      )}
-
+        )}
+      </section>
       <div
         role="tablist"
         aria-label="Compliance issue categories"
