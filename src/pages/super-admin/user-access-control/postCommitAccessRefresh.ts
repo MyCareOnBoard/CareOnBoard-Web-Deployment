@@ -10,7 +10,10 @@ export async function refreshCommittedAccess({
   onFailure,
 }: RefreshCommittedAccessOptions): Promise<boolean> {
   try {
-    await refreshProfile();
+    const profile = await refreshProfile();
+    if (profile == null) {
+      throw new Error("Profile refresh returned no active profile.");
+    }
     resetCaches?.();
     return true;
   } catch (error) {

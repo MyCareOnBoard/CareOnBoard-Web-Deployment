@@ -23,9 +23,8 @@ import Step9Billing from "@/pages/super-admin/agencies/components/StepSix";
 import Step10Subscription from "@/pages/super-admin/agencies/components/StepSeven";
 import {GetDraftAgencyResponse} from "@/pages/super-admin/agencies/apiTypes";
 import {useAuth} from "@/utils/auth";
-import {toast as sonnerToast} from "sonner";
 import {finalizeAgencyCreation} from "./agencyCreationAccessRefresh";
-import {refreshCommittedAccess} from "../user-access-control/postCommitAccessRefresh";
+import {showAgencyAccessRefreshWarning} from "./agencyAccessRefreshToast";
 
 interface AgencyFormData {
     // Step 1: Agency Identity Information
@@ -655,24 +654,6 @@ export default function AddAgencyWizard() {
         }
     };
 
-    function showAgencyAccessRefreshWarning() {
-        sonnerToast.warning("Agency created, but access refresh failed", {
-            description: "The agency was saved. Retry to update which agencies you can access.",
-            duration: Infinity,
-            action: {
-                label: "Retry",
-                onClick: () => void retryCreatedAgencyAccessRefresh(),
-            },
-        });
-    }
-
-    async function retryCreatedAgencyAccessRefresh() {
-        await refreshCommittedAccess({
-            refreshProfile,
-            onFailure: showAgencyAccessRefreshWarning,
-        });
-    }
-
     const handleSubmit = async () => {
         // Validate all steps before submission
         for (let i = 0; i < STEPS.length; i++) {
@@ -740,7 +721,7 @@ export default function AddAgencyWizard() {
                     }),
                     navigate: () => navigate(Routes.superAdmin.agencies),
                     refreshProfile,
-                    onRefreshFailure: showAgencyAccessRefreshWarning,
+                    onRefreshFailure: () => showAgencyAccessRefreshWarning(refreshProfile),
                 });
                 return;
             }

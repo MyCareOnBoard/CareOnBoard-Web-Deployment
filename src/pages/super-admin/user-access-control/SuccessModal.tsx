@@ -26,13 +26,13 @@ export default function SuccessModal({
 }: SuccessModalProps) {
   // Auto-close after 3 seconds
   React.useEffect(() => {
-    if (open && !warning) {
+    if (open && !warning && !isRetrying) {
       const timer = setTimeout(() => {
         onOpenChange(false);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [open, onOpenChange, warning]);
+  }, [isRetrying, open, onOpenChange, warning]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -61,6 +61,11 @@ export default function SuccessModal({
               ? `New user ${userName} has been added successfully.`
               : `User ${userName} has been updated successfully.`}
           </p>
+          {isRetrying && !warning && (
+            <p role="status" className="text-sm font-semibold text-[#087f82]">
+              Refreshing access...
+            </p>
+          )}
           {warning && (
             <div
               role="alert"

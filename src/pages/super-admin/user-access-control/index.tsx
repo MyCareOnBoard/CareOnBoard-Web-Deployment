@@ -120,6 +120,7 @@ export default function UserAccessControlPage() {
   const userRequestRef = useRef(0);
   const configRequestRef = useRef(0);
   const selectedAgencyIdsRef = useRef<string[]>([]);
+  const accessRefreshSessionRef = useRef(0);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -356,18 +357,45 @@ export default function UserAccessControlPage() {
     setIsModalOpen(nextOpen);
   };
 
-  const refreshCurrentAdminAccess = async () => {
-    setIsRetryingAccessRefresh(true);
+  const runCurrentAdminAccessRefresh = async (sessionId: number) => {
     const refreshed = await refreshCommittedAccess({
       refreshProfile,
-      resetCaches: () => resetSuperAdminCaches(dispatch),
-      onFailure: () =>
-        setAccessRefreshWarning(
-          "Your changes were saved, but your access could not be refreshed. Retry before continuing.",
-        ),
     });
-    if (refreshed) setAccessRefreshWarning("");
+    if (sessionId !== accessRefreshSessionRef.current) return;
+    if (refreshed) {
+      resetSuperAdminCaches(dispatch);
+      setAccessRefreshWarning("");
+    } else {
+      setAccessRefreshWarning(
+        "Your changes were saved, but your access could not be refreshed. Retry before continuing.",
+      );
+    }
     setIsRetryingAccessRefresh(false);
+  };
+
+  const startCommittedAccessRefresh = () => {
+    const sessionId = ++accessRefreshSessionRef.current;
+    setAccessRefreshWarning("");
+    setIsRetryingAccessRefresh(true);
+    void runCurrentAdminAccessRefresh(sessionId);
+  };
+
+  const retryCurrentAccessRefresh = () => {
+    if (!isSuccessModalOpen || !accessRefreshWarning || isRetryingAccessRefresh)
+      return;
+    const sessionId = accessRefreshSessionRef.current;
+    setAccessRefreshWarning("");
+    setIsRetryingAccessRefresh(true);
+    void runCurrentAdminAccessRefresh(sessionId);
+  };
+
+  const handleSuccessModalOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      accessRefreshSessionRef.current += 1;
+      setAccessRefreshWarning("");
+      setIsRetryingAccessRefresh(false);
+    }
+    setIsSuccessModalOpen(nextOpen);
   };
 
   const saveUser = async (data: UserAccessFormValue) => {
@@ -385,6 +413,9 @@ export default function UserAccessControlPage() {
           editingUser.uid === user?.uid || editingUser.id === user?.uid;
       }
       await loadUsers();
+      accessRefreshSessionRef.current += 1;
+      setAccessRefreshWarning("");
+      setIsRetryingAccessRefresh(false);
       setSuccessUserName(data.name);
       setIsSuccessModalOpen(true);
     } catch (caught) {
@@ -395,7 +426,7 @@ export default function UserAccessControlPage() {
       setShowErrorDialog(true);
       throw caught;
     }
-    if (refreshSignedInUser) void refreshCurrentAdminAccess();
+    if (refreshSignedInUser) startCommittedAccessRefresh();
   };
 
   const confirmRemove = async () => {
@@ -651,12 +682,12 @@ export default function UserAccessControlPage() {
       />
       <SuccessModal
         open={isSuccessModalOpen}
-        onOpenChange={setIsSuccessModalOpen}
+        onOpenChange={handleSuccessModalOpenChange}
         userName={successUserName}
         mode={modalMode}
         warning={accessRefreshWarning}
         isRetrying={isRetryingAccessRefresh}
-        onRetry={() => void refreshCurrentAdminAccess()}
+        onRetry={retryCurrentAccessRefresh}
       />
       <ErrorDialog
         open={showErrorDialog}

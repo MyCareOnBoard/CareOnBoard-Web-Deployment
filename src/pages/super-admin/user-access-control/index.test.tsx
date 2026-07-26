@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import UserAccessControlPage from "./index";
@@ -465,4 +465,42 @@ describe("UserAccessControlPage", () => {
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
     expect(updateSuperAdminUser).toHaveBeenCalledOnce();
   });
+
+  it("clears an earlier warning for a new committed edit and ignores the old session completion", async () => {
+    vi.mocked(updateSuperAdminUser).mockResolvedValue({} as never);
+    const firstRefresh = deferred<any>();
+    const secondRefresh = deferred<any>();
+    refreshProfile
+      .mockReturnValueOnce(firstRefresh.promise)
+      .mockReturnValueOnce(secondRefresh.promise);
+    const user = userEvent.setup();
+    render(<UserAccessControlPage />);
+    await screen.findByText("Ada Admin");
+
+    await user.click(screen.getByRole("button", { name: "Edit user Ada Admin" }));
+    await user.click(screen.getByRole("button", { name: "Update User" }));
+    expect(await screen.findByText("Refreshing access...")).toBeVisible();
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "User updated" }))
+        .not.toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Edit user Ada Admin" }));
+    await user.click(screen.getByRole("button", { name: "Update User" }));
+    expect(await screen.findByText("Refreshing access...")).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    firstRefresh.reject(new Error("stale refresh failed"));
+    await waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("Refreshing access...")).toBeVisible();
+
+    secondRefresh.resolve({ uid: "u1" });
+    await waitFor(() =>
+      expect(screen.queryByText("Refreshing access...")).not.toBeInTheDocument(),
+    );
+    expect(dispatch).toHaveBeenCalledTimes(10);
+    expect(updateSuperAdminUser).toHaveBeenCalledTimes(2);
+  }, 15000);
 });
