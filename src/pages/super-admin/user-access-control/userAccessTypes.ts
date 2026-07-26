@@ -1,4 +1,4 @@
-import type { RoleTemplateKey } from "@/lib/api/super-admin-users";
+import type { AgencyScopeMode, RoleTemplateKey } from "@/lib/api/super-admin-users";
 
 export interface UserAccessFormValue {
   name: string;
@@ -7,6 +7,8 @@ export interface UserAccessFormValue {
   role: string;
   roleTemplate: RoleTemplateKey;
   accessList: string[];
+  agencyScope: AgencyScopeMode;
+  agencyIds: string[];
 }
 
 export type UserAccessInitialData = UserAccessFormValue;

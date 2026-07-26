@@ -81,6 +81,8 @@ describe("UserAccessModal", () => {
         role: "Compliance Manager",
         roleTemplate: "compliance_manager",
         accessList: ["Compliance Monitor"],
+        agencyScope: "all",
+        agencyIds: [],
       });
     });
   });

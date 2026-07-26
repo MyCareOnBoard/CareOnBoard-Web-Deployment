@@ -15,6 +15,7 @@ import {
   type SuperAdminAccessConfig,
 } from "@/lib/api/super-admin-users";
 import RolePermissionsFields from "./RolePermissionsFields";
+import AgencyScopeField from "./AgencyScopeField";
 import type { UserAccessFormValue } from "./userAccessTypes";
 
 interface UserAccessInitialData {
@@ -24,6 +25,8 @@ interface UserAccessInitialData {
   role?: string;
   roleTemplate?: RoleTemplateKey;
   accessList: string[];
+  agencyScope?: UserAccessFormValue["agencyScope"];
+  agencyIds?: string[];
 }
 
 interface UserAccessModalProps {
@@ -33,6 +36,13 @@ interface UserAccessModalProps {
   config?: SuperAdminAccessConfig;
   initialData?: UserAccessInitialData;
   onSave: (data: UserAccessFormValue) => Promise<void>;
+  agencies?: Array<{ id: string; name: string; status?: string }>;
+  agencySearch?: string;
+  isAgenciesLoading?: boolean;
+  hasMoreAgencies?: boolean;
+  defaultAgencyScope?: Pick<UserAccessFormValue, "agencyScope" | "agencyIds">;
+  onAgencySearchChange?: (search: string) => void;
+  onLoadMoreAgencies?: () => void;
 }
 
 type RoleAccessValue = Pick<
@@ -45,6 +55,7 @@ const EMPTY_ROLE_ACCESS: RoleAccessValue = {
   roleTemplate: "custom",
   accessList: [],
 };
+const DEFAULT_AGENCY_ACCESS = { agencyScope: "all" as const, agencyIds: [] as string[] };
 
 function roleAccessFromInitialData(
   initialData?: UserAccessInitialData,
@@ -79,6 +90,13 @@ export default function UserAccessModal({
   config,
   initialData,
   onSave,
+  agencies = [],
+  agencySearch = "",
+  isAgenciesLoading = false,
+  hasMoreAgencies = false,
+  defaultAgencyScope = DEFAULT_AGENCY_ACCESS,
+  onAgencySearchChange = () => undefined,
+  onLoadMoreAgencies = () => undefined,
 }: UserAccessModalProps) {
   const [name, setName] = useState(initialData?.name || "");
   const [email, setEmail] = useState(initialData?.email || "");
@@ -86,6 +104,10 @@ export default function UserAccessModal({
   const [roleAccess, setRoleAccess] = useState<RoleAccessValue>(() =>
     roleAccessFromInitialData(initialData),
   );
+  const [agencyAccess, setAgencyAccess] = useState(() => ({
+    agencyScope: initialData?.agencyScope || defaultAgencyScope.agencyScope,
+    agencyIds: [...(initialData?.agencyIds || defaultAgencyScope.agencyIds)],
+  }));
   const [resolvedConfig, setResolvedConfig] =
     useState<SuperAdminAccessConfig | null>(config || null);
   const [configError, setConfigError] = useState("");
@@ -147,6 +169,10 @@ export default function UserAccessModal({
           ? normalizeRoleAccess(nextRoleAccess, activeConfig)
           : nextRoleAccess,
       );
+      setAgencyAccess({
+        agencyScope: initialData?.agencyScope || defaultAgencyScope.agencyScope,
+        agencyIds: [...(initialData?.agencyIds || defaultAgencyScope.agencyIds)],
+      });
       setShowPassword(false);
       setIsSaving(saveInFlightRef.current);
 
@@ -156,7 +182,7 @@ export default function UserAccessModal({
     }
 
     previousOpenRef.current = open;
-  }, [config, initialData, open, resolvedConfig]);
+  }, [config, defaultAgencyScope, initialData, open, resolvedConfig]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -191,7 +217,8 @@ export default function UserAccessModal({
     isConfigLoading ||
     !resolvedConfig ||
     roleIsInvalid ||
-    normalizedRoleAccess.accessList.length === 0;
+    normalizedRoleAccess.accessList.length === 0 ||
+    (agencyAccess.agencyScope === "selected" && agencyAccess.agencyIds.length === 0);
 
   const handleSave = async () => {
     if (saveIsDisabled || saveInFlightRef.current) return;
@@ -207,6 +234,8 @@ export default function UserAccessModal({
         role: normalizedRoleAccess.role.trim(),
         roleTemplate: normalizedRoleAccess.roleTemplate,
         accessList: [...normalizedRoleAccess.accessList],
+        agencyScope: agencyAccess.agencyScope,
+        agencyIds: agencyAccess.agencyScope === "all" ? [] : [...new Set(agencyAccess.agencyIds)],
       });
       if (sessionGenerationRef.current === saveSession) {
         onOpenChange(false);
@@ -384,6 +413,24 @@ export default function UserAccessModal({
                   Retry
                 </button>
               </div>
+            )}
+
+            {resolvedConfig && (
+              <>
+                <div className="h-px bg-[#e8ecec]" />
+                <AgencyScopeField
+                  agencies={agencies}
+                  canAssignAllAgencies={resolvedConfig.canAssignAllAgencies}
+                  isLoading={isAgenciesLoading}
+                  hasMore={hasMoreAgencies}
+                  search={agencySearch}
+                  value={agencyAccess}
+                  disabled={isSaving}
+                  onSearchChange={onAgencySearchChange}
+                  onLoadMore={onLoadMoreAgencies}
+                  onChange={setAgencyAccess}
+                />
+              </>
             )}
           </div>
         </div>

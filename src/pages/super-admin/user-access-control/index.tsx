@@ -1,431 +1,187 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Plus, Search, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import UserAccessModal from "./UserAccessModal";
 import SuccessModal from "./SuccessModal";
 import ErrorDialog from "./ErrorDialog";
 import {
-  listSuperAdminUsers,
   createSuperAdminUser,
-  updateSuperAdminUser,
+  getSuperAdminAccessConfig,
+  listAssignableAgencies,
+  listSuperAdminUsers,
   removeSuperAdminUser,
+  updateSuperAdminUser,
+  type SuperAdminAccessConfig,
   type SuperAdminUser,
 } from "@/lib/api/super-admin-users";
+import type { UserAccessFormValue } from "./userAccessTypes";
 
-interface UserAccess {
-  id: string;
-  role: string;
-  name: string;
-  email: string;
-  accessStages: number;
-  password?: string;
-  accessList?: string[];
+type AgencyOption = { id: string; name: string; status?: string };
+const PAGE_SIZE = 10;
+
+function normalizeUser(user: SuperAdminUser): SuperAdminUser {
+  return {
+    ...user,
+    role: user.role || "Super Admin",
+    roleTemplate: user.roleTemplate || "custom",
+    accessList: user.accessList || [],
+    agencyScope: user.agencyScope || "all",
+    agencyIds: user.agencyIds || [],
+  };
+}
+
+function TableSkeleton() {
+  return <div role="status" aria-label="Loading users" className="space-y-3 px-2 py-4">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="grid grid-cols-4 gap-4 rounded-xl border border-[#e4eaea] p-4"><Skeleton className="h-4 w-28" /><Skeleton className="h-4 w-36" /><Skeleton className="h-4 w-24" /><Skeleton className="h-4 w-20 justify-self-end" /></div>)}</div>;
 }
 
 export default function UserAccessControlPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [config, setConfig] = useState<SuperAdminAccessConfig | null>(null);
+  const [users, setUsers] = useState<SuperAdminUser[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 1 });
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [configError, setConfigError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
-  const [editingUser, setEditingUser] = useState<UserAccess | null>(null);
+  const [editingUser, setEditingUser] = useState<SuperAdminUser | null>(null);
+  const [agencies, setAgencies] = useState<AgencyOption[]>([]);
+  const [agencySearch, setAgencySearch] = useState("");
+  const [debouncedAgencySearch, setDebouncedAgencySearch] = useState("");
+  const [agencyCursor, setAgencyCursor] = useState<string | null>(null);
+  const [isAgenciesLoading, setIsAgenciesLoading] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successUserName, setSuccessUserName] = useState("");
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
-  const [userToRemove, setUserToRemove] = useState<UserAccess | null>(null);
-  const [showErrorDialog, setShowErrorDialog] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [errorTitle, setErrorTitle] = useState("Error");
-
-  // API integration
-  const [userAccesses, setUserAccesses] = useState<UserAccess[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [userToRemove, setUserToRemove] = useState<SuperAdminUser | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorTitle, setErrorTitle] = useState("Error");
+  const [errorMessage, setErrorMessage] = useState("");
+  const agencyAbortRef = useRef<AbortController | null>(null);
+  const agencyRequestRef = useRef(0);
+  const hydrationIdsRef = useRef<string[]>([]);
 
-  // Fetch super admins from API
-  const fetchSuperAdmins = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await listSuperAdminUsers({
-        page: 1,
-        limit: 100,
-        isActive: true,
-      });
-
-      const mappedUsers: UserAccess[] = response.data.map((admin) => ({
-        id: admin.id,
-        role: "Administration",
-        name: admin.name,
-        email: admin.email,
-        password: "", // Never store password in state
-        accessStages: admin.accessList.length,
-        accessList: admin.accessList,
-      }));
-
-      setUserAccesses(mappedUsers);
-    } catch (err: any) {
-      console.error("Failed to fetch super admins:", err);
-      setError(err.message || "Failed to load super admin users");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch on component mount
   useEffect(() => {
-    fetchSuperAdmins();
+    const timer = window.setTimeout(() => { setDebouncedSearch(search.trim()); setPage(1); }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedAgencySearch(agencySearch.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [agencySearch]);
+
+  const loadUsers = useCallback(async () => {
+    setIsLoading(true); setError("");
+    try {
+      const response = await listSuperAdminUsers({ page, limit: PAGE_SIZE, search: debouncedSearch, isActive: true });
+      setUsers(response.data.map(normalizeUser));
+      setPagination({ page: response.pagination.page, total: response.pagination.total, totalPages: Math.max(1, response.pagination.totalPages) });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to load user access.");
+    } finally { setIsLoading(false); }
+  }, [debouncedSearch, page]);
+
+  useEffect(() => { void loadUsers(); }, [loadUsers]);
+  const loadConfig = useCallback(async () => {
+    setConfigError("");
+    try { setConfig(await getSuperAdminAccessConfig()); }
+    catch (caught) { setConfigError(caught instanceof Error ? caught.message : "Unable to load access configuration."); }
   }, []);
+  useEffect(() => { void loadConfig(); }, [loadConfig]);
 
-  const filteredAccesses = userAccesses.filter((access) =>
-    access.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    access.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const totalPages = Math.max(1, Math.ceil(filteredAccesses.length / itemsPerPage));
-  const paginatedAccesses = filteredAccesses.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const handleRemoveAccess = (id: string) => {
-    const user = userAccesses.find((u) => u.id === id);
-    if (user) {
-      setUserToRemove(user);
-      setShowRemoveDialog(true);
-    }
+  const mergeAgencies = (current: AgencyOption[], incoming: AgencyOption[], replace: boolean) => {
+    const merged = new Map((replace ? [] : current).map((agency) => [agency.id, agency]));
+    incoming.forEach((agency) => merged.set(agency.id, agency));
+    return Array.from(merged.values());
   };
 
-  const handleConfirmRemove = async () => {
-    if (!userToRemove) return;
-
-    setIsRemoving(true);
-
+  const requestAgencyPage = useCallback(async ({ cursor, ids, append = false }: { cursor?: string; ids?: string[]; append?: boolean } = {}) => {
+    agencyAbortRef.current?.abort();
+    const controller = new AbortController();
+    agencyAbortRef.current = controller;
+    const requestId = ++agencyRequestRef.current;
+    setIsAgenciesLoading(true);
     try {
-      await removeSuperAdminUser(userToRemove.id);
+      const [response, hydration] = await Promise.all([
+        listAssignableAgencies({ search: debouncedAgencySearch, cursor, limit: 50, signal: controller.signal }),
+        ids?.length ? listAssignableAgencies({ ids, limit: 50, signal: controller.signal }) : Promise.resolve(null),
+      ]);
+      if (requestId !== agencyRequestRef.current) return;
+      setAgencies((current) => mergeAgencies(mergeAgencies(current, response.agencies, !append), hydration?.agencies || [], false));
+      setAgencyCursor(response.nextCursor);
+    } catch (caught) {
+      if (controller.signal.aborted) return;
+      setErrorMessage(caught instanceof Error ? caught.message : "Unable to load agencies.");
+      setErrorTitle("Agency list unavailable"); setShowErrorDialog(true);
+    } finally { if (requestId === agencyRequestRef.current) setIsAgenciesLoading(false); }
+  }, [debouncedAgencySearch]);
 
-      // Refresh the list
-      await fetchSuperAdmins();
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const hydrationIds = hydrationIdsRef.current;
+    hydrationIdsRef.current = [];
+    void requestAgencyPage({ ids: hydrationIds });
+    return () => agencyAbortRef.current?.abort();
+  }, [debouncedAgencySearch, isModalOpen, requestAgencyPage]);
 
-      // Close dialog
-      setShowRemoveDialog(false);
-      setUserToRemove(null);
-    } catch (err: any) {
-      console.error("Failed to delete user:", err);
-      setError(err.message || "Failed to delete super admin user");
-      setErrorTitle("Delete Failed");
-      setErrorMessage(err.message || "Failed to delete super admin user");
-      setShowErrorDialog(true);
-    } finally {
-      setIsRemoving(false);
-    }
+  const openCreate = () => { hydrationIdsRef.current = []; setEditingUser(null); setModalMode("create"); setAgencySearch(""); setDebouncedAgencySearch(""); setAgencies([]); setIsModalOpen(true); };
+  const openEdit = (user: SuperAdminUser) => {
+    hydrationIdsRef.current = user.agencyScope === "selected" ? user.agencyIds : [];
+    setEditingUser(user); setModalMode("edit"); setAgencySearch(""); setDebouncedAgencySearch(""); setAgencies([]); setIsModalOpen(true);
   };
 
-  const handleEditUser = (id: string) => {
-    const user = userAccesses.find((u) => u.id === id);
-    if (user) {
-      setEditingUser(user);
-      setModalMode("edit");
-      setIsModalOpen(true);
-    }
-  };
-
-  const handleNewAccess = () => {
-    setEditingUser(null);
-    setModalMode("create");
-    setIsModalOpen(true);
-  };
-
-  const handleSaveUser = async (data: {
-    name: string;
-    email: string;
-    password: string;
-    accessList: string[];
-  }) => {
-    setIsLoading(true);
-
+  const saveUser = async (data: UserAccessFormValue) => {
     try {
-      if (modalMode === "create") {
-        // Create new super admin
-        await createSuperAdminUser({
-          name: data.name,
-          email: data.email,
-          password: data.password,
-          phone: "", // Optional
-          accessList: data.accessList,
-        });
-      } else if (editingUser) {
-        // Update existing super admin
-        const updateData: any = {
-          name: data.name,
-          accessList: data.accessList,
-        };
-
-        // Only include password if it's provided (not empty)
-        if (data.password && data.password.trim() !== "") {
-          updateData.password = data.password;
-        }
-
-        await updateSuperAdminUser(editingUser.id, updateData);
+      if (modalMode === "create") await createSuperAdminUser({ ...data, phone: "" });
+      else if (editingUser) {
+        const { email: _email, password, ...updateData } = data;
+        await updateSuperAdminUser(editingUser.id, { ...updateData, ...(password.trim() ? { password } : {}) });
       }
-
-      // Refresh the list
-      await fetchSuperAdmins();
-
-      // Show success modal
-      setSuccessUserName(data.name);
-      setIsSuccessModalOpen(true);
-    } catch (err: any) {
-      console.error("Failed to save user:", err);
-      setError(err.message || "Failed to save super admin user");
-      setErrorTitle(modalMode === "create" ? "Create Failed" : "Update Failed");
-      setErrorMessage(err.message || "Failed to save super admin user");
-      setShowErrorDialog(true);
-      // Re-throw error to keep modal open
-      throw err;
-    } finally {
-      setIsLoading(false);
+      await loadUsers(); setSuccessUserName(data.name); setIsSuccessModalOpen(true);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Unable to save user.";
+      setErrorTitle(modalMode === "create" ? "Create failed" : "Update failed"); setErrorMessage(message); setShowErrorDialog(true); throw caught;
     }
   };
 
-  // Memoize initialData to prevent unnecessary re-renders that could reset modal state
-  const modalInitialData = useMemo(() => {
-    if (!editingUser) return undefined;
-    return {
-      name: editingUser.name,
-      email: editingUser.email,
-      password: editingUser.password || "",
-      accessList: editingUser.accessList || [],
-    };
-  }, [editingUser]);
+  const confirmRemove = async () => {
+    if (!userToRemove) return;
+    setIsRemoving(true);
+    try { await removeSuperAdminUser(userToRemove.id); await loadUsers(); setShowRemoveDialog(false); setUserToRemove(null); }
+    catch (caught) { setErrorTitle("Delete failed"); setErrorMessage(caught instanceof Error ? caught.message : "Unable to remove user."); setShowErrorDialog(true); }
+    finally { setIsRemoving(false); }
+  };
 
-  return (
-    <div className="min-h-[calc(100vh-200px)]">
-      {/* Page Header */}
-      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.4] text-[#10141a]">
-          User Access Control
-        </h1>
-        <button
-          onClick={handleNewAccess}
-          disabled={isLoading}
-          className="flex items-center gap-[13px] px-[16px] py-[12px] rounded-[60px] bg-[#2b82ff] backdrop-blur-[22px] hover:bg-[#2775e5] transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Plus className="w-5 h-5 text-white" />
-          <span className="text-[14px] font-semibold leading-[1.4] text-white">
-            New Access
-          </span>
-        </button>
+  const modalInitialData = useMemo(() => editingUser ? ({
+    name: editingUser.name, email: editingUser.email, password: "", role: editingUser.role,
+    roleTemplate: editingUser.roleTemplate, accessList: editingUser.accessList,
+    agencyScope: editingUser.agencyScope, agencyIds: editingUser.agencyIds,
+  }) : undefined, [editingUser]);
+  const defaultAgencyScope = useMemo(() => config?.canAssignAllAgencies ? ({ agencyScope: "all" as const, agencyIds: [] }) : ({ agencyScope: "selected" as const, agencyIds: [] }), [config?.canAssignAllAgencies]);
+
+  return <div className="min-h-[calc(100vh-200px)] space-y-6">
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div><p className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#087f82]">Platform administration</p><h1 className="text-[clamp(28px,4vw,40px)] font-bold leading-tight text-[#10141a]">User Access Control</h1><p className="mt-2 max-w-2xl text-[13px] text-[#687173]">Create focused roles and keep every administrator inside the right agency boundary.</p></div>
+      <button onClick={openCreate} disabled={!config || isLoading} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#087f82] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[#066d70] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92] focus-visible:ring-offset-2 disabled:opacity-50"><Plus className="h-4 w-4" />New Access</button>
+    </header>
+
+    <section className="overflow-hidden rounded-[24px] border border-[#dfe6e6] bg-[#fdfefe] shadow-[0_16px_45px_rgba(33,69,70,0.08)]">
+      <div className="flex flex-col gap-4 border-b border-[#e6ecec] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+        <div><h2 className="flex items-center gap-2 text-[18px] font-semibold text-[#10141a]"><ShieldCheck className="h-5 w-5 text-[#087f82]" />Administrator access</h2><p className="mt-1 text-[12px] text-[#687173]">{pagination.total} active account{pagination.total === 1 ? "" : "s"}</p></div>
+        <div className="relative w-full sm:w-[320px]"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#748082]" /><Input aria-label="Search users" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or email" className="h-11 rounded-full border-[#d2dada] bg-[#f6f9f9] pl-10 pr-4 text-[13px] focus-visible:ring-[#008f92]/30" /></div>
       </div>
+      {isLoading ? <TableSkeleton /> : (error || configError) ? <div role="alert" className="p-10 text-center"><p className="text-[13px] font-semibold text-[#9b3e33]">{error || configError}</p><button onClick={() => { void loadUsers(); if (!config) void loadConfig(); }} className="mt-4 rounded-full border border-[#087f82] px-4 py-2 text-[12px] font-semibold text-[#087f82]">Try again</button></div> : users.length === 0 ? <div className="p-12 text-center"><p className="text-[14px] font-semibold text-[#273033]">No administrators found</p><p className="mt-1 text-[12px] text-[#687173]">Try a different search or create a new access level.</p></div> : <div className="overflow-x-auto"><table className="w-full min-w-[820px]"><thead className="bg-[#f5f8f8]"><tr>{["User", "Role", "Permissions", "Agency access", "Actions"].map((label) => <th key={label} className={`px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-[#687173] ${label === "Actions" ? "text-right" : ""}`}>{label}</th>)}</tr></thead><tbody>{users.map((user) => <tr key={user.id} className="border-t border-[#e7eded] transition-colors hover:bg-[#f8fbfb]"><td className="px-5 py-4"><p className="text-[14px] font-semibold text-[#172022]">{user.name}</p><p className="mt-0.5 text-[11px] text-[#687173]">{user.email}</p></td><td className="px-5 py-4 text-[13px] font-medium text-[#273033]">{user.role}</td><td className="px-5 py-4 text-[12px] text-[#566164]">{user.accessList.length} permissions</td><td className="px-5 py-4"><span className="rounded-full bg-[#e8f5f5] px-3 py-1.5 text-[11px] font-semibold text-[#176b6d]">{user.agencyScope === "all" ? "All agencies" : `${user.agencyIds.length} agencies`}</span></td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button aria-label={`Remove user ${user.name}`} onClick={() => { setUserToRemove(user); setShowRemoveDialog(true); }} className="rounded-full border border-[#d59489] px-3 py-2 text-[11px] font-semibold text-[#a33e30] hover:bg-[#fff3f1]">Remove</button><button aria-label={`Edit user ${user.name}`} onClick={() => openEdit(user)} className="rounded-full border border-[#a9b9ba] px-3 py-2 text-[11px] font-semibold text-[#3e4a4c] hover:bg-[#edf4f4]">Edit user</button></div></td></tr>)}</tbody></table></div>}
+      {!isLoading && !error && pagination.totalPages > 0 && <div className="flex items-center justify-center gap-3 border-t border-[#e6ecec] px-5 py-4"><button aria-label="Previous page" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d4dddd] disabled:opacity-35"><ChevronLeft className="h-4 w-4" /></button><span className="text-[12px] font-semibold text-[#273033]">{pagination.page} <span className="font-normal text-[#7a8587]">of {pagination.totalPages}</span></span><button aria-label="Next page" disabled={page >= pagination.totalPages} onClick={() => setPage((value) => Math.min(pagination.totalPages, value + 1))} className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d4dddd] disabled:opacity-35"><ChevronRight className="h-4 w-4" /></button></div>}
+    </section>
 
-      {/* Main Card */}
-      <div className="relative overflow-hidden rounded-[20px] sm:rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
-        <div className="relative p-4 sm:p-[19px]">
-          {/* Section Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-[35px] gap-4">
-            <div className="flex flex-col gap-[4px]">
-              <h2 className="text-[18px] sm:text-[20px] font-medium leading-[1.6] text-[#10141a]">
-                Global Access Given
-              </h2>
-              <p className="text-[14px] font-medium leading-[1.4] text-[#808081] capitalize">
-                These are the list of access given
-              </p>
-            </div>
-
-            {/* Search Bar */}
-            <div className="relative flex items-center gap-[10px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-[60px] pl-[12px] pr-[16px] py-[10px] h-[36px] w-full sm:w-[320px] backdrop-blur overflow-hidden">
-              <Search className="w-5 h-5 text-[#808081] shrink-0" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search"
-                className="h-[20px] border-0 bg-transparent px-0 py-0 text-[12px] font-medium leading-[1.4] text-[#10141a] placeholder:text-[#808081] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
-            </div>
-          </div>
-
-          {/* Loading State */}
-          {isLoading && (
-            <div className="py-12 text-center">
-              <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
-              <p className="mt-4 text-sm text-[#808081]">Loading super admin users...</p>
-            </div>
-          )}
-
-          {/* Error State */}
-          {!isLoading && error && (
-            <div className="py-12 text-center">
-              <p className="text-red-500 mb-4">{error}</p>
-              <button
-                onClick={fetchSuperAdmins}
-                className="px-4 py-2 bg-[#00b4b8] text-white rounded-lg hover:bg-[#009a9e] transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-
-          {/* User Access Table */}
-          {!isLoading && !error && (
-            <div className="overflow-x-auto">
-              {paginatedAccesses.length === 0 ? (
-                <div className="py-12 text-center">
-                  <p className="text-[14px] font-medium text-[#808081]">
-                    No user access found.
-                  </p>
-                </div>
-              ) : (
-                <table className="w-full">
-                  {/* Table Header */}
-                  <thead>
-                    <tr className="border-b border-[rgba(0,0,0,0.05)]">
-                      <th className="text-left px-4 py-3 text-[14px] font-semibold leading-[1.4] text-[#808081]">
-                        Name
-                      </th>
-                      <th className="text-left px-4 py-3 text-[14px] font-semibold leading-[1.4] text-[#808081]">
-                        Email
-                      </th>
-                      <th className="text-left px-4 py-3 text-[14px] font-semibold leading-[1.4] text-[#808081]">
-                        Access
-                      </th>
-                      <th className="text-right px-4 py-3 text-[14px] font-semibold leading-[1.4] text-[#808081]">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-
-                  {/* Table Body */}
-                  <tbody>
-                    {paginatedAccesses.map((access) => (
-                      <tr
-                        key={access.id}
-                        className="border-b border-[rgba(0,0,0,0.05)] hover:bg-white/30 transition-colors"
-                      >
-                        {/* Name */}
-                        <td className="px-4 py-4">
-                          <p className="text-[16px] font-semibold leading-[1.6] text-black">
-                            {access.name}
-                          </p>
-                        </td>
-
-                        {/* Email */}
-                        <td className="px-4 py-4">
-                          <p className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
-                            {access.email}
-                          </p>
-                        </td>
-
-                        {/* Access */}
-                        <td className="px-4 py-4">
-                          <p className="text-[14px] font-medium leading-[1.4] text-black">
-                            {access.accessStages} stages
-                          </p>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-4 py-4">
-                          <div className="flex items-center justify-end gap-2">
-                            {/* Remove Access Button */}
-                            <button
-                              onClick={() => handleRemoveAccess(access.id)}
-                              disabled={isLoading}
-                              className="flex items-center justify-center px-[10px] py-[10px] rounded-[60px] bg-[rgba(175,33,14,0.05)] border-[0.5px] border-[#d53411] hover:bg-[rgba(175,33,14,0.1)] transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <p className="text-[12px] font-semibold leading-[normal] text-[#d53411] text-center">
-                                Remove Access
-                              </p>
-                            </button>
-
-                            {/* Edit User Button */}
-                            <button
-                              onClick={() => handleEditUser(access.id)}
-                              disabled={isLoading}
-                              className="flex items-center justify-center px-[10px] py-[10px] rounded-[60px] bg-[rgba(178,178,179,0.1)] border-[0.5px] border-[#b2b2b3] hover:bg-[rgba(178,178,179,0.2)] transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <p className="text-[12px] font-semibold leading-[normal] text-[#565656] text-center">
-                                Edit User
-                              </p>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {!isLoading && !error && paginatedAccesses.length > 0 && (
-            <div className="mt-6 sm:mt-[30px] flex items-center justify-center gap-2">
-              <span className="text-[14px] sm:text-[16px] font-medium leading-[1.6] text-[#10141a]">
-                {Math.min(currentPage, totalPages)}
-                <span className="text-[12px] sm:text-[14px] text-[#808081]">/{totalPages}</span>
-              </span>
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage <= 1}
-                className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-[145.455px] p-[6px] disabled:opacity-50 hover:bg-white/70 transition-colors cursor-pointer touch-manipulation"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-[#10141a]" />
-              </button>
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages}
-                className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-[145.455px] p-[6px] disabled:opacity-50 hover:bg-white/70 transition-colors cursor-pointer touch-manipulation"
-                aria-label="Next page"
-              >
-                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-[#10141a]" />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* User Access Modal */}
-      <UserAccessModal
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-        mode={modalMode}
-        initialData={modalInitialData}
-        onSave={handleSaveUser}
-      />
-
-      {/* Success Modal */}
-      <SuccessModal
-        open={isSuccessModalOpen}
-        onOpenChange={setIsSuccessModalOpen}
-        userName={successUserName}
-        mode={modalMode}
-      />
-
-      {/* Error Dialog */}
-      <ErrorDialog
-        open={showErrorDialog}
-        onOpenChange={setShowErrorDialog}
-        title={errorTitle}
-        message={errorMessage}
-      />
-
-      {/* Remove Access Confirmation Dialog */}
-      <ConfirmDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
-        <ConfirmDialogContent
-          title="Delete User?"
-          description={`Are you sure you want to permanently delete ${userToRemove?.name || 'this user'}? This will remove their account from Firebase Auth and all data from Firestore. This action cannot be undone.`}
-          confirmText="Yes, Delete Permanently"
-          cancelText="No, Keep It"
-          onConfirm={handleConfirmRemove}
-          onCancel={() => setShowRemoveDialog(false)}
-          isLoading={isRemoving}
-          loadingText="Deleting..."
-        />
-      </ConfirmDialog>
-    </div>
-  );
+    <UserAccessModal open={isModalOpen} onOpenChange={setIsModalOpen} mode={modalMode} config={config || undefined} initialData={modalInitialData} onSave={saveUser} agencies={agencies} agencySearch={agencySearch} isAgenciesLoading={isAgenciesLoading} hasMoreAgencies={Boolean(agencyCursor)} defaultAgencyScope={defaultAgencyScope} onAgencySearchChange={setAgencySearch} onLoadMoreAgencies={() => { if (agencyCursor) void requestAgencyPage({ cursor: agencyCursor, append: true }); }} />
+    <SuccessModal open={isSuccessModalOpen} onOpenChange={setIsSuccessModalOpen} userName={successUserName} mode={modalMode} />
+    <ErrorDialog open={showErrorDialog} onOpenChange={setShowErrorDialog} title={errorTitle} message={errorMessage} />
+    <ConfirmDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}><ConfirmDialogContent title="Delete User?" description={`Are you sure you want to permanently delete ${userToRemove?.name || "this user"}? This action cannot be undone.`} confirmText="Yes, Delete Permanently" cancelText="No, Keep It" onConfirm={confirmRemove} onCancel={() => setShowRemoveDialog(false)} isLoading={isRemoving} loadingText="Deleting..." /></ConfirmDialog>
+  </div>;
 }
