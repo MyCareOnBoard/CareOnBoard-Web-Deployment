@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import DashboardHeader from "./DashboardHeader";
@@ -24,5 +24,23 @@ describe("DashboardHeader", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("Compliance lead")).toBeVisible();
+  });
+
+  it("shows the assigned role in the phone-accessible account menu", () => {
+    render(
+      <MemoryRouter>
+        <DashboardHeader
+          userName="Ada Admin"
+          userRole="Compliance lead"
+          userType={UserType.SUPER_ADMIN}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Account menu for Ada Admin" }),
+    );
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getByText("Ada Admin")).toBeVisible();
+    expect(within(menu).getByText("Compliance lead")).toBeVisible();
   });
 });

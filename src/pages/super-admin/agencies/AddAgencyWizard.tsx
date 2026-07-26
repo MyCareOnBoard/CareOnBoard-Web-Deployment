@@ -23,6 +23,9 @@ import Step9Billing from "@/pages/super-admin/agencies/components/StepSix";
 import Step10Subscription from "@/pages/super-admin/agencies/components/StepSeven";
 import {GetDraftAgencyResponse} from "@/pages/super-admin/agencies/apiTypes";
 import {useAuth} from "@/utils/auth";
+import {toast as sonnerToast} from "sonner";
+import {finalizeAgencyCreation} from "./agencyCreationAccessRefresh";
+import {refreshCommittedAccess} from "../user-access-control/postCommitAccessRefresh";
 
 interface AgencyFormData {
     // Step 1: Agency Identity Information
@@ -652,6 +655,24 @@ export default function AddAgencyWizard() {
         }
     };
 
+    function showAgencyAccessRefreshWarning() {
+        sonnerToast.warning("Agency created, but access refresh failed", {
+            description: "The agency was saved. Retry to update which agencies you can access.",
+            duration: Infinity,
+            action: {
+                label: "Retry",
+                onClick: () => void retryCreatedAgencyAccessRefresh(),
+            },
+        });
+    }
+
+    async function retryCreatedAgencyAccessRefresh() {
+        await refreshCommittedAccess({
+            refreshProfile,
+            onFailure: showAgencyAccessRefreshWarning,
+        });
+    }
+
     const handleSubmit = async () => {
         // Validate all steps before submission
         for (let i = 0; i < STEPS.length; i++) {
@@ -711,13 +732,17 @@ export default function AddAgencyWizard() {
                 });
             } else {
                 await createAgencyWithUser(requestPayload).unwrap();
-                if (user?.profile?.agencyScope === "selected") {
-                    await refreshProfile();
-                }
-                toast({
-                    title: "Success",
-                    description: "Agency created successfully",
+                await finalizeAgencyCreation({
+                    isRestricted: user?.profile?.agencyScope === "selected",
+                    showSuccess: () => toast({
+                        title: "Success",
+                        description: "Agency created successfully",
+                    }),
+                    navigate: () => navigate(Routes.superAdmin.agencies),
+                    refreshProfile,
+                    onRefreshFailure: showAgencyAccessRefreshWarning,
                 });
+                return;
             }
             navigate(Routes.superAdmin.agencies);
         } catch (error: any) {

@@ -409,6 +409,8 @@ describe("UserAccessControlPage", () => {
 
   it("sends the complete edit payload without an empty password", async () => {
     vi.mocked(updateSuperAdminUser).mockResolvedValue({} as never);
+    const pendingRefresh = deferred<any>();
+    refreshProfile.mockReturnValueOnce(pendingRefresh.promise);
     const user = userEvent.setup();
     render(<UserAccessControlPage />);
     await screen.findByText("Ada Admin");
@@ -424,30 +426,43 @@ describe("UserAccessControlPage", () => {
         agencyIds: ["a1", "a2"],
       }),
     );
+    expect(dispatch).not.toHaveBeenCalled();
+    pendingRefresh.resolve({ uid: "u1" });
     await waitFor(() => expect(refreshProfile).toHaveBeenCalledOnce());
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "superAdminApi/invalidateTags",
-      payload: ["Agencies"],
-    });
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "superAdminDashboardApi/invalidateTags",
-      payload: [
-        "SuperAdminStats",
-        "ShiftStats",
-        "AttendanceReport",
-        "NetworkComplianceSummary",
-        "AgencyComplianceRows",
-      ],
-    });
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "complianceApi/invalidateTags",
-      payload: [
-        "ComplianceDocuments",
-        "ComplianceNotes",
-        "ComplianceEvv",
-        "ComplianceOthers",
-        "ComplianceStats",
-      ],
-    });
+    await waitFor(() => expect(dispatch).toHaveBeenCalledTimes(10));
+    expect(dispatch.mock.calls.map(([action]) => action.type)).toEqual([
+      "superAdminApi/resetApiState",
+      "superAdminDashboardApi/resetApiState",
+      "complianceApi/resetApiState",
+      "billingMonitorApi/resetApiState",
+      "clientsApi/resetApiState",
+      "reportsApi/resetApiState",
+      "agencyStaffApi/resetApiState",
+      "userMessagingApi/resetApiState",
+      "billingExpensesApi/resetApiState",
+      "servicesApi/resetApiState",
+    ]);
+  });
+
+  it("commits a self-edit even when profile refresh fails and retries only refresh", async () => {
+    vi.mocked(updateSuperAdminUser).mockResolvedValue({} as never);
+    refreshProfile.mockRejectedValueOnce(new Error("Profile refresh failed"));
+    const user = userEvent.setup();
+    render(<UserAccessControlPage />);
+    await screen.findByText("Ada Admin");
+    await user.click(screen.getByRole("button", { name: "Edit user Ada Admin" }));
+    await user.click(screen.getByRole("button", { name: "Update User" }));
+
+    expect(await screen.findByRole("heading", { name: "User updated" })).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "saved, but your access could not be refreshed",
+    );
+    expect(updateSuperAdminUser).toHaveBeenCalledOnce();
+
+    refreshProfile.mockResolvedValueOnce({ uid: "u1" });
+    await user.click(screen.getByRole("button", { name: "Retry access refresh" }));
+    await waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(updateSuperAdminUser).toHaveBeenCalledOnce();
   });
 });

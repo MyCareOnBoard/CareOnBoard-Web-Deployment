@@ -318,6 +318,14 @@ export default function DashboardHeader(
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[214px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-xl p-0 backdrop-blur-sm">
                 <div className="py-0">
+                  <div className="border-b border-[#dde5e6] px-4 py-3">
+                    <p className="truncate text-sm font-semibold text-[#10141a]">
+                      {userName || "User"}
+                    </p>
+                    <p className="mt-1 truncate text-xs font-medium text-[#687173]">
+                      {userRole || "User"}
+                    </p>
+                  </div>
                   <DropdownMenuItem
                     disabled={userType === UserType.SUPER_ADMIN}
                     className={cn(

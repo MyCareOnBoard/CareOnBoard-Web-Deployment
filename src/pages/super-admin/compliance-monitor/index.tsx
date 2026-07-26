@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SearchSelect } from "@/components/ui/search-select";
 import { useListAllAgenciesQuery } from "@/pages/super-admin/agencies/api";
+import { listAssignableAgencies } from "@/lib/api/super-admin-users";
 import { Routes } from "@/routes/constants";
 import {
   type ComplianceCategory,
@@ -77,40 +78,107 @@ export default function ComplianceMonitor() {
   );
   const [searchInput, setSearchInput] = useState(urlTextSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(urlTextSearch);
+  const [urlAgencyValidation, setUrlAgencyValidation] = useState<{
+    agencyId: string;
+    status: "loading" | "valid" | "missing" | "error";
+    agency?: { value: string; label: string };
+  } | null>(null);
+  const [urlAgencyRetry, setUrlAgencyRetry] = useState(0);
+  const urlAgencyAbortRef = useRef<AbortController | null>(null);
   const agencyQuery = useListAllAgenciesQuery({
     limit: 100,
     status: "active",
   });
-  const agencyOptions = useMemo(() => {
+  const listedAgencyOptions = useMemo(() => {
     return (agencyQuery.data?.agencies ?? [])
       .filter((agency) => agency.status === "active")
       .map((agency) => ({ value: agency.id, label: agency.name }))
       .sort((left, right) => left.label.localeCompare(right.label));
   }, [agencyQuery.data?.agencies]);
-  const agencyScope = useMemo(() => {
-    if (!agencyQuery.data || !requestedAgencyScope) return null;
-    const option = agencyOptions.find(
-      (candidate) => candidate.value === requestedAgencyScope.agencyId,
-    );
-    return option
-      ? { agencyId: option.value, agencyName: option.label }
-      : null;
-  }, [agencyOptions, agencyQuery.data, requestedAgencyScope?.agencyId]);
+  const listedRequestedAgency = requestedAgencyScope
+    ? listedAgencyOptions.find(
+        (candidate) => candidate.value === requestedAgencyScope.agencyId,
+      )
+    : undefined;
 
   useEffect(() => {
-    if (!agencyQuery.data || !requestedAgencyScope || agencyScope) return;
+    if (!agencyQuery.data || !requestedAgencyScope || listedRequestedAgency) {
+      urlAgencyAbortRef.current?.abort();
+      return;
+    }
+    const controller = new AbortController();
+    urlAgencyAbortRef.current?.abort();
+    urlAgencyAbortRef.current = controller;
+    const requestedId = requestedAgencyScope.agencyId;
+    setUrlAgencyValidation({ agencyId: requestedId, status: "loading" });
+    void listAssignableAgencies({
+      ids: [requestedId],
+      limit: 50,
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        const agency = response.agencies.find((item) => item.id === requestedId);
+        setUrlAgencyValidation(
+          agency
+            ? {
+                agencyId: requestedId,
+                status: "valid",
+                agency: { value: agency.id, label: agency.name },
+              }
+            : { agencyId: requestedId, status: "missing" },
+        );
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setUrlAgencyValidation({ agencyId: requestedId, status: "error" });
+      });
+    return () => controller.abort();
+  }, [
+    agencyQuery.data,
+    listedRequestedAgency,
+    requestedAgencyScope?.agencyId,
+    urlAgencyRetry,
+  ]);
+
+  const hydratedRequestedAgency =
+    urlAgencyValidation?.agencyId === requestedAgencyScope?.agencyId &&
+    urlAgencyValidation?.status === "valid"
+      ? urlAgencyValidation.agency
+      : undefined;
+  const validatedRequestedAgency =
+    listedRequestedAgency || hydratedRequestedAgency;
+  const agencyOptions = useMemo(() => {
+    if (!hydratedRequestedAgency) return listedAgencyOptions;
+    return [hydratedRequestedAgency, ...listedAgencyOptions];
+  }, [hydratedRequestedAgency, listedAgencyOptions]);
+  const agencyScope = useMemo(() => {
+    return validatedRequestedAgency
+      ? {
+          agencyId: validatedRequestedAgency.value,
+          agencyName: validatedRequestedAgency.label,
+        }
+      : null;
+  }, [validatedRequestedAgency]);
+
+  useEffect(() => {
+    if (
+      !requestedAgencyScope ||
+      urlAgencyValidation?.agencyId !== requestedAgencyScope.agencyId ||
+      urlAgencyValidation.status !== "missing"
+    )
+      return;
     const nextSearch = buildComplianceMonitorLocationSearch({
       scope: null,
       search: urlTextSearch,
     });
     navigate(`${location.pathname}${nextSearch}`, { replace: true });
   }, [
-    agencyQuery.data,
-    agencyScope,
     location.pathname,
     navigate,
-    requestedAgencyScope,
+    requestedAgencyScope?.agencyId,
     urlTextSearch,
+    urlAgencyValidation,
   ]);
 
   useEffect(() => {
@@ -379,6 +447,20 @@ export default function ComplianceMonitor() {
                 </button>
               </div>
             )}
+            {urlAgencyValidation?.agencyId === requestedAgencyScope?.agencyId &&
+              urlAgencyValidation?.status === "error" && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#A13D2D]">
+                  <span>Couldn't verify the selected agency.</span>
+                  <button
+                    type="button"
+                    aria-label="Retry selected agency validation"
+                    onClick={() => setUrlAgencyRetry((value) => value + 1)}
+                    className="font-semibold text-[#007F83] underline decoration-[#99E0E2] underline-offset-2"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
           </div>
 
           {hasFilters && (

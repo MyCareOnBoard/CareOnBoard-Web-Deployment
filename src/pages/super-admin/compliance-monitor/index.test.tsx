@@ -12,6 +12,7 @@ import {
   useSendComplianceAlertMutation,
 } from "./complianceApi";
 import { useListAllAgenciesQuery } from "@/pages/super-admin/agencies/api";
+import { listAssignableAgencies } from "@/lib/api/super-admin-users";
 import ComplianceMonitor from "./index";
 
 const { routerSearch, navigate } = vi.hoisted(() => ({
@@ -47,6 +48,10 @@ vi.mock("./complianceApi", () => ({
 
 vi.mock("@/pages/super-admin/agencies/api", () => ({
   useListAllAgenciesQuery: vi.fn(),
+}));
+
+vi.mock("@/lib/api/super-admin-users", () => ({
+  listAssignableAgencies: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -108,6 +113,10 @@ describe("ComplianceMonitor", () => {
       isError: false,
       refetch: vi.fn(),
     } as never);
+    vi.mocked(listAssignableAgencies).mockResolvedValue({
+      agencies: [],
+      nextCursor: null,
+    });
     vi.mocked(useGetComplianceDocumentsQuery).mockReturnValue(successResult());
     vi.mocked(useGetComplianceNotesQuery).mockReturnValue(successResult([]));
     vi.mocked(useGetComplianceEvvQuery).mockReturnValue(successResult([]));
@@ -234,12 +243,84 @@ describe("ComplianceMonitor", () => {
     );
   });
 
-  it("ignores URL agencies outside the backend-scoped options", () => {
+  it("clears a URL agency only after authoritative lookup confirms it is unavailable", async () => {
     renderPage("?agencyId=locked-agency&agencyName=Locked+Care");
     fireEvent.click(screen.getByRole("button", { name: "All agencies" }));
     expect(screen.queryByRole("button", { name: "Locked Care" })).not.toBeInTheDocument();
     expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
       { page: 1, limit: 10 }, { skip: false },
+    );
+    await waitFor(() =>
+      expect(listAssignableAgencies).toHaveBeenCalledWith(
+        expect.objectContaining({ ids: ["locked-agency"], limit: 50 }),
+      ),
+    );
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith(
+        "/super-admin/compliance-monitor",
+        { replace: true },
+      ),
+    );
+  });
+
+  it("authorizes a URL agency beyond the first options page without clearing it", async () => {
+    vi.mocked(listAssignableAgencies).mockResolvedValueOnce({
+      agencies: [{ id: "agency-101", name: "Hundred First Care", status: "active" }],
+      nextCursor: null,
+    });
+    renderPage("?agencyId=agency-101&agencyName=Hundred+First+Care");
+
+    expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+      { page: 1, limit: 10 }, { skip: false },
+    );
+    await waitFor(() =>
+      expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+        { page: 1, limit: 10, agencyId: "agency-101" },
+        { skip: false },
+      ),
+    );
+    expect(
+      screen.getByRole("button", { name: "Hundred First Care" }),
+    ).toBeVisible();
+    expect(navigate).not.toHaveBeenCalledWith(
+      "/super-admin/compliance-monitor",
+      { replace: true },
+    );
+  });
+
+  it("keeps an unverified URL agency out of queries and retries validation without clearing it", async () => {
+    vi.mocked(listAssignableAgencies)
+      .mockRejectedValueOnce(new Error("lookup failed"))
+      .mockResolvedValueOnce({
+        agencies: [{ id: "agency-101", name: "Hundred First Care", status: "active" }],
+        nextCursor: null,
+      });
+    renderPage("?agencyId=agency-101&agencyName=Hundred+First+Care");
+
+    await screen.findByText("Couldn't verify the selected agency.");
+    expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+      { page: 1, limit: 10 },
+      { skip: false },
+    );
+    expect(navigate).not.toHaveBeenCalledWith(
+      "/super-admin/compliance-monitor",
+      { replace: true },
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry selected agency validation" }),
+    );
+
+    await waitFor(() =>
+      expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+        { page: 1, limit: 10, agencyId: "agency-101" },
+        { skip: false },
+      ),
+    );
+    expect(listAssignableAgencies).toHaveBeenCalledTimes(2);
+    expect(navigate).not.toHaveBeenCalledWith(
+      "/super-admin/compliance-monitor",
+      { replace: true },
     );
   });
 

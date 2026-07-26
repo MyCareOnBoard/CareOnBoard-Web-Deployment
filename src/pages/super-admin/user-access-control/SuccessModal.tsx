@@ -10,6 +10,9 @@ interface SuccessModalProps {
   onOpenChange: (open: boolean) => void;
   userName: string;
   mode: "create" | "edit";
+  warning?: string;
+  isRetrying?: boolean;
+  onRetry?: () => void;
 }
 
 export default function SuccessModal({
@@ -17,16 +20,19 @@ export default function SuccessModal({
   onOpenChange,
   userName,
   mode,
+  warning,
+  isRetrying = false,
+  onRetry,
 }: SuccessModalProps) {
   // Auto-close after 3 seconds
   React.useEffect(() => {
-    if (open) {
+    if (open && !warning) {
       const timer = setTimeout(() => {
         onOpenChange(false);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, warning]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -55,6 +61,24 @@ export default function SuccessModal({
               ? `New user ${userName} has been added successfully.`
               : `User ${userName} has been updated successfully.`}
           </p>
+          {warning && (
+            <div
+              role="alert"
+              className="w-full rounded-2xl border border-[#f2c27b] bg-[#fff8eb] p-4 text-left"
+            >
+              <p className="text-sm font-semibold leading-5 text-[#8a4b08]">
+                {warning}
+              </p>
+              <button
+                type="button"
+                onClick={onRetry}
+                disabled={isRetrying}
+                className="mt-3 min-h-11 rounded-full bg-[#8a4b08] px-4 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {isRetrying ? "Refreshing access..." : "Retry access refresh"}
+              </button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -34,9 +34,8 @@ import {
 import type { UserAccessFormValue } from "./userAccessTypes";
 import { useAuth } from "@/utils/auth";
 import { useAppDispatch } from "@/store/redux/hooks";
-import { superAdminApi } from "@/pages/super-admin/agencies/api";
-import { superAdminDashboardApi } from "@/pages/super-admin/dashboard/api";
-import { complianceApi } from "@/pages/super-admin/compliance-monitor/complianceApi";
+import { refreshCommittedAccess } from "./postCommitAccessRefresh";
+import { resetSuperAdminCaches } from "./resetSuperAdminCaches";
 
 type AgencyOption = { id: string; name: string; status?: string };
 const PAGE_SIZE = 10;
@@ -106,6 +105,8 @@ export default function UserAccessControlPage() {
   const [pendingHydrationIds, setPendingHydrationIds] = useState<string[]>([]);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successUserName, setSuccessUserName] = useState("");
+  const [accessRefreshWarning, setAccessRefreshWarning] = useState("");
+  const [isRetryingAccessRefresh, setIsRetryingAccessRefresh] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [userToRemove, setUserToRemove] = useState<SuperAdminUser | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
@@ -355,7 +356,22 @@ export default function UserAccessControlPage() {
     setIsModalOpen(nextOpen);
   };
 
+  const refreshCurrentAdminAccess = async () => {
+    setIsRetryingAccessRefresh(true);
+    const refreshed = await refreshCommittedAccess({
+      refreshProfile,
+      resetCaches: () => resetSuperAdminCaches(dispatch),
+      onFailure: () =>
+        setAccessRefreshWarning(
+          "Your changes were saved, but your access could not be refreshed. Retry before continuing.",
+        ),
+    });
+    if (refreshed) setAccessRefreshWarning("");
+    setIsRetryingAccessRefresh(false);
+  };
+
   const saveUser = async (data: UserAccessFormValue) => {
+    let refreshSignedInUser = false;
     try {
       if (modalMode === "create")
         await createSuperAdminUser({ ...data, phone: "" });
@@ -365,28 +381,8 @@ export default function UserAccessControlPage() {
           ...updateData,
           ...(password.trim() ? { password } : {}),
         });
-        if (editingUser.uid === user?.uid || editingUser.id === user?.uid) {
-          await refreshProfile();
-          dispatch(superAdminApi.util.invalidateTags(["Agencies"]));
-          dispatch(
-            superAdminDashboardApi.util.invalidateTags([
-              "SuperAdminStats",
-              "ShiftStats",
-              "AttendanceReport",
-              "NetworkComplianceSummary",
-              "AgencyComplianceRows",
-            ]),
-          );
-          dispatch(
-            complianceApi.util.invalidateTags([
-              "ComplianceDocuments",
-              "ComplianceNotes",
-              "ComplianceEvv",
-              "ComplianceOthers",
-              "ComplianceStats",
-            ]),
-          );
-        }
+        refreshSignedInUser =
+          editingUser.uid === user?.uid || editingUser.id === user?.uid;
       }
       await loadUsers();
       setSuccessUserName(data.name);
@@ -399,6 +395,7 @@ export default function UserAccessControlPage() {
       setShowErrorDialog(true);
       throw caught;
     }
+    if (refreshSignedInUser) void refreshCurrentAdminAccess();
   };
 
   const confirmRemove = async () => {
@@ -657,6 +654,9 @@ export default function UserAccessControlPage() {
         onOpenChange={setIsSuccessModalOpen}
         userName={successUserName}
         mode={modalMode}
+        warning={accessRefreshWarning}
+        isRetrying={isRetryingAccessRefresh}
+        onRetry={() => void refreshCurrentAdminAccess()}
       />
       <ErrorDialog
         open={showErrorDialog}
