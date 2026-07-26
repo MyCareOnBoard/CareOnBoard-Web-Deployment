@@ -15,6 +15,7 @@ const MAX_ATTACHMENTS_PER_MESSAGE = 5;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 interface MessageInputProps {
+  conversationId: string;
   onSend: (
     content: string,
     attachments?: Array<{ type: "image" | "file"; url: string; name?: string }>
@@ -24,6 +25,7 @@ interface MessageInputProps {
 }
 
 export const MessageInput = React.memo(function MessageInput({
+  conversationId,
   onSend,
   disabled = false,
   placeholder = "Type a message...",
@@ -161,7 +163,7 @@ export const MessageInput = React.memo(function MessageInput({
       ]);
 
       try {
-        const result = await uploadAttachment({ file }).unwrap();
+        const result = await uploadAttachment({ conversationId, file }).unwrap();
         setAttachments((prev) =>
           prev.map((att) =>
             att.id === tempId

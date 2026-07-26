@@ -372,16 +372,20 @@ export async function markConversationAsRead(conversationId: string): Promise<Ma
  * Upload file attachment for messaging
  * Maximum file size: 10MB
  * Supported types: images, PDF, Word documents, text files
+ * @param conversationId - Conversation receiving the attachment
  * @param file - File to upload
  * @returns Promise with attachment data
  */
-export async function uploadAttachment(file: File): Promise<UploadResponse> {
+export async function uploadAttachment(
+  conversationId: string,
+  file: File,
+): Promise<UploadResponse> {
   try {
     const formData = new FormData();
     formData.append('file', file);
 
     const response = await axiosClient.post<UploadResponse>(
-      '/superAdminMessaging/upload',
+      `/superAdminMessaging/upload?conversationId=${encodeURIComponent(conversationId)}`,
       formData,
       {
         headers: {

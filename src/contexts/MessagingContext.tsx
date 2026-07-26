@@ -19,7 +19,11 @@ import {
   useMarkMessagesAsReadMutation,
   useLeaveConversationMutation,
   useGetConversationByIdQuery,
+  useGetConversationsQuery,
+  useGetMessagesQuery,
   AgencyContact,
+  UserConversation,
+  UserMessage,
 } from "@/lib/api/userMessaging";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types/user.types";
@@ -61,6 +65,45 @@ interface MessagingProviderProps {
   children: React.ReactNode;
 }
 
+function mapApiConversation(conversation: UserConversation): Conversation {
+  const participants = (conversation.participants || []).map((participant) => ({
+    uid: participant.uid,
+    name: participant.name,
+    role: participant.role,
+    avatar: participant.avatar,
+    userType: participant.userType || participant.role || "user",
+    agencyName: participant.agencyName,
+  }));
+  const lastMessage = typeof conversation.lastMessage === "string"
+    ? conversation.lastMessage
+    : conversation.lastMessage?.text || null;
+
+  return {
+    ...conversation,
+    type: conversation.type || "direct",
+    participants,
+    participantDetails: participants,
+    lastMessage,
+    createdAt: conversation.createdAt || "",
+    updatedAt: conversation.updatedAt || "",
+    createdBy: conversation.createdBy || "",
+  };
+}
+
+function mapApiMessage(message: UserMessage): Message {
+  const readBy = Array.isArray(message.readBy)
+    ? message.readBy
+    : Object.keys(message.readBy || {});
+  return {
+    ...message,
+    content: message.content || message.text || "",
+    readBy,
+    status: "sent",
+    createdAt: message.createdAt || "",
+    updatedAt: message.updatedAt || message.createdAt || "",
+  };
+}
+
 export function MessagingProvider({ children }: MessagingProviderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -71,6 +114,7 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
 
   // RTK Query hooks - skip for unauthenticated users and family members (they use their own messaging API)
   const isFamilyMember = user?.userType === UserType.FAMILY_MEMBER;
+  const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
   const { data: contactsData, refetch: refetchContacts } = useGetContactsQuery(undefined, {
     skip: !user || isFamilyMember,
   });
@@ -78,27 +122,99 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   const [sendMessageMutation] = useSendMessageMutation();
   const [markMessagesAsReadMutation] = useMarkMessagesAsReadMutation();
   const [leaveConversationMutation] = useLeaveConversationMutation();
+  const {
+    data: apiConversationsData,
+    isLoading: apiConversationsLoading,
+    error: apiConversationsError,
+    refetch: refetchConversations,
+  } = useGetConversationsQuery(undefined, {
+    skip: !user || !isSuperAdmin,
+  });
+  const {
+    data: apiConversationData,
+    isLoading: apiConversationLoading,
+    error: apiConversationError,
+    refetch: refetchConversation,
+  } = useGetConversationByIdQuery(selectedConversationId || "", {
+    skip: !user || !isSuperAdmin || !selectedConversationId,
+  });
+  const {
+    data: apiMessagesData,
+    isLoading: apiMessagesLoading,
+    error: apiMessagesError,
+    refetch: refetchMessages,
+  } = useGetMessagesQuery(
+    { conversationId: selectedConversationId || "", limit: 50 },
+    { skip: !user || !isSuperAdmin || !selectedConversationId },
+  );
 
   // Subscribe to conversations list (already checks for user internally)
   const {
-    conversations,
-    loading: conversationsLoading,
-    error: conversationsError,
-  } = useConversations({ limit: 50 });
+    conversations: firestoreConversations,
+    loading: firestoreConversationsLoading,
+    error: firestoreConversationsError,
+  } = useConversations({ limit: 50, skip: isSuperAdmin });
 
   // Subscribe to selected conversation (already checks for user internally)
   const {
-    conversation: currentConversation,
-    loading: conversationLoading,
-    error: conversationError,
-  } = useConversation(selectedConversationId);
+    conversation: firestoreConversation,
+    loading: firestoreConversationLoading,
+    error: firestoreConversationError,
+  } = useConversation(selectedConversationId, { skip: isSuperAdmin });
 
   // Subscribe to messages in selected conversation (already checks for user internally)
   const {
-    messages: currentMessages,
-    loading: messagesLoading,
-    error: messagesError,
-  } = useConversationMessages(selectedConversationId, { limit: 50, reverse: true });
+    messages: firestoreMessages,
+    loading: firestoreMessagesLoading,
+    error: firestoreMessagesError,
+  } = useConversationMessages(selectedConversationId, {
+    limit: 50,
+    reverse: true,
+    skip: isSuperAdmin,
+  });
+
+  const conversations = useMemo(
+    () => isSuperAdmin
+      ? (apiConversationsData?.conversations || apiConversationsData?.data || [])
+        .map(mapApiConversation)
+      : firestoreConversations,
+    [apiConversationsData, firestoreConversations, isSuperAdmin],
+  );
+  const currentConversation = useMemo(
+    () => isSuperAdmin
+      ? (apiConversationData?.conversation || apiConversationData?.data
+        ? mapApiConversation(
+          (apiConversationData.conversation || apiConversationData.data)!,
+        )
+        : null)
+      : firestoreConversation,
+    [apiConversationData, firestoreConversation, isSuperAdmin],
+  );
+  const currentMessages = useMemo(
+    () => isSuperAdmin
+      ? (apiMessagesData?.messages || apiMessagesData?.data || [])
+        .map(mapApiMessage)
+      : firestoreMessages,
+    [apiMessagesData, firestoreMessages, isSuperAdmin],
+  );
+  const conversationsLoading = isSuperAdmin
+    ? apiConversationsLoading
+    : firestoreConversationsLoading;
+  const conversationLoading = isSuperAdmin
+    ? apiConversationLoading
+    : firestoreConversationLoading;
+  const messagesLoading = isSuperAdmin
+    ? apiMessagesLoading
+    : firestoreMessagesLoading;
+  const conversationsError = isSuperAdmin && apiConversationsError
+    ? new Error("Failed to load conversations")
+    : firestoreConversationsError;
+  const conversationError = isSuperAdmin && apiConversationError
+    ? new Error("Failed to load conversation")
+    : firestoreConversationError;
+  const messagesError = isSuperAdmin && apiMessagesError
+    ? new Error("Failed to load messages")
+    : firestoreMessagesError;
 
   // Subscribe to presence for conversation participants
   const participantIds = useMemo(() => {
@@ -171,11 +287,7 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       try {
         const response = await createConversationMutation({ participantIds }).unwrap();
         if (response.success && response.data) {
-          // Map API response to Conversation type
-          const { participants, ...rest } = response.data;
-
-          // Ensure id is present
-          if (!rest.id) {
+          if (!response.data.id) {
             console.error("Conversation created but missing ID:", response.data);
             toast({
               title: "Error",
@@ -185,17 +297,7 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
             return null;
           }
 
-          const mappedConversation: Conversation = {
-            ...rest,
-            id: rest.id,
-            participantDetails: participants?.map(p => ({
-              uid: p.uid,
-              name: p.name,
-              role: p.role,
-              avatar: p.avatar,
-              userType: (p as any).userType || p.role || 'user',
-            })) || [],
-          };
+          const mappedConversation = mapApiConversation(response.data);
           // Select the new conversation
           setSelectedConversationId(mappedConversation.id);
           return mappedConversation;
@@ -285,11 +387,21 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   // Refresh conversation (trigger refetch)
   const refreshConversation = useCallback(
     async (conversationId: string) => {
-      // The Firestore subscription handles real-time updates
-      // This is a no-op since we use real-time subscriptions
-      console.log("Refreshing conversation:", conversationId);
+      if (isSuperAdmin && conversationId === selectedConversationId) {
+        await Promise.all([
+          refetchConversations(),
+          refetchConversation(),
+          refetchMessages(),
+        ]);
+      }
     },
-    []
+    [
+      isSuperAdmin,
+      refetchConversation,
+      refetchConversations,
+      refetchMessages,
+      selectedConversationId,
+    ]
   );
 
   const value: MessagingContextType = useMemo(

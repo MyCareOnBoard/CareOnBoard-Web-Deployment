@@ -79,12 +79,18 @@ interface UseConversationsOptions {
   limit?: number;
   startAfter?: QueryDocumentSnapshot<DocumentData>;
   fields?: string[]; // Fields to select (for optimization)
+  skip?: boolean;
 }
 
 interface UseConversationMessagesOptions {
   limit?: number;
   startAfter?: QueryDocumentSnapshot<DocumentData>;
   reverse?: boolean; // Reverse order for display
+  skip?: boolean;
+}
+
+interface UseConversationOptions {
+  skip?: boolean;
 }
 
 // ==================== Helper Functions ====================
@@ -192,10 +198,10 @@ export function useConversations(
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
-  const { limit: limitCount = 50, fields } = options;
+  const { limit: limitCount = 50, skip = false } = options;
 
   useEffect(() => {
-    if (!user?.uid) {
+    if (skip || !user?.uid) {
       setLoading(false);
       setConversations([]);
       return;
@@ -249,10 +255,10 @@ export function useConversations(
     );
 
     return () => unsubscribe();
-  }, [user?.uid, limitCount]);
+  }, [user?.uid, limitCount, skip]);
 
   const loadMore = useCallback(async () => {
-    if (!user?.uid || !hasMore || !lastDoc) return;
+    if (skip || !user?.uid || !hasMore || !lastDoc) return;
 
     try {
       const conversationsRef = collection(db, "conversations");
@@ -275,7 +281,7 @@ export function useConversations(
     } catch (err) {
       console.error("Error loading more conversations:", err);
     }
-  }, [user?.uid, hasMore, lastDoc, limitCount]);
+  }, [user?.uid, hasMore, lastDoc, limitCount, skip]);
 
   return {
     conversations,
@@ -306,10 +312,10 @@ export function useConversationMessages(
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
-  const { limit: limitCount = 50, reverse = true } = options;
+  const { limit: limitCount = 50, reverse = true, skip = false } = options;
 
   useEffect(() => {
-    if (!conversationId || !user?.uid) {
+    if (skip || !conversationId || !user?.uid) {
       setLoading(false);
       setMessages([]);
       return;
@@ -355,10 +361,10 @@ export function useConversationMessages(
     );
 
     return () => unsubscribe();
-  }, [conversationId, user?.uid, limitCount, reverse]);
+  }, [conversationId, user?.uid, limitCount, reverse, skip]);
 
   const loadMore = useCallback(async () => {
-    if (!conversationId || !user?.uid || !hasMore || !lastDoc) return;
+    if (skip || !conversationId || !user?.uid || !hasMore || !lastDoc) return;
 
     try {
       const messagesRef = collection(db, "conversations", conversationId, "messages");
@@ -384,7 +390,7 @@ export function useConversationMessages(
     } catch (err) {
       console.error("Error loading more messages:", err);
     }
-  }, [conversationId, user?.uid, hasMore, lastDoc, limitCount, reverse]);
+  }, [conversationId, user?.uid, hasMore, lastDoc, limitCount, reverse, skip]);
 
   return {
     messages,
@@ -398,7 +404,10 @@ export function useConversationMessages(
 /**
  * Hook to subscribe to a single conversation's metadata
  */
-export function useConversation(conversationId: string | null): {
+export function useConversation(
+  conversationId: string | null,
+  options: UseConversationOptions = {},
+): {
   conversation: Conversation | null;
   loading: boolean;
   error: Error | null;
@@ -407,9 +416,10 @@ export function useConversation(conversationId: string | null): {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const { skip = false } = options;
 
   useEffect(() => {
-    if (!conversationId || !user?.uid) {
+    if (skip || !conversationId || !user?.uid) {
       setLoading(false);
       setConversation(null);
       return;
@@ -441,7 +451,7 @@ export function useConversation(conversationId: string | null): {
     );
 
     return () => unsubscribe();
-  }, [conversationId, user?.uid]);
+  }, [conversationId, user?.uid, skip]);
 
   return {
     conversation,

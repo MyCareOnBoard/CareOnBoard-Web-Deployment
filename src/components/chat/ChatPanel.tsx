@@ -66,6 +66,7 @@ function ChatPanelComponent({
                     {/* Message Input */}
                     <div className="flex-shrink-0">
                         <MessageInput
+                            conversationId={conversation.id}
                             onSend={onSendMessage}
                             disabled={loading}
                             placeholder="Type a message..."

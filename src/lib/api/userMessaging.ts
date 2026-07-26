@@ -40,6 +40,7 @@ export interface ConversationParticipant {
   agencyName?: string;
   avatar?: string;
   email?: string;
+  userType?: string;
 }
 
 /**
@@ -64,6 +65,7 @@ export interface UserMessage {
   senderRole: string;
   senderAvatar?: string;
   content: string;
+  text?: string;
   attachments?: MessageAttachment[];
   readBy: string[];
   isRead: boolean;
@@ -80,7 +82,7 @@ export interface UserConversation {
   topic?: string;
   participantIds: string[];
   participants: ConversationParticipant[];
-  lastMessage?: string;
+  lastMessage?: string | { text?: string; senderId?: string; timestamp?: string };
   lastMessageAt?: string;
   lastMessageSenderId?: string;
   unreadCount: number;
@@ -122,7 +124,8 @@ export interface MarkAsReadPayload {
  */
 export interface GetConversationsResponse {
   success: boolean;
-  data: UserConversation[];
+  conversations: UserConversation[];
+  data?: UserConversation[];
   count: number;
 }
 
@@ -131,7 +134,8 @@ export interface GetConversationsResponse {
  */
 export interface GetConversationResponse {
   success: boolean;
-  data: UserConversation;
+  conversation?: UserConversation;
+  data?: UserConversation;
 }
 
 /**
@@ -139,7 +143,8 @@ export interface GetConversationResponse {
  */
 export interface GetMessagesResponse {
   success: boolean;
-  data: UserMessage[];
+  messages: UserMessage[];
+  data?: UserMessage[];
   pagination?: {
     page: number;
     limit: number;
@@ -197,6 +202,7 @@ export interface UploadAttachmentResponse {
 }
 
 export interface UploadAttachmentParams {
+  conversationId: string;
   file: File;
 }
 
@@ -313,12 +319,12 @@ export const userMessagingApi = createApi({
 
     // Upload attachment for user messaging
     uploadAttachment: builder.mutation<UploadAttachmentResponse, UploadAttachmentParams>({
-      query: ({ file }) => {
+      query: ({ conversationId, file }) => {
         const formData = new FormData();
         formData.append('file', file);
 
         return {
-          url: `${USER_MESSAGING_BASE}/upload`,
+          url: `${USER_MESSAGING_BASE}/upload?conversationId=${encodeURIComponent(conversationId)}`,
           method: "POST",
           data: formData,
           requiresAuth: true,
