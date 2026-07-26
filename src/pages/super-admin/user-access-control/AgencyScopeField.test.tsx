@@ -45,4 +45,16 @@ describe("AgencyScopeField", () => {
     await userEvent.click(screen.getByRole("button", { name: "Load more agencies" }));
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps prior agency options visible with an inline retryable error", async () => {
+    const onRetry = vi.fn();
+    render(
+      <AgencyScopeField agencies={agencies} canAssignAllAgencies isLoading={false} hasMore={false} search="atlas" value={{ agencyScope: "selected", agencyIds: ["a1"] }} disabled={false} error="Agency search failed" onSearchChange={vi.fn()} onLoadMore={vi.fn()} onRetry={onRetry} onChange={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Choose agencies" }));
+    expect(screen.getByRole("checkbox", { name: "Atlas Care" })).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("Agency search failed");
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
 });

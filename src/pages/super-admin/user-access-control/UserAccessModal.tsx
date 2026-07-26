@@ -40,9 +40,11 @@ interface UserAccessModalProps {
   agencySearch?: string;
   isAgenciesLoading?: boolean;
   hasMoreAgencies?: boolean;
+  agencyError?: string;
   defaultAgencyScope?: Pick<UserAccessFormValue, "agencyScope" | "agencyIds">;
   onAgencySearchChange?: (search: string) => void;
   onLoadMoreAgencies?: () => void;
+  onRetryAgencies?: () => void;
 }
 
 type RoleAccessValue = Pick<
@@ -55,7 +57,10 @@ const EMPTY_ROLE_ACCESS: RoleAccessValue = {
   roleTemplate: "custom",
   accessList: [],
 };
-const DEFAULT_AGENCY_ACCESS = { agencyScope: "all" as const, agencyIds: [] as string[] };
+const DEFAULT_AGENCY_ACCESS = {
+  agencyScope: "all" as const,
+  agencyIds: [] as string[],
+};
 
 function roleAccessFromInitialData(
   initialData?: UserAccessInitialData,
@@ -94,9 +99,11 @@ export default function UserAccessModal({
   agencySearch = "",
   isAgenciesLoading = false,
   hasMoreAgencies = false,
+  agencyError = "",
   defaultAgencyScope = DEFAULT_AGENCY_ACCESS,
   onAgencySearchChange = () => undefined,
   onLoadMoreAgencies = () => undefined,
+  onRetryAgencies = () => undefined,
 }: UserAccessModalProps) {
   const [name, setName] = useState(initialData?.name || "");
   const [email, setEmail] = useState(initialData?.email || "");
@@ -171,7 +178,9 @@ export default function UserAccessModal({
       );
       setAgencyAccess({
         agencyScope: initialData?.agencyScope || defaultAgencyScope.agencyScope,
-        agencyIds: [...(initialData?.agencyIds || defaultAgencyScope.agencyIds)],
+        agencyIds: [
+          ...(initialData?.agencyIds || defaultAgencyScope.agencyIds),
+        ],
       });
       setShowPassword(false);
       setIsSaving(saveInFlightRef.current);
@@ -218,7 +227,8 @@ export default function UserAccessModal({
     !resolvedConfig ||
     roleIsInvalid ||
     normalizedRoleAccess.accessList.length === 0 ||
-    (agencyAccess.agencyScope === "selected" && agencyAccess.agencyIds.length === 0);
+    (agencyAccess.agencyScope === "selected" &&
+      agencyAccess.agencyIds.length === 0);
 
   const handleSave = async () => {
     if (saveIsDisabled || saveInFlightRef.current) return;
@@ -235,7 +245,10 @@ export default function UserAccessModal({
         roleTemplate: normalizedRoleAccess.roleTemplate,
         accessList: [...normalizedRoleAccess.accessList],
         agencyScope: agencyAccess.agencyScope,
-        agencyIds: agencyAccess.agencyScope === "all" ? [] : [...new Set(agencyAccess.agencyIds)],
+        agencyIds:
+          agencyAccess.agencyScope === "all"
+            ? []
+            : [...new Set(agencyAccess.agencyIds)],
       });
       if (sessionGenerationRef.current === saveSession) {
         onOpenChange(false);
@@ -380,7 +393,11 @@ export default function UserAccessModal({
                 onChange={setRoleAccess}
               />
             ) : isConfigLoading ? (
-              <div role="status" className="space-y-3" aria-label="Loading roles">
+              <div
+                role="status"
+                className="space-y-3"
+                aria-label="Loading roles"
+              >
                 <div className="h-4 w-28 animate-pulse rounded bg-[#dfe8e8]" />
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {[0, 1, 2, 3].map((item) => (
@@ -401,7 +418,8 @@ export default function UserAccessModal({
                     Roles could not be loaded
                   </p>
                   <p className="mt-1 text-[12px] leading-5 text-[#8a514a]">
-                    {configError || "Try loading the access configuration again."}
+                    {configError ||
+                      "Try loading the access configuration again."}
                   </p>
                 </div>
                 <button
@@ -426,8 +444,10 @@ export default function UserAccessModal({
                   search={agencySearch}
                   value={agencyAccess}
                   disabled={isSaving}
+                  error={agencyError}
                   onSearchChange={onAgencySearchChange}
                   onLoadMore={onLoadMoreAgencies}
+                  onRetry={onRetryAgencies}
                   onChange={setAgencyAccess}
                 />
               </>
