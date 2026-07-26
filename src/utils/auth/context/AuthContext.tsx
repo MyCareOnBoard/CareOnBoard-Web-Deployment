@@ -20,6 +20,7 @@ import { PageLoader } from "@/components/ui/loader"
 import { auth } from "@/lib/firebase";
 import { reload } from "firebase/auth";
 import { clearAuthCache } from "@/lib/axios";
+import { getUser } from "@/lib/api/users";
 import { clearMfaResolverSession } from "@/utils/auth/services/mfaSessionStore";
 import type { User } from "../types/user.types"
 
@@ -38,6 +39,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>
   createUser: (fullName: string) => Promise<void>
   getToken: (forceRefresh?: boolean) => Promise<string | null>
+  refreshProfile: () => Promise<User | null>
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType)
@@ -211,6 +213,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return await getIdToken(forceRefresh)
   }
 
+  const refreshProfile = async (): Promise<User | null> => {
+    if (!auth.currentUser) return null
+
+    const nextUser = await getUser()
+    setUserState(nextUser)
+    dispatch(setUser(nextUser))
+    return nextUser
+  }
+
   const value = {
     user,
     loading,
@@ -220,6 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetPassword,
     getToken,
     createUser,
+    refreshProfile,
   }
 
   // Show loader while checking auth state

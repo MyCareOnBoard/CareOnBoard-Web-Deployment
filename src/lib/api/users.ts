@@ -91,6 +91,9 @@ export async function getUser(): Promise<User> {
 
     // Extract profile data from backend response
     const profileSource = backendUser.profile || backendUser;
+    const superAdminAccess = backendUser.superAdminAccess
+      || profileSource.superAdminAccess
+      || profileSource;
 
     // Build profile sub-object from available data
     user.profile = {
@@ -110,10 +113,12 @@ export async function getUser(): Promise<User> {
       workAvailability: profileSource.workAvailability,
       tagId: profileSource.tagId,
       supportedClientTypes: profileSource?.supportedClientTypes || [],
-      agencyScope: profileSource.agencyScope,
-      agencyIds: Array.isArray(profileSource.agencyIds)
-        ? [...profileSource.agencyIds]
-        : undefined,
+      agencyScope: superAdminAccess.agencyScope || profileSource.agencyScope,
+      agencyIds: Array.isArray(superAdminAccess.agencyIds)
+        ? [...superAdminAccess.agencyIds]
+        : Array.isArray(profileSource.agencyIds)
+          ? [...profileSource.agencyIds]
+          : undefined,
     };
 
     // Add agency details if user is an employee
@@ -148,10 +153,17 @@ export async function getUser(): Promise<User> {
     if ([UserType.SUPER_ADMIN, UserType.AGENCY_STAFF].includes(user.userType)) {
       user.profile = {
         ...user.profile,
-        accessList: profileSource.accessList,
+        accessList: superAdminAccess.accessList || profileSource.accessList,
+        roleTemplate: superAdminAccess.roleTemplate || profileSource.roleTemplate,
+        agencyScope: superAdminAccess.agencyScope || profileSource.agencyScope,
+        agencyIds: Array.isArray(superAdminAccess.agencyIds)
+          ? [...superAdminAccess.agencyIds]
+          : Array.isArray(profileSource.agencyIds)
+            ? [...profileSource.agencyIds]
+            : undefined,
         // Agency staff HR fields — used to prefill the staff timesheet (role) and
         // shown read-only. Pay rate stays server-authoritative for actual payroll.
-        role: profileSource.role,
+        role: superAdminAccess.role || profileSource.role,
         employmentType: profileSource.employmentType,
         billingType: profileSource.billingType,
         billingRate: profileSource.billingRate,

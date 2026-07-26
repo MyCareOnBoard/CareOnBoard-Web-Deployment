@@ -1,4 +1,17 @@
 import axiosClient from '../axios';
+import type {
+  AgencyScopeMode,
+  AssignableAgenciesPage,
+  RoleTemplateKey,
+  SuperAdminAccessConfig,
+} from "@/utils/auth/types/user.types";
+
+export type {
+  AgencyScopeMode,
+  AssignableAgenciesPage,
+  RoleTemplateKey,
+  SuperAdminAccessConfig,
+} from "@/utils/auth/types/user.types";
 
 /**
  * Available Access Scopes for Super Admins
@@ -28,7 +41,11 @@ export interface SuperAdminUser {
   name: string;
   email: string;
   phone?: string;
+  role: string;
+  roleTemplate: RoleTemplateKey;
   accessList: string[];
+  agencyScope: AgencyScopeMode;
+  agencyIds: string[];
   isActive: boolean;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -43,7 +60,11 @@ export interface CreateSuperAdminRequest {
   email: string;
   password: string;
   phone?: string;
+  role?: string;
+  roleTemplate?: RoleTemplateKey;
   accessList: string[];
+  agencyScope?: AgencyScopeMode;
+  agencyIds?: string[];
 }
 
 /**
@@ -53,12 +74,24 @@ export interface UpdateSuperAdminRequest {
   name?: string;
   phone?: string;
   password?: string;
+  role?: string;
+  roleTemplate?: RoleTemplateKey;
   accessList?: string[];
+  agencyScope?: AgencyScopeMode;
+  agencyIds?: string[];
 }
 
 /**
  * List Super Admin Users Query Parameters
  */
+export interface ListAssignableAgenciesParams {
+  search?: string;
+  cursor?: string;
+  limit?: number;
+  ids?: string[];
+  signal?: AbortSignal;
+}
+
 export interface ListSuperAdminUsersParams {
   page?: number;
   limit?: number;
@@ -90,6 +123,86 @@ export interface SuperAdminUserResponse {
   message?: string;
 }
 
+interface SuperAdminAccessConfigResponse {
+  success: boolean;
+  data?: SuperAdminAccessConfig;
+  message?: string;
+}
+
+interface AssignableAgenciesResponse {
+  success: boolean;
+  data?: AssignableAgenciesPage["agencies"];
+  cursor?: string | null;
+  message?: string;
+}
+
+export async function getSuperAdminAccessConfig(): Promise<SuperAdminAccessConfig> {
+  try {
+    const response = await axiosClient.get<SuperAdminAccessConfigResponse>(
+      "/superAdminUsers/config"
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || "Failed to fetch super admin access config");
+    }
+
+    return response.data.data;
+  } catch (err: any) {
+    console.error("getSuperAdminAccessConfig error:", err);
+    throw new Error(
+      err.response?.data?.error || err.message || "Failed to fetch super admin access config"
+    );
+  }
+}
+
+export async function listAssignableAgencies(
+  params: ListAssignableAgenciesParams = {}
+): Promise<AssignableAgenciesPage> {
+  try {
+    const response = await axiosClient.get<AssignableAgenciesResponse>(
+      "/superAdminUsers/assignable-agencies",
+      {
+        params: {
+          search: params.search,
+          cursor: params.cursor,
+          limit: params.limit || 50,
+          ids: params.ids?.join(","),
+        },
+        signal: params.signal,
+      }
+    );
+
+    if (!response.data.success || !Array.isArray(response.data.data)) {
+      throw new Error(response.data.message || "Failed to fetch assignable agencies");
+    }
+
+    return {
+      agencies: response.data.data,
+      nextCursor: response.data.cursor || null,
+    };
+  } catch (err: any) {
+    console.error("listAssignableAgencies error:", err);
+    throw new Error(
+      err.response?.data?.error || err.message || "Failed to fetch assignable agencies"
+    );
+  }
+}
+function normalizeLegacyScopeFields<T extends {
+  role?: string;
+  roleTemplate?: RoleTemplateKey;
+  agencyScope?: AgencyScopeMode;
+  agencyIds?: string[];
+}>(data: T): T & Required<Pick<CreateSuperAdminRequest,
+  "role" | "roleTemplate" | "agencyScope" | "agencyIds"
+>> {
+  return {
+    ...data,
+    role: data.role || "Super Admin",
+    roleTemplate: data.roleTemplate || "custom",
+    agencyScope: data.agencyScope || "all",
+    agencyIds: data.agencyIds || [],
+  };
+}
 /**
  * Create a new super admin user
  * @param data - Super admin user data
@@ -101,7 +214,7 @@ export async function createSuperAdminUser(
   try {
     const response = await axiosClient.post<SuperAdminUserResponse>(
       "/superAdminUsers/users",
-      data
+      normalizeLegacyScopeFields(data)
     );
 
     if (!response.data.success || !response.data.user) {
@@ -191,7 +304,7 @@ export async function updateSuperAdminUser(
   try {
     const response = await axiosClient.patch<SuperAdminUserResponse>(
       `/superAdminUsers/users/${id}`,
-      data
+      normalizeLegacyScopeFields(data)
     );
 
     if (!response.data.success || !response.data.data) {

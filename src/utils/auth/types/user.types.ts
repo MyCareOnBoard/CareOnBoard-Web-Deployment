@@ -16,6 +16,31 @@ export enum UserType {
   FAMILY_MEMBER = "family_member",
 }
 
+export type AgencyScopeMode = "all" | "selected"
+
+export type RoleTemplateKey =
+  | "platform_administrator"
+  | "agency_operations_manager"
+  | "compliance_manager"
+  | "billing_manager"
+  | "support_specialist"
+  | "custom"
+
+export interface SuperAdminAccessConfig {
+  accessScopes: string[]
+  roleTemplates: Array<{
+    key: RoleTemplateKey
+    label: string
+    accessList: string[]
+  }>
+  canAssignAllAgencies: boolean
+}
+
+export interface AssignableAgenciesPage {
+  agencies: Array<{ id: string; name: string; status?: string }>
+  nextCursor: string | null
+}
+
 export interface EmergencyContact {
   name: string
   relationship: string
@@ -70,7 +95,8 @@ export interface Profile {
   tagId?: string
   // Super Admin specific
   accessList?: string[]  // List of access scopes for super admins
-  agencyScope?: string  // Canonical "all" or "selected" agency authorization mode
+  roleTemplate?: RoleTemplateKey
+  agencyScope?: AgencyScopeMode  // Canonical agency authorization mode
   agencyIds?: string[]  // Canonical selected agency IDs
   supportedClientTypes?: ("ddd" | "hha")[]
   // Agency staff HR fields (surfaced from the agencyStaff doc for the staff timesheet)
