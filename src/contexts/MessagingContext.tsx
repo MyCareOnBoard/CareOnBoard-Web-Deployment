@@ -3,7 +3,7 @@
  * Provides shared messaging state and methods across the application
  */
 
-import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   useConversations,
   useConversationMessages,
@@ -13,7 +13,8 @@ import {
 } from "@/lib/hooks/useMessaging";
 import { useMultiplePresence, usePresenceManager, UserPresence } from "@/lib/hooks/usePresence";
 import {
-  useGetContactsQuery,
+  useLazyGetContactsQuery,
+  useLazyGetConversationsQuery,
   useCreateConversationMutation,
   useSendMessageMutation,
   useMarkMessagesAsReadMutation,
@@ -22,6 +23,11 @@ import {
   useGetConversationsQuery,
   useGetMessagesQuery,
   AgencyContact,
+  CursorPageParams,
+  CursorPagination,
+  GetContactsResponse,
+  GetConversationsResponse,
+  UserConversation,
 } from "@/lib/api/userMessaging";
 import {
   mapRestConversation,
@@ -31,9 +37,24 @@ import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types/user.types";
 import { useToast } from "@/hooks/use-toast";
 
+export interface MessagingListQuery {
+  search?: string;
+  role?: string;
+  /** Client-only identity for local filters that change the visible scope. */
+  scopeKey?: string;
+}
+
+export interface MessagingContinuationState {
+  hasMore: boolean;
+  nextCursor: string | null;
+  isLoadingMore: boolean;
+  error: Error | null;
+}
+
 interface MessagingContextType {
   // State
   conversations: Conversation[];
+  contacts: AgencyContact[];
   currentConversation: Conversation | null;
   currentMessages: Message[];
   presenceMap: Record<string, UserPresence>;
@@ -44,6 +65,9 @@ interface MessagingContextType {
   conversationLoading: boolean;
   /** Loading state for messages in selected conversation */
   messagesLoading: boolean;
+  contactsLoading: boolean;
+  conversationPagination: MessagingContinuationState;
+  contactPagination: MessagingContinuationState;
   error: Error | null;
 
   // Actions
@@ -56,7 +80,10 @@ interface MessagingContextType {
   createConversation: (participantIds: string[]) => Promise<Conversation | null>;
   markAsRead: (conversationId: string, messageIds: string[]) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
-  getContacts: () => Promise<AgencyContact[]>;
+  getContacts: (query?: MessagingListQuery) => Promise<AgencyContact[]>;
+  setConversationQuery: (query?: MessagingListQuery) => void;
+  loadMoreConversations: () => Promise<void>;
+  loadMoreContacts: () => Promise<void>;
   getPresence: (userId: string) => UserPresence | null;
   refreshConversation: (conversationId: string) => Promise<void>;
 }
@@ -68,11 +95,112 @@ interface MessagingProviderProps {
 }
 
 const SUPER_ADMIN_REFRESH_INTERVAL_MS = 15_000;
+const MESSAGING_PAGE_LIMIT = 50;
+
+interface RestConversationListState extends MessagingContinuationState {
+  key: string;
+  items: UserConversation[];
+  continuationLoaded: boolean;
+}
+
+function emptyContinuation(): MessagingContinuationState {
+  return {
+    hasMore: false,
+    nextCursor: null,
+    isLoadingMore: false,
+    error: null,
+  };
+}
+
+function continuationFrom(
+  pagination?: CursorPagination,
+): MessagingContinuationState {
+  return {
+    hasMore: Boolean(pagination?.hasMore),
+    nextCursor: pagination?.nextCursor || null,
+    isLoadingMore: false,
+    error: null,
+  };
+}
+
+function normalizeListQuery(query: MessagingListQuery = {}): MessagingListQuery {
+  const search = query.search?.trim();
+  const role = query.role?.trim();
+  const scopeKey = query.scopeKey?.trim();
+  return {
+    ...(search ? { search } : {}),
+    ...(role ? { role } : {}),
+    ...(scopeKey ? { scopeKey } : {}),
+  };
+}
+
+function listQueryKey(query: MessagingListQuery): string {
+  return JSON.stringify([
+    query.search || "",
+    query.role || "",
+    query.scopeKey || "",
+  ]);
+}
+
+function appendCanonical<T>(
+  current: T[],
+  incoming: T[],
+  getKey: (item: T) => string,
+): T[] {
+  const incomingOrder: string[] = [];
+  const incomingById = new Map<string, T>();
+  for (const item of incoming) {
+    const key = getKey(item);
+    if (!incomingById.has(key)) incomingOrder.push(key);
+    incomingById.set(key, item);
+  }
+  const merged = current.map((item) => incomingById.get(getKey(item)) || item);
+  const existingIds = new Set(current.map(getKey));
+  for (const key of incomingOrder) {
+    if (!existingIds.has(key)) merged.push(incomingById.get(key)!);
+  }
+  return merged;
+}
+
+function refreshCanonicalWindow<T>(
+  current: T[],
+  refreshed: T[],
+  getKey: (item: T) => string,
+): T[] {
+  const canonicalRefreshed = appendCanonical([], refreshed, getKey);
+  const refreshedIds = new Set(canonicalRefreshed.map(getKey));
+  return [
+    ...canonicalRefreshed,
+    ...current.filter((item) => !refreshedIds.has(getKey(item))),
+  ];
+}
+
+function messagingError(error: unknown, fallback: string): Error {
+  if (error instanceof Error) return error;
+  if (error && typeof error === "object") {
+    const candidate = error as {
+      data?: { message?: string; error?: string } | string;
+      error?: string;
+      message?: string;
+    };
+    const dataMessage = typeof candidate.data === "string"
+      ? candidate.data
+      : candidate.data?.message || candidate.data?.error;
+    return new Error(dataMessage || candidate.error || candidate.message || fallback);
+  }
+  return new Error(fallback);
+}
 
 export function MessagingProvider({ children }: MessagingProviderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [conversationQuery, setConversationQueryState] = useState<MessagingListQuery>({});
+  const [contacts, setContacts] = useState<AgencyContact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [contactStateKey, setContactStateKey] = useState("");
+  const [contactPagination, setContactPagination] =
+    useState<MessagingContinuationState>(emptyContinuation);
 
   // Initialize presence manager
   usePresenceManager();
@@ -80,19 +208,55 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   // RTK Query hooks - skip for unauthenticated users and family members (they use their own messaging API)
   const isFamilyMember = user?.userType === UserType.FAMILY_MEMBER;
   const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
-  const { data: contactsData, refetch: refetchContacts } = useGetContactsQuery({ limit: 50 }, {
-    skip: !user || isFamilyMember,
-  });
+  const authScopeKey = useMemo(() => JSON.stringify([
+    user?.uid || "",
+    user?.userType || "",
+    user?.agencyId || "",
+    [...(user?.profile?.accessList || [])].sort(),
+  ]), [
+    user?.agencyId,
+    user?.profile?.accessList,
+    user?.uid,
+    user?.userType,
+  ]);
+  const conversationRequestParams = useMemo<CursorPageParams>(() => ({
+    limit: MESSAGING_PAGE_LIMIT,
+    ...conversationQuery,
+    scopeKey: `${authScopeKey}|${conversationQuery.scopeKey || ""}`,
+  }), [authScopeKey, conversationQuery]);
+  const conversationListKey = useMemo(
+    () => JSON.stringify(conversationRequestParams),
+    [conversationRequestParams],
+  );
+  const [restConversationState, setRestConversationState] =
+    useState<RestConversationListState>(() => ({
+      key: conversationListKey,
+      items: [],
+      continuationLoaded: false,
+      ...emptyContinuation(),
+    }));
+  const conversationListKeyRef = useRef(conversationListKey);
+  conversationListKeyRef.current = conversationListKey;
+  const conversationLoadSequenceRef = useRef(0);
+  const activeConversationLoadRef = useRef<number | null>(null);
+  const contactLoadSequenceRef = useRef(0);
+  const activeContactLoadRef = useRef<number | null>(null);
+  const contactQueryRef = useRef<MessagingListQuery>({});
+  const contactQueryKeyRef = useRef("");
+  const contactRequestIdRef = useRef(0);
+
+  const [fetchConversationContinuation] = useLazyGetConversationsQuery();
+  const [fetchContactPage] = useLazyGetContactsQuery();
   const [createConversationMutation] = useCreateConversationMutation();
   const [sendMessageMutation] = useSendMessageMutation();
   const [markMessagesAsReadMutation] = useMarkMessagesAsReadMutation();
   const [leaveConversationMutation] = useLeaveConversationMutation();
   const {
-    data: apiConversationsData,
+    currentData: apiConversationsData,
     isLoading: apiConversationsLoading,
     error: apiConversationsError,
     refetch: refetchConversations,
-  } = useGetConversationsQuery({ limit: 50 }, {
+  } = useGetConversationsQuery(conversationRequestParams, {
     skip: !user || !isSuperAdmin,
   });
   const {
@@ -113,12 +277,75 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
     { skip: !user || !isSuperAdmin || !selectedConversationId },
   );
 
+  const applyConversationFirstWindow = useCallback((
+    response: GetConversationsResponse,
+    requestKey: string,
+  ) => {
+    if (conversationListKeyRef.current !== requestKey) return;
+    const refreshed = response.conversations || response.data || [];
+    setRestConversationState((current) => {
+      const state = current.key === requestKey
+        ? current
+        : {
+          key: requestKey,
+          items: [],
+          continuationLoaded: false,
+          ...emptyContinuation(),
+        };
+      const firstWindowPagination = continuationFrom(response.pagination);
+      return {
+        ...state,
+        items: refreshCanonicalWindow(
+          state.items,
+          refreshed,
+          (conversation) => conversation.id,
+        ),
+        hasMore: state.continuationLoaded
+          ? state.hasMore
+          : firstWindowPagination.hasMore,
+        nextCursor: state.continuationLoaded
+          ? state.nextCursor
+          : firstWindowPagination.nextCursor,
+        error: null,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    conversationLoadSequenceRef.current += 1;
+    activeConversationLoadRef.current = null;
+    setRestConversationState({
+      key: conversationListKey,
+      items: [],
+      continuationLoaded: false,
+      ...emptyContinuation(),
+    });
+  }, [conversationListKey]);
+
+  useEffect(() => {
+    if (!isSuperAdmin || !apiConversationsData) return;
+    applyConversationFirstWindow(apiConversationsData, conversationListKey);
+  }, [
+    apiConversationsData,
+    applyConversationFirstWindow,
+    conversationListKey,
+    isSuperAdmin,
+  ]);
+
+  const refreshConversationFirstWindow = useCallback(async () => {
+    const requestKey = conversationListKeyRef.current;
+    const result = await refetchConversations() as
+      | { data?: GetConversationsResponse }
+      | undefined;
+    if (result?.data) applyConversationFirstWindow(result.data, requestKey);
+  }, [applyConversationFirstWindow, refetchConversations]);
+
   useEffect(() => {
     if (!user || !isSuperAdmin) return;
 
     const refresh = () => {
       if (document.visibilityState === "hidden") return;
-      void refetchConversations();
+      void refreshConversationFirstWindow();
       if (selectedConversationId) {
         void refetchConversation();
         void refetchMessages();
@@ -139,8 +366,8 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   }, [
     isSuperAdmin,
     refetchConversation,
-    refetchConversations,
     refetchMessages,
+    refreshConversationFirstWindow,
     selectedConversationId,
     user,
   ]);
@@ -150,6 +377,8 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
     conversations: firestoreConversations,
     loading: firestoreConversationsLoading,
     error: firestoreConversationsError,
+    hasMore: firestoreConversationsHasMore,
+    loadMore: loadMoreFirestoreConversations,
   } = useConversations({ limit: 50, skip: isSuperAdmin });
 
   // Subscribe to selected conversation (already checks for user internally)
@@ -170,12 +399,29 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
     skip: isSuperAdmin,
   });
 
+  const restConversationStateIsCurrent =
+    restConversationState.key === conversationListKey;
+  const contactStateIsCurrent =
+    contactStateKey.startsWith(`${authScopeKey}|`);
+  const visibleContacts = contactStateIsCurrent ? contacts : [];
+  const visibleContactPagination = contactStateIsCurrent
+    ? contactPagination
+    : emptyContinuation();
+  const visibleContactsLoading = contactStateIsCurrent
+    ? contactsLoading
+    : false;
   const conversations = useMemo(
     () => isSuperAdmin
-      ? (apiConversationsData?.conversations || apiConversationsData?.data || [])
-        .map(mapRestConversation)
+      ? (restConversationStateIsCurrent
+        ? restConversationState.items.map(mapRestConversation)
+        : [])
       : firestoreConversations,
-    [apiConversationsData, firestoreConversations, isSuperAdmin],
+    [
+      firestoreConversations,
+      isSuperAdmin,
+      restConversationState.items,
+      restConversationStateIsCurrent,
+    ],
   );
   const currentConversation = useMemo(
     () => isSuperAdmin
@@ -212,6 +458,40 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   const messagesError = isSuperAdmin && apiMessagesError
     ? new Error("Failed to load messages")
     : firestoreMessagesError;
+  const conversationPagination = useMemo<MessagingContinuationState>(() =>
+    isSuperAdmin
+      ? (restConversationStateIsCurrent ? {
+        hasMore: restConversationState.hasMore,
+        nextCursor: restConversationState.nextCursor,
+        isLoadingMore: restConversationState.isLoadingMore,
+        error: restConversationState.error,
+      } : emptyContinuation())
+      : {
+        hasMore: firestoreConversationsHasMore,
+        nextCursor: null,
+        isLoadingMore: restConversationState.isLoadingMore,
+        error: restConversationState.error,
+      }, [
+    firestoreConversationsHasMore,
+    isSuperAdmin,
+    restConversationState.error,
+    restConversationState.hasMore,
+    restConversationState.isLoadingMore,
+    restConversationState.nextCursor,
+    restConversationStateIsCurrent,
+  ]);
+
+  useEffect(() => {
+    contactRequestIdRef.current += 1;
+    contactLoadSequenceRef.current += 1;
+    activeContactLoadRef.current = null;
+    contactQueryRef.current = {};
+    contactQueryKeyRef.current = "";
+    setContactStateKey("");
+    setContacts([]);
+    setContactsLoading(false);
+    setContactPagination(emptyContinuation());
+  }, [authScopeKey]);
 
   // Subscribe to presence for conversation participants
   const participantIds = useMemo(() => {
@@ -223,12 +503,131 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
 
   // Combined loading state
   const loading = conversationsLoading || conversationLoading || messagesLoading;
-  const error = conversationsError || conversationError || messagesError;
+  const error = conversationsError || conversationError || messagesError ||
+    conversationPagination.error || visibleContactPagination.error;
 
   // Select conversation
   const selectConversation = useCallback((conversationId: string | null) => {
     setSelectedConversationId(conversationId);
   }, []);
+
+  const setConversationQuery = useCallback((query: MessagingListQuery = {}) => {
+    const normalized = normalizeListQuery(query);
+    setConversationQueryState((current) =>
+      listQueryKey(current) === listQueryKey(normalized) ? current : normalized);
+  }, []);
+
+  const loadMoreConversations = useCallback(async () => {
+    if (activeConversationLoadRef.current !== null) return;
+
+    if (!isSuperAdmin) {
+      if (!firestoreConversationsHasMore) return;
+      const requestKey = conversationListKeyRef.current;
+      const loadId = conversationLoadSequenceRef.current + 1;
+      conversationLoadSequenceRef.current = loadId;
+      activeConversationLoadRef.current = loadId;
+      setRestConversationState((current) => ({
+        ...current,
+        isLoadingMore: true,
+        error: null,
+      }));
+      try {
+        await loadMoreFirestoreConversations();
+      } catch (caught) {
+        if (conversationListKeyRef.current !== requestKey) return;
+        const loadError = messagingError(caught, "Failed to load more conversations");
+        setRestConversationState((current) => ({ ...current, error: loadError }));
+        toast({
+          title: "Error",
+          description: loadError.message,
+          variant: "destructive",
+        });
+      } finally {
+        if (activeConversationLoadRef.current === loadId) {
+          activeConversationLoadRef.current = null;
+          if (conversationListKeyRef.current === requestKey) {
+            setRestConversationState((current) => ({
+              ...current,
+              isLoadingMore: false,
+            }));
+          }
+        }
+      }
+      return;
+    }
+
+    const requestKey = restConversationState.key;
+    const cursor = restConversationState.nextCursor;
+    if (
+      requestKey !== conversationListKeyRef.current ||
+      !restConversationState.hasMore ||
+      !cursor
+    ) {
+      return;
+    }
+
+    const loadId = conversationLoadSequenceRef.current + 1;
+    conversationLoadSequenceRef.current = loadId;
+    activeConversationLoadRef.current = loadId;
+    setRestConversationState((current) => ({
+      ...current,
+      isLoadingMore: true,
+      error: null,
+    }));
+    try {
+      const response = await fetchConversationContinuation({
+        ...conversationRequestParams,
+        cursor,
+      }, false).unwrap() as GetConversationsResponse;
+      if (conversationListKeyRef.current !== requestKey) return;
+      const incoming = response.conversations || response.data || [];
+      const next = continuationFrom(response.pagination);
+      setRestConversationState((current) => current.key === requestKey
+        ? {
+          ...current,
+          items: appendCanonical(
+            current.items,
+            incoming,
+            (conversation) => conversation.id,
+          ),
+          continuationLoaded: true,
+          hasMore: next.hasMore,
+          nextCursor: next.nextCursor,
+          error: null,
+        }
+        : current);
+    } catch (caught) {
+      if (conversationListKeyRef.current !== requestKey) return;
+      const loadError = messagingError(caught, "Failed to load more conversations");
+      setRestConversationState((current) => current.key === requestKey
+        ? { ...current, error: loadError }
+        : current);
+      toast({
+        title: "Error",
+        description: loadError.message,
+        variant: "destructive",
+      });
+    } finally {
+      if (activeConversationLoadRef.current === loadId) {
+        activeConversationLoadRef.current = null;
+        if (conversationListKeyRef.current === requestKey) {
+          setRestConversationState((current) => current.key === requestKey
+            ? { ...current, isLoadingMore: false }
+            : current);
+        }
+      }
+    }
+  }, [
+    conversationRequestParams,
+    fetchConversationContinuation,
+    firestoreConversationsHasMore,
+    isSuperAdmin,
+    loadMoreFirestoreConversations,
+    restConversationState.hasMore,
+    restConversationState.key,
+    restConversationState.nextCursor,
+    toast,
+  ]);
 
   // Send message
   const sendMessage = useCallback(
@@ -337,6 +736,12 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
     async (conversationId: string) => {
       try {
         await leaveConversationMutation(conversationId).unwrap();
+        if (isSuperAdmin) {
+          setRestConversationState((current) => ({
+            ...current,
+            items: current.items.filter((item) => item.id !== conversationId),
+          }));
+        }
         if (selectedConversationId === conversationId) {
           setSelectedConversationId(null);
         }
@@ -354,24 +759,156 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
         throw error;
       }
     },
-    [leaveConversationMutation, selectedConversationId, toast]
+    [isSuperAdmin, leaveConversationMutation, selectedConversationId, toast]
   );
 
-  // Get contacts
-  const getContacts = useCallback(async (): Promise<AgencyContact[]> => {
+  // Get the first contact window. A different search/filter scope invalidates
+  // the old cursor before the new request starts.
+  const getContacts = useCallback(async (
+    query: MessagingListQuery = {},
+  ): Promise<AgencyContact[]> => {
+    if (!user || isFamilyMember) return [];
+
+    const normalized = normalizeListQuery(query);
+    const requestKey = `${authScopeKey}|${listQueryKey(normalized)}`;
+    const requestId = contactRequestIdRef.current + 1;
+    contactRequestIdRef.current = requestId;
+    contactLoadSequenceRef.current += 1;
+    activeContactLoadRef.current = null;
+    contactQueryRef.current = normalized;
+    contactQueryKeyRef.current = requestKey;
+    setContactStateKey(requestKey);
+    setContacts([]);
+    setContactsLoading(true);
+    setContactPagination(emptyContinuation());
+
     try {
-      const result = await refetchContacts();
-      return result.data?.data || [];
-    } catch (error: any) {
-      console.error("Error fetching contacts:", error);
+      const response = await fetchContactPage({
+        limit: MESSAGING_PAGE_LIMIT,
+        ...normalized,
+        scopeKey: `${authScopeKey}|${normalized.scopeKey || ""}`,
+      }, false).unwrap() as GetContactsResponse;
+      if (
+        contactRequestIdRef.current !== requestId ||
+        contactQueryKeyRef.current !== requestKey
+      ) {
+        return [];
+      }
+      const nextContacts = response.data || [];
+      setContacts(appendCanonical(
+        [],
+        nextContacts,
+        (contact) => contact.uid || contact.id,
+      ));
+      setContactPagination(continuationFrom(response.pagination));
+      return nextContacts;
+    } catch (caught) {
+      if (
+        contactRequestIdRef.current !== requestId ||
+        contactQueryKeyRef.current !== requestKey
+      ) {
+        return [];
+      }
+      const loadError = messagingError(caught, "Failed to load contacts");
+      console.error("Error fetching contacts:", caught);
+      setContactPagination({ ...emptyContinuation(), error: loadError });
       toast({
         title: "Error",
-        description: error.message || "Failed to load contacts",
+        description: loadError.message,
         variant: "destructive",
       });
       return [];
+    } finally {
+      if (
+        contactRequestIdRef.current === requestId &&
+        contactQueryKeyRef.current === requestKey
+      ) {
+        setContactsLoading(false);
+      }
     }
-  }, [refetchContacts, toast]);
+  }, [authScopeKey, fetchContactPage, isFamilyMember, toast, user]);
+
+  const loadMoreContacts = useCallback(async () => {
+    const cursor = contactPagination.nextCursor;
+    const requestKey = contactQueryKeyRef.current;
+    if (
+      activeContactLoadRef.current !== null ||
+      !contactPagination.hasMore ||
+      !cursor ||
+      !requestKey ||
+      !user ||
+      isFamilyMember
+    ) {
+      return;
+    }
+
+    const query = contactQueryRef.current;
+    const requestId = contactRequestIdRef.current;
+    const loadId = contactLoadSequenceRef.current + 1;
+    contactLoadSequenceRef.current = loadId;
+    activeContactLoadRef.current = loadId;
+    setContactPagination((current) => ({
+      ...current,
+      isLoadingMore: true,
+      error: null,
+    }));
+    try {
+      const response = await fetchContactPage({
+        limit: MESSAGING_PAGE_LIMIT,
+        ...query,
+        cursor,
+        scopeKey: `${authScopeKey}|${query.scopeKey || ""}`,
+      }, false).unwrap() as GetContactsResponse;
+      if (
+        contactRequestIdRef.current !== requestId ||
+        contactQueryKeyRef.current !== requestKey
+      ) {
+        return;
+      }
+      const next = continuationFrom(response.pagination);
+      setContacts((current) => appendCanonical(
+        current,
+        response.data || [],
+        (contact) => contact.uid || contact.id,
+      ));
+      setContactPagination(next);
+    } catch (caught) {
+      if (
+        contactRequestIdRef.current !== requestId ||
+        contactQueryKeyRef.current !== requestKey
+      ) {
+        return;
+      }
+      const loadError = messagingError(caught, "Failed to load more contacts");
+      setContactPagination((current) => ({ ...current, error: loadError }));
+      toast({
+        title: "Error",
+        description: loadError.message,
+        variant: "destructive",
+      });
+    } finally {
+      if (activeContactLoadRef.current === loadId) {
+        activeContactLoadRef.current = null;
+        if (
+          contactRequestIdRef.current === requestId &&
+          contactQueryKeyRef.current === requestKey
+        ) {
+          setContactPagination((current) => ({
+            ...current,
+            isLoadingMore: false,
+          }));
+        }
+      }
+    }
+  }, [
+    authScopeKey,
+    contactPagination.hasMore,
+    contactPagination.nextCursor,
+    fetchContactPage,
+    isFamilyMember,
+    toast,
+    user,
+  ]);
 
   // Get presence for a user
   const getPresence = useCallback(
@@ -386,7 +923,7 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
     async (conversationId: string) => {
       if (isSuperAdmin && conversationId === selectedConversationId) {
         await Promise.all([
-          refetchConversations(),
+          refreshConversationFirstWindow(),
           refetchConversation(),
           refetchMessages(),
         ]);
@@ -395,8 +932,8 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
     [
       isSuperAdmin,
       refetchConversation,
-      refetchConversations,
       refetchMessages,
+      refreshConversationFirstWindow,
       selectedConversationId,
     ]
   );
@@ -404,6 +941,7 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   const value: MessagingContextType = useMemo(
     () => ({
       conversations,
+      contacts: visibleContacts,
       currentConversation,
       currentMessages,
       presenceMap,
@@ -411,6 +949,9 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       conversationsLoading,
       conversationLoading,
       messagesLoading,
+      contactsLoading: visibleContactsLoading,
+      conversationPagination,
+      contactPagination: visibleContactPagination,
       error,
       selectConversation,
       sendMessage,
@@ -418,11 +959,15 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       markAsRead,
       deleteConversation,
       getContacts,
+      setConversationQuery,
+      loadMoreConversations,
+      loadMoreContacts,
       getPresence,
       refreshConversation,
     }),
     [
       conversations,
+      visibleContacts,
       currentConversation,
       currentMessages,
       presenceMap,
@@ -430,6 +975,9 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       conversationsLoading,
       conversationLoading,
       messagesLoading,
+      visibleContactsLoading,
+      conversationPagination,
+      visibleContactPagination,
       error,
       selectConversation,
       sendMessage,
@@ -437,6 +985,9 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
       markAsRead,
       deleteConversation,
       getContacts,
+      setConversationQuery,
+      loadMoreConversations,
+      loadMoreContacts,
       getPresence,
       refreshConversation,
     ]

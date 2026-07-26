@@ -166,13 +166,17 @@ describe("messaging upload contracts", () => {
     });
 
     const result = await store.dispatch(
-      userMessagingApi.endpoints.getContacts.initiate({ limit: 1 }),
+      userMessagingApi.endpoints.getContacts.initiate({
+        limit: 1,
+        search: "Late",
+        scopeKey: "staff-scope",
+      }),
     ).unwrap();
 
     expect(result.data.map((contact) => contact.uid)).toEqual(["late-contact"]);
     expect(baseQuery).toHaveBeenCalledTimes(2);
     expect((baseQuery.mock.calls[1]![0] as { url: string }).url).toBe(
-      "/userMessaging/contacts?limit=1&cursor=contact-cursor",
+      "/userMessaging/contacts?limit=1&cursor=contact-cursor&search=Late",
     );
   });
 

@@ -178,6 +178,13 @@ export interface CursorPagination {
 export interface CursorPageParams {
   limit?: number;
   cursor?: string;
+  search?: string;
+  role?: string;
+  /**
+   * Client-only cache partition for the authenticated authorization/UI scope.
+   * This is intentionally not sent to the API.
+   */
+  scopeKey?: string;
 }
 
 const MAX_CURSOR_REQUESTS = 2;
@@ -257,6 +264,8 @@ export const userMessagingApi = createApi({
             limit: String(requestedLimit - conversationsById.size),
           });
           if (cursor) queryParams.set("cursor", cursor);
+          if (params?.search) queryParams.set("search", params.search);
+          if (params?.role) queryParams.set("role", params.role);
           const result = await baseQuery({
             url: `${USER_MESSAGING_BASE}?${queryParams.toString()}`,
             method: "GET",
@@ -329,6 +338,8 @@ export const userMessagingApi = createApi({
             limit: String(requestedLimit - contactsById.size),
           });
           if (cursor) queryParams.set("cursor", cursor);
+          if (params?.search) queryParams.set("search", params.search);
+          if (params?.role) queryParams.set("role", params.role);
           const result = await baseQuery({
             url: `${USER_MESSAGING_BASE}/contacts?${queryParams.toString()}`,
             method: "GET",
@@ -470,8 +481,10 @@ export const userMessagingApi = createApi({
 // Export RTK Query hooks
 export const {
   useGetConversationsQuery,
+  useLazyGetConversationsQuery,
   useGetConversationByIdQuery,
   useGetContactsQuery,
+  useLazyGetContactsQuery,
   useGetMessagesQuery,
   useCreateConversationMutation,
   useSendMessageMutation,

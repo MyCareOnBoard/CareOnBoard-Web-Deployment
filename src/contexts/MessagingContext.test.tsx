@@ -27,6 +27,11 @@ const mocks = vi.hoisted(() => ({
     error: null,
     refetch: vi.fn(),
   })),
+  conversationListData: {
+    success: true,
+    conversations: [],
+    count: 0,
+  },
   getConversation: vi.fn(() => ({
     data: undefined,
     isLoading: false,
@@ -42,7 +47,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 mocks.getConversations.mockImplementation(() => ({
-  data: { success: true, conversations: [], count: 0 },
+  data: mocks.conversationListData,
+  currentData: mocks.conversationListData,
   isLoading: false,
   error: null,
   refetch: mocks.refetchConversations,
@@ -77,6 +83,8 @@ vi.mock("@/hooks/use-toast", () => ({
 }));
 vi.mock("@/lib/api/userMessaging", () => ({
   useGetContactsQuery: () => ({ data: { data: [] }, refetch: vi.fn() }),
+  useLazyGetContactsQuery: () => [vi.fn()],
+  useLazyGetConversationsQuery: () => [vi.fn()],
   useCreateConversationMutation: () => [vi.fn()],
   useSendMessageMutation: () => [vi.fn()],
   useMarkMessagesAsReadMutation: () => [vi.fn()],
@@ -91,6 +99,13 @@ import { MessagingProvider, useMessaging } from "./MessagingContext";
 describe("MessagingProvider super-admin reads", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getConversations.mockImplementation(() => ({
+      data: mocks.conversationListData,
+      currentData: mocks.conversationListData,
+      isLoading: false,
+      error: null,
+      refetch: mocks.refetchConversations,
+    }));
   });
 
   it("disables direct Firestore subscriptions and uses guarded REST hooks", () => {
@@ -106,9 +121,13 @@ describe("MessagingProvider super-admin reads", () => {
       reverse: true,
       skip: true,
     });
-    expect(mocks.getConversations).toHaveBeenCalledWith({ limit: 50 }, {
-      skip: false,
-    });
+    expect(mocks.getConversations).toHaveBeenCalledWith(
+      expect.objectContaining({
+        limit: 50,
+        scopeKey: expect.stringContaining("super-1"),
+      }),
+      { skip: false },
+    );
   });
 
   it("polls guarded REST data and stops polling after unmount", () => {

@@ -3,7 +3,7 @@
  * Real-time subscriptions for conversations and messages using Firestore onSnapshot
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   collection,
   query,
@@ -193,20 +193,29 @@ export function useConversations(
 } {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationOwnerUid, setConversationOwnerUid] =
+    useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
   const { limit: limitCount = 50, skip = false } = options;
+  const currentUserUidRef = useRef(user?.uid);
+  currentUserUidRef.current = skip ? undefined : user?.uid;
 
   useEffect(() => {
     if (skip || !user?.uid) {
+      setConversationOwnerUid(null);
       setLoading(false);
       setConversations([]);
+      setError(null);
+      setLastDoc(null);
+      setHasMore(false);
       return;
     }
 
+    const requestUserUid = user.uid;
     setLoading(true);
     setError(null);
 
@@ -228,16 +237,19 @@ export function useConversations(
       q,
       { includeMetadataChanges: false },
       (snapshot) => {
+        if (currentUserUidRef.current !== requestUserUid) return;
         const newConversations: Conversation[] = snapshot.docs.map((doc) =>
           parseConversationDoc(doc.id, doc.data(), user.uid)
         );
 
+        setConversationOwnerUid(requestUserUid);
         setConversations(newConversations);
         setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
         setHasMore(snapshot.docs.length === limitCount);
         setLoading(false);
       },
       (err: any) => {
+        if (currentUserUidRef.current !== requestUserUid) return;
         console.error("Error fetching conversations:", err);
         console.error("Error code:", err?.code);
         console.error("Error message:", err?.message);
@@ -249,6 +261,10 @@ export function useConversations(
           console.error("3. Firestore rules may not be deployed to production");
           console.error("4. User UID:", user?.uid);
         }
+        setConversationOwnerUid(requestUserUid);
+        setConversations([]);
+        setLastDoc(null);
+        setHasMore(false);
         setError(err);
         setLoading(false);
       }
@@ -258,13 +274,22 @@ export function useConversations(
   }, [user?.uid, limitCount, skip]);
 
   const loadMore = useCallback(async () => {
-    if (skip || !user?.uid || !hasMore || !lastDoc) return;
+    if (
+      skip ||
+      !user?.uid ||
+      conversationOwnerUid !== user.uid ||
+      !hasMore ||
+      !lastDoc
+    ) {
+      return;
+    }
 
     try {
+      const requestUserUid = user.uid;
       const conversationsRef = collection(db, "conversations");
       const q = query(
         conversationsRef,
-        where("participantIds", "array-contains", user.uid),
+        where("participantIds", "array-contains", requestUserUid),
         orderBy("updatedAt", "desc"),
         startAfter(lastDoc),
         limit(limitCount)
@@ -272,22 +297,34 @@ export function useConversations(
 
       const snapshot = await getDocs(q);
       const newConversations: Conversation[] = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) =>
-        parseConversationDoc(doc.id, doc.data(), user.uid)
+        parseConversationDoc(doc.id, doc.data(), requestUserUid)
       );
 
+      if (currentUserUidRef.current !== requestUserUid) return;
       setConversations((prev) => [...prev, ...newConversations]);
       setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
       setHasMore(snapshot.docs.length === limitCount);
     } catch (err) {
       console.error("Error loading more conversations:", err);
+      throw err;
     }
-  }, [user?.uid, hasMore, lastDoc, limitCount, skip]);
+  }, [
+    conversationOwnerUid,
+    user?.uid,
+    hasMore,
+    lastDoc,
+    limitCount,
+    skip,
+  ]);
+
+  const currentOwnerUid = skip ? null : user?.uid || null;
+  const isCurrentOwner = conversationOwnerUid === currentOwnerUid;
 
   return {
-    conversations,
-    loading,
-    error,
-    hasMore,
+    conversations: isCurrentOwner ? conversations : [],
+    loading: !currentOwnerUid ? false : (!isCurrentOwner ? true : loading),
+    error: isCurrentOwner ? error : null,
+    hasMore: isCurrentOwner ? hasMore : false,
     loadMore,
   };
 }
