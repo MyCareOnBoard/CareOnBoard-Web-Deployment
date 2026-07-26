@@ -94,7 +94,8 @@ export default function UserAccessControlPage() {
   const [isAgencyPageLoading, setIsAgencyPageLoading] = useState(false);
   const [isAgencyHydrationLoading, setIsAgencyHydrationLoading] =
     useState(false);
-  const [agencyError, setAgencyError] = useState("");
+  const [agencyPageError, setAgencyPageError] = useState("");
+  const [agencyHydrationError, setAgencyHydrationError] = useState("");
   const [pendingHydrationIds, setPendingHydrationIds] = useState<string[]>([]);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successUserName, setSuccessUserName] = useState("");
@@ -210,7 +211,7 @@ export default function UserAccessControlPage() {
       agencyPageAbortRef.current = controller;
       const requestId = ++agencyPageRequestRef.current;
       setIsAgencyPageLoading(true);
-      setAgencyError("");
+      setAgencyPageError("");
       try {
         const response = await listAssignableAgencies({
           search: debouncedAgencySearch,
@@ -231,7 +232,7 @@ export default function UserAccessControlPage() {
       } catch (caught) {
         if (controller.signal.aborted) return;
         if (requestId === agencyPageRequestRef.current)
-          setAgencyError(
+          setAgencyPageError(
             caught instanceof Error
               ? caught.message
               : "Unable to load agencies.",
@@ -256,7 +257,7 @@ export default function UserAccessControlPage() {
     const requestId = ++agencyHydrationRequestRef.current;
     setPendingHydrationIds(uniqueIds);
     setIsAgencyHydrationLoading(true);
-    setAgencyError("");
+    setAgencyHydrationError("");
     try {
       const chunks: string[][] = [];
       for (let index = 0; index < uniqueIds.length; index += 50)
@@ -282,7 +283,7 @@ export default function UserAccessControlPage() {
     } catch (caught) {
       if (controller.signal.aborted) return;
       if (requestId === agencyHydrationRequestRef.current)
-        setAgencyError(
+        setAgencyHydrationError(
           caught instanceof Error
             ? caught.message
             : "Unable to load selected agencies.",
@@ -319,7 +320,8 @@ export default function UserAccessControlPage() {
     setAgencySearch("");
     setDebouncedAgencySearch("");
     setAgencies([]);
-    setAgencyError("");
+    setAgencyPageError("");
+    setAgencyHydrationError("");
     setIsModalOpen(true);
   };
   const openEdit = (user: SuperAdminUser) => {
@@ -331,7 +333,8 @@ export default function UserAccessControlPage() {
     setAgencySearch("");
     setDebouncedAgencySearch("");
     setAgencies([]);
-    setAgencyError("");
+    setAgencyPageError("");
+    setAgencyHydrationError("");
     setIsModalOpen(true);
   };
 
@@ -604,15 +607,18 @@ export default function UserAccessControlPage() {
         agencySearch={agencySearch}
         isAgenciesLoading={isAgenciesLoading}
         hasMoreAgencies={Boolean(agencyCursor)}
-        agencyError={agencyError}
+        agencyPageError={agencyPageError}
+        agencyHydrationError={agencyHydrationError}
         defaultAgencyScope={defaultAgencyScope}
         onAgencySearchChange={setAgencySearch}
         onLoadMoreAgencies={() => {
           if (agencyCursor)
             void requestAgencyPage({ cursor: agencyCursor, append: true });
         }}
-        onRetryAgencies={() => {
+        onRetryAgencyPage={() => {
           void requestAgencyPage();
+        }}
+        onRetryAgencyHydration={() => {
           if (pendingHydrationIds.length)
             void hydrateAgencyIds(pendingHydrationIds);
         }}

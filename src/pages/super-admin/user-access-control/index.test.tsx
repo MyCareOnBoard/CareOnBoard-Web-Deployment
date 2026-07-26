@@ -292,6 +292,46 @@ describe("UserAccessControlPage", () => {
     expect(screen.queryByText("Stale Agency")).not.toBeInTheDocument();
   });
 
+  it("keeps hydration and page errors independently visible and retryable", async () => {
+    let hydrationAttempts = 0;
+    vi.mocked(listAssignableAgencies).mockImplementation((params) => {
+      if (params?.ids) {
+        hydrationAttempts += 1;
+        return hydrationAttempts === 1
+          ? Promise.reject(new Error("Selected agencies failed"))
+          : Promise.resolve({ agencies: params.ids.map((id) => ({ id, name: `Recovered ${id}` })), nextCursor: null });
+      }
+      if (params?.search === "fresh")
+        return Promise.resolve({ agencies: [{ id: "fresh", name: "Fresh Agency" }], nextCursor: null });
+      if (params?.search === "broken")
+        return Promise.reject(new Error("Agency search failed"));
+      return Promise.resolve({ agencies: [{ id: "base", name: "Base Agency" }], nextCursor: null });
+    });
+    const user = userEvent.setup();
+    render(<UserAccessControlPage />);
+    await screen.findByText("Ada Admin");
+    await user.click(screen.getByRole("button", { name: "Edit user Ada Admin" }));
+    await user.click(screen.getByRole("button", { name: "Choose agencies" }));
+    expect(await screen.findByText("Selected agencies failed")).toBeVisible();
+
+    const search = screen.getByLabelText("Search agencies");
+    await user.type(search, "fresh");
+    expect(await screen.findByText("Fresh Agency", {}, { timeout: 1500 })).toBeVisible();
+    expect(screen.getByText("Selected agencies failed")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Retry selected agencies" })).toBeVisible();
+
+    await user.clear(search);
+    await user.type(search, "broken");
+    expect(await screen.findByText("Agency search failed", {}, { timeout: 1500 })).toBeVisible();
+    expect(screen.getByText("Selected agencies failed")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Retry agency search" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Retry selected agencies" }));
+    expect(await screen.findByRole("button", { name: "Remove Recovered a1" })).toBeVisible();
+    expect(screen.queryByText("Selected agencies failed")).not.toBeInTheDocument();
+    expect(screen.getByText("Agency search failed")).toBeVisible();
+  });
+
   it("renders a 50-row agency page, appends the cursor page, and preserves selected chips", async () => {
     const firstPage = Array.from({ length: 50 }, (_, index) => ({
       id: `p${index}`,

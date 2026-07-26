@@ -24,10 +24,12 @@ interface AgencyScopeFieldProps {
   search: string;
   value: { agencyScope: AgencyScopeMode; agencyIds: string[] };
   disabled: boolean;
-  error?: string;
+  pageError?: string;
+  hydrationError?: string;
   onSearchChange: (search: string) => void;
   onLoadMore: () => void;
-  onRetry?: () => void;
+  onRetryPage?: () => void;
+  onRetryHydration?: () => void;
   onChange: (value: {
     agencyScope: AgencyScopeMode;
     agencyIds: string[];
@@ -42,10 +44,12 @@ export default function AgencyScopeField({
   search,
   value,
   disabled,
-  error,
+  pageError,
+  hydrationError,
   onSearchChange,
   onLoadMore,
-  onRetry,
+  onRetryPage,
+  onRetryHydration,
   onChange,
 }: AgencyScopeFieldProps) {
   const [open, setOpen] = useState(false);
@@ -202,23 +206,30 @@ export default function AgencyScopeField({
                     ))}
                   </div>
                 )}
-                {error && (
+                {pageError && (
                   <div
                     role="alert"
                     className="mx-2 my-2 flex items-center justify-between gap-3 rounded-xl border border-[#efcbc5] bg-[#fff5f3] p-3"
                   >
                     <span className="text-[11px] font-medium text-[#944236]">
-                      {error}
+                      {pageError}
                     </span>
-                    {onRetry && (
+                    {onRetryPage && (
                       <button
                         type="button"
-                        onClick={onRetry}
+                        aria-label="Retry agency search"
+                        onClick={onRetryPage}
                         className="shrink-0 rounded-full border border-[#c98277] px-3 py-1.5 text-[10px] font-semibold text-[#944236]"
                       >
-                        Try again
+                        Retry search
                       </button>
                     )}
+                  </div>
+                )}
+                {hydrationError && (
+                  <div role="alert" className="mx-2 my-2 flex items-center justify-between gap-3 rounded-xl border border-[#efcbc5] bg-[#fff5f3] p-3">
+                    <span className="text-[11px] font-medium text-[#944236]">{hydrationError}</span>
+                    {onRetryHydration && <button type="button" aria-label="Retry selected agencies" onClick={onRetryHydration} className="shrink-0 rounded-full border border-[#c98277] px-3 py-1.5 text-[10px] font-semibold text-[#944236]">Retry selected</button>}
                   </div>
                 )}
                 {!isLoading && agencies.length === 0 && (

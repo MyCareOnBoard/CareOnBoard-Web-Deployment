@@ -40,11 +40,13 @@ interface UserAccessModalProps {
   agencySearch?: string;
   isAgenciesLoading?: boolean;
   hasMoreAgencies?: boolean;
-  agencyError?: string;
+  agencyPageError?: string;
+  agencyHydrationError?: string;
   defaultAgencyScope?: Pick<UserAccessFormValue, "agencyScope" | "agencyIds">;
   onAgencySearchChange?: (search: string) => void;
   onLoadMoreAgencies?: () => void;
-  onRetryAgencies?: () => void;
+  onRetryAgencyPage?: () => void;
+  onRetryAgencyHydration?: () => void;
 }
 
 type RoleAccessValue = Pick<
@@ -99,11 +101,13 @@ export default function UserAccessModal({
   agencySearch = "",
   isAgenciesLoading = false,
   hasMoreAgencies = false,
-  agencyError = "",
+  agencyPageError = "",
+  agencyHydrationError = "",
   defaultAgencyScope = DEFAULT_AGENCY_ACCESS,
   onAgencySearchChange = () => undefined,
   onLoadMoreAgencies = () => undefined,
-  onRetryAgencies = () => undefined,
+  onRetryAgencyPage = () => undefined,
+  onRetryAgencyHydration = () => undefined,
 }: UserAccessModalProps) {
   const [name, setName] = useState(initialData?.name || "");
   const [email, setEmail] = useState(initialData?.email || "");
@@ -444,10 +448,12 @@ export default function UserAccessModal({
                   search={agencySearch}
                   value={agencyAccess}
                   disabled={isSaving}
-                  error={agencyError}
+                  pageError={agencyPageError}
+                  hydrationError={agencyHydrationError}
                   onSearchChange={onAgencySearchChange}
                   onLoadMore={onLoadMoreAgencies}
-                  onRetry={onRetryAgencies}
+                  onRetryPage={onRetryAgencyPage}
+                  onRetryHydration={onRetryAgencyHydration}
                   onChange={setAgencyAccess}
                 />
               </>
