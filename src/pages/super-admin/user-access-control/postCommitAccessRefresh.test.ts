@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { refreshCommittedAccess } from "./postCommitAccessRefresh";
+import { refreshCommittedAccessProfile } from "./postCommitAccessRefresh";
 
 describe("refreshCommittedAccess", () => {
   it("waits for profile refresh before evicting scoped caches", async () => {
@@ -8,10 +8,10 @@ describe("refreshCommittedAccess", () => {
       () => new Promise<{ uid: string }>((done) => { resolve = done; }),
     );
     const resetCaches = vi.fn();
-    const completion = refreshCommittedAccess({ refreshProfile, resetCaches });
+    const completion = refreshCommittedAccessProfile({ refreshProfile, resetCaches });
     expect(resetCaches).not.toHaveBeenCalled();
     resolve({ uid: "u1" });
-    await expect(completion).resolves.toBe(true);
+    await expect(completion).resolves.toEqual({ uid: "u1" });
     expect(resetCaches).toHaveBeenCalledOnce();
   });
 
@@ -19,11 +19,11 @@ describe("refreshCommittedAccess", () => {
     const failure = new Error("refresh unavailable");
     const onFailure = vi.fn();
     const resetCaches = vi.fn();
-    await expect(refreshCommittedAccess({
+    await expect(refreshCommittedAccessProfile({
       refreshProfile: vi.fn().mockRejectedValue(failure),
       resetCaches,
       onFailure,
-    })).resolves.toBe(false);
+    })).resolves.toBeNull();
     expect(onFailure).toHaveBeenCalledWith(failure);
     expect(resetCaches).not.toHaveBeenCalled();
   });
@@ -32,11 +32,11 @@ describe("refreshCommittedAccess", () => {
     const onFailure = vi.fn();
     const resetCaches = vi.fn();
 
-    await expect(refreshCommittedAccess({
+    await expect(refreshCommittedAccessProfile({
       refreshProfile: vi.fn().mockResolvedValue(null),
       resetCaches,
       onFailure,
-    })).resolves.toBe(false);
+    })).resolves.toBeNull();
 
     expect(onFailure).toHaveBeenCalledOnce();
     expect(onFailure.mock.calls[0][0]).toBeInstanceOf(Error);

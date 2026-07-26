@@ -10,8 +10,9 @@ import {
   updateSuperAdminUser,
 } from "@/lib/api/super-admin-users";
 
-const { dispatch, refreshProfile } = vi.hoisted(() => ({
+const { dispatch, navigate, refreshProfile } = vi.hoisted(() => ({
   dispatch: vi.fn(),
+  navigate: vi.fn(),
   refreshProfile: vi.fn(),
 }));
 
@@ -19,6 +20,10 @@ vi.mock("@/utils/auth", () => ({
   useAuth: () => ({ user: { uid: "u1" }, refreshProfile }),
 }));
 vi.mock("@/store/redux/hooks", () => ({ useAppDispatch: () => dispatch }));
+vi.mock("react-router", async () => ({
+  ...(await vi.importActual("react-router")),
+  useNavigate: () => navigate,
+}));
 
 vi.mock("@/lib/api/super-admin-users", () => ({
   getSuperAdminAccessConfig: vi.fn(),
@@ -47,7 +52,12 @@ const deferred = <T,>() => {
 describe("UserAccessControlPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    refreshProfile.mockResolvedValue({ uid: "u1" });
+    refreshProfile.mockReset();
+    vi.mocked(listSuperAdminUsers).mockReset();
+    refreshProfile.mockResolvedValue({
+      uid: "u1",
+      profile: { accessList: ["User Access Control"] },
+    });
     vi.mocked(getSuperAdminAccessConfig).mockResolvedValue(config as never);
     vi.mocked(listSuperAdminUsers).mockResolvedValue({
       success: true,
@@ -67,7 +77,14 @@ describe("UserAccessControlPage", () => {
           updatedAt: "",
         },
       ],
-      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      pagination: {
+        limit: 10,
+        total: null,
+        totalPages: null,
+        hasMore: false,
+        nextCursor: null,
+        scanned: 1,
+      },
     });
     vi.mocked(listAssignableAgencies).mockResolvedValue({
       agencies: [
@@ -84,11 +101,54 @@ describe("UserAccessControlPage", () => {
     expect(screen.getByText("Compliance lead")).toBeVisible();
     expect(screen.getByText("2 agencies")).toBeVisible();
     expect(listSuperAdminUsers).toHaveBeenCalledWith({
-      page: 1,
+      cursor: undefined,
       limit: 10,
       search: "",
       isActive: true,
     });
+  });
+
+  it("uses cursor history for next and previous user pages", async () => {
+    vi.mocked(listSuperAdminUsers).mockImplementation((params) => Promise.resolve({
+      success: true,
+      data: [{
+        id: params?.cursor ? "u2" : "u1",
+        uid: params?.cursor ? "u2" : "u1",
+        name: params?.cursor ? "Bea Admin" : "Ada Admin",
+        email: params?.cursor ? "bea@example.com" : "ada@example.com",
+        role: "Compliance lead",
+        roleTemplate: "custom",
+        accessList: ["Compliance Monitor"],
+        agencyScope: "selected",
+        agencyIds: ["a1"],
+        isActive: true,
+        createdAt: "",
+        updatedAt: "",
+      }],
+      pagination: {
+        limit: 10,
+        total: null,
+        totalPages: null,
+        hasMore: !params?.cursor,
+        nextCursor: params?.cursor ? null : "cursor-1",
+        scanned: 1,
+      },
+    } as never));
+    const user = userEvent.setup();
+    render(<UserAccessControlPage />);
+    await screen.findByText("Ada Admin");
+
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    expect(await screen.findByText("Bea Admin")).toBeVisible();
+    expect(listSuperAdminUsers).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: "cursor-1" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Previous page" }));
+    expect(await screen.findByText("Ada Admin")).toBeVisible();
+    expect(listSuperAdminUsers).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: undefined }),
+    );
   });
 
   it("does not load agencies until the modal opens and hydrates edit IDs", async () => {
@@ -115,7 +175,7 @@ describe("UserAccessControlPage", () => {
     await waitFor(
       () =>
         expect(listSuperAdminUsers).toHaveBeenLastCalledWith(
-          expect.objectContaining({ page: 1, limit: 10, search: "ada" }),
+          expect.objectContaining({ cursor: undefined, limit: 10, search: "ada" }),
         ),
       { timeout: 1500 },
     );
@@ -143,7 +203,14 @@ describe("UserAccessControlPage", () => {
       return Promise.resolve({
         success: true,
         data: [],
-        pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
+        pagination: {
+          limit: 10,
+          total: null,
+          totalPages: null,
+          hasMore: false,
+          nextCursor: null,
+          scanned: 0,
+        },
       });
     });
     const user = userEvent.setup();
@@ -184,7 +251,14 @@ describe("UserAccessControlPage", () => {
           updatedAt: "",
         },
       ],
-      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      pagination: {
+        limit: 10,
+        total: null,
+        totalPages: null,
+        hasMore: false,
+        nextCursor: null,
+        scanned: 1,
+      },
     });
     expect(await screen.findByText("New Result")).toBeVisible();
     oldResult.resolve({
@@ -205,7 +279,14 @@ describe("UserAccessControlPage", () => {
           updatedAt: "",
         },
       ],
-      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      pagination: {
+        limit: 10,
+        total: null,
+        totalPages: null,
+        hasMore: false,
+        nextCursor: null,
+        scanned: 1,
+      },
     });
     await new Promise((resolve) => window.setTimeout(resolve, 20));
     expect(screen.getByText("New Result")).toBeVisible();
@@ -232,7 +313,14 @@ describe("UserAccessControlPage", () => {
           updatedAt: "",
         },
       ],
-      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      pagination: {
+        limit: 10,
+        total: null,
+        totalPages: null,
+        hasMore: false,
+        nextCursor: null,
+        scanned: 1,
+      },
     });
     const hydration = deferred<any>();
     vi.mocked(listAssignableAgencies).mockImplementation((params) => {
@@ -459,11 +547,61 @@ describe("UserAccessControlPage", () => {
     );
     expect(updateSuperAdminUser).toHaveBeenCalledOnce();
 
-    refreshProfile.mockResolvedValueOnce({ uid: "u1" });
+    refreshProfile.mockResolvedValueOnce({
+      uid: "u1",
+      profile: { accessList: ["User Access Control"] },
+    });
     await user.click(screen.getByRole("button", { name: "Retry access refresh" }));
     await waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
     expect(updateSuperAdminUser).toHaveBeenCalledOnce();
+  });
+
+  it("refreshes self-demoted access before protected reloads and leaves without a false mutation error", async () => {
+    vi.mocked(updateSuperAdminUser).mockResolvedValue({} as never);
+    vi.mocked(listSuperAdminUsers)
+      .mockResolvedValueOnce({
+        success: true,
+        data: [{
+          id: "u1",
+          uid: "u1",
+          name: "Ada Admin",
+          email: "ada@example.com",
+          role: "Compliance lead",
+          roleTemplate: "custom",
+          accessList: ["Compliance Monitor"],
+          agencyScope: "selected",
+          agencyIds: ["a1", "a2"],
+          isActive: true,
+          createdAt: "",
+          updatedAt: "",
+        }],
+        pagination: {
+          limit: 10,
+          total: null,
+          totalPages: null,
+          hasMore: false,
+          nextCursor: null,
+          scanned: 1,
+        },
+      })
+      .mockRejectedValueOnce(new Error("403 Access denied"));
+    refreshProfile.mockResolvedValueOnce({
+      uid: "u1",
+      profile: { accessList: [] },
+    });
+    const user = userEvent.setup();
+    render(<UserAccessControlPage />);
+    await screen.findByText("Ada Admin");
+
+    await user.click(screen.getByRole("button", { name: "Edit user Ada Admin" }));
+    await user.click(screen.getByRole("button", { name: "Update User" }));
+
+    await waitFor(() => expect(refreshProfile).toHaveBeenCalledOnce());
+    expect(dispatch).toHaveBeenCalledTimes(10);
+    expect(listSuperAdminUsers).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith("/super-admin/dashboard", { replace: true });
+    expect(screen.queryByText("Update failed")).not.toBeInTheDocument();
   });
 
   it("resets scoped caches after a successful self-refresh even when the success modal was dismissed", async () => {
@@ -521,7 +659,10 @@ describe("UserAccessControlPage", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByText("Refreshing access...")).toBeVisible();
 
-    secondRefresh.resolve({ uid: "u1" });
+    secondRefresh.resolve({
+      uid: "u1",
+      profile: { accessList: ["User Access Control"] },
+    });
     await waitFor(() =>
       expect(screen.queryByText("Refreshing access...")).not.toBeInTheDocument(),
     );

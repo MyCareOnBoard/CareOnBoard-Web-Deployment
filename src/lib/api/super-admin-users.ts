@@ -94,7 +94,7 @@ export interface ListAssignableAgenciesParams {
 }
 
 export interface ListSuperAdminUsersParams {
-  page?: number;
+  cursor?: string;
   limit?: number;
   search?: string;
   isActive?: boolean;
@@ -107,10 +107,12 @@ export interface ListSuperAdminUsersResponse {
   success: boolean;
   data: SuperAdminUser[];
   pagination: {
-    page: number;
     limit: number;
-    total: number;
-    totalPages: number;
+    total: null;
+    totalPages: null;
+    hasMore: boolean;
+    nextCursor: string | null;
+    scanned: number;
   };
 }
 
@@ -254,7 +256,7 @@ export async function listSuperAdminUsers(
       "/superAdminUsers/users",
       {
         params: {
-          page: params?.page || 1,
+          cursor: params?.cursor,
           limit: params?.limit || 10,
           search: params?.search || "",
           isActive: params?.isActive,

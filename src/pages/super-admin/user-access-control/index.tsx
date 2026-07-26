@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useNavigate } from "react-router";
 import {
   ChevronLeft,
   ChevronRight,
@@ -34,7 +35,7 @@ import {
 import type { UserAccessFormValue } from "./userAccessTypes";
 import { useAuth } from "@/utils/auth";
 import { useAppDispatch } from "@/store/redux/hooks";
-import { refreshCommittedAccess } from "./postCommitAccessRefresh";
+import { refreshCommittedAccessProfile } from "./postCommitAccessRefresh";
 import { resetSuperAdminCaches } from "./resetSuperAdminCaches";
 
 type AgencyOption = { id: string; name: string; status?: string };
@@ -75,15 +76,19 @@ function TableSkeleton() {
 
 export default function UserAccessControlPage() {
   const { user, refreshProfile } = useAuth();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const [config, setConfig] = useState<SuperAdminAccessConfig | null>(null);
   const [users, setUsers] = useState<SuperAdminUser[]>([]);
   const [pagination, setPagination] = useState({
     page: 1,
-    total: 0,
-    totalPages: 1,
+    total: null as number | null,
+    totalPages: null as number | null,
+    hasMore: false,
+    nextCursor: null as string | null,
   });
   const [page, setPage] = useState(1);
+  const [userCursors, setUserCursors] = useState<Array<string | null>>([null]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -126,6 +131,7 @@ export default function UserAccessControlPage() {
     const timer = window.setTimeout(() => {
       setDebouncedSearch(search.trim());
       setPage(1);
+      setUserCursors([null]);
     }, 300);
     return () => window.clearTimeout(timer);
   }, [search]);
@@ -137,13 +143,15 @@ export default function UserAccessControlPage() {
     return () => window.clearTimeout(timer);
   }, [agencySearch]);
 
+  const userCursor = userCursors[page - 1] || undefined;
+
   const loadUsers = useCallback(async () => {
     const requestId = ++userRequestRef.current;
     setIsLoading(true);
     setError("");
     try {
       const response = await listSuperAdminUsers({
-        page,
+        cursor: userCursor,
         limit: PAGE_SIZE,
         search: debouncedSearch,
         isActive: true,
@@ -151,9 +159,18 @@ export default function UserAccessControlPage() {
       if (requestId !== userRequestRef.current) return;
       setUsers(response.data.map(normalizeUser));
       setPagination({
-        page: response.pagination.page,
+        page,
         total: response.pagination.total,
-        totalPages: Math.max(1, response.pagination.totalPages),
+        totalPages: response.pagination.totalPages,
+        hasMore: response.pagination.hasMore,
+        nextCursor: response.pagination.nextCursor,
+      });
+      setUserCursors((current) => {
+        const next = current.slice(0, page);
+        if (response.pagination.hasMore && response.pagination.nextCursor) {
+          next[page] = response.pagination.nextCursor;
+        }
+        return next;
       });
     } catch (caught) {
       if (requestId !== userRequestRef.current) return;
@@ -165,7 +182,7 @@ export default function UserAccessControlPage() {
     } finally {
       if (requestId === userRequestRef.current) setIsLoading(false);
     }
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, page, userCursor]);
 
   useEffect(() => {
     void loadUsers();
@@ -358,11 +375,18 @@ export default function UserAccessControlPage() {
   };
 
   const runCurrentAdminAccessRefresh = async (sessionId: number) => {
-    const refreshed = await refreshCommittedAccess({
+    const refreshed = await refreshCommittedAccessProfile({
       refreshProfile,
     });
     if (refreshed) {
       resetSuperAdminCaches(dispatch);
+      const refreshedAccess = refreshed.profile?.accessList;
+      if (!refreshedAccess?.includes("User Access Control")) {
+        setIsSuccessModalOpen(false);
+        navigate("/super-admin/dashboard", { replace: true });
+        return;
+      }
+      await loadUsers();
     }
     if (sessionId !== accessRefreshSessionRef.current) return;
     if (refreshed) {
@@ -414,12 +438,6 @@ export default function UserAccessControlPage() {
         refreshSignedInUser =
           editingUser.uid === user?.uid || editingUser.id === user?.uid;
       }
-      await loadUsers();
-      accessRefreshSessionRef.current += 1;
-      setAccessRefreshWarning("");
-      setIsRetryingAccessRefresh(false);
-      setSuccessUserName(data.name);
-      setIsSuccessModalOpen(true);
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : "Unable to save user.";
@@ -428,7 +446,16 @@ export default function UserAccessControlPage() {
       setShowErrorDialog(true);
       throw caught;
     }
-    if (refreshSignedInUser) startCommittedAccessRefresh();
+    accessRefreshSessionRef.current += 1;
+    setAccessRefreshWarning("");
+    setIsRetryingAccessRefresh(false);
+    setSuccessUserName(data.name);
+    setIsSuccessModalOpen(true);
+    if (refreshSignedInUser) {
+      startCommittedAccessRefresh();
+    } else {
+      await loadUsers();
+    }
   };
 
   const confirmRemove = async () => {
@@ -509,8 +536,9 @@ export default function UserAccessControlPage() {
               Administrator access
             </h2>
             <p className="mt-1 text-[12px] text-[#687173]">
-              {pagination.total} active account
-              {pagination.total === 1 ? "" : "s"}
+              {pagination.total === null
+                ? `${users.length} account${users.length === 1 ? "" : "s"} shown`
+                : `${pagination.total} active account${pagination.total === 1 ? "" : "s"}`}
             </p>
           </div>
           <div className="relative w-full sm:w-[320px]">
@@ -625,7 +653,7 @@ export default function UserAccessControlPage() {
             </table>
           </div>
         )}
-      {!isInitialLoading && !error && !configError && pagination.totalPages > 0 && (
+      {!isInitialLoading && !error && !configError && (page > 1 || pagination.hasMore) && (
           <div className="flex items-center justify-center gap-3 border-t border-[#e6ecec] px-5 py-4">
             <button
               aria-label="Previous page"
@@ -636,17 +664,20 @@ export default function UserAccessControlPage() {
               <ChevronLeft className="h-4 w-4" />
             </button>
             <span className="text-[12px] font-semibold text-[#273033]">
-              {pagination.page}{" "}
-              <span className="font-normal text-[#7a8587]">
-                of {pagination.totalPages}
-              </span>
+              Page {pagination.page}
             </span>
             <button
               aria-label="Next page"
-              disabled={page >= pagination.totalPages}
-              onClick={() =>
-                setPage((value) => Math.min(pagination.totalPages, value + 1))
-              }
+              disabled={!pagination.hasMore}
+              onClick={() => {
+                if (!pagination.nextCursor) return;
+                setUserCursors((current) => {
+                  const next = [...current];
+                  next[page] = pagination.nextCursor;
+                  return next;
+                });
+                setPage((value) => value + 1);
+              }}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d4dddd] disabled:opacity-35"
             >
               <ChevronRight className="h-4 w-4" />

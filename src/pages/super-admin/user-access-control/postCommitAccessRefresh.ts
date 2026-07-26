@@ -1,23 +1,29 @@
-type RefreshCommittedAccessOptions = {
-  refreshProfile: () => Promise<unknown>;
+type RefreshCommittedAccessOptions<T> = {
+  refreshProfile: () => Promise<T | null>;
   resetCaches?: () => void;
   onFailure?: (error: unknown) => void;
 };
 
-export async function refreshCommittedAccess({
+export async function refreshCommittedAccessProfile<T>({
   refreshProfile,
   resetCaches,
   onFailure,
-}: RefreshCommittedAccessOptions): Promise<boolean> {
+}: RefreshCommittedAccessOptions<T>): Promise<T | null> {
   try {
     const profile = await refreshProfile();
     if (profile == null) {
       throw new Error("Profile refresh returned no active profile.");
     }
     resetCaches?.();
-    return true;
+    return profile;
   } catch (error) {
     onFailure?.(error);
-    return false;
+    return null;
   }
+}
+
+export async function refreshCommittedAccess(
+  options: RefreshCommittedAccessOptions<unknown>,
+): Promise<boolean> {
+  return (await refreshCommittedAccessProfile(options)) !== null;
 }
