@@ -1,5 +1,5 @@
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useRef, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { setUser } from "@/utils/auth"
 import type { AppDispatch, RootState } from "@/store/redux/store"
@@ -61,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUserState] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
+  const refreshGenerationRef = useRef(0)
 
   useEffect(() => {
     const initAuth = async () => {
@@ -106,6 +107,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth()
   }, []) // Only run once on mount
 
+  useEffect(() => {
+    return auth.onAuthStateChanged(() => {
+      refreshGenerationRef.current += 1
+    })
+  }, [])
   // Sync local state when Redux state changes (after login/signup)
   useEffect(() => {
     if (isInitialized) {
@@ -185,6 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Logout current user
    */
   const logout = async () => {
+    refreshGenerationRef.current += 1
     clearMfaResolverSession()
     const { clearRecaptchaVerifier } = await import('@/utils/auth/services/mfaService')
     clearRecaptchaVerifier()
@@ -214,9 +221,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const refreshProfile = async (): Promise<User | null> => {
-    if (!auth.currentUser) return null
+    const startingUid = auth.currentUser?.uid
+    if (!startingUid) return null
 
+    const refreshGeneration = refreshGenerationRef.current + 1
+    refreshGenerationRef.current = refreshGeneration
     const nextUser = await getUser()
+
+    if (
+      auth.currentUser?.uid !== startingUid ||
+      refreshGenerationRef.current !== refreshGeneration
+    ) {
+      return null
+    }
+
     setUserState(nextUser)
     dispatch(setUser(nextUser))
     return nextUser

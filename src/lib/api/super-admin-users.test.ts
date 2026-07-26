@@ -138,4 +138,19 @@ describe("super-admin access API", () => {
       accessList: ["Reports"],
       ...canonicalDefaults,
     });
-  });});
+  });
+  it("rethrows Axios cancellation unchanged without logging it as a failure", async () => {
+    const controller = new AbortController();
+    const cancellation = Object.assign(new Error("canceled"), {
+      code: "ERR_CANCELED",
+      name: "CanceledError",
+    });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    get.mockRejectedValueOnce(cancellation);
+    controller.abort();
+
+    await expect(listAssignableAgencies({ signal: controller.signal })).rejects.toBe(cancellation);
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+});

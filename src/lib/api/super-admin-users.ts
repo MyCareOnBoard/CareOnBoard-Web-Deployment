@@ -1,3 +1,4 @@
+import axios from "axios";
 import axiosClient from '../axios';
 import type {
   AgencyScopeMode,
@@ -155,6 +156,15 @@ export async function getSuperAdminAccessConfig(): Promise<SuperAdminAccessConfi
   }
 }
 
+function isRequestCancellation(error: unknown): boolean {
+  if (axios.isCancel(error)) return true
+  if (!error || typeof error !== "object") return false
+
+  const candidate = error as { code?: string; name?: string }
+  return candidate.code === "ERR_CANCELED"
+    || candidate.name === "CanceledError"
+    || candidate.name === "AbortError"
+}
 export async function listAssignableAgencies(
   params: ListAssignableAgenciesParams = {}
 ): Promise<AssignableAgenciesPage> {
@@ -181,6 +191,7 @@ export async function listAssignableAgencies(
       nextCursor: response.data.cursor || null,
     };
   } catch (err: any) {
+    if (isRequestCancellation(err)) throw err
     console.error("listAssignableAgencies error:", err);
     throw new Error(
       err.response?.data?.error || err.message || "Failed to fetch assignable agencies"
