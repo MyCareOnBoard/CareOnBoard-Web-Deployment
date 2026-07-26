@@ -198,7 +198,6 @@ export interface DeleteConversationResponse {
  */
 export async function searchUsers(params?: {
   search?: string;
-  page?: number;
   limit?: number;
   role?: UserRole;
   userType?: UserType;
@@ -207,7 +206,6 @@ export async function searchUsers(params?: {
   try {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.append('search', params.search);
-    if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.role) searchParams.append('role', params.role);
     if (params?.userType) searchParams.append('userType', params.userType);
@@ -230,14 +228,12 @@ export async function searchUsers(params?: {
  * @returns Promise with conversations list and pagination
  */
 export async function getConversations(params?: {
-  page?: number;
   limit?: number;
   search?: string;
   cursor?: string;
 }): Promise<ConversationsListResponse> {
   try {
     const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.search) searchParams.append('search', params.search);
     if (params?.cursor) searchParams.append('cursor', params.cursor);

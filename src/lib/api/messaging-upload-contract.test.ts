@@ -22,7 +22,18 @@ vi.mock("@/lib/baseQuery", () => ({ customBaseQuery: baseQuery }));
 vi.mock("../axios", () => ({ default: { post: axiosPost } }));
 
 import { userMessagingApi } from "./userMessaging";
-import { uploadAttachment } from "./superAdminMessaging";
+import {
+  getConversations as getDedicatedConversations,
+  searchUsers,
+  uploadAttachment,
+} from "./superAdminMessaging";
+
+if (false) {
+  // @ts-expect-error Cursor-migrated selected endpoints do not accept page numbers.
+  void searchUsers({ page: 2 });
+  // @ts-expect-error Cursor-migrated selected endpoints do not accept page numbers.
+  void getDedicatedConversations({ page: 2 });
+}
 
 describe("messaging upload contracts", () => {
   beforeEach(() => {
@@ -39,7 +50,20 @@ describe("messaging upload contracts", () => {
         },
       },
     });
-    baseQuery.mockClear();
+    baseQuery.mockReset();
+    baseQuery.mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          fileName: "file.txt",
+          fileSize: 4,
+          fileType: "text/plain",
+          url: "https://example.test/file.txt",
+          storagePath: "messages/file.txt",
+          uploadedAt: "2026-07-26T00:00:00.000Z",
+        },
+      },
+    });
   });
 
   it("follows guarded conversation continuation until the requested page is filled", async () => {
@@ -150,6 +174,157 @@ describe("messaging upload contracts", () => {
     expect((baseQuery.mock.calls[1]![0] as { url: string }).url).toBe(
       "/userMessaging/contacts?limit=1&cursor=contact-cursor",
     );
+  });
+
+  it("caps sparse conversation continuation and preserves the next cursor", async () => {
+    for (const cursor of ["cursor-1", "cursor-2", "cursor-3"]) {
+      baseQuery.mockResolvedValueOnce({
+        data: {
+          success: true,
+          conversations: [],
+          count: 0,
+          pagination: {
+            limit: 5,
+            count: 0,
+            hasMore: true,
+            nextCursor: cursor,
+          },
+        },
+      });
+    }
+    baseQuery.mockResolvedValueOnce({
+      data: {
+        success: true,
+        conversations: [],
+        count: 0,
+        pagination: {
+          limit: 5,
+          count: 0,
+          hasMore: false,
+          nextCursor: null,
+        },
+      },
+    });
+    const store = configureStore({
+      reducer: { [userMessagingApi.reducerPath]: userMessagingApi.reducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware().concat(userMessagingApi.middleware),
+    });
+
+    const result = await store.dispatch(
+      userMessagingApi.endpoints.getConversations.initiate({ limit: 5 }),
+    ).unwrap();
+
+    expect(baseQuery).toHaveBeenCalledTimes(2);
+    expect(result.pagination).toMatchObject({
+      hasMore: true,
+      nextCursor: "cursor-2",
+    });
+  });
+
+  it("deduplicates conversations by ID across a bounded merge", async () => {
+    const duplicate = {
+      id: "conversation-a",
+      type: "direct",
+      participantIds: ["super-1", "employee-a"],
+      participants: [],
+      unreadCount: 1,
+      createdAt: "2026-07-26T00:00:00.000Z",
+      updatedAt: "2026-07-26T00:00:00.000Z",
+      createdBy: "super-1",
+    };
+    baseQuery
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          conversations: [duplicate],
+          count: 1,
+          pagination: {
+            limit: 3,
+            count: 1,
+            hasMore: true,
+            nextCursor: "cursor-1",
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          conversations: [
+            { ...duplicate, unreadCount: 2 },
+            { ...duplicate, id: "conversation-b" },
+          ],
+          count: 2,
+          pagination: {
+            limit: 2,
+            count: 2,
+            hasMore: true,
+            nextCursor: "cursor-2",
+          },
+        },
+      });
+    const store = configureStore({
+      reducer: { [userMessagingApi.reducerPath]: userMessagingApi.reducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware().concat(userMessagingApi.middleware),
+    });
+
+    const result = await store.dispatch(
+      userMessagingApi.endpoints.getConversations.initiate({ limit: 3 }),
+    ).unwrap();
+
+    expect(result.conversations.map(({ id }) => id)).toEqual([
+      "conversation-a",
+      "conversation-b",
+    ]);
+    expect(result.conversations[0]?.unreadCount).toBe(2);
+    expect(result.pagination?.nextCursor).toBe("cursor-2");
+  });
+
+  it("caps sparse contact continuation and preserves the next cursor", async () => {
+    for (const cursor of ["contact-1", "contact-2", "contact-3"]) {
+      baseQuery.mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: [],
+          count: 0,
+          pagination: {
+            limit: 5,
+            count: 0,
+            hasMore: true,
+            nextCursor: cursor,
+          },
+        },
+      });
+    }
+    baseQuery.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: [],
+        count: 0,
+        pagination: {
+          limit: 5,
+          count: 0,
+          hasMore: false,
+          nextCursor: null,
+        },
+      },
+    });
+    const store = configureStore({
+      reducer: { [userMessagingApi.reducerPath]: userMessagingApi.reducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware().concat(userMessagingApi.middleware),
+    });
+
+    const result = await store.dispatch(
+      userMessagingApi.endpoints.getContacts.initiate({ limit: 5 }),
+    ).unwrap();
+
+    expect(baseQuery).toHaveBeenCalledTimes(2);
+    expect(result.pagination).toMatchObject({
+      hasMore: true,
+      nextCursor: "contact-2",
+    });
   });
 
   it("includes the encoded conversation ID in live userMessaging uploads", async () => {

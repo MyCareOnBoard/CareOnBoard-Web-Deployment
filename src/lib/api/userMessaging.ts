@@ -180,6 +180,8 @@ export interface CursorPageParams {
   cursor?: string;
 }
 
+const MAX_CURSOR_REQUESTS = 2;
+
 /**
  * Get Messages Params
  */
@@ -240,14 +242,19 @@ export const userMessagingApi = createApi({
     >({
       queryFn: async (params, _api, _extraOptions, baseQuery) => {
         const requestedLimit = params?.limit || 50;
-        const conversations: UserConversation[] = [];
-        const seenCursors = new Set<string>();
+        const conversationsById = new Map<string, UserConversation>();
+        const seenCursors = new Set<string>(params?.cursor ? [params.cursor] : []);
         let cursor = params?.cursor;
         let lastPage: GetConversationsResponse | null = null;
+        let requestCount = 0;
 
-        while (conversations.length < requestedLimit) {
+        while (
+          conversationsById.size < requestedLimit &&
+          requestCount < MAX_CURSOR_REQUESTS
+        ) {
+          requestCount++;
           const queryParams = new URLSearchParams({
-            limit: String(requestedLimit - conversations.length),
+            limit: String(requestedLimit - conversationsById.size),
           });
           if (cursor) queryParams.set("cursor", cursor);
           const result = await baseQuery({
@@ -259,7 +266,9 @@ export const userMessagingApi = createApi({
 
           const page = result.data as GetConversationsResponse;
           lastPage = page;
-          conversations.push(...(page.conversations || page.data || []));
+          for (const conversation of page.conversations || page.data || []) {
+            conversationsById.set(conversation.id, conversation);
+          }
           const nextCursor = page.pagination?.nextCursor || undefined;
           if (!page.pagination?.hasMore || !nextCursor) break;
           if (seenCursors.has(nextCursor)) {
@@ -274,6 +283,7 @@ export const userMessagingApi = createApi({
           cursor = nextCursor;
         }
 
+        const conversations = [...conversationsById.values()];
         return {
           data: {
             ...(lastPage || { success: true, count: 0 }),
@@ -304,14 +314,19 @@ export const userMessagingApi = createApi({
     getContacts: builder.query<GetContactsResponse, CursorPageParams | void>({
       queryFn: async (params, _api, _extraOptions, baseQuery) => {
         const requestedLimit = params?.limit || 50;
-        const contacts: AgencyContact[] = [];
-        const seenCursors = new Set<string>();
+        const contactsById = new Map<string, AgencyContact>();
+        const seenCursors = new Set<string>(params?.cursor ? [params.cursor] : []);
         let cursor = params?.cursor;
         let lastPage: GetContactsResponse | null = null;
+        let requestCount = 0;
 
-        while (contacts.length < requestedLimit) {
+        while (
+          contactsById.size < requestedLimit &&
+          requestCount < MAX_CURSOR_REQUESTS
+        ) {
+          requestCount++;
           const queryParams = new URLSearchParams({
-            limit: String(requestedLimit - contacts.length),
+            limit: String(requestedLimit - contactsById.size),
           });
           if (cursor) queryParams.set("cursor", cursor);
           const result = await baseQuery({
@@ -323,7 +338,9 @@ export const userMessagingApi = createApi({
 
           const page = result.data as GetContactsResponse;
           lastPage = page;
-          contacts.push(...(page.data || []));
+          for (const contact of page.data || []) {
+            contactsById.set(contact.uid || contact.id, contact);
+          }
           const nextCursor = page.pagination?.nextCursor || undefined;
           if (!page.pagination?.hasMore || !nextCursor) break;
           if (seenCursors.has(nextCursor)) {
@@ -338,6 +355,7 @@ export const userMessagingApi = createApi({
           cursor = nextCursor;
         }
 
+        const contacts = [...contactsById.values()];
         return {
           data: {
             ...(lastPage || { success: true }),
