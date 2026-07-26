@@ -33,4 +33,19 @@ describe("finalizeAgencyCreation", () => {
     });
     expect(refreshProfile).not.toHaveBeenCalled();
   });
+
+  it("reports a successful restricted refresh so an older warning can be cleared", async () => {
+    const onRefreshSuccess = vi.fn();
+
+    await finalizeAgencyCreation({
+      isRestricted: true,
+      showSuccess: vi.fn(),
+      navigate: vi.fn(),
+      refreshProfile: vi.fn().mockResolvedValue({ uid: "super-1" }),
+      onRefreshFailure: vi.fn(),
+      onRefreshSuccess,
+    });
+
+    expect(onRefreshSuccess).toHaveBeenCalledOnce();
+  });
 });

@@ -6,6 +6,7 @@ type FinalizeAgencyCreationOptions = {
   navigate: () => void;
   refreshProfile: () => Promise<unknown>;
   onRefreshFailure: (error: unknown) => void;
+  onRefreshSuccess?: () => void;
 };
 
 export async function finalizeAgencyCreation({
@@ -14,14 +15,16 @@ export async function finalizeAgencyCreation({
   navigate,
   refreshProfile,
   onRefreshFailure,
+  onRefreshSuccess,
 }: FinalizeAgencyCreationOptions): Promise<void> {
   showSuccess();
   navigate();
 
   if (!isRestricted) return;
 
-  await refreshCommittedAccess({
+  const refreshed = await refreshCommittedAccess({
     refreshProfile,
     onFailure: onRefreshFailure,
   });
+  if (refreshed) onRefreshSuccess?.();
 }

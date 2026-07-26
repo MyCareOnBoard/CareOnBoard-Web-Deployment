@@ -24,7 +24,10 @@ import Step10Subscription from "@/pages/super-admin/agencies/components/StepSeve
 import {GetDraftAgencyResponse} from "@/pages/super-admin/agencies/apiTypes";
 import {useAuth} from "@/utils/auth";
 import {finalizeAgencyCreation} from "./agencyCreationAccessRefresh";
-import {showAgencyAccessRefreshWarning} from "./agencyAccessRefreshToast";
+import {
+    dismissAgencyAccessRefreshWarning,
+    showAgencyAccessRefreshWarning,
+} from "./agencyAccessRefreshToast";
 
 interface AgencyFormData {
     // Step 1: Agency Identity Information
@@ -722,6 +725,7 @@ export default function AddAgencyWizard() {
                     navigate: () => navigate(Routes.superAdmin.agencies),
                     refreshProfile,
                     onRefreshFailure: () => showAgencyAccessRefreshWarning(refreshProfile),
+                    onRefreshSuccess: dismissAgencyAccessRefreshWarning,
                 });
                 return;
             }

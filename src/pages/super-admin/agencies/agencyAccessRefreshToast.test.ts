@@ -4,6 +4,8 @@ import {
   AGENCY_ACCESS_REFRESH_TOAST_ID,
   showAgencyAccessRefreshWarning,
 } from "./agencyAccessRefreshToast";
+import * as agencyAccessRefreshToast from "./agencyAccessRefreshToast";
+import {finalizeAgencyCreation} from "./agencyCreationAccessRefresh";
 
 const { warning, dismiss } = vi.hoisted(() => ({
   warning: vi.fn(),
@@ -38,5 +40,26 @@ describe("agency access refresh toast", () => {
     await warning.mock.calls[1][1].action.onClick();
     expect(dismiss).toHaveBeenCalledWith(AGENCY_ACCESS_REFRESH_TOAST_ID);
     expect(warning).toHaveBeenCalledTimes(2);
+  });
+
+  it("dismisses an older warning after a later initial refresh succeeds", async () => {
+    const dismissWarning = (
+      agencyAccessRefreshToast as typeof agencyAccessRefreshToast & {
+        dismissAgencyAccessRefreshWarning?: () => void;
+      }
+    ).dismissAgencyAccessRefreshWarning;
+
+    showAgencyAccessRefreshWarning(vi.fn());
+    expect(dismissWarning).toBeTypeOf("function");
+    await finalizeAgencyCreation({
+      isRestricted: true,
+      showSuccess: vi.fn(),
+      navigate: vi.fn(),
+      refreshProfile: vi.fn().mockResolvedValue({uid: "super-1"}),
+      onRefreshFailure: vi.fn(),
+      onRefreshSuccess: dismissWarning,
+    });
+
+    expect(dismiss).toHaveBeenCalledWith(AGENCY_ACCESS_REFRESH_TOAST_ID);
   });
 });

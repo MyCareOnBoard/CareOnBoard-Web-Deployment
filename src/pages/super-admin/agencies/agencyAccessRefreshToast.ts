@@ -3,6 +3,10 @@ import {refreshCommittedAccess} from "../user-access-control/postCommitAccessRef
 
 export const AGENCY_ACCESS_REFRESH_TOAST_ID = "agency-access-refresh";
 
+export function dismissAgencyAccessRefreshWarning(): void {
+  toast.dismiss(AGENCY_ACCESS_REFRESH_TOAST_ID);
+}
+
 export function showAgencyAccessRefreshWarning(
   refreshProfile: () => Promise<unknown>,
 ): void {
@@ -23,7 +27,7 @@ async function retryAgencyAccessRefresh(
   const refreshed = await refreshCommittedAccess({refreshProfile});
 
   if (refreshed) {
-    toast.dismiss(AGENCY_ACCESS_REFRESH_TOAST_ID);
+    dismissAgencyAccessRefreshWarning();
   } else {
     showAgencyAccessRefreshWarning(refreshProfile);
   }

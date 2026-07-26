@@ -361,9 +361,11 @@ export default function UserAccessControlPage() {
     const refreshed = await refreshCommittedAccess({
       refreshProfile,
     });
-    if (sessionId !== accessRefreshSessionRef.current) return;
     if (refreshed) {
       resetSuperAdminCaches(dispatch);
+    }
+    if (sessionId !== accessRefreshSessionRef.current) return;
+    if (refreshed) {
       setAccessRefreshWarning("");
     } else {
       setAccessRefreshWarning(

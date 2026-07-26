@@ -466,6 +466,30 @@ describe("UserAccessControlPage", () => {
     expect(updateSuperAdminUser).toHaveBeenCalledOnce();
   });
 
+  it("resets scoped caches after a successful self-refresh even when the success modal was dismissed", async () => {
+    vi.mocked(updateSuperAdminUser).mockResolvedValue({} as never);
+    const pendingRefresh = deferred<any>();
+    refreshProfile.mockReturnValueOnce(pendingRefresh.promise);
+    const user = userEvent.setup();
+    render(<UserAccessControlPage />);
+    await screen.findByText("Ada Admin");
+
+    await user.click(screen.getByRole("button", { name: "Edit user Ada Admin" }));
+    await user.click(screen.getByRole("button", { name: "Update User" }));
+    expect(await screen.findByText("Refreshing access...")).toBeVisible();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "User updated" }))
+        .not.toBeInTheDocument(),
+    );
+
+    pendingRefresh.resolve({ uid: "u1" });
+    await waitFor(() => expect(dispatch).toHaveBeenCalledTimes(10));
+    expect(screen.queryByRole("heading", { name: "User updated" }))
+      .not.toBeInTheDocument();
+  });
+
   it("clears an earlier warning for a new committed edit and ignores the old session completion", async () => {
     vi.mocked(updateSuperAdminUser).mockResolvedValue({} as never);
     const firstRefresh = deferred<any>();
@@ -491,8 +515,9 @@ describe("UserAccessControlPage", () => {
     expect(await screen.findByText("Refreshing access...")).toBeVisible();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
-    firstRefresh.reject(new Error("stale refresh failed"));
+    firstRefresh.resolve(null);
     await waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(2));
+    expect(dispatch).not.toHaveBeenCalled();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByText("Refreshing access...")).toBeVisible();
 
