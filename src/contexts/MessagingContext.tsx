@@ -22,9 +22,11 @@ import {
   useGetConversationsQuery,
   useGetMessagesQuery,
   AgencyContact,
-  UserConversation,
-  UserMessage,
 } from "@/lib/api/userMessaging";
+import {
+  mapRestConversation,
+  mapRestMessage,
+} from "@/lib/chat/restMessagingAdapters";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types/user.types";
 import { useToast } from "@/hooks/use-toast";
@@ -65,44 +67,7 @@ interface MessagingProviderProps {
   children: React.ReactNode;
 }
 
-function mapApiConversation(conversation: UserConversation): Conversation {
-  const participants = (conversation.participants || []).map((participant) => ({
-    uid: participant.uid,
-    name: participant.name,
-    role: participant.role,
-    avatar: participant.avatar,
-    userType: participant.userType || participant.role || "user",
-    agencyName: participant.agencyName,
-  }));
-  const lastMessage = typeof conversation.lastMessage === "string"
-    ? conversation.lastMessage
-    : conversation.lastMessage?.text || null;
-
-  return {
-    ...conversation,
-    type: conversation.type || "direct",
-    participants,
-    participantDetails: participants,
-    lastMessage,
-    createdAt: conversation.createdAt || "",
-    updatedAt: conversation.updatedAt || "",
-    createdBy: conversation.createdBy || "",
-  };
-}
-
-function mapApiMessage(message: UserMessage): Message {
-  const readBy = Array.isArray(message.readBy)
-    ? message.readBy
-    : Object.keys(message.readBy || {});
-  return {
-    ...message,
-    content: message.content || message.text || "",
-    readBy,
-    status: "sent",
-    createdAt: message.createdAt || "",
-    updatedAt: message.updatedAt || message.createdAt || "",
-  };
-}
+const SUPER_ADMIN_REFRESH_INTERVAL_MS = 15_000;
 
 export function MessagingProvider({ children }: MessagingProviderProps) {
   const { user } = useAuth();
@@ -115,7 +80,7 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   // RTK Query hooks - skip for unauthenticated users and family members (they use their own messaging API)
   const isFamilyMember = user?.userType === UserType.FAMILY_MEMBER;
   const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
-  const { data: contactsData, refetch: refetchContacts } = useGetContactsQuery(undefined, {
+  const { data: contactsData, refetch: refetchContacts } = useGetContactsQuery({ limit: 50 }, {
     skip: !user || isFamilyMember,
   });
   const [createConversationMutation] = useCreateConversationMutation();
@@ -127,7 +92,7 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
     isLoading: apiConversationsLoading,
     error: apiConversationsError,
     refetch: refetchConversations,
-  } = useGetConversationsQuery(undefined, {
+  } = useGetConversationsQuery({ limit: 50 }, {
     skip: !user || !isSuperAdmin,
   });
   const {
@@ -147,6 +112,38 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
     { conversationId: selectedConversationId || "", limit: 50 },
     { skip: !user || !isSuperAdmin || !selectedConversationId },
   );
+
+  useEffect(() => {
+    if (!user || !isSuperAdmin) return;
+
+    const refresh = () => {
+      if (document.visibilityState === "hidden") return;
+      void refetchConversations();
+      if (selectedConversationId) {
+        void refetchConversation();
+        void refetchMessages();
+      }
+    };
+    const interval = window.setInterval(
+      refresh,
+      SUPER_ADMIN_REFRESH_INTERVAL_MS,
+    );
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+    };
+  }, [
+    isSuperAdmin,
+    refetchConversation,
+    refetchConversations,
+    refetchMessages,
+    selectedConversationId,
+    user,
+  ]);
 
   // Subscribe to conversations list (already checks for user internally)
   const {
@@ -176,14 +173,14 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   const conversations = useMemo(
     () => isSuperAdmin
       ? (apiConversationsData?.conversations || apiConversationsData?.data || [])
-        .map(mapApiConversation)
+        .map(mapRestConversation)
       : firestoreConversations,
     [apiConversationsData, firestoreConversations, isSuperAdmin],
   );
   const currentConversation = useMemo(
     () => isSuperAdmin
       ? (apiConversationData?.conversation || apiConversationData?.data
-        ? mapApiConversation(
+        ? mapRestConversation(
           (apiConversationData.conversation || apiConversationData.data)!,
         )
         : null)
@@ -193,9 +190,9 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   const currentMessages = useMemo(
     () => isSuperAdmin
       ? (apiMessagesData?.messages || apiMessagesData?.data || [])
-        .map(mapApiMessage)
+        .map((message) => mapRestMessage(message, user?.uid))
       : firestoreMessages,
-    [apiMessagesData, firestoreMessages, isSuperAdmin],
+    [apiMessagesData, firestoreMessages, isSuperAdmin, user?.uid],
   );
   const conversationsLoading = isSuperAdmin
     ? apiConversationsLoading
@@ -297,7 +294,7 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
             return null;
           }
 
-          const mappedConversation = mapApiConversation(response.data);
+          const mappedConversation = mapRestConversation(response.data);
           // Select the new conversation
           setSelectedConversationId(mappedConversation.id);
           return mappedConversation;

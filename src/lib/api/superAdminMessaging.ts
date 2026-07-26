@@ -99,8 +99,11 @@ export interface Message {
 export interface Pagination {
   page: number;
   limit: number;
-  total: number;
-  totalPages: number;
+  total: number | null;
+  totalPages: number | null;
+  hasMore?: boolean;
+  nextCursor?: string | null;
+  scanned?: number;
 }
 
 /**
@@ -199,6 +202,7 @@ export async function searchUsers(params?: {
   limit?: number;
   role?: UserRole;
   userType?: UserType;
+  cursor?: string;
 }): Promise<SearchUsersResponse> {
   try {
     const searchParams = new URLSearchParams();
@@ -207,6 +211,7 @@ export async function searchUsers(params?: {
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.role) searchParams.append('role', params.role);
     if (params?.userType) searchParams.append('userType', params.userType);
+    if (params?.cursor) searchParams.append('cursor', params.cursor);
     
     const queryString = searchParams.toString();
     const url = `/superAdminMessaging/users/search${queryString ? `?${queryString}` : ''}`;
@@ -228,12 +233,14 @@ export async function getConversations(params?: {
   page?: number;
   limit?: number;
   search?: string;
+  cursor?: string;
 }): Promise<ConversationsListResponse> {
   try {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.search) searchParams.append('search', params.search);
+    if (params?.cursor) searchParams.append('cursor', params.cursor);
     
     const queryString = searchParams.toString();
     const url = `/superAdminMessaging/conversations${queryString ? `?${queryString}` : ''}`;

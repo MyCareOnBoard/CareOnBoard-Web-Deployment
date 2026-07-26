@@ -1,7 +1,11 @@
-import { render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { useEffect } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  refetchConversations: vi.fn(),
+  refetchConversation: vi.fn(),
+  refetchMessages: vi.fn(),
   useConversations: vi.fn(() => ({
     conversations: [],
     loading: false,
@@ -37,6 +41,25 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
+mocks.getConversations.mockImplementation(() => ({
+  data: { success: true, conversations: [], count: 0 },
+  isLoading: false,
+  error: null,
+  refetch: mocks.refetchConversations,
+}));
+mocks.getConversation.mockImplementation(() => ({
+  data: undefined,
+  isLoading: false,
+  error: null,
+  refetch: mocks.refetchConversation,
+}));
+mocks.getMessages.mockImplementation(() => ({
+  data: undefined,
+  isLoading: false,
+  error: null,
+  refetch: mocks.refetchMessages,
+}));
+
 vi.mock("@/utils/auth", () => ({
   useAuth: () => ({ user: { uid: "super-1", userType: "super_admin" } }),
 }));
@@ -63,9 +86,13 @@ vi.mock("@/lib/api/userMessaging", () => ({
   useGetMessagesQuery: mocks.getMessages,
 }));
 
-import { MessagingProvider } from "./MessagingContext";
+import { MessagingProvider, useMessaging } from "./MessagingContext";
 
 describe("MessagingProvider super-admin reads", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("disables direct Firestore subscriptions and uses guarded REST hooks", () => {
     render(<MessagingProvider><div>child</div></MessagingProvider>);
 
@@ -79,8 +106,102 @@ describe("MessagingProvider super-admin reads", () => {
       reverse: true,
       skip: true,
     });
-    expect(mocks.getConversations).toHaveBeenCalledWith(undefined, {
+    expect(mocks.getConversations).toHaveBeenCalledWith({ limit: 50 }, {
       skip: false,
+    });
+  });
+
+  it("polls guarded REST data and stops polling after unmount", () => {
+    vi.useFakeTimers();
+    function SelectedConversation() {
+      const { selectConversation } = useMessaging();
+      useEffect(() => selectConversation("conversation-a"), [selectConversation]);
+      return null;
+    }
+
+    const { unmount } = render(
+      <MessagingProvider><SelectedConversation /></MessagingProvider>,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(15_000);
+    });
+    expect(mocks.refetchConversations).toHaveBeenCalled();
+    expect(mocks.refetchConversation).toHaveBeenCalled();
+    expect(mocks.refetchMessages).toHaveBeenCalled();
+
+    unmount();
+    vi.clearAllMocks();
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(mocks.refetchConversations).not.toHaveBeenCalled();
+    expect(mocks.refetchConversation).not.toHaveBeenCalled();
+    expect(mocks.refetchMessages).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("normalizes REST timestamps and preserves read and status semantics", () => {
+    mocks.getMessages.mockReturnValue({
+      data: {
+        success: true,
+        messages: [
+          {
+            id: "read-message",
+            conversationId: "conversation-a",
+            senderId: "other",
+            senderName: "Other",
+            senderRole: "DSP",
+            content: "Read",
+            attachments: [],
+            readBy: { "super-1": "2026-07-26T00:00:00.000Z" },
+            isRead: false,
+            status: "read",
+            createdAt: { seconds: 0, nanoseconds: 0 },
+            updatedAt: { _seconds: 1, _nanoseconds: 500_000_000 },
+          },
+          {
+            id: "unread-message",
+            conversationId: "conversation-a",
+            senderId: "other",
+            senderName: "Other",
+            senderRole: "DSP",
+            content: "Unread",
+            attachments: [],
+            readBy: { other: "2026-07-26T00:00:00.000Z" },
+            isRead: true,
+            status: "delivered",
+            createdAt: "2026-07-26T10:00:00.000Z",
+            updatedAt: "2026-07-26T10:00:01.000Z",
+          },
+        ],
+        count: 2,
+      },
+      isLoading: false,
+      error: null,
+      refetch: mocks.refetchMessages,
+    } as any);
+
+    function MessageProbe() {
+      const { currentMessages } = useMessaging();
+      return (
+        <pre data-testid="messages">{JSON.stringify(currentMessages)}</pre>
+      );
+    }
+
+    render(<MessagingProvider><MessageProbe /></MessagingProvider>);
+    const messages = JSON.parse(screen.getByTestId("messages").textContent!);
+
+    expect(messages[0]).toMatchObject({
+      status: "read",
+      isRead: true,
+      createdAt: "1970-01-01T00:00:00.000Z",
+      updatedAt: "1970-01-01T00:00:01.500Z",
+    });
+    expect(messages[1]).toMatchObject({
+      status: "delivered",
+      isRead: false,
+      createdAt: "2026-07-26T10:00:00.000Z",
     });
   });
 });

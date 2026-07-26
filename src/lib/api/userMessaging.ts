@@ -67,10 +67,11 @@ export interface UserMessage {
   content: string;
   text?: string;
   attachments?: MessageAttachment[];
-  readBy: string[];
+  readBy: string[] | Record<string, unknown>;
   isRead: boolean;
-  createdAt: string;
-  updatedAt: string;
+  status?: "sent" | "delivered" | "read";
+  createdAt: unknown;
+  updatedAt: unknown;
 }
 
 /**
@@ -83,11 +84,11 @@ export interface UserConversation {
   participantIds: string[];
   participants: ConversationParticipant[];
   lastMessage?: string | { text?: string; senderId?: string; timestamp?: string };
-  lastMessageAt?: string;
+  lastMessageAt?: unknown;
   lastMessageSenderId?: string;
   unreadCount: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: unknown;
+  updatedAt: unknown;
   createdBy: string;
 }
 
@@ -127,6 +128,7 @@ export interface GetConversationsResponse {
   conversations: UserConversation[];
   data?: UserConversation[];
   count: number;
+  pagination?: CursorPagination;
 }
 
 /**
@@ -159,6 +161,23 @@ export interface GetMessagesResponse {
 export interface GetContactsResponse {
   success: boolean;
   data: AgencyContact[];
+  count?: number;
+  pagination?: CursorPagination;
+}
+
+export interface CursorPagination {
+  limit: number;
+  count?: number;
+  total?: number | null;
+  totalPages?: number | null;
+  hasMore?: boolean;
+  nextCursor?: string | null;
+  scanned?: number;
+}
+
+export interface CursorPageParams {
+  limit?: number;
+  cursor?: string;
 }
 
 /**
@@ -215,12 +234,59 @@ export const userMessagingApi = createApi({
   keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     // Get all conversations for authenticated user
-    getConversations: builder.query<GetConversationsResponse, void>({
-      query: () => ({
-        url: USER_MESSAGING_BASE,
-        method: "GET",
-        requiresAuth: true
-      }),
+    getConversations: builder.query<
+      GetConversationsResponse,
+      CursorPageParams | void
+    >({
+      queryFn: async (params, _api, _extraOptions, baseQuery) => {
+        const requestedLimit = params?.limit || 50;
+        const conversations: UserConversation[] = [];
+        const seenCursors = new Set<string>();
+        let cursor = params?.cursor;
+        let lastPage: GetConversationsResponse | null = null;
+
+        while (conversations.length < requestedLimit) {
+          const queryParams = new URLSearchParams({
+            limit: String(requestedLimit - conversations.length),
+          });
+          if (cursor) queryParams.set("cursor", cursor);
+          const result = await baseQuery({
+            url: `${USER_MESSAGING_BASE}?${queryParams.toString()}`,
+            method: "GET",
+            requiresAuth: true,
+          });
+          if (result.error) return { error: result.error };
+
+          const page = result.data as GetConversationsResponse;
+          lastPage = page;
+          conversations.push(...(page.conversations || page.data || []));
+          const nextCursor = page.pagination?.nextCursor || undefined;
+          if (!page.pagination?.hasMore || !nextCursor) break;
+          if (seenCursors.has(nextCursor)) {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error: "Conversation pagination cursor did not advance",
+              },
+            };
+          }
+          seenCursors.add(nextCursor);
+          cursor = nextCursor;
+        }
+
+        return {
+          data: {
+            ...(lastPage || { success: true, count: 0 }),
+            conversations,
+            count: conversations.length,
+            pagination: {
+              ...lastPage?.pagination,
+              limit: requestedLimit,
+              count: conversations.length,
+            },
+          } as GetConversationsResponse,
+        };
+      },
       providesTags: ['Conversations'],
     }),
 
@@ -235,12 +301,56 @@ export const userMessagingApi = createApi({
     }),
 
     // Get contacts available for messaging
-    getContacts: builder.query<GetContactsResponse, void>({
-      query: () => ({
-        url: `${USER_MESSAGING_BASE}/contacts`,
-        method: "GET",
-        requiresAuth: true
-      }),
+    getContacts: builder.query<GetContactsResponse, CursorPageParams | void>({
+      queryFn: async (params, _api, _extraOptions, baseQuery) => {
+        const requestedLimit = params?.limit || 50;
+        const contacts: AgencyContact[] = [];
+        const seenCursors = new Set<string>();
+        let cursor = params?.cursor;
+        let lastPage: GetContactsResponse | null = null;
+
+        while (contacts.length < requestedLimit) {
+          const queryParams = new URLSearchParams({
+            limit: String(requestedLimit - contacts.length),
+          });
+          if (cursor) queryParams.set("cursor", cursor);
+          const result = await baseQuery({
+            url: `${USER_MESSAGING_BASE}/contacts?${queryParams.toString()}`,
+            method: "GET",
+            requiresAuth: true,
+          });
+          if (result.error) return { error: result.error };
+
+          const page = result.data as GetContactsResponse;
+          lastPage = page;
+          contacts.push(...(page.data || []));
+          const nextCursor = page.pagination?.nextCursor || undefined;
+          if (!page.pagination?.hasMore || !nextCursor) break;
+          if (seenCursors.has(nextCursor)) {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error: "Contact pagination cursor did not advance",
+              },
+            };
+          }
+          seenCursors.add(nextCursor);
+          cursor = nextCursor;
+        }
+
+        return {
+          data: {
+            ...(lastPage || { success: true }),
+            data: contacts,
+            count: contacts.length,
+            pagination: {
+              ...lastPage?.pagination,
+              limit: requestedLimit,
+              count: contacts.length,
+            },
+          } as GetContactsResponse,
+        };
+      },
       providesTags: ['Contacts'],
     }),
 
