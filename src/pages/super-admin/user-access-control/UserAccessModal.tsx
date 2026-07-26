@@ -58,6 +58,20 @@ function roleAccessFromInitialData(
   };
 }
 
+function normalizeRoleAccess(
+  value: RoleAccessValue,
+  config: SuperAdminAccessConfig,
+): RoleAccessValue {
+  const selectedPermissions = new Set(value.accessList);
+
+  return {
+    ...value,
+    accessList: config.accessScopes.filter((permission) =>
+      selectedPermissions.has(permission),
+    ),
+  };
+}
+
 export default function UserAccessModal({
   open,
   onOpenChange,
@@ -80,6 +94,9 @@ export default function UserAccessModal({
   const [showPassword, setShowPassword] = useState(false);
   const previousOpenRef = useRef(false);
   const configRequestRef = useRef(0);
+  const saveInFlightRef = useRef(false);
+  const sessionGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     if (config) {
@@ -119,12 +136,19 @@ export default function UserAccessModal({
     const justOpened = open && !previousOpenRef.current;
 
     if (justOpened) {
+      sessionGenerationRef.current += 1;
       setName(initialData?.name || "");
       setEmail(initialData?.email || "");
       setPassword(initialData?.password || "");
-      setRoleAccess(roleAccessFromInitialData(initialData));
+      const nextRoleAccess = roleAccessFromInitialData(initialData);
+      const activeConfig = config || resolvedConfig;
+      setRoleAccess(
+        activeConfig
+          ? normalizeRoleAccess(nextRoleAccess, activeConfig)
+          : nextRoleAccess,
+      );
       setShowPassword(false);
-      setIsSaving(false);
+      setIsSaving(saveInFlightRef.current);
 
       if (!config && !resolvedConfig) {
         void loadConfig();
@@ -134,12 +158,14 @@ export default function UserAccessModal({
     previousOpenRef.current = open;
   }, [config, initialData, open, resolvedConfig]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
       configRequestRef.current += 1;
-    },
-    [],
-  );
+    };
+  }, []);
 
   const handleGeneratePassword = () => {
     const chars =
@@ -151,49 +177,58 @@ export default function UserAccessModal({
     setPassword(newPassword);
   };
 
-  const customTitleLength = roleAccess.role.trim().length;
+  const normalizedRoleAccess = resolvedConfig
+    ? normalizeRoleAccess(roleAccess, resolvedConfig)
+    : roleAccess;
+  const customTitleLength = normalizedRoleAccess.role.trim().length;
   const roleIsInvalid =
     customTitleLength === 0 ||
-    (roleAccess.roleTemplate === "custom" &&
+    (normalizedRoleAccess.roleTemplate === "custom" &&
       (customTitleLength < 2 || customTitleLength > 60));
   const saveIsDisabled =
     isSaving ||
+    saveInFlightRef.current ||
     isConfigLoading ||
     !resolvedConfig ||
     roleIsInvalid ||
-    roleAccess.accessList.length === 0;
+    normalizedRoleAccess.accessList.length === 0;
 
   const handleSave = async () => {
-    if (saveIsDisabled) return;
+    if (saveIsDisabled || saveInFlightRef.current) return;
 
+    const saveSession = sessionGenerationRef.current;
+    saveInFlightRef.current = true;
     setIsSaving(true);
     try {
       await onSave({
         name,
         email,
         password,
-        role: roleAccess.role.trim(),
-        roleTemplate: roleAccess.roleTemplate,
-        accessList: [...roleAccess.accessList],
+        role: normalizedRoleAccess.role.trim(),
+        roleTemplate: normalizedRoleAccess.roleTemplate,
+        accessList: [...normalizedRoleAccess.accessList],
       });
-      onOpenChange(false);
+      if (sessionGenerationRef.current === saveSession) {
+        onOpenChange(false);
+      }
     } catch (error) {
       console.error("Error saving user:", error);
       // Keep the modal open so the same form can be retried.
     } finally {
-      setIsSaving(false);
+      saveInFlightRef.current = false;
+      if (mountedRef.current) setIsSaving(false);
     }
   };
 
   const handleClose = () => {
-    if (!isSaving) onOpenChange(false);
+    if (!saveInFlightRef.current) onOpenChange(false);
   };
 
   return (
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (nextOpen || !isSaving) onOpenChange(nextOpen);
+        if (nextOpen || !saveInFlightRef.current) onOpenChange(nextOpen);
       }}
     >
       <DialogContent
@@ -311,7 +346,7 @@ export default function UserAccessModal({
             {resolvedConfig ? (
               <RolePermissionsFields
                 config={resolvedConfig}
-                value={roleAccess}
+                value={normalizedRoleAccess}
                 disabled={isSaving}
                 onChange={setRoleAccess}
               />

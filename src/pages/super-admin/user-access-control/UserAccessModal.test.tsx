@@ -168,6 +168,41 @@ describe("UserAccessModal", () => {
     expect(screen.getByLabelText("Email")).toBeDisabled();
   });
 
+  it("removes out-of-config permissions before rendering and submission", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <UserAccessModal
+        open
+        onOpenChange={vi.fn()}
+        mode="edit"
+        config={config}
+        initialData={{
+          name: "Casey Admin",
+          email: "casey@example.com",
+          password: "",
+          role: "Compliance Manager",
+          roleTemplate: "compliance_manager",
+          accessList: ["Compliance Monitor", "Hidden Internal Access"],
+        }}
+        onSave={onSave}
+      />,
+    );
+
+    expect(screen.queryByText("Hidden Internal Access")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "Compliance Monitor" }),
+    ).toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: "Update User" }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ accessList: ["Compliance Monitor"] }),
+      );
+    });
+  });
+
   it("keeps the modal open and exposes saving state while save is pending", async () => {
     const user = userEvent.setup();
     let resolveSave!: () => void;
@@ -201,6 +236,76 @@ describe("UserAccessModal", () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
 
     resolveSave();
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it("keeps a reopened session guarded from an older pending save", async () => {
+    const user = userEvent.setup();
+    const pendingSaves: Array<() => void> = [];
+    const onSave = vi.fn(
+      () => new Promise<void>((resolve) => pendingSaves.push(resolve)),
+    );
+    const onOpenChange = vi.fn();
+    const initialData = {
+      name: "Casey Admin",
+      email: "casey@example.com",
+      password: "",
+      role: "Compliance Manager",
+      roleTemplate: "compliance_manager" as const,
+      accessList: ["Compliance Monitor"],
+    };
+    const { rerender } = render(
+      <UserAccessModal
+        open
+        onOpenChange={onOpenChange}
+        mode="edit"
+        config={config}
+        initialData={initialData}
+        onSave={onSave}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Update User" }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <UserAccessModal
+        open={false}
+        onOpenChange={onOpenChange}
+        mode="edit"
+        config={config}
+        initialData={initialData}
+        onSave={onSave}
+      />,
+    );
+    rerender(
+      <UserAccessModal
+        open
+        onOpenChange={onOpenChange}
+        mode="edit"
+        config={config}
+        initialData={initialData}
+        onSave={onSave}
+      />,
+    );
+
+    const guardedSave = await screen.findByRole("button", {
+      name: "Updating user...",
+    });
+    expect(guardedSave).toBeDisabled();
+    await user.click(guardedSave);
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    onOpenChange.mockClear();
+    pendingSaves[0]();
+
+    const nextSave = await screen.findByRole("button", { name: "Update User" });
+    expect(nextSave).toBeEnabled();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+    await user.click(nextSave);
+    expect(onSave).toHaveBeenCalledTimes(2);
+    pendingSaves[1]();
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 });
