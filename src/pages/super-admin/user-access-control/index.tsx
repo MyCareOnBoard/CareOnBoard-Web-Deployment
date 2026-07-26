@@ -32,6 +32,11 @@ import {
   type SuperAdminUser,
 } from "@/lib/api/super-admin-users";
 import type { UserAccessFormValue } from "./userAccessTypes";
+import { useAuth } from "@/utils/auth";
+import { useAppDispatch } from "@/store/redux/hooks";
+import { superAdminApi } from "@/pages/super-admin/agencies/api";
+import { superAdminDashboardApi } from "@/pages/super-admin/dashboard/api";
+import { complianceApi } from "@/pages/super-admin/compliance-monitor/complianceApi";
 
 type AgencyOption = { id: string; name: string; status?: string };
 const PAGE_SIZE = 10;
@@ -70,6 +75,8 @@ function TableSkeleton() {
 }
 
 export default function UserAccessControlPage() {
+  const { user, refreshProfile } = useAuth();
+  const dispatch = useAppDispatch();
   const [config, setConfig] = useState<SuperAdminAccessConfig | null>(null);
   const [users, setUsers] = useState<SuperAdminUser[]>([]);
   const [pagination, setPagination] = useState({
@@ -358,6 +365,28 @@ export default function UserAccessControlPage() {
           ...updateData,
           ...(password.trim() ? { password } : {}),
         });
+        if (editingUser.uid === user?.uid || editingUser.id === user?.uid) {
+          await refreshProfile();
+          dispatch(superAdminApi.util.invalidateTags(["Agencies"]));
+          dispatch(
+            superAdminDashboardApi.util.invalidateTags([
+              "SuperAdminStats",
+              "ShiftStats",
+              "AttendanceReport",
+              "NetworkComplianceSummary",
+              "AgencyComplianceRows",
+            ]),
+          );
+          dispatch(
+            complianceApi.util.invalidateTags([
+              "ComplianceDocuments",
+              "ComplianceNotes",
+              "ComplianceEvv",
+              "ComplianceOthers",
+              "ComplianceStats",
+            ]),
+          );
+        }
       }
       await loadUsers();
       setSuccessUserName(data.name);

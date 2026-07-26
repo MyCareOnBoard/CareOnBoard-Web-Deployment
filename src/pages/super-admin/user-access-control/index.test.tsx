@@ -10,6 +10,16 @@ import {
   updateSuperAdminUser,
 } from "@/lib/api/super-admin-users";
 
+const { dispatch, refreshProfile } = vi.hoisted(() => ({
+  dispatch: vi.fn(),
+  refreshProfile: vi.fn(),
+}));
+
+vi.mock("@/utils/auth", () => ({
+  useAuth: () => ({ user: { uid: "u1" }, refreshProfile }),
+}));
+vi.mock("@/store/redux/hooks", () => ({ useAppDispatch: () => dispatch }));
+
 vi.mock("@/lib/api/super-admin-users", () => ({
   getSuperAdminAccessConfig: vi.fn(),
   listAssignableAgencies: vi.fn(),
@@ -37,6 +47,7 @@ const deferred = <T,>() => {
 describe("UserAccessControlPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    refreshProfile.mockResolvedValue({ uid: "u1" });
     vi.mocked(getSuperAdminAccessConfig).mockResolvedValue(config as never);
     vi.mocked(listSuperAdminUsers).mockResolvedValue({
       success: true,
@@ -413,5 +424,30 @@ describe("UserAccessControlPage", () => {
         agencyIds: ["a1", "a2"],
       }),
     );
+    await waitFor(() => expect(refreshProfile).toHaveBeenCalledOnce());
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "superAdminApi/invalidateTags",
+      payload: ["Agencies"],
+    });
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "superAdminDashboardApi/invalidateTags",
+      payload: [
+        "SuperAdminStats",
+        "ShiftStats",
+        "AttendanceReport",
+        "NetworkComplianceSummary",
+        "AgencyComplianceRows",
+      ],
+    });
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "complianceApi/invalidateTags",
+      payload: [
+        "ComplianceDocuments",
+        "ComplianceNotes",
+        "ComplianceEvv",
+        "ComplianceOthers",
+        "ComplianceStats",
+      ],
+    });
   });
 });

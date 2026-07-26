@@ -234,6 +234,15 @@ describe("ComplianceMonitor", () => {
     );
   });
 
+  it("ignores URL agencies outside the backend-scoped options", () => {
+    renderPage("?agencyId=locked-agency&agencyName=Locked+Care");
+    fireEvent.click(screen.getByRole("button", { name: "All agencies" }));
+    expect(screen.queryByRole("button", { name: "Locked Care" })).not.toBeInTheDocument();
+    expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+      { page: 1, limit: 10 }, { skip: false },
+    );
+  });
+
   it("clears all filters and retries an unavailable agency selector", () => {
     const retryAgencies = vi.fn();
     vi.mocked(useListAllAgenciesQuery).mockReturnValue({

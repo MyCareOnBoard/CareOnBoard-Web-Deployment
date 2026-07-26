@@ -71,7 +71,7 @@ export function UserAvatar({ userName, userImage }: { userName?: string; userIma
 }
 
 export default function DashboardHeader(
-  { actions, centerContent, userName, userImage, onLogout, userType }: {
+  { actions, centerContent, userName, userImage, userRole, onLogout, userType }: {
     actions?: ReactNode;
     centerContent?: ReactNode;
     userName?: string;
@@ -299,7 +299,16 @@ export default function DashboardHeader(
                   className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer"
                 >
                   <UserAvatar userName={userName} userImage={userImage} />
-                  <p className="hidden pr-[12px] text-sm font-medium leading-[1.4] text-[#10141a] md:block">{userName || 'User'}</p>
+                  <div className="hidden min-w-0 pr-2 sm:block">
+                    <p className="max-w-40 truncate text-sm font-medium leading-tight text-[#10141a]">
+                      {userName || 'User'}
+                    </p>
+                    {userRole && (
+                      <p className="mt-0.5 max-w-40 truncate text-[11px] font-medium leading-tight text-[#687173]">
+                        {userRole}
+                      </p>
+                    )}
+                  </div>
                   {isUserDropdownOpen ? (
                     <ChevronUp className="h-4 w-4 text-[#808081] mr-2" />
                   ) : (

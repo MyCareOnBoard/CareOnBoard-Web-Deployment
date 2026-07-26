@@ -66,7 +66,7 @@ const CATEGORIES = Object.keys(CATEGORY_META) as ComplianceCategory[];
 export default function ComplianceMonitor() {
   const location = useLocation();
   const navigate = useNavigate();
-  const agencyScope = parseComplianceMonitorScope(location.search);
+  const requestedAgencyScope = parseComplianceMonitorScope(location.search);
   const urlTextSearch = parseComplianceMonitorTextSearch(location.search);
   const [activeTab, setActiveTab] =
     useState<ComplianceCategory>("documents");
@@ -82,26 +82,35 @@ export default function ComplianceMonitor() {
     status: "active",
   });
   const agencyOptions = useMemo(() => {
-    const options = (agencyQuery.data?.agencies ?? [])
+    return (agencyQuery.data?.agencies ?? [])
       .filter((agency) => agency.status === "active")
       .map((agency) => ({ value: agency.id, label: agency.name }))
       .sort((left, right) => left.label.localeCompare(right.label));
+  }, [agencyQuery.data?.agencies]);
+  const agencyScope = useMemo(() => {
+    if (!agencyQuery.data || !requestedAgencyScope) return null;
+    const option = agencyOptions.find(
+      (candidate) => candidate.value === requestedAgencyScope.agencyId,
+    );
+    return option
+      ? { agencyId: option.value, agencyName: option.label }
+      : null;
+  }, [agencyOptions, agencyQuery.data, requestedAgencyScope?.agencyId]);
 
-    if (
-      agencyScope &&
-      !options.some((option) => option.value === agencyScope.agencyId)
-    ) {
-      options.unshift({
-        value: agencyScope.agencyId,
-        label: agencyScope.agencyName,
-      });
-    }
-
-    return options;
+  useEffect(() => {
+    if (!agencyQuery.data || !requestedAgencyScope || agencyScope) return;
+    const nextSearch = buildComplianceMonitorLocationSearch({
+      scope: null,
+      search: urlTextSearch,
+    });
+    navigate(`${location.pathname}${nextSearch}`, { replace: true });
   }, [
-    agencyQuery.data?.agencies,
-    agencyScope?.agencyId,
-    agencyScope?.agencyName,
+    agencyQuery.data,
+    agencyScope,
+    location.pathname,
+    navigate,
+    requestedAgencyScope,
+    urlTextSearch,
   ]);
 
   useEffect(() => {
