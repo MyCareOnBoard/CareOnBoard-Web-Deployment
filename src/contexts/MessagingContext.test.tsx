@@ -1,8 +1,17 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  authUser: {
+    uid: "super-1",
+    userType: "super_admin",
+    profile: {
+      accessList: ["Corporate Support"],
+      agencyScope: "all",
+      agencyIds: ["agency-a", "agency-b"],
+    },
+  } as any,
   refetchConversations: vi.fn(),
   refetchConversation: vi.fn(),
   refetchMessages: vi.fn(),
@@ -32,6 +41,10 @@ const mocks = vi.hoisted(() => ({
     conversations: [],
     count: 0,
   },
+  conversationData: undefined as any,
+  conversationCurrentData: undefined as any,
+  messagesData: undefined as any,
+  messagesCurrentData: undefined as any,
   getConversation: vi.fn(() => ({
     data: undefined,
     isLoading: false,
@@ -54,20 +67,22 @@ mocks.getConversations.mockImplementation(() => ({
   refetch: mocks.refetchConversations,
 }));
 mocks.getConversation.mockImplementation(() => ({
-  data: undefined,
+  data: mocks.conversationData,
+  currentData: mocks.conversationCurrentData,
   isLoading: false,
   error: null,
   refetch: mocks.refetchConversation,
 }));
 mocks.getMessages.mockImplementation(() => ({
-  data: undefined,
+  data: mocks.messagesData,
+  currentData: mocks.messagesCurrentData,
   isLoading: false,
   error: null,
   refetch: mocks.refetchMessages,
 }));
 
 vi.mock("@/utils/auth", () => ({
-  useAuth: () => ({ user: { uid: "super-1", userType: "super_admin" } }),
+  useAuth: () => ({ user: mocks.authUser }),
 }));
 vi.mock("@/lib/hooks/useMessaging", () => ({
   useConversations: mocks.useConversations,
@@ -96,15 +111,49 @@ vi.mock("@/lib/api/userMessaging", () => ({
 
 import { MessagingProvider, useMessaging } from "./MessagingContext";
 
+function lastConversationScopeKey(): string | undefined {
+  const calls = mocks.getConversations.mock.calls as unknown as Array<
+    [{ scopeKey?: string }]
+  >;
+  return calls[calls.length - 1]?.[0]?.scopeKey;
+}
+
 describe("MessagingProvider super-admin reads", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.authUser = {
+      uid: "super-1",
+      userType: "super_admin",
+      profile: {
+        accessList: ["Corporate Support"],
+        agencyScope: "all",
+        agencyIds: ["agency-a", "agency-b"],
+      },
+    };
+    mocks.conversationData = undefined;
+    mocks.conversationCurrentData = undefined;
+    mocks.messagesData = undefined;
+    mocks.messagesCurrentData = undefined;
     mocks.getConversations.mockImplementation(() => ({
       data: mocks.conversationListData,
       currentData: mocks.conversationListData,
       isLoading: false,
       error: null,
       refetch: mocks.refetchConversations,
+    }));
+    mocks.getConversation.mockImplementation(() => ({
+      data: mocks.conversationData,
+      currentData: mocks.conversationCurrentData,
+      isLoading: false,
+      error: null,
+      refetch: mocks.refetchConversation,
+    }));
+    mocks.getMessages.mockImplementation(() => ({
+      data: mocks.messagesData,
+      currentData: mocks.messagesCurrentData,
+      isLoading: false,
+      error: null,
+      refetch: mocks.refetchMessages,
     }));
   });
 
@@ -161,8 +210,7 @@ describe("MessagingProvider super-admin reads", () => {
   });
 
   it("normalizes REST timestamps and preserves read and status semantics", () => {
-    mocks.getMessages.mockReturnValue({
-      data: {
+    const response = {
         success: true,
         messages: [
           {
@@ -195,14 +243,20 @@ describe("MessagingProvider super-admin reads", () => {
           },
         ],
         count: 2,
-      },
+    };
+    mocks.getMessages.mockReturnValue({
+      data: response,
+      currentData: response,
       isLoading: false,
       error: null,
       refetch: mocks.refetchMessages,
     } as any);
 
     function MessageProbe() {
-      const { currentMessages } = useMessaging();
+      const { currentMessages, selectConversation } = useMessaging();
+      useEffect(() => {
+        selectConversation("conversation-a");
+      }, [selectConversation]);
       return (
         <pre data-testid="messages">{JSON.stringify(currentMessages)}</pre>
       );
@@ -222,5 +276,213 @@ describe("MessagingProvider super-admin reads", () => {
       isRead: false,
       createdAt: "2026-07-26T10:00:00.000Z",
     });
+  });
+
+  it("changes the scope fingerprint for same-UID all, selected A, and selected B access", () => {
+    mocks.authUser = {
+      uid: "super-1",
+      userType: "super_admin",
+      profile: {
+        accessList: ["Corporate Support", "Compliance"],
+        agencyScope: "all",
+        agencyIds: ["agency-b", "agency-a"],
+      },
+    };
+    const view = render(
+      <MessagingProvider><div>scope probe</div></MessagingProvider>,
+    );
+    const allScopeKey = lastConversationScopeKey();
+
+    mocks.authUser = {
+      ...mocks.authUser,
+      profile: {
+        accessList: ["Compliance", "Corporate Support"],
+        agencyScope: "all",
+        agencyIds: ["agency-a", "agency-b", "agency-a"],
+      },
+    };
+    view.rerender(
+      <MessagingProvider><div>scope probe</div></MessagingProvider>,
+    );
+    expect(lastConversationScopeKey()).toBe(
+      allScopeKey,
+    );
+
+    mocks.authUser = {
+      ...mocks.authUser,
+      profile: {
+        ...mocks.authUser.profile,
+        agencyScope: "selected",
+        agencyIds: ["agency-a"],
+      },
+    };
+    view.rerender(
+      <MessagingProvider><div>scope probe</div></MessagingProvider>,
+    );
+    const agencyAScopeKey = lastConversationScopeKey();
+    expect(agencyAScopeKey).not.toBe(allScopeKey);
+
+    mocks.authUser = {
+      ...mocks.authUser,
+      profile: {
+        ...mocks.authUser.profile,
+        agencyIds: ["agency-b"],
+      },
+    };
+    view.rerender(
+      <MessagingProvider><div>scope probe</div></MessagingProvider>,
+    );
+    const agencyBScopeKey = lastConversationScopeKey();
+    expect(agencyBScopeKey).not.toBe(agencyAScopeKey);
+  });
+
+  it("masks revoked detail/messages and rejects stale old-scope query data", () => {
+    const allScopeConversation = {
+      success: true,
+      conversation: {
+        id: "all-scope-detail",
+        type: "direct",
+        participantIds: ["super-1", "employee-a"],
+        participants: [],
+        unreadCount: 3,
+        createdAt: "2026-07-26T00:00:00.000Z",
+        updatedAt: "2026-07-26T00:00:00.000Z",
+        createdBy: "super-1",
+      },
+    };
+    const allScopeMessages = {
+      success: true,
+      messages: [{
+        id: "all-scope-message",
+        conversationId: "conversation-a",
+        senderId: "employee-a",
+        senderName: "Employee A",
+        senderRole: "DSP",
+        content: "Old scope",
+        readBy: [],
+        isRead: false,
+        status: "sent",
+        createdAt: "2026-07-26T00:00:00.000Z",
+        updatedAt: "2026-07-26T00:00:00.000Z",
+      }],
+    };
+    mocks.conversationData = allScopeConversation;
+    mocks.conversationCurrentData = allScopeConversation;
+    mocks.messagesData = allScopeMessages;
+    mocks.messagesCurrentData = allScopeMessages;
+
+    function SelectionProbe() {
+      const {
+        currentConversation,
+        currentMessages,
+        selectConversation,
+      } = useMessaging();
+      return (
+        <>
+          <button onClick={() => selectConversation("conversation-a")}>
+            Select conversation
+          </button>
+          <div data-testid="detail-id">
+            {currentConversation?.id || "none"}
+          </div>
+          <div data-testid="message-ids">
+            {currentMessages.map(({ id }) => id).join(",") || "none"}
+          </div>
+        </>
+      );
+    }
+
+    const view = render(
+      <MessagingProvider><SelectionProbe /></MessagingProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", {
+      name: "Select conversation",
+    }));
+    expect(screen.getByTestId("detail-id")).toHaveTextContent(
+      "all-scope-detail",
+    );
+    expect(screen.getByTestId("message-ids")).toHaveTextContent(
+      "all-scope-message",
+    );
+
+    mocks.authUser = {
+      ...mocks.authUser,
+      profile: {
+        ...mocks.authUser.profile,
+        agencyScope: "selected",
+        agencyIds: ["agency-a"],
+      },
+    };
+    mocks.conversationCurrentData = undefined;
+    mocks.messagesCurrentData = undefined;
+    view.rerender(
+      <MessagingProvider><SelectionProbe /></MessagingProvider>,
+    );
+    expect(screen.getByTestId("detail-id")).toHaveTextContent("none");
+    expect(screen.getByTestId("message-ids")).toHaveTextContent("none");
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "Select conversation",
+    }));
+    expect(screen.getByTestId("detail-id")).toHaveTextContent("none");
+    expect(screen.getByTestId("message-ids")).toHaveTextContent("none");
+    expect(mocks.getConversation).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        conversationId: "conversation-a",
+        scopeKey: expect.any(String),
+      }),
+      { skip: false },
+    );
+    expect(mocks.getMessages).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        conversationId: "conversation-a",
+        scopeKey: expect.any(String),
+      }),
+      { skip: false },
+    );
+
+    mocks.conversationData = {
+      ...allScopeConversation,
+      conversation: {
+        ...allScopeConversation.conversation,
+        id: "stale-all-scope-detail",
+      },
+    };
+    mocks.messagesData = {
+      ...allScopeMessages,
+      messages: [{
+        ...allScopeMessages.messages[0],
+        id: "stale-all-scope-message",
+      }],
+    };
+    view.rerender(
+      <MessagingProvider><SelectionProbe /></MessagingProvider>,
+    );
+    expect(screen.getByTestId("detail-id")).toHaveTextContent("none");
+    expect(screen.getByTestId("message-ids")).toHaveTextContent("none");
+
+    mocks.conversationCurrentData = {
+      ...allScopeConversation,
+      conversation: {
+        ...allScopeConversation.conversation,
+        id: "agency-a-detail",
+      },
+    };
+    mocks.messagesCurrentData = {
+      ...allScopeMessages,
+      messages: [{
+        ...allScopeMessages.messages[0],
+        id: "agency-a-message",
+      }],
+    };
+    view.rerender(
+      <MessagingProvider><SelectionProbe /></MessagingProvider>,
+    );
+    expect(screen.getByTestId("detail-id")).toHaveTextContent(
+      "agency-a-detail",
+    );
+    expect(screen.getByTestId("message-ids")).toHaveTextContent(
+      "agency-a-message",
+    );
   });
 });

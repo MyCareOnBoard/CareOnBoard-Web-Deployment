@@ -331,6 +331,63 @@ describe("messaging upload contracts", () => {
     });
   });
 
+  it("partitions conversation detail and message caches by auth scope without leaking the key into URLs", async () => {
+    baseQuery.mockImplementation(async (request: unknown) => {
+      const url = (request as { url: string }).url;
+      return url.endsWith("/messages?limit=50")
+        ? {
+          data: {
+            success: true,
+            messages: [],
+          },
+        }
+        : {
+          data: {
+            success: true,
+            conversation: {
+              id: "conversation-a",
+              participantIds: [],
+            },
+          },
+        };
+    });
+    const store = configureStore({
+      reducer: { [userMessagingApi.reducerPath]: userMessagingApi.reducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware().concat(userMessagingApi.middleware),
+    });
+
+    await Promise.all([
+      store.dispatch(userMessagingApi.endpoints.getConversationById.initiate({
+        conversationId: "conversation-a",
+        scopeKey: "scope-a",
+      } as any)).unwrap(),
+      store.dispatch(userMessagingApi.endpoints.getConversationById.initiate({
+        conversationId: "conversation-a",
+        scopeKey: "scope-b",
+      } as any)).unwrap(),
+      store.dispatch(userMessagingApi.endpoints.getMessages.initiate({
+        conversationId: "conversation-a",
+        limit: 50,
+        scopeKey: "scope-a",
+      } as any)).unwrap(),
+      store.dispatch(userMessagingApi.endpoints.getMessages.initiate({
+        conversationId: "conversation-a",
+        limit: 50,
+        scopeKey: "scope-b",
+      } as any)).unwrap(),
+    ]);
+
+    expect(baseQuery).toHaveBeenCalledTimes(4);
+    expect(baseQuery.mock.calls.map(([request]) =>
+      (request as { url: string }).url)).toEqual([
+      "/userMessaging/conversation-a",
+      "/userMessaging/conversation-a",
+      "/userMessaging/conversation-a/messages?limit=50",
+      "/userMessaging/conversation-a/messages?limit=50",
+    ]);
+  });
+
   it("includes the encoded conversation ID in live userMessaging uploads", async () => {
     const store = configureStore({
       reducer: { [userMessagingApi.reducerPath]: userMessagingApi.reducer },

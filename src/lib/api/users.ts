@@ -110,6 +110,10 @@ export async function getUser(): Promise<User> {
       workAvailability: profileSource.workAvailability,
       tagId: profileSource.tagId,
       supportedClientTypes: profileSource?.supportedClientTypes || [],
+      agencyScope: profileSource.agencyScope,
+      agencyIds: Array.isArray(profileSource.agencyIds)
+        ? [...profileSource.agencyIds]
+        : undefined,
     };
 
     // Add agency details if user is an employee

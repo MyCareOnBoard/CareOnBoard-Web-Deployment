@@ -70,6 +70,8 @@ export interface Profile {
   tagId?: string
   // Super Admin specific
   accessList?: string[]  // List of access scopes for super admins
+  agencyScope?: string  // Canonical "all" or "selected" agency authorization mode
+  agencyIds?: string[]  // Canonical selected agency IDs
   supportedClientTypes?: ("ddd" | "hha")[]
   // Agency staff HR fields (surfaced from the agencyStaff doc for the staff timesheet)
   role?: string

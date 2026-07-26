@@ -196,6 +196,14 @@ export interface GetMessagesParams {
   conversationId: string;
   page?: number;
   limit?: number;
+  /** Client-only authorization cache partition; never sent to the API. */
+  scopeKey?: string;
+}
+
+export interface GetConversationParams {
+  conversationId: string;
+  /** Client-only authorization cache partition; never sent to the API. */
+  scopeKey?: string;
 }
 
 /**
@@ -310,13 +318,18 @@ export const userMessagingApi = createApi({
     }),
 
     // Get specific conversation by ID
-    getConversationById: builder.query<GetConversationResponse, string>({
-      query: (conversationId) => ({
+    getConversationById: builder.query<
+      GetConversationResponse,
+      GetConversationParams
+    >({
+      query: ({ conversationId }) => ({
         url: `${USER_MESSAGING_BASE}/${conversationId}`,
         method: "GET",
         requiresAuth: true
       }),
-      providesTags: (_result, _error, id) => [{ type: 'Conversations', id }],
+      providesTags: (_result, _error, { conversationId }) => [
+        { type: 'Conversations', id: conversationId },
+      ],
     }),
 
     // Get contacts available for messaging

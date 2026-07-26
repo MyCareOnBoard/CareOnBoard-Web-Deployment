@@ -444,6 +444,182 @@ describe("MessagingProvider cursor continuation", () => {
     );
   });
 
+  it("rejects an old continuation across a same-scope A to B to A transition", async () => {
+    const oldAgencyAPage = deferred<any>();
+    mocks.triggerConversations.mockReturnValue({
+      unwrap: () => oldAgencyAPage.promise,
+      unsubscribe: vi.fn(),
+    });
+    mocks.authUser = {
+      uid: "super-1",
+      userType: "super_admin",
+      profile: {
+        accessList: ["Corporate Support"],
+        agencyScope: "selected",
+        agencyIds: ["agency-a"],
+      },
+    };
+    mocks.baseConversationData = {
+      success: true,
+      conversations: [conversation("agency-a-initial")],
+      count: 1,
+      pagination: {
+        limit: 50,
+        count: 1,
+        hasMore: true,
+        nextCursor: "agency-a-cursor",
+      },
+    };
+
+    const view = render(
+      <MessagingProvider><PaginationProbe /></MessagingProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("conversation-ids")).toHaveTextContent(
+        /^agency-a-initial$/,
+      );
+    });
+    const initialAgencyAScopeKey = mocks.getConversations.mock.calls.at(-1)?.[0]
+      ?.scopeKey;
+    fireEvent.click(screen.getByRole("button", { name: "More conversations" }));
+
+    mocks.authUser = {
+      ...mocks.authUser,
+      profile: {
+        ...mocks.authUser.profile,
+        agencyIds: ["agency-b"],
+      },
+    };
+    mocks.baseConversationData = {
+      success: true,
+      conversations: [conversation("agency-b-window")],
+      count: 1,
+      pagination: { hasMore: false, nextCursor: null },
+    };
+    view.rerender(<MessagingProvider><PaginationProbe /></MessagingProvider>);
+    await waitFor(() => {
+      expect(screen.getByTestId("conversation-ids")).toHaveTextContent(
+        /^agency-b-window$/,
+      );
+    });
+
+    mocks.authUser = {
+      ...mocks.authUser,
+      profile: {
+        ...mocks.authUser.profile,
+        agencyIds: ["agency-a"],
+      },
+    };
+    mocks.baseConversationData = {
+      success: true,
+      conversations: [conversation("agency-a-fresh")],
+      count: 1,
+      pagination: { hasMore: false, nextCursor: null },
+    };
+    view.rerender(<MessagingProvider><PaginationProbe /></MessagingProvider>);
+    await waitFor(() => {
+      expect(screen.getByTestId("conversation-ids")).toHaveTextContent(
+        /^agency-a-fresh$/,
+      );
+    });
+    expect(mocks.getConversations.mock.calls.at(-1)?.[0]?.scopeKey).not.toBe(
+      initialAgencyAScopeKey,
+    );
+
+    await act(async () => {
+      oldAgencyAPage.resolve({
+        success: true,
+        conversations: [conversation("stale-agency-a-tail")],
+        pagination: { hasMore: false, nextCursor: null },
+      });
+      await oldAgencyAPage.promise;
+    });
+    expect(screen.getByTestId("conversation-ids")).toHaveTextContent(
+      /^agency-a-fresh$/,
+    );
+  });
+
+  it("rejects an old polling refresh across an A to B to A transition", async () => {
+    const oldAgencyARefresh = deferred<any>();
+    mocks.refetchConversations.mockReturnValue(oldAgencyARefresh.promise);
+    mocks.authUser = {
+      uid: "super-1",
+      userType: "super_admin",
+      profile: {
+        accessList: ["Corporate Support"],
+        agencyScope: "selected",
+        agencyIds: ["agency-a"],
+      },
+    };
+    mocks.baseConversationData = {
+      success: true,
+      conversations: [conversation("agency-a-initial")],
+      count: 1,
+      pagination: { hasMore: false, nextCursor: null },
+    };
+
+    const view = render(
+      <MessagingProvider><PaginationProbe /></MessagingProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("conversation-ids")).toHaveTextContent(
+        /^agency-a-initial$/,
+      );
+    });
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+
+    mocks.authUser = {
+      ...mocks.authUser,
+      profile: { ...mocks.authUser.profile, agencyIds: ["agency-b"] },
+    };
+    mocks.baseConversationData = {
+      success: true,
+      conversations: [conversation("agency-b-window")],
+      count: 1,
+      pagination: { hasMore: false, nextCursor: null },
+    };
+    view.rerender(<MessagingProvider><PaginationProbe /></MessagingProvider>);
+    await waitFor(() => {
+      expect(screen.getByTestId("conversation-ids")).toHaveTextContent(
+        /^agency-b-window$/,
+      );
+    });
+
+    mocks.authUser = {
+      ...mocks.authUser,
+      profile: { ...mocks.authUser.profile, agencyIds: ["agency-a"] },
+    };
+    mocks.baseConversationData = {
+      success: true,
+      conversations: [conversation("agency-a-fresh")],
+      count: 1,
+      pagination: { hasMore: false, nextCursor: null },
+    };
+    view.rerender(<MessagingProvider><PaginationProbe /></MessagingProvider>);
+    await waitFor(() => {
+      expect(screen.getByTestId("conversation-ids")).toHaveTextContent(
+        /^agency-a-fresh$/,
+      );
+    });
+
+    await act(async () => {
+      oldAgencyARefresh.resolve({
+        data: {
+          success: true,
+          conversations: [conversation("stale-agency-a-refresh")],
+          count: 1,
+          pagination: { hasMore: false, nextCursor: null },
+        },
+      });
+      await oldAgencyARefresh.promise;
+    });
+    expect(screen.getByTestId("conversation-ids")).toHaveTextContent(
+      /^agency-a-fresh$/,
+    );
+  });
+
   it("surfaces non-super-admin continuation failures", async () => {
     mocks.authUser = {
       uid: "staff-1",
