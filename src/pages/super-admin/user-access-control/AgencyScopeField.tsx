@@ -24,6 +24,7 @@ interface AgencyScopeFieldProps {
   search: string;
   value: { agencyScope: AgencyScopeMode; agencyIds: string[] };
   disabled: boolean;
+  popoverContainer?: HTMLElement | null;
   pageError?: string;
   hydrationError?: string;
   onSearchChange: (search: string) => void;
@@ -44,6 +45,7 @@ export default function AgencyScopeField({
   search,
   value,
   disabled,
+  popoverContainer,
   pageError,
   hydrationError,
   onSearchChange,
@@ -147,6 +149,7 @@ export default function AgencyScopeField({
             </PopoverTrigger>
             <PopoverContent
               align="start"
+              portalContainer={popoverContainer}
               className="w-[min(440px,calc(100vw-40px))] overflow-hidden rounded-2xl border border-[#dce5e5] bg-[#fdfefe] shadow-[0_18px_48px_rgba(21,54,55,0.18)]"
             >
               <div className="border-b border-[#e5ebeb] p-3">
@@ -161,7 +164,11 @@ export default function AgencyScopeField({
                   />
                 </div>
               </div>
-              <div className="max-h-[min(320px,45vh)] overflow-y-auto p-2">
+              <div
+                role="group"
+                aria-label="Agency options"
+                className="max-h-[min(320px,45vh)] touch-pan-y overflow-y-auto overscroll-contain p-2"
+              >
                 {agencies.map((agency) => {
                   const checked = value.agencyIds.includes(agency.id);
                   return (

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import AgencyScopeField from "./AgencyScopeField";
@@ -56,5 +56,36 @@ describe("AgencyScopeField", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Agency search failed");
     await userEvent.click(screen.getByRole("button", { name: "Retry agency search" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("mounts the scrollable agency list inside the modal scroll boundary", async () => {
+    const portalContainer = document.createElement("div");
+    document.body.appendChild(portalContainer);
+
+    try {
+      render(
+        <AgencyScopeField
+          agencies={agencies}
+          canAssignAllAgencies
+          isLoading={false}
+          hasMore={false}
+          search=""
+          value={{ agencyScope: "selected", agencyIds: [] }}
+          disabled={false}
+          popoverContainer={portalContainer}
+          onSearchChange={vi.fn()}
+          onLoadMore={vi.fn()}
+          onChange={vi.fn()}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: "Choose agencies" }));
+
+      expect(
+        within(portalContainer).getByRole("group", { name: "Agency options" }),
+      ).toHaveClass("overflow-y-auto", "overscroll-contain", "touch-pan-y");
+    } finally {
+      portalContainer.remove();
+    }
   });
 });
