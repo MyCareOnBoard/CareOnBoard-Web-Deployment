@@ -145,10 +145,18 @@ export default function UserAccessControlPage() {
 
   const userCursor = userCursors[page - 1] || undefined;
 
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async ({
+    shouldApply = () => true,
+    showLoading = true,
+    showError = true,
+  }: {
+    shouldApply?: () => boolean;
+    showLoading?: boolean;
+    showError?: boolean;
+  } = {}): Promise<boolean> => {
     const requestId = ++userRequestRef.current;
-    setIsLoading(true);
-    setError("");
+    if (showLoading) setIsLoading(true);
+    if (showError) setError("");
     try {
       const response = await listSuperAdminUsers({
         cursor: userCursor,
@@ -156,7 +164,7 @@ export default function UserAccessControlPage() {
         search: debouncedSearch,
         isActive: true,
       });
-      if (requestId !== userRequestRef.current) return;
+      if (requestId !== userRequestRef.current || !shouldApply()) return false;
       setUsers(response.data.map(normalizeUser));
       setPagination({
         page,
@@ -172,15 +180,21 @@ export default function UserAccessControlPage() {
         }
         return next;
       });
+      return true;
     } catch (caught) {
-      if (requestId !== userRequestRef.current) return;
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Unable to load user access.",
-      );
+      if (requestId !== userRequestRef.current || !shouldApply()) return false;
+      if (showError) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Unable to load user access.",
+        );
+      }
+      return false;
     } finally {
-      if (requestId === userRequestRef.current) setIsLoading(false);
+      if (requestId === userRequestRef.current && showLoading) {
+        setIsLoading(false);
+      }
     }
   }, [debouncedSearch, page, userCursor]);
 
@@ -375,28 +389,40 @@ export default function UserAccessControlPage() {
   };
 
   const runCurrentAdminAccessRefresh = async (sessionId: number) => {
-    const refreshed = await refreshCommittedAccessProfile({
-      refreshProfile,
-    });
-    if (refreshed) {
-      resetSuperAdminCaches(dispatch);
-      const refreshedAccess = refreshed.profile?.accessList;
-      if (!refreshedAccess?.includes("User Access Control")) {
-        setIsSuccessModalOpen(false);
-        navigate("/super-admin/dashboard", { replace: true });
-        return;
+    try {
+      const refreshed = await refreshCommittedAccessProfile({
+        refreshProfile,
+      });
+      if (refreshed) {
+        resetSuperAdminCaches(dispatch);
+        const refreshedAccess = refreshed.profile?.accessList;
+        if (!refreshedAccess?.includes("User Access Control")) {
+          setIsSuccessModalOpen(false);
+          navigate("/super-admin/dashboard", { replace: true });
+          return;
+        }
+        if (sessionId !== accessRefreshSessionRef.current) return;
+        const reloaded = await loadUsers({
+          shouldApply: () => sessionId === accessRefreshSessionRef.current,
+          showLoading: false,
+          showError: false,
+        });
+        if (sessionId !== accessRefreshSessionRef.current) return;
+        setAccessRefreshWarning(
+          reloaded
+            ? ""
+            : "Your access was refreshed, but the administrator list could not be reloaded. Retry before continuing.",
+        );
+      } else if (sessionId === accessRefreshSessionRef.current) {
+        setAccessRefreshWarning(
+          "Your changes were saved, but your access could not be refreshed. Retry before continuing.",
+        );
       }
-      await loadUsers();
+    } finally {
+      if (sessionId === accessRefreshSessionRef.current) {
+        setIsRetryingAccessRefresh(false);
+      }
     }
-    if (sessionId !== accessRefreshSessionRef.current) return;
-    if (refreshed) {
-      setAccessRefreshWarning("");
-    } else {
-      setAccessRefreshWarning(
-        "Your changes were saved, but your access could not be refreshed. Retry before continuing.",
-      );
-    }
-    setIsRetryingAccessRefresh(false);
   };
 
   const startCommittedAccessRefresh = () => {

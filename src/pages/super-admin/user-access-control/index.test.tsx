@@ -465,6 +465,34 @@ describe("UserAccessControlPage", () => {
     ).toBeVisible();
   });
 
+  it("continues agency search after an empty page with a cursor", async () => {
+    vi.mocked(listAssignableAgencies).mockImplementation((params) =>
+      Promise.resolve(
+        params?.cursor
+          ? {
+              agencies: [{ id: "late", name: "Late Agency" }],
+              nextCursor: null,
+            }
+          : { agencies: [], nextCursor: "opaque-empty-page" },
+      ),
+    );
+    const user = userEvent.setup();
+    render(<UserAccessControlPage />);
+    await screen.findByText("Ada Admin");
+    await user.click(screen.getByRole("button", { name: "New Access" }));
+    await user.click(screen.getByRole("radio", { name: "Selected agencies" }));
+    await user.click(screen.getByRole("button", { name: "Choose agencies" }));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Load more agencies" }),
+    );
+
+    expect(await screen.findByText("Late Agency")).toBeVisible();
+    expect(listAssignableAgencies).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: "opaque-empty-page" }),
+    );
+  });
+
   it("sends complete create and update payloads", async () => {
     vi.mocked(createSuperAdminUser).mockResolvedValue({} as never);
     vi.mocked(updateSuperAdminUser).mockResolvedValue({} as never);
@@ -601,6 +629,28 @@ describe("UserAccessControlPage", () => {
     expect(dispatch).toHaveBeenCalledTimes(10);
     expect(listSuperAdminUsers).toHaveBeenCalledOnce();
     expect(navigate).toHaveBeenCalledWith("/super-admin/dashboard", { replace: true });
+    expect(screen.queryByText("Update failed")).not.toBeInTheDocument();
+  });
+
+  it("reports a post-refresh user reload failure without rejecting the committed update", async () => {
+    vi.mocked(updateSuperAdminUser).mockResolvedValue({} as never);
+    const user = userEvent.setup();
+    render(<UserAccessControlPage />);
+    await screen.findByText("Ada Admin");
+    vi.mocked(listSuperAdminUsers).mockRejectedValueOnce(
+      new Error("User list reload failed"),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Edit user Ada Admin" }));
+    await user.click(screen.getByRole("button", { name: "Update User" }));
+
+    expect(await screen.findByRole("heading", { name: "User updated" })).toBeVisible();
+    await waitFor(() => expect(refreshProfile).toHaveBeenCalledOnce());
+    expect(dispatch).toHaveBeenCalledTimes(10);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "access was refreshed, but the administrator list could not be reloaded",
+    );
+    expect(screen.queryByText("Refreshing access...")).not.toBeInTheDocument();
     expect(screen.queryByText("Update failed")).not.toBeInTheDocument();
   });
 
