@@ -103,12 +103,38 @@ export interface ComplianceQueryParams {
     search?: string;
 }
 
+export interface ComplianceAgencyOption {
+    id: string;
+    name: string;
+    status: "active";
+}
+
+export interface ComplianceAgencyOptionsResponse {
+    success: boolean;
+    data: ComplianceAgencyOption[];
+}
+
+export interface ComplianceAgencyOptionsParams {
+    ids?: string[];
+}
+
 export const complianceApi = createApi({
     reducerPath: "complianceApi",
     baseQuery: customBaseQuery,
     tagTypes: ["ComplianceDocuments", "ComplianceNotes", "ComplianceEvv", "ComplianceOthers", "ComplianceStats"],
     keepUnusedDataFor: 300,
     endpoints: (builder) => ({
+        getComplianceAgencies: builder.query<
+            ComplianceAgencyOptionsResponse,
+            ComplianceAgencyOptionsParams
+        >({
+            query: ({ ids }) => ({
+                url: "/superAdminCompliance/agencies",
+                method: "GET",
+                params: ids?.length ? { ids: ids.join(",") } : undefined,
+                requiresAuth: true,
+            }),
+        }),
         getComplianceDocuments: builder.query<ComplianceResponse, ComplianceQueryParams>({
             query: (params) => ({
                 url: `/superAdminCompliance/documents`,
@@ -174,6 +200,7 @@ export const complianceApi = createApi({
 });
 
 export const {
+    useGetComplianceAgenciesQuery,
     useGetComplianceDocumentsQuery,
     useGetComplianceNotesQuery,
     useGetComplianceEvvQuery,

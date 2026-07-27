@@ -22,6 +22,12 @@ import Step8Branding from "@/pages/super-admin/agencies/components/StepFive";
 import Step9Billing from "@/pages/super-admin/agencies/components/StepSix";
 import Step10Subscription from "@/pages/super-admin/agencies/components/StepSeven";
 import {GetDraftAgencyResponse} from "@/pages/super-admin/agencies/apiTypes";
+import {useAuth} from "@/utils/auth";
+import {finalizeAgencyCreation} from "./agencyCreationAccessRefresh";
+import {
+    dismissAgencyAccessRefreshWarning,
+    showAgencyAccessRefreshWarning,
+} from "./agencyAccessRefreshToast";
 
 interface AgencyFormData {
     // Step 1: Agency Identity Information
@@ -220,6 +226,7 @@ const STEPS = [
 ];
 
 export default function AddAgencyWizard() {
+    const {user, refreshProfile} = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [currentStep, setCurrentStep] = useState(1);
@@ -709,10 +716,18 @@ export default function AddAgencyWizard() {
                 });
             } else {
                 await createAgencyWithUser(requestPayload).unwrap();
-                toast({
-                    title: "Success",
-                    description: "Agency created successfully",
+                await finalizeAgencyCreation({
+                    isRestricted: user?.profile?.agencyScope === "selected",
+                    showSuccess: () => toast({
+                        title: "Success",
+                        description: "Agency created successfully",
+                    }),
+                    navigate: () => navigate(Routes.superAdmin.agencies),
+                    refreshProfile,
+                    onRefreshFailure: () => showAgencyAccessRefreshWarning(refreshProfile),
+                    onRefreshSuccess: dismissAgencyAccessRefreshWarning,
                 });
+                return;
             }
             navigate(Routes.superAdmin.agencies);
         } catch (error: any) {

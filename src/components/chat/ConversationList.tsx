@@ -23,6 +23,9 @@ export interface ConversationListProps {
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   loading?: boolean;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => Promise<void>;
   currentUserId?: string;
   filterTab?: "all" | "dsp" | "staff" | "administration" | "agency";
   onFilterChange?: (tab: "all" | "dsp" | "staff" | "administration" | "agency") => void;
@@ -162,6 +165,9 @@ export const ConversationList = React.memo(function ConversationList({
   searchQuery = "",
   onSearchChange,
   loading = false,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
   currentUserId,
   filterTab = "all",
   onFilterChange,
@@ -444,6 +450,18 @@ export const ConversationList = React.memo(function ConversationList({
             );
           })
         )}
+        {hasMore && onLoadMore && !loading && (
+          <div className="flex justify-center px-4 py-3">
+            <button
+              type="button"
+              onClick={() => void onLoadMore()}
+              disabled={loadingMore}
+              className="text-[13px] font-medium text-[#2563eb] hover:text-[#114fd7] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loadingMore ? "Loading more..." : "Load more conversations"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -454,6 +472,9 @@ export const ConversationList = React.memo(function ConversationList({
     prevProps.selectedConversationId === nextProps.selectedConversationId &&
     prevProps.searchQuery === nextProps.searchQuery &&
     prevProps.loading === nextProps.loading &&
+    prevProps.hasMore === nextProps.hasMore &&
+    prevProps.loadingMore === nextProps.loadingMore &&
+    prevProps.onLoadMore === nextProps.onLoadMore &&
     prevProps.currentUserId === nextProps.currentUserId &&
     prevProps.filterTab === nextProps.filterTab &&
     prevProps.showAgencyName === nextProps.showAgencyName &&

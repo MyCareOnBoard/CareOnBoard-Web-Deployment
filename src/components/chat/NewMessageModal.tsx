@@ -20,6 +20,10 @@ export interface NewMessageModalProps {
     isLoadingContacts: boolean;
     users: NewMessageUser[];
     onStartChat: (selectedUserIds: string[]) => Promise<void>;
+    hasMoreUsers?: boolean;
+    isLoadingMoreUsers?: boolean;
+    onLoadMoreUsers?: () => Promise<void>;
+    onSearchChange?: (query: string) => void | Promise<void>;
 }
 
 export function NewMessageModal({
@@ -28,6 +32,10 @@ export function NewMessageModal({
     isLoadingContacts,
     users,
     onStartChat,
+    hasMoreUsers = false,
+    isLoadingMoreUsers = false,
+    onLoadMoreUsers,
+    onSearchChange,
 }: NewMessageModalProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
@@ -47,8 +55,9 @@ export function NewMessageModal({
         // Set new debounce timer (300ms)
         debounceTimerRef.current = setTimeout(() => {
             setDebouncedSearchQuery(value);
+            void onSearchChange?.(value);
         }, 300);
-    }, []);
+    }, [onSearchChange]);
 
     // Cleanup debounce timer on unmount
     useEffect(() => {
@@ -263,6 +272,18 @@ export function NewMessageModal({
                             ) : (
                                 <div className="flex items-center justify-center h-[200px] text-center text-[#808081] text-[14px]">
                                     No contacts found
+                                </div>
+                            )}
+                            {hasMoreUsers && onLoadMoreUsers && !isLoadingContacts && (
+                                <div className="flex justify-center py-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => void onLoadMoreUsers()}
+                                        disabled={isLoadingMoreUsers}
+                                        className="text-[13px] font-medium text-[#2563eb] hover:text-[#114fd7] disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {isLoadingMoreUsers ? "Loading more..." : "Load more contacts"}
+                                    </button>
                                 </div>
                             )}
                         </div>

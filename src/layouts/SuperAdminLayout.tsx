@@ -102,7 +102,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
       <DashboardHeader
         userName={user?.fullName}
         userImage={user?.profilePicture || user?.photo || user?.photoURL || user?.profile?.profilePicture}
-        userRole="Super Admin"
+        userRole={user?.profile?.role || "Super Admin"}
         userType={user?.userType || UserType.SUPER_ADMIN}
         onLogout={handleLogout}
       />

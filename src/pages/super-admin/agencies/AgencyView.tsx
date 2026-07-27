@@ -6,7 +6,7 @@ import {
 } from "./api";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
-import {Search, ChevronLeft, ChevronRight, Phone, MessageSquare, Edit, ArrowLeft} from "lucide-react";
+import {Search, ChevronLeft, ChevronRight, Phone, MessageSquare, Edit, ArrowLeft, Loader2} from "lucide-react";
 import {Routes} from "@/routes/constants";
 import {toast} from "sonner";
 import {cn} from "@/lib/utils";
@@ -60,8 +60,19 @@ export default function AgencyView() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-[#808081]">Loading agency...</p>
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div
+          role="status"
+          aria-label="Loading agency"
+          aria-live="polite"
+          className="flex flex-col items-center gap-4 text-center"
+        >
+          <Loader2
+            aria-hidden="true"
+            className="h-12 w-12 animate-spin text-[#00b4b8] motion-reduce:animate-none"
+          />
+          <p className="text-sm font-medium text-[#808081]">Loading agency...</p>
+        </div>
       </div>
     );
   }

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 
 import {
+  useGetComplianceAgenciesQuery,
   useGetComplianceDocumentsQuery,
   useGetComplianceEvvQuery,
   useGetComplianceNotesQuery,
@@ -37,6 +38,7 @@ vi.mock("react-router", async () => {
 });
 
 vi.mock("./complianceApi", () => ({
+  useGetComplianceAgenciesQuery: vi.fn(),
   useGetComplianceDocumentsQuery: vi.fn(),
   useGetComplianceNotesQuery: vi.fn(),
   useGetComplianceEvvQuery: vi.fn(),
@@ -47,6 +49,13 @@ vi.mock("./complianceApi", () => ({
 
 vi.mock("@/pages/super-admin/agencies/api", () => ({
   useListAllAgenciesQuery: vi.fn(),
+}));
+
+vi.mock("@/lib/api/super-admin-users", () => ({
+  listAssignableAgencies: vi.fn().mockResolvedValue({
+    agencies: [],
+    nextCursor: null,
+  }),
 }));
 
 vi.mock("sonner", () => ({
@@ -97,17 +106,26 @@ describe("ComplianceMonitor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useListAllAgenciesQuery).mockReturnValue({
-      data: {
-        agencies: [
-          { id: "agency-1", name: "Bright Care", status: "active" },
-          { id: "agency-2", name: "Anchor Health", status: "active" },
-          { id: "agency-3", name: "Inactive Care", status: "inactive" },
-        ],
-      },
       isLoading: false,
-      isError: false,
+      isError: true,
       refetch: vi.fn(),
     } as never);
+    vi.mocked(useGetComplianceAgenciesQuery).mockImplementation(
+      (params) => ({
+        data: {
+          success: true,
+          data: (params as { ids?: string[] }).ids?.length
+            ? []
+            : [
+                { id: "agency-1", name: "Bright Care", status: "active" },
+                { id: "agency-2", name: "Anchor Health", status: "active" },
+              ],
+        },
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      }) as never,
+    );
     vi.mocked(useGetComplianceDocumentsQuery).mockReturnValue(successResult());
     vi.mocked(useGetComplianceNotesQuery).mockReturnValue(successResult([]));
     vi.mocked(useGetComplianceEvvQuery).mockReturnValue(successResult([]));
@@ -178,10 +196,11 @@ describe("ComplianceMonitor", () => {
     expect(
       screen.getByRole("searchbox", { name: "Search compliance issues" }),
     ).toHaveValue("Avery");
-    expect(useListAllAgenciesQuery).toHaveBeenCalledWith({
-      limit: 100,
-      status: "active",
-    });
+    expect(useGetComplianceAgenciesQuery).toHaveBeenCalledWith(
+      {},
+      expect.any(Object),
+    );
+    expect(useListAllAgenciesQuery).not.toHaveBeenCalled();
     expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
       {
         page: 1,
@@ -213,7 +232,7 @@ describe("ComplianceMonitor", () => {
     );
   });
 
-  it("offers only active agencies and preserves search when one is selected", () => {
+  it("uses compliance-owned active agency options even when the unrelated directory endpoint would be forbidden", () => {
     renderPage("?search=Avery");
 
     fireEvent.click(screen.getByRole("button", { name: "All agencies" }));
@@ -223,9 +242,7 @@ describe("ComplianceMonitor", () => {
     expect(
       screen.getByRole("button", { name: "Anchor Health" }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Inactive Care" }),
-    ).not.toBeInTheDocument();
+    expect(useListAllAgenciesQuery).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Bright Care" }));
     expect(navigate).toHaveBeenCalledWith(
@@ -234,9 +251,135 @@ describe("ComplianceMonitor", () => {
     );
   });
 
+  it("clears a URL agency only after authoritative lookup confirms it is unavailable", async () => {
+    renderPage("?agencyId=locked-agency&agencyName=Locked+Care");
+    fireEvent.click(screen.getByRole("button", { name: "All agencies" }));
+    expect(screen.queryByRole("button", { name: "Locked Care" })).not.toBeInTheDocument();
+    expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+      { page: 1, limit: 10 }, { skip: false },
+    );
+    expect(useGetComplianceAgenciesQuery).toHaveBeenCalledWith(
+      { ids: ["locked-agency"] },
+      expect.objectContaining({ skip: false }),
+    );
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith(
+        "/super-admin/compliance-monitor",
+        { replace: true },
+      ),
+    );
+  });
+
+  it("authorizes a URL agency beyond the first options page without clearing it", async () => {
+    vi.mocked(useGetComplianceAgenciesQuery).mockImplementation(
+      (params) => ({
+        data: {
+          success: true,
+          data: (params as { ids?: string[] }).ids?.includes("agency-101")
+            ? [{ id: "agency-101", name: "Hundred First Care", status: "active" }]
+            : [
+                { id: "agency-1", name: "Bright Care", status: "active" },
+                { id: "agency-2", name: "Anchor Health", status: "active" },
+              ],
+        },
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      }) as never,
+    );
+    renderPage("?agencyId=agency-101&agencyName=Hundred+First+Care");
+
+    expect(useGetComplianceAgenciesQuery).toHaveBeenCalledWith(
+      { ids: ["agency-101"] },
+      expect.objectContaining({ skip: false }),
+    );
+    await waitFor(() =>
+      expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+        { page: 1, limit: 10, agencyId: "agency-101" },
+        { skip: false },
+      ),
+    );
+    expect(
+      screen.getByRole("button", { name: "Hundred First Care" }),
+    ).toBeVisible();
+    expect(navigate).not.toHaveBeenCalledWith(
+      "/super-admin/compliance-monitor",
+      { replace: true },
+    );
+  });
+
+  it("keeps a failed compliance agency lookup out of queries and retries without clearing it", async () => {
+    const retrySelected = vi.fn();
+    vi.mocked(useGetComplianceAgenciesQuery).mockImplementation(
+      (params) => ({
+        data: (params as { ids?: string[] }).ids?.length
+          ? undefined
+          : {
+              success: true,
+              data: [
+                { id: "agency-1", name: "Bright Care", status: "active" },
+                { id: "agency-2", name: "Anchor Health", status: "active" },
+              ],
+            },
+        isLoading: false,
+        isError: Boolean((params as { ids?: string[] }).ids?.length),
+        refetch: (params as { ids?: string[] }).ids?.length ? retrySelected : vi.fn(),
+      }) as never,
+    );
+    renderPage("?agencyId=agency-101&agencyName=Hundred+First+Care");
+
+    await screen.findByText("Couldn't verify the selected agency.");
+    expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+      { page: 1, limit: 10 },
+      { skip: false },
+    );
+    expect(navigate).not.toHaveBeenCalledWith(
+      "/super-admin/compliance-monitor",
+      { replace: true },
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry selected agency validation" }),
+    );
+    expect(retrySelected).toHaveBeenCalledOnce();
+    expect(navigate).not.toHaveBeenCalledWith(
+      "/super-admin/compliance-monitor",
+      { replace: true },
+    );
+  });
+
+  it("confirms an inactive deep-linked agency as absent and clears it", async () => {
+    vi.mocked(useGetComplianceAgenciesQuery).mockImplementation(
+      (params) => ({
+        data: {
+          success: true,
+          data: (params as { ids?: string[] }).ids?.length
+            ? [{ id: "agency-old", name: "Old Care", status: "inactive" }]
+            : [],
+        },
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      }) as never,
+    );
+
+    renderPage("?agencyId=agency-old&agencyName=Old+Care");
+
+    expect(useGetComplianceDocumentsQuery).toHaveBeenLastCalledWith(
+      { page: 1, limit: 10 },
+      { skip: false },
+    );
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith(
+        "/super-admin/compliance-monitor",
+        { replace: true },
+      ),
+    );
+  });
+
   it("clears all filters and retries an unavailable agency selector", () => {
     const retryAgencies = vi.fn();
-    vi.mocked(useListAllAgenciesQuery).mockReturnValue({
+    vi.mocked(useGetComplianceAgenciesQuery).mockReturnValue({
       isLoading: false,
       isError: true,
       refetch: retryAgencies,

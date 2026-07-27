@@ -14,11 +14,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useMessaging } from "@/contexts/MessagingContext";
 import { ConversationList } from "@/components/chat/ConversationList";
 import { ChatPanel } from "@/components/chat/ChatPanel";
-import { AgencyContact } from "@/lib/api/userMessaging";
 import { NewMessageModal } from "@/components/chat/NewMessageModal";
-import { getInitials } from "@/lib/utils/string-utils";
+import { getInitials, sanitizeSearchQuery } from "@/lib/utils/string-utils";
 import { matchesAgencyMode } from "@/lib/roleLabel";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import { useDebounce } from "@/hooks/useDebounce";
 
 export type FilterTab = "all" | "dsp" | "staff" | "administration" | "agency";
 
@@ -59,8 +59,6 @@ export function MessagingPage({
     const [searchQuery, setSearchQuery] = useState("");
     const [activeTab, setActiveTab] = useState<FilterTab>("all");
     const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
-    const [contacts, setContacts] = useState<AgencyContact[]>([]);
-    const [loadingContacts, setLoadingContacts] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showChatView, setShowChatView] = useState(false);
@@ -78,28 +76,44 @@ export function MessagingPage({
     }, [conversationId, messaging.currentConversation?.id]);
 
     // Memoized fetch contacts function
-    const fetchContacts = useCallback(async () => {
+    const fetchContacts = useCallback(async (query = "") => {
         try {
-            setLoadingContacts(true);
-            const contactsData = await messaging.getContacts();
-            setContacts(contactsData || []);
+            await messaging.getContacts({
+                search: sanitizeSearchQuery(query) || undefined,
+                scopeKey: programMode || "all",
+            });
         } catch (error: any) {
             toast({
                 title: "Error",
                 description: error.message || "Failed to load contacts",
                 variant: "destructive",
             });
-        } finally {
-            setLoadingContacts(false);
         }
-    }, [messaging, toast]);
+    }, [messaging.getContacts, programMode, toast]);
 
     // Fetch contacts when modal opens
     useEffect(() => {
         if (isNewMessageModalOpen) {
-            fetchContacts();
+            void fetchContacts();
         }
-    }, [isNewMessageModalOpen]);
+    }, [fetchContacts, isNewMessageModalOpen]);
+
+    const debouncedConversationSearch = useDebounce(
+        sanitizeSearchQuery(searchQuery),
+        300,
+    );
+
+    useEffect(() => {
+        messaging.setConversationQuery({
+            search: debouncedConversationSearch || undefined,
+            scopeKey: `${activeTab}:${programMode || "all"}`,
+        });
+    }, [
+        activeTab,
+        debouncedConversationSearch,
+        messaging.setConversationQuery,
+        programMode,
+    ]);
 
     // Show chat view when conversation is selected (for mobile)
     useEffect(() => {
@@ -203,7 +217,7 @@ export function MessagingPage({
 
     // Memoize contacts for NewMessageModal (scoped to active program when set)
     const mappedContacts = useMemo(() =>
-        contacts
+        messaging.contacts
             .filter(contact => matchesAgencyMode(contact.role, programMode))
             .map(contact => ({
                 id: contact.uid,
@@ -212,7 +226,7 @@ export function MessagingPage({
                 agency: contact?.agencyName,
                 avatar: getInitials(contact.name),
                 image: contact.avatar
-            })), [contacts, programMode]);
+            })), [messaging.contacts, programMode]);
 
     // Generate button hover color (slightly darker)
     const buttonHoverColor = useMemo(() => {
@@ -255,6 +269,9 @@ export function MessagingPage({
                             searchQuery={searchQuery}
                             onSearchChange={setSearchQuery}
                             loading={messaging.conversationsLoading}
+                            hasMore={messaging.conversationPagination.hasMore}
+                            loadingMore={messaging.conversationPagination.isLoadingMore}
+                            onLoadMore={messaging.loadMoreConversations}
                             currentUserId={user?.uid}
                             filterTab={showFilterTabs ? activeTab : undefined}
                             onFilterChange={showFilterTabs ? handleFilterChange : undefined}
@@ -281,9 +298,13 @@ export function MessagingPage({
             <NewMessageModal
                 open={isNewMessageModalOpen}
                 onOpenChange={setIsNewMessageModalOpen}
-                isLoadingContacts={loadingContacts}
+                isLoadingContacts={messaging.contactsLoading}
                 users={mappedContacts}
                 onStartChat={handleCreateConversation}
+                hasMoreUsers={messaging.contactPagination.hasMore}
+                isLoadingMoreUsers={messaging.contactPagination.isLoadingMore}
+                onLoadMoreUsers={messaging.loadMoreContacts}
+                onSearchChange={fetchContacts}
             />
 
             {/* Delete Confirmation Dialog */}

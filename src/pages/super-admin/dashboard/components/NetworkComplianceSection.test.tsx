@@ -152,6 +152,16 @@ describe("NetworkComplianceSection", () => {
     );
   });
 
+  it("does not send a user-controlled global agency override", () => {
+    render(<MemoryRouter><NetworkComplianceSection /></MemoryRouter>);
+    expect(useGetNetworkComplianceSummaryQuery).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ agencyIds: expect.anything() }),
+    );
+    expect(useGetAgencyComplianceQuery).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ agencyIds: expect.anything() }),
+    );
+  });
+
   it("shows outcome-aware trends and lightweight comparison graphs", () => {
     render(
       <MemoryRouter>

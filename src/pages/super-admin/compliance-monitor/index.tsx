@@ -5,11 +5,11 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { SearchSelect } from "@/components/ui/search-select";
-import { useListAllAgenciesQuery } from "@/pages/super-admin/agencies/api";
 import { Routes } from "@/routes/constants";
 import {
   type ComplianceCategory,
   type ComplianceIssue,
+  useGetComplianceAgenciesQuery,
   useGetComplianceDocumentsQuery,
   useGetComplianceEvvQuery,
   useGetComplianceNotesQuery,
@@ -66,7 +66,7 @@ const CATEGORIES = Object.keys(CATEGORY_META) as ComplianceCategory[];
 export default function ComplianceMonitor() {
   const location = useLocation();
   const navigate = useNavigate();
-  const agencyScope = parseComplianceMonitorScope(location.search);
+  const requestedAgencyScope = parseComplianceMonitorScope(location.search);
   const urlTextSearch = parseComplianceMonitorTextSearch(location.search);
   const [activeTab, setActiveTab] =
     useState<ComplianceCategory>("documents");
@@ -77,31 +77,76 @@ export default function ComplianceMonitor() {
   );
   const [searchInput, setSearchInput] = useState(urlTextSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(urlTextSearch);
-  const agencyQuery = useListAllAgenciesQuery({
-    limit: 100,
-    status: "active",
-  });
-  const agencyOptions = useMemo(() => {
-    const options = (agencyQuery.data?.agencies ?? [])
+  const agencyQuery = useGetComplianceAgenciesQuery({}, {});
+  const listedAgencyOptions = useMemo(() => {
+    return (agencyQuery.data?.data ?? [])
       .filter((agency) => agency.status === "active")
       .map((agency) => ({ value: agency.id, label: agency.name }))
       .sort((left, right) => left.label.localeCompare(right.label));
+  }, [agencyQuery.data?.data]);
+  const listedRequestedAgency = requestedAgencyScope
+    ? listedAgencyOptions.find(
+        (candidate) => candidate.value === requestedAgencyScope.agencyId,
+      )
+    : undefined;
+  const shouldValidateRequestedAgency =
+    Boolean(requestedAgencyScope) && !listedRequestedAgency;
+  const requestedAgencyQuery = useGetComplianceAgenciesQuery(
+    {
+      ids: requestedAgencyScope ? [requestedAgencyScope.agencyId] : [],
+    },
+    { skip: !shouldValidateRequestedAgency },
+  );
+  const hydratedRequestedAgency = shouldValidateRequestedAgency
+    ? requestedAgencyQuery.data?.data
+        .filter((agency) => agency.status === "active")
+        .find((agency) => agency.id === requestedAgencyScope?.agencyId)
+    : undefined;
+  const hydratedRequestedOption = hydratedRequestedAgency
+    ? { value: hydratedRequestedAgency.id, label: hydratedRequestedAgency.name }
+    : undefined;
+  const urlAgencyValidationStatus =
+    !shouldValidateRequestedAgency
+      ? null
+      : requestedAgencyQuery.isError
+        ? "error"
+        : requestedAgencyQuery.data
+          ? hydratedRequestedOption
+            ? "valid"
+            : "missing"
+          : "loading";
+  const validatedRequestedAgency =
+    listedRequestedAgency || hydratedRequestedOption;
+  const agencyOptions = useMemo(() => {
+    if (!hydratedRequestedOption) return listedAgencyOptions;
+    return [hydratedRequestedOption, ...listedAgencyOptions];
+  }, [hydratedRequestedOption, listedAgencyOptions]);
+  const agencyScope = useMemo(() => {
+    return validatedRequestedAgency
+      ? {
+          agencyId: validatedRequestedAgency.value,
+          agencyName: validatedRequestedAgency.label,
+        }
+      : null;
+  }, [validatedRequestedAgency]);
 
+  useEffect(() => {
     if (
-      agencyScope &&
-      !options.some((option) => option.value === agencyScope.agencyId)
-    ) {
-      options.unshift({
-        value: agencyScope.agencyId,
-        label: agencyScope.agencyName,
-      });
-    }
-
-    return options;
+      !requestedAgencyScope ||
+      urlAgencyValidationStatus !== "missing"
+    )
+      return;
+    const nextSearch = buildComplianceMonitorLocationSearch({
+      scope: null,
+      search: urlTextSearch,
+    });
+    navigate(`${location.pathname}${nextSearch}`, { replace: true });
   }, [
-    agencyQuery.data?.agencies,
-    agencyScope?.agencyId,
-    agencyScope?.agencyName,
+    location.pathname,
+    navigate,
+    requestedAgencyScope?.agencyId,
+    urlTextSearch,
+    urlAgencyValidationStatus,
   ]);
 
   useEffect(() => {
@@ -370,6 +415,19 @@ export default function ComplianceMonitor() {
                 </button>
               </div>
             )}
+            {urlAgencyValidationStatus === "error" && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#A13D2D]">
+                  <span>Couldn't verify the selected agency.</span>
+                  <button
+                    type="button"
+                    aria-label="Retry selected agency validation"
+                    onClick={() => void requestedAgencyQuery.refetch()}
+                    className="font-semibold text-[#007F83] underline decoration-[#99E0E2] underline-offset-2"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
           </div>
 
           {hasFilters && (

@@ -40,6 +40,7 @@ export interface ConversationParticipant {
   agencyName?: string;
   avatar?: string;
   email?: string;
+  userType?: string;
 }
 
 /**
@@ -64,11 +65,13 @@ export interface UserMessage {
   senderRole: string;
   senderAvatar?: string;
   content: string;
+  text?: string;
   attachments?: MessageAttachment[];
-  readBy: string[];
+  readBy: string[] | Record<string, unknown>;
   isRead: boolean;
-  createdAt: string;
-  updatedAt: string;
+  status?: "sent" | "delivered" | "read";
+  createdAt: unknown;
+  updatedAt: unknown;
 }
 
 /**
@@ -80,12 +83,12 @@ export interface UserConversation {
   topic?: string;
   participantIds: string[];
   participants: ConversationParticipant[];
-  lastMessage?: string;
-  lastMessageAt?: string;
+  lastMessage?: string | { text?: string; senderId?: string; timestamp?: string };
+  lastMessageAt?: unknown;
   lastMessageSenderId?: string;
   unreadCount: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: unknown;
+  updatedAt: unknown;
   createdBy: string;
 }
 
@@ -122,8 +125,10 @@ export interface MarkAsReadPayload {
  */
 export interface GetConversationsResponse {
   success: boolean;
-  data: UserConversation[];
+  conversations: UserConversation[];
+  data?: UserConversation[];
   count: number;
+  pagination?: CursorPagination;
 }
 
 /**
@@ -131,7 +136,8 @@ export interface GetConversationsResponse {
  */
 export interface GetConversationResponse {
   success: boolean;
-  data: UserConversation;
+  conversation?: UserConversation;
+  data?: UserConversation;
 }
 
 /**
@@ -139,7 +145,8 @@ export interface GetConversationResponse {
  */
 export interface GetMessagesResponse {
   success: boolean;
-  data: UserMessage[];
+  messages: UserMessage[];
+  data?: UserMessage[];
   pagination?: {
     page: number;
     limit: number;
@@ -154,7 +161,33 @@ export interface GetMessagesResponse {
 export interface GetContactsResponse {
   success: boolean;
   data: AgencyContact[];
+  count?: number;
+  pagination?: CursorPagination;
 }
+
+export interface CursorPagination {
+  limit: number;
+  count?: number;
+  total?: number | null;
+  totalPages?: number | null;
+  hasMore?: boolean;
+  nextCursor?: string | null;
+  scanned?: number;
+}
+
+export interface CursorPageParams {
+  limit?: number;
+  cursor?: string;
+  search?: string;
+  role?: string;
+  /**
+   * Client-only cache partition for the authenticated authorization/UI scope.
+   * This is intentionally not sent to the API.
+   */
+  scopeKey?: string;
+}
+
+const MAX_CURSOR_REQUESTS = 2;
 
 /**
  * Get Messages Params
@@ -163,6 +196,14 @@ export interface GetMessagesParams {
   conversationId: string;
   page?: number;
   limit?: number;
+  /** Client-only authorization cache partition; never sent to the API. */
+  scopeKey?: string;
+}
+
+export interface GetConversationParams {
+  conversationId: string;
+  /** Client-only authorization cache partition; never sent to the API. */
+  scopeKey?: string;
 }
 
 /**
@@ -197,6 +238,7 @@ export interface UploadAttachmentResponse {
 }
 
 export interface UploadAttachmentParams {
+  conversationId: string;
   file: File;
 }
 
@@ -209,32 +251,148 @@ export const userMessagingApi = createApi({
   keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     // Get all conversations for authenticated user
-    getConversations: builder.query<GetConversationsResponse, void>({
-      query: () => ({
-        url: USER_MESSAGING_BASE,
-        method: "GET",
-        requiresAuth: true
-      }),
+    getConversations: builder.query<
+      GetConversationsResponse,
+      CursorPageParams | void
+    >({
+      queryFn: async (params, _api, _extraOptions, baseQuery) => {
+        const requestedLimit = params?.limit || 50;
+        const conversationsById = new Map<string, UserConversation>();
+        const seenCursors = new Set<string>(params?.cursor ? [params.cursor] : []);
+        let cursor = params?.cursor;
+        let lastPage: GetConversationsResponse | null = null;
+        let requestCount = 0;
+
+        while (
+          conversationsById.size < requestedLimit &&
+          requestCount < MAX_CURSOR_REQUESTS
+        ) {
+          requestCount++;
+          const queryParams = new URLSearchParams({
+            limit: String(requestedLimit - conversationsById.size),
+          });
+          if (cursor) queryParams.set("cursor", cursor);
+          if (params?.search) queryParams.set("search", params.search);
+          if (params?.role) queryParams.set("role", params.role);
+          const result = await baseQuery({
+            url: `${USER_MESSAGING_BASE}?${queryParams.toString()}`,
+            method: "GET",
+            requiresAuth: true,
+          });
+          if (result.error) return { error: result.error };
+
+          const page = result.data as GetConversationsResponse;
+          lastPage = page;
+          for (const conversation of page.conversations || page.data || []) {
+            conversationsById.set(conversation.id, conversation);
+          }
+          const nextCursor = page.pagination?.nextCursor || undefined;
+          if (!page.pagination?.hasMore || !nextCursor) break;
+          if (seenCursors.has(nextCursor)) {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error: "Conversation pagination cursor did not advance",
+              },
+            };
+          }
+          seenCursors.add(nextCursor);
+          cursor = nextCursor;
+        }
+
+        const conversations = [...conversationsById.values()];
+        return {
+          data: {
+            ...(lastPage || { success: true, count: 0 }),
+            conversations,
+            count: conversations.length,
+            pagination: {
+              ...lastPage?.pagination,
+              limit: requestedLimit,
+              count: conversations.length,
+            },
+          } as GetConversationsResponse,
+        };
+      },
       providesTags: ['Conversations'],
     }),
 
     // Get specific conversation by ID
-    getConversationById: builder.query<GetConversationResponse, string>({
-      query: (conversationId) => ({
+    getConversationById: builder.query<
+      GetConversationResponse,
+      GetConversationParams
+    >({
+      query: ({ conversationId }) => ({
         url: `${USER_MESSAGING_BASE}/${conversationId}`,
         method: "GET",
         requiresAuth: true
       }),
-      providesTags: (_result, _error, id) => [{ type: 'Conversations', id }],
+      providesTags: (_result, _error, { conversationId }) => [
+        { type: 'Conversations', id: conversationId },
+      ],
     }),
 
     // Get contacts available for messaging
-    getContacts: builder.query<GetContactsResponse, void>({
-      query: () => ({
-        url: `${USER_MESSAGING_BASE}/contacts`,
-        method: "GET",
-        requiresAuth: true
-      }),
+    getContacts: builder.query<GetContactsResponse, CursorPageParams | void>({
+      queryFn: async (params, _api, _extraOptions, baseQuery) => {
+        const requestedLimit = params?.limit || 50;
+        const contactsById = new Map<string, AgencyContact>();
+        const seenCursors = new Set<string>(params?.cursor ? [params.cursor] : []);
+        let cursor = params?.cursor;
+        let lastPage: GetContactsResponse | null = null;
+        let requestCount = 0;
+
+        while (
+          contactsById.size < requestedLimit &&
+          requestCount < MAX_CURSOR_REQUESTS
+        ) {
+          requestCount++;
+          const queryParams = new URLSearchParams({
+            limit: String(requestedLimit - contactsById.size),
+          });
+          if (cursor) queryParams.set("cursor", cursor);
+          if (params?.search) queryParams.set("search", params.search);
+          if (params?.role) queryParams.set("role", params.role);
+          const result = await baseQuery({
+            url: `${USER_MESSAGING_BASE}/contacts?${queryParams.toString()}`,
+            method: "GET",
+            requiresAuth: true,
+          });
+          if (result.error) return { error: result.error };
+
+          const page = result.data as GetContactsResponse;
+          lastPage = page;
+          for (const contact of page.data || []) {
+            contactsById.set(contact.uid || contact.id, contact);
+          }
+          const nextCursor = page.pagination?.nextCursor || undefined;
+          if (!page.pagination?.hasMore || !nextCursor) break;
+          if (seenCursors.has(nextCursor)) {
+            return {
+              error: {
+                status: "CUSTOM_ERROR",
+                error: "Contact pagination cursor did not advance",
+              },
+            };
+          }
+          seenCursors.add(nextCursor);
+          cursor = nextCursor;
+        }
+
+        const contacts = [...contactsById.values()];
+        return {
+          data: {
+            ...(lastPage || { success: true }),
+            data: contacts,
+            count: contacts.length,
+            pagination: {
+              ...lastPage?.pagination,
+              limit: requestedLimit,
+              count: contacts.length,
+            },
+          } as GetContactsResponse,
+        };
+      },
       providesTags: ['Contacts'],
     }),
 
@@ -313,12 +471,12 @@ export const userMessagingApi = createApi({
 
     // Upload attachment for user messaging
     uploadAttachment: builder.mutation<UploadAttachmentResponse, UploadAttachmentParams>({
-      query: ({ file }) => {
+      query: ({ conversationId, file }) => {
         const formData = new FormData();
         formData.append('file', file);
 
         return {
-          url: `${USER_MESSAGING_BASE}/upload`,
+          url: `${USER_MESSAGING_BASE}/upload?conversationId=${encodeURIComponent(conversationId)}`,
           method: "POST",
           data: formData,
           requiresAuth: true,
@@ -336,8 +494,10 @@ export const userMessagingApi = createApi({
 // Export RTK Query hooks
 export const {
   useGetConversationsQuery,
+  useLazyGetConversationsQuery,
   useGetConversationByIdQuery,
   useGetContactsQuery,
+  useLazyGetContactsQuery,
   useGetMessagesQuery,
   useCreateConversationMutation,
   useSendMessageMutation,
