@@ -125,6 +125,8 @@ export default function UserAccessModal({
   const [isConfigLoading, setIsConfigLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [popoverContainer, setPopoverContainer] =
+    useState<HTMLDivElement | null>(null);
   const previousOpenRef = useRef(false);
   const configRequestRef = useRef(0);
   const saveInFlightRef = useRef(false);
@@ -278,6 +280,7 @@ export default function UserAccessModal({
       }}
     >
       <DialogContent
+        ref={setPopoverContainer}
         className="flex h-[min(940px,calc(100vh-24px))] w-[min(720px,calc(100vw-24px))] max-w-[720px] flex-col gap-0 rounded-[22px] border border-[#dfe5e5] bg-[#fdfefe] p-0 shadow-[0_24px_70px_rgba(21,54,55,0.18)] sm:h-[min(940px,calc(100vh-40px))] sm:rounded-[28px] md:!left-auto md:!right-6 md:!translate-x-0"
         showCloseButton={false}
       >
@@ -448,6 +451,7 @@ export default function UserAccessModal({
                   search={agencySearch}
                   value={agencyAccess}
                   disabled={isSaving}
+                  popoverContainer={popoverContainer}
                   pageError={agencyPageError}
                   hydrationError={agencyHydrationError}
                   onSearchChange={onAgencySearchChange}
