@@ -68,6 +68,7 @@ export function serializeCalendarSearch(
   state: Pick<CalendarSearchState, "agencyIds" | "month">,
 ): string {
   const params = paramsFor(search);
+  params.delete("agencyId");
   params.delete("agencyIds");
   for (const agencyId of uniqueIds(state.agencyIds)) {
     params.append("agencyIds", agencyId);

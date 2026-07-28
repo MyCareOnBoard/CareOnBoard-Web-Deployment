@@ -64,6 +64,22 @@ describe("super-admin operational options API", () => {
     });
   });
 
+  it("preserves bounded option-search metadata and defaults it when the backend omits it", async () => {
+    const option = { id: "client-1", name: "Ada Client", mode: "ddd" };
+    axiosGet
+      .mockResolvedValueOnce({
+        data: { success: true, data: [option], truncated: true, scanLimit: 200 },
+      })
+      .mockResolvedValueOnce({ data: { success: true, data: [] } });
+
+    await expect(
+      searchOperationalClients("shift-management", { agencyId: "agency-1" }),
+    ).resolves.toEqual({ items: [option], truncated: true, scanLimit: 200 });
+    await expect(
+      searchOperationalStaff("shift-management", { agencyId: "agency-1" }),
+    ).resolves.toEqual({ items: [], truncated: false, scanLimit: null });
+  });
+
   it("validates the minimal success envelope before returning operational data", async () => {
     axiosGet.mockResolvedValue({ data: { success: true, data: [] } });
     await expect(getOperationalAgencyContext("shift-management", "agency-1")).rejects.toThrow(

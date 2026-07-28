@@ -4,6 +4,7 @@ import {
   OperationalAgencyProvider,
   useOperationalAgency,
 } from "./OperationalAgencyProvider";
+import { agencyShiftRoutes, superAdminShiftRoutes } from "./routes";
 
 const agency = {
   id: "agency-1",
@@ -14,9 +15,9 @@ const agency = {
 };
 
 const data = {
-  searchClients: async () => [],
-  searchStaff: async () => [],
-  listServices: async () => [],
+  searchClients: async () => ({ items: [], truncated: false, scanLimit: null }),
+  searchStaff: async () => ({ items: [], truncated: false, scanLimit: null }),
+  listServices: async () => ({ items: [], truncated: false, scanLimit: null }),
 };
 
 describe("OperationalAgencyProvider", () => {
@@ -77,5 +78,40 @@ describe("OperationalAgencyProvider", () => {
       "/super-admin/shifts/shift-9?agencyId=selected-agency",
     );
     expect(result.current.capabilities.canManageBilling).toBe(true);
+  });
+});
+
+describe("operational shift route builders", () => {
+  it.each([
+    {
+      label: "agency",
+      routes: agencyShiftRoutes,
+      expected: {
+        index: "/agency/dashboard/shifts",
+        list: "/agency/shifts/shifts",
+        approvals: "/agency/shifts/approvals",
+        activityLogs: "/agency/shifts/activity-logs",
+        details: "/agency/shifts/shift%2F9",
+      },
+    },
+    {
+      label: "super-admin",
+      routes: superAdminShiftRoutes,
+      expected: {
+        index: "/super-admin/shifts",
+        list: "/super-admin/shifts/list",
+        approvals: "/super-admin/shifts/approvals",
+        activityLogs: "/super-admin/shifts/activity-logs",
+        details: "/super-admin/shifts/shift%2F9",
+      },
+    },
+  ])("builds every $label shift route with encoded IDs and preserved search", ({ routes, expected }) => {
+    const search = "?filter=mine&agencyId=agency-1";
+
+    expect(routes.index(search)).toBe(`${expected.index}${search}`);
+    expect(routes.list(search)).toBe(`${expected.list}${search}`);
+    expect(routes.approvals(search)).toBe(`${expected.approvals}${search}`);
+    expect(routes.activityLogs(search)).toBe(`${expected.activityLogs}${search}`);
+    expect(routes.details("shift/9", search)).toBe(`${expected.details}${search}`);
   });
 });

@@ -22,13 +22,13 @@ describe("operational agency URL state", () => {
     });
   });
 
-  it("keeps unrelated query parameters while serializing calendar state", () => {
+  it("normalizes a list search into calendar state without retaining its singular agency", () => {
     expect(
       serializeCalendarSearch("?filter=mine&agencyId=legacy", {
         agencyIds: ["b", "a", "b"],
         month: "2026-07",
       }),
-    ).toBe("?filter=mine&agencyId=legacy&agencyIds=b&agencyIds=a&month=2026-07&view=calendar");
+    ).toBe("?filter=mine&agencyIds=b&agencyIds=a&month=2026-07&view=calendar");
   });
 
   it("chooses the supplied agency when changing a calendar into a singular list", () => {

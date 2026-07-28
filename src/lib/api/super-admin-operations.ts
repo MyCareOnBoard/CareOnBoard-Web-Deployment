@@ -3,6 +3,7 @@ import type {
   OperationalAgencySummary,
   OperationalClientOption,
   OperationalFeature,
+  OperationalOptionPage,
   OperationalServiceOption,
   OperationalStaffOption,
 } from "@/lib/operational-agency/types";
@@ -35,6 +36,8 @@ interface SuccessEnvelope<T> {
   success: true;
   data: T;
   nextCursor?: string;
+  truncated?: boolean;
+  scanLimit?: number;
 }
 
 function uniqueIds(ids: string[] = []): string[] {
@@ -106,7 +109,7 @@ async function listOptions<T>(
   feature: OperationalFeature,
   kind: "clients" | "staff" | "services",
   input: OperationalOptionInput,
-): Promise<T[]> {
+): Promise<OperationalOptionPage<T>> {
   const response = await axiosClient.get<SuccessEnvelope<T[]>>(
     `/superAdminOperations/agencies/${requiredAgencyId(input.agencyId)}/${kind}`,
     {
@@ -121,26 +124,30 @@ async function listOptions<T>(
   );
   const data = responseData<T[]>(response.data);
   if (!Array.isArray(data)) throw new Error("Invalid operational agency response.");
-  return data;
+  return {
+    items: data,
+    truncated: response.data.truncated === true,
+    scanLimit: typeof response.data.scanLimit === "number" ? response.data.scanLimit : null,
+  };
 }
 
 export function searchOperationalClients(
   feature: OperationalFeature,
   input: OperationalOptionInput,
-): Promise<OperationalClientOption[]> {
+): Promise<OperationalOptionPage<OperationalClientOption>> {
   return listOptions(feature, "clients", input);
 }
 
 export function searchOperationalStaff(
   feature: OperationalFeature,
   input: OperationalOptionInput,
-): Promise<OperationalStaffOption[]> {
+): Promise<OperationalOptionPage<OperationalStaffOption>> {
   return listOptions(feature, "staff", input);
 }
 
 export function listOperationalServices(
   feature: OperationalFeature,
   input: OperationalOptionInput,
-): Promise<OperationalServiceOption[]> {
+): Promise<OperationalOptionPage<OperationalServiceOption>> {
   return listOptions(feature, "services", input);
 }

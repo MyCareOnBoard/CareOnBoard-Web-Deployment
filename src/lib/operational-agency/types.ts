@@ -29,6 +29,12 @@ export interface OperationalServiceOption {
   code: string;
 }
 
+export interface OperationalOptionPage<T> {
+  items: T[];
+  truncated: boolean;
+  scanLimit: number | null;
+}
+
 export interface OperationalLookupInput {
   search?: string;
   mode?: AgencyMode;
@@ -37,9 +43,9 @@ export interface OperationalLookupInput {
 }
 
 export interface OperationalAgencyDataAdapter {
-  searchClients(input?: OperationalLookupInput): Promise<OperationalClientOption[]>;
-  searchStaff(input?: OperationalLookupInput): Promise<OperationalStaffOption[]>;
-  listServices(input?: OperationalLookupInput): Promise<OperationalServiceOption[]>;
+  searchClients(input?: OperationalLookupInput): Promise<OperationalOptionPage<OperationalClientOption>>;
+  searchStaff(input?: OperationalLookupInput): Promise<OperationalOptionPage<OperationalStaffOption>>;
+  listServices(input?: OperationalLookupInput): Promise<OperationalOptionPage<OperationalServiceOption>>;
 }
 
 export interface OperationalCapabilities {
