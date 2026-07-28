@@ -1,0 +1,89 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const routing = vi.hoisted(() => ({
+  pathname: "/super-admin/shifts",
+  search: "?agencyIds=&month=2026-08&view=calendar",
+  navigate: vi.fn(),
+}));
+const listOperationalAgencies = vi.hoisted(() => vi.fn());
+const listCalendarShifts = vi.hoisted(() => vi.fn());
+
+vi.mock("react-router", async () => {
+  const actual = await vi.importActual<typeof import("react-router")>("react-router");
+  return {
+    ...actual,
+    useLocation: () => ({ pathname: routing.pathname, search: routing.search, hash: "", state: null, key: "test" }),
+    useNavigate: () => routing.navigate,
+  };
+});
+vi.mock("@/lib/api/super-admin-operations", () => ({ listOperationalAgencies }));
+vi.mock("@/lib/api/shifts", () => ({ listCalendarShifts }));
+
+import ShiftManagementWorkspace from "./index";
+
+const atlas = { id: "atlas", name: "Atlas Care", status: "active", supportedClientTypes: ["ddd", "hha"], timezone: "America/New_York" };
+const beacon = { id: "beacon", name: "Beacon Supports", status: "active", supportedClientTypes: ["ddd"], timezone: "America/New_York" };
+
+describe("super-admin shift management workspace", () => {
+  beforeEach(() => {
+    routing.pathname = "/super-admin/shifts";
+    routing.search = "?agencyIds=&month=2026-08&view=calendar";
+    routing.navigate.mockReset();
+    listOperationalAgencies.mockReset();
+    listCalendarShifts.mockReset();
+    listOperationalAgencies.mockResolvedValue({ data: [beacon, atlas], nextCursor: null });
+    listCalendarShifts.mockResolvedValue({ month: "2026-08", shifts: [], nextCursor: null });
+  });
+
+  it("defaults to Calendar and preserves an explicit empty scope with zero shift requests", async () => {
+    render(<ShiftManagementWorkspace />);
+
+    expect(await screen.findByRole("heading", { name: "Shift management" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Calendar view" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByText("Choose one or more agencies to view shifts.")).toBeVisible();
+    expect(listCalendarShifts).not.toHaveBeenCalled();
+    const pageRequest = listOperationalAgencies.mock.calls.find(([, input]) => input?.limit === 50);
+    expect(pageRequest?.[0]).toBe("shift-management");
+    expect(pageRequest?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("hydrates repeated URL agencies and renders their calendar without a global request", async () => {
+    routing.search = "?agencyIds=atlas&agencyIds=beacon&month=2026-08&view=calendar&filter=open";
+    listCalendarShifts.mockImplementation(async (params) => ({
+      month: "2026-08",
+      shifts: [{
+        id: `${params.agencyId}-shift`,
+        date: "2026-08-05",
+        startTime: "09:00",
+        endTime: "12:00",
+        status: "pending",
+        clientId: "client-1",
+        clientName: "Jamie Client",
+        employeeId: "staff-1",
+        staffName: "Robin Staff",
+        serviceCode: "H2021",
+      }],
+      nextCursor: null,
+    }));
+
+    render(<ShiftManagementWorkspace />);
+
+    expect(await screen.findByText("2 shifts across 2 agencies.")).toBeVisible();
+    const requestedAgencyIds = listCalendarShifts.mock.calls.map(([params]) => params.agencyId).sort();
+    expect(requestedAgencyIds).toEqual(["atlas", "beacon"]);
+    expect(listCalendarShifts.mock.calls.every(([params]) => typeof params.agencyId === "string" && !Array.isArray(params.agencyId))).toBe(true);
+  });
+
+  it("keeps unrelated search state when clearing the selected agencies", async () => {
+    routing.search = "?filter=open&agencyIds=atlas&month=2026-08&view=calendar";
+    render(<ShiftManagementWorkspace />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Clear agencies" }));
+    await waitFor(() => expect(routing.navigate).toHaveBeenCalledWith({
+      pathname: "/super-admin/shifts",
+      search: "?filter=open&month=2026-08&view=calendar&agencyIds=",
+    }));
+  });
+});

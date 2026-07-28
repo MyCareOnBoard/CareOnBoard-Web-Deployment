@@ -127,6 +127,7 @@ const ServicesManagementPage = lazy(() => import("@/pages/super-admin/services")
 const AgencyTrainings = lazy(() => import("@/pages/agency/trainings"));
 const GlobalNotesQualityPage = lazy(() => import("@/pages/super-admin/global-notes-quality"));
 const SuperAdminShiftMaintenancePage = lazy(() => import("@/pages/super-admin/shift-maintenance"));
+const SuperAdminShiftManagementPage = lazy(() => import("@/pages/super-admin/shift-management"));
 const AgencyBillingMonitorPage = lazy(() => import("@/pages/super-admin/agency-billing-monitor"));
 const AIAutomationPage = lazy(() => import("@/pages/agency/ai-automation"));
 const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));
@@ -741,6 +742,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.shiftMaintenance,
                 Component: SuperAdminShiftMaintenancePage,
+            },
+            {
+                path: Routes.superAdmin.shifts.index,
+                Component: SuperAdminShiftManagementPage,
             },
             {
                 path: Routes.superAdmin.reports.index,

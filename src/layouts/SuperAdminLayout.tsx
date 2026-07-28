@@ -1,6 +1,6 @@
 import type {ReactNode} from "react";
 import {useEffect, useMemo} from "react";
-import {Outlet, useNavigate, useLocation} from "react-router";
+import {matchPath, Outlet, useNavigate, useLocation} from "react-router";
 import {useAuth} from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {Routes} from "@/routes/constants";
@@ -23,6 +23,7 @@ import {
   UserLock,
   Briefcase,
   Wrench,
+  CalendarRange,
 } from "lucide-react";
 
 const allNavItems: NavItem[] = [
@@ -36,10 +37,17 @@ const allNavItems: NavItem[] = [
   {label: "Oversight Center", path: Routes.superAdmin.oversightCenter, icon: BarChart3, accessKey: "Oversight Center"},
   {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock, accessKey: "Clients Directory"},
   {label: "Shift Maintenance", path: Routes.superAdmin.shiftMaintenance, icon: Wrench, accessKey: "Shift Maintenance"},
+  {label: "Shift Management", path: Routes.superAdmin.shifts.index, icon: CalendarRange, accessKey: "Shift Management"},
   {label: "Reports", path: Routes.superAdmin.reports.index, icon: ChartGantt, accessKey: "Reports"},
   {label: "Services", path: Routes.superAdmin.services, icon: Briefcase, accessKey: "Services"},
   {label: "System Settings", path: Routes.superAdmin.systemSettings, icon: Settings, accessKey: "System Settings"},
 ];
+
+function mostSpecificNavItem(pathname: string): NavItem | undefined {
+  return allNavItems
+    .filter((item) => item.path && matchPath({ path: item.path, end: false }, pathname))
+    .sort((left, right) => (right.path?.length ?? 0) - (left.path?.length ?? 0))[0];
+}
 
 export default function SuperAdminLayout({children}: { children?: ReactNode }) {
   const {user, logout} = useAuth();
@@ -81,7 +89,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
 
     const currentPath = location.pathname;
     
-    const currentNavItem = allNavItems.find((item) => item.path && currentPath.includes(item.path));
+    const currentNavItem = mostSpecificNavItem(currentPath);
     
     if (!currentNavItem || !currentNavItem.accessKey) {
       return;

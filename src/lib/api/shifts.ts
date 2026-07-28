@@ -270,6 +270,33 @@ export interface ListShiftsParams {
     clientType?: 'hha' | 'ddd';
 }
 
+export interface CalendarShiftsParams {
+    agencyId: string;
+    month: string;
+    clientType?: "ddd" | "hha";
+    cursor?: string;
+    limit?: number;
+}
+
+export interface CompactCalendarShift {
+    id: string;
+    date: string;
+    startTime: string | null;
+    endTime: string | null;
+    status: ShiftStatus | null;
+    clientId: string | null;
+    clientName: string | null;
+    employeeId: string | null;
+    staffName: string | null;
+    serviceCode: string | null;
+}
+
+export interface CalendarShiftPage {
+    month: string;
+    shifts: CompactCalendarShift[];
+    nextCursor: string | null;
+}
+
 /**
  * Shift API Response
  */
@@ -529,6 +556,35 @@ export const listShifts = async (
         console.error('Failed to fetch shifts:', error);
         throw error;
     }
+};
+
+export const listCalendarShifts = async (
+    params: CalendarShiftsParams,
+    options?: { signal?: AbortSignal },
+): Promise<CalendarShiftPage> => {
+    if (!params.agencyId.trim()) {
+        throw new Error("agencyId is required.");
+    }
+
+    const response = await axiosClient.get<{
+        success: boolean;
+        data?: CalendarShiftPage;
+    }>(`${SHIFT_BASE}/calendar`, {
+        params: {
+            agencyId: params.agencyId,
+            month: params.month,
+            ...(params.clientType ? { clientType: params.clientType } : {}),
+            ...(params.cursor ? { cursor: params.cursor } : {}),
+            ...(params.limit ? { limit: Math.min(200, Math.max(1, params.limit)) } : {}),
+        },
+        signal: options?.signal,
+    });
+
+    if (!response.data.success || !response.data.data || !Array.isArray(response.data.data.shifts)) {
+        throw new Error("Invalid shift calendar response.");
+    }
+
+    return response.data.data;
 };
 
 /**
