@@ -64,7 +64,9 @@ function serializeWorkspace(search: string, state: ShiftWorkspaceState): string 
     params.delete("agencyIds");
     params.set("month", state.month);
     params.set("view", "calendar");
-    for (const agencyId of unique(state.agencyIds)) params.append("agencyIds", agencyId);
+    const agencyIds = unique(state.agencyIds);
+    if (agencyIds.length === 0) params.append("agencyIds", "");
+    else for (const agencyId of agencyIds) params.append("agencyIds", agencyId);
   } else {
     params.delete("agencyIds");
     if (state.agencyId) params.set("agencyId", state.agencyId);
@@ -79,7 +81,7 @@ function serializeWorkspace(search: string, state: ShiftWorkspaceState): string 
 export function resolveInitialShiftWorkspace(
   search: string,
   agencies: readonly OperationalAgencySummary[],
-  savedAgencyIds: readonly string[] = [],
+  savedAgencyIds?: readonly string[],
   now = new Date(),
 ): ShiftWorkspaceState {
   const params = paramsFor(search);
@@ -99,16 +101,26 @@ export function resolveInitialShiftWorkspace(
     return { view: "list", month, ...(agencyId ? { agencyId } : {}) };
   }
 
-  const requestedIds = validSelection(params.getAll("agencyIds"), allowedIds);
+  const requestedValues = params.getAll("agencyIds");
+  const requestedIds = validSelection(requestedValues, allowedIds);
   if (requestedIds.length) return { view: "calendar", month, agencyIds: requestedIds };
+  if (params.has("agencyIds") && requestedValues.every((value) => !value.trim())) {
+    return { view: "calendar", month, agencyIds: [] };
+  }
   if (allowed.length === 0) return { view: "calendar", month, agencyIds: [] };
+  if (savedAgencyIds !== undefined) {
+    return {
+      view: "calendar",
+      month,
+      agencyIds: validSelection(savedAgencyIds, allowedIds),
+    };
+  }
   if (allowed.length === 1) return { view: "calendar", month, agencyIds: [allowed[0].id] };
 
-  const savedIds = validSelection(savedAgencyIds, allowedIds);
   return {
     view: "calendar",
     month,
-    agencyIds: savedIds.length ? savedIds : [allowed[0].id],
+    agencyIds: [allowed[0].id],
   };
 }
 

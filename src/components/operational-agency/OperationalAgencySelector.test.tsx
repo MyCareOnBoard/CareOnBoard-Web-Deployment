@@ -157,6 +157,37 @@ describe("OperationalAgencySelector", () => {
     expect(trigger).toHaveFocus();
   });
 
+  it("keeps the Load more action outside the listbox that owns agency options", async () => {
+    listOperationalAgencies.mockResolvedValue({ data: options, nextCursor: "page-2" });
+    const user = userEvent.setup();
+    render(<SelectorHarness />);
+
+    await user.click(screen.getByRole("button", { name: "Select agencies, none selected" }));
+    const listbox = screen.getByRole("listbox", { name: "Agency options" });
+    expect(await within(listbox).findAllByRole("option")).toHaveLength(2);
+
+    const loadMore = screen.getByRole("button", { name: "Load more agencies" });
+    expect(within(listbox).queryByRole("button", { name: "Load more agencies" })).not.toBeInTheDocument();
+    expect(listbox).not.toContainElement(loadMore);
+  });
+
+  it("exposes one roving option tab stop and moves it with Arrow navigation", async () => {
+    const user = userEvent.setup();
+    render(<SelectorHarness />);
+
+    await user.click(screen.getByRole("button", { name: "Select agencies, none selected" }));
+    const atlas = await screen.findByRole("option", { name: "Atlas Care" });
+    const birch = screen.getByRole("option", { name: "Birch House" });
+    expect(atlas).toHaveAttribute("tabindex", "0");
+    expect(birch).toHaveAttribute("tabindex", "-1");
+
+    atlas.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(atlas).toHaveAttribute("tabindex", "-1");
+    expect(birch).toHaveAttribute("tabindex", "0");
+    expect(birch).toHaveFocus();
+  });
+
   it("gives multiple selector instances unique search fields and focuses the opened instance", async () => {
     const user = userEvent.setup();
     render(

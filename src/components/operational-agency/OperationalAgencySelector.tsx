@@ -62,6 +62,7 @@ export default function OperationalAgencySelector({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
+  const [activeOptionIndex, setActiveOptionIndex] = useState(0);
   const loadMoreController = useRef<AbortController | null>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -142,6 +143,11 @@ export default function OperationalAgencySelector({
 
   useEffect(() => () => loadMoreController.current?.abort(), []);
 
+  useEffect(() => {
+    optionRefs.current.length = agencies.length;
+    setActiveOptionIndex((current) => Math.min(current, Math.max(agencies.length - 1, 0)));
+  }, [agencies.length]);
+
   const selectedAgencies = selectedIds.map((id) => knownAgencies[id] || {
     id,
     name: id,
@@ -172,6 +178,7 @@ export default function OperationalAgencySelector({
   const focusOption = (index: number) => {
     if (!agencies.length) return;
     const normalized = (index + agencies.length) % agencies.length;
+    setActiveOptionIndex(normalized);
     optionRefs.current[normalized]?.focus();
   };
 
@@ -287,54 +294,57 @@ export default function OperationalAgencySelector({
             </div>
           </div>
 
-          <div
-            role="listbox"
-            aria-label="Agency options"
-            aria-busy={loading}
-            aria-multiselectable={selectionMode === "multiple" || undefined}
-            className="max-h-[min(320px,45vh)] touch-pan-y overflow-y-auto overscroll-contain p-2"
-          >
-            {agencies.map((agency, index) => {
-              const selected = selectedIds.includes(agency.id);
-              return (
-                <button
-                  key={agency.id}
-                  ref={(element) => { optionRefs.current[index] = element; }}
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  onClick={() => toggleAgency(agency.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "ArrowDown") {
-                      event.preventDefault();
-                      focusOption(index + 1);
-                    } else if (event.key === "ArrowUp") {
-                      event.preventDefault();
-                      focusOption(index - 1);
-                    } else if (event.key === "Home") {
-                      event.preventDefault();
-                      focusOption(0);
-                    } else if (event.key === "End") {
-                      event.preventDefault();
-                      focusOption(agencies.length - 1);
-                    }
-                  }}
-                  className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-[#eef8f8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92] focus-visible:ring-inset"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${selected
-                      ? "border-[#087f82] bg-[#087f82] text-white"
-                      : "border-[#b7c2c3] bg-white"}`}
+          <div className="max-h-[min(320px,45vh)] touch-pan-y overflow-y-auto overscroll-contain p-2">
+            <div
+              role="listbox"
+              aria-label="Agency options"
+              aria-busy={loading}
+              aria-multiselectable={selectionMode === "multiple" || undefined}
+            >
+              {agencies.map((agency, index) => {
+                const selected = selectedIds.includes(agency.id);
+                return (
+                  <button
+                    key={agency.id}
+                    ref={(element) => { optionRefs.current[index] = element; }}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    tabIndex={activeOptionIndex === index ? 0 : -1}
+                    onFocus={() => setActiveOptionIndex(index)}
+                    onClick={() => toggleAgency(agency.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        focusOption(index + 1);
+                      } else if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        focusOption(index - 1);
+                      } else if (event.key === "Home") {
+                        event.preventDefault();
+                        focusOption(0);
+                      } else if (event.key === "End") {
+                        event.preventDefault();
+                        focusOption(agencies.length - 1);
+                      }
+                    }}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-[#eef8f8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92] focus-visible:ring-inset"
                   >
-                    {selected && <Check className="h-3.5 w-3.5" />}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#20282a]">
-                    {agency.name}
-                  </span>
-                </button>
-              );
-            })}
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${selected
+                        ? "border-[#087f82] bg-[#087f82] text-white"
+                        : "border-[#b7c2c3] bg-white"}`}
+                    >
+                      {selected && <Check className="h-3.5 w-3.5" />}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#20282a]">
+                      {agency.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             {loading && (
               <div aria-label="Loading agencies" className="space-y-2 p-2">
                 {[0, 1, 2].map((item) => <Skeleton key={item} className="h-10 w-full rounded-xl" />)}

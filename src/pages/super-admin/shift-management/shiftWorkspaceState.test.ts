@@ -40,7 +40,7 @@ const agencies: OperationalAgencySummary[] = [
 
 describe("shift workspace initialization", () => {
   it("defaults to Calendar and falls back to the alphabetically first active agency", () => {
-    expect(resolveInitialShiftWorkspace("?month=bad", agencies, [], new Date(2026, 6, 10))).toEqual({
+    expect(resolveInitialShiftWorkspace("?month=bad", agencies, undefined, new Date(2026, 6, 10))).toEqual({
       view: "calendar",
       month: "2026-07",
       agencyIds: ["atlas-a"],
@@ -84,6 +84,20 @@ describe("shift workspace initialization", () => {
     });
   });
 
+  it("preserves an explicitly empty saved Calendar preference", () => {
+    expect(resolveInitialShiftWorkspace("?month=2026-07", agencies, [])).toEqual({
+      view: "calendar",
+      month: "2026-07",
+      agencyIds: [],
+    });
+
+    expect(resolveInitialShiftWorkspace("?month=2026-07", [agencies[0]], [])).toEqual({
+      view: "calendar",
+      month: "2026-07",
+      agencyIds: [],
+    });
+  });
+
   it("allows an empty Calendar when no active agencies are available", () => {
     expect(resolveInitialShiftWorkspace("?month=2026-07", [agencies[3]])).toEqual({
       view: "calendar",
@@ -94,7 +108,7 @@ describe("shift workspace initialization", () => {
 });
 
 describe("shift workspace transitions", () => {
-  it("preserves an explicit in-session Clear without applying initialization fallback", () => {
+  it("preserves an explicit Calendar Clear after serializing and resolving browser history", () => {
     const result = updateShiftWorkspaceSelection(
       "?filter=unfilled&month=2026-07&agencyIds=atlas-a",
       { view: "calendar", month: "2026-07", agencyIds: ["atlas-a"] },
@@ -103,8 +117,13 @@ describe("shift workspace transitions", () => {
 
     expect(result).toEqual({
       state: { view: "calendar", month: "2026-07", agencyIds: [] },
-      search: "?filter=unfilled&month=2026-07&view=calendar",
+      search: "?filter=unfilled&month=2026-07&view=calendar&agencyIds=",
       requiresAgencyChoice: false,
+    });
+    expect(resolveInitialShiftWorkspace(result.search, agencies, ["atlas-a"])).toEqual({
+      view: "calendar",
+      month: "2026-07",
+      agencyIds: [],
     });
   });
 
