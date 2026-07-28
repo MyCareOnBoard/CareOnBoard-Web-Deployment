@@ -22,6 +22,8 @@ export interface OperationalAgencyListInput {
 export interface OperationalAgencyPage {
   data: OperationalAgencySummary[];
   nextCursor: string | null;
+  truncated: boolean;
+  scanLimit: number | null;
 }
 
 export interface OperationalOptionInput {
@@ -35,7 +37,7 @@ export interface OperationalOptionInput {
 interface SuccessEnvelope<T> {
   success: true;
   data: T;
-  nextCursor?: string;
+  nextCursor?: string | null;
   truncated?: boolean;
   scanLimit?: number;
 }
@@ -55,6 +57,30 @@ function responseData<T>(value: unknown): T {
     throw new Error("Invalid operational agency response.");
   }
   return envelope.data as T;
+}
+
+function operationalAgency(value: unknown): OperationalAgencySummary | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const agency = value as Record<string, unknown>;
+  const supported = agency.supportedClientTypes;
+  if (
+    typeof agency.id !== "string" || !agency.id ||
+    typeof agency.name !== "string" ||
+    agency.status !== "active" ||
+    !Array.isArray(supported) ||
+    !supported.every((mode) => mode === "ddd" || mode === "hha") ||
+    new Set(supported).size !== supported.length ||
+    typeof agency.timezone !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: agency.id,
+    name: agency.name,
+    status: "active",
+    supportedClientTypes: supported,
+    timezone: agency.timezone,
+  };
 }
 
 function requiredAgencyId(agencyId: string): string {
@@ -81,11 +107,26 @@ export async function listOperationalAgencies(
       signal: input.signal,
     },
   );
-  const data = responseData<OperationalAgencySummary[]>(response.data);
-  if (!Array.isArray(data)) throw new Error("Invalid operational agency response.");
+  const rawData = responseData<unknown>(response.data);
+  if (!Array.isArray(rawData)) throw new Error("Invalid operational agency response.");
+  const data = rawData.map(operationalAgency);
+  const nextCursor = response.data.nextCursor;
+  const truncated = response.data.truncated;
+  const scanLimit = response.data.scanLimit;
+  if (
+    data.some((agency) => agency === null) ||
+    !(nextCursor == null || (typeof nextCursor === "string" && Boolean(nextCursor))) ||
+    !(truncated === undefined || typeof truncated === "boolean") ||
+    (truncated === true && !(Number.isInteger(scanLimit) && Number(scanLimit) > 0)) ||
+    (truncated !== true && scanLimit !== undefined)
+  ) {
+    throw new Error("Invalid operational agency response.");
+  }
   return {
-    data,
-    nextCursor: typeof response.data.nextCursor === "string" ? response.data.nextCursor : null,
+    data: data as OperationalAgencySummary[],
+    nextCursor: nextCursor ?? null,
+    truncated: truncated === true,
+    scanLimit: truncated === true ? Number(scanLimit) : null,
   };
 }
 

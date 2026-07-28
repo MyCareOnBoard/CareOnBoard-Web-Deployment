@@ -111,6 +111,7 @@ describe("ShiftsMonthCalendar shared-grid regression", () => {
     render(<ShiftsMonthCalendar variant="dsp" agencyId="agency-a" employeeId="staff-a" />);
 
     const open = await screen.findByRole("button", { name: /Open shift details for Morgan Client/i });
+    expect(open).toHaveAccessibleName(/Morgan Client.*Caregiver Robin Staff.*Status Pending.*Anomaly Missed shift/i);
     expect(listShifts.mock.calls[0][0]).toMatchObject({
       agencyId: "agency-a",
       employeeId: "staff-a",
@@ -121,7 +122,7 @@ describe("ShiftsMonthCalendar shared-grid regression", () => {
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/agency/shifts/dsp-shift-1"));
   });
 
-  it("opens desktop hover overflow from the keyboard and moves focus into its choices", async () => {
+  it("uses one keyboard-safe overflow menu on desktop and restores focus on Escape", async () => {
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       value: (query: string) => ({
@@ -137,20 +138,26 @@ describe("ShiftsMonthCalendar shared-grid regression", () => {
     });
     listShifts.mockResolvedValue({
       success: true,
-      count: 2,
+      count: 3,
       shifts: [
         entityShift("keyboard-shift-1", "09:00AM", "Jamie Client", "Robin Staff"),
         entityShift("keyboard-shift-2", "10:00AM", "Jamie Client", "Taylor Staff"),
+        entityShift("keyboard-shift-3", "11:00AM", "Jamie Client", "Morgan Staff"),
       ],
     });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<ShiftsMonthCalendar variant="client" agencyId="agency-a" clientId="client-keyboard" />);
 
-    const overflow = await screen.findByRole("button", { name: "Show 1 more shift on August 12" });
+    const overflow = await screen.findByRole("button", { name: "Show 2 more shifts on August 12" });
     overflow.focus();
     await user.keyboard("{Enter}");
 
-    const choice = await screen.findByRole("button", { name: /Open shift details for Taylor Staff/i });
-    await waitFor(() => expect(choice).toHaveFocus());
+    const firstChoice = await screen.findByRole("button", { name: /Open shift details for Taylor Staff/i });
+    const secondChoice = await screen.findByRole("button", { name: /Open shift details for Morgan Staff/i });
+    await waitFor(() => expect(firstChoice).toHaveFocus());
+    await user.tab();
+    expect(secondChoice).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(overflow).toHaveFocus();
   });
 });

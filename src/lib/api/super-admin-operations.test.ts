@@ -80,6 +80,54 @@ describe("super-admin operational options API", () => {
     ).resolves.toEqual({ items: [], truncated: false, scanLimit: null });
   });
 
+  it("preserves agency-list truncation metadata", async () => {
+    const agency = {
+      id: "agency-a",
+      name: "Agency A",
+      status: "active",
+      supportedClientTypes: ["ddd"],
+      timezone: "UTC",
+    };
+    axiosGet.mockResolvedValue({
+      data: {
+        success: true,
+        data: [agency],
+        nextCursor: null,
+        truncated: true,
+        scanLimit: 200,
+      },
+    });
+
+    await expect(listOperationalAgencies("shift-management")).resolves.toEqual({
+      data: [agency],
+      nextCursor: null,
+      truncated: true,
+      scanLimit: 200,
+    });
+  });
+
+  it("rejects malformed agency rows, cursors, and truncation metadata", async () => {
+    const agency = {
+      id: "agency-a",
+      name: "Agency A",
+      status: "active",
+      supportedClientTypes: ["ddd"],
+      timezone: "UTC",
+    };
+    const malformed = [
+      { success: true, data: [{ ...agency, supportedClientTypes: ["private"] }] },
+      { success: true, data: [agency], nextCursor: 42 },
+      { success: true, data: [agency], truncated: true, scanLimit: "200" },
+    ];
+
+    for (const data of malformed) {
+      axiosGet.mockResolvedValueOnce({ data });
+      await expect(listOperationalAgencies("shift-management")).rejects.toThrow(
+        "Invalid operational agency response.",
+      );
+    }
+  });
+
   it("validates the minimal success envelope before returning operational data", async () => {
     axiosGet.mockResolvedValue({ data: { success: true, data: [] } });
     await expect(getOperationalAgencyContext("shift-management", "agency-1")).rejects.toThrow(

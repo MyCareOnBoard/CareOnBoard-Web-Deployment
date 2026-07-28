@@ -15,6 +15,7 @@ export interface NormalizedCalendarShift extends CompactCalendarShift {
 
 export interface CalendarState {
   generation: number;
+  requestKey: string;
   shiftById: Map<string, NormalizedCalendarShift>;
   shifts: NormalizedCalendarShift[];
   agencies: Map<string, CalendarAgencyLoadState>;
@@ -23,9 +24,11 @@ export interface CalendarState {
 export function createCalendarState(
   agencies: readonly OperationalAgencySummary[],
   generation: number,
+  requestKey = "",
 ): CalendarState {
   return {
     generation,
+    requestKey,
     shiftById: new Map(),
     shifts: [],
     agencies: new Map(agencies.map((agency) => [
@@ -142,4 +145,56 @@ export async function mapWithConcurrency<T, R>(
   await Promise.all(workers);
   if (signal.aborted) throw abortError();
   return results;
+}
+
+export interface KeyedConcurrencyScheduler<T> {
+  enqueue: (value: T) => boolean;
+  cancel: () => void;
+}
+
+export function createKeyedConcurrencyScheduler<T>(
+  concurrency: number,
+  keyFor: (value: T) => string,
+  worker: (value: T, signal: AbortSignal) => Promise<void>,
+  signal: AbortSignal,
+): KeyedConcurrencyScheduler<T> {
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new Error("concurrency must be a positive integer.");
+  }
+  const queuedOrActive = new Set<string>();
+  const queue: T[] = [];
+  let active = 0;
+  let cancelled = signal.aborted;
+
+  const drain = () => {
+    while (!cancelled && !signal.aborted && active < concurrency && queue.length > 0) {
+      const value = queue.shift() as T;
+      const key = keyFor(value);
+      active += 1;
+      void worker(value, signal).finally(() => {
+        active -= 1;
+        queuedOrActive.delete(key);
+        drain();
+      });
+    }
+  };
+
+  const cancel = () => {
+    cancelled = true;
+    queue.length = 0;
+    queuedOrActive.clear();
+  };
+  signal.addEventListener("abort", cancel, { once: true });
+
+  return {
+    enqueue(value) {
+      const key = keyFor(value);
+      if (cancelled || signal.aborted || queuedOrActive.has(key)) return false;
+      queuedOrActive.add(key);
+      queue.push(value);
+      drain();
+      return true;
+    },
+    cancel,
+  };
 }

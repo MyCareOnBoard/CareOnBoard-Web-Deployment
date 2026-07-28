@@ -76,6 +76,31 @@ function primaryNameForVariant(shift: Shift, variant: ShiftsMonthCalendarVariant
   return variant === "dsp" ? getClientName(shift) : dspFullLabel(shift);
 }
 
+function orderEntityShiftsForDay(entries: readonly Shift[]): Shift[] {
+  const ordered = [...entries].sort((left, right) => (
+    (left.startTime || "").localeCompare(right.startTime || "")
+    || left.id.localeCompare(right.id)
+  ));
+  const firstAnomaly = ordered.find((shift) => detectShiftAnomalyCodes(shift).length > 0);
+  return firstAnomaly
+    ? [firstAnomaly, ...ordered.filter((shift) => shift.id !== firstAnomaly.id)]
+    : ordered;
+}
+
+function entityShiftAriaLabel(shift: Shift, variant: ShiftsMonthCalendarVariant): string {
+  const anomalyCode = detectShiftAnomalyCodes(shift)[0];
+  const status = shift.status
+    ? shift.status.charAt(0).toUpperCase() + shift.status.slice(1).replaceAll("_", " ")
+    : "Unknown";
+  return [
+    primaryNameForVariant(shift, variant),
+    formatShiftWindow(shift),
+    `Caregiver ${dspFullLabel(shift)}`,
+    `Status ${status}`,
+    anomalyCode ? `Anomaly ${ANOMALY_LABELS[anomalyCode].label}` : null,
+  ].filter(Boolean).join(", ");
+}
+
 function isAbortLike(error: unknown): boolean {
   if (axios.isCancel(error)) return true;
   if (!error || typeof error !== "object") return false;
@@ -256,13 +281,13 @@ export function ShiftsMonthCalendar({
           entries={shifts}
           getEntryKey={(shift) => shift.id}
           getEntryDate={(shift) => shift.date}
-          getEntryStartTime={(shift) => shift.startTime}
-          getEntryAriaLabel={(shift) => `${primaryNameForVariant(shift, variant)}, ${formatShiftWindow(shift)}`}
+          getEntryAriaLabel={(shift) => entityShiftAriaLabel(shift, variant)}
           renderEntry={(shift, options) => <CompactShiftSummary shift={shift} variant={variant} showBadge={options.showBadge} />}
           renderBadge={(shift) => <ShiftStatusOrAnomalyBadge shift={shift} />}
           getSurfaceStyle={getShiftDayCellSurfaceStyle}
-          isPriorityEntry={(shift) => detectShiftAnomalyCodes(shift).length > 0}
+          orderEntriesForDay={orderEntityShiftsForDay}
           onOpenShift={onOpenShift}
+          showEmptyState={!loading && !error}
         />
       </div>
     </div>

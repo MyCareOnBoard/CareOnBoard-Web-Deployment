@@ -289,12 +289,76 @@ export interface CompactCalendarShift {
     employeeId: string | null;
     staffName: string | null;
     serviceCode: string | null;
+    anomalyCodes: AnomalyCode[];
 }
 
 export interface CalendarShiftPage {
     month: string;
     shifts: CompactCalendarShift[];
     nextCursor: string | null;
+}
+
+const CALENDAR_ANOMALY_CODES = new Set<AnomalyCode>([
+    "missed",
+    "incomplete_clock",
+    "late_clock_in",
+    "unassigned",
+    "invalid_time",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function nullableString(value: unknown): value is string | null {
+    return value === null || typeof value === "string";
+}
+
+function validCalendarDate(value: unknown, month: string): value is string {
+    if (typeof value !== "string" || !value.startsWith(`${month}-`)) return false;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return false;
+    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    return date.toISOString().slice(0, 10) === value;
+}
+
+function compactCalendarShift(value: unknown, month: string): CompactCalendarShift | null {
+    if (!isRecord(value)) return null;
+    const anomalyCodes = value.anomalyCodes;
+    const validAnomalies = Array.isArray(anomalyCodes)
+        && anomalyCodes.every((code): code is AnomalyCode =>
+            typeof code === "string" && CALENDAR_ANOMALY_CODES.has(code as AnomalyCode))
+        && new Set(anomalyCodes).size === anomalyCodes.length;
+    const validStatus = value.status === null ||
+        (typeof value.status === "string" && Object.values(ShiftStatus).includes(value.status as ShiftStatus));
+    if (
+        typeof value.id !== "string" || !value.id.trim() ||
+        !validCalendarDate(value.date, month) ||
+        !nullableString(value.startTime) ||
+        !nullableString(value.endTime) ||
+        !validStatus ||
+        !nullableString(value.clientId) ||
+        !nullableString(value.clientName) ||
+        !nullableString(value.employeeId) ||
+        !nullableString(value.staffName) ||
+        !nullableString(value.serviceCode) ||
+        !validAnomalies
+    ) {
+        return null;
+    }
+    return {
+        id: value.id,
+        date: value.date,
+        startTime: value.startTime,
+        endTime: value.endTime,
+        status: value.status as ShiftStatus | null,
+        clientId: value.clientId,
+        clientName: value.clientName,
+        employeeId: value.employeeId,
+        staffName: value.staffName,
+        serviceCode: value.serviceCode,
+        anomalyCodes,
+    };
 }
 
 /**
@@ -565,11 +629,11 @@ export const listCalendarShifts = async (
     if (!params.agencyId.trim()) {
         throw new Error("agencyId is required.");
     }
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(params.month)) {
+        throw new Error("month must use YYYY-MM.");
+    }
 
-    const response = await axiosClient.get<{
-        success: boolean;
-        data?: CalendarShiftPage;
-    }>(`${SHIFT_BASE}/calendar`, {
+    const response = await axiosClient.get<unknown>(`${SHIFT_BASE}/calendar`, {
         params: {
             agencyId: params.agencyId,
             month: params.month,
@@ -580,11 +644,27 @@ export const listCalendarShifts = async (
         signal: options?.signal,
     });
 
-    if (!response.data.success || !response.data.data || !Array.isArray(response.data.data.shifts)) {
+    if (!isRecord(response.data) || response.data.success !== true || !isRecord(response.data.data)) {
         throw new Error("Invalid shift calendar response.");
     }
-
-    return response.data.data;
+    const data = response.data.data;
+    const nextCursor = data.nextCursor;
+    if (
+        data.month !== params.month ||
+        !Array.isArray(data.shifts) ||
+        !(nextCursor === null || (typeof nextCursor === "string" && Boolean(nextCursor)))
+    ) {
+        throw new Error("Invalid shift calendar response.");
+    }
+    const shifts = data.shifts.map((shift) => compactCalendarShift(shift, params.month));
+    if (shifts.some((shift) => shift === null)) {
+        throw new Error("Invalid shift calendar response.");
+    }
+    return {
+        month: params.month,
+        shifts: shifts as CompactCalendarShift[],
+        nextCursor,
+    };
 };
 
 /**

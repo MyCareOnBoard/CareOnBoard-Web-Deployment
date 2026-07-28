@@ -55,6 +55,7 @@ describe("calendar shift API", () => {
             employeeId: "staff-1",
             staffName: "Robin Staff",
             serviceCode: "H2021",
+            anomalyCodes: [],
           }],
           nextCursor: "page-2",
         },
@@ -96,16 +97,21 @@ describe("calendar shift API", () => {
 });
 
 describe("calendar model", () => {
+  it("binds state to the request key used for synchronous render suppression", () => {
+    const state = createCalendarState([agencyA], 9, "agency-a|2026-08|ddd");
+    expect(state.requestKey).toBe("agency-a|2026-08|ddd");
+  });
+
   it("dedupes through one Map lookup per incoming shift and sorts stably", () => {
     const state = createCalendarState([agencyA, agencyB], 4);
     const has = vi.spyOn(Map.prototype, "has");
     const page = {
       month: "2026-08",
       shifts: [
-        { id: "late", date: "2026-08-04", startTime: "11:00", endTime: null, status: ShiftStatus.PENDING, clientId: "c1", clientName: "Client 1", employeeId: "e1", staffName: "Staff 1", serviceCode: null },
-        { id: "early-z", date: "2026-08-04", startTime: "09:00", endTime: null, status: ShiftStatus.PENDING, clientId: "c2", clientName: "Client 2", employeeId: "e2", staffName: "Staff 2", serviceCode: null },
-        { id: "early-a", date: "2026-08-04", startTime: "09:00", endTime: null, status: ShiftStatus.PENDING, clientId: "c3", clientName: "Client 3", employeeId: "e3", staffName: "Staff 3", serviceCode: null },
-        { id: "early-a", date: "2026-08-04", startTime: "09:00", endTime: null, status: ShiftStatus.PENDING, clientId: "c3", clientName: "Client 3", employeeId: "e3", staffName: "Staff 3", serviceCode: null },
+        { id: "late", date: "2026-08-04", startTime: "11:00", endTime: null, status: ShiftStatus.PENDING, clientId: "c1", clientName: "Client 1", employeeId: "e1", staffName: "Staff 1", serviceCode: null, anomalyCodes: [] },
+        { id: "early-z", date: "2026-08-04", startTime: "09:00", endTime: null, status: ShiftStatus.PENDING, clientId: "c2", clientName: "Client 2", employeeId: "e2", staffName: "Staff 2", serviceCode: null, anomalyCodes: [] },
+        { id: "early-a", date: "2026-08-04", startTime: "09:00", endTime: null, status: ShiftStatus.PENDING, clientId: "c3", clientName: "Client 3", employeeId: "e3", staffName: "Staff 3", serviceCode: null, anomalyCodes: [] },
+        { id: "early-a", date: "2026-08-04", startTime: "09:00", endTime: null, status: ShiftStatus.PENDING, clientId: "c3", clientName: "Client 3", employeeId: "e3", staffName: "Staff 3", serviceCode: null, anomalyCodes: [] },
       ],
       nextCursor: null,
     };
@@ -113,7 +119,7 @@ describe("calendar model", () => {
     const mergedA = mergeCalendarAgencyPage(state, agencyB, page, 4);
     const merged = mergeCalendarAgencyPage(mergedA, agencyA, {
       month: "2026-08",
-      shifts: [{ id: "first", date: "2026-08-03", startTime: "15:00", endTime: null, status: ShiftStatus.COMPLETED, clientId: "c4", clientName: "Client 4", employeeId: "e4", staffName: "Staff 4", serviceCode: null }],
+      shifts: [{ id: "first", date: "2026-08-03", startTime: "15:00", endTime: null, status: ShiftStatus.COMPLETED, clientId: "c4", clientName: "Client 4", employeeId: "e4", staffName: "Staff 4", serviceCode: null, anomalyCodes: [] }],
       nextCursor: null,
     }, 4);
 
@@ -136,7 +142,7 @@ describe("calendar model", () => {
     const failed = markCalendarAgencyError(loading, agencyA.id, "Timed out", 8);
     const stale = mergeCalendarAgencyPage(failed, agencyB, {
       month: "2026-08",
-      shifts: [{ id: "stale", date: "2026-08-01", startTime: "08:00", endTime: null, status: ShiftStatus.PENDING, clientId: null, clientName: null, employeeId: null, staffName: null, serviceCode: null }],
+      shifts: [{ id: "stale", date: "2026-08-01", startTime: "08:00", endTime: null, status: ShiftStatus.PENDING, clientId: null, clientName: null, employeeId: null, staffName: null, serviceCode: null, anomalyCodes: [] }],
       nextCursor: null,
     }, 7);
 
@@ -189,6 +195,7 @@ describe("calendar model", () => {
           employeeId: null,
           staffName: null,
           serviceCode: null,
+          anomalyCodes: [],
         })),
         nextCursor: pageNumber === 7 ? null : `cursor-${pageNumber + 1}`,
       }, 12);
@@ -197,6 +204,6 @@ describe("calendar model", () => {
     expect(state.shifts).toHaveLength(1_600);
     expect(state.shiftById.size).toBe(1_600);
     expect([...state.agencies.values()]).toEqual([{ status: "idle", error: null }]);
-    expect(Object.keys(state)).toEqual(["generation", "shiftById", "shifts", "agencies"]);
+    expect(Object.keys(state)).toEqual(["generation", "requestKey", "shiftById", "shifts", "agencies"]);
   });
 });

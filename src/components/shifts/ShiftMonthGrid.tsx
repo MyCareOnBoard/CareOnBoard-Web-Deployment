@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   eachDayOfInterval,
   endOfMonth,
@@ -8,7 +8,6 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
@@ -20,35 +19,21 @@ export interface ShiftMonthGridProps<T> {
   entries: readonly T[];
   getEntryKey: (entry: T) => string;
   getEntryDate: (entry: T) => string;
-  getEntryStartTime: (entry: T) => string | null | undefined;
   getEntryAriaLabel: (entry: T) => string;
   renderEntry: (entry: T, options: { showBadge: boolean }) => ReactNode;
   renderBadge?: (entry: T) => ReactNode;
   getSurfaceStyle?: (entry: T) => CSSProperties | undefined;
-  isPriorityEntry?: (entry: T) => boolean;
-  onOpenShift: (entry: T) => void;
+  orderEntriesForDay?: (entries: readonly T[]) => readonly T[];
+  onOpenShift?: (entry: T) => void;
+  interactionDisabledReason?: string;
   emptyMessage?: string;
-}
-
-function usePrefersHoverCard(): boolean {
-  const [fine, setFine] = useState(() =>
-    window.matchMedia("(hover: hover) and (pointer: fine)").matches,
-  );
-  useEffect(() => {
-    const query = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const sync = () => setFine(query.matches);
-    sync();
-    query.addEventListener("change", sync);
-    return () => query.removeEventListener("change", sync);
-  }, []);
-  return fine;
+  showEmptyState?: boolean;
 }
 
 interface DayCellProps<T> extends Omit<ShiftMonthGridProps<T>, "visibleMonth" | "entries" | "emptyMessage"> {
   day: Date;
   inMonth: boolean;
   entries: readonly T[];
-  prefersHoverCard: boolean;
   openKey: string | null;
   setOpenKey: (key: string | null) => void;
 }
@@ -63,7 +48,6 @@ function DayCell<T>({
   renderBadge,
   getSurfaceStyle,
   onOpenShift,
-  prefersHoverCard,
   openKey,
   setOpenKey,
 }: DayCellProps<T>) {
@@ -87,7 +71,7 @@ function DayCell<T>({
       <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto pr-0.5" role="list">
         {rest.map((entry, index) => (
           <li key={getEntryKey(entry)}>
-            <button
+            {onOpenShift ? <button
               ref={index === 0 ? firstChoiceRef : undefined}
               type="button"
               className="flex min-h-11 w-full min-w-0 flex-col rounded-lg border border-[#dfe6e6] bg-[#f7fafa] px-2 py-1.5 text-left transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]"
@@ -98,7 +82,11 @@ function DayCell<T>({
               }}
             >
               {renderEntry(entry, { showBadge: true })}
-            </button>
+            </button> : (
+              <div className="flex min-h-11 w-full min-w-0 flex-col rounded-lg border border-[#dfe6e6] bg-[#f7fafa] px-2 py-1.5 text-left" aria-label={getEntryAriaLabel(entry)}>
+                {renderEntry(entry, { showBadge: true })}
+              </div>
+            )}
           </li>
         ))}
       </ul>
@@ -113,12 +101,6 @@ function DayCell<T>({
       title={overflowLabel}
       aria-expanded={open}
       onPointerDown={(event) => event.stopPropagation()}
-      onKeyDown={(event) => {
-        if (!prefersHoverCard || !["Enter", " ", "ArrowDown"].includes(event.key)) return;
-        if (event.key === "ArrowDown") event.preventDefault();
-        setOpenKey(dateKey);
-        window.setTimeout(() => firstChoiceRef.current?.focus(), 0);
-      }}
     >
       +{rest.length}
     </button>
@@ -139,7 +121,7 @@ function DayCell<T>({
         <span className={cn("shrink-0 text-[11px] font-semibold tabular-nums", inMonth ? "text-[#10141a]" : "text-[#9aa5a6]")}>{format(day, "d")}</span>
         {first && renderBadge ? <span className="flex min-w-0 justify-end">{renderBadge(first)}</span> : null}
       </div>
-      {first ? (
+      {first && onOpenShift ? (
         <button
           type="button"
           className="flex min-h-11 w-full min-w-0 flex-col rounded-md border border-transparent bg-white/70 px-1 py-1 text-left transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]"
@@ -148,20 +130,28 @@ function DayCell<T>({
         >
           {renderEntry(first, { showBadge: false })}
         </button>
+      ) : first ? (
+        <div className="flex min-h-11 w-full min-w-0 flex-col rounded-md border border-transparent bg-white/70 px-1 py-1 text-left" aria-label={getEntryAriaLabel(first)}>
+          {renderEntry(first, { showBadge: false })}
+        </div>
       ) : null}
-      {rest.length > 0 && (prefersHoverCard ? (
-        <HoverCard open={open} onOpenChange={(nextOpen) => setOpenKey(nextOpen ? dateKey : null)} openDelay={180} closeDelay={260}>
-          <HoverCardTrigger asChild>{overflowButton}</HoverCardTrigger>
-          <HoverCardContent side="top" align="end" className="w-72 p-3">{overflow}</HoverCardContent>
-        </HoverCard>
-      ) : (
+      {rest.length > 0 ? (
         <Popover open={open} onOpenChange={(nextOpen) => setOpenKey(nextOpen ? dateKey : null)}>
           <PopoverTrigger asChild>{overflowButton}</PopoverTrigger>
-          <PopoverContent align="end" side="top" sideOffset={6} className="z-[100] w-72 p-3">
+          <PopoverContent
+            align="end"
+            side="top"
+            sideOffset={6}
+            className="z-[100] w-72 p-3"
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              firstChoiceRef.current?.focus();
+            }}
+          >
             {overflow}
           </PopoverContent>
         </Popover>
-      ))}
+      ) : null}
     </div>
   );
 }
@@ -171,16 +161,16 @@ export default function ShiftMonthGrid<T>({
   entries,
   getEntryKey,
   getEntryDate,
-  getEntryStartTime,
   getEntryAriaLabel,
   renderEntry,
   renderBadge,
   getSurfaceStyle,
-  isPriorityEntry,
+  orderEntriesForDay,
   onOpenShift,
+  interactionDisabledReason,
   emptyMessage = "No shifts scheduled this month.",
+  showEmptyState = true,
 }: ShiftMonthGridProps<T>) {
-  const prefersHoverCard = usePrefersHoverCard();
   const [openKey, setOpenKey] = useState<string | null>(null);
   const monthStart = startOfMonth(visibleMonth);
   const calendarDays = eachDayOfInterval({
@@ -194,12 +184,10 @@ export default function ShiftMonthGrid<T>({
     list.push(entry);
     entriesByDate.set(date, list);
   }
-  for (const list of entriesByDate.values()) {
-    list.sort((left, right) => (
-      Number(Boolean(isPriorityEntry?.(right))) - Number(Boolean(isPriorityEntry?.(left)))
-      || (getEntryStartTime(left) || "").localeCompare(getEntryStartTime(right) || "")
-      || getEntryKey(left).localeCompare(getEntryKey(right))
-    ));
+  if (orderEntriesForDay) {
+    for (const [date, list] of entriesByDate) {
+      entriesByDate.set(date, [...orderEntriesForDay(list)]);
+    }
   }
 
   return (
@@ -220,14 +208,12 @@ export default function ShiftMonthGrid<T>({
                   entries={entriesByDate.get(key) ?? []}
                   getEntryKey={getEntryKey}
                   getEntryDate={getEntryDate}
-                  getEntryStartTime={getEntryStartTime}
                   getEntryAriaLabel={getEntryAriaLabel}
                   renderEntry={renderEntry}
                   renderBadge={renderBadge}
                   getSurfaceStyle={getSurfaceStyle}
-                  isPriorityEntry={isPriorityEntry}
+                  orderEntriesForDay={orderEntriesForDay}
                   onOpenShift={onOpenShift}
-                  prefersHoverCard={prefersHoverCard}
                   openKey={openKey}
                   setOpenKey={setOpenKey}
                 />
@@ -236,7 +222,10 @@ export default function ShiftMonthGrid<T>({
           </div>
         </div>
       </div>
-      {entries.length === 0 ? <p className="mt-4 text-center text-sm font-medium text-[#687576]">{emptyMessage}</p> : null}
+      {entries.length === 0 && showEmptyState ? <p className="mt-4 text-center text-sm font-medium text-[#687576]">{emptyMessage}</p> : null}
+      {entries.length > 0 && !onOpenShift && interactionDisabledReason ? (
+        <p className="mt-3 text-center text-xs font-medium text-[#687576]">{interactionDisabledReason}</p>
+      ) : null}
     </div>
   );
 }

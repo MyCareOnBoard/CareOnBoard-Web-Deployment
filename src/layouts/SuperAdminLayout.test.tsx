@@ -56,4 +56,20 @@ describe("SuperAdminLayout", () => {
 
     await waitFor(() => expect(routing.navigate).toHaveBeenCalledWith("/super-admin/dashboard", { replace: true }));
   });
+
+  it("never mounts denied nested-route content before redirecting", async () => {
+    routing.pathname = "/super-admin/shifts/shift-123";
+    state.user = { ...state.user, profile: { role: "Maintainer", accessList: ["Shift Maintenance"] } };
+    const mounted = vi.fn();
+    function DeniedContent() {
+      mounted();
+      return <div>Protected shift details</div>;
+    }
+
+    render(<MemoryRouter><SuperAdminLayout><DeniedContent /></SuperAdminLayout></MemoryRouter>);
+
+    expect(screen.queryByText("Protected shift details")).not.toBeInTheDocument();
+    expect(mounted).not.toHaveBeenCalled();
+    await waitFor(() => expect(routing.navigate).toHaveBeenCalledWith("/super-admin/dashboard", { replace: true }));
+  });
 });

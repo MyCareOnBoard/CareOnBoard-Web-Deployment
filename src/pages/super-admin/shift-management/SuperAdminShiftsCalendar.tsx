@@ -1,21 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { format } from "date-fns";
-import { generatePath, useNavigate } from "react-router";
 import { AlertTriangle, Building2, Loader2, X } from "lucide-react";
 import ShiftMonthGrid from "@/components/shifts/ShiftMonthGrid";
 import { Button } from "@/components/ui/button";
 import { listCalendarShifts } from "@/lib/api/shifts";
 import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
-import { Routes } from "@/routes/constants";
+import { ANOMALY_CHIP_CLASS } from "@/lib/shift-visual-tokens";
+import { cn } from "@/lib/utils";
+import {
+  ANOMALY_CALENDAR_SHORT_LABEL,
+  ANOMALY_LABELS,
+} from "@/pages/shared/shift-maintenance/audit-display";
 import {
   createCalendarState,
-  mapWithConcurrency,
+  createKeyedConcurrencyScheduler,
   markCalendarAgencyError,
   markCalendarAgencyLoading,
   markCalendarAgencySkipped,
   markCalendarAgencySuccess,
   mergeCalendarAgencyPage,
   type NormalizedCalendarShift,
+  type KeyedConcurrencyScheduler,
 } from "./calendarModel";
 
 const PAGE_LIMIT = 200;
@@ -64,12 +68,24 @@ function ShiftSummary({ shift, showBadge }: { shift: NormalizedCalendarShift; sh
         <Building2 aria-hidden="true" className="h-2.5 w-2.5 shrink-0" />
         {shift.agencyName}
       </span>
-      {showBadge ? <StatusBadge status={shift.status} /> : null}
+      {showBadge ? <StatusBadge shift={shift} /> : null}
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: string | null }) {
+function StatusBadge({ shift }: { shift: NormalizedCalendarShift }) {
+  const firstCode = shift.anomalyCodes[0];
+  if (firstCode) {
+    return (
+      <span
+        className={cn("inline-flex w-fit rounded border px-1.5 py-0.5 text-[9px] font-semibold", ANOMALY_CHIP_CLASS[firstCode])}
+        title={ANOMALY_LABELS[firstCode].label}
+      >
+        {ANOMALY_CALENDAR_SHORT_LABEL[firstCode]}
+      </span>
+    );
+  }
+  const status = shift.status;
   return <span className="inline-flex w-fit rounded-full bg-[#e6f3f3] px-1.5 py-0.5 text-[9px] font-semibold text-[#075b5d]">{statusLabel(status)}</span>;
 }
 
@@ -79,12 +95,18 @@ export default function SuperAdminShiftsCalendar({
   mode,
   onSelectionChange,
 }: SuperAdminShiftsCalendarProps) {
-  const navigate = useNavigate();
   const generationRef = useRef(0);
   const generationControllerRef = useRef<AbortController | null>(null);
-  const retryControllersRef = useRef(new Set<AbortController>());
-  const [state, setState] = useState(() => createCalendarState(agencies, 0));
+  const schedulerRef = useRef<{
+    generation: number;
+    scheduler: KeyedConcurrencyScheduler<OperationalAgencySummary>;
+  } | null>(null);
   const selectionKey = agencies.map((agency) => `${agency.id}:${agency.name}:${agency.supportedClientTypes.join(",")}`).join("|");
+  const requestKey = `${selectionKey}|${month}|${mode}`;
+  const [state, setState] = useState(() => createCalendarState(agencies, 0, requestKey));
+  const renderedState = state.requestKey === requestKey
+    ? state
+    : createCalendarState(agencies, state.generation, requestKey);
 
   const loadAgency = useCallback(async (
     agency: OperationalAgencySummary,
@@ -94,6 +116,7 @@ export default function SuperAdminShiftsCalendar({
     setState((current) => markCalendarAgencyLoading(current, agency.id, generation));
     try {
       let cursor: string | undefined;
+      const seenCursors = new Set<string>();
       do {
         const page = await listCalendarShifts({
           agencyId: agency.id,
@@ -104,7 +127,12 @@ export default function SuperAdminShiftsCalendar({
         }, { signal });
         if (signal.aborted || generationRef.current !== generation) return;
         setState((current) => mergeCalendarAgencyPage(current, agency, page, generation));
-        cursor = page.nextCursor || undefined;
+        const nextCursor = page.nextCursor || undefined;
+        if (nextCursor && seenCursors.has(nextCursor)) {
+          throw new Error("Repeated calendar cursor.");
+        }
+        if (nextCursor) seenCursors.add(nextCursor);
+        cursor = nextCursor;
       } while (cursor);
       setState((current) => markCalendarAgencySuccess(current, agency.id, generation));
     } catch (error) {
@@ -117,12 +145,11 @@ export default function SuperAdminShiftsCalendar({
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     generationControllerRef.current?.abort();
-    for (const controller of retryControllersRef.current) controller.abort();
-    retryControllersRef.current.clear();
+    schedulerRef.current?.scheduler.cancel();
 
     const controller = new AbortController();
     generationControllerRef.current = controller;
-    let nextState = createCalendarState(agencies, generation);
+    let nextState = createCalendarState(agencies, generation, requestKey);
     const supported = agencies.filter((agency) => agency.supportedClientTypes.includes(mode));
     for (const agency of agencies) {
       if (!agency.supportedClientTypes.includes(mode)) {
@@ -131,41 +158,30 @@ export default function SuperAdminShiftsCalendar({
     }
     setState(nextState);
 
-    if (supported.length > 0) {
-      void mapWithConcurrency(
-        supported,
+    const scheduler = createKeyedConcurrencyScheduler<OperationalAgencySummary>(
         MAX_AGENCY_CHAINS,
-        async (agency, signal) => loadAgency(agency, generation, signal),
+        (agency) => agency.id,
+        (agency, signal) => loadAgency(agency, generation, signal),
         controller.signal,
-      ).catch((error) => {
-        if (!isAbort(error)) console.error("Super-admin shift calendar load failed:", error);
-      });
-    }
+      );
+    schedulerRef.current = { generation, scheduler };
+    for (const agency of supported) scheduler.enqueue(agency);
 
-    return () => controller.abort();
+    return () => {
+      scheduler.cancel();
+      controller.abort();
+    };
   }, [selectionKey, mode, month, loadAgency]);
 
   useEffect(() => () => {
+    schedulerRef.current?.scheduler.cancel();
     generationControllerRef.current?.abort();
-    for (const controller of retryControllersRef.current) controller.abort();
   }, []);
 
   const retryAgency = (agency: OperationalAgencySummary) => {
-    const controller = new AbortController();
-    retryControllersRef.current.add(controller);
-    const generation = generationRef.current;
-    void loadAgency(agency, generation, controller.signal).finally(() => {
-      retryControllersRef.current.delete(controller);
-    });
-  };
-
-  const openShift = (shift: NormalizedCalendarShift) => {
-    const params = new URLSearchParams();
-    for (const agency of agencies) params.append("agencyIds", agency.id);
-    params.set("month", month);
-    params.set("view", "calendar");
-    params.set("agencyId", shift.agencyId);
-    navigate(`${generatePath(Routes.superAdmin.shifts.details, { shiftId: shift.id })}?${params.toString()}`);
+    const current = schedulerRef.current;
+    if (!current || current.generation !== generationRef.current) return;
+    current.scheduler.enqueue(agency);
   };
 
   if (agencies.length === 0) {
@@ -178,14 +194,15 @@ export default function SuperAdminShiftsCalendar({
     );
   }
 
-  const loadingCount = [...state.agencies.values()].filter((item) => item.status === "loading").length;
+  const loadingCount = [...renderedState.agencies.values()].filter((item) => item.status === "loading").length;
+  const errorCount = [...renderedState.agencies.values()].filter((item) => item.status === "error").length;
   const agencyById = new Map(agencies.map((agency) => [agency.id, agency]));
 
   return (
     <section className="space-y-3" aria-label="Multi-agency shift calendar">
       <div className="flex flex-wrap items-center gap-2">
         {agencies.map((agency) => {
-          const agencyState = state.agencies.get(agency.id);
+          const agencyState = renderedState.agencies.get(agency.id);
           return (
             <span key={agency.id} className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-[#cad7d7] bg-white pl-3 pr-1 text-xs font-semibold text-[#284041]">
               <span className="truncate">{agency.name}</span>
@@ -199,7 +216,7 @@ export default function SuperAdminShiftsCalendar({
         <Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={() => onSelectionChange([])}>Clear agencies</Button>
       </div>
 
-      {[...state.agencies.entries()].map(([agencyId, agencyState]) => {
+      {[...renderedState.agencies.entries()].map(([agencyId, agencyState]) => {
         const agency = agencyById.get(agencyId);
         if (!agency) return null;
         if (agencyState.status === "skipped") {
@@ -217,21 +234,28 @@ export default function SuperAdminShiftsCalendar({
       })}
 
       <p className="text-xs font-medium text-[#5e6d6e]" aria-live="polite">
-        {state.shifts.length} shift{state.shifts.length === 1 ? "" : "s"} across {agencies.length} agenc{agencies.length === 1 ? "y" : "ies"}.
+        {renderedState.shifts.length} shift{renderedState.shifts.length === 1 ? "" : "s"} across {agencies.length} agenc{agencies.length === 1 ? "y" : "ies"}.
         {loadingCount > 0 ? ` Loading ${loadingCount} ${loadingCount === 1 ? "agency" : "agencies"}…` : ""}
       </p>
 
       <ShiftMonthGrid
         visibleMonth={new Date(`${month}-01T12:00:00`)}
-        entries={state.shifts}
+        entries={renderedState.shifts}
         getEntryKey={(shift) => shift.id}
         getEntryDate={(shift) => shift.date}
-        getEntryStartTime={(shift) => shift.startTime}
-        getEntryAriaLabel={(shift) => `${shift.clientName || "Unknown client"}, ${timeLabel(shift.startTime)}–${timeLabel(shift.endTime)}, ${shift.agencyName}`}
+        getEntryAriaLabel={(shift) => [
+          shift.clientName || "Unknown client",
+          `${timeLabel(shift.startTime)}–${timeLabel(shift.endTime)}`,
+          `Caregiver ${shift.staffName || "Unassigned"}`,
+          shift.agencyName,
+          `Status ${statusLabel(shift.status)}`,
+          shift.anomalyCodes[0] ? `Anomaly ${ANOMALY_LABELS[shift.anomalyCodes[0]].label}` : null,
+        ].filter(Boolean).join(", ")}
         renderEntry={(shift, options) => <ShiftSummary shift={shift} showBadge={options.showBadge} />}
-        renderBadge={(shift) => <StatusBadge status={shift.status} />}
-        onOpenShift={openShift}
-        emptyMessage={loadingCount > 0 ? `Loading shifts for ${format(new Date(`${month}-01T12:00:00`), "MMMM yyyy")}…` : "No shifts found for these agencies."}
+        renderBadge={(shift) => <StatusBadge shift={shift} />}
+        interactionDisabledReason="Shift details are not available yet."
+        emptyMessage="No shifts found for these agencies."
+        showEmptyState={loadingCount === 0 && errorCount === 0}
       />
     </section>
   );

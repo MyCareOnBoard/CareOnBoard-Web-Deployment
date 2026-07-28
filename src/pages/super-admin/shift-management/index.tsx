@@ -35,6 +35,7 @@ export default function ShiftManagementWorkspace() {
   const [agencies, setAgencies] = useState<OperationalAgencySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scanLimit, setScanLimit] = useState<number | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
 
   useEffect(() => {
@@ -45,25 +46,53 @@ export default function ShiftManagementWorkspace() {
       setLoading(true);
       setError(null);
       const agencyById = new Map<string, OperationalAgencySummary>();
-      let cursor: string | undefined;
       try {
-        do {
-          const page = await listOperationalAgencies("shift-management", {
-            cursor,
-            limit: AGENCY_PAGE_LIMIT,
-            signal: controller.signal,
-          });
-          if (!active) return;
-          for (const agency of page.data) agencyById.set(agency.id, agency);
-          cursor = page.nextCursor || undefined;
-        } while (cursor);
+        const requestedIds = Array.from(new Set(
+          new URLSearchParams(location.search).getAll("agencyIds").filter(Boolean),
+        ));
+        let discoveredScanLimit: number | null = null;
+        const hydrateRequested = async () => {
+          for (let start = 0; start < requestedIds.length; start += AGENCY_PAGE_LIMIT) {
+            const ids = requestedIds.slice(start, start + AGENCY_PAGE_LIMIT);
+            const page = await listOperationalAgencies("shift-management", {
+              ids,
+              limit: ids.length,
+              signal: controller.signal,
+            });
+            const requested = new Set(ids);
+            for (const agency of page.data) {
+              if (requested.has(agency.id)) agencyById.set(agency.id, agency);
+            }
+          }
+        };
+        const scanAllowed = async () => {
+          const seenCursors = new Set<string>();
+          let cursor: string | undefined;
+          do {
+            const page = await listOperationalAgencies("shift-management", {
+              cursor,
+              limit: AGENCY_PAGE_LIMIT,
+              signal: controller.signal,
+            });
+            for (const agency of page.data) agencyById.set(agency.id, agency);
+            if (page.truncated) discoveredScanLimit = page.scanLimit;
+            const nextCursor = page.nextCursor || undefined;
+            if (nextCursor && seenCursors.has(nextCursor)) throw new Error("Repeated agency cursor.");
+            if (nextCursor) seenCursors.add(nextCursor);
+            cursor = nextCursor;
+          } while (cursor);
+        };
+        await Promise.all([hydrateRequested(), scanAllowed()]);
+        if (!active) return;
         setAgencies(activeSorted(agencyById.values()));
+        setScanLimit(discoveredScanLimit);
       } catch (loadFailure) {
         if (!active || isAbort(loadFailure)) return;
         setError(loadFailure instanceof Error && loadFailure.message
           ? loadFailure.message
           : "Could not load your agencies.");
         setAgencies([]);
+        setScanLimit(null);
       } finally {
         if (active && !controller.signal.aborted) setLoading(false);
       }
@@ -140,7 +169,14 @@ export default function ShiftManagementWorkspace() {
         onViewChange={changeView}
         onMonthChange={changeMonth}
         onAgencySelectionChange={changeSelection}
+        initialAgencies={agencies}
       />
+
+      {scanLimit ? (
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+          Agency discovery was limited to {scanLimit} records. Your selected agencies were checked directly.
+        </p>
+      ) : null}
 
       {workspace.view === "calendar" ? (
         <SuperAdminShiftsCalendar

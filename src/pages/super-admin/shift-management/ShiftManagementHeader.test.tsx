@@ -33,7 +33,7 @@ describe("ShiftManagementHeader", () => {
     expect(screen.getByText("July 2026")).toBeVisible();
   });
 
-  it("moves by calendar month and reports requested view changes", async () => {
+  it("moves by calendar month and keeps the unfinished List view disabled", async () => {
     const user = userEvent.setup();
     const onMonthChange = vi.fn();
     const onViewChange = vi.fn();
@@ -54,7 +54,8 @@ describe("ShiftManagementHeader", () => {
 
     expect(onMonthChange).toHaveBeenNthCalledWith(1, "2025-12");
     expect(onMonthChange).toHaveBeenNthCalledWith(2, "2026-02");
-    expect(onViewChange).toHaveBeenCalledWith("list");
+    expect(screen.getByRole("button", { name: "List view" })).toBeDisabled();
+    expect(onViewChange).not.toHaveBeenCalled();
   });
 
   it("prompts for exactly one agency when List has no singular selection", () => {

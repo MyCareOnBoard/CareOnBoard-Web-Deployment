@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -27,6 +27,7 @@ function shift(id: string, date: string, overrides: Partial<CompactCalendarShift
     employeeId: `staff-${id}`,
     staffName: `Staff ${id}`,
     serviceCode: "H2021",
+    anomalyCodes: [],
     ...overrides,
   };
 }
@@ -43,6 +44,12 @@ function abortable<T>(signal: AbortSignal | undefined, work: () => Promise<T>): 
     signal.addEventListener("abort", onAbort, { once: true });
     void work().then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => { resolve = next; });
+  return { promise, resolve };
 }
 
 describe("SuperAdminShiftsCalendar", () => {
@@ -99,7 +106,7 @@ describe("SuperAdminShiftsCalendar", () => {
       />,
     );
 
-    expect(await screen.findByRole("button", { name: /Open shift details for Client agency-0-one/i })).toBeVisible();
+    expect(await screen.findByText("Client agency-0-one")).toBeVisible();
     await waitFor(() => expect(screen.getByText("12 shifts across 6 agencies.")).toBeVisible());
     expect(peak).toBe(4);
     for (const selectedAgency of agencies) {
@@ -129,14 +136,87 @@ describe("SuperAdminShiftsCalendar", () => {
       />,
     );
 
-    expect(await screen.findByRole("button", { name: /Open shift details for Client atlas-shift/i })).toBeVisible();
+    expect(await screen.findByText("Client atlas-shift")).toBeVisible();
     const retry = await screen.findByRole("button", { name: "Retry Beacon Supports" });
     await userEvent.click(retry);
 
-    expect(await screen.findByRole("button", { name: /Open shift details for Client beacon-shift/i })).toBeVisible();
-    expect(screen.getByRole("button", { name: /Open shift details for Client atlas-shift/i })).toBeVisible();
+    expect(await screen.findByText("Client beacon-shift")).toBeVisible();
+    expect(screen.getByText("Client atlas-shift")).toBeVisible();
     expect(listCalendarShifts.mock.calls.filter(([params]) => params.agencyId === "atlas")).toHaveLength(1);
     expect(beaconAttempts).toBe(2);
+  });
+
+  it("rejects a repeated agency cursor without issuing a third page request", async () => {
+    listCalendarShifts
+      .mockResolvedValueOnce(page([shift("atlas-one", "2026-08-03")], "repeat"))
+      .mockResolvedValueOnce(page([], "repeat"))
+      .mockRejectedValueOnce(new Error("Runaway cursor request"));
+
+    render(
+      <SuperAdminShiftsCalendar
+        agencies={[agency("atlas", "Atlas Care")]}
+        month="2026-08"
+        mode="ddd"
+        onMonthChange={vi.fn()}
+        onSelectionChange={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText("Atlas Care: Repeated calendar cursor.")).toBeVisible();
+    expect(listCalendarShifts).toHaveBeenCalledTimes(2);
+  });
+
+  it("queues one retry behind four active chains and suppresses duplicate clicks", async () => {
+    const blockers = new Map<string, ReturnType<typeof deferred<CalendarShiftPage>>>();
+    let retryAttempts = 0;
+    let active = 0;
+    let peak = 0;
+    listCalendarShifts.mockImplementation(async (params) => {
+      active += 1;
+      peak = Math.max(peak, active);
+      if (params.agencyId === "retry") {
+        retryAttempts += 1;
+        active -= 1;
+        if (retryAttempts === 1) throw new Error("Temporary failure");
+        return page([shift("retried", "2026-08-07")]);
+      }
+      const pending = deferred<CalendarShiftPage>();
+      blockers.set(params.agencyId, pending);
+      const result = await pending.promise;
+      active -= 1;
+      return result;
+    });
+
+    render(
+      <SuperAdminShiftsCalendar
+        agencies={[
+          agency("retry", "Retry Care"),
+          ...Array.from({ length: 4 }, (_, index) => agency(`block-${index}`, `Block ${index}`)),
+        ]}
+        month="2026-08"
+        mode="ddd"
+        onMonthChange={vi.fn()}
+        onSelectionChange={vi.fn()}
+      />,
+    );
+
+    const retry = await screen.findByRole("button", { name: "Retry Retry Care" });
+    await waitFor(() => expect(blockers.size).toBe(4));
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+
+    expect(retryAttempts).toBe(1);
+    expect(peak).toBe(4);
+
+    await act(async () => {
+      blockers.get("block-0")?.resolve(page([]));
+    });
+    await waitFor(() => expect(retryAttempts).toBe(2));
+    expect(peak).toBe(4);
+    await act(async () => {
+      for (const pending of blockers.values()) pending.resolve(page([]));
+    });
   });
 
   it("skips agencies that do not support the selected mode", async () => {
@@ -155,9 +235,50 @@ describe("SuperAdminShiftsCalendar", () => {
       />,
     );
 
-    expect(await screen.findByRole("button", { name: /Open shift details for Client hha-shift/i })).toBeVisible();
+    expect(await screen.findByText("Client hha-shift")).toBeVisible();
     expect(screen.getByText("Community Supports does not support HHA.")).toBeVisible();
     expect(listCalendarShifts).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the model's date, time, agency, and id tuple order in each day", async () => {
+    listCalendarShifts.mockImplementation(async (params) => params.agencyId === "atlas"
+      ? page([shift("z-atlas", "2026-08-03", { startTime: "09:00", anomalyCodes: ["missed"] })])
+      : page([shift("a-beacon", "2026-08-03", { startTime: "09:00" })]));
+
+    render(
+      <SuperAdminShiftsCalendar
+        agencies={[agency("atlas", "Atlas Care"), agency("beacon", "Beacon Supports")]}
+        month="2026-08"
+        mode="ddd"
+        onMonthChange={vi.fn()}
+        onSelectionChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("2 shifts across 2 agencies.")).toBeVisible());
+    const day = screen.getByRole("gridcell", { name: /August 3, 2 shifts/i });
+    expect(day).toHaveAccessibleName(/First: Client z-atlas/i);
+  });
+
+  it("renders backend anomaly metadata and names the caregiver, status, and anomaly", async () => {
+    listCalendarShifts.mockResolvedValue(page([
+      shift("flagged", "2026-08-03", { anomalyCodes: ["missed"] }),
+    ]));
+
+    render(
+      <SuperAdminShiftsCalendar
+        agencies={[agency("atlas", "Atlas Care")]}
+        month="2026-08"
+        mode="ddd"
+        onMonthChange={vi.fn()}
+        onSelectionChange={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByTitle("Missed shift")).toHaveTextContent("Missed");
+    expect(screen.getByRole("gridcell", { name: /August 3, 1 shift/i })).toHaveAccessibleName(
+      /Staff flagged.*Atlas Care.*Pending.*Missed shift/i,
+    );
   });
 
   it("aborts a stale month generation and never renders its late result", async () => {
@@ -191,12 +312,12 @@ describe("SuperAdminShiftsCalendar", () => {
       />,
     );
 
-    expect(await screen.findByRole("button", { name: /Open shift details for Client fresh-shift/i })).toBeVisible();
+    expect(await screen.findByText("Client fresh-shift")).toBeVisible();
     expect(observedSignals[0]?.aborted).toBe(true);
     expect(screen.queryByText("Client stale-shift")).not.toBeInTheDocument();
   });
 
-  it("preserves calendar state and the owning agency when opening details", async () => {
+  it("keeps incomplete shift details non-interactive with an accessible reason", async () => {
     listCalendarShifts.mockResolvedValue(page([shift("shared-id", "2026-08-03")]));
     render(
       <SuperAdminShiftsCalendar
@@ -208,11 +329,36 @@ describe("SuperAdminShiftsCalendar", () => {
       />,
     );
 
-    const open = await screen.findAllByRole("button", { name: /Open shift details for Client shared-id/i });
-    fireEvent.click(open[0]);
+    expect(await screen.findByText("Client shared-id")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Open shift details for Client shared-id/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Shift details are not available yet/i)).toBeVisible();
+    expect(navigate).not.toHaveBeenCalled();
+  });
 
-    expect(navigate).toHaveBeenCalledWith(
-      "/super-admin/shifts/shared-id?agencyIds=atlas&agencyIds=beacon&month=2026-08&view=calendar&agencyId=atlas",
+  it("suppresses the empty result while agencies are loading or failed", async () => {
+    const pending = deferred<CalendarShiftPage>();
+    listCalendarShifts.mockReturnValueOnce(pending.promise).mockRejectedValueOnce(new Error("Broken feed"));
+    const view = render(
+      <SuperAdminShiftsCalendar
+        agencies={[agency("atlas", "Atlas Care")]}
+        month="2026-08"
+        mode="ddd"
+        onMonthChange={vi.fn()}
+        onSelectionChange={vi.fn()}
+      />,
     );
+    expect(screen.queryByText("No shifts found for these agencies.")).not.toBeInTheDocument();
+    view.rerender(
+      <SuperAdminShiftsCalendar
+        agencies={[agency("beacon", "Beacon Supports")]}
+        month="2026-08"
+        mode="ddd"
+        onMonthChange={vi.fn()}
+        onSelectionChange={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText("Beacon Supports: Broken feed")).toBeVisible();
+    expect(screen.queryByText("No shifts found for these agencies.")).not.toBeInTheDocument();
+    await act(async () => pending.resolve(page([])));
   });
 });

@@ -18,6 +18,7 @@ export interface OperationalAgencySelectorProps {
   selectionMode: "single" | "multiple";
   selectedIds: string[];
   onSelectionChange: (selectedIds: string[]) => void;
+  initialAgencies?: OperationalAgencySummary[];
 }
 
 const PAGE_SIZE = 50;
@@ -52,14 +53,18 @@ export default function OperationalAgencySelector({
   selectionMode,
   selectedIds,
   onSelectionChange,
+  initialAgencies,
 }: OperationalAgencySelectorProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [agencies, setAgencies] = useState<OperationalAgencySummary[]>([]);
-  const [knownAgencies, setKnownAgencies] = useState<Record<string, OperationalAgencySummary>>({});
+  const initialSorted = sortedAgencies(initialAgencies ?? []);
+  const initialKnown = Object.fromEntries(initialSorted.map((agency) => [agency.id, agency]));
+  const initialKey = initialSorted.map((agency) => `${agency.id}:${agency.name}`).join("|");
+  const [agencies, setAgencies] = useState<OperationalAgencySummary[]>(initialSorted);
+  const [knownAgencies, setKnownAgencies] = useState<Record<string, OperationalAgencySummary>>(initialKnown);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialAgencies);
   const [error, setError] = useState<string | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
   const [activeOptionIndex, setActiveOptionIndex] = useState(0);
@@ -75,6 +80,15 @@ export default function OperationalAgencySelector({
   }, [search]);
 
   useEffect(() => {
+    if (!debouncedSearch && initialAgencies) {
+      const seeded = sortedAgencies(initialAgencies);
+      setAgencies(seeded);
+      setKnownAgencies((current) => mergeKnownAgencies(current, seeded));
+      setNextCursor(null);
+      setError(null);
+      setLoading(false);
+      return undefined;
+    }
     const controller = new AbortController();
     let active = true;
     loadMoreController.current?.abort();
@@ -104,11 +118,12 @@ export default function OperationalAgencySelector({
       active = false;
       controller.abort();
     };
-  }, [debouncedSearch, feature, retryVersion]);
+  }, [debouncedSearch, feature, initialKey, retryVersion]);
 
   const selectedKey = JSON.stringify(selectedIds);
   useEffect(() => {
-    const ids = Array.from(new Set(selectedIds.filter(Boolean)));
+    const seededIds = new Set((initialAgencies ?? []).map((agency) => agency.id));
+    const ids = Array.from(new Set(selectedIds.filter((id) => id && !seededIds.has(id))));
     if (!ids.length) return undefined;
     const controller = new AbortController();
     let active = true;
@@ -139,7 +154,7 @@ export default function OperationalAgencySelector({
     };
   // selectedKey intentionally makes equal controlled selections stable across parent renders.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feature, selectedKey]);
+  }, [feature, initialKey, selectedKey]);
 
   useEffect(() => () => loadMoreController.current?.abort(), []);
 

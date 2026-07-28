@@ -54,6 +54,9 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed] = useSidebarCollapsed();
+  const currentNavItem = mostSpecificNavItem(location.pathname);
+  const canRenderCurrentRoute = !currentNavItem?.accessKey
+    || Boolean(user?.profile?.accessList?.includes(currentNavItem.accessKey));
 
   const handleLogout = async () => {
     try {
@@ -87,10 +90,6 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
-    const currentPath = location.pathname;
-    
-    const currentNavItem = mostSpecificNavItem(currentPath);
-    
     if (!currentNavItem || !currentNavItem.accessKey) {
       return;
     }
@@ -102,7 +101,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
       console.warn(`[SuperAdminLayout] Access denied to ${currentNavItem.label}. Redirecting to dashboard.`);
       navigate(Routes.superAdmin.dashboard, {replace: true});
     }
-  }, [user, location.pathname, navigate]);
+  }, [user, currentNavItem, navigate]);
 
   return (
     <ProtectedRoute>
@@ -116,7 +115,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
       />
       <DashboardSidebar navItems={navItems}/>
       <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
-        <div className="px-8">{children ?? <Outlet/>}</div>
+        <div className="px-8">{canRenderCurrentRoute ? (children ?? <Outlet/>) : null}</div>
       </main>
     </div>
     </ProtectedRoute>
