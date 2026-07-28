@@ -150,6 +150,13 @@ export const Routes = {
         corporateSupportConversation: "/super-admin/corporate-support/:conversationId",
         oversightCenter: "/super-admin/oversight-center",
         shiftMaintenance: "/super-admin/shift-maintenance",
+        shifts: {
+            index: "/super-admin/shifts",
+            list: "/super-admin/shifts/list",
+            approvals: "/super-admin/shifts/approvals",
+            activityLogs: "/super-admin/shifts/activity-logs",
+            details: "/super-admin/shifts/:shiftId",
+        },
         clientDirectory: "/super-admin/clients",
         clientDetails: "/super-admin/clients/:clientId",
         editClient: "/super-admin/clients/edit/:clientId",
