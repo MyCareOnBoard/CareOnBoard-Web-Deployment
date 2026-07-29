@@ -96,6 +96,7 @@ const data: OperationalAgencyDataAdapter = {
   getClientSchedulingContext: vi.fn(),
   getStaffSchedulingContext: vi.fn(),
   createStaffActivity: vi.fn(),
+  createGoalDocument: vi.fn(),
 };
 
 const agency = (id: string, name: string): OperationalAgencySummary => ({

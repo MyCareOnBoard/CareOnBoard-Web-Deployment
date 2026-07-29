@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DocumentType } from "@/lib/api/goals-and-documents";
 
 const { axiosGet, axiosPost } = vi.hoisted(() => ({
   axiosGet: vi.fn(),
@@ -10,6 +11,7 @@ vi.mock("@/lib/axios", () => ({
 }));
 
 import {
+  createOperationalShiftGoalDocument,
   createOperationalStaffActivity,
   getOperationalClientSchedulingContext,
   getOperationalAgencyContext,
@@ -37,19 +39,16 @@ describe("super-admin operational options API", () => {
     axiosPost.mockResolvedValueOnce({ data: { success: true, data: activity } });
 
     await expect(getOperationalClientSchedulingContext(
-      "shift-management",
       "agency-1",
       "client-1",
       signal,
     )).resolves.toEqual(client);
     await expect(getOperationalStaffSchedulingContext(
-      "shift-management",
       "agency-1",
       "staff-1",
       signal,
     )).resolves.toEqual(staff);
     await expect(createOperationalStaffActivity(
-      "shift-management",
       "agency-1",
       "staff-1",
       {
@@ -80,6 +79,51 @@ describe("super-admin operational options API", () => {
         agencyId: "agency-1",
       },
       { params: { feature: "shift-management" }, signal },
+    );
+  });
+
+  it("creates a shift goal document through the canonical operational resource path", async () => {
+    const signal = new AbortController().signal;
+    axiosPost.mockResolvedValueOnce({
+      data: { success: true, data: { id: "goal-1", status: "draft" } },
+    });
+
+    await expect(createOperationalShiftGoalDocument(
+      "agency-1",
+      "client-1",
+      "shift-1",
+      {
+        documentType: DocumentType.NATURAL_SUPPORTS_TRAINING,
+        metadata: {
+          name: "Ada Client",
+          birthDate: "",
+          ispOutcome: "",
+          nameOfTrainer: "",
+          trainingParticipants: [],
+          trainings: [],
+          completedBy: "",
+          completionDate: "",
+        },
+      },
+      signal,
+    )).resolves.toEqual({ id: "goal-1", status: "draft" });
+
+    expect(axiosPost).toHaveBeenCalledWith(
+      "/superAdminOperations/agencies/agency-1/clients/client-1/shifts/shift-1/goal-documents",
+      {
+        documentType: "natural_supports_training",
+        metadata: {
+          name: "Ada Client",
+          birthDate: "",
+          ispOutcome: "",
+          nameOfTrainer: "",
+          trainingParticipants: [],
+          trainings: [],
+          completedBy: "",
+          completionDate: "",
+        },
+      },
+      { signal },
     );
   });
 

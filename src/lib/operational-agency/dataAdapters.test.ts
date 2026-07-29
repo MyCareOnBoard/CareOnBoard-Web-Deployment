@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DocumentType } from "@/lib/api/goals-and-documents";
 
 const api = vi.hoisted(() => ({
   listClients: vi.fn(),
@@ -6,6 +7,7 @@ const api = vi.hoisted(() => ({
   listEmployees: vi.fn(),
   getEmployeeById: vi.fn(),
   createEmployeeActivityLog: vi.fn(),
+  createGoalDocument: vi.fn(),
   listServices: vi.fn(),
   searchOperationalClients: vi.fn(),
   searchOperationalStaff: vi.fn(),
@@ -13,6 +15,7 @@ const api = vi.hoisted(() => ({
   getOperationalClientSchedulingContext: vi.fn(),
   getOperationalStaffSchedulingContext: vi.fn(),
   createOperationalStaffActivity: vi.fn(),
+  createOperationalShiftGoalDocument: vi.fn(),
 }));
 
 vi.mock("@/lib/api/clients", () => ({
@@ -25,6 +28,10 @@ vi.mock("@/lib/api/employees", () => ({
   createEmployeeActivityLog: api.createEmployeeActivityLog,
 }));
 vi.mock("@/lib/api/services", () => ({ listServices: api.listServices }));
+vi.mock("@/lib/api/goals-and-documents", () => ({
+  createGoalDocument: api.createGoalDocument,
+  SubmissionStatus: { DRAFT: "draft" },
+}));
 vi.mock("@/lib/api/super-admin-operations", () => ({
   searchOperationalClients: api.searchOperationalClients,
   searchOperationalStaff: api.searchOperationalStaff,
@@ -32,6 +39,7 @@ vi.mock("@/lib/api/super-admin-operations", () => ({
   getOperationalClientSchedulingContext: api.getOperationalClientSchedulingContext,
   getOperationalStaffSchedulingContext: api.getOperationalStaffSchedulingContext,
   createOperationalStaffActivity: api.createOperationalStaffActivity,
+  createOperationalShiftGoalDocument: api.createOperationalShiftGoalDocument,
 }));
 
 import {
@@ -57,11 +65,32 @@ describe("operational scheduling data adapters", () => {
     api.getClientById.mockResolvedValue(client);
     api.getEmployeeById.mockResolvedValue(staff);
     api.createEmployeeActivityLog.mockResolvedValue({ id: "activity-1" });
+    api.createGoalDocument.mockResolvedValue({
+      document: { id: "goal-1", status: "draft" },
+    });
     const adapter = createAgencyOperationalDataAdapter("agency-1");
 
     await expect(adapter.getClientSchedulingContext("client-1", { signal })).resolves.toBe(client);
     await expect(adapter.getStaffSchedulingContext("staff-1", { signal })).resolves.toBe(staff);
     await adapter.createStaffActivity("staff-1", payload, { signal });
+    await expect(adapter.createGoalDocument(
+      "client-1",
+      "shift-1",
+      {
+        documentType: "natural_supports_training" as DocumentType,
+        metadata: {
+          name: "Ada",
+          birthDate: "",
+          ispOutcome: "",
+          nameOfTrainer: "",
+          trainingParticipants: [],
+          trainings: [],
+          completedBy: "",
+          completionDate: "",
+        },
+      },
+      { signal },
+    )).resolves.toEqual({ id: "goal-1", status: "draft" });
 
     expect(api.getClientById).toHaveBeenCalledWith("client-1", "agency-1", { signal });
     expect(api.getEmployeeById).toHaveBeenCalledWith("staff-1", "agency-1", { signal });
@@ -69,6 +98,23 @@ describe("operational scheduling data adapters", () => {
       ...payload,
       employeeId: "staff-1",
       agencyId: "agency-1",
+    }, { signal });
+    expect(api.createGoalDocument).toHaveBeenCalledWith({
+      agencyId: "agency-1",
+      clientId: "client-1",
+      shiftId: "shift-1",
+      status: "draft",
+      documentType: "natural_supports_training",
+      metadata: {
+        name: "Ada",
+        birthDate: "",
+        ispOutcome: "",
+        nameOfTrainer: "",
+        trainingParticipants: [],
+        trainings: [],
+        completedBy: "",
+        completionDate: "",
+      },
     }, { signal });
   });
 
@@ -85,27 +131,66 @@ describe("operational scheduling data adapters", () => {
     api.getOperationalClientSchedulingContext.mockResolvedValue(client);
     api.getOperationalStaffSchedulingContext.mockResolvedValue(staff);
     api.createOperationalStaffActivity.mockResolvedValue({ id: "activity-1", status: "active" });
+    api.createOperationalShiftGoalDocument.mockResolvedValue({ id: "goal-1", status: "draft" });
     const adapter = createSuperAdminOperationalDataAdapter("shift-management", "agency-1");
 
     await expect(adapter.getClientSchedulingContext("client-1", { signal })).resolves.toBe(client);
     await expect(adapter.getStaffSchedulingContext("staff-1", { signal })).resolves.toBe(staff);
     await adapter.createStaffActivity("staff-1", payload, { signal });
+    await expect(adapter.createGoalDocument(
+      "client-1",
+      "shift-1",
+      {
+        documentType: "natural_supports_training" as DocumentType,
+        metadata: {
+          name: "Ada",
+          birthDate: "",
+          ispOutcome: "",
+          nameOfTrainer: "",
+          trainingParticipants: [],
+          trainings: [],
+          completedBy: "",
+          completionDate: "",
+        },
+      },
+      { signal },
+    )).resolves.toEqual({ id: "goal-1", status: "draft" });
 
     expect(api.getOperationalClientSchedulingContext).toHaveBeenCalledWith(
-      "shift-management", "agency-1", "client-1", signal,
+      "agency-1", "client-1", signal,
     );
     expect(api.getOperationalStaffSchedulingContext).toHaveBeenCalledWith(
-      "shift-management", "agency-1", "staff-1", signal,
+      "agency-1", "staff-1", signal,
     );
     expect(api.createOperationalStaffActivity).toHaveBeenCalledWith(
-      "shift-management", "agency-1", "staff-1", {
+      "agency-1", "staff-1", {
         ...payload,
         employeeId: "staff-1",
         agencyId: "agency-1",
       }, signal,
     );
+    expect(api.createOperationalShiftGoalDocument).toHaveBeenCalledWith(
+      "agency-1",
+      "client-1",
+      "shift-1",
+      {
+        documentType: "natural_supports_training",
+        metadata: {
+          name: "Ada",
+          birthDate: "",
+          ispOutcome: "",
+          nameOfTrainer: "",
+          trainingParticipants: [],
+          trainings: [],
+          completedBy: "",
+          completionDate: "",
+        },
+      },
+      signal,
+    );
     expect(api.getClientById).not.toHaveBeenCalled();
     expect(api.getEmployeeById).not.toHaveBeenCalled();
     expect(api.createEmployeeActivityLog).not.toHaveBeenCalled();
+    expect(api.createGoalDocument).not.toHaveBeenCalled();
   });
 });

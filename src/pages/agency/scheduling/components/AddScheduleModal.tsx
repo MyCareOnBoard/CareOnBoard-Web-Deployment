@@ -12,7 +12,7 @@ import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatu
 import type { CreateActivityLogRequest } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
-import { createGoalDocument, DocumentType, CreateGoalDocumentRequest } from "@/lib/api/goals-and-documents";
+import { DocumentType } from "@/lib/api/goals-and-documents";
 import { noteTypesForClientType, getNoteTitle, HHA_PERSONAL_CARE, HHA_SERVICE_LOG } from "@/lib/notes/noteTypes";
 import { resolveHhaNoteType } from "@/pages/agency/scheduling/utils/resolveHhaNoteType";
 import { getClientBasicInfo } from "@/lib/notes/clientBasicInfo";
@@ -1934,19 +1934,19 @@ export default function AddScheduleModal({
         // Create goal documents with shiftId at top level
         const goalResults = await Promise.all(
           successfulShifts.map((shift) =>
-            createGoalDocument({
-              agencyId,
-              clientId: formData.clientId || undefined,
-              createdBy: user?.uid,
-              documentType: formData.goalsType as DocumentType,
-              status: SubmissionStatus.DRAFT,
-              shiftId: shift.id,
-              metadata: {
-                name: formData.client,
-                completedBy: formData.assignedDsp,
-                completionDate: shift.date || format(new Date(), "yyyy-MM-dd"),
-              } as any,
-            }, { signal: operation.controller.signal }).catch((err) => {
+            data.createGoalDocument(
+              formData.clientId,
+              shift.id,
+              {
+                documentType: formData.goalsType as DocumentType,
+                metadata: {
+                  name: formData.client,
+                  completedBy: formData.assignedDsp,
+                  completionDate: shift.date || format(new Date(), "yyyy-MM-dd"),
+                } as any,
+              },
+              { signal: operation.controller.signal },
+            ).catch((err) => {
               if (isCurrentMutation(operation.generation, operation.controller)) {
                 console.error("Failed to create goal document:", err);
               }
@@ -1960,9 +1960,9 @@ export default function AddScheduleModal({
         const shiftUpdates = successfulShifts
           .map((shift, index) => {
             const goalResult = goalResults[index];
-            if (goalResult && goalResult.document?.id) {
+            if (goalResult?.id) {
               return updateShift(shift.id, {
-                goalsAndDocumentsId: goalResult.document.id,
+                goalsAndDocumentsId: goalResult.id,
               }, {
                 agencyId,
                 signal: operation.controller.signal,

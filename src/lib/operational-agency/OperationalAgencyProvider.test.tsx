@@ -21,6 +21,7 @@ const data = {
   getClientSchedulingContext: async () => ({ id: "client-1" }),
   getStaffSchedulingContext: async () => ({ id: "staff-1", workAvailability: false }),
   createStaffActivity: async () => ({}),
+  createGoalDocument: async () => ({ id: "goal-1", status: "draft" as const }),
 };
 
 describe("OperationalAgencyProvider", () => {

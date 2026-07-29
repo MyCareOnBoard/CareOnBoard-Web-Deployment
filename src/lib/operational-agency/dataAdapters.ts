@@ -6,8 +6,13 @@ import {
 } from "@/lib/api/employees";
 import { listServices } from "@/lib/api/services";
 import {
+  createGoalDocument,
+  SubmissionStatus as GoalDocumentStatus,
+} from "@/lib/api/goals-and-documents";
+import {
   listOperationalServices,
   createOperationalStaffActivity,
+  createOperationalShiftGoalDocument,
   getOperationalClientSchedulingContext,
   getOperationalStaffSchedulingContext,
   searchOperationalClients,
@@ -84,6 +89,16 @@ export function createAgencyOperationalDataAdapter(agencyId: string): Operationa
         employeeId: staffId,
         agencyId,
       }, options),
+    async createGoalDocument(clientId, shiftId, input, options = {}) {
+      const response = await createGoalDocument({
+        agencyId,
+        clientId,
+        shiftId,
+        status: GoalDocumentStatus.DRAFT,
+        ...input,
+      }, options);
+      return { id: response.document.id, status: "draft" };
+    },
   };
 }
 
@@ -96,14 +111,16 @@ export function createSuperAdminOperationalDataAdapter(
     searchStaff: (input = {}) => searchOperationalStaff(feature, { agencyId, ...input }),
     listServices: (input = {}) => listOperationalServices(feature, { agencyId, ...input }),
     getClientSchedulingContext: (clientId, options = {}) =>
-      getOperationalClientSchedulingContext(feature, agencyId, clientId, options.signal),
+      getOperationalClientSchedulingContext(agencyId, clientId, options.signal),
     getStaffSchedulingContext: (staffId, options = {}) =>
-      getOperationalStaffSchedulingContext(feature, agencyId, staffId, options.signal),
+      getOperationalStaffSchedulingContext(agencyId, staffId, options.signal),
     createStaffActivity: (staffId, payload, options = {}) =>
-      createOperationalStaffActivity(feature, agencyId, staffId, {
+      createOperationalStaffActivity(agencyId, staffId, {
         ...payload,
         employeeId: staffId,
         agencyId,
       }, options.signal),
+    createGoalDocument: (clientId, shiftId, input, options = {}) =>
+      createOperationalShiftGoalDocument(agencyId, clientId, shiftId, input, options.signal),
   };
 }

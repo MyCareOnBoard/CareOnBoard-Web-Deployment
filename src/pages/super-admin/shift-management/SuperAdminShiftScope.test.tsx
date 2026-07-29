@@ -118,4 +118,24 @@ describe("SuperAdminShiftScope route transitions", () => {
     expect(screen.queryByText("Restricted shift page")).not.toBeInTheDocument();
     expect(getOperationalAgencyContext).not.toHaveBeenCalled();
   });
+
+  it("shows a retryable error when direct-route agency context loading fails", async () => {
+    getOperationalAgencyContext.mockRejectedValueOnce(new Error("Agency context unavailable"));
+
+    render(
+      <MemoryRouter initialEntries={["/super-admin/shifts/list?agencyId=atlas"]}>
+        <Routes>
+          <Route
+            path="/super-admin/shifts/list"
+            element={<SuperAdminShiftScope><div>Restricted until loaded</div></SuperAdminShiftScope>}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Agency context unavailable");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+    expect(screen.queryByText("Restricted until loaded")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loading agency")).not.toBeInTheDocument();
+  });
 });

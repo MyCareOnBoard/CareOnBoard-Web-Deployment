@@ -3,6 +3,8 @@ import type {
   OperationalAgencySummary,
   OperationalClientOption,
   OperationalFeature,
+  OperationalGoalDocumentInput,
+  OperationalGoalDocumentResult,
   OperationalOptionPage,
   OperationalServiceOption,
   OperationalStaffOption,
@@ -156,14 +158,13 @@ export async function getOperationalAgencyContext(
 }
 
 export async function getOperationalClientSchedulingContext(
-  feature: OperationalFeature,
   agencyId: string,
   clientId: string,
   signal?: AbortSignal,
 ): Promise<Client> {
   const response = await axiosClient.get<SuccessEnvelope<Client>>(
     `/superAdminOperations/agencies/${requiredAgencyId(agencyId)}/clients/${encodeURIComponent(clientId)}/scheduling-context`,
-    { params: { feature }, signal },
+    { params: { feature: "shift-management" }, signal },
   );
   const data = responseData<Client>(response.data);
   if (!data || Array.isArray(data) || typeof data.id !== "string") {
@@ -173,14 +174,13 @@ export async function getOperationalClientSchedulingContext(
 }
 
 export async function getOperationalStaffSchedulingContext(
-  feature: OperationalFeature,
   agencyId: string,
   staffId: string,
   signal?: AbortSignal,
 ): Promise<OperationalStaffSchedulingContext> {
   const response = await axiosClient.get<SuccessEnvelope<OperationalStaffSchedulingContext>>(
     `/superAdminOperations/agencies/${requiredAgencyId(agencyId)}/staff/${encodeURIComponent(staffId)}/scheduling-context`,
-    { params: { feature }, signal },
+    { params: { feature: "shift-management" }, signal },
   );
   const data = responseData<OperationalStaffSchedulingContext>(response.data);
   if (
@@ -195,7 +195,6 @@ export async function getOperationalStaffSchedulingContext(
 }
 
 export async function createOperationalStaffActivity(
-  feature: OperationalFeature,
   agencyId: string,
   staffId: string,
   payload: CreateActivityLogRequest,
@@ -204,7 +203,7 @@ export async function createOperationalStaffActivity(
   const response = await axiosClient.post<SuccessEnvelope<OperationalActivityResult>>(
     `/superAdminOperations/agencies/${requiredAgencyId(agencyId)}/staff/${encodeURIComponent(staffId)}/activities`,
     payload,
-    { params: { feature }, signal },
+    { params: { feature: "shift-management" }, signal },
   );
   const data = responseData<OperationalActivityResult>(response.data);
   if (
@@ -214,6 +213,31 @@ export async function createOperationalStaffActivity(
     typeof data.status !== "string"
   ) {
     throw new Error("Invalid operational activity response.");
+  }
+  return data;
+}
+
+export async function createOperationalShiftGoalDocument(
+  agencyId: string,
+  clientId: string,
+  shiftId: string,
+  input: OperationalGoalDocumentInput,
+  signal?: AbortSignal,
+): Promise<OperationalGoalDocumentResult> {
+  const response = await axiosClient.post<SuccessEnvelope<OperationalGoalDocumentResult>>(
+    `/superAdminOperations/agencies/${requiredAgencyId(agencyId)}` +
+      `/clients/${encodeURIComponent(clientId)}/shifts/${encodeURIComponent(shiftId)}/goal-documents`,
+    input,
+    { signal },
+  );
+  const data = responseData<OperationalGoalDocumentResult>(response.data);
+  if (
+    !data ||
+    Array.isArray(data) ||
+    typeof data.id !== "string" ||
+    data.status !== "draft"
+  ) {
+    throw new Error("Invalid operational goal document response.");
   }
   return data;
 }

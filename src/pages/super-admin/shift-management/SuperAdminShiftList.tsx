@@ -84,6 +84,15 @@ export function SuperAdminShiftScope({ children, agency: suppliedAgency }: Super
   if (!agencyId || (!suppliedAgency && requestedIds.length !== 1)) {
     return <p role="alert" className="px-4 py-8 text-sm font-medium text-[#808081]">Choose exactly one agency to manage shifts.</p>;
   }
+  if (error) {
+    return (
+      <div role="alert" className="rounded-2xl border border-[#efcbc6] bg-[#fff5f3] px-5 py-8 text-center">
+        <AlertTriangle className="mx-auto size-7 text-[#9a4038]" aria-hidden />
+        <p className="mt-2 text-sm font-semibold text-[#7e3029]">{error}</p>
+        <Button type="button" variant="outline" className="mt-4" onClick={() => setRetryVersion((value) => value + 1)}>Try again</Button>
+      </div>
+    );
+  }
   if (loading || resolvedAgency?.id !== agencyId) {
     return (
       <div className="flex min-h-64 items-center justify-center" aria-busy="true">
@@ -91,14 +100,8 @@ export function SuperAdminShiftScope({ children, agency: suppliedAgency }: Super
       </div>
     );
   }
-  if (error || !resolvedAgency) {
-    return (
-      <div role="alert" className="rounded-2xl border border-[#efcbc6] bg-[#fff5f3] px-5 py-8 text-center">
-        <AlertTriangle className="mx-auto size-7 text-[#9a4038]" aria-hidden />
-        <p className="mt-2 text-sm font-semibold text-[#7e3029]">{error || "Could not load this agency."}</p>
-        <Button type="button" variant="outline" className="mt-4" onClick={() => setRetryVersion((value) => value + 1)}>Try again</Button>
-      </div>
-    );
+  if (!resolvedAgency) {
+    return <p role="alert" className="px-4 py-8 text-sm font-medium text-[#7e3029]">Could not load this agency.</p>;
   }
 
   const requestedMode = new URLSearchParams(location.search).get("clientType");

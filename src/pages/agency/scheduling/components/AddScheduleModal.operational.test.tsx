@@ -51,6 +51,7 @@ function createDataAdapter(): OperationalAgencyDataAdapter {
     getClientSchedulingContext: vi.fn(),
     getStaffSchedulingContext: vi.fn(),
     createStaffActivity: vi.fn(),
+    createGoalDocument: vi.fn(),
   };
 }
 

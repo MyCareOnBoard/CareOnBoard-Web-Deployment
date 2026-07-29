@@ -4,6 +4,7 @@ import type {
   CreateActivityLogRequest,
   Employee,
 } from "@/lib/api/employees";
+import type { CreateGoalDocumentRequest } from "@/lib/api/goals-and-documents";
 
 export type OperationalActor = "agency" | "super_admin";
 export type OperationalFeature = "shift-management" | "billing-management";
@@ -53,6 +54,16 @@ export interface OperationalRequestOptions {
 
 export type OperationalStaffSchedulingContext = Pick<Employee, "id" | "workAvailability">;
 
+export type OperationalGoalDocumentInput = Pick<
+  CreateGoalDocumentRequest,
+  "documentType" | "metadata"
+>;
+
+export interface OperationalGoalDocumentResult {
+  id: string;
+  status: "draft";
+}
+
 export interface OperationalAgencyDataAdapter {
   searchClients(input?: OperationalLookupInput): Promise<OperationalOptionPage<OperationalClientOption>>;
   searchStaff(input?: OperationalLookupInput): Promise<OperationalOptionPage<OperationalStaffOption>>;
@@ -67,6 +78,12 @@ export interface OperationalAgencyDataAdapter {
     payload: CreateActivityLogRequest,
     options?: OperationalRequestOptions,
   ): Promise<unknown>;
+  createGoalDocument(
+    clientId: string,
+    shiftId: string,
+    input: OperationalGoalDocumentInput,
+    options?: OperationalRequestOptions,
+  ): Promise<OperationalGoalDocumentResult>;
 }
 
 export interface OperationalCapabilities {
