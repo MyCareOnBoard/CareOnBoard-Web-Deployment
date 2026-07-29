@@ -1,13 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Plus, ChevronLeft, ChevronRight, Search, Pencil, X, Calendar, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router";
-import { Routes } from "@/routes/constants";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { listShifts, Shift, deleteShift, updateShift, ShiftType, SubmissionStatus, formatShiftLocation } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/utils/auth";
-import { useStaffLabels } from "@/hooks/useStaffLabels";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
 import { shiftToScheduleFormData } from "../shift-to-schedule-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -15,6 +11,8 @@ import {
   ConfirmDialog,
   ConfirmDialogContent,
 } from "@/components/ui/confirm-dialog";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { staffLabels } from "@/lib/roleLabel";
 
 const getInitialsFromName = (name: string) => {
   const parts = name.split(" ").filter(Boolean);
@@ -26,10 +24,10 @@ const getInitialsFromName = (name: string) => {
 };
 
 export default function ShiftsListPage() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
   const { toast } = useToast();
-  const { mode, labels } = useStaffLabels();
+  const { agencyId, agency, mode, data } = useOperationalAgency();
+  const labels = staffLabels(mode ? [mode] : [...agency.supportedClientTypes]);
+  const operationScopeRef = useRef(0);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -57,25 +55,24 @@ export default function ShiftsListPage() {
 
   const itemsPerPage = 7;
 
-  // Fetch shifts from API
-  useEffect(() => {
-    const fetchShifts = async () => {
+  const fetchShifts = useCallback(async (signal?: AbortSignal) => {
       try {
         setLoading(true);
         const response = await listShifts({
           limit: 100,
-          // For agency users the backend can infer agencyId, but we pass profile.data.id when available
-          agencyId: user?.agencyId,
+          agencyId,
           client: true,
           employee: true,
           clientType: mode ?? undefined,
-        });
+        }, { signal });
+        if (signal?.aborted) return;
         // Filter out shifts with type="manual" and submissionStatus="draft"
         const filteredShifts = (response.shifts || []).filter(shift =>
           !(shift.type === ShiftType.MANUAL && shift.submissionStatus === SubmissionStatus.DRAFT)
         );
         setShifts(filteredShifts);
       } catch (error) {
+        if (signal?.aborted) return;
         console.error("Failed to fetch shifts:", error);
         toast({
           title: "Error",
@@ -83,19 +80,36 @@ export default function ShiftsListPage() {
           variant: "destructive",
         });
       } finally {
-        setLoading(false);
+        if (!signal?.aborted) setLoading(false);
       }
-    };
+  }, [agencyId, mode, toast]);
 
-    // Always attempt to fetch when profile is present; loading will be cleared in finally
-    if (user?.agencyId) {
-      fetchShifts();
-    } else {
-      // If there is no profile yet, don't get stuck in loading
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.agencyId, mode]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchShifts(controller.signal);
+    return () => controller.abort();
+  }, [fetchShifts]);
+
+  useEffect(() => {
+    operationScopeRef.current += 1;
+    setSearchQuery("");
+    setCurrentPage(1);
+    setSelectedDate(null);
+    setShowDatePicker(false);
+    setShifts([]);
+    setShowAddScheduleModal(false);
+    setShowCancelModal(false);
+    setShiftToCancel(null);
+    setShowCancelledModal(false);
+    setCancelledShiftInfo(null);
+    setEditFormData(null);
+    setModalMode("create");
+    setShowApproveModal(false);
+    setShiftToApprove(null);
+    return () => {
+      operationScopeRef.current += 1;
+    };
+  }, [agencyId]);
 
   // Calendar days calculation
   const calendarDays = useMemo(() => {
@@ -144,6 +158,7 @@ export default function ShiftsListPage() {
   };
 
   const confirmCancelShift = async (shiftId: string) => {
+    const operationScope = operationScopeRef.current;
     try {
       setIsCancelling(true);
 
@@ -170,19 +185,23 @@ export default function ShiftsListPage() {
         });
       }
 
-      await deleteShift(shiftId);
+      await deleteShift(shiftId, { agencyId });
+      if (operationScope !== operationScopeRef.current) return;
       setShifts(prev => prev.filter(s => s.id !== shiftId));
       setShowCancelledModal(true);
     } catch (error) {
+      if (operationScope !== operationScopeRef.current) return;
       toast({
         title: "Error",
         description: "Failed to cancel shift. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsCancelling(false);
-      setShowCancelModal(false);
-      setShiftToCancel(null);
+      if (operationScope === operationScopeRef.current) {
+        setIsCancelling(false);
+        setShowCancelModal(false);
+        setShiftToCancel(null);
+      }
     }
   };
 
@@ -197,9 +216,11 @@ export default function ShiftsListPage() {
   };
 
   const confirmApproveShift = async (shiftId: string) => {
+    const operationScope = operationScopeRef.current;
     try {
       setIsApproving(true);
-      await updateShift(shiftId, { type: ShiftType.AUTOMATIC });
+      await updateShift(shiftId, { type: ShiftType.AUTOMATIC }, { agencyId });
+      if (operationScope !== operationScopeRef.current) return;
 
       // Update the shift in the local state
       setShifts(prev => prev.map(shift =>
@@ -217,6 +238,7 @@ export default function ShiftsListPage() {
       setShowApproveModal(false);
       setShiftToApprove(null);
     } catch (error) {
+      if (operationScope !== operationScopeRef.current) return;
       console.error("Failed to approve shift:", error);
       toast({
         title: "Error",
@@ -224,7 +246,7 @@ export default function ShiftsListPage() {
         variant: "destructive",
       });
     } finally {
-      setIsApproving(false);
+      if (operationScope === operationScopeRef.current) setIsApproving(false);
     }
   };
 
@@ -576,6 +598,11 @@ export default function ShiftsListPage() {
       {/* Add Schedule Modal */}
       <AddScheduleModal
         isOpen={showAddScheduleModal}
+        agencyId={agencyId}
+        agencyName={agency.name}
+        agencyMode={mode}
+        supportedClientTypes={agency.supportedClientTypes}
+        data={data}
         onClose={() => {
           setShowAddScheduleModal(false);
           setModalMode("create");

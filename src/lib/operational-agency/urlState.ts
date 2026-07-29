@@ -88,3 +88,20 @@ export function calendarSearchToListSearch(search: string, agencyId?: string): s
   params.set("view", "list");
   return stringify(params);
 }
+
+function safeInternalReturnTo(value: string | null): string | null {
+  if (!value) return null;
+  const candidate = value.trim();
+  if (
+    !candidate.startsWith("/")
+    || candidate.startsWith("//")
+    || /[\\\u0000-\u001f\u007f]/.test(candidate)
+  ) {
+    return null;
+  }
+  return candidate;
+}
+
+export function resolveOperationalReturnTo(search: string, fallback: string): string {
+  return safeInternalReturnTo(paramsFor(search).get("returnTo")) ?? fallback;
+}

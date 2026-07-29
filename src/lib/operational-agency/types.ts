@@ -51,6 +51,7 @@ export interface OperationalAgencyDataAdapter {
 export interface OperationalCapabilities {
   canManageShifts: boolean;
   canManageBilling: boolean;
+  shiftMaintenance: boolean;
 }
 
 export interface OperationalShiftRoutes {
@@ -58,6 +59,7 @@ export interface OperationalShiftRoutes {
   list(search?: string): string;
   approvals(search?: string): string;
   activityLogs(search?: string): string;
+  maintenance(search?: string): string;
   details(shiftId: string, search?: string): string;
 }
 

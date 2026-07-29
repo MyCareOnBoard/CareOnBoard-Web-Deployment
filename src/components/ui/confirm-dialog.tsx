@@ -80,14 +80,14 @@ const ConfirmDialogContent = React.forwardRef<
         {/* Content */}
         <div className="flex w-full flex-col gap-[12px] text-center whitespace-pre-wrap">
           {title && (
-            <p className="font-semibold text-[32px] leading-normal text-[#10141a]">
+            <DialogPrimitive.Title className="font-semibold text-[32px] leading-normal text-[#10141a]">
               {title}
-            </p>
+            </DialogPrimitive.Title>
           )}
           {description && (
-            <p className="font-medium text-[16px] leading-[1.6] text-[#808081]">
+            <DialogPrimitive.Description className="font-medium text-[16px] leading-[1.6] text-[#808081]">
               {description}
-            </p>
+            </DialogPrimitive.Description>
           )}
           {children}
         </div>

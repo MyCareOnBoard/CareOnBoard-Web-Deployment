@@ -200,6 +200,7 @@ export default function ShiftDetailsModal({
 
   const shiftRef = useRef(shift);
   shiftRef.current = shift;
+  const operationScopeRef = useRef(0);
 
   const shiftResetKey = shift
     ? `${shift.id}|${String(shift.clockedInAt)}|${String(shift.clockedOutAt)}|${shift.status}|${String(shift.approved)}`
@@ -221,6 +222,7 @@ export default function ShiftDetailsModal({
   }, []);
 
   useEffect(() => {
+    const operationScope = ++operationScopeRef.current;
     if (!isOpen) return;
     const s = shiftRef.current;
     if (!s) return;
@@ -258,6 +260,9 @@ export default function ShiftDetailsModal({
 
     return () => {
       cancelled = true;
+      if (operationScopeRef.current === operationScope) {
+        operationScopeRef.current += 1;
+      }
     };
   }, [isOpen, shiftResetKey, hydrateFromServer, agencyId, toast, resetDraftsFromShift]);
 
@@ -379,8 +384,10 @@ export default function ShiftDetailsModal({
     }
 
     setIsSubmitting(true);
+    const operationScope = operationScopeRef.current;
     try {
-      const response = await updateShift(resolvedShift.id, payload);
+      const response = await updateShift(resolvedShift.id, payload, { agencyId });
+      if (operationScope !== operationScopeRef.current) return;
       if (hydrateFromServer) setFetchedShift(response.shift);
       resetDraftsFromShift(response.shift);
       setReason("");
@@ -391,6 +398,7 @@ export default function ShiftDetailsModal({
         description: "The shift was updated.",
       });
     } catch (e) {
+      if (operationScope !== operationScopeRef.current) return;
       if (typeof e === "object" && e !== null && "response" in e && typeof e.response === "object" && e.response !== null && "data" in e.response) {
         const errorData = e.response.data as { code?: string; error?: string };
         toast({
@@ -400,7 +408,7 @@ export default function ShiftDetailsModal({
         });
       }
     } finally {
-      setIsSubmitting(false);
+      if (operationScope === operationScopeRef.current) setIsSubmitting(false);
     }
   }
   const showBody = !hydrateFromServer || !loadingFull;

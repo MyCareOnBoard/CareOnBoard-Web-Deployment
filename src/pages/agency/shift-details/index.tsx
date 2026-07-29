@@ -1,5 +1,5 @@
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { format, parseISO } from "date-fns";
 import { ArrowLeft, Loader2, StickyNote } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -12,9 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Routes } from "@/routes/constants";
 import {
   deleteShift,
   fetchShiftMaintenanceAudit,
@@ -36,6 +34,8 @@ import {
   formatShiftAuditTimestamp,
   summarizeChanges,
 } from "@/pages/shared/shift-maintenance/audit-display";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { resolveOperationalReturnTo } from "@/lib/operational-agency/urlState";
 
 const AddScheduleModal = lazy(() => import("@/pages/agency/scheduling/components/AddScheduleModal"));
 const ShiftDetailsModal = lazy(() => import("@/components/ShiftDetailsModal"));
@@ -96,12 +96,17 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 export default function AgencyShiftDetailsPage() {
   const { shiftId } = useParams<{ shiftId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
   const { toast } = useToast();
+  const { actor, agencyId, agency, mode, capabilities, data, routes } = useOperationalAgency();
+
+  const fallbackRoute = routes.list(
+    actor === "super_admin" ? new URLSearchParams({ agencyId }).toString() : undefined,
+  );
 
   const goBack = useCallback(() => {
-    navigate(-1);
-  }, [navigate]);
+    navigate(resolveOperationalReturnTo(location.search, fallbackRoute), { replace: true });
+  }, [fallbackRoute, location.search, navigate]);
 
   const [shift, setShift] = useState<Shift | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
@@ -125,56 +130,91 @@ export default function AgencyShiftDetailsPage() {
     when: string;
     who: string;
   } | null>(null);
-
-  const agencyId = user?.agencyId;
+  const requestVersion = useRef(0);
+  const deleteRequestVersion = useRef(0);
 
   const refetchShiftAndRelated = useCallback(
-    async (options?: { silent?: boolean }) => {
+    async (options?: { silent?: boolean; signal?: AbortSignal }) => {
       if (!shiftId || !agencyId) return;
+      const requestId = ++requestVersion.current;
       const silent = options?.silent === true;
       if (!silent) {
         setPageLoading(true);
       }
       setLoadError(null);
       try {
-        const res = await getShiftById(shiftId, { agencyId, client: true, employee: true });
+        const res = await getShiftById(shiftId, {
+          agencyId,
+          client: true,
+          employee: true,
+          signal: options?.signal,
+        });
+        if (options?.signal?.aborted || requestId !== requestVersion.current) return;
         const s = res.shift;
         setShift(s);
 
-        const auditRes = await fetchShiftMaintenanceAudit({
-          agencyId,
-          shiftId,
-          limit: AUDIT_PAGE_SIZE,
-        });
-
-        setAudits(auditRes.audits);
-        setAuditCursor(auditRes.nextCursor);
-        setAuditHasNext(auditRes.hasNextPage);
+        if (capabilities.shiftMaintenance) {
+          const auditRes = await fetchShiftMaintenanceAudit(
+            {
+              agencyId,
+              shiftId,
+              limit: AUDIT_PAGE_SIZE,
+            },
+            { signal: options?.signal },
+          );
+          if (options?.signal?.aborted || requestId !== requestVersion.current) return;
+          setAudits(auditRes.audits);
+          setAuditCursor(auditRes.nextCursor);
+          setAuditHasNext(auditRes.hasNextPage);
+        } else {
+          setAudits([]);
+          setAuditCursor(null);
+          setAuditHasNext(false);
+        }
       } catch (e) {
+        if (options?.signal?.aborted || requestId !== requestVersion.current) return;
         console.error(e);
         setLoadError("We couldn't load this shift. It may have been removed or you may not have access.");
         setShift(null);
       } finally {
-        if (!silent) {
+        if (!silent && !options?.signal?.aborted && requestId === requestVersion.current) {
           setPageLoading(false);
         }
       }
     },
-    [shiftId, agencyId]
+    [agencyId, capabilities.shiftMaintenance, shiftId]
   );
 
   useEffect(() => {
+    deleteRequestVersion.current += 1;
+    setShift(null);
+    setAudits([]);
+    setAuditCursor(null);
+    setAuditHasNext(false);
+    setShowAddScheduleModal(false);
+    setEditFormData(null);
+    setShowShiftDetailsModal(false);
+    setShiftPendingDelete(false);
+    setIsDeletingShift(false);
+    setAuditNoteModal(null);
     if (!shiftId || !agencyId) {
       setPageLoading(false);
       if (!agencyId) setLoadError("Sign in again to view shift details.");
       else setLoadError("Missing shift.");
       return;
     }
-    refetchShiftAndRelated();
+    const controller = new AbortController();
+    void refetchShiftAndRelated({ signal: controller.signal });
+    return () => {
+      controller.abort();
+      requestVersion.current += 1;
+      deleteRequestVersion.current += 1;
+    };
   }, [shiftId, agencyId, refetchShiftAndRelated]);
 
   const loadMoreAudits = async () => {
-    if (!agencyId || !shiftId || !auditCursor || auditLoadingMore) return;
+    if (!capabilities.shiftMaintenance || !agencyId || !shiftId || !auditCursor || auditLoadingMore) return;
+    const requestId = requestVersion.current;
     setAuditLoadingMore(true);
     try {
       const res = await fetchShiftMaintenanceAudit({
@@ -183,17 +223,19 @@ export default function AgencyShiftDetailsPage() {
         limit: AUDIT_PAGE_SIZE,
         startAfter: auditCursor,
       });
+      if (requestId !== requestVersion.current) return;
       setAudits((prev) => [...prev, ...res.audits]);
       setAuditCursor(res.nextCursor);
       setAuditHasNext(res.hasNextPage);
     } catch {
+      if (requestId !== requestVersion.current) return;
       toast({
         title: "Couldn't load more activity",
         description: "Try again in a moment.",
         variant: "destructive",
       });
     } finally {
-      setAuditLoadingMore(false);
+      if (requestId === requestVersion.current) setAuditLoadingMore(false);
     }
   };
 
@@ -211,9 +253,11 @@ export default function AgencyShiftDetailsPage() {
 
   const confirmDeleteShift = async () => {
     if (!shift || !shiftId) return;
+    const requestId = ++deleteRequestVersion.current;
     setIsDeletingShift(true);
     try {
-      await deleteShift(shiftId);
+      await deleteShift(shiftId, { agencyId });
+      if (requestId !== deleteRequestVersion.current) return;
       toast({
         title: "Shift deleted",
         description: "This shift was removed from the schedule.",
@@ -221,6 +265,7 @@ export default function AgencyShiftDetailsPage() {
       setShiftPendingDelete(false);
       goBack();
     } catch (err) {
+      if (requestId !== deleteRequestVersion.current) return;
       console.error(err);
       toast({
         title: "Couldn't delete shift",
@@ -228,7 +273,7 @@ export default function AgencyShiftDetailsPage() {
         variant: "destructive",
       });
     } finally {
-      setIsDeletingShift(false);
+      if (requestId === deleteRequestVersion.current) setIsDeletingShift(false);
     }
   };
 
@@ -311,14 +356,16 @@ export default function AgencyShiftDetailsPage() {
             >
               Update shift
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full border-[rgba(255,255,255,0.5)] bg-white px-4 font-semibold text-[#10141a] shadow-sm hover:bg-white/90"
-              onClick={() => setShowShiftDetailsModal(true)}
-            >
-              Edit clock times
-            </Button>
+            {capabilities.shiftMaintenance ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full border-[rgba(255,255,255,0.5)] bg-white px-4 font-semibold text-[#10141a] shadow-sm hover:bg-white/90"
+                onClick={() => setShowShiftDetailsModal(true)}
+              >
+                Edit clock times
+              </Button>
+            ) : null}
             <Button
               type="button"
               className="rounded-full bg-[#d93c24] px-4 font-semibold text-white hover:bg-[#c52d16]"
@@ -372,7 +419,7 @@ export default function AgencyShiftDetailsPage() {
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-[18px] font-semibold text-[#10141a]">What needs attention</h2>
-            {derivedAnomaly ? (
+            {derivedAnomaly && capabilities.shiftMaintenance ? (
               <Button
                 type="button"
                 variant="outline"
@@ -395,7 +442,7 @@ export default function AgencyShiftDetailsPage() {
                 </span>
               ))}
             </div>
-          ) : (
+          ) : capabilities.shiftMaintenance ? (
             <p className="text-[14px] text-[#808081]">
               Nothing stands out from this shift&apos;s schedule and clock times. Use{" "}
               <span className="font-semibold text-[#10141a]">Edit clock times</span> above to adjust clocks or
@@ -403,15 +450,22 @@ export default function AgencyShiftDetailsPage() {
               <button
                 type="button"
                 className="font-semibold text-[#10141a] underline underline-offset-2"
-                onClick={() => navigate(Routes.agency.shiftMaintenance)}
+                onClick={() => navigate(routes.maintenance(
+                  actor === "super_admin" ? new URLSearchParams({ agencyId }).toString() : undefined,
+                ))}
               >
                 Shift maintenance
               </button>
               .
             </p>
+          ) : (
+            <p className="text-[14px] text-[#808081]">
+              Nothing stands out from this shift&apos;s schedule and clock times.
+            </p>
           )}
         </div>
 
+        {capabilities.shiftMaintenance ? (
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
           <h2 className="mb-2 text-[18px] font-semibold text-[#10141a]">Schedule</h2>
           <dl>
@@ -437,6 +491,7 @@ export default function AgencyShiftDetailsPage() {
             <DetailRow label="Submission" value={shift.submissionStatus || "—"} />
           </dl>
         </div>
+        ) : null}
 
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
           <h2 className="mb-2 text-[18px] font-semibold text-[#10141a]">Clock activity</h2>
@@ -553,6 +608,11 @@ export default function AgencyShiftDetailsPage() {
         <Suspense fallback={null}>
           <AddScheduleModal
             isOpen={showAddScheduleModal}
+            agencyId={agencyId}
+            agencyName={agency.name}
+            agencyMode={mode}
+            supportedClientTypes={agency.supportedClientTypes}
+            data={data}
             onClose={() => {
               setShowAddScheduleModal(false);
               setEditFormData(null);
@@ -564,13 +624,14 @@ export default function AgencyShiftDetailsPage() {
         </Suspense>
       )}
 
-      {showShiftDetailsModal ? (
+      {showShiftDetailsModal && capabilities.shiftMaintenance ? (
         <Suspense fallback={null}>
           <ShiftDetailsModal
             isOpen={showShiftDetailsModal}
             shift={shift}
             anomalyCodes={derivedAnomaly?.anomalyCodes ?? []}
             hydrateFromServer={false}
+            agencyId={agencyId}
             onClose={() => setShowShiftDetailsModal(false)}
             onShiftUpdated={(updated) => {
               setShift(updated);

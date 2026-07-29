@@ -42,13 +42,54 @@ describe("super-admin shift management workspace", () => {
 
     expect(await screen.findByRole("heading", { name: "Shift management" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Calendar view" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "List view" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "List view" })).toHaveAccessibleDescription(/not available yet/i);
+    expect(screen.getByRole("button", { name: "List view" })).toBeEnabled();
     expect(await screen.findByText("Choose one or more agencies to view shifts.")).toBeVisible();
     expect(listCalendarShifts).not.toHaveBeenCalled();
     const pageRequest = listOperationalAgencies.mock.calls.find(([, input]) => input?.limit === 50);
     expect(pageRequest?.[0]).toBe("shift-management");
     expect(pageRequest?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("opens the functional singular-agency List view", async () => {
+    routing.search = "?agencyIds=atlas&month=2026-08&view=calendar&filter=open";
+    render(<ShiftManagementWorkspace />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "List view" }));
+
+    expect(routing.navigate).toHaveBeenCalledWith({
+      pathname: "/super-admin/shifts/list",
+      search: "?month=2026-08&view=list&filter=open&agencyId=atlas",
+    });
+  });
+
+  it("opens a calendar card with singular agency scope and a safe return target", async () => {
+    routing.search = "?agencyIds=atlas&month=2026-08&view=calendar&filter=open";
+    listCalendarShifts.mockResolvedValue({
+      month: "2026-08",
+      shifts: [{
+        id: "shift-9",
+        date: "2026-08-05",
+        startTime: "09:00",
+        endTime: "12:00",
+        status: "pending",
+        clientId: "client-1",
+        clientName: "Jamie Client",
+        employeeId: "staff-1",
+        staffName: "Robin Staff",
+        serviceCode: "H2021",
+        anomalyCodes: [],
+      }],
+      nextCursor: null,
+    });
+    render(<ShiftManagementWorkspace />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Open shift details for Jamie Client/i }));
+
+    expect(routing.navigate).toHaveBeenCalledWith(
+      `/super-admin/shifts/shift-9?agencyId=atlas&returnTo=${encodeURIComponent(
+        "/super-admin/shifts?agencyIds=atlas&month=2026-08&view=calendar&filter=open",
+      )}`,
+    );
   });
 
   it("hydrates repeated URL agencies and renders their calendar without a global request", async () => {

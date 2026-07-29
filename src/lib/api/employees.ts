@@ -234,9 +234,11 @@ export async function getCurrentEmployee(): Promise<Employee> {
  * ✅ Get employee by ID
  * Endpoint: GET /employees/:employeeId
  */
-export async function getEmployeeById(employeeId: string): Promise<Employee> {
+export async function getEmployeeById(employeeId: string, agencyId?: string): Promise<Employee> {
     try {
-        const response = await axiosClient.get<EmployeeResponse>(`/employees/${employeeId}`);
+        const response = await axiosClient.get<EmployeeResponse>(`/employees/${employeeId}`, {
+            params: agencyId ? { agencyId } : undefined,
+        });
 
         if (!response.data.success) {
             throw new Error('Employee not found');

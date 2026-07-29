@@ -18,20 +18,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { format, isSameDay, parseISO } from "date-fns";
 import { listShifts, deleteShift, Shift, ShiftStatus, ListShiftsParams } from "@/lib/api/shifts";
-import { listClients } from "@/lib/api/clients";
-import { listEmployees } from "@/lib/api/employees";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate, generatePath } from "react-router";
-import { Routes } from "@/routes/constants";
+import { useLocation, useNavigate } from "react-router";
 import AddScheduleModal, { ScheduleFormData } from "./components/AddScheduleModal";
 import { shiftToScheduleFormData } from "./shift-to-schedule-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAuth } from "@/utils/auth";
-import { useSelector } from "react-redux";
 import { staffLabels } from "@/lib/roleLabel";
-import type { RootState } from "@/store/redux/store";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import { ANOMALY_LABELS } from "@/pages/shared/shift-maintenance/audit-display";
@@ -52,18 +47,20 @@ type PersonFilter = { kind: "client" | "dsp"; id: string; label: string };
 
 type PersonSearchRow = { kind: "client" | "dsp"; id: string; label: string };
 
-function clientDisplayName(c: { firstName?: string; lastName?: string }): string {
-  const n = `${c.firstName || ""} ${c.lastName || ""}`.trim();
-  return n || "Unknown client";
-}
-
 export default function SchedulingPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const agencyId = user?.agencyId || user?.agency?.id || "";
-  const selectedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
-  const effectiveTypes = selectedMode ? [selectedMode] : user?.agency?.supportedClientTypes;
-  const labels = staffLabels(effectiveTypes);
+  const location = useLocation();
+  const {
+    actor,
+    agencyId,
+    agency,
+    mode: selectedMode,
+    routes,
+    data,
+    capabilities,
+  } = useOperationalAgency();
+  const effectiveTypes = selectedMode ? [selectedMode] : agency.supportedClientTypes;
+  const labels = staffLabels([...effectiveTypes]);
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
@@ -90,12 +87,10 @@ export default function SchedulingPage() {
   const [personSearchSettledKey, setPersonSearchSettledKey] = useState<string | null>(null);
   const [personSearchTruncated, setPersonSearchTruncated] = useState(false);
   const personSearchContainerRef = useRef<HTMLDivElement>(null);
+  const deleteRequestVersion = useRef(0);
   const itemsPerPage = 6;
 
-  const loadShifts = useCallback(async () => {
-    const agencyId = user?.agencyId;
-    if (!agencyId) return;
-
+  const loadShifts = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       const params: ListShiftsParams = {
@@ -103,14 +98,16 @@ export default function SchedulingPage() {
         agencyId,
         client: true,
         employee: true,
-        clientType: selectedMode,
+        clientType: selectedMode ?? undefined,
       };
       if (personFilter?.kind === "client") params.clientId = personFilter.id;
       if (personFilter?.kind === "dsp") params.employeeId = personFilter.id;
 
-      const response = await listShifts(params);
+      const response = await listShifts(params, { signal });
+      if (signal?.aborted) return;
       setShifts(response.shifts || []);
     } catch (error) {
+      if (signal?.aborted) return;
       console.error("Failed to fetch shifts:", error);
       toast({
         title: "Couldn’t load shifts",
@@ -118,14 +115,40 @@ export default function SchedulingPage() {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  }, [user?.agencyId, personFilter, toast, selectedMode]);
+  }, [agencyId, personFilter, toast, selectedMode]);
 
   useEffect(() => {
-    if (!user?.agencyId) return;
-    void loadShifts();
-  }, [user?.agencyId, loadShifts]);
+    const controller = new AbortController();
+    void loadShifts(controller.signal);
+    return () => controller.abort();
+  }, [loadShifts]);
+
+  useEffect(() => {
+    deleteRequestVersion.current += 1;
+    setSelectedDate(null);
+    setCalendarOpen(false);
+    setActivityPage(1);
+    setShowAddScheduleModal(false);
+    setShowShiftDetails(false);
+    setSelectedShift(null);
+    setEditFormData(null);
+    setModalMode("create");
+    setShiftMenuOpenForId(null);
+    setShiftPendingDelete(null);
+    setIsDeletingShift(false);
+    setPersonFilter(null);
+    setPersonSearchInput("");
+    setPersonSearchOpen(false);
+    setPersonSearchResults([]);
+    setPersonSearchSettledKey(null);
+    setPersonSearchTruncated(false);
+    setShifts([]);
+    return () => {
+      deleteRequestVersion.current += 1;
+    };
+  }, [agencyId]);
 
   const handleEdit = (shift: Shift) => {
     setEditFormData(shiftToScheduleFormData(shift));
@@ -137,7 +160,15 @@ export default function SchedulingPage() {
 
   const goToShiftDetailsPage = (shift: Shift) => {
     closeShiftRowMenu();
-    navigate(generatePath(Routes.agency.shiftDetails, { shiftId: shift.id }));
+    if (actor === "super_admin") {
+      const params = new URLSearchParams({
+        agencyId,
+        returnTo: `${location.pathname}${location.search}`,
+      });
+      navigate(routes.details(shift.id, params.toString()));
+      return;
+    }
+    navigate(routes.details(shift.id));
   };
 
   const openShiftMaintenanceModal = (shift: Shift) => {
@@ -158,16 +189,20 @@ export default function SchedulingPage() {
 
   const confirmDeleteShift = async () => {
     if (!shiftPendingDelete) return;
+    const requestId = ++deleteRequestVersion.current;
+    const pendingShiftId = shiftPendingDelete.id;
     setIsDeletingShift(true);
     try {
-      await deleteShift(shiftPendingDelete.id);
-      setShifts((prev) => prev.filter((s) => s.id !== shiftPendingDelete.id));
+      await deleteShift(pendingShiftId, { agencyId });
+      if (requestId !== deleteRequestVersion.current) return;
+      setShifts((prev) => prev.filter((s) => s.id !== pendingShiftId));
       toast({
         title: "Shift deleted",
         description: "This shift was removed from the schedule.",
       });
       setShiftPendingDelete(null);
     } catch (err) {
+      if (requestId !== deleteRequestVersion.current) return;
       console.error(err);
       toast({
         title: "Couldn't delete shift",
@@ -175,7 +210,7 @@ export default function SchedulingPage() {
         variant: "destructive",
       });
     } finally {
-      setIsDeletingShift(false);
+      if (requestId === deleteRequestVersion.current) setIsDeletingShift(false);
     }
   };
 
@@ -237,8 +272,7 @@ export default function SchedulingPage() {
   }, [totalActivityPages]);
 
   useEffect(() => {
-    const agencyId = user?.agencyId;
-    if (!agencyId || personFilter) {
+    if (personFilter) {
       setPersonSearchResults([]);
       setPersonSearchLoading(false);
       setPersonSearchSettledKey(null);
@@ -262,17 +296,15 @@ export default function SchedulingPage() {
     const timer = window.setTimeout(async () => {
       try {
         const [clientsOutcome, employeesOutcome] = await Promise.allSettled([
-          listClients({
+          data.searchClients({
             search: q,
-            agencyId,
-            type: selectedMode,
+            mode: selectedMode ?? undefined,
             limit: PERSON_TYPEAHEAD_LIMIT,
             signal: ac.signal,
           }),
-          listEmployees({
+          data.searchStaff({
             search: q,
-            agencyId,
-            role: selectedMode === "hha" ? "hha" : selectedMode === "ddd" ? "dsp" : undefined,
+            mode: selectedMode ?? undefined,
             limit: PERSON_TYPEAHEAD_LIMIT,
             signal: ac.signal,
           }),
@@ -283,21 +315,21 @@ export default function SchedulingPage() {
         const rows: PersonSearchRow[] = [];
 
         if (clientsOutcome.status === "fulfilled") {
-          for (const c of clientsOutcome.value) {
+          for (const c of clientsOutcome.value.items) {
             rows.push({
               kind: "client",
               id: c.id,
-              label: clientDisplayName(c),
+              label: c.name || "Unknown client",
             });
           }
         }
 
         if (employeesOutcome.status === "fulfilled") {
-          for (const e of employeesOutcome.value.employees) {
+          for (const e of employeesOutcome.value.items) {
             rows.push({
               kind: "dsp",
               id: e.id,
-              label: e.fullName?.trim() || `Unknown ${labels.noun}`,
+              label: e.name?.trim() || `Unknown ${labels.noun}`,
             });
           }
         }
@@ -305,7 +337,11 @@ export default function SchedulingPage() {
         const merged = rows.slice(0, PERSON_RESULTS_MERGED_MAX);
         setPersonSearchResults(merged);
         setPersonSearchSettledKey(q);
-        setPersonSearchTruncated(rows.length > PERSON_RESULTS_MERGED_MAX);
+        setPersonSearchTruncated(
+          rows.length > PERSON_RESULTS_MERGED_MAX ||
+          (clientsOutcome.status === "fulfilled" && clientsOutcome.value.truncated) ||
+          (employeesOutcome.status === "fulfilled" && employeesOutcome.value.truncated),
+        );
 
         if (
           clientsOutcome.status === "rejected" &&
@@ -334,7 +370,7 @@ export default function SchedulingPage() {
       window.clearTimeout(timer);
       ac.abort();
     };
-  }, [personSearchInput, user?.agencyId, personFilter, toast, selectedMode, labels.noun]);
+  }, [personSearchInput, personFilter, toast, selectedMode, labels.noun, data]);
 
   useEffect(() => {
     if (!personSearchOpen) return;
@@ -392,16 +428,18 @@ export default function SchedulingPage() {
             Shift Management
           </h1>
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate(Routes.agency.shiftMaintenance)}
-              className="flex items-center gap-2 rounded-full border-[rgba(255,255,255,0.5)] bg-[rgba(255,255,255,0.5)] px-4 py-3 h-auto text-[14px] font-semibold text-[#10141a] shadow-sm hover:bg-white/80"
-              aria-label="Open shift maintenance: review problem shifts and activity history"
-            >
-              <Wrench className="size-5 shrink-0" aria-hidden />
-              Maintenance
-            </Button>
+            {capabilities.shiftMaintenance ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate(routes.maintenance())}
+                className="flex items-center gap-2 rounded-full border-[rgba(255,255,255,0.5)] bg-[rgba(255,255,255,0.5)] px-4 py-3 h-auto text-[14px] font-semibold text-[#10141a] shadow-sm hover:bg-white/80"
+                aria-label="Open shift maintenance: review problem shifts and activity history"
+              >
+                <Wrench className="size-5 shrink-0" aria-hidden />
+                Maintenance
+              </Button>
+            ) : null}
             <Button
               onClick={() => {
                 setEditFormData(null);
@@ -433,7 +471,7 @@ export default function SchedulingPage() {
               </div>
 
               {/* Stats Section */}
-              <div className="flex gap-12 px-6 cursor-pointer" onClick={() => navigate(Routes.agency.shiftsList)}>
+              <div className="flex gap-12 px-6 cursor-pointer" onClick={() => navigate(routes.list())}>
                 {/* Active */}
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[40px] font-semibold leading-normal text-[#10141a]">
@@ -489,7 +527,7 @@ export default function SchedulingPage() {
 
               {/* Expand Button */}
               <button
-                onClick={() => navigate(Routes.agency.shiftsList)}
+                onClick={() => navigate(routes.list())}
                 className="ml-auto bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full w-[38px] h-[38px] flex items-center justify-center hover:bg-white/70 transition-colors cursor-pointer"
               >
                 <ArrowUpRight className="w-4 h-4 text-[#10141a]" />
@@ -848,16 +886,18 @@ export default function SchedulingPage() {
                             <Pencil className="size-4 shrink-0 text-[#808081]" aria-hidden />
                             Edit
                           </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#10141a] hover:bg-black/[0.06]"
-                            aria-label="Adjust clock times, notes, or mark shift completed"
-                            onClick={() => openShiftMaintenanceModal(shift)}
-                          >
-                            <Wrench className="size-4 shrink-0 text-[#808081]" aria-hidden />
-                            Maintenance
-                          </button>
+                          {capabilities.shiftMaintenance ? (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[14px] font-medium text-[#10141a] hover:bg-black/[0.06]"
+                              aria-label="Adjust clock times, notes, or mark shift completed"
+                              onClick={() => openShiftMaintenanceModal(shift)}
+                            >
+                              <Wrench className="size-4 shrink-0 text-[#808081]" aria-hidden />
+                              Maintenance
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             role="menuitem"
@@ -906,6 +946,11 @@ export default function SchedulingPage() {
       {/* Add Schedule Modal */}
       <AddScheduleModal
         isOpen={showAddScheduleModal}
+        agencyId={agencyId}
+        agencyName={agency.name}
+        agencyMode={selectedMode}
+        supportedClientTypes={agency.supportedClientTypes}
+        data={data}
         onClose={() => {
           setShowAddScheduleModal(false);
           setEditFormData(null);
@@ -915,18 +960,18 @@ export default function SchedulingPage() {
         editData={editFormData}
         mode={modalMode}
       />
-      <ShiftDetailsModal
+      {capabilities.shiftMaintenance ? <ShiftDetailsModal
         isOpen={showShiftDetails}
         shift={selectedShift}
         anomalyCodes={selectedShift ? detectShiftAnomalyCodes(selectedShift) : []}
         hydrateFromServer
-        agencyId={user?.agencyId ?? ""}
+        agencyId={agencyId}
         onClose={() => {
           setShowShiftDetails(false);
           setSelectedShift(null);
         }}
         onShiftUpdated={(_updated) => void loadShifts()}
-      />
+      /> : null}
       <DeleteConfirmationModal
         isOpen={!!shiftPendingDelete}
         onClose={() => {

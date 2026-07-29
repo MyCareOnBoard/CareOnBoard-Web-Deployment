@@ -11,6 +11,7 @@ export interface ShiftManagementHeaderProps {
   onMonthChange: (month: string) => void;
   onAgencySelectionChange: (selectedIds: string[]) => void;
   initialAgencies?: OperationalAgencySummary[];
+  requiresAgencyChoice?: boolean;
 }
 
 function dateForMonth(month: string): Date {
@@ -40,8 +41,9 @@ export default function ShiftManagementHeader({
   onMonthChange,
   onAgencySelectionChange,
   initialAgencies,
+  requiresAgencyChoice = false,
 }: ShiftManagementHeaderProps) {
-  const needsSingularAgency = view === "list" && selectedAgencyIds.length !== 1;
+  const needsSingularAgency = (view === "list" && selectedAgencyIds.length !== 1) || requiresAgencyChoice;
 
   return (
     <header className="rounded-2xl border border-[#dce3e3] bg-[#f9fbfb] px-4 py-4 sm:px-5" aria-labelledby="shift-management-title">
@@ -115,17 +117,15 @@ export default function ShiftManagementHeader({
           <button
             type="button"
             aria-label="List view"
-            aria-describedby="shift-list-unavailable"
             aria-pressed={view === "list"}
-            disabled
+            onClick={() => onViewChange("list")}
             className={`flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92] ${view === "list"
               ? "bg-white text-[#075b5d] shadow-[0_1px_2px_rgba(26,54,55,0.12)]"
-              : "text-[#5e696b] hover:bg-white/60"} disabled:cursor-not-allowed disabled:opacity-55`}
+              : "text-[#5e696b] hover:bg-white/60"}`}
           >
             <List aria-hidden="true" className="h-4 w-4" />
             List
           </button>
-          <span id="shift-list-unavailable" className="sr-only">List view is not available yet.</span>
         </div>
 
         {needsSingularAgency && (

@@ -908,6 +908,7 @@ export async function listAgencyClients(params?: ListClientsParams): Promise<Cli
     const response = await axiosClient.get<ListAgencyClientsResponse>('/clientManagement', {
       params: {
         agencyId: params?.agencyId,
+        type: params?.type,
         status: params?.status,
         service: params?.service,
         search: params?.search,

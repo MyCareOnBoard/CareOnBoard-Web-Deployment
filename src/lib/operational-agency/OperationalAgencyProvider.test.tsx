@@ -35,7 +35,7 @@ describe("OperationalAgencyProvider", () => {
           agencyId="agency-1"
           agency={agency}
           mode="ddd"
-          capabilities={{ canManageShifts: true, canManageBilling: false }}
+          capabilities={{ canManageShifts: true, canManageBilling: false, shiftMaintenance: true }}
           data={data}
         >
           {children}
@@ -48,7 +48,7 @@ describe("OperationalAgencyProvider", () => {
       agencyId: "agency-1",
       agency,
       mode: "ddd",
-      capabilities: { canManageShifts: true, canManageBilling: false },
+      capabilities: { canManageShifts: true, canManageBilling: false, shiftMaintenance: true },
     });
     expect(result.current.data).toBe(data);
     expect(result.current.routes.details("shift-9", "?tab=notes")).toBe(
@@ -64,7 +64,7 @@ describe("OperationalAgencyProvider", () => {
           agencyId="selected-agency"
           agency={{ ...agency, id: "selected-agency" }}
           mode="hha"
-          capabilities={{ canManageShifts: true, canManageBilling: true }}
+          capabilities={{ canManageShifts: true, canManageBilling: true, shiftMaintenance: false }}
           data={data}
         >
           {children}
@@ -91,6 +91,7 @@ describe("operational shift route builders", () => {
         list: "/agency/shifts/shifts",
         approvals: "/agency/shifts/approvals",
         activityLogs: "/agency/shifts/activity-logs",
+        maintenance: "/agency/shifts/maintenance",
         details: "/agency/shifts/shift%2F9",
       },
     },
@@ -102,6 +103,7 @@ describe("operational shift route builders", () => {
         list: "/super-admin/shifts/list",
         approvals: "/super-admin/shifts/approvals",
         activityLogs: "/super-admin/shifts/activity-logs",
+        maintenance: "/super-admin/shift-maintenance",
         details: "/super-admin/shifts/shift%2F9",
       },
     },
@@ -112,6 +114,7 @@ describe("operational shift route builders", () => {
     expect(routes.list(search)).toBe(`${expected.list}${search}`);
     expect(routes.approvals(search)).toBe(`${expected.approvals}${search}`);
     expect(routes.activityLogs(search)).toBe(`${expected.activityLogs}${search}`);
+    expect(routes.maintenance(search)).toBe(`${expected.maintenance}${search}`);
     expect(routes.details("shift/9", search)).toBe(`${expected.details}${search}`);
   });
 });

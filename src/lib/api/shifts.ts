@@ -270,6 +270,11 @@ export interface ListShiftsParams {
     clientType?: 'hha' | 'ddd';
 }
 
+export interface ShiftRequestOptions {
+    agencyId?: string;
+    signal?: AbortSignal;
+}
+
 export interface CalendarShiftsParams {
     agencyId: string;
     month: string;
@@ -584,12 +589,13 @@ export const createShift = async (data: CreateShiftRequest): Promise<ShiftRespon
  */
 export const getShiftById = async (
     shiftId: string,
-    options?: { agencyId?: string; client?: boolean; employee?: boolean; agency?: boolean },
+    options?: ShiftRequestOptions & { client?: boolean; employee?: boolean; agency?: boolean },
 ): Promise<ShiftResponse> => {
     try {
+        const { signal, ...params } = options ?? {};
         const response = await axiosClient.get<ShiftResponse>(
             `${SHIFT_BASE}/${shiftId}`,
-            { params: options },
+            { params, signal },
         );
 
         return response.data;
@@ -706,12 +712,17 @@ export const getShiftStats = async (
  */
 export const updateShift = async (
     shiftId: string,
-    data: UpdateShiftRequest
+    data: UpdateShiftRequest,
+    options?: ShiftRequestOptions,
 ): Promise<ShiftResponse> => {
     try {
         const response = await axiosClient.put<ShiftResponse>(
             `${SHIFT_BASE}/${shiftId}`,
-            data
+            data,
+            {
+                params: options?.agencyId ? { agencyId: options.agencyId } : undefined,
+                signal: options?.signal,
+            },
         );
 
         return response.data;
@@ -726,10 +737,17 @@ export const updateShift = async (
  * @param shiftId - The ID of the shift to delete
  * @returns Promise with deletion confirmation
  */
-export const deleteShift = async (shiftId: string): Promise<DeleteShiftResponse> => {
+export const deleteShift = async (
+    shiftId: string,
+    options?: ShiftRequestOptions,
+): Promise<DeleteShiftResponse> => {
     try {
         const response = await axiosClient.delete<DeleteShiftResponse>(
-            `${SHIFT_BASE}/${shiftId}`
+            `${SHIFT_BASE}/${shiftId}`,
+            {
+                params: options?.agencyId ? { agencyId: options.agencyId } : undefined,
+                signal: options?.signal,
+            },
         );
 
         return response.data;
@@ -1046,11 +1064,14 @@ export const fetchShiftAnomalies = async (params: FetchAnomaliesParams): Promise
     }
 };
 
-export const fetchShiftMaintenanceAudit = async (params: FetchAuditParams): Promise<FetchAuditResponse> => {
+export const fetchShiftMaintenanceAudit = async (
+    params: FetchAuditParams,
+    options?: { signal?: AbortSignal },
+): Promise<FetchAuditResponse> => {
     try {
         const response = await axiosClient.get<FetchAuditResponse>(
             `${SHIFT_BASE}/maintenance/audit`,
-            { params }
+            { params, signal: options?.signal }
         );
         return response.data;
     } catch (error) {

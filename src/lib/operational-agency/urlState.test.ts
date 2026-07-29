@@ -3,6 +3,7 @@ import {
   calendarSearchToListSearch,
   parseCalendarSearch,
   parseListSearch,
+  resolveOperationalReturnTo,
   serializeCalendarSearch,
 } from "./urlState";
 
@@ -43,5 +44,26 @@ describe("operational agency URL state", () => {
       month: "2026-07",
       view: "list",
     });
+  });
+
+  it("accepts only same-app absolute paths as operational return targets", () => {
+    const fallback = "/super-admin/shifts/list?agencyId=agency-b";
+
+    expect(resolveOperationalReturnTo(
+      `?returnTo=${encodeURIComponent("/super-admin/shifts?agencyIds=agency-b&view=calendar")}`,
+      fallback,
+    )).toBe("/super-admin/shifts?agencyIds=agency-b&view=calendar");
+    expect(resolveOperationalReturnTo(
+      `?returnTo=${encodeURIComponent("https://evil.example/steal")}`,
+      fallback,
+    )).toBe(fallback);
+    expect(resolveOperationalReturnTo(
+      `?returnTo=${encodeURIComponent("//evil.example/steal")}`,
+      fallback,
+    )).toBe(fallback);
+    expect(resolveOperationalReturnTo(
+      `?returnTo=${encodeURIComponent("/safe\\evil")}`,
+      fallback,
+    )).toBe(fallback);
   });
 });

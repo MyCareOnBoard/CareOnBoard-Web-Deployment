@@ -10,6 +10,7 @@ function createShiftRoutes(paths: {
   list: string;
   approvals: string;
   activityLogs: string;
+  maintenance: string;
   details: string;
 }): OperationalShiftRoutes {
   return {
@@ -17,6 +18,7 @@ function createShiftRoutes(paths: {
     list: (search) => withSearch(paths.list, search),
     approvals: (search) => withSearch(paths.approvals, search),
     activityLogs: (search) => withSearch(paths.activityLogs, search),
+    maintenance: (search) => withSearch(paths.maintenance, search),
     details: (shiftId, search) => withSearch(
       paths.details.replace(":shiftId", encodeURIComponent(shiftId)),
       search,
@@ -29,6 +31,7 @@ export const agencyShiftRoutes = createShiftRoutes({
   list: "/agency/shifts/shifts",
   approvals: "/agency/shifts/approvals",
   activityLogs: "/agency/shifts/activity-logs",
+  maintenance: "/agency/shifts/maintenance",
   details: "/agency/shifts/:shiftId",
 });
 
@@ -37,5 +40,6 @@ export const superAdminShiftRoutes = createShiftRoutes({
   list: "/super-admin/shifts/list",
   approvals: "/super-admin/shifts/approvals",
   activityLogs: "/super-admin/shifts/activity-logs",
+  maintenance: "/super-admin/shift-maintenance",
   details: "/super-admin/shifts/:shiftId",
 });

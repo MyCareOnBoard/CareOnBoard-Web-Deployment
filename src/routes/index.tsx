@@ -78,7 +78,9 @@ const BillingExpensesDashboardPage = lazy(() =>
 );
 const BillingIndexRedirect = lazy(() => import("@/pages/agency/billing/BillingIndexRedirect"));
 const ClientClaimsPage = lazy(() => import("@/pages/agency/billing-and-approvals/client-claims"));
-const SchedulingPage = lazy(() => import("@/pages/agency/scheduling"));
+const AgencySchedulingRoute = lazy(() =>
+    import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencySchedulingRoute }))
+);
 const SupportPage = lazy(() => import("@/pages/agency/support"));
 const AnalyticsPage = lazy(() => import("@/pages/agency/analytics"));
 const AnalyticsPrintPage = lazy(() => import("@/pages/agency/analytics/print"));
@@ -90,11 +92,19 @@ const ApplicantProfilePage = lazy(() => import("@/pages/agency/applicant-directo
 const ComplianceAlertsPage = lazy(() => import("@/pages/agency/compliance-alerts"));
 const ManualStaffOnboardingPage = lazy(() => import("@/pages/agency/dsp-management/ManualStaffOnboarding"));
 const ShiftsPage = lazy(() => import("@/pages/agency/shifts"));
-const ShiftsListPage = lazy(() => import("@/pages/agency/scheduling/shifts"));
-const ApprovalsPage = lazy(() => import("@/pages/agency/scheduling/approvals"));
-const ActivityLogsPage = lazy(() => import("@/pages/agency/scheduling/activity-logs"));
+const AgencyShiftsListRoute = lazy(() =>
+    import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencyShiftsListRoute }))
+);
+const AgencyShiftApprovalsRoute = lazy(() =>
+    import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencyShiftApprovalsRoute }))
+);
+const AgencyShiftActivityLogsRoute = lazy(() =>
+    import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencyShiftActivityLogsRoute }))
+);
 const AgencyShiftMaintenancePage = lazy(() => import("@/pages/agency/shift-maintenance"));
-const AgencyShiftDetailsPage = lazy(() => import("@/pages/agency/shift-details"));
+const AgencyShiftDetailsRoute = lazy(() =>
+    import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencyShiftDetailsRoute }))
+);
 const NotesPage = lazy(() => import("@/pages/userPanel/notes"));
 const AgencyNotesPage = lazy(() => import("@/pages/agency/notes"));
 const SuperAdminLayout = lazy(() => import("@/layouts/SuperAdminLayout"));
@@ -128,6 +138,14 @@ const AgencyTrainings = lazy(() => import("@/pages/agency/trainings"));
 const GlobalNotesQualityPage = lazy(() => import("@/pages/super-admin/global-notes-quality"));
 const SuperAdminShiftMaintenancePage = lazy(() => import("@/pages/super-admin/shift-maintenance"));
 const SuperAdminShiftManagementPage = lazy(() => import("@/pages/super-admin/shift-management"));
+const SuperAdminShiftListPage = lazy(() => import("@/pages/super-admin/shift-management/SuperAdminShiftList"));
+const SuperAdminShiftApprovalsPage = lazy(() =>
+    import("@/pages/super-admin/shift-management/SuperAdminShiftList").then((module) => ({ default: module.SuperAdminShiftApprovals }))
+);
+const SuperAdminShiftActivityLogsPage = lazy(() =>
+    import("@/pages/super-admin/shift-management/SuperAdminShiftList").then((module) => ({ default: module.SuperAdminShiftActivityLogs }))
+);
+const SuperAdminShiftDetailsPage = lazy(() => import("@/pages/super-admin/shift-management/SuperAdminShiftDetails"));
 const AgencyBillingMonitorPage = lazy(() => import("@/pages/super-admin/agency-billing-monitor"));
 const AIAutomationPage = lazy(() => import("@/pages/agency/ai-automation"));
 const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));
@@ -367,11 +385,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.scheduling,
-                Component: SchedulingPage,
+                Component: AgencySchedulingRoute,
             },
             {
                 path: Routes.agency.shiftsList,
-                Component: ShiftsListPage,
+                Component: AgencyShiftsListRoute,
             },
             {
                 path: Routes.agency.supportConversation,
@@ -383,11 +401,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.approvals,
-                Component: ApprovalsPage,
+                Component: AgencyShiftApprovalsRoute,
             },
             {
                 path: Routes.agency.activityLogs,
-                Component: ActivityLogsPage,
+                Component: AgencyShiftActivityLogsRoute,
             },
             {
                 path: Routes.agency.shiftMaintenance,
@@ -395,7 +413,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.shiftDetails,
-                Component: AgencyShiftDetailsPage,
+                Component: AgencyShiftDetailsRoute,
             },
             {
                 path: Routes.agency.analytics,
@@ -746,6 +764,22 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.shifts.index,
                 Component: SuperAdminShiftManagementPage,
+            },
+            {
+                path: Routes.superAdmin.shifts.list,
+                Component: SuperAdminShiftListPage,
+            },
+            {
+                path: Routes.superAdmin.shifts.approvals,
+                Component: SuperAdminShiftApprovalsPage,
+            },
+            {
+                path: Routes.superAdmin.shifts.activityLogs,
+                Component: SuperAdminShiftActivityLogsPage,
+            },
+            {
+                path: Routes.superAdmin.shifts.details,
+                Component: SuperAdminShiftDetailsPage,
             },
             {
                 path: Routes.superAdmin.reports.index,

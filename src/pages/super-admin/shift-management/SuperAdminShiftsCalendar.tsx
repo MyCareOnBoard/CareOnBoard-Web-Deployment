@@ -31,6 +31,7 @@ export interface SuperAdminShiftsCalendarProps {
   mode: "ddd" | "hha";
   onMonthChange: (month: string) => void;
   onSelectionChange: (selectedIds: string[]) => void;
+  onOpenShift?: (shift: NormalizedCalendarShift) => void;
 }
 
 function isAbort(error: unknown): boolean {
@@ -94,6 +95,7 @@ export default function SuperAdminShiftsCalendar({
   month,
   mode,
   onSelectionChange,
+  onOpenShift,
 }: SuperAdminShiftsCalendarProps) {
   const generationRef = useRef(0);
   const generationControllerRef = useRef<AbortController | null>(null);
@@ -253,7 +255,7 @@ export default function SuperAdminShiftsCalendar({
         ].filter(Boolean).join(", ")}
         renderEntry={(shift, options) => <ShiftSummary shift={shift} showBadge={options.showBadge} />}
         renderBadge={(shift) => <StatusBadge shift={shift} />}
-        interactionDisabledReason="Shift details are not available yet."
+        onOpenShift={onOpenShift}
         emptyMessage="No shifts found for these agencies."
         showEmptyState={loadingCount === 0 && errorCount === 0}
       />

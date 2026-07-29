@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { listOperationalAgencies } from "@/lib/api/super-admin-operations";
 import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
 import { Routes } from "@/routes/constants";
+import { superAdminShiftRoutes } from "@/lib/operational-agency/routes";
 import ShiftManagementHeader from "./ShiftManagementHeader";
 import SuperAdminShiftsCalendar from "./SuperAdminShiftsCalendar";
 import {
@@ -14,6 +15,9 @@ import {
   updateShiftWorkspaceSelection,
   type ShiftWorkspaceState,
 } from "./shiftWorkspaceState";
+import type { NormalizedCalendarShift } from "./calendarModel";
+
+const SuperAdminShiftList = lazy(() => import("./SuperAdminShiftList"));
 
 const AGENCY_PAGE_LIMIT = 50;
 
@@ -37,6 +41,7 @@ export default function ShiftManagementWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [scanLimit, setScanLimit] = useState<number | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
+  const [requiresAgencyChoice, setRequiresAgencyChoice] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -125,6 +130,7 @@ export default function ShiftManagementWorkspace() {
   };
 
   const changeSelection = (ids: string[]) => {
+    setRequiresAgencyChoice(false);
     const transition = updateShiftWorkspaceSelection(location.search, workspace, ids);
     navigateTo(transition.state, transition.search);
   };
@@ -136,7 +142,16 @@ export default function ShiftManagementWorkspace() {
 
   const changeView = (view: ShiftWorkspaceState["view"]) => {
     const transition = transitionShiftWorkspaceView(location.search, workspace, view);
+    setRequiresAgencyChoice(transition.requiresAgencyChoice);
     if (!transition.requiresAgencyChoice) navigateTo(transition.state, transition.search);
+  };
+
+  const openCalendarShift = (shift: NormalizedCalendarShift) => {
+    const params = new URLSearchParams({
+      agencyId: shift.agencyId,
+      returnTo: `${location.pathname}${location.search}`,
+    });
+    navigate(superAdminShiftRoutes.details(shift.id, params.toString()));
   };
 
   if (loading) {
@@ -170,6 +185,7 @@ export default function ShiftManagementWorkspace() {
         onMonthChange={changeMonth}
         onAgencySelectionChange={changeSelection}
         initialAgencies={agencies}
+        requiresAgencyChoice={requiresAgencyChoice}
       />
 
       {scanLimit ? (
@@ -185,7 +201,26 @@ export default function ShiftManagementWorkspace() {
           mode={mode}
           onMonthChange={changeMonth}
           onSelectionChange={changeSelection}
+          onOpenShift={openCalendarShift}
         />
+      ) : null}
+
+      {workspace.view === "list" ? (
+        workspace.agencyId && selectedAgencies.length === 1 ? (
+          <Suspense
+            fallback={(
+              <div className="flex min-h-64 items-center justify-center" aria-busy="true">
+                <Loader2 className="size-7 animate-spin text-[#008f92]" aria-label="Loading shift list" />
+              </div>
+            )}
+          >
+            <SuperAdminShiftList agency={selectedAgencies[0]} />
+          </Suspense>
+        ) : (
+          <p role="status" className="rounded-xl border border-[#d8e6e6] bg-white px-4 py-8 text-center text-sm font-medium text-[#556768]">
+            Choose exactly one agency to view its shift list.
+          </p>
+        )
       ) : null}
     </div>
   );
