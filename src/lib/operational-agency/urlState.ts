@@ -89,6 +89,19 @@ export function calendarSearchToListSearch(search: string, agencyId?: string): s
   return stringify(params);
 }
 
+const OPERATIONAL_RETURN_PATHS = new Set([
+  "/agency/shifts",
+  "/agency/shifts/list",
+  "/agency/shifts/approvals",
+  "/agency/shifts/activity-logs",
+  "/agency/shifts/maintenance",
+  "/super-admin/shifts",
+  "/super-admin/shifts/list",
+  "/super-admin/shifts/approvals",
+  "/super-admin/shifts/activity-logs",
+  "/super-admin/shifts/maintenance",
+]);
+
 function safeInternalReturnTo(value: string | null): string | null {
   if (!value) return null;
   const candidate = value.trim();
@@ -99,6 +112,8 @@ function safeInternalReturnTo(value: string | null): string | null {
   ) {
     return null;
   }
+  const pathname = candidate.split(/[?#]/, 1)[0];
+  if (!OPERATIONAL_RETURN_PATHS.has(pathname)) return null;
   return candidate;
 }
 

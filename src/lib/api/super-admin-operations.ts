@@ -8,6 +8,8 @@ import type {
   OperationalStaffOption,
 } from "@/lib/operational-agency/types";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import type { Client } from "@/lib/api/clients";
+import type { CreateActivityLogRequest, Employee } from "@/lib/api/employees";
 
 export type { OperationalFeature } from "@/lib/operational-agency/types";
 
@@ -32,6 +34,13 @@ export interface OperationalOptionInput {
   mode?: AgencyMode;
   limit?: number;
   signal?: AbortSignal;
+}
+
+export type OperationalStaffSchedulingContext = Pick<Employee, "id" | "workAvailability">;
+
+export interface OperationalActivityResult {
+  id: string;
+  status: string;
 }
 
 interface SuccessEnvelope<T> {
@@ -142,6 +151,69 @@ export async function getOperationalAgencyContext(
   const data = responseData<OperationalAgencySummary>(response.data);
   if (!data || Array.isArray(data) || typeof data.id !== "string") {
     throw new Error("Invalid operational agency response.");
+  }
+  return data;
+}
+
+export async function getOperationalClientSchedulingContext(
+  feature: OperationalFeature,
+  agencyId: string,
+  clientId: string,
+  signal?: AbortSignal,
+): Promise<Client> {
+  const response = await axiosClient.get<SuccessEnvelope<Client>>(
+    `/superAdminOperations/agencies/${requiredAgencyId(agencyId)}/clients/${encodeURIComponent(clientId)}/scheduling-context`,
+    { params: { feature }, signal },
+  );
+  const data = responseData<Client>(response.data);
+  if (!data || Array.isArray(data) || typeof data.id !== "string") {
+    throw new Error("Invalid operational client response.");
+  }
+  return data;
+}
+
+export async function getOperationalStaffSchedulingContext(
+  feature: OperationalFeature,
+  agencyId: string,
+  staffId: string,
+  signal?: AbortSignal,
+): Promise<OperationalStaffSchedulingContext> {
+  const response = await axiosClient.get<SuccessEnvelope<OperationalStaffSchedulingContext>>(
+    `/superAdminOperations/agencies/${requiredAgencyId(agencyId)}/staff/${encodeURIComponent(staffId)}/scheduling-context`,
+    { params: { feature }, signal },
+  );
+  const data = responseData<OperationalStaffSchedulingContext>(response.data);
+  if (
+    !data ||
+    Array.isArray(data) ||
+    typeof data.id !== "string" ||
+    typeof data.workAvailability !== "boolean"
+  ) {
+    throw new Error("Invalid operational staff response.");
+  }
+  return data;
+}
+
+export async function createOperationalStaffActivity(
+  feature: OperationalFeature,
+  agencyId: string,
+  staffId: string,
+  payload: CreateActivityLogRequest,
+  signal?: AbortSignal,
+): Promise<OperationalActivityResult> {
+  const response = await axiosClient.post<SuccessEnvelope<OperationalActivityResult>>(
+    `/superAdminOperations/agencies/${requiredAgencyId(agencyId)}/staff/${encodeURIComponent(staffId)}/activities`,
+    payload,
+    { params: { feature }, signal },
+  );
+  const data = responseData<OperationalActivityResult>(response.data);
+  if (
+    !data ||
+    Array.isArray(data) ||
+    typeof data.id !== "string" ||
+    typeof data.status !== "string"
+  ) {
+    throw new Error("Invalid operational activity response.");
   }
   return data;
 }

@@ -138,6 +138,9 @@ const AgencyTrainings = lazy(() => import("@/pages/agency/trainings"));
 const GlobalNotesQualityPage = lazy(() => import("@/pages/super-admin/global-notes-quality"));
 const SuperAdminShiftMaintenancePage = lazy(() => import("@/pages/super-admin/shift-maintenance"));
 const SuperAdminShiftManagementPage = lazy(() => import("@/pages/super-admin/shift-management"));
+const SuperAdminShiftWorkspaceIndexPage = lazy(() =>
+    import("@/pages/super-admin/shift-management").then((module) => ({ default: module.SuperAdminShiftWorkspaceIndex }))
+);
 const SuperAdminShiftListPage = lazy(() => import("@/pages/super-admin/shift-management/SuperAdminShiftList"));
 const SuperAdminShiftApprovalsPage = lazy(() =>
     import("@/pages/super-admin/shift-management/SuperAdminShiftList").then((module) => ({ default: module.SuperAdminShiftApprovals }))
@@ -764,22 +767,28 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.shifts.index,
                 Component: SuperAdminShiftManagementPage,
-            },
-            {
-                path: Routes.superAdmin.shifts.list,
-                Component: SuperAdminShiftListPage,
-            },
-            {
-                path: Routes.superAdmin.shifts.approvals,
-                Component: SuperAdminShiftApprovalsPage,
-            },
-            {
-                path: Routes.superAdmin.shifts.activityLogs,
-                Component: SuperAdminShiftActivityLogsPage,
-            },
-            {
-                path: Routes.superAdmin.shifts.details,
-                Component: SuperAdminShiftDetailsPage,
+                children: [
+                    {
+                        index: true,
+                        Component: SuperAdminShiftWorkspaceIndexPage,
+                    },
+                    {
+                        path: "list",
+                        Component: SuperAdminShiftListPage,
+                    },
+                    {
+                        path: "approvals",
+                        Component: SuperAdminShiftApprovalsPage,
+                    },
+                    {
+                        path: "activity-logs",
+                        Component: SuperAdminShiftActivityLogsPage,
+                    },
+                    {
+                        path: ":shiftId",
+                        Component: SuperAdminShiftDetailsPage,
+                    },
+                ],
             },
             {
                 path: Routes.superAdmin.reports.index,

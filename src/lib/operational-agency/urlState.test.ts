@@ -46,7 +46,7 @@ describe("operational agency URL state", () => {
     });
   });
 
-  it("accepts only same-app absolute paths as operational return targets", () => {
+  it("accepts only exact operational workspace paths as return targets", () => {
     const fallback = "/super-admin/shifts/list?agencyId=agency-b";
 
     expect(resolveOperationalReturnTo(
@@ -63,6 +63,18 @@ describe("operational agency URL state", () => {
     )).toBe(fallback);
     expect(resolveOperationalReturnTo(
       `?returnTo=${encodeURIComponent("/safe\\evil")}`,
+      fallback,
+    )).toBe(fallback);
+    expect(resolveOperationalReturnTo(
+      `?returnTo=${encodeURIComponent("/safe")}`,
+      fallback,
+    )).toBe(fallback);
+    expect(resolveOperationalReturnTo(
+      `?returnTo=${encodeURIComponent("/super-admin/shifts/shift-9")}`,
+      fallback,
+    )).toBe(fallback);
+    expect(resolveOperationalReturnTo(
+      `?returnTo=${encodeURIComponent("/super-admin/users")}`,
       fallback,
     )).toBe(fallback);
   });

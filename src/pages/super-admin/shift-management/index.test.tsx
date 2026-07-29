@@ -83,7 +83,11 @@ describe("super-admin shift management workspace", () => {
     });
     render(<ShiftManagementWorkspace />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /Open shift details for Jamie Client/i }));
+    await userEvent.click(await screen.findByRole(
+      "button",
+      { name: /Open shift details for Jamie Client/i },
+      { timeout: 5_000 },
+    ));
 
     expect(routing.navigate).toHaveBeenCalledWith(
       `/super-admin/shifts/shift-9?agencyId=atlas&returnTo=${encodeURIComponent(

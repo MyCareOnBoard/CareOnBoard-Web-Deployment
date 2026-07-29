@@ -540,6 +540,7 @@ export default function ActivityLogsPage() {
         isOpen={showShiftDetails}
         shift={selectedShift}
         agencyId={agencyId}
+        agencyName={agency.name}
         onClose={() => {
           setShowShiftDetails(false);
           setSelectedShift(null);

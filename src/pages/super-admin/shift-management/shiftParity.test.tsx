@@ -87,12 +87,15 @@ beforeAll(async () => {
     typeof import("@/components/ShiftDetailsModal")
   >("@/components/ShiftDetailsModal");
   RealShiftDetailsModal = shiftDetailsModule.default;
-});
+}, 30_000);
 
 const data: OperationalAgencyDataAdapter = {
-  searchClients: async () => ({ items: [], truncated: false, scanLimit: null }),
-  searchStaff: async () => ({ items: [], truncated: false, scanLimit: null }),
-  listServices: async () => ({ items: [], truncated: false, scanLimit: null }),
+  searchClients: vi.fn(),
+  searchStaff: vi.fn(),
+  listServices: vi.fn(),
+  getClientSchedulingContext: vi.fn(),
+  getStaffSchedulingContext: vi.fn(),
+  createStaffActivity: vi.fn(),
 };
 
 const agency = (id: string, name: string): OperationalAgencySummary => ({
@@ -210,6 +213,15 @@ describe("shared operational shift pages", () => {
   beforeEach(() => {
     toast.mockReset();
     modalCapture.addScheduleProps = null;
+    vi.mocked(data.searchClients).mockReset();
+    vi.mocked(data.searchClients).mockResolvedValue({ items: [], truncated: false, scanLimit: null });
+    vi.mocked(data.searchStaff).mockReset();
+    vi.mocked(data.searchStaff).mockResolvedValue({ items: [], truncated: false, scanLimit: null });
+    vi.mocked(data.listServices).mockReset();
+    vi.mocked(data.listServices).mockResolvedValue({ items: [], truncated: false, scanLimit: null });
+    vi.mocked(data.getClientSchedulingContext).mockReset();
+    vi.mocked(data.getStaffSchedulingContext).mockReset();
+    vi.mocked(data.createStaffActivity).mockReset();
     api.listShifts.mockReset();
     api.listShifts.mockResolvedValue({ success: true, shifts: [] });
     api.getShiftById.mockReset();
@@ -445,7 +457,41 @@ describe("shared operational shift pages", () => {
       expect.objectContaining({ agencyId: "agency-b", client: true, employee: true }),
     );
     expect(api.fetchShiftMaintenanceAudit).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Schedule" })).toBeVisible();
+    expect(screen.getByText("09:00:AM")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Update shift" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit clock times" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete shift" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Activity on this shift" })).not.toBeInTheDocument();
+  }, 15_000);
+
+  it("stops detail audit pagination when the server repeats its cursor", async () => {
+    auth.user = { uid: "agency-user", userType: "agency", agencyId: "agency-a" };
+    const audit = (id: string) => ({
+      id,
+      action: "updated",
+      timestamp: "2026-07-28T12:00:00.000Z",
+      actorName: "Agency Admin",
+      actorUid: "agency-user",
+      actorUserType: "agency",
+      changes: {},
+    });
+    api.fetchShiftMaintenanceAudit
+      .mockResolvedValueOnce({ audits: [audit("audit-1")], nextCursor: "repeat", hasNextPage: true })
+      .mockResolvedValueOnce({ audits: [audit("audit-2")], nextCursor: "repeat", hasNextPage: true });
+
+    renderDetails("agency", agency("agency-a", "Atlas Care"), "/agency/shifts/shift-1", true);
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+
+    await waitFor(() => expect(api.fetchShiftMaintenanceAudit).toHaveBeenCalledTimes(2));
+    expect(api.fetchShiftMaintenanceAudit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ agencyId: "agency-a", shiftId: "shift-1", startAfter: "repeat" }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Couldn't load more activity",
+    }));
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
   });
 
   it("ignores a completed detail deletion after the operational agency changes", async () => {
@@ -454,7 +500,11 @@ describe("shared operational shift pages", () => {
     api.getShiftById
       .mockResolvedValueOnce({ success: true, shift: shift("shared-shift", "agency-a", "Atlas") })
       .mockResolvedValueOnce({ success: true, shift: shift("shared-shift", "agency-b", "Beacon") });
-    auth.user = { uid: "super-user", userType: "super_admin", profile: { accessList: ["Shift Management"] } };
+    auth.user = {
+      uid: "super-user",
+      userType: "super_admin",
+      profile: { accessList: ["Shift Management", "Shift Maintenance"] },
+    };
 
     const view = render(
       <MemoryRouter initialEntries={["/super-admin/shifts/shared-shift?agencyId=agency-a"]}>
@@ -468,7 +518,7 @@ describe("shared operational shift pages", () => {
                 agencyId="agency-a"
                 agency={agency("agency-a", "Atlas Care")}
                 mode="ddd"
-                capabilities={{ canManageShifts: true, canManageBilling: false, shiftMaintenance: false } as never}
+                capabilities={{ canManageShifts: true, canManageBilling: false, shiftMaintenance: true } as never}
                 data={data}
               >
                 <AgencyShiftDetailsPage />
@@ -507,7 +557,7 @@ describe("shared operational shift pages", () => {
                 agencyId="agency-b"
                 agency={agency("agency-b", "Beacon Supports")}
                 mode="ddd"
-                capabilities={{ canManageShifts: true, canManageBilling: false, shiftMaintenance: false } as never}
+                capabilities={{ canManageShifts: true, canManageBilling: false, shiftMaintenance: true } as never}
                 data={data}
               >
                 <AgencyShiftDetailsPage />
@@ -571,8 +621,11 @@ describe("shared operational shift pages", () => {
         onClose={vi.fn()}
         shift={shift("shift-1", "agency-b", "Jamie") as never}
         agencyId="agency-b"
+        agencyName="Beacon Supports"
       />,
     );
+
+    expect(screen.getByText("Maintenance changes for Beacon Supports")).toBeVisible();
 
     await userEvent.click(screen.getByRole("switch", { name: "Mark shift as completed" }));
     await userEvent.type(screen.getByLabelText("Note for activity history (required)"), "Verified clock record");
@@ -621,7 +674,7 @@ describe("shared operational shift pages", () => {
     await userEvent.click(screen.getByRole("button", { name: "Approve" }));
     const approvalDialog = screen.getByRole("dialog", { name: "Approve shift?" });
     expect(approvalDialog).toHaveAccessibleDescription(
-      "Are you sure you want to approve this manual shift for Jamie Client? This will convert it to an automatic shift.",
+      "Are you sure you want to approve this manual shift for Jamie Client at Beacon Supports? This will convert it to an automatic shift.",
     );
     await userEvent.click(screen.getByRole("button", { name: "Approve Shift" }));
     await waitFor(() => expect(api.updateShift).toHaveBeenCalledWith(
@@ -659,7 +712,7 @@ describe("shared operational shift pages", () => {
     );
   });
 
-  it("ignores a completed list approval after the operational agency scope unmounts", async () => {
+  it("resets pending list actions when the operational agency changes in place", async () => {
     const approval = deferred<{ success: true; shift: ReturnType<typeof shift> }>();
     api.updateShift.mockReturnValueOnce(approval.promise);
     api.listShifts
@@ -669,14 +722,13 @@ describe("shared operational shift pages", () => {
       })
       .mockResolvedValueOnce({
         success: true,
-        shifts: [{ ...shift("beacon-shift", "agency-b", "Beacon"), type: "automatic" }],
+        shifts: [{ ...shift("beacon-shift", "agency-b", "Beacon"), type: "manual" }],
       });
     auth.user = { uid: "super-user", userType: "super_admin", profile: { accessList: ["Shift Management"] } };
 
     const view = render(
       <MemoryRouter initialEntries={["/super-admin/shifts/list?agencyId=agency-a"]}>
         <OperationalAgencyProvider
-          key="agency-a"
           actor="super_admin"
           agencyId="agency-a"
           agency={agency("agency-a", "Atlas Care")}
@@ -701,7 +753,6 @@ describe("shared operational shift pages", () => {
     view.rerender(
       <MemoryRouter initialEntries={["/super-admin/shifts/list?agencyId=agency-b"]}>
         <OperationalAgencyProvider
-          key="agency-b"
           actor="super_admin"
           agencyId="agency-b"
           agency={agency("agency-b", "Beacon Supports")}
@@ -714,6 +765,8 @@ describe("shared operational shift pages", () => {
       </MemoryRouter>,
     );
     expect((await screen.findAllByText("Beacon Client")).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    expect(screen.getByRole("button", { name: "Approve Shift" })).toBeEnabled();
 
     await act(async () => {
       approval.resolve({

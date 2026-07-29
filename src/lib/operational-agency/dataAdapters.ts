@@ -1,8 +1,15 @@
-import { listClients } from "@/lib/api/clients";
-import { listEmployees } from "@/lib/api/employees";
+import { getClientById, listClients } from "@/lib/api/clients";
+import {
+  createEmployeeActivityLog,
+  getEmployeeById,
+  listEmployees,
+} from "@/lib/api/employees";
 import { listServices } from "@/lib/api/services";
 import {
   listOperationalServices,
+  createOperationalStaffActivity,
+  getOperationalClientSchedulingContext,
+  getOperationalStaffSchedulingContext,
   searchOperationalClients,
   searchOperationalStaff,
 } from "@/lib/api/super-admin-operations";
@@ -67,6 +74,16 @@ export function createAgencyOperationalDataAdapter(agencyId: string): Operationa
         scanLimit: null,
       };
     },
+    getClientSchedulingContext: (clientId, options = {}) =>
+      getClientById(clientId, agencyId, options),
+    getStaffSchedulingContext: (staffId, options = {}) =>
+      getEmployeeById(staffId, agencyId, options),
+    createStaffActivity: (staffId, payload, options = {}) =>
+      createEmployeeActivityLog({
+        ...payload,
+        employeeId: staffId,
+        agencyId,
+      }, options),
   };
 }
 
@@ -78,5 +95,15 @@ export function createSuperAdminOperationalDataAdapter(
     searchClients: (input = {}) => searchOperationalClients(feature, { agencyId, ...input }),
     searchStaff: (input = {}) => searchOperationalStaff(feature, { agencyId, ...input }),
     listServices: (input = {}) => listOperationalServices(feature, { agencyId, ...input }),
+    getClientSchedulingContext: (clientId, options = {}) =>
+      getOperationalClientSchedulingContext(feature, agencyId, clientId, options.signal),
+    getStaffSchedulingContext: (staffId, options = {}) =>
+      getOperationalStaffSchedulingContext(feature, agencyId, staffId, options.signal),
+    createStaffActivity: (staffId, payload, options = {}) =>
+      createOperationalStaffActivity(feature, agencyId, staffId, {
+        ...payload,
+        employeeId: staffId,
+        agencyId,
+      }, options.signal),
   };
 }

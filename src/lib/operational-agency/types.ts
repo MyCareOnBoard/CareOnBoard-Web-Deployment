@@ -1,4 +1,9 @@
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import type { Client } from "@/lib/api/clients";
+import type {
+  CreateActivityLogRequest,
+  Employee,
+} from "@/lib/api/employees";
 
 export type OperationalActor = "agency" | "super_admin";
 export type OperationalFeature = "shift-management" | "billing-management";
@@ -42,10 +47,26 @@ export interface OperationalLookupInput {
   signal?: AbortSignal;
 }
 
+export interface OperationalRequestOptions {
+  signal?: AbortSignal;
+}
+
+export type OperationalStaffSchedulingContext = Pick<Employee, "id" | "workAvailability">;
+
 export interface OperationalAgencyDataAdapter {
   searchClients(input?: OperationalLookupInput): Promise<OperationalOptionPage<OperationalClientOption>>;
   searchStaff(input?: OperationalLookupInput): Promise<OperationalOptionPage<OperationalStaffOption>>;
   listServices(input?: OperationalLookupInput): Promise<OperationalOptionPage<OperationalServiceOption>>;
+  getClientSchedulingContext(clientId: string, options?: OperationalRequestOptions): Promise<Client>;
+  getStaffSchedulingContext(
+    staffId: string,
+    options?: OperationalRequestOptions,
+  ): Promise<OperationalStaffSchedulingContext>;
+  createStaffActivity(
+    staffId: string,
+    payload: CreateActivityLogRequest,
+    options?: OperationalRequestOptions,
+  ): Promise<unknown>;
 }
 
 export interface OperationalCapabilities {

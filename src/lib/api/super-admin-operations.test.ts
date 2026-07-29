@@ -1,13 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const axiosGet = vi.hoisted(() => vi.fn());
+const { axiosGet, axiosPost } = vi.hoisted(() => ({
+  axiosGet: vi.fn(),
+  axiosPost: vi.fn(),
+}));
 
 vi.mock("@/lib/axios", () => ({
-  default: { get: axiosGet },
+  default: { get: axiosGet, post: axiosPost },
 }));
 
 import {
+  createOperationalStaffActivity,
+  getOperationalClientSchedulingContext,
   getOperationalAgencyContext,
+  getOperationalStaffSchedulingContext,
   listOperationalAgencies,
   listOperationalServices,
   searchOperationalClients,
@@ -17,6 +23,64 @@ import {
 describe("super-admin operational options API", () => {
   beforeEach(() => {
     axiosGet.mockReset();
+    axiosPost.mockReset();
+  });
+
+  it("uses explicit Shift Management scheduling-context and staff-activity operations", async () => {
+    const signal = new AbortController().signal;
+    const client = { id: "client-1", firstName: "Ada", services: [] };
+    const staff = { id: "staff-1", workAvailability: true };
+    const activity = { id: "activity-1", status: "active" };
+    axiosGet
+      .mockResolvedValueOnce({ data: { success: true, data: client } })
+      .mockResolvedValueOnce({ data: { success: true, data: staff } });
+    axiosPost.mockResolvedValueOnce({ data: { success: true, data: activity } });
+
+    await expect(getOperationalClientSchedulingContext(
+      "shift-management",
+      "agency-1",
+      "client-1",
+      signal,
+    )).resolves.toEqual(client);
+    await expect(getOperationalStaffSchedulingContext(
+      "shift-management",
+      "agency-1",
+      "staff-1",
+      signal,
+    )).resolves.toEqual(staff);
+    await expect(createOperationalStaffActivity(
+      "shift-management",
+      "agency-1",
+      "staff-1",
+      {
+        activityType: "Service Log",
+        shiftId: "shift-1",
+        employeeId: "staff-1",
+        agencyId: "agency-1",
+      },
+      signal,
+    )).resolves.toEqual(activity);
+
+    expect(axiosGet).toHaveBeenNthCalledWith(
+      1,
+      "/superAdminOperations/agencies/agency-1/clients/client-1/scheduling-context",
+      { params: { feature: "shift-management" }, signal },
+    );
+    expect(axiosGet).toHaveBeenNthCalledWith(
+      2,
+      "/superAdminOperations/agencies/agency-1/staff/staff-1/scheduling-context",
+      { params: { feature: "shift-management" }, signal },
+    );
+    expect(axiosPost).toHaveBeenCalledWith(
+      "/superAdminOperations/agencies/agency-1/staff/staff-1/activities",
+      {
+        activityType: "Service Log",
+        shiftId: "shift-1",
+        employeeId: "staff-1",
+        agencyId: "agency-1",
+      },
+      { params: { feature: "shift-management" }, signal },
+    );
   });
 
   it("lists agencies with the exact feature and repeated ids serialization", async () => {

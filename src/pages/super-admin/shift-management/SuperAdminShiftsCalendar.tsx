@@ -256,6 +256,7 @@ export default function SuperAdminShiftsCalendar({
         renderEntry={(shift, options) => <ShiftSummary shift={shift} showBadge={options.showBadge} />}
         renderBadge={(shift) => <StatusBadge shift={shift} />}
         onOpenShift={onOpenShift}
+        interactionDisabledReason="Shift details are not available yet."
         emptyMessage="No shifts found for these agencies."
         showEmptyState={loadingCount === 0 && errorCount === 0}
       />

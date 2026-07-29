@@ -567,11 +567,18 @@ export const categorizeShifts = (shifts: Shift[]): CategorizedShifts => {
  * @param data - The shift data to create
  * @returns Promise with shift response
  */
-export const createShift = async (data: CreateShiftRequest): Promise<ShiftResponse> => {
+export const createShift = async (
+    data: CreateShiftRequest,
+    options?: ShiftRequestOptions,
+): Promise<ShiftResponse> => {
     try {
         const response = await axiosClient.post<ShiftResponse>(
             `${SHIFT_BASE}`,
-            data
+            data,
+            {
+                params: options?.agencyId ? { agencyId: options.agencyId } : undefined,
+                signal: options?.signal,
+            },
         );
 
         return response.data;

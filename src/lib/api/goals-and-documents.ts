@@ -206,11 +206,15 @@ export interface SubmitGoalDocumentResponse {
  * @param data - The document data to create
  * @returns Promise with document response
  */
-export const createGoalDocument = async (data: CreateGoalDocumentRequest): Promise<GoalDocumentResponse> => {
+export const createGoalDocument = async (
+    data: CreateGoalDocumentRequest,
+    options: { signal?: AbortSignal } = {},
+): Promise<GoalDocumentResponse> => {
     try {
         const response = await axiosClient.post<GoalDocumentResponse>(
             `${GOALS_DOCS_BASE}`,
-            data
+            data,
+            { signal: options.signal },
         );
 
         return response.data;

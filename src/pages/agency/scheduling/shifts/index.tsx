@@ -100,12 +100,14 @@ export default function ShiftsListPage() {
     setShowAddScheduleModal(false);
     setShowCancelModal(false);
     setShiftToCancel(null);
+    setIsCancelling(false);
     setShowCancelledModal(false);
     setCancelledShiftInfo(null);
     setEditFormData(null);
     setModalMode("create");
     setShowApproveModal(false);
     setShiftToApprove(null);
+    setIsApproving(false);
     return () => {
       operationScopeRef.current += 1;
     };
@@ -629,7 +631,7 @@ export default function ShiftsListPage() {
           description={shiftToCancel ? `Are you sure you want to cancel this shift for ${shiftToCancel.client
             ? `${shiftToCancel.client.firstName || ""} ${shiftToCancel.client.lastName || ""}`.trim() || "Unknown Client"
             : "Unknown Client"
-            }? This action cannot be undone.` : ""}
+            } at ${agency.name}? This action cannot be undone.` : ""}
           confirmText="Cancel Shift"
           cancelText="Keep Shift"
           onConfirm={() => shiftToCancel && confirmCancelShift(shiftToCancel.id)}
@@ -677,7 +679,7 @@ export default function ShiftsListPage() {
           description={shiftToApprove ? `Are you sure you want to approve this manual shift for ${shiftToApprove.client
             ? `${shiftToApprove.client.firstName || ""} ${shiftToApprove.client.lastName || ""}`.trim() || "Unknown Client"
             : "Unknown Client"
-            }? This will convert it to an automatic shift.` : ""}
+            } at ${agency.name}? This will convert it to an automatic shift.` : ""}
           confirmText="Approve Shift"
           cancelText="Cancel"
           onConfirm={() => shiftToApprove && confirmApproveShift(shiftToApprove.id)}

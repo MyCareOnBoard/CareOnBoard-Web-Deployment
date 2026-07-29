@@ -18,6 +18,9 @@ const data = {
   searchClients: async () => ({ items: [], truncated: false, scanLimit: null }),
   searchStaff: async () => ({ items: [], truncated: false, scanLimit: null }),
   listServices: async () => ({ items: [], truncated: false, scanLimit: null }),
+  getClientSchedulingContext: async () => ({ id: "client-1" }),
+  getStaffSchedulingContext: async () => ({ id: "staff-1", workAvailability: false }),
+  createStaffActivity: async () => ({}),
 };
 
 describe("OperationalAgencyProvider", () => {

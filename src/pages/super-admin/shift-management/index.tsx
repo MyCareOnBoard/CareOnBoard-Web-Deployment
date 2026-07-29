@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { listOperationalAgencies } from "@/lib/api/super-admin-operations";
 import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
@@ -16,8 +16,6 @@ import {
   type ShiftWorkspaceState,
 } from "./shiftWorkspaceState";
 import type { NormalizedCalendarShift } from "./calendarModel";
-
-const SuperAdminShiftList = lazy(() => import("./SuperAdminShiftList"));
 
 const AGENCY_PAGE_LIMIT = 50;
 
@@ -110,7 +108,15 @@ export default function ShiftManagementWorkspace() {
     };
   }, [retryVersion]);
 
-  const workspace = resolveInitialShiftWorkspace(location.search, agencies);
+  const isCalendarRoute = location.pathname === Routes.superAdmin.shifts.index;
+  const workspaceSearch = isCalendarRoute
+    ? location.search
+    : (() => {
+      const params = new URLSearchParams(location.search);
+      params.set("view", "list");
+      return `?${params.toString()}`;
+    })();
+  const workspace = resolveInitialShiftWorkspace(workspaceSearch, agencies);
   const selectedIds = workspace.view === "calendar"
     ? workspace.agencyIds
     : workspace.agencyId ? [workspace.agencyId] : [];
@@ -154,6 +160,29 @@ export default function ShiftManagementWorkspace() {
     navigate(superAdminShiftRoutes.details(shift.id, params.toString()));
   };
 
+  const singularSearch = () => {
+    const params = new URLSearchParams(location.search);
+    params.delete("agencyIds");
+    if (selectedIds.length === 1) params.set("agencyId", selectedIds[0]);
+    else params.delete("agencyId");
+    params.set("month", workspace.month);
+    params.set("view", "list");
+    return `?${params.toString()}`;
+  };
+
+  const openSection = (pathname: string) => {
+    if (pathname !== Routes.superAdmin.shifts.index && selectedIds.length !== 1) {
+      setRequiresAgencyChoice(true);
+      return;
+    }
+    if (pathname === Routes.superAdmin.shifts.index) {
+      const transition = transitionShiftWorkspaceView(location.search, workspace, "calendar");
+      navigate({ pathname, search: transition.search });
+      return;
+    }
+    navigate({ pathname, search: singularSearch() });
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[24rem] items-center justify-center" aria-busy="true" aria-live="polite">
@@ -188,13 +217,52 @@ export default function ShiftManagementWorkspace() {
         requiresAgencyChoice={requiresAgencyChoice}
       />
 
+      <nav
+        aria-label="Shift workspace sections"
+        className="flex flex-wrap gap-2 rounded-xl border border-[#dce3e3] bg-white/70 p-2"
+      >
+        {[
+          ["Calendar", Routes.superAdmin.shifts.index],
+          ["Shift list", Routes.superAdmin.shifts.list],
+          ["Approvals", Routes.superAdmin.shifts.approvals],
+          ["Activity logs", Routes.superAdmin.shifts.activityLogs],
+        ].map(([label, pathname]) => {
+          const active = location.pathname === pathname;
+          const disabled = pathname !== Routes.superAdmin.shifts.index && selectedIds.length !== 1;
+          return (
+            <button
+              key={pathname}
+              type="button"
+              aria-current={active ? "page" : undefined}
+              disabled={disabled}
+              onClick={() => openSection(pathname)}
+              className={`min-h-11 rounded-lg px-4 text-sm font-semibold transition-colors ${active
+                ? "bg-[#075b5d] text-white"
+                : "text-[#4d5a5c] hover:bg-[#edf5f5] disabled:cursor-not-allowed disabled:opacity-50"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </nav>
+
       {scanLimit ? (
         <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
           Agency discovery was limited to {scanLimit} records. Your selected agencies were checked directly.
         </p>
       ) : null}
 
-      {workspace.view === "calendar" ? (
+      {selectedAgencies.length === 1 ? (
+        <div
+          role="status"
+          aria-label="Selected operational agency"
+          className="rounded-xl border border-[#b9dfe0] bg-[#eefafa] px-4 py-3 text-sm text-[#234f50]"
+        >
+          Operating in <strong>{selectedAgencies[0].name}</strong>
+        </div>
+      ) : null}
+
+      {isCalendarRoute && workspace.view === "calendar" ? (
         <SuperAdminShiftsCalendar
           agencies={selectedAgencies}
           month={workspace.month}
@@ -205,23 +273,11 @@ export default function ShiftManagementWorkspace() {
         />
       ) : null}
 
-      {workspace.view === "list" ? (
-        workspace.agencyId && selectedAgencies.length === 1 ? (
-          <Suspense
-            fallback={(
-              <div className="flex min-h-64 items-center justify-center" aria-busy="true">
-                <Loader2 className="size-7 animate-spin text-[#008f92]" aria-label="Loading shift list" />
-              </div>
-            )}
-          >
-            <SuperAdminShiftList agency={selectedAgencies[0]} />
-          </Suspense>
-        ) : (
-          <p role="status" className="rounded-xl border border-[#d8e6e6] bg-white px-4 py-8 text-center text-sm font-medium text-[#556768]">
-            Choose exactly one agency to view its shift list.
-          </p>
-        )
-      ) : null}
+      {!isCalendarRoute ? <Outlet /> : null}
     </div>
   );
+}
+
+export function SuperAdminShiftWorkspaceIndex() {
+  return null;
 }

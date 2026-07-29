@@ -33,6 +33,7 @@ type ShiftDetailsModalProps = {
   /** When true, load full shift (client/employee) via `getShiftById` using `agencyId`. */
   hydrateFromServer?: boolean;
   agencyId?: string;
+  agencyName?: string;
   onShiftUpdated?: (shift: Shift) => void;
   /** e.g. shift maintenance: refresh list after a successful save. */
   onMaintenanceComplete?: () => void;
@@ -176,6 +177,7 @@ export default function ShiftDetailsModal({
   anomalyCodes = [],
   hydrateFromServer = false,
   agencyId,
+  agencyName,
   onShiftUpdated,
   onMaintenanceComplete,
 }: ShiftDetailsModalProps) {
@@ -435,6 +437,11 @@ export default function ShiftDetailsModal({
           <p className="text-[14px] leading-[1.4] font-medium text-[#808081]">
             {resolvedShift ? getShiftDateLabel(resolvedShift) : getShiftDateLabel(shift)}
           </p>
+          {agencyName?.trim() ? (
+            <p className="mt-2 rounded-lg border border-[#00b4b8]/30 bg-[#00b4b8]/10 px-3 py-2 text-[13px] font-semibold text-[#006f72]">
+              Maintenance changes for {agencyName.trim()}
+            </p>
+          ) : null}
         </div>
 
         {loadingFull && hydrateFromServer ? (

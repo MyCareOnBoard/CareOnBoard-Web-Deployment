@@ -26,7 +26,7 @@ const getInitialsFromName = (name: string) => {
 
 export default function ApprovalsPage() {
   const { toast } = useToast();
-  const { agencyId } = useOperationalAgency();
+  const { agencyId, agency } = useOperationalAgency();
   const operationScopeRef = useRef(0);
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -541,7 +541,7 @@ export default function ApprovalsPage() {
                     ? `${shiftToApprove.client.firstName || ""} ${shiftToApprove.client.lastName || ""}`.trim() || "Unknown Client"
                     : "Unknown Client"}
                 </span>
-                ?
+                {` at ${agency.name}?`}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="flex justify-end gap-3 mt-2">
@@ -592,7 +592,7 @@ export default function ApprovalsPage() {
                     ? `${shiftToApprove.client.firstName || ""} ${shiftToApprove.client.lastName || ""}`.trim() || "Unknown Client"
                     : "Unknown Client"}
                 </span>
-                ? This action cannot be undone.
+                {` at ${agency.name}? This action cannot be undone.`}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="flex justify-end gap-3 mt-2">

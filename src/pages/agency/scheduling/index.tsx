@@ -966,6 +966,7 @@ export default function SchedulingPage() {
         anomalyCodes={selectedShift ? detectShiftAnomalyCodes(selectedShift) : []}
         hydrateFromServer
         agencyId={agencyId}
+        agencyName={agency.name}
         onClose={() => {
           setShowShiftDetails(false);
           setSelectedShift(null);
@@ -980,7 +981,7 @@ export default function SchedulingPage() {
         onConfirm={confirmDeleteShift}
         isDeleting={isDeletingShift}
         title="Delete this shift?"
-        message={shiftPendingDelete ? shiftDeleteConfirmMessage(shiftPendingDelete) : ""}
+        message={shiftPendingDelete ? shiftDeleteConfirmMessage(shiftPendingDelete, agency.name) : ""}
         confirmText="Delete shift"
         cancelText="Cancel"
       />

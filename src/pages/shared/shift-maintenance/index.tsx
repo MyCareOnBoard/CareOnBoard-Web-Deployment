@@ -188,6 +188,9 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
   const [editShift, setEditShift] = useState<ShiftAnomaly | null>(null);
 
   const resolvedAgencyId = isSuperAdmin ? agencyFilter : user?.agencyId;
+  const resolvedAgencyName = isSuperAdmin
+    ? agencies.find((candidate) => candidate.id === agencyFilter)?.name
+    : user?.agency?.name;
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -573,6 +576,7 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
             anomalyCodes={editShift.anomalyCodes}
             hydrateFromServer
             agencyId={resolvedAgencyId || ""}
+            agencyName={resolvedAgencyName}
             onClose={() => setEditShift(null)}
             onMaintenanceComplete={handleCorrectionComplete}
           />

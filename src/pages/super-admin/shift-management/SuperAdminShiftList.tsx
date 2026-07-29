@@ -84,7 +84,7 @@ export function SuperAdminShiftScope({ children, agency: suppliedAgency }: Super
   if (!agencyId || (!suppliedAgency && requestedIds.length !== 1)) {
     return <p role="alert" className="px-4 py-8 text-sm font-medium text-[#808081]">Choose exactly one agency to manage shifts.</p>;
   }
-  if (loading) {
+  if (loading || resolvedAgency?.id !== agencyId) {
     return (
       <div className="flex min-h-64 items-center justify-center" aria-busy="true">
         <Loader2 className="size-7 animate-spin text-[#008f92]" aria-label="Loading agency" />
@@ -109,7 +109,7 @@ export function SuperAdminShiftScope({ children, agency: suppliedAgency }: Super
 
   return (
     <OperationalAgencyProvider
-      key={resolvedAgency.id}
+      key={`${agencyId}:${resolvedAgency.id}`}
       actor="super_admin"
       agencyId={resolvedAgency.id}
       agency={resolvedAgency}
