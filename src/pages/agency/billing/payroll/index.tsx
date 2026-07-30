@@ -3,6 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useToast } from "@/hooks/use-toast";
 
 import { useAuth } from "@/utils/auth";
+import { useSelector } from "react-redux";
 
 import { getAgencyById } from "@/lib/api/agencies";
 
@@ -82,6 +83,15 @@ import {
   needsAgencyFallback,
 
 } from "./utils/buildPayrollInvoiceDocument";
+import {
+  OperationalAgencyProvider,
+  useOperationalAgency,
+} from "@/lib/operational-agency/OperationalAgencyProvider";
+import { createAgencyOperationalDataAdapter } from "@/lib/operational-agency/dataAdapters";
+import { agencyDirectoryRoutes } from "@/lib/operational-agency/routes";
+import { resolveEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import type { RootState } from "@/store/redux/store";
+import { UserType } from "@/utils/auth/types/user.types";
 
 
 
@@ -90,9 +100,9 @@ const CreatePayrollInvoiceModal = lazy(() => import("./components/CreatePayrollI
 
 
 
-export default function PayrollDashboardPage() {
+export function PayrollDashboardContent() {
 
-  const { user } = useAuth();
+  const { agencyId } = useOperationalAgency();
 
   const { toast } = useToast();
 
@@ -126,6 +136,7 @@ export default function PayrollDashboardPage() {
   const [markingPaid, setMarkingPaid] = useState(false);
 
   const openingInvoiceRequestIdRef = useRef(0);
+  const operationControllerRef = useRef<AbortController | null>(null);
 
   const lastDashboardErrorRef = useRef<string | null>(null);
 
@@ -134,6 +145,18 @@ export default function PayrollDashboardPage() {
   const lastStaffToPayErrorRef = useRef<string | null>(null);
 
   const lastStaffTimesheetsErrorRef = useRef<string | null>(null);
+
+  const beginOperation = useCallback(() => {
+    operationControllerRef.current?.abort();
+    const controller = new AbortController();
+    operationControllerRef.current = controller;
+    return controller;
+  }, []);
+
+  useEffect(() => () => {
+    openingInvoiceRequestIdRef.current += 1;
+    operationControllerRef.current?.abort();
+  }, []);
 
 
 
@@ -364,7 +387,7 @@ export default function PayrollDashboardPage() {
 
     async (prefill: PayrollInvoiceDetail["invoicePrefill"]) => {
 
-      if (!needsAgencyFallback(prefill) || !user?.agencyId) {
+      if (!needsAgencyFallback(prefill)) {
 
         return undefined;
 
@@ -372,11 +395,11 @@ export default function PayrollDashboardPage() {
 
 
 
-      return getAgencyById(user.agencyId).catch(() => undefined);
+      return getAgencyById(agencyId).catch(() => undefined);
 
     },
 
-    [user?.agencyId],
+    [agencyId],
 
   );
 
@@ -420,49 +443,54 @@ export default function PayrollDashboardPage() {
 
       const requestId = openingInvoiceRequestIdRef.current + 1;
       openingInvoiceRequestIdRef.current = requestId;
+      const controller = beginOperation();
       setCreatingInvoice(true);
       setOpeningInvoice({ staffName: entry.staffName });
 
       try {
-        if (!user?.agencyId) return;
         const created = await createStaffPayrollInvoice({
-          context: { agencyId: user.agencyId },
+          context: { agencyId },
           payload: {
             staffUid: entry.staffUid,
             periodStart: entry.dateRangeStart,
             periodEnd: entry.dateRangeEnd,
             staffTimesheetIds: entry.staffTimesheetIds,
           },
+          signal: controller.signal,
         });
-        if (openingInvoiceRequestIdRef.current !== requestId) return;
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
 
         const detail = await getPayrollInvoiceById({
-          context: { agencyId: user.agencyId },
+          context: { agencyId },
           invoiceId: created.id,
+          signal: controller.signal,
         });
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
         const agency = await fetchAgencyFallbackIfNeeded(detail.invoicePrefill);
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
         await openInvoiceDetail(detail, agency);
         setActiveTab("generated");
         await refreshPayrollWorkspace({ refreshStaff: true });
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
         toast({
           title: "Payroll invoice created",
           description: `Timesheet payroll for ${entry.staffName} is ready to review.`,
         });
       } catch (error) {
-        if (openingInvoiceRequestIdRef.current !== requestId) return;
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
         toast({
           title: "Couldn't create payroll invoice",
           description: getStaffTimesheetErrorMessage(error),
           variant: "destructive",
         });
       } finally {
-        if (openingInvoiceRequestIdRef.current === requestId) {
+        if (!controller.signal.aborted && openingInvoiceRequestIdRef.current === requestId) {
           setCreatingInvoice(false);
           setOpeningInvoice(null);
         }
       }
     },
-    [fetchAgencyFallbackIfNeeded, openInvoiceDetail, refreshPayrollWorkspace, toast, user?.agencyId],
+    [agencyId, beginOperation, fetchAgencyFallbackIfNeeded, openInvoiceDetail, refreshPayrollWorkspace, toast],
   );
 
   const handleCreateInvoiceClick = useCallback(
@@ -478,42 +506,37 @@ export default function PayrollDashboardPage() {
 
   const handleConfirmCreateInvoice = useCallback(
     async (preview: PayrollInvoicePreview, selectedIds: Set<string>) => {
-      if (!user?.agencyId) {
-        toast({
-          title: "Agency not found",
-          description: "Sign in again and retry.",
-          variant: "destructive",
-        });
-        return;
-      }
-
       const requestId = openingInvoiceRequestIdRef.current + 1;
       openingInvoiceRequestIdRef.current = requestId;
+      const controller = beginOperation();
       setCreatingInvoice(true);
       setOpeningInvoice({ staffName: preview.employeeName });
 
       try {
         const created = await createPayrollInvoice({
-          context: { agencyId: user.agencyId },
+          context: { agencyId },
           payload: buildCreatePayloadFromSelection(preview, selectedIds),
+          signal: controller.signal,
         });
 
-        if (openingInvoiceRequestIdRef.current !== requestId) {
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) {
           return;
         }
 
         setCreateInvoiceEntry(null);
 
         const agency = await fetchAgencyFallbackIfNeeded(created.invoicePrefill);
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
         await openInvoiceDetail(created, agency);
         setActiveTab("generated");
         await refreshPayrollWorkspace({ refreshStaff: true });
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
         toast({
           title: "Payroll invoice created",
           description: `Invoice ${created.invoiceNumber} is ready to review.`,
         });
       } catch (error) {
-        if (openingInvoiceRequestIdRef.current !== requestId) {
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) {
           return;
         }
 
@@ -534,13 +557,13 @@ export default function PayrollDashboardPage() {
           variant: "destructive",
         });
       } finally {
-        if (openingInvoiceRequestIdRef.current === requestId) {
+        if (!controller.signal.aborted && openingInvoiceRequestIdRef.current === requestId) {
           setCreatingInvoice(false);
           setOpeningInvoice(null);
         }
       }
     },
-    [fetchAgencyFallbackIfNeeded, openInvoiceDetail, refreshPayrollWorkspace, toast, user?.agencyId],
+    [agencyId, beginOperation, fetchAgencyFallbackIfNeeded, openInvoiceDetail, refreshPayrollWorkspace, toast],
   );
 
 
@@ -552,6 +575,7 @@ export default function PayrollDashboardPage() {
       const requestId = openingInvoiceRequestIdRef.current + 1;
 
       openingInvoiceRequestIdRef.current = requestId;
+      const controller = beginOperation();
 
       setOpeningInvoice({ staffName: invoice.employeeName ?? "Staff member" });
 
@@ -559,15 +583,15 @@ export default function PayrollDashboardPage() {
 
       try {
 
-        if (!user?.agencyId) return;
         const detail = await getPayrollInvoiceById({
-          context: { agencyId: user.agencyId },
+          context: { agencyId },
           invoiceId: invoice.id,
+          signal: controller.signal,
         });
 
 
 
-        if (openingInvoiceRequestIdRef.current !== requestId) {
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) {
 
           return;
 
@@ -577,9 +601,13 @@ export default function PayrollDashboardPage() {
 
         const agency = await fetchAgencyFallbackIfNeeded(detail.invoicePrefill);
 
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
+
         await openInvoiceDetail(detail, agency);
 
       } catch (error) {
+
+        if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
 
         toast({
 
@@ -593,7 +621,7 @@ export default function PayrollDashboardPage() {
 
       } finally {
 
-        if (openingInvoiceRequestIdRef.current === requestId) {
+        if (!controller.signal.aborted && openingInvoiceRequestIdRef.current === requestId) {
 
           setOpeningInvoice(null);
 
@@ -603,7 +631,7 @@ export default function PayrollDashboardPage() {
 
     },
 
-    [fetchAgencyFallbackIfNeeded, openInvoiceDetail, toast],
+    [agencyId, beginOperation, fetchAgencyFallbackIfNeeded, openInvoiceDetail, toast],
 
   );
 
@@ -634,11 +662,16 @@ export default function PayrollDashboardPage() {
       return;
     }
 
+    const requestId = openingInvoiceRequestIdRef.current + 1;
+    openingInvoiceRequestIdRef.current = requestId;
+    const controller = beginOperation();
     setMarkingPaid(true);
 
     try {
-      await markPaid(markPaidConfirmTarget.id);
+      await markPaid(markPaidConfirmTarget.id, controller.signal);
+      if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
       await refreshPayrollWorkspace();
+      if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
 
       const staffLabel = markPaidConfirmTarget.employeeName ?? "staff";
       setMarkPaidConfirmTarget(null);
@@ -652,15 +685,18 @@ export default function PayrollDashboardPage() {
         description: `Payroll for ${staffLabel} was marked as paid.`,
       });
     } catch (error) {
+      if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
       toast({
         title: "Couldn't mark invoice as paid",
         description: getPayrollInvoiceMutationErrorMessage(error),
         variant: "destructive",
       });
     } finally {
-      setMarkingPaid(false);
+      if (!controller.signal.aborted && openingInvoiceRequestIdRef.current === requestId) {
+        setMarkingPaid(false);
+      }
     }
-  }, [invoiceModal?.invoiceId, markPaid, markPaidConfirmTarget, refreshPayrollWorkspace, toast]);
+  }, [beginOperation, invoiceModal?.invoiceId, markPaid, markPaidConfirmTarget, refreshPayrollWorkspace, toast]);
 
   const handleConfirmCancelInvoice = useCallback(async () => {
 
@@ -672,13 +708,20 @@ export default function PayrollDashboardPage() {
 
 
 
+    const requestId = openingInvoiceRequestIdRef.current + 1;
+    openingInvoiceRequestIdRef.current = requestId;
+    const controller = beginOperation();
     setCancellingInvoice(true);
 
     try {
 
-      await cancelInvoice(cancelModalInvoice.id);
+      await cancelInvoice(cancelModalInvoice.id, controller.signal);
+
+      if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
 
       await refreshPayrollWorkspace({ refreshStaff: true });
+
+      if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
 
       setCancelModalInvoice(null);
 
@@ -692,6 +735,8 @@ export default function PayrollDashboardPage() {
 
     } catch (error) {
 
+      if (controller.signal.aborted || openingInvoiceRequestIdRef.current !== requestId) return;
+
       toast({
 
         title: "Couldn't cancel payroll invoice",
@@ -704,11 +749,13 @@ export default function PayrollDashboardPage() {
 
     } finally {
 
-      setCancellingInvoice(false);
+      if (!controller.signal.aborted && openingInvoiceRequestIdRef.current === requestId) {
+        setCancellingInvoice(false);
+      }
 
     }
 
-  }, [cancelInvoice, cancelModalInvoice, refreshPayrollWorkspace, toast]);
+  }, [beginOperation, cancelInvoice, cancelModalInvoice, refreshPayrollWorkspace, toast]);
 
 
 
@@ -897,4 +944,51 @@ export default function PayrollDashboardPage() {
 
   );
 
+}
+
+export default function PayrollDashboardPage() {
+  const { agencyId } = useOperationalAgency();
+  return <PayrollDashboardContent key={agencyId} />;
+}
+
+export function AgencyPayrollDashboardPage() {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const supportedClientTypes = user?.agency?.supportedClientTypes ?? [];
+  const storedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const mode = resolveEffectiveAgencyMode(supportedClientTypes, storedMode);
+  const data = useMemo(() => createAgencyOperationalDataAdapter(agencyId), [agencyId]);
+  const accessList = user?.profile?.accessList ?? [];
+  const isAgencyOwner = user?.userType === UserType.AGENCY;
+
+  if (!agencyId) {
+    return <p role="alert" className="px-4 py-8 text-sm text-[#808081]">Sign in again to manage billing.</p>;
+  }
+
+  return (
+    <OperationalAgencyProvider
+      key={agencyId}
+      actor="agency"
+      agencyId={agencyId}
+      agency={{
+        id: agencyId,
+        name: user?.agency?.name || user?.fullName || "Agency",
+        status: "active",
+        supportedClientTypes,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      }}
+      mode={mode}
+      capabilities={{
+        canManageShifts: true,
+        canManageBilling: true,
+        shiftMaintenance: true,
+        canAccessClientDirectory: isAgencyOwner || accessList.includes("Client Management"),
+        canAccessStaffDirectory: isAgencyOwner || accessList.includes("DSP Management"),
+      }}
+      directoryRoutes={agencyDirectoryRoutes}
+      data={data}
+    >
+      <PayrollDashboardPage />
+    </OperationalAgencyProvider>
+  );
 }

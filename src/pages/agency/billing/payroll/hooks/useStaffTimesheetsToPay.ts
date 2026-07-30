@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { subscribePayrollInvalidation } from "@/pages/agency/billing/shared/billingInvalidation";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import { useListAgencyStaffQuery } from "@/lib/api/agency-staff";
 import { listStaffTimesheets, type StaffTimesheet } from "@/lib/api/staff-timesheets";
 import type { DuePayrollEntry } from "@/lib/api/payroll";
-import { useAuth } from "@/utils/auth";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 type StaffRate = { name?: string; role?: string; billingType?: string; billingRate?: number };
 
@@ -82,16 +81,18 @@ function buildEntries(approved: StaffTimesheet[], rateMap: Map<string, StaffRate
  * dashboard's current window, so it always shows until it's invoiced.
  */
 export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean } = {}) {
-  const { user } = useAuth();
-  const agencyId = user?.agencyId ?? "";
-  const mode = useEffectiveAgencyMode();
+  const { actor, agencyId, mode } = useOperationalAgency();
   const [approved, setApproved] = useState<StaffTimesheet[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const requestControllerRef = useRef<AbortController | null>(null);
   const hasLoadedRef = useRef(false);
 
-  const { data: staffResponse } = useListAgencyStaffQuery({ limit: 200 }, { skip: !enabled });
+  const { data: staffResponse } = useListAgencyStaffQuery(
+    { limit: 200 },
+    { skip: !enabled || actor === "super_admin" },
+  );
 
   const rateMap = useMemo(() => {
     const map = new Map<string, StaffRate>();
@@ -108,9 +109,12 @@ export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean 
 
   const refetch = useCallback(
     async ({ force = false }: { force?: boolean } = {}) => {
+      requestControllerRef.current?.abort();
       if (!agencyId || (!enabled && !force)) return;
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
+      const controller = new AbortController();
+      requestControllerRef.current = controller;
       if (!hasLoadedRef.current) setLoading(true);
       setError(null);
       try {
@@ -122,15 +126,16 @@ export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean 
             limit: 200,
             ...(mode ? { mode } : {}),
           },
+          signal: controller.signal,
         });
-        if (requestIdRef.current !== requestId) return;
+        if (controller.signal.aborted || requestIdRef.current !== requestId) return;
         setApproved(timesheets);
         hasLoadedRef.current = true;
       } catch (fetchError) {
-        if (requestIdRef.current !== requestId) return;
+        if (controller.signal.aborted || requestIdRef.current !== requestId) return;
         setError(fetchError instanceof Error ? fetchError.message : "Failed to load staff timesheets");
       } finally {
-        if (requestIdRef.current === requestId) setLoading(false);
+        if (!controller.signal.aborted && requestIdRef.current === requestId) setLoading(false);
       }
     },
     [agencyId, enabled, mode],
@@ -138,6 +143,10 @@ export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean 
 
   useEffect(() => {
     void refetch();
+    return () => {
+      requestIdRef.current += 1;
+      requestControllerRef.current?.abort();
+    };
   }, [refetch]);
 
   useEffect(() => {

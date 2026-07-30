@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   BILLING_MODAL_DESCRIPTION_CLASS,
   BILLING_MODAL_DIVIDER_CLASS,
@@ -24,7 +24,9 @@ export default function BillingCornerModalHeader({
       <div className="flex items-start justify-between gap-4 px-6 py-6">
         <div className="min-w-0 flex-1">
           <DialogTitle className={BILLING_MODAL_TITLE_CLASS}>{title}</DialogTitle>
-          <p className={BILLING_MODAL_DESCRIPTION_CLASS}>{description}</p>
+          <DialogDescription className={BILLING_MODAL_DESCRIPTION_CLASS}>
+            {description}
+          </DialogDescription>
         </div>
         {onClose ? (
           <button

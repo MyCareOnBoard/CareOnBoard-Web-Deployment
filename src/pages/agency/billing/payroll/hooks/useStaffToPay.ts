@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DateRangeValues } from "@/pages/agency/billing/shared/types";
 import { subscribePayrollInvalidation } from "@/pages/agency/billing/shared/billingInvalidation";
 import { getStaffToPay, type DuePayrollEntry } from "@/lib/api/payroll";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
-import { useAuth } from "@/utils/auth";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
@@ -23,19 +22,19 @@ export function useStaffToPay(
   dateRange: DateRangeValues,
   { enabled = true, duePage = 1, dueLimit = 100 }: UseStaffToPayOptions = {},
 ) {
-  const { user } = useAuth();
-  const agencyId = user?.agencyId ?? "";
+  const { agencyId, mode } = useOperationalAgency();
   const [entries, setEntries] = useState<DuePayrollEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isRefetching, setIsRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const requestControllerRef = useRef<AbortController | null>(null);
   const hasLoadedOnceRef = useRef(false);
-  const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
+      requestControllerRef.current?.abort();
       if (!agencyId || ((!enabled || !hasCompleteDateRange(dateRange)) && !force)) {
         return;
       }
@@ -52,6 +51,8 @@ export function useStaffToPay(
 
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
+      const controller = new AbortController();
+      requestControllerRef.current = controller;
 
       if (hasLoadedOnceRef.current) {
         setIsRefetching(true);
@@ -71,9 +72,10 @@ export function useStaffToPay(
             approved: true,
             ...(mode ? { mode } : {}),
           },
+          signal: controller.signal,
         });
 
-        if (requestIdRef.current !== requestId) {
+        if (controller.signal.aborted || requestIdRef.current !== requestId) {
           return;
         }
 
@@ -81,7 +83,7 @@ export function useStaffToPay(
         setTotal(data.total);
         hasLoadedOnceRef.current = true;
       } catch (fetchError) {
-        if (requestIdRef.current !== requestId) {
+        if (controller.signal.aborted || requestIdRef.current !== requestId) {
           return;
         }
 
@@ -93,7 +95,7 @@ export function useStaffToPay(
           fetchError instanceof Error ? fetchError.message : "Failed to load staff to pay",
         );
       } finally {
-        if (requestIdRef.current === requestId) {
+        if (!controller.signal.aborted && requestIdRef.current === requestId) {
           setLoading(false);
           setIsRefetching(false);
         }
@@ -104,6 +106,10 @@ export function useStaffToPay(
 
   useEffect(() => {
     void refetch();
+    return () => {
+      requestIdRef.current += 1;
+      requestControllerRef.current?.abort();
+    };
   }, [refetch]);
 
   useEffect(() => {
