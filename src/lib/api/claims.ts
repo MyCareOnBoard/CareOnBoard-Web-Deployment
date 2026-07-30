@@ -5,7 +5,11 @@ import type { MileageRide } from "@/lib/api/mileage";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import type { Coverage, SplitMode } from "@/lib/coverage";
 import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
-import { operationalAgencyId, withOperationalAgency } from "@/lib/operational-agency/request";
+import {
+  operationalAgencyId,
+  withOperationalAgency,
+  withoutAgencyId,
+} from "@/lib/operational-agency/request";
 
 export type BillingClaimStatus = "pending" | "paid" | "rejected";
 
@@ -304,7 +308,7 @@ export async function updateBillingClaimStatus(
   const { context, claimId, payload, signal } = input;
   const response = await axiosClient.patch<BillingClaimMutationResponse>(
     `/billing/claims/${encodeURIComponent(claimId)}/status`,
-    payload,
+    withoutAgencyId(payload),
     { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
 

@@ -1,7 +1,11 @@
 import axiosClient from "../axios";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
-import { operationalAgencyId, withOperationalAgency } from "@/lib/operational-agency/request";
+import {
+  operationalAgencyId,
+  withOperationalAgency,
+  withoutAgencyId,
+} from "@/lib/operational-agency/request";
 
 export type StaffTimesheetStatus = "draft" | "pending" | "approved" | "rejected";
 
@@ -109,7 +113,10 @@ export async function listStaffTimesheets(
 export async function listMyStaffTimesheets(
   query: ListStaffTimesheetsQuery = {},
 ): Promise<{ timesheets: StaffTimesheet[]; total: number }> {
-  const response = await axiosClient.get<ListResponse>(BASE, { params: query });
+  const { scope: _untrustedScope, ...selfQuery } = withoutAgencyId(query);
+  const response = await axiosClient.get<ListResponse>(BASE, {
+    params: { ...selfQuery, scope: "mine" },
+  });
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || "Failed to list timesheets");
   }
@@ -185,7 +192,7 @@ export async function createStaffPayrollInvoice(
   const { context, payload, signal } = input;
   const response = await axiosClient.post<{ success: boolean; data?: { id: string }; message?: string }>(
     `${BASE}/payroll`,
-    payload,
+    withoutAgencyId(payload),
     { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
   if (!response.data.success || !response.data.data) {

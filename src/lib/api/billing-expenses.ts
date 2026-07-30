@@ -70,11 +70,17 @@ export function billingExpenseTag(type: BillingExpenseTagType, agencyId: string)
 }
 
 export function serializeExpensesQueryArgs(queryArgs: ExpensesListQuery) {
+  const { page: _page, ...serialized } = normalizeExpensesQueryArgs(queryArgs);
+  return serialized;
+}
+
+function normalizeExpensesQueryArgs(queryArgs: ExpensesListQuery) {
   const { agencyId: unvalidatedAgencyId, startDate, endDate, mode } = queryArgs;
   const agencyId = operationalAgencyId({ agencyId: unvalidatedAgencyId });
   const status = queryArgs.status ?? "all";
+  const page = queryArgs.page ?? 1;
   const limit = queryArgs.limit ?? 25;
-  return { agencyId, startDate, endDate, status, limit, mode };
+  return { agencyId, startDate, endDate, status, page, limit, mode };
 }
 
 export function buildExpensesDashboardRequest(query: ExpensesDashboardQuery) {
@@ -171,13 +177,10 @@ export const billingExpensesApi = createApi({
         if (!previousArg || !currentArg) {
           return false;
         }
-        return (
-          currentArg.startDate !== previousArg.startDate ||
-          currentArg.endDate !== previousArg.endDate ||
-          currentArg.status !== previousArg.status ||
-          currentArg.limit !== previousArg.limit ||
-          currentArg.mode !== previousArg.mode ||
-          currentArg.agencyId !== previousArg.agencyId
+        const current = normalizeExpensesQueryArgs(currentArg);
+        const previous = normalizeExpensesQueryArgs(previousArg);
+        return Object.keys(current).some(
+          (key) => current[key as keyof typeof current] !== previous[key as keyof typeof previous],
         );
       },
       providesTags: (_result, _error, { agencyId }) => [

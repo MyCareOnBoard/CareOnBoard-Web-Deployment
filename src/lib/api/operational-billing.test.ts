@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { configureStore } from "@reduxjs/toolkit";
 
 import axiosClient from "@/lib/axios";
 import {
@@ -32,6 +33,7 @@ import {
   createStaffPayrollInvoice,
   createStaffTimesheet,
   getStaffTimesheet,
+  listMyStaffTimesheets,
   listStaffTimesheets,
   reviewStaffTimesheet,
   updateStaffTimesheet,
@@ -39,6 +41,7 @@ import {
 import { generateBillingReport, listBillingRecords } from "@/lib/api/billing";
 import {
   billingExpenseTag,
+  billingExpensesApi,
   buildExpensesDashboardRequest,
   buildExpensesListRequest,
   buildExpensesMutationRequest,
@@ -65,15 +68,15 @@ import {
 } from "@/lib/operational-agency/routes";
 
 vi.mock("@/lib/axios", () => ({
-  default: {
+  default: Object.assign(vi.fn(), {
     get: vi.fn(),
     post: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
-  },
+  }),
 }));
 
-const mockedAxios = axiosClient as unknown as {
+const mockedAxios = axiosClient as unknown as ReturnType<typeof vi.fn> & {
   get: ReturnType<typeof vi.fn>;
   post: ReturnType<typeof vi.fn>;
   patch: ReturnType<typeof vi.fn>;
@@ -201,6 +204,38 @@ describe("operational billing request context", () => {
     });
   });
 
+  it("rejects forged agency IDs in claims query and mutation payloads", async () => {
+    mockedAxios.get.mockResolvedValue({ data: { success: true, data: { claims: [] } } } as never);
+    mockedAxios.patch.mockResolvedValue({ data: { success: true } } as never);
+
+    await listBillingClaims({
+      context: { agencyId: "agency-a" },
+      query: {
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        agencyId: "forged-agency",
+      } as never,
+    });
+    await updateBillingClaimStatus({
+      context: { agencyId: "agency-a" },
+      claimId: "claim-1",
+      payload: { status: "paid", agencyId: "forged-agency" } as never,
+    });
+
+    expect(mockedAxios.get).toHaveBeenCalledWith("/billing/claims", {
+      params: {
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        agencyId: "agency-a",
+      },
+    });
+    expect(mockedAxios.patch).toHaveBeenCalledWith(
+      "/billing/claims/claim-1/status",
+      { status: "paid" },
+      { params: { agencyId: "agency-a" } },
+    );
+  });
+
   it("scopes payroll reads, previews, creation, and status mutations", async () => {
     mockedAxios.get.mockResolvedValue({ data: { success: true, data: { invoices: [] } } } as never);
     mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "payroll-1" } } } as never);
@@ -247,6 +282,43 @@ describe("operational billing request context", () => {
     });
   });
 
+  it("overwrites forged agency IDs in payroll queries and create bodies", async () => {
+    mockedAxios.get.mockResolvedValue({ data: { success: true, data: { invoices: [] } } } as never);
+    mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "payroll-1" } } } as never);
+
+    await listPayrollInvoices({
+      context: { agencyId: "agency-a" },
+      query: {
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        agencyId: "forged-agency",
+      } as never,
+    });
+    await createPayrollInvoice({
+      context: { agencyId: "agency-a" },
+      payload: {
+        employeeId: "staff-1",
+        periodStart: "2026-07-01",
+        periodEnd: "2026-07-31",
+        shiftIds: ["shift-1"],
+        agencyId: "forged-agency",
+      } as never,
+    });
+
+    expect(mockedAxios.get).toHaveBeenCalledWith("/billing/payroll/invoices", {
+      params: {
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        agencyId: "agency-a",
+      },
+    });
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      "/billing/payroll/invoices",
+      expect.objectContaining({ agencyId: "agency-a" }),
+      { params: { agencyId: "agency-a" } },
+    );
+  });
+
   it("scopes out-of-pocket reads and mutations without trusting a body agency", async () => {
     mockedAxios.get.mockResolvedValue({ data: { success: true, data: { rows: [], invoices: [] } } } as never);
     mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "oop-1" } } } as never);
@@ -281,6 +353,33 @@ describe("operational billing request context", () => {
     expect(mockedAxios.delete).toHaveBeenCalledWith("/billing/out-of-pocket/invoices/oop-1", {
       params: { agencyId: "agency-a" },
     });
+  });
+
+  it("strips forged agency IDs from out-of-pocket query and create bodies", async () => {
+    mockedAxios.get.mockResolvedValue({ data: { success: true, data: { invoices: [] } } } as never);
+    mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "oop-1" } } } as never);
+
+    await listOutOfPocketInvoices({
+      context: { agencyId: "agency-a" },
+      query: { limit: 10, agencyId: "forged-agency" } as never,
+    });
+    await createOutOfPocketInvoice({
+      context: { agencyId: "agency-a" },
+      payload: {
+        clientId: "client-1",
+        shiftIds: ["shift-1"],
+        agencyId: "forged-agency",
+      } as never,
+    });
+
+    expect(mockedAxios.get).toHaveBeenCalledWith("/billing/out-of-pocket/invoices", {
+      params: { limit: 10, agencyId: "agency-a" },
+    });
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      "/billing/out-of-pocket/invoices",
+      { clientId: "client-1", shiftIds: ["shift-1"] },
+      { params: { agencyId: "agency-a" } },
+    );
   });
 
   it("scopes billing-side staff timesheets while preserving employee create/edit signatures", async () => {
@@ -335,6 +434,41 @@ describe("operational billing request context", () => {
     expect(mockedAxios.patch).toHaveBeenCalledWith("/agencyStaff/timesheets/draft-1", employeePayload);
   });
 
+  it("separates employee-owned timesheet scope from operational agency mutations", async () => {
+    mockedAxios.get.mockResolvedValue({ data: { success: true, data: { timesheets: [] } } } as never);
+    mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "payroll-1" } } } as never);
+
+    await listMyStaffTimesheets({
+      scope: "agency",
+      agencyId: "forged-agency",
+      status: "draft",
+    } as never);
+    await createStaffPayrollInvoice({
+      context: { agencyId: "agency-a" },
+      payload: {
+        staffUid: "staff-1",
+        periodStart: "2026-07-01",
+        periodEnd: "2026-07-31",
+        staffTimesheetIds: ["timesheet-1"],
+        agencyId: "forged-agency",
+      } as never,
+    });
+
+    expect(mockedAxios.get).toHaveBeenCalledWith("/agencyStaff/timesheets", {
+      params: { status: "draft", scope: "mine" },
+    });
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      "/agencyStaff/timesheets/payroll",
+      {
+        staffUid: "staff-1",
+        periodStart: "2026-07-01",
+        periodEnd: "2026-07-31",
+        staffTimesheetIds: ["timesheet-1"],
+      },
+      { params: { agencyId: "agency-a" } },
+    );
+  });
+
   it("scopes legacy billing records and generated reports", async () => {
     mockedAxios.get.mockResolvedValue({ data: { success: true, records: [], total: 0, count: 0 } } as never);
     mockedAxios.post.mockResolvedValue({ data: { success: true, reportUrl: "/report.pdf" } } as never);
@@ -369,6 +503,71 @@ describe("operational billing request context", () => {
     );
   });
 
+  it("requests and merges the next expense page without crossing agency caches", async () => {
+    const requestUrls: string[] = [];
+    mockedAxios.mockImplementation(async ({ url }: { url: string }) => {
+      requestUrls.push(url);
+      const parsed = new URL(url, "https://example.test");
+      const agencyId = parsed.searchParams.get("agencyId");
+      const page = Number(parsed.searchParams.get("page"));
+      return {
+        data: {
+          success: true,
+          data: {
+            expenses: [{ id: `${agencyId}-page-${page}` }],
+            total: 2,
+            page,
+            limit: 1,
+            hasMore: page < 2,
+          },
+        },
+      };
+    });
+    const store = configureStore({
+      reducer: { [billingExpensesApi.reducerPath]: billingExpensesApi.reducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware().concat(billingExpensesApi.middleware),
+    });
+    const base = {
+      agencyId: "agency-a",
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      limit: 1,
+    };
+
+    await store.dispatch(billingExpensesApi.endpoints.getAgencyExpenses.initiate({
+      ...base,
+      page: 1,
+    })).unwrap();
+    await store.dispatch(billingExpensesApi.endpoints.getAgencyExpenses.initiate({
+      ...base,
+      page: 2,
+    })).unwrap();
+    await store.dispatch(billingExpensesApi.endpoints.getAgencyExpenses.initiate({
+      ...base,
+      agencyId: "agency-b",
+      page: 1,
+    })).unwrap();
+
+    expect(requestUrls).toEqual([
+      expect.stringContaining("agencyId=agency-a"),
+      expect.stringContaining("agencyId=agency-a"),
+      expect.stringContaining("agencyId=agency-b"),
+    ]);
+    expect(
+      billingExpensesApi.endpoints.getAgencyExpenses.select({ ...base, page: 2 })(
+        store.getState(),
+      ).data?.expenses,
+    ).toEqual([{ id: "agency-a-page-1" }, { id: "agency-a-page-2" }]);
+    expect(
+      billingExpensesApi.endpoints.getAgencyExpenses.select({
+        ...base,
+        agencyId: "agency-b",
+        page: 1,
+      })(store.getState()).data?.expenses,
+    ).toEqual([{ id: "agency-b-page-1" }]);
+  });
+
   it("invalidates payroll listeners only for the mutated agency", () => {
     vi.useFakeTimers();
     const agencyA = vi.fn();
@@ -386,10 +585,14 @@ describe("operational billing request context", () => {
   });
 
   it("scopes RTK billing records, reports, cache keys, and tags", () => {
-    const agencyA = { context: { agencyId: "agency-a" }, query: { page: 1 } };
+    const contextA = { agencyId: "agency-a" };
+    const agencyA = {
+      context: contextA,
+      query: { page: 1, agencyId: "forged-agency" },
+    } as unknown as Parameters<typeof buildBillingRecordRequest>[0];
     const agencyB = { context: { agencyId: "agency-b" }, query: { page: 1 } };
     expect(buildBillingRecordRequest(agencyA).url).toContain("agencyId=agency-a");
-    expect(buildBillingReportRequest({ context: agencyA.context, recordIds: ["record-1"] }))
+    expect(buildBillingReportRequest({ context: contextA, recordIds: ["record-1"] }))
       .toMatchObject({
         url: "/billing/generate-report?agencyId=agency-a",
         data: { recordIds: ["record-1"], agencyId: "agency-a" },

@@ -4,7 +4,7 @@ import { Client } from "@/lib/api/clients";
 import { Employee } from "@/lib/api/employees";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
-import { operationalAgencyId } from "@/lib/operational-agency/request";
+import { operationalAgencyId, withOperationalAgency } from "@/lib/operational-agency/request";
 
 export interface EmployeeWithHours extends Employee {
   totalHours?: number;
@@ -263,7 +263,7 @@ export function billingRecordTag(agencyId: string) {
 }
 
 export function serializeBillingRecordArgs(input: BillingRecordsRequest) {
-  return { agencyId: operationalAgencyId(input.context), ...(input.query ?? {}) };
+  return withOperationalAgency(input.context, input.query ?? {});
 }
 
 export function buildBillingRecordRequest(input: BillingRecordsRequest) {

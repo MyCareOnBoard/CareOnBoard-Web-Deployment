@@ -18,6 +18,11 @@ export function withOperationalAgency<T extends object>(
   return { ...rest, agencyId } as Omit<T, "agencyId"> & { agencyId: string };
 }
 
+export function withoutAgencyId<T extends object>(params: T): Omit<T, "agencyId"> {
+  const { agencyId: _untrustedAgencyId, ...rest } = params as T & { agencyId?: unknown };
+  return rest;
+}
+
 export function operationalBillingCacheKey(
   namespace: string,
   context: OperationalBillingRequestContext,

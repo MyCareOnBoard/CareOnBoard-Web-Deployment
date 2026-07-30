@@ -2,7 +2,11 @@ import axiosClient from "../axios";
 import type { ReadyToClaimRow } from "./claims";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
-import { operationalAgencyId, withOperationalAgency } from "@/lib/operational-agency/request";
+import {
+  operationalAgencyId,
+  withOperationalAgency,
+  withoutAgencyId,
+} from "@/lib/operational-agency/request";
 
 export type OutOfPocketReadyRow = ReadyToClaimRow;
 
@@ -101,7 +105,7 @@ export async function createOutOfPocketInvoice(
   const { context, payload, signal } = input;
   const res = await axiosClient.post<ApiEnvelope<OutOfPocketInvoiceDetail>>(
     "/billing/out-of-pocket/invoices",
-    payload,
+    withoutAgencyId(payload),
     { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
   if (!res.data.success || !res.data.data) {
