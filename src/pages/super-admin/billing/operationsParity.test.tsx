@@ -115,8 +115,12 @@ vi.mock("@/components/modals/DeleteConfirmationModal", () => ({
     onConfirm: () => void;
   }) => isOpen ? <button type="button" onClick={onConfirm}>{title}</button> : null,
 }));
+vi.mock("@/pages/agency/billing/financial-overview", () => ({ default: () => null }));
+vi.mock("@/pages/agency/billing/claims", () => ({ default: () => null }));
+vi.mock("@/pages/agency/billing/payroll", () => ({ default: () => null }));
 
 import ExpensesDashboardPage from "@/pages/agency/billing/expenses";
+import { ExpensesDashboard as AgencyExpensesDashboardRoute } from "@/pages/agency/billing/pages";
 import StaffTimesheetsApprovalPage from "@/pages/agency/billing/staff-timesheets";
 import { router } from "@/routes";
 
@@ -260,6 +264,20 @@ describe("super-admin expense and submitted-timesheet parity", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it("renders the agency expense export in the authenticated agency scope", async () => {
+    render(<MemoryRouter><AgencyExpensesDashboardRoute /></MemoryRouter>);
+
+    expect(await screen.findByRole("heading", { name: "DSP expenses" })).toBeVisible();
+    expect(expenseApi.dashboard).toHaveBeenCalledWith(
+      expect.objectContaining({ agencyId: "auth-owned-agency", mode: "hha" }),
+      expect.objectContaining({ skip: false }),
+    );
+    expect(expenseApi.list).toHaveBeenCalledWith(
+      expect.objectContaining({ agencyId: "auth-owned-agency", mode: "hha", status: "pending" }),
+      expect.objectContaining({ skip: false }),
+    );
   });
 
   it("produces equal agency-scoped expense dashboard and history inputs for agency and super-admin actors", async () => {

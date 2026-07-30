@@ -66,5 +66,5 @@ export function ClaimsDashboard() {
 }
 
 export function ExpensesDashboard() {
-  return <ExpensesDashboardPage />;
+  return <AgencyBillingScope><ExpensesDashboardPage /></AgencyBillingScope>;
 }
