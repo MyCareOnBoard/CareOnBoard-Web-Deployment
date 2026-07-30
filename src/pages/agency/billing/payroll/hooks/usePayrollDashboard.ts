@@ -10,12 +10,15 @@ import {
   mapDashboardToStatusChart,
 } from "../utils/payrollDashboardUtils";
 import type { OvertimeAlert } from "../types";
+import { useAuth } from "@/utils/auth";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
 }
 
 export function usePayrollDashboard(dateRange: DateRangeValues) {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId ?? "";
   const [rawData, setRawData] = useState<PayrollDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefetching, setIsRefetching] = useState(false);
@@ -25,7 +28,7 @@ export function usePayrollDashboard(dateRange: DateRangeValues) {
   const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(async () => {
-    if (!hasCompleteDateRange(dateRange)) {
+    if (!agencyId || !hasCompleteDateRange(dateRange)) {
       setRawData(null);
       setLoading(false);
       setIsRefetching(false);
@@ -46,9 +49,12 @@ export function usePayrollDashboard(dateRange: DateRangeValues) {
 
     try {
       const data = await getPayrollDashboard({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-        ...(mode ? { mode } : {}),
+        context: { agencyId },
+        query: {
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          ...(mode ? { mode } : {}),
+        },
       });
 
       if (requestIdRef.current !== requestId) {
@@ -74,7 +80,7 @@ export function usePayrollDashboard(dateRange: DateRangeValues) {
         setIsRefetching(false);
       }
     }
-  }, [dateRange.endDate, dateRange.startDate, mode]);
+  }, [agencyId, dateRange.endDate, dateRange.startDate, mode]);
 
   useEffect(() => {
     void refetch();

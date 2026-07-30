@@ -424,15 +424,22 @@ export default function PayrollDashboardPage() {
       setOpeningInvoice({ staffName: entry.staffName });
 
       try {
+        if (!user?.agencyId) return;
         const created = await createStaffPayrollInvoice({
-          staffUid: entry.staffUid,
-          periodStart: entry.dateRangeStart,
-          periodEnd: entry.dateRangeEnd,
-          staffTimesheetIds: entry.staffTimesheetIds,
+          context: { agencyId: user.agencyId },
+          payload: {
+            staffUid: entry.staffUid,
+            periodStart: entry.dateRangeStart,
+            periodEnd: entry.dateRangeEnd,
+            staffTimesheetIds: entry.staffTimesheetIds,
+          },
         });
         if (openingInvoiceRequestIdRef.current !== requestId) return;
 
-        const detail = await getPayrollInvoiceById(created.id);
+        const detail = await getPayrollInvoiceById({
+          context: { agencyId: user.agencyId },
+          invoiceId: created.id,
+        });
         const agency = await fetchAgencyFallbackIfNeeded(detail.invoicePrefill);
         await openInvoiceDetail(detail, agency);
         setActiveTab("generated");
@@ -455,7 +462,7 @@ export default function PayrollDashboardPage() {
         }
       }
     },
-    [fetchAgencyFallbackIfNeeded, openInvoiceDetail, refreshPayrollWorkspace, toast],
+    [fetchAgencyFallbackIfNeeded, openInvoiceDetail, refreshPayrollWorkspace, toast, user?.agencyId],
   );
 
   const handleCreateInvoiceClick = useCallback(
@@ -486,9 +493,10 @@ export default function PayrollDashboardPage() {
       setOpeningInvoice({ staffName: preview.employeeName });
 
       try {
-        const created = await createPayrollInvoice(
-          buildCreatePayloadFromSelection(preview, selectedIds, user.agencyId),
-        );
+        const created = await createPayrollInvoice({
+          context: { agencyId: user.agencyId },
+          payload: buildCreatePayloadFromSelection(preview, selectedIds),
+        });
 
         if (openingInvoiceRequestIdRef.current !== requestId) {
           return;
@@ -551,7 +559,11 @@ export default function PayrollDashboardPage() {
 
       try {
 
-        const detail = await getPayrollInvoiceById(invoice.id);
+        if (!user?.agencyId) return;
+        const detail = await getPayrollInvoiceById({
+          context: { agencyId: user.agencyId },
+          invoiceId: invoice.id,
+        });
 
 
 
@@ -886,5 +898,3 @@ export default function PayrollDashboardPage() {
   );
 
 }
-
-

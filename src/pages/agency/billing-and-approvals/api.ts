@@ -3,6 +3,8 @@ import { customBaseQuery } from "@/lib/baseQuery";
 import { Client } from "@/lib/api/clients";
 import { Employee } from "@/lib/api/employees";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
+import { operationalAgencyId } from "@/lib/operational-agency/request";
 
 export interface EmployeeWithHours extends Employee {
   totalHours?: number;
@@ -43,7 +45,6 @@ export interface BillingRecordGrouped extends BillingRecord {
 }
 
 export interface ListBillingRecordsParams {
-  agencyId: string;
   billingStatus?: string;
   date?: string;
   serviceType?: string;
@@ -66,7 +67,6 @@ export interface ListBillingRecordsResponse {
 
 export interface GenerateReportRequest {
   recordIds: string[];
-  agencyId: string;
 }
 
 export interface GenerateReportResponse {
@@ -248,54 +248,79 @@ export interface DspClaimsResponse {
   data: DspClaimsData;
 }
 
+export type BillingRecordsRequest = {
+  context: OperationalBillingRequestContext;
+  query?: ListBillingRecordsParams;
+};
+
+export type BillingReportRequest = {
+  context: OperationalBillingRequestContext;
+  recordIds: string[];
+};
+
+export function billingRecordTag(agencyId: string) {
+  return { type: "BillingRecords" as const, id: operationalAgencyId({ agencyId }) };
+}
+
+export function serializeBillingRecordArgs(input: BillingRecordsRequest) {
+  return { agencyId: operationalAgencyId(input.context), ...(input.query ?? {}) };
+}
+
+export function buildBillingRecordRequest(input: BillingRecordsRequest) {
+  const { agencyId, billingStatus, date, serviceType, limit = 10, page = 1, groupBy = "client", mode } =
+    serializeBillingRecordArgs(input);
+  const params = new URLSearchParams({
+    agencyId,
+    limit: String(limit),
+    page: String(page),
+    groupBy,
+  });
+  if (billingStatus && billingStatus !== "all") params.set("billingStatus", billingStatus);
+  if (date && date !== "all") params.set("date", date);
+  if (serviceType && serviceType !== "all") params.set("serviceType", serviceType);
+  if (mode) params.set("mode", mode);
+  return { url: `/billing?${params.toString()}`, method: "GET", requiresAuth: true };
+}
+
+export function buildBillingReportRequest(input: BillingReportRequest) {
+  const agencyId = operationalAgencyId(input.context);
+  return {
+    url: `/billing/generate-report?agencyId=${encodeURIComponent(agencyId)}`,
+    method: "POST",
+    data: { recordIds: input.recordIds, agencyId },
+    requiresAuth: true,
+  };
+}
+
 export const billingApi = createApi({
   reducerPath: "billingApi",
   baseQuery: customBaseQuery,
   tagTypes: ['BillingRecords'],
   keepUnusedDataFor: 300,
   endpoints: (builder) => ({
-    getBillingRecords: builder.query<ListBillingRecordsResponse, ListBillingRecordsParams>({
-      query: ({ agencyId, billingStatus, date, serviceType, limit = 10, page = 1, groupBy = 'client', mode }) => {
-        const params = new URLSearchParams({ agencyId });
-        if (billingStatus && billingStatus !== 'all') params.append('billingStatus', billingStatus);
-        if (date && date !== 'all') params.append('date', date);
-        if (serviceType && serviceType !== 'all') params.append('serviceType', serviceType);
-        params.append('limit', limit.toString());
-        params.append('page', page.toString());
-        params.append('groupBy', groupBy);
-        if (mode) params.append('mode', mode);
-
-        return {
-          url: `/billing?${params.toString()}`,
-          method: "GET",
-          requiresAuth: true
-        };
-      },
-      providesTags: ['BillingRecords']
+    getBillingRecords: builder.query<ListBillingRecordsResponse, BillingRecordsRequest>({
+      query: buildBillingRecordRequest,
+      serializeQueryArgs: ({ queryArgs }) => serializeBillingRecordArgs(queryArgs),
+      providesTags: (_result, _error, { context }) => [billingRecordTag(operationalAgencyId(context))],
     }),
-    generateReport: builder.mutation<GenerateReportResponse, GenerateReportRequest>({
-      query: (data) => ({
-        url: '/billing/generate-report',
-        method: "POST",
-        data,
-        requiresAuth: true
-      })
+    generateReport: builder.mutation<GenerateReportResponse, BillingReportRequest>({
+      query: buildBillingReportRequest,
     }),
-    getClientClaims: builder.query<ClientClaimsResponse, { clientId: string; agencyId: string; serviceCode?: string }>({
-      query: ({ clientId, agencyId, serviceCode }) => ({
-        url: `/billing/client/${clientId}?agencyId=${agencyId}${serviceCode ? `&serviceCode=${serviceCode}` : ''}`,
+    getClientClaims: builder.query<ClientClaimsResponse, { context: OperationalBillingRequestContext; clientId: string; serviceCode?: string }>({
+      query: ({ context, clientId, serviceCode }) => ({
+        url: `/billing/client/${encodeURIComponent(clientId)}?agencyId=${encodeURIComponent(operationalAgencyId(context))}${serviceCode ? `&serviceCode=${encodeURIComponent(serviceCode)}` : ''}`,
         method: "GET",
         requiresAuth: true
       }),
-      providesTags: ['BillingRecords']
+      providesTags: (_result, _error, { context }) => [billingRecordTag(operationalAgencyId(context))],
     }),
-    getDspClaims: builder.query<DspClaimsResponse, { dspId: string; agencyId: string }>({
-      query: ({ dspId, agencyId }) => ({
-        url: `/billing/dsp/${dspId}?agencyId=${agencyId}`,
+    getDspClaims: builder.query<DspClaimsResponse, { context: OperationalBillingRequestContext; dspId: string }>({
+      query: ({ context, dspId }) => ({
+        url: `/billing/dsp/${encodeURIComponent(dspId)}?agencyId=${encodeURIComponent(operationalAgencyId(context))}`,
         method: "GET",
         requiresAuth: true
       }),
-      providesTags: ['BillingRecords']
+      providesTags: (_result, _error, { context }) => [billingRecordTag(operationalAgencyId(context))],
     }),
   }),
 });

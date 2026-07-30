@@ -8,6 +8,7 @@ import {
   type PayrollInvoiceStatus,
 } from "@/lib/api/payroll";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { useAuth } from "@/utils/auth";
 
 type RefetchOptions = {
   force?: boolean;
@@ -22,6 +23,8 @@ export function usePayrollInvoices(
   dateRange: DateRangeValues,
   { enabled = true, statusFilter = "all" }: UsePayrollInvoicesOptions = {},
 ) {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId ?? "";
   const [invoices, setInvoices] = useState<PayrollInvoiceListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -36,7 +39,7 @@ export function usePayrollInvoices(
         return;
       }
 
-      if (!dateRange.startDate || !dateRange.endDate) {
+      if (!agencyId || !dateRange.startDate || !dateRange.endDate) {
         setInvoices([]);
         setTotal(0);
         setLoading(false);
@@ -51,11 +54,14 @@ export function usePayrollInvoices(
 
       try {
         const data = await listPayrollInvoices({
-          startDate: dateRange.startDate,
-          endDate: dateRange.endDate,
-          status: statusFilter === "all" ? undefined : statusFilter,
-          limit: 50,
-          ...(mode ? { mode } : {}),
+          context: { agencyId },
+          query: {
+            startDate: dateRange.startDate,
+            endDate: dateRange.endDate,
+            status: statusFilter === "all" ? undefined : statusFilter,
+            limit: 50,
+            ...(mode ? { mode } : {}),
+          },
         });
 
         if (requestIdRef.current !== requestId) {
@@ -80,7 +86,7 @@ export function usePayrollInvoices(
         }
       }
     },
-    [dateRange.endDate, dateRange.startDate, enabled, statusFilter, mode],
+    [agencyId, dateRange.endDate, dateRange.startDate, enabled, statusFilter, mode],
   );
 
   useEffect(() => {
@@ -91,26 +97,26 @@ export function usePayrollInvoices(
     async (invoiceId: string) => {
       setMutating(true);
       try {
-        await markPayrollInvoicePaid(invoiceId);
+        await markPayrollInvoicePaid({ context: { agencyId }, invoiceId });
         await refetch({ force: true });
       } finally {
         setMutating(false);
       }
     },
-    [refetch],
+    [agencyId, refetch],
   );
 
   const cancelInvoice = useCallback(
     async (invoiceId: string) => {
       setMutating(true);
       try {
-        await cancelPayrollInvoice(invoiceId);
+        await cancelPayrollInvoice({ context: { agencyId }, invoiceId });
         await refetch({ force: true });
       } finally {
         setMutating(false);
       }
     },
-    [refetch],
+    [agencyId, refetch],
   );
 
   return {

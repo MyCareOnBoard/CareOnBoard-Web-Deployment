@@ -5,6 +5,7 @@ import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtil
 import { useListAgencyStaffQuery } from "@/lib/api/agency-staff";
 import { listStaffTimesheets, type StaffTimesheet } from "@/lib/api/staff-timesheets";
 import type { DuePayrollEntry } from "@/lib/api/payroll";
+import { useAuth } from "@/utils/auth";
 
 type StaffRate = { name?: string; role?: string; billingType?: string; billingRate?: number };
 
@@ -81,6 +82,8 @@ function buildEntries(approved: StaffTimesheet[], rateMap: Map<string, StaffRate
  * dashboard's current window, so it always shows until it's invoiced.
  */
 export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean } = {}) {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId ?? "";
   const mode = useEffectiveAgencyMode();
   const [approved, setApproved] = useState<StaffTimesheet[]>([]);
   const [loading, setLoading] = useState(false);
@@ -105,17 +108,20 @@ export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean 
 
   const refetch = useCallback(
     async ({ force = false }: { force?: boolean } = {}) => {
-      if (!enabled && !force) return;
+      if (!agencyId || (!enabled && !force)) return;
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
       if (!hasLoadedRef.current) setLoading(true);
       setError(null);
       try {
         const { timesheets } = await listStaffTimesheets({
-          scope: "agency",
-          status: "approved",
-          limit: 200,
-          ...(mode ? { mode } : {}),
+          context: { agencyId },
+          query: {
+            scope: "agency",
+            status: "approved",
+            limit: 200,
+            ...(mode ? { mode } : {}),
+          },
         });
         if (requestIdRef.current !== requestId) return;
         setApproved(timesheets);
@@ -127,7 +133,7 @@ export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean 
         if (requestIdRef.current === requestId) setLoading(false);
       }
     },
-    [enabled, mode],
+    [agencyId, enabled, mode],
   );
 
   useEffect(() => {
@@ -135,11 +141,12 @@ export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean 
   }, [refetch]);
 
   useEffect(() => {
-    return subscribePayrollInvalidation(() => {
+    if (!agencyId) return;
+    return subscribePayrollInvalidation(agencyId, () => {
       if (!hasLoadedRef.current) return;
       void refetch({ force: true });
     });
-  }, [refetch]);
+  }, [agencyId, refetch]);
 
   const entries = useMemo(() => buildEntries(approved, rateMap), [approved, rateMap]);
 

@@ -39,13 +39,15 @@ export default function BillingReport() {
 
     const {data: billingData, isLoading, isFetching} = useGetBillingRecordsQuery(
         {
-            agencyId: user?.agencyId || '',
-            billingStatus: "all",
-            date: "all",
-            serviceType: "all",
-            limit: itemsPerPage,
-            page: currentPage,
-            groupBy: activeTab === "client" ? "client" : "dsp",
+            context: { agencyId: user?.agencyId || '' },
+            query: {
+                billingStatus: "all",
+                date: "all",
+                serviceType: "all",
+                limit: itemsPerPage,
+                page: currentPage,
+                groupBy: activeTab === "client" ? "client" : "dsp",
+            },
         },
         {
             skip: !user?.agencyId,

@@ -9,6 +9,10 @@ import type { CreateGoalDocumentRequest } from "@/lib/api/goals-and-documents";
 export type OperationalActor = "agency" | "super_admin";
 export type OperationalFeature = "shift-management" | "billing-management";
 
+export interface OperationalBillingRequestContext {
+  agencyId: string;
+}
+
 export interface OperationalAgencySummary {
   id: string;
   name: string;
@@ -99,6 +103,15 @@ export interface OperationalShiftRoutes {
   activityLogs(search?: string): string;
   maintenance(search?: string): string;
   details(shiftId: string, search?: string): string;
+}
+
+export interface OperationalBillingRoutes {
+  index(search?: string): string;
+  financialOverview(search?: string): string;
+  payroll(search?: string): string;
+  claims(search?: string): string;
+  expenses(search?: string): string;
+  timesheets(search?: string): string;
 }
 
 export interface OperationalAgencyContextValue {

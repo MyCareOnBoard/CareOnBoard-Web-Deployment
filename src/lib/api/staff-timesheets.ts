@@ -1,5 +1,7 @@
 import axiosClient from "../axios";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
+import { operationalAgencyId, withOperationalAgency } from "@/lib/operational-agency/request";
 
 export type StaffTimesheetStatus = "draft" | "pending" | "approved" | "rejected";
 
@@ -87,6 +89,24 @@ type MutationResponse = {
 const BASE = "/agencyStaff/timesheets";
 
 export async function listStaffTimesheets(
+  input: {
+    context: OperationalBillingRequestContext;
+    query?: ListStaffTimesheetsQuery;
+    signal?: AbortSignal;
+  },
+): Promise<{ timesheets: StaffTimesheet[]; total: number }> {
+  const { context, query = {}, signal } = input;
+  const response = await axiosClient.get<ListResponse>(BASE, {
+    params: withOperationalAgency(context, query),
+    ...(signal ? { signal } : {}),
+  });
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to list timesheets");
+  }
+  return response.data.data;
+}
+
+export async function listMyStaffTimesheets(
   query: ListStaffTimesheetsQuery = {},
 ): Promise<{ timesheets: StaffTimesheet[]; total: number }> {
   const response = await axiosClient.get<ListResponse>(BASE, { params: query });
@@ -96,8 +116,16 @@ export async function listStaffTimesheets(
   return response.data.data;
 }
 
-export async function getStaffTimesheet(id: string): Promise<StaffTimesheet> {
-  const response = await axiosClient.get<ItemResponse>(`${BASE}/${id}`);
+export async function getStaffTimesheet(input: {
+  context: OperationalBillingRequestContext;
+  timesheetId: string;
+  signal?: AbortSignal;
+}): Promise<StaffTimesheet> {
+  const { context, timesheetId, signal } = input;
+  const response = await axiosClient.get<ItemResponse>(`${BASE}/${encodeURIComponent(timesheetId)}`, {
+    params: { agencyId: operationalAgencyId(context) },
+    ...(signal ? { signal } : {}),
+  });
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || "Failed to fetch timesheet");
   }
@@ -126,13 +154,21 @@ export async function updateStaffTimesheet(
 }
 
 export async function reviewStaffTimesheet(
-  id: string,
-  status: "approved" | "rejected",
-  reviewerNotes?: string,
+  input: {
+    context: OperationalBillingRequestContext;
+    timesheetId: string;
+    status: "approved" | "rejected";
+    reviewerNotes?: string;
+    signal?: AbortSignal;
+  },
 ): Promise<void> {
-  const response = await axiosClient.patch<MutationResponse>(`${BASE}/${id}/status`, {
+  const { context, timesheetId, status, reviewerNotes, signal } = input;
+  const response = await axiosClient.patch<MutationResponse>(`${BASE}/${encodeURIComponent(timesheetId)}/status`, {
     status,
     ...(reviewerNotes ? { reviewerNotes } : {}),
+  }, {
+    params: { agencyId: operationalAgencyId(context) },
+    ...(signal ? { signal } : {}),
   });
   if (!response.data.success) {
     throw new Error(response.data.message || "Failed to review timesheet");
@@ -140,11 +176,17 @@ export async function reviewStaffTimesheet(
 }
 
 export async function createStaffPayrollInvoice(
-  payload: CreateStaffPayrollInvoicePayload,
+  input: {
+    context: OperationalBillingRequestContext;
+    payload: CreateStaffPayrollInvoicePayload;
+    signal?: AbortSignal;
+  },
 ): Promise<{ id: string }> {
+  const { context, payload, signal } = input;
   const response = await axiosClient.post<{ success: boolean; data?: { id: string }; message?: string }>(
     `${BASE}/payroll`,
     payload,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || "Failed to create payroll invoice");

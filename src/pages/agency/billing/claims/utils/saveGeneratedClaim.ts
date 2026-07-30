@@ -42,11 +42,13 @@ export async function saveGeneratedClaim({
     }
 
     const savedClaim = await createBillingClaim({
-      agencyId,
-      clientId,
-      rideIds: selectedRides.map((ride) => ride.id),
-      serviceCode: normalizedServiceCode,
-      weekRange,
+      context: { agencyId },
+      payload: {
+        clientId,
+        rideIds: selectedRides.map((ride) => ride.id),
+        serviceCode: normalizedServiceCode,
+        weekRange,
+      },
     });
 
     return {
@@ -66,11 +68,13 @@ export async function saveGeneratedClaim({
   }
 
   const savedClaim = await createBillingClaim({
-    agencyId,
-    clientId,
-    shiftIds: selectedShifts.map((shift) => shift.id),
-    serviceCode: normalizedServiceCode,
-    weekRange,
+    context: { agencyId },
+    payload: {
+      clientId,
+      shiftIds: selectedShifts.map((shift) => shift.id),
+      serviceCode: normalizedServiceCode,
+      weekRange,
+    },
   });
 
   return {

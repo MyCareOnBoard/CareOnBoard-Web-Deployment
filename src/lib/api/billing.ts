@@ -1,6 +1,8 @@
 import axiosClient from '../axios';
 import { Client } from './clients';
 import { Employee } from './employees';
+import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
+import { operationalAgencyId, withOperationalAgency } from "@/lib/operational-agency/request";
 
 export interface BillingRecord {
   id: string;
@@ -33,10 +35,16 @@ export interface ListBillingRecordsResponse {
   count: number;
 }
 
-export const listBillingRecords = async (params?: ListBillingRecordsParams): Promise<ListBillingRecordsResponse> => {
+export const listBillingRecords = async (input: {
+  context: OperationalBillingRequestContext;
+  query?: ListBillingRecordsParams;
+  signal?: AbortSignal;
+}): Promise<ListBillingRecordsResponse> => {
   try {
+    const { context, query = {}, signal } = input;
     const response = await axiosClient.get<ListBillingRecordsResponse>('/billing', {
-      params
+      params: withOperationalAgency(context, query),
+      ...(signal ? { signal } : {}),
     });
 
     if (!response.data.success) {
@@ -50,10 +58,20 @@ export const listBillingRecords = async (params?: ListBillingRecordsParams): Pro
   }
 };
 
-export const generateBillingReport = async (recordIds: string[]): Promise<{ success: boolean; reportUrl: string }> => {
+export const generateBillingReport = async (input: {
+  context: OperationalBillingRequestContext;
+  recordIds: string[];
+  signal?: AbortSignal;
+}): Promise<{ success: boolean; reportUrl: string }> => {
   try {
+    const { context, recordIds, signal } = input;
+    const agencyId = operationalAgencyId(context);
     const response = await axiosClient.post<{ success: boolean; reportUrl: string }>('/billing/generate-report', {
-      recordIds
+      recordIds,
+      agencyId,
+    }, {
+      params: { agencyId },
+      ...(signal ? { signal } : {}),
     });
 
     if (!response.data.success) {

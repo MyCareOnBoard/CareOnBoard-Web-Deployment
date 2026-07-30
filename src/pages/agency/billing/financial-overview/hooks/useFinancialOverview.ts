@@ -22,6 +22,7 @@ import {
   mapDashboardToFinancialPayrollChart,
   mapDashboardToOverviewStats,
 } from "../utils/financialOverviewUtils";
+import { useAuth } from "@/utils/auth";
 
 const LIST_LIMIT = 15;
 const ACTIVITY_LIMIT = 20;
@@ -40,6 +41,7 @@ type PrimaryFetchResult = {
 };
 
 async function fetchPrimaryBatch(
+  agencyId: string,
   dateRange: DateRangeValues,
   mode: AgencyMode | null,
 ): Promise<PrimaryFetchResult> {
@@ -51,10 +53,10 @@ async function fetchPrimaryBatch(
 
   const [claimsDashboardResult, payrollDashboardResult, claimsListResult, invoicesListResult] =
     await Promise.allSettled([
-      getClaimsDashboard(query),
-      getPayrollDashboard(query),
-      listBillingClaims({ ...query, limit: LIST_LIMIT }),
-      listPayrollInvoices({ ...query, limit: LIST_LIMIT }),
+      getClaimsDashboard({ context: { agencyId }, query }),
+      getPayrollDashboard({ context: { agencyId }, query }),
+      listBillingClaims({ context: { agencyId }, query: { ...query, limit: LIST_LIMIT } }),
+      listPayrollInvoices({ context: { agencyId }, query: { ...query, limit: LIST_LIMIT } }),
     ]);
 
   const partialErrors: string[] = [];
@@ -120,6 +122,8 @@ async function fetchPrimaryBatch(
 }
 
 export function useFinancialOverview(dateRange: DateRangeValues) {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId ?? "";
   const [claimsDashboard, setClaimsDashboard] = useState<ClaimsDashboardSummary | null>(null);
   const [previousClaimsDashboard, setPreviousClaimsDashboard] =
     useState<ClaimsDashboardSummary | null>(null);
@@ -148,9 +152,12 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
 
       try {
         const previousData = await getClaimsDashboard({
-          startDate: previousRange.startDate,
-          endDate: previousRange.endDate,
-          ...(mode ? { mode } : {}),
+          context: { agencyId },
+          query: {
+            startDate: previousRange.startDate,
+            endDate: previousRange.endDate,
+            ...(mode ? { mode } : {}),
+          },
         });
 
         if (requestIdRef.current !== requestId) {
@@ -170,11 +177,11 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
         }
       }
     },
-    [mode],
+    [agencyId, mode],
   );
 
   const refetch = useCallback(async () => {
-    if (!hasCompleteDateRange(dateRange)) {
+    if (!agencyId || !hasCompleteDateRange(dateRange)) {
       setClaimsDashboard(null);
       setPreviousClaimsDashboard(null);
       setPayrollDashboard(null);
@@ -218,7 +225,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
     setPreviousClaimsDashboard(null);
 
     try {
-      const result = await fetchPrimaryBatch(dateRange, mode);
+      const result = await fetchPrimaryBatch(agencyId, dateRange, mode);
 
       if (requestIdRef.current !== requestId) {
         return;
@@ -267,7 +274,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
         setIsRefetching(false);
       }
     }
-  }, [dateRange.endDate, dateRange.startDate, fetchTrends, mode]);
+  }, [agencyId, dateRange.endDate, dateRange.startDate, fetchTrends, mode]);
 
   useEffect(() => {
     void refetch();

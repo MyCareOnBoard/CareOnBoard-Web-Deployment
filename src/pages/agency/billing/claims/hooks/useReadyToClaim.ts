@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listReadyToClaim, type ReadyToClaimRow } from "@/lib/api/claims";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { useAuth } from "@/utils/auth";
 
 type RefetchOptions = {
   force?: boolean;
@@ -11,6 +12,8 @@ type UseReadyToClaimOptions = {
 };
 
 export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {}) {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId ?? "";
   const [rows, setRows] = useState<ReadyToClaimRow[]>([]);
   const [mileageRate, setMileageRate] = useState(0);
   const [truncated, setTruncated] = useState(false);
@@ -20,7 +23,7 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
   const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(async ({ force = false }: RefetchOptions = {}) => {
-    if (!enabled && !force) {
+    if (!agencyId || (!enabled && !force)) {
       return;
     }
 
@@ -30,7 +33,10 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
     setError(null);
 
     try {
-      const response = await listReadyToClaim({ limit: 100, ...(mode ? { mode } : {}) });
+      const response = await listReadyToClaim({
+        context: { agencyId },
+        query: { limit: 100, ...(mode ? { mode } : {}) },
+      });
 
       if (requestIdRef.current !== requestId) {
         return;
@@ -57,7 +63,7 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
         setLoading(false);
       }
     }
-  }, [enabled, mode]);
+  }, [agencyId, enabled, mode]);
 
   useEffect(() => {
     void refetch();

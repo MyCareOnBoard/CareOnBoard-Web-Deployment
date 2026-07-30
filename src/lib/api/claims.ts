@@ -4,6 +4,8 @@ import type { Shift } from "@/lib/api/shifts";
 import type { MileageRide } from "@/lib/api/mileage";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import type { Coverage, SplitMode } from "@/lib/coverage";
+import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
+import { operationalAgencyId, withOperationalAgency } from "@/lib/operational-agency/request";
 
 export type BillingClaimStatus = "pending" | "paid" | "rejected";
 
@@ -111,7 +113,6 @@ export type SavedBillingClaim = {
 };
 
 export type CreateBillingClaimPayload = {
-  agencyId: string;
   clientId: string;
   shiftIds?: string[];
   rideIds?: string[];
@@ -189,9 +190,19 @@ function getAxiosErrorPayload(error: unknown) {
 }
 
 export async function createBillingClaim(
-  payload: CreateBillingClaimPayload,
+  input: {
+    context: OperationalBillingRequestContext;
+    payload: CreateBillingClaimPayload;
+    signal?: AbortSignal;
+  },
 ): Promise<SavedBillingClaim> {
-  const response = await axiosClient.post<CreateBillingClaimResponse>("/billing/claims", payload);
+  const { context, payload, signal } = input;
+  const body = withOperationalAgency(context, payload);
+  const response = await axiosClient.post<CreateBillingClaimResponse>(
+    "/billing/claims",
+    body,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
+  );
 
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || "Failed to create billing claim");
@@ -201,11 +212,16 @@ export async function createBillingClaim(
 }
 
 export async function getClaimsDashboard(
-  query: ClaimsDashboardQuery,
+  input: {
+    context: OperationalBillingRequestContext;
+    query: ClaimsDashboardQuery;
+    signal?: AbortSignal;
+  },
 ): Promise<ClaimsDashboardSummary> {
+  const { context, query, signal } = input;
   const response = await axiosClient.get<ClaimsDashboardResponse>(
     "/billing/claims/dashboard",
-    { params: query },
+    { params: withOperationalAgency(context, query), ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success || !response.data.data) {
@@ -221,13 +237,15 @@ type ReadyToClaimApiResponse = {
   message?: string;
 };
 
-export async function listReadyToClaim(params?: {
-  limit?: number;
-  mode?: AgencyMode;
+export async function listReadyToClaim(input: {
+  context: OperationalBillingRequestContext;
+  query?: { limit?: number; mode?: AgencyMode };
+  signal?: AbortSignal;
 }): Promise<ReadyToClaimResponse> {
+  const { context, query = {}, signal } = input;
   const response = await axiosClient.get<ReadyToClaimApiResponse>(
     "/billing/claims/ready-to-claim",
-    { params },
+    { params: withOperationalAgency(context, query), ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success || !response.data.data) {
@@ -238,10 +256,16 @@ export async function listReadyToClaim(params?: {
 }
 
 export async function listBillingClaims(
-  query: BillingClaimsListQuery,
+  input: {
+    context: OperationalBillingRequestContext;
+    query: BillingClaimsListQuery;
+    signal?: AbortSignal;
+  },
 ): Promise<{ claims: BillingClaimListItem[]; total: number }> {
+  const { context, query, signal } = input;
   const response = await axiosClient.get<BillingClaimsListResponse>("/billing/claims", {
-    params: query,
+    params: withOperationalAgency(context, query),
+    ...(signal ? { signal } : {}),
   });
 
   if (!response.data.success || !response.data.data) {
@@ -251,9 +275,15 @@ export async function listBillingClaims(
   return response.data.data;
 }
 
-export async function getBillingClaimById(claimId: string): Promise<BillingClaimDetail> {
+export async function getBillingClaimById(input: {
+  context: OperationalBillingRequestContext;
+  claimId: string;
+  signal?: AbortSignal;
+}): Promise<BillingClaimDetail> {
+  const { context, claimId, signal } = input;
   const response = await axiosClient.get<BillingClaimDetailResponse>(
-    `/billing/claims/${claimId}`,
+    `/billing/claims/${encodeURIComponent(claimId)}`,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success || !response.data.data) {
@@ -264,12 +294,18 @@ export async function getBillingClaimById(claimId: string): Promise<BillingClaim
 }
 
 export async function updateBillingClaimStatus(
-  claimId: string,
-  payload: UpdateBillingClaimStatusPayload,
+  input: {
+    context: OperationalBillingRequestContext;
+    claimId: string;
+    payload: UpdateBillingClaimStatusPayload;
+    signal?: AbortSignal;
+  },
 ): Promise<void> {
+  const { context, claimId, payload, signal } = input;
   const response = await axiosClient.patch<BillingClaimMutationResponse>(
-    `/billing/claims/${claimId}/status`,
+    `/billing/claims/${encodeURIComponent(claimId)}/status`,
     payload,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success) {
@@ -277,9 +313,15 @@ export async function updateBillingClaimStatus(
   }
 }
 
-export async function cancelBillingClaim(claimId: string): Promise<void> {
+export async function cancelBillingClaim(input: {
+  context: OperationalBillingRequestContext;
+  claimId: string;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const { context, claimId, signal } = input;
   const response = await axiosClient.delete<BillingClaimMutationResponse>(
-    `/billing/claims/${claimId}`,
+    `/billing/claims/${encodeURIComponent(claimId)}`,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success) {

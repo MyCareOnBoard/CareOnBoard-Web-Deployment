@@ -252,9 +252,12 @@ export default function ClaimsDashboardPage() {
         setGeneratingInvoice(true);
         try {
           createdInvoice = await createOutOfPocketInvoice({
-            clientId,
-            shiftIds: invoiceShiftIds,
-            rideIds: invoiceRideIds,
+            context: { agencyId: user.agencyId },
+            payload: {
+              clientId,
+              shiftIds: invoiceShiftIds,
+              rideIds: invoiceRideIds,
+            },
           });
         } catch (error) {
           invoiceError = error;
@@ -340,7 +343,8 @@ export default function ClaimsDashboardPage() {
   const handleViewInvoice = useCallback(
     async (item: OutOfPocketInvoiceListItem) => {
       try {
-        setOpenInvoice(await getOutOfPocketInvoice(item.id));
+        if (!user?.agencyId) return;
+        setOpenInvoice(await getOutOfPocketInvoice({ context: { agencyId: user.agencyId }, invoiceId: item.id }));
       } catch (error) {
         toast({
           title: "Couldn't open invoice",
@@ -349,7 +353,7 @@ export default function ClaimsDashboardPage() {
         });
       }
     },
-    [toast],
+    [toast, user?.agencyId],
   );
 
   const handleConfirmCancelInvoice = useCallback(async () => {
@@ -357,7 +361,11 @@ export default function ClaimsDashboardPage() {
 
     setMutationSaving(true);
     try {
-      await cancelOutOfPocketInvoice(cancelModalInvoice.id);
+      if (!user?.agencyId) return;
+      await cancelOutOfPocketInvoice({
+        context: { agencyId: user.agencyId },
+        invoiceId: cancelModalInvoice.id,
+      });
       setCancelModalInvoice(null);
       toast({ title: "Invoice cancelled. Its items are billable again." });
       await refreshAfterCreateOrCancel();
@@ -370,7 +378,7 @@ export default function ClaimsDashboardPage() {
     } finally {
       setMutationSaving(false);
     }
-  }, [cancelModalInvoice, refreshAfterCreateOrCancel, toast]);
+  }, [cancelModalInvoice, refreshAfterCreateOrCancel, toast, user?.agencyId]);
 
   const handleCloseReportModal = useCallback(() => {
     setClaimReport(null);
@@ -383,7 +391,11 @@ export default function ClaimsDashboardPage() {
       setOpeningReport({ claimNumber: claim.claimNumber });
 
       try {
-        const detail = await getBillingClaimById(claim.id);
+        if (!user?.agencyId) return;
+        const detail = await getBillingClaimById({
+          context: { agencyId: user.agencyId },
+          claimId: claim.id,
+        });
 
         if (openingReportRequestIdRef.current !== requestId) {
           return;

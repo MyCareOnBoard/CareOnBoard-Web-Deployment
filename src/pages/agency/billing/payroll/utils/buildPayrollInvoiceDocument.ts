@@ -92,7 +92,6 @@ export function needsAgencyFallback(prefill: PayrollInvoicePrefill | null | unde
 export function buildCreatePayloadFromSelection(
   preview: PayrollInvoicePreview,
   selectedIds: Set<string>,
-  agencyId: string,
 ): CreatePayrollInvoicePayload {
   const shiftIds: string[] = [];
   const rideIds: string[] = [];
@@ -112,7 +111,6 @@ export function buildCreatePayloadFromSelection(
   }
 
   return {
-    agencyId,
     employeeId: preview.employeeId,
     periodStart: preview.periodStart,
     periodEnd: preview.periodEnd,
@@ -124,10 +122,8 @@ export function buildCreatePayloadFromSelection(
 
 export function dueEntryToCreatePayload(
   entry: DuePayrollEntry,
-  agencyId: string,
 ) {
   return {
-    agencyId,
     employeeId: entry.employeeId,
     periodStart: entry.dateRangeStart,
     periodEnd: entry.dateRangeEnd,

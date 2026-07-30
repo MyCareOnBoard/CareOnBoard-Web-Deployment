@@ -12,6 +12,7 @@ import {
 } from "../../components/billingModalStyles";
 import { downloadPayrollInvoicePdf } from "../../payroll/utils/payrollInvoicePrintUtils";
 import { sendOutOfPocketInvoice, type OutOfPocketInvoiceDetail } from "@/lib/api/out-of-pocket";
+import { useAuth } from "@/utils/auth";
 
 const MODAL_CLASS =
   "fixed !left-auto !right-6 !top-6 !translate-x-0 !translate-y-0 w-[calc(100vw-32px)] max-w-[720px] rounded-[20px] border border-[#e5e5e6] bg-white p-0 shadow-lg sm:!right-6";
@@ -28,6 +29,7 @@ type Props = {
 };
 
 export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent }: Props) {
+  const { user } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
@@ -55,14 +57,17 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
   }, [downloading, invoice.invoiceNumber, toast]);
 
   const handleSend = useCallback(async () => {
-    if (sending) return;
+    if (sending || !user?.agencyId) return;
     if (!doc.payerEmail) {
       toast({ title: "No payer email on record for this client.", variant: "destructive" });
       return;
     }
     setSending(true);
     try {
-      const result = await sendOutOfPocketInvoice(invoice.id);
+      const result = await sendOutOfPocketInvoice({
+        context: { agencyId: user.agencyId },
+        invoiceId: invoice.id,
+      });
       setEmailStatus(result.emailStatus);
       setEmailedTo(result.emailedTo);
       toast({ title: `Invoice sent to ${result.emailedTo}.` });
@@ -77,7 +82,7 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
     } finally {
       setSending(false);
     }
-  }, [doc.payerEmail, invoice.id, onSent, sending, toast]);
+  }, [doc.payerEmail, invoice.id, onSent, sending, toast, user?.agencyId]);
 
   const sendLabel = sending
     ? "Sending…"

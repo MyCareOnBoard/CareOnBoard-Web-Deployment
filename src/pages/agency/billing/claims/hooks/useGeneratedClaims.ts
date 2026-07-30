@@ -10,6 +10,7 @@ import {
 } from "@/lib/api/claims";
 import { filterClaimsByClientSearch } from "../utils/savedClaimUtils";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { useAuth } from "@/utils/auth";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
@@ -35,6 +36,8 @@ export function useGeneratedClaims(
     selectedClientName,
   }: UseGeneratedClaimsOptions = {},
 ) {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId ?? "";
   const [rawClaims, setRawClaims] = useState<BillingClaimListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +50,7 @@ export function useGeneratedClaims(
         return;
       }
 
-      if (!hasCompleteDateRange(dateRange)) {
+      if (!agencyId || !hasCompleteDateRange(dateRange)) {
         return;
       }
 
@@ -58,10 +61,13 @@ export function useGeneratedClaims(
 
       try {
         const { claims } = await listBillingClaims({
-          startDate: dateRange.startDate,
-          endDate: dateRange.endDate,
-          ...(statusFilter !== "all" ? { status: statusFilter } : {}),
-          ...(mode ? { mode } : {}),
+          context: { agencyId },
+          query: {
+            startDate: dateRange.startDate,
+            endDate: dateRange.endDate,
+            ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+            ...(mode ? { mode } : {}),
+          },
         });
 
         if (requestIdRef.current !== requestId) {
@@ -84,7 +90,7 @@ export function useGeneratedClaims(
         }
       }
     },
-    [dateRange.endDate, dateRange.startDate, enabled, statusFilter, mode],
+    [agencyId, dateRange.endDate, dateRange.startDate, enabled, statusFilter, mode],
   );
 
   useEffect(() => {
@@ -118,13 +124,13 @@ export function useGeneratedClaims(
       );
 
       try {
-        await updateBillingClaimStatus(claimId, payload);
+        await updateBillingClaimStatus({ context: { agencyId }, claimId, payload });
       } catch (mutationError) {
         await refetch({ force: true });
         throw mutationError;
       }
     },
-    [refetch],
+    [agencyId, refetch],
   );
 
   const cancelClaim = useCallback(
@@ -132,13 +138,13 @@ export function useGeneratedClaims(
       setRawClaims((previous) => previous.filter((claim) => claim.id !== claimId));
 
       try {
-        await cancelBillingClaim(claimId);
+        await cancelBillingClaim({ context: { agencyId }, claimId });
       } catch (mutationError) {
         await refetch({ force: true });
         throw mutationError;
       }
     },
-    [refetch],
+    [agencyId, refetch],
   );
 
   return {

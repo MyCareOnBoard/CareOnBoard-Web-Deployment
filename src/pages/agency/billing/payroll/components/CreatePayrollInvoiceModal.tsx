@@ -20,6 +20,7 @@ import {
   type PayrollInvoicePreviewItem,
   type PayrollInvoicePreviewItemType,
 } from "@/lib/api/payroll";
+import { useAuth } from "@/utils/auth";
 import { cn } from "@/lib/utils";
 import { computeSelectedPayrollTotals } from "@/pages/agency/billing/payroll/utils/payrollInvoiceTotals";
 
@@ -174,6 +175,7 @@ export default function CreatePayrollInvoiceModal({
   onClose,
   onConfirm,
 }: CreatePayrollInvoiceModalProps) {
+  const { user } = useAuth();
   const [preview, setPreview] = useState<PayrollInvoicePreview | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -181,7 +183,7 @@ export default function CreatePayrollInvoiceModal({
   const [reloadToken, setReloadToken] = useState(0);
 
   const loadPreview = useCallback(async (signal: AbortSignal) => {
-    if (!entry) {
+    if (!entry || !user?.agencyId) {
       return;
     }
 
@@ -190,9 +192,13 @@ export default function CreatePayrollInvoiceModal({
 
     try {
       const data = await getPayrollInvoicePreview({
-        employeeId: entry.employeeId,
-        periodStart: entry.dateRangeStart,
-        periodEnd: entry.dateRangeEnd,
+        context: { agencyId: user.agencyId },
+        query: {
+          employeeId: entry.employeeId,
+          periodStart: entry.dateRangeStart,
+          periodEnd: entry.dateRangeEnd,
+        },
+        signal,
       });
 
       if (signal.aborted) {
@@ -217,7 +223,7 @@ export default function CreatePayrollInvoiceModal({
         setLoading(false);
       }
     }
-  }, [entry]);
+  }, [entry, user?.agencyId]);
 
   useEffect(() => {
     if (!open || !entry) {

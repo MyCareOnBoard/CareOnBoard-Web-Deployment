@@ -28,6 +28,7 @@ import {
   type StaffTimesheet,
   type StaffTimesheetStatus,
 } from "@/lib/api/staff-timesheets";
+import { useAuth } from "@/utils/auth";
 
 const STATUS_META: Record<string, { label: string; border: string; dot: string }> = {
   pending: { label: "Pending", border: "border-[#FF6C10] text-[#FF6C10]", dot: "bg-[#FF6C10]" },
@@ -93,6 +94,8 @@ function SkeletonRow() {
 }
 
 export default function StaffTimesheetsApprovalPage() {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId ?? "";
   const { toast } = useToast();
   const mode = useEffectiveAgencyMode();
 
@@ -106,9 +109,17 @@ export default function StaffTimesheetsApprovalPage() {
   const [rejectNotes, setRejectNotes] = useState("");
 
   const load = useCallback(async () => {
+    if (!agencyId) {
+      setTimesheets([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const { timesheets: rows } = await listStaffTimesheets({ scope: "agency", ...(mode ? { mode } : {}) });
+      const { timesheets: rows } = await listStaffTimesheets({
+        context: { agencyId },
+        query: { scope: "agency", ...(mode ? { mode } : {}) },
+      });
       setTimesheets(rows);
     } catch (error) {
       toast({
@@ -119,7 +130,7 @@ export default function StaffTimesheetsApprovalPage() {
     } finally {
       setLoading(false);
     }
-  }, [mode, toast]);
+  }, [agencyId, mode, toast]);
 
   useEffect(() => {
     load();
@@ -146,7 +157,11 @@ export default function StaffTimesheetsApprovalPage() {
   async function handleApprove(t: StaffTimesheet) {
     setBusyId(t.id);
     try {
-      await reviewStaffTimesheet(t.id, "approved");
+      await reviewStaffTimesheet({
+        context: { agencyId },
+        timesheetId: t.id,
+        status: "approved",
+      });
       toast({ title: "Timesheet approved", variant: "success" });
       await load();
     } catch (error) {
@@ -164,7 +179,12 @@ export default function StaffTimesheetsApprovalPage() {
     }
     setBusyId(rejectTarget.id);
     try {
-      await reviewStaffTimesheet(rejectTarget.id, "rejected", rejectNotes.trim());
+      await reviewStaffTimesheet({
+        context: { agencyId },
+        timesheetId: rejectTarget.id,
+        status: "rejected",
+        reviewerNotes: rejectNotes.trim(),
+      });
       toast({ title: "Timesheet rejected", variant: "success" });
       setRejectTarget(null);
       setRejectNotes("");
@@ -180,10 +200,13 @@ export default function StaffTimesheetsApprovalPage() {
     setBusyId(t.id);
     try {
       await createStaffPayrollInvoice({
-        staffUid: t.staffUid,
-        periodStart: t.periodStart,
-        periodEnd: t.periodEnd,
-        staffTimesheetIds: [t.id],
+        context: { agencyId },
+        payload: {
+          staffUid: t.staffUid,
+          periodStart: t.periodStart,
+          periodEnd: t.periodEnd,
+          staffTimesheetIds: [t.id],
+        },
       });
       toast({
         title: "Payroll created",

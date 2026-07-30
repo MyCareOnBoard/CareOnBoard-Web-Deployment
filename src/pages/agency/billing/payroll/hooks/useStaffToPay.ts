@@ -3,6 +3,7 @@ import type { DateRangeValues } from "@/pages/agency/billing/shared/types";
 import { subscribePayrollInvalidation } from "@/pages/agency/billing/shared/billingInvalidation";
 import { getStaffToPay, type DuePayrollEntry } from "@/lib/api/payroll";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { useAuth } from "@/utils/auth";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
@@ -22,6 +23,8 @@ export function useStaffToPay(
   dateRange: DateRangeValues,
   { enabled = true, duePage = 1, dueLimit = 100 }: UseStaffToPayOptions = {},
 ) {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId ?? "";
   const [entries, setEntries] = useState<DuePayrollEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -33,7 +36,7 @@ export function useStaffToPay(
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
-      if ((!enabled || !hasCompleteDateRange(dateRange)) && !force) {
+      if (!agencyId || ((!enabled || !hasCompleteDateRange(dateRange)) && !force)) {
         return;
       }
 
@@ -59,12 +62,15 @@ export function useStaffToPay(
 
       try {
         const data = await getStaffToPay({
-          startDate: dateRange.startDate,
-          endDate: dateRange.endDate,
-          duePage,
-          dueLimit,
-          approved: true,
-          ...(mode ? { mode } : {}),
+          context: { agencyId },
+          query: {
+            startDate: dateRange.startDate,
+            endDate: dateRange.endDate,
+            duePage,
+            dueLimit,
+            approved: true,
+            ...(mode ? { mode } : {}),
+          },
         });
 
         if (requestIdRef.current !== requestId) {
@@ -93,7 +99,7 @@ export function useStaffToPay(
         }
       }
     },
-    [dateRange.endDate, dateRange.startDate, dueLimit, duePage, enabled, mode],
+    [agencyId, dateRange.endDate, dateRange.startDate, dueLimit, duePage, enabled, mode],
   );
 
   useEffect(() => {
@@ -101,13 +107,14 @@ export function useStaffToPay(
   }, [refetch]);
 
   useEffect(() => {
-    return subscribePayrollInvalidation(() => {
+    if (!agencyId) return;
+    return subscribePayrollInvalidation(agencyId, () => {
       if (!enabled || !hasLoadedOnceRef.current) {
         return;
       }
       void refetch({ force: true });
     });
-  }, [enabled, refetch]);
+  }, [agencyId, enabled, refetch]);
 
   return {
     entries,

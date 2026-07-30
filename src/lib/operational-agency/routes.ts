@@ -1,4 +1,4 @@
-import type { OperationalShiftRoutes } from "./types";
+import type { OperationalBillingRoutes, OperationalShiftRoutes } from "./types";
 
 function withSearch(path: string, search?: string): string {
   if (!search) return path;
@@ -43,3 +43,17 @@ export const superAdminShiftRoutes = createShiftRoutes({
   maintenance: "/super-admin/shift-maintenance",
   details: "/super-admin/shifts/:shiftId",
 });
+
+function createBillingRoutes(basePath: string): OperationalBillingRoutes {
+  return {
+    index: (search) => withSearch(basePath, search),
+    financialOverview: (search) => withSearch(`${basePath}/financial-overview`, search),
+    payroll: (search) => withSearch(`${basePath}/payroll-management`, search),
+    claims: (search) => withSearch(`${basePath}/claims`, search),
+    expenses: (search) => withSearch(`${basePath}/expenses`, search),
+    timesheets: (search) => withSearch(`${basePath}/staff-timesheets`, search),
+  };
+}
+
+export const agencyBillingRoutes = createBillingRoutes("/agency/billing");
+export const superAdminBillingRoutes = createBillingRoutes("/super-admin/billing");

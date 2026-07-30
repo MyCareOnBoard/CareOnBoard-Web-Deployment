@@ -31,7 +31,7 @@ export default function DSPClaimsPage() {
   const {data, isLoading, error} = useGetDspClaimsQuery(
     {
       dspId: dsp || "",
-      agencyId: user?.agencyId || "",
+      context: { agencyId: user?.agencyId || "" },
     },
     {
       skip: !dsp || !user?.agencyId,
@@ -60,7 +60,7 @@ export default function DSPClaimsPage() {
     }
 
     try {
-      await approveExpense({ expenseId }).unwrap();
+      await approveExpense({ agencyId: user.agencyId, expenseId }).unwrap();
 
       toast({
         title: "Expense approved",
@@ -93,7 +93,9 @@ export default function DSPClaimsPage() {
     }
 
     try {
+      if (!user?.agencyId) return;
       await rejectExpense({
+        agencyId: user.agencyId,
         expenseId,
         reviewerNotes: trimmed,
       }).unwrap();

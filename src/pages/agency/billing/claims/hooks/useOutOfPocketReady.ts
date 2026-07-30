@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listOutOfPocketReady, type OutOfPocketReadyRow } from "@/lib/api/out-of-pocket";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { useAuth } from "@/utils/auth";
 
 type RefetchOptions = { force?: boolean };
 type Options = { enabled?: boolean };
 
 /** Out-of-pocket "ready to bill" rows, merged into the claims "Shifts to claim" tab. */
 export function useOutOfPocketReady({ enabled = true }: Options = {}) {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId ?? "";
   const [rows, setRows] = useState<OutOfPocketReadyRow[]>([]);
   const [mileageRate, setMileageRate] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -16,13 +19,16 @@ export function useOutOfPocketReady({ enabled = true }: Options = {}) {
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
-      if (!enabled && !force) return;
+      if (!agencyId || (!enabled && !force)) return;
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
       setLoading(true);
       setError(null);
       try {
-        const response = await listOutOfPocketReady({ limit: 100, ...(mode ? { mode } : {}) });
+        const response = await listOutOfPocketReady({
+          context: { agencyId },
+          query: { limit: 100, ...(mode ? { mode } : {}) },
+        });
         if (requestIdRef.current !== requestId) return;
         setRows(response.rows);
         setMileageRate(response.mileageRate ?? 0);
@@ -35,7 +41,7 @@ export function useOutOfPocketReady({ enabled = true }: Options = {}) {
         if (requestIdRef.current === requestId) setLoading(false);
       }
     },
-    [enabled, mode],
+    [agencyId, enabled, mode],
   );
 
   useEffect(() => {

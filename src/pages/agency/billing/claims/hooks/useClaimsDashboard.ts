@@ -7,12 +7,15 @@ import {
   mapDashboardToRejectionChart,
   mapDashboardToStatusChart,
 } from "../utils/claimsDashboardUtils";
+import { useAuth } from "@/utils/auth";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
 }
 
 export function useClaimsDashboard(dateRange: DateRangeValues) {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId ?? "";
   const [rawData, setRawData] = useState<ClaimsDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +23,7 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
   const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(async () => {
-    if (!hasCompleteDateRange(dateRange)) {
+    if (!agencyId || !hasCompleteDateRange(dateRange)) {
       setRawData(null);
       setLoading(false);
       setError(null);
@@ -34,9 +37,12 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
 
     try {
       const data = await getClaimsDashboard({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-        ...(mode ? { mode } : {}),
+        context: { agencyId },
+        query: {
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          ...(mode ? { mode } : {}),
+        },
       });
 
       if (requestIdRef.current !== requestId) {
@@ -58,7 +64,7 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
         setLoading(false);
       }
     }
-  }, [dateRange.endDate, dateRange.startDate, mode]);
+  }, [agencyId, dateRange.endDate, dateRange.startDate, mode]);
 
   useEffect(() => {
     void refetch();

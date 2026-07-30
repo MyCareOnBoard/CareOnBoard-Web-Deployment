@@ -46,7 +46,8 @@ export default function ExpensesDashboardPage() {
   const lastDashboardErrorRef = useRef<string | null>(null);
   const lastListErrorRef = useRef<string | null>(null);
 
-  const hasAgency = Boolean(user?.agencyId);
+  const agencyId = user?.agencyId ?? "";
+  const hasAgency = Boolean(agencyId);
   const hasDateRange = Boolean(dateRange.startDate && dateRange.endDate);
   const { mode, labels } = useStaffLabels();
   const staffNoun = labels.noun;
@@ -57,12 +58,13 @@ export default function ExpensesDashboardPage() {
     isError: dashboardError,
     error: dashboardErrorPayload,
   } = useGetExpensesDashboardQuery(
-    { startDate: dateRange.startDate, endDate: dateRange.endDate, mode: mode ?? undefined },
-    { skip: !hasDateRange },
+    { agencyId, startDate: dateRange.startDate, endDate: dateRange.endDate, mode: mode ?? undefined },
+    { skip: !hasAgency || !hasDateRange },
   );
 
   const pendingQuery = useGetAgencyExpensesQuery(
     {
+      agencyId,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
       status: "pending",
@@ -70,11 +72,12 @@ export default function ExpensesDashboardPage() {
       limit: 50,
       mode: mode ?? undefined,
     },
-    { skip: !hasDateRange || activeTab !== "pending" },
+    { skip: !hasAgency || !hasDateRange || activeTab !== "pending" },
   );
 
   const allQuery = useGetAgencyExpensesQuery(
     {
+      agencyId,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
       status: statusFilter,
@@ -82,7 +85,7 @@ export default function ExpensesDashboardPage() {
       limit: LIST_PAGE_SIZE,
       mode: mode ?? undefined,
     },
-    { skip: !hasDateRange || activeTab !== "all" },
+    { skip: !hasAgency || !hasDateRange || activeTab !== "all" },
   );
 
   const [approveExpense, { isLoading: isApproving }] = useApproveExpenseMutation();
@@ -107,7 +110,7 @@ export default function ExpensesDashboardPage() {
       }
 
       try {
-        await approveExpense({ expenseId: expense.id }).unwrap();
+        await approveExpense({ agencyId, expenseId: expense.id }).unwrap();
         setApproveTarget(null);
         toast({
           title: "Expense approved",
@@ -121,7 +124,7 @@ export default function ExpensesDashboardPage() {
         });
       }
     },
-    [approveExpense, hasAgency, toast, staffNoun],
+    [agencyId, approveExpense, hasAgency, toast, staffNoun],
   );
 
   const handleRequestApprove = useCallback((expense: AgencyExpenseListItem) => {
@@ -147,7 +150,7 @@ export default function ExpensesDashboardPage() {
       }
 
       try {
-        await deleteExpense({ expenseId: expense.id }).unwrap();
+        await deleteExpense({ agencyId, expenseId: expense.id }).unwrap();
         setDeleteTarget(null);
         toast({
           title: "Expense deleted",
@@ -161,7 +164,7 @@ export default function ExpensesDashboardPage() {
         });
       }
     },
-    [deleteExpense, hasAgency, toast],
+    [agencyId, deleteExpense, hasAgency, toast],
   );
 
   const handleRequestDelete = useCallback((expense: AgencyExpenseListItem) => {
@@ -190,6 +193,7 @@ export default function ExpensesDashboardPage() {
 
       try {
         await rejectExpense({
+          agencyId,
           expenseId: declineTarget.id,
           reviewerNotes,
         }).unwrap();
@@ -206,7 +210,7 @@ export default function ExpensesDashboardPage() {
         });
       }
     },
-    [declineTarget, hasAgency, rejectExpense, toast, staffNoun],
+    [agencyId, declineTarget, hasAgency, rejectExpense, toast, staffNoun],
   );
 
   const handleStatusSegmentClick = useCallback((segmentLabel: string) => {
