@@ -1,9 +1,14 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Shift } from "@/lib/api/shifts";
-import type { OperationalActor, OperationalAgencyDataAdapter } from "@/lib/operational-agency/types";
+import type {
+  OperationalActor,
+  OperationalAgencyDataAdapter,
+  OperationalCapabilities,
+  OperationalDirectoryRoutes,
+} from "@/lib/operational-agency/types";
 import { OperationalAgencyProvider } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 const claimsApi = vi.hoisted(() => ({
@@ -122,9 +127,6 @@ vi.mock("@/pages/agency/billing/claims/components/GenerateClaimModal", () => ({
       <button type="button" onClick={onClose}>Close generated billing</button>
     </div>
   ),
-}));
-vi.mock("@/pages/agency/billing/claims/components/claim-report/ClaimReportModal", () => ({
-  default: () => <div role="dialog" aria-label="Claim report">Claim report loaded</div>,
 }));
 vi.mock("@/pages/agency/billing/claims/components/UpdateClaimStatusModal", () => ({
   default: ({ open, onConfirm }: { open: boolean; onConfirm: (input: { status: "paid" }) => void }) => open
@@ -249,11 +251,30 @@ const claimDetail = {
   shiftIds: ["shift-1"],
   rideIds: [],
   reportPrefill: {
-    clientName: "Alice Atlas",
-    clientAddress: "1 Main Street",
-    medicaidId: "M-1",
+    dateOfBirth: "1990-01-01",
+    patientSex: "F",
+    patientAddress: "1 Main Street",
+    city: "Columbus",
+    state: "OH",
+    zipCode: "43004",
     diagnosisCodes: {},
-    serviceLines: [],
+    paNumber: "PA-1",
+    serviceLines: [{
+      duration: "7/29/2026 -> 7/29/2026",
+      placeOfService: "99",
+      cptHcpcs: "S1",
+      modifier: "HI",
+      diagnosisPointer: "A",
+      totalCharges: "$120.00",
+      nipId: "NPI-ATLAS",
+      providerId: "PROVIDER-ATLAS",
+    }],
+    summary: {
+      totalClaimsProcessed: 1,
+      totalUnitsBilled: "1",
+      totalBilledHours: "1 hr",
+      totalClaimAmount: "$120.00",
+    },
   },
   updatedAt: "2026-07-29T12:00:00.000Z",
   shifts: [{
@@ -283,11 +304,28 @@ function dataAdapter(searchClients: OperationalAgencyDataAdapter["searchClients"
   } as OperationalAgencyDataAdapter;
 }
 
-function Scope({ actor, agency = atlas, children, data = dataAdapter() }: {
+const noDirectoryCapabilities: OperationalCapabilities = {
+  canManageShifts: false,
+  canManageBilling: true,
+  shiftMaintenance: false,
+  canAccessClientDirectory: false,
+  canAccessStaffDirectory: false,
+};
+
+function Scope({
+  actor,
+  agency = atlas,
+  children,
+  data = dataAdapter(),
+  capabilities = noDirectoryCapabilities,
+  directoryRoutes,
+}: {
   actor: OperationalActor;
   agency?: typeof atlas;
   children: React.ReactNode;
   data?: OperationalAgencyDataAdapter;
+  capabilities?: OperationalCapabilities;
+  directoryRoutes?: OperationalDirectoryRoutes;
 }) {
   return (
     <MemoryRouter>
@@ -296,7 +334,8 @@ function Scope({ actor, agency = atlas, children, data = dataAdapter() }: {
         agencyId={agency.id}
         agency={agency}
         mode="ddd"
-        capabilities={{ canManageShifts: false, canManageBilling: true, shiftMaintenance: false }}
+        capabilities={capabilities}
+        directoryRoutes={directoryRoutes}
         data={data}
       >
         {children}
@@ -307,6 +346,31 @@ function Scope({ actor, agency = atlas, children, data = dataAdapter() }: {
 
 function renderClaims(actor: OperationalActor, agency = atlas) {
   return render(<Scope actor={actor} agency={agency}><ClaimsDashboardPage /></Scope>);
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((next, fail) => {
+    resolve = next;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+function atlasRefreshCount() {
+  return [
+    claimsApi.getClaimsDashboard,
+    claimsApi.listReadyToClaim,
+    claimsApi.listBillingClaims,
+    outOfPocketApi.listOutOfPocketReady,
+    outOfPocketApi.listOutOfPocketInvoices,
+  ].reduce(
+    (count, request) => count + request.mock.calls.filter(
+      ([input]) => input?.context?.agencyId === "atlas",
+    ).length,
+    0,
+  );
 }
 
 describe("shared claims operational parity", () => {
@@ -361,6 +425,26 @@ describe("shared claims operational parity", () => {
     expect(claimsApi.getClaimsDashboard).toHaveBeenCalledTimes(1);
   });
 
+  it("uses scoped claim-detail report metadata without calling the actor-owned agency endpoint", async () => {
+    const user = userEvent.setup();
+    renderClaims("super_admin");
+    await user.click(await screen.findByRole("button", { name: "Claims & invoices" }));
+    await user.click(await screen.findByRole("button", { name: "Open report" }));
+
+    const report = await screen.findByRole("dialog", { name: "Claim report" }, { timeout: 5000 });
+    expect(report).toHaveAccessibleDescription(
+      "Review claim details, add signatures, download, or send the report.",
+    );
+    expect(within(report).getByText("NPI-ATLAS")).toBeVisible();
+    expect(within(report).getByText("PROVIDER-ATLAS")).toBeVisible();
+    expect(claimsApi.getBillingClaimById).toHaveBeenCalledWith(expect.objectContaining({
+      context: { agencyId: "atlas" },
+      claimId: "claim-1",
+      signal: expect.any(AbortSignal),
+    }));
+    expect(agencyApi.getAgencyById).not.toHaveBeenCalled();
+  });
+
   it("keeps generation, report, status, cancellation, and invalidation in one agency", async () => {
     const user = userEvent.setup();
     renderClaims("super_admin");
@@ -368,36 +452,41 @@ describe("shared claims operational parity", () => {
     await user.click(await screen.findByRole("button", { name: "Open generated billing" }));
     await user.click(await screen.findByRole("button", { name: "Confirm generated billing" }));
     await waitFor(() => expect(claimsApi.createBillingClaim).toHaveBeenCalledWith(expect.objectContaining({
-      context: { agencyId: "atlas" },
+      context: { agencyId: "atlas" }, signal: expect.any(AbortSignal),
     })));
     expect(outOfPocketApi.createOutOfPocketInvoice).toHaveBeenCalledWith(expect.objectContaining({
-      context: { agencyId: "atlas" },
+      context: { agencyId: "atlas" }, signal: expect.any(AbortSignal),
     }));
     await user.click(await screen.findByRole("button", { name: "Close invoice" }));
 
     await user.click(screen.getByRole("button", { name: "Claims & invoices" }));
     await user.click(await screen.findByRole("button", { name: "Open report" }));
-    expect(await screen.findByRole("dialog", { name: "Claim report" })).toBeVisible();
+    const report = await screen.findByRole("dialog", { name: "Claim report" }, { timeout: 5000 });
+    expect(report).toBeVisible();
+    expect(within(report).getByText("NPI-ATLAS")).toBeVisible();
+    expect(within(report).getByText("PROVIDER-ATLAS")).toBeVisible();
     expect(claimsApi.getBillingClaimById).toHaveBeenCalledWith(expect.objectContaining({
       context: { agencyId: "atlas" }, claimId: "claim-1", signal: expect.any(AbortSignal),
     }));
+    expect(agencyApi.getAgencyById).not.toHaveBeenCalled();
+    await user.click(within(report).getByRole("button", { name: "Close" }));
 
     await user.click(screen.getByRole("button", { name: "Open status" }));
     await user.click(screen.getByRole("button", { name: "Confirm paid" }));
     await waitFor(() => expect(claimsApi.updateBillingClaimStatus).toHaveBeenCalledWith(expect.objectContaining({
-      context: { agencyId: "atlas" }, claimId: "claim-1",
+      context: { agencyId: "atlas" }, claimId: "claim-1", signal: expect.any(AbortSignal),
     })));
 
     await user.click(screen.getByRole("button", { name: "Open cancel claim" }));
     await user.click(screen.getByRole("button", { name: "Confirm claim cancellation" }));
     await waitFor(() => expect(claimsApi.cancelBillingClaim).toHaveBeenCalledWith(expect.objectContaining({
-      context: { agencyId: "atlas" }, claimId: "claim-1",
+      context: { agencyId: "atlas" }, claimId: "claim-1", signal: expect.any(AbortSignal),
     })));
 
     await user.click(screen.getByRole("button", { name: "Open cancel invoice" }));
     await user.click(screen.getByRole("button", { name: "Confirm invoice cancellation" }));
     await waitFor(() => expect(outOfPocketApi.cancelOutOfPocketInvoice).toHaveBeenCalledWith(expect.objectContaining({
-      context: { agencyId: "atlas" }, invoiceId: "invoice-1",
+      context: { agencyId: "atlas" }, invoiceId: "invoice-1", signal: expect.any(AbortSignal),
     })));
     expect(claimsApi.listBillingClaims.mock.calls.every(([input]) => input.context.agencyId === "atlas")).toBe(true);
     expect(outOfPocketApi.listOutOfPocketInvoices.mock.calls.every(([input]) => input.context.agencyId === "atlas")).toBe(true);
@@ -440,7 +529,7 @@ describe("shared claims operational parity", () => {
     await waitFor(() => expect(screen.getByLabelText("Ready client")).toHaveTextContent("Beatrice Beacon"));
   });
 
-  it("aborts stale client search and disables directory links without an operational capability", async () => {
+  it("aborts stale client search and gates client and staff routes independently", async () => {
     const requests: AbortSignal[] = [];
     const searchClients = vi.fn(({ signal }: { signal?: AbortSignal }) => {
       if (signal) requests.push(signal);
@@ -469,17 +558,89 @@ describe("shared claims operational parity", () => {
     await user.type(screen.getByPlaceholderText("Search client name..."), "Bob");
     await waitFor(() => expect(searchClients).toHaveBeenCalledTimes(2));
     expect(requests[0].aborted).toBe(true);
+    expect(screen.queryAllByRole("link", { name: "Alice Atlas" })).toHaveLength(0);
+    expect(screen.queryAllByRole("link", { name: "Dana DSP" })).toHaveLength(0);
+
+    view.rerender(<Scope
+      actor="agency"
+      capabilities={{
+        ...noDirectoryCapabilities,
+        canAccessClientDirectory: false,
+        canAccessStaffDirectory: false,
+      }}
+      directoryRoutes={{
+        clientDetails: (clientId) => `/agency/clients/${clientId}`,
+        staffDetails: (staffId) => `/agency/dsp-management/${staffId}`,
+      }}
+    >
+      <ClientNameLink name="Alice Atlas" clientId="client-1" />
+      <RecentClaimRow
+        variant="mobile"
+        claim={{
+          id: "ready-2", client: "Alice Atlas", clientId: "client-1", staffId: "staff-1",
+          staffName: "Dana DSP", serviceCode: "S1", paNumber: "PA-1", serviceDate: "Jul 29, 2026",
+          serviceDateSortKey: "2026-07-29", durationStart: "9:00 AM", durationEnd: "10:00 AM",
+          totalHours: "1h", rate: "$120.00", sourceType: "shift", sourceId: "shift-1",
+        }}
+      />
+    </Scope>);
     expect(screen.queryByRole("link", { name: "Alice Atlas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Dana DSP" })).not.toBeInTheDocument();
 
-    view.rerender(
-      <Scope actor="agency">
-        <ClientNameLink name="Alice Atlas" clientId="client-1" />
-      </Scope>,
-    );
-    expect(screen.getByRole("link", { name: "Alice Atlas" })).toHaveAttribute(
+    view.rerender(<Scope
+      actor="super_admin"
+      capabilities={{
+        ...noDirectoryCapabilities,
+        canAccessClientDirectory: true,
+        canAccessStaffDirectory: false,
+      }}
+      directoryRoutes={{
+        clientDetails: (clientId) => `/super-admin/clients/${clientId}?agencyId=atlas`,
+        staffDetails: (staffId) => `/future-super-admin/staff/${staffId}?agencyId=atlas`,
+      }}
+    >
+      <ClientNameLink name="Alice Atlas" clientId="client-1" />
+      <RecentClaimRow
+        variant="mobile"
+        claim={{
+          id: "ready-3", client: "Alice Atlas", clientId: "client-1", staffId: "staff-1",
+          staffName: "Dana DSP", serviceCode: "S1", paNumber: "PA-1", serviceDate: "Jul 29, 2026",
+          serviceDateSortKey: "2026-07-29", durationStart: "9:00 AM", durationEnd: "10:00 AM",
+          totalHours: "1h", rate: "$120.00", sourceType: "shift", sourceId: "shift-1",
+        }}
+      />
+    </Scope>);
+    expect(screen.getAllByRole("link", { name: "Alice Atlas" })[0]).toHaveAttribute(
       "href",
-      "/agency/clients/client-1",
+      "/super-admin/clients/client-1?agencyId=atlas",
+    );
+    expect(screen.queryByRole("link", { name: "Dana DSP" })).not.toBeInTheDocument();
+
+    view.rerender(<Scope
+      actor="super_admin"
+      capabilities={{
+        ...noDirectoryCapabilities,
+        canAccessClientDirectory: false,
+        canAccessStaffDirectory: true,
+      }}
+      directoryRoutes={{
+        staffDetails: (staffId) => `/future-super-admin/staff/${staffId}?agencyId=atlas`,
+      }}
+    >
+      <RecentClaimRow
+        variant="mobile"
+        claim={{
+          id: "ready-4", client: "Alice Atlas", clientId: "client-1", staffId: "staff-1",
+          staffName: "Dana DSP", serviceCode: "S1", paNumber: "PA-1", serviceDate: "Jul 29, 2026",
+          serviceDateSortKey: "2026-07-29", durationStart: "9:00 AM", durationEnd: "10:00 AM",
+          totalHours: "1h", rate: "$120.00", sourceType: "shift", sourceId: "shift-1",
+        }}
+      />
+    </Scope>);
+    expect(screen.queryByRole("link", { name: "Alice Atlas" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Dana DSP" })).toHaveAttribute(
+      "href",
+      "/future-super-admin/staff/staff-1?agencyId=atlas",
     );
   });
 
@@ -507,6 +668,156 @@ describe("shared claims operational parity", () => {
     expect(ui.toast).not.toHaveBeenCalledWith(expect.objectContaining({
       title: "Couldn't open invoice",
     }));
+  });
+
+  it("aborts pending claim generation on agency switch without starting invoice work or refreshes", async () => {
+    const pendingClaim = deferred<{
+      id: string; claimNumber: string; status: "pending"; amount: number; clientId: string;
+      shiftIds: string[]; reportPrefill: typeof claimDetail.reportPrefill;
+    }>();
+    let claimSignal: AbortSignal | undefined;
+    claimsApi.createBillingClaim.mockImplementation(({ signal }: { signal?: AbortSignal }) => {
+      claimSignal = signal;
+      return pendingClaim.promise;
+    });
+
+    const user = userEvent.setup();
+    const view = renderClaims("super_admin");
+    await user.click(await screen.findByRole("button", { name: "Open generated billing" }));
+    await user.click(await screen.findByRole("button", { name: "Confirm generated billing" }));
+    await waitFor(() => expect(claimsApi.createBillingClaim).toHaveBeenCalledTimes(1));
+
+    view.rerender(<Scope actor="super_admin" agency={beacon}><ClaimsDashboardPage /></Scope>);
+    await waitFor(() => expect(claimsApi.getClaimsDashboard).toHaveBeenCalledWith(expect.objectContaining({
+      context: { agencyId: "beacon" },
+    })));
+    expect(claimSignal?.aborted).toBe(true);
+    const refreshCount = atlasRefreshCount();
+    ui.toast.mockClear();
+
+    await act(async () => pendingClaim.resolve({
+      id: "claim-2", claimNumber: "CLM-002", status: "pending", amount: 80,
+      clientId: "client-1", shiftIds: ["shift-1"], reportPrefill: claimDetail.reportPrefill,
+    }));
+    expect(outOfPocketApi.createOutOfPocketInvoice).not.toHaveBeenCalled();
+    expect(atlasRefreshCount()).toBe(refreshCount);
+    expect(ui.toast).not.toHaveBeenCalled();
+  });
+
+  it("aborts pending invoice creation on agency switch without stale refresh, toast, or modal state", async () => {
+    const pendingInvoice = deferred<typeof invoiceDetail>();
+    let invoiceSignal: AbortSignal | undefined;
+    outOfPocketApi.createOutOfPocketInvoice.mockImplementation(
+      ({ signal }: { signal?: AbortSignal }) => {
+        invoiceSignal = signal;
+        return pendingInvoice.promise;
+      },
+    );
+
+    const user = userEvent.setup();
+    const view = renderClaims("super_admin");
+    await user.click(await screen.findByRole("button", { name: "Open generated billing" }));
+    await user.click(await screen.findByRole("button", { name: "Confirm generated billing" }));
+    await waitFor(() => expect(outOfPocketApi.createOutOfPocketInvoice).toHaveBeenCalledTimes(1));
+
+    view.rerender(<Scope actor="super_admin" agency={beacon}><ClaimsDashboardPage /></Scope>);
+    await waitFor(() => expect(claimsApi.getClaimsDashboard).toHaveBeenCalledWith(expect.objectContaining({
+      context: { agencyId: "beacon" },
+    })));
+    expect(invoiceSignal?.aborted).toBe(true);
+    const refreshCount = atlasRefreshCount();
+    ui.toast.mockClear();
+
+    await act(async () => pendingInvoice.resolve(invoiceDetail));
+    expect(atlasRefreshCount()).toBe(refreshCount);
+    expect(ui.toast).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Invoice INV-001" })).not.toBeInTheDocument();
+  });
+
+  it("aborts a pending status update on agency switch without stale refresh or toast", async () => {
+    const pendingStatus = deferred<void>();
+    let statusSignal: AbortSignal | undefined;
+    claimsApi.updateBillingClaimStatus.mockImplementation(({ signal }: { signal?: AbortSignal }) => {
+      statusSignal = signal;
+      return pendingStatus.promise;
+    });
+
+    const user = userEvent.setup();
+    const view = renderClaims("super_admin");
+    await user.click(await screen.findByRole("button", { name: "Claims & invoices" }));
+    await user.click(await screen.findByRole("button", { name: "Open status" }));
+    await user.click(screen.getByRole("button", { name: "Confirm paid" }));
+    await waitFor(() => expect(claimsApi.updateBillingClaimStatus).toHaveBeenCalledTimes(1));
+
+    view.rerender(<Scope actor="super_admin" agency={beacon}><ClaimsDashboardPage /></Scope>);
+    await waitFor(() => expect(claimsApi.getClaimsDashboard).toHaveBeenCalledWith(expect.objectContaining({
+      context: { agencyId: "beacon" },
+    })));
+    expect(statusSignal?.aborted).toBe(true);
+    const refreshCount = atlasRefreshCount();
+    ui.toast.mockClear();
+
+    await act(async () => pendingStatus.resolve());
+    expect(atlasRefreshCount()).toBe(refreshCount);
+    expect(ui.toast).not.toHaveBeenCalled();
+  });
+
+  it("aborts a pending claim cancellation on agency switch without stale refresh or toast", async () => {
+    const pendingCancellation = deferred<void>();
+    let cancelSignal: AbortSignal | undefined;
+    claimsApi.cancelBillingClaim.mockImplementation(({ signal }: { signal?: AbortSignal }) => {
+      cancelSignal = signal;
+      return pendingCancellation.promise;
+    });
+
+    const user = userEvent.setup();
+    const view = renderClaims("super_admin");
+    await user.click(await screen.findByRole("button", { name: "Claims & invoices" }));
+    await user.click(await screen.findByRole("button", { name: "Open cancel claim" }));
+    await user.click(screen.getByRole("button", { name: "Confirm claim cancellation" }));
+    await waitFor(() => expect(claimsApi.cancelBillingClaim).toHaveBeenCalledTimes(1));
+
+    view.rerender(<Scope actor="super_admin" agency={beacon}><ClaimsDashboardPage /></Scope>);
+    await waitFor(() => expect(claimsApi.getClaimsDashboard).toHaveBeenCalledWith(expect.objectContaining({
+      context: { agencyId: "beacon" },
+    })));
+    expect(cancelSignal?.aborted).toBe(true);
+    const refreshCount = atlasRefreshCount();
+    ui.toast.mockClear();
+
+    await act(async () => pendingCancellation.resolve());
+    expect(atlasRefreshCount()).toBe(refreshCount);
+    expect(ui.toast).not.toHaveBeenCalled();
+  });
+
+  it("aborts a pending invoice cancellation on agency switch without stale refresh or toast", async () => {
+    const pendingCancellation = deferred<void>();
+    let cancelSignal: AbortSignal | undefined;
+    outOfPocketApi.cancelOutOfPocketInvoice.mockImplementation(
+      ({ signal }: { signal?: AbortSignal }) => {
+        cancelSignal = signal;
+        return pendingCancellation.promise;
+      },
+    );
+
+    const user = userEvent.setup();
+    const view = renderClaims("super_admin");
+    await user.click(await screen.findByRole("button", { name: "Claims & invoices" }));
+    await user.click(await screen.findByRole("button", { name: "Open cancel invoice" }));
+    await user.click(screen.getByRole("button", { name: "Confirm invoice cancellation" }));
+    await waitFor(() => expect(outOfPocketApi.cancelOutOfPocketInvoice).toHaveBeenCalledTimes(1));
+
+    view.rerender(<Scope actor="super_admin" agency={beacon}><ClaimsDashboardPage /></Scope>);
+    await waitFor(() => expect(claimsApi.getClaimsDashboard).toHaveBeenCalledWith(expect.objectContaining({
+      context: { agencyId: "beacon" },
+    })));
+    expect(cancelSignal?.aborted).toBe(true);
+    const refreshCount = atlasRefreshCount();
+    ui.toast.mockClear();
+
+    await act(async () => pendingCancellation.resolve());
+    expect(atlasRefreshCount()).toBe(refreshCount);
+    expect(ui.toast).not.toHaveBeenCalled();
   });
 
   it("lazily registers claims beneath the existing super-admin billing workspace", () => {

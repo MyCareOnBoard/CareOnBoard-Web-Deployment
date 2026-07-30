@@ -6,6 +6,7 @@ import type {
   OperationalAgencyDataAdapter,
   OperationalAgencySummary,
   OperationalCapabilities,
+  OperationalDirectoryRoutes,
 } from "./types";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 
@@ -18,6 +19,7 @@ export interface OperationalAgencyProviderProps {
   agency: OperationalAgencySummary;
   mode: AgencyMode | null;
   capabilities: OperationalCapabilities;
+  directoryRoutes?: OperationalDirectoryRoutes;
   data: OperationalAgencyDataAdapter;
 }
 
@@ -28,6 +30,7 @@ export function OperationalAgencyProvider({
   agency,
   mode,
   capabilities,
+  directoryRoutes,
   data,
 }: OperationalAgencyProviderProps) {
   if (!agencyId) {
@@ -45,6 +48,7 @@ export function OperationalAgencyProvider({
     mode,
     routes: actor === "super_admin" ? superAdminShiftRoutes : agencyShiftRoutes,
     capabilities,
+    directoryRoutes,
     data,
   };
 

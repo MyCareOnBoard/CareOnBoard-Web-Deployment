@@ -1,19 +1,18 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getAgencyById } from "@/lib/api/agencies";
 import type { RecentClaim } from "../../data/mockClaimsDashboardData";
 import type { ClaimReportFormState, ClaimSignaturePayload } from "../../data/mockClaimReportData";
 import { buildClaimReportFromClaim } from "../../utils/claimReportUtils";
 import type { ClaimReportPrefillSnapshot } from "../../utils/claimReportPrefillUtils";
 import { downloadClaimReportPdf } from "../../utils/claimReportPrintUtils";
 import { normalizeSignaturePayload } from "../../utils/claimReportSignatureUtils";
-import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 import {
   CLAIM_REPORT_PRINT_ROOT_CLASS,
   CLAIMS_REPORT_MODAL_CLASS,
@@ -49,7 +48,6 @@ export default function ClaimReportModal({
   onClose,
 }: ClaimReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
-  const { agencyId } = useOperationalAgency();
   const [form, setForm] = useState<ClaimReportFormState>(() =>
     buildClaimReportFromClaim(claim, initialPrefill),
   );
@@ -59,39 +57,6 @@ export default function ClaimReportModal({
   const updateForm = useCallback((patch: Partial<ClaimReportFormState>) => {
     setForm((prev) => ({ ...prev, ...patch }));
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-
-    let cancelled = false;
-
-    getAgencyById(agencyId)
-      .then((agency) => {
-        if (cancelled) return;
-
-        const nipId = agency.npi?.trim() ?? "";
-        const providerId =
-          agency.providerId?.trim() ?? agency.medicaidProviderId?.trim() ?? "";
-
-        setForm((prev) => ({
-          ...prev,
-          serviceLines: prev.serviceLines.map((line) => ({
-            ...line,
-            nipId,
-            providerId,
-          })),
-        }));
-      })
-      .catch(() => {
-        if (!cancelled) {
-          console.error("Failed to load agency for claim report.");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [agencyId, open]);
 
   const updateDiagnosis = useCallback((letter: string, value: string) => {
     setForm((prev) => ({
@@ -201,6 +166,9 @@ export default function ClaimReportModal({
                   </span>
                 </button>
               </div>
+              <DialogDescription className="sr-only">
+                Review claim details, add signatures, download, or send the report.
+              </DialogDescription>
             </DialogHeader>
 
             <div key={claim.id} className="claim-report-modal-body flex-1 overflow-x-hidden overflow-y-auto pb-6">

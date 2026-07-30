@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { getOperationalAgencyContext } from "@/lib/api/super-admin-operations";
 import { createSuperAdminOperationalDataAdapter } from "@/lib/operational-agency/dataAdapters";
 import { OperationalAgencyProvider } from "@/lib/operational-agency/OperationalAgencyProvider";
-import { superAdminBillingRoutes } from "@/lib/operational-agency/routes";
+import {
+  createSuperAdminDirectoryRoutes,
+  superAdminBillingRoutes,
+} from "@/lib/operational-agency/routes";
 import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
 import { useAuth } from "@/utils/auth";
 
@@ -46,6 +49,10 @@ export default function SuperAdminBillingWorkspace() {
   const [retryVersion, setRetryVersion] = useState(0);
   const data = useMemo(
     () => createSuperAdminOperationalDataAdapter("billing-management", agencyId),
+    [agencyId],
+  );
+  const directoryRoutes = useMemo(
+    () => createSuperAdminDirectoryRoutes(agencyId),
     [agencyId],
   );
 
@@ -167,7 +174,10 @@ export default function SuperAdminBillingWorkspace() {
             canManageShifts: accessList.includes("Shift Management"),
             canManageBilling: true,
             shiftMaintenance: accessList.includes("Shift Maintenance"),
+            canAccessClientDirectory: accessList.includes("Clients Directory"),
+            canAccessStaffDirectory: accessList.includes("Staff Directory"),
           }}
+          directoryRoutes={directoryRoutes}
           data={data}
         >
           <div className="min-w-0 space-y-6">

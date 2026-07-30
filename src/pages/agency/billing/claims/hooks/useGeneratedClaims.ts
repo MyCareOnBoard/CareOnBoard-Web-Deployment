@@ -114,7 +114,11 @@ export function useGeneratedClaims(
   );
 
   const updateClaimStatus = useCallback(
-    async (claimId: string, payload: UpdateBillingClaimStatusPayload) => {
+    async (
+      claimId: string,
+      payload: UpdateBillingClaimStatusPayload,
+      signal?: AbortSignal,
+    ) => {
       setRawClaims((previous) =>
         previous.map((claim) =>
           claim.id === claimId
@@ -131,9 +135,9 @@ export function useGeneratedClaims(
       );
 
       try {
-        await updateBillingClaimStatus({ context: { agencyId }, claimId, payload });
+        await updateBillingClaimStatus({ context: { agencyId }, claimId, payload, signal });
       } catch (mutationError) {
-        await refetch({ force: true });
+        if (!signal?.aborted) await refetch({ force: true });
         throw mutationError;
       }
     },
@@ -141,13 +145,13 @@ export function useGeneratedClaims(
   );
 
   const cancelClaim = useCallback(
-    async (claimId: string) => {
+    async (claimId: string, signal?: AbortSignal) => {
       setRawClaims((previous) => previous.filter((claim) => claim.id !== claimId));
 
       try {
-        await cancelBillingClaim({ context: { agencyId }, claimId });
+        await cancelBillingClaim({ context: { agencyId }, claimId, signal });
       } catch (mutationError) {
-        await refetch({ force: true });
+        if (!signal?.aborted) await refetch({ force: true });
         throw mutationError;
       }
     },

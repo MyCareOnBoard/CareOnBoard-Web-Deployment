@@ -94,6 +94,13 @@ export interface OperationalCapabilities {
   canManageShifts: boolean;
   canManageBilling: boolean;
   shiftMaintenance: boolean;
+  canAccessClientDirectory?: boolean;
+  canAccessStaffDirectory?: boolean;
+}
+
+export interface OperationalDirectoryRoutes {
+  clientDetails?: (clientId: string) => string;
+  staffDetails?: (staffId: string) => string;
 }
 
 export interface OperationalShiftRoutes {
@@ -121,5 +128,6 @@ export interface OperationalAgencyContextValue {
   mode: AgencyMode | null;
   routes: OperationalShiftRoutes;
   capabilities: OperationalCapabilities;
+  directoryRoutes?: OperationalDirectoryRoutes;
   data: OperationalAgencyDataAdapter;
 }

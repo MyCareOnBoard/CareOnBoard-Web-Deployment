@@ -97,6 +97,7 @@ export default function GenerateClaimModal({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const clientSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clientSearchControllerRef = useRef<AbortController | null>(null);
+  const clientSearchRequestIdRef = useRef(0);
   const clientLoadControllerRef = useRef<AbortController | null>(null);
   const prefillRequestIdRef = useRef(0);
 
@@ -170,6 +171,7 @@ export default function GenerateClaimModal({
   const resetWizard = useCallback(() => {
     setClientQuery("");
     setClientSearchResults([]);
+    setIsSearchingClients(false);
     setShowClientDropdown(false);
     setSelectedClient(null);
     setSelectedServiceIds([]);
@@ -189,6 +191,7 @@ export default function GenerateClaimModal({
       if (clientSearchTimeoutRef.current) {
         clearTimeout(clientSearchTimeoutRef.current);
       }
+      clientSearchRequestIdRef.current += 1;
       clientSearchControllerRef.current?.abort();
       clientLoadControllerRef.current?.abort();
     };
@@ -254,7 +257,10 @@ export default function GenerateClaimModal({
       if (clientSearchTimeoutRef.current) {
         clearTimeout(clientSearchTimeoutRef.current);
       }
+      const requestId = clientSearchRequestIdRef.current + 1;
+      clientSearchRequestIdRef.current = requestId;
       clientSearchControllerRef.current?.abort();
+      setIsSearchingClients(false);
 
       if (searchQuery.trim().length < 2) {
         setClientSearchResults([]);
@@ -266,23 +272,23 @@ export default function GenerateClaimModal({
         const controller = new AbortController();
         clientSearchControllerRef.current = controller;
         try {
-          setIsSearchingClients(true);
+          if (clientSearchRequestIdRef.current === requestId) setIsSearchingClients(true);
           const response = await data.searchClients({
             search: searchQuery,
             mode: mode ?? undefined,
             limit: 20,
             signal: controller.signal,
           });
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted || clientSearchRequestIdRef.current !== requestId) return;
           setClientSearchResults(response.items);
           setShowClientDropdown(response.items.length > 0);
         } catch {
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted || clientSearchRequestIdRef.current !== requestId) return;
           console.error("Failed to search clients.");
           setClientSearchResults([]);
           setShowClientDropdown(false);
         } finally {
-          if (!controller.signal.aborted) setIsSearchingClients(false);
+          if (clientSearchRequestIdRef.current === requestId) setIsSearchingClients(false);
         }
       }, 300);
     },

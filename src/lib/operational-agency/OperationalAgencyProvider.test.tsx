@@ -61,6 +61,10 @@ describe("OperationalAgencyProvider", () => {
   });
 
   it("uses the supplied singular super-admin agency and propagates capabilities", () => {
+    const directoryRoutes = {
+      clientDetails: (clientId: string) => `/super-admin/clients/${clientId}?agencyId=selected-agency`,
+      staffDetails: (staffId: string) => `/future/staff/${staffId}?agencyId=selected-agency`,
+    };
     const { result } = renderHook(() => useOperationalAgency(), {
       wrapper: ({ children }) => (
         <OperationalAgencyProvider
@@ -68,7 +72,14 @@ describe("OperationalAgencyProvider", () => {
           agencyId="selected-agency"
           agency={{ ...agency, id: "selected-agency" }}
           mode="hha"
-          capabilities={{ canManageShifts: true, canManageBilling: true, shiftMaintenance: false }}
+          capabilities={{
+            canManageShifts: true,
+            canManageBilling: true,
+            shiftMaintenance: false,
+            canAccessClientDirectory: true,
+            canAccessStaffDirectory: false,
+          }}
+          directoryRoutes={directoryRoutes}
           data={data}
         >
           {children}
@@ -82,6 +93,9 @@ describe("OperationalAgencyProvider", () => {
       "/super-admin/shifts/shift-9?agencyId=selected-agency",
     );
     expect(result.current.capabilities.canManageBilling).toBe(true);
+    expect(result.current.capabilities.canAccessClientDirectory).toBe(true);
+    expect(result.current.capabilities.canAccessStaffDirectory).toBe(false);
+    expect(result.current.directoryRoutes).toBe(directoryRoutes);
   });
 });
 

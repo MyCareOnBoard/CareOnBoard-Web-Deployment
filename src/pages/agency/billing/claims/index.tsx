@@ -16,7 +16,9 @@ import {
   useOperationalAgency,
 } from "@/lib/operational-agency/OperationalAgencyProvider";
 import { resolveEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { agencyDirectoryRoutes } from "@/lib/operational-agency/routes";
 import type { RootState } from "@/store/redux/store";
+import { UserType } from "@/utils/auth/types/user.types";
 import ClaimsDashboardHeader from "./components/ClaimsDashboardHeader";
 import ClaimsOverviewCards from "./components/ClaimsOverviewCards";
 import ClaimsByStatusChart from "./components/ClaimsByStatusChart";
@@ -140,6 +142,8 @@ export function ClaimsDashboardContent() {
   const openingReportRequestIdRef = useRef(0);
   const openingReportControllerRef = useRef<AbortController | null>(null);
   const openingInvoiceControllerRef = useRef<AbortController | null>(null);
+  const mutationRequestIdRef = useRef(0);
+  const mutationControllerRef = useRef<AbortController | null>(null);
   const [mutationSaving, setMutationSaving] = useState(false);
   const [statusModalClaim, setStatusModalClaim] = useState<BillingClaimListItem | null>(null);
   const [cancelModalClaim, setCancelModalClaim] = useState<BillingClaimListItem | null>(null);
@@ -155,7 +159,26 @@ export function ClaimsDashboardContent() {
     openingReportRequestIdRef.current += 1;
     openingReportControllerRef.current?.abort();
     openingInvoiceControllerRef.current?.abort();
+    mutationRequestIdRef.current += 1;
+    mutationControllerRef.current?.abort();
   }, []);
+
+  const beginMutation = useCallback(() => {
+    mutationControllerRef.current?.abort();
+    const requestId = mutationRequestIdRef.current + 1;
+    mutationRequestIdRef.current = requestId;
+    const controller = new AbortController();
+    mutationControllerRef.current = controller;
+    return { requestId, controller };
+  }, []);
+
+  const isMutationCurrent = useCallback(
+    (requestId: number, controller: AbortController) =>
+      mutationRequestIdRef.current === requestId
+      && mutationControllerRef.current === controller
+      && !controller.signal.aborted,
+    [],
+  );
 
   useEffect(() => {
     if (!dashboard.error) {
@@ -236,6 +259,7 @@ export function ClaimsDashboardContent() {
     ) => {
       if (claimSelections.length === 0 && invoiceSelections.length === 0) return;
 
+      const { requestId, controller } = beginMutation();
       setSavingClaim(true);
       let claimError: unknown = null;
       let invoiceError: unknown = null;
@@ -252,9 +276,12 @@ export function ClaimsDashboardContent() {
             selectedRides: selection.rides,
             serviceCode: selection.serviceCode,
             weekRange: selection.weekRange,
+            signal: controller.signal,
           });
+          if (!isMutationCurrent(requestId, controller)) return;
           claimResults.push({ savedClaim: result.savedClaim, anchorClaim: result.anchorClaim });
         } catch (error) {
+          if (!isMutationCurrent(requestId, controller)) return;
           claimError = error;
           break;
         }
@@ -273,15 +300,19 @@ export function ClaimsDashboardContent() {
               shiftIds: invoiceShiftIds,
               rideIds: invoiceRideIds,
             },
+            signal: controller.signal,
           });
+          if (!isMutationCurrent(requestId, controller)) return;
         } catch (error) {
+          if (!isMutationCurrent(requestId, controller)) return;
           invoiceError = error;
         } finally {
-          setGeneratingInvoice(false);
+          if (isMutationCurrent(requestId, controller)) setGeneratingInvoice(false);
         }
       }
 
       await refreshAfterCreateOrCancel();
+      if (!isMutationCurrent(requestId, controller)) return;
       setSavingClaim(false);
 
       if (!claimError && !invoiceError) {
@@ -322,7 +353,7 @@ export function ClaimsDashboardContent() {
         });
       }
     },
-    [agencyId, refreshAfterCreateOrCancel, toast],
+    [agencyId, beginMutation, isMutationCurrent, refreshAfterCreateOrCancel, toast],
   );
 
   const closeGenerateModal = useCallback(() => {
@@ -382,25 +413,37 @@ export function ClaimsDashboardContent() {
   const handleConfirmCancelInvoice = useCallback(async () => {
     if (!cancelModalInvoice) return;
 
+    const { requestId, controller } = beginMutation();
     setMutationSaving(true);
     try {
       await cancelOutOfPocketInvoice({
         context: { agencyId },
         invoiceId: cancelModalInvoice.id,
+        signal: controller.signal,
       });
+      if (!isMutationCurrent(requestId, controller)) return;
       setCancelModalInvoice(null);
-      toast({ title: "Invoice cancelled. Its items are billable again." });
       await refreshAfterCreateOrCancel();
+      if (!isMutationCurrent(requestId, controller)) return;
+      toast({ title: "Invoice cancelled. Its items are billable again." });
     } catch (error) {
+      if (!isMutationCurrent(requestId, controller)) return;
       toast({
         title: "Couldn't cancel invoice",
         description: error instanceof Error ? error.message : undefined,
         variant: "destructive",
       });
     } finally {
-      setMutationSaving(false);
+      if (isMutationCurrent(requestId, controller)) setMutationSaving(false);
     }
-  }, [agencyId, cancelModalInvoice, refreshAfterCreateOrCancel, toast]);
+  }, [
+    agencyId,
+    beginMutation,
+    cancelModalInvoice,
+    isMutationCurrent,
+    refreshAfterCreateOrCancel,
+    toast,
+  ]);
 
   const handleCloseReportModal = useCallback(() => {
     setClaimReport(null);
@@ -463,50 +506,72 @@ export function ClaimsDashboardContent() {
     async (payload: { status: Exclude<BillingClaimStatus, "pending">; rejectionReason?: string }) => {
       if (!statusModalClaim) return;
 
+      const { requestId, controller } = beginMutation();
       setMutationSaving(true);
       try {
-        await generatedClaims.updateClaimStatus(statusModalClaim.id, payload);
+        await generatedClaims.updateClaimStatus(statusModalClaim.id, payload, controller.signal);
+        if (!isMutationCurrent(requestId, controller)) return;
         setStatusModalClaim(null);
         await refreshAfterStatusUpdate();
+        if (!isMutationCurrent(requestId, controller)) return;
         toast({
           title: "Claim status updated",
           description: `${statusModalClaim.claimNumber} is now ${payload.status}.`,
         });
       } catch (error) {
+        if (!isMutationCurrent(requestId, controller)) return;
         toast({
           title: "Couldn't update claim status",
           description: getBillingClaimMutationErrorMessage(error),
           variant: "destructive",
         });
       } finally {
-        setMutationSaving(false);
+        if (isMutationCurrent(requestId, controller)) setMutationSaving(false);
       }
     },
-    [generatedClaims, refreshAfterStatusUpdate, statusModalClaim, toast],
+    [
+      beginMutation,
+      generatedClaims,
+      isMutationCurrent,
+      refreshAfterStatusUpdate,
+      statusModalClaim,
+      toast,
+    ],
   );
 
   const handleConfirmCancelClaim = useCallback(async () => {
     if (!cancelModalClaim) return;
 
+    const { requestId, controller } = beginMutation();
     setMutationSaving(true);
     try {
-      await generatedClaims.cancelClaim(cancelModalClaim.id);
+      await generatedClaims.cancelClaim(cancelModalClaim.id, controller.signal);
+      if (!isMutationCurrent(requestId, controller)) return;
       setCancelModalClaim(null);
       await refreshAfterCreateOrCancel();
+      if (!isMutationCurrent(requestId, controller)) return;
       toast({
         title: "Claim cancelled",
         description: `${cancelModalClaim.claimNumber} was removed and its shifts are claimable again.`,
       });
     } catch (error) {
+      if (!isMutationCurrent(requestId, controller)) return;
       toast({
         title: "Couldn't cancel claim",
         description: getBillingClaimMutationErrorMessage(error),
         variant: "destructive",
       });
     } finally {
-      setMutationSaving(false);
+      if (isMutationCurrent(requestId, controller)) setMutationSaving(false);
     }
-  }, [cancelModalClaim, generatedClaims, refreshAfterCreateOrCancel, toast]);
+  }, [
+    beginMutation,
+    cancelModalClaim,
+    generatedClaims,
+    isMutationCurrent,
+    refreshAfterCreateOrCancel,
+    toast,
+  ]);
 
   const handleStatusSegmentClick = useCallback((segmentLabel: string) => {
     const nextFilter = STATUS_LABEL_TO_FILTER[segmentLabel];
@@ -672,6 +737,8 @@ export function AgencyClaimsDashboardPage() {
   const storedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
   const mode = resolveEffectiveAgencyMode(supportedClientTypes, storedMode);
   const data = useMemo(() => createAgencyOperationalDataAdapter(agencyId), [agencyId]);
+  const accessList = user?.profile?.accessList ?? [];
+  const isAgencyOwner = user?.userType === UserType.AGENCY;
 
   if (!agencyId) {
     return <p role="alert" className="px-4 py-8 text-sm text-[#808081]">Sign in again to manage billing.</p>;
@@ -690,7 +757,14 @@ export function AgencyClaimsDashboardPage() {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
       }}
       mode={mode}
-      capabilities={{ canManageShifts: true, canManageBilling: true, shiftMaintenance: true }}
+      capabilities={{
+        canManageShifts: true,
+        canManageBilling: true,
+        shiftMaintenance: true,
+        canAccessClientDirectory: isAgencyOwner || accessList.includes("Client Management"),
+        canAccessStaffDirectory: isAgencyOwner || accessList.includes("DSP Management"),
+      }}
+      directoryRoutes={agencyDirectoryRoutes}
       data={data}
     >
       <ClaimsDashboardPage />

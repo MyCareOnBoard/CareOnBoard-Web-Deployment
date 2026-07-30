@@ -1,4 +1,8 @@
-import type { OperationalBillingRoutes, OperationalShiftRoutes } from "./types";
+import type {
+  OperationalBillingRoutes,
+  OperationalDirectoryRoutes,
+  OperationalShiftRoutes,
+} from "./types";
 
 function withSearch(path: string, search?: string): string {
   if (!search) return path;
@@ -57,3 +61,19 @@ function createBillingRoutes(basePath: string): OperationalBillingRoutes {
 
 export const agencyBillingRoutes = createBillingRoutes("/agency/billing");
 export const superAdminBillingRoutes = createBillingRoutes("/super-admin/billing");
+
+export const agencyDirectoryRoutes: OperationalDirectoryRoutes = {
+  clientDetails: (clientId) => `/agency/clients/${encodeURIComponent(clientId)}`,
+  staffDetails: (staffId) => `/agency/dsp-management/${encodeURIComponent(staffId)}`,
+};
+
+export function createSuperAdminDirectoryRoutes(
+  agencyId: string,
+): OperationalDirectoryRoutes {
+  return {
+    clientDetails: (clientId) => {
+      const search = new URLSearchParams({ agencyId }).toString();
+      return `/super-admin/clients/${encodeURIComponent(clientId)}?${search}`;
+    },
+  };
+}

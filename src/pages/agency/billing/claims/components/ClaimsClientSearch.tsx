@@ -15,12 +15,14 @@ export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearc
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchControllerRef = useRef<AbortController | null>(null);
+  const searchRequestIdRef = useRef(0);
 
   useEffect(() => {
     return () => {
       if (clientSearchTimeoutRef.current) {
         clearTimeout(clientSearchTimeoutRef.current);
       }
+      searchRequestIdRef.current += 1;
       searchControllerRef.current?.abort();
     };
   }, []);
@@ -30,7 +32,10 @@ export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearc
       if (clientSearchTimeoutRef.current) {
         clearTimeout(clientSearchTimeoutRef.current);
       }
+      const requestId = searchRequestIdRef.current + 1;
+      searchRequestIdRef.current = requestId;
       searchControllerRef.current?.abort();
+      setIsSearchingClients(false);
 
       if (searchQuery.trim().length < 2) {
         setClientSearchResults([]);
@@ -42,23 +47,23 @@ export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearc
         const controller = new AbortController();
         searchControllerRef.current = controller;
         try {
-          setIsSearchingClients(true);
+          if (searchRequestIdRef.current === requestId) setIsSearchingClients(true);
           const response = await data.searchClients({
             search: searchQuery,
             mode: mode ?? undefined,
             limit: 20,
             signal: controller.signal,
           });
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted || searchRequestIdRef.current !== requestId) return;
           setClientSearchResults(response.items);
           setShowClientDropdown(response.items.length > 0);
         } catch {
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted || searchRequestIdRef.current !== requestId) return;
           console.error("Failed to search clients.");
           setClientSearchResults([]);
           setShowClientDropdown(false);
         } finally {
-          if (!controller.signal.aborted) setIsSearchingClients(false);
+          if (searchRequestIdRef.current === requestId) setIsSearchingClients(false);
         }
       }, 300);
     },

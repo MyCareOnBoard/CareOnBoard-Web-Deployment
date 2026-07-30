@@ -230,7 +230,6 @@ export async function getAgencyById(agencyId: string): Promise<Agency> {
 
         return response.data.agency;
     } catch (err: any) {
-        console.error('getAgencyById error:', err);
         throw new Error(err.message || 'Failed to get agency');
     }
 }

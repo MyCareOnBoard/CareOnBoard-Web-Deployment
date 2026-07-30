@@ -1,7 +1,6 @@
 import { memo } from "react";
 import { Link } from "react-router";
 import { ArrowRight } from "lucide-react";
-import { Routes } from "@/routes/constants";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import ClientNameLink from "./ClientNameLink";
 import CoverageBadge from "./CoverageBadge";
@@ -25,17 +24,18 @@ function formatStaffIdDisplay(staffId: string): string {
 }
 
 function StaffLink({ staffId, staffName }: { staffId: string; staffName?: string }) {
-  const { actor } = useOperationalAgency();
+  const { capabilities, directoryRoutes } = useOperationalAgency();
   // Prefer the resolved staff name; fall back to the (truncated) id when it's missing.
   const label = staffName?.trim() || formatStaffIdDisplay(staffId);
 
-  if (!isStaffIdLinkable(staffId) || actor !== "agency") {
+  const staffDetailsRoute = directoryRoutes?.staffDetails;
+  if (!isStaffIdLinkable(staffId) || !capabilities.canAccessStaffDirectory || !staffDetailsRoute) {
     return <span className="text-[13px] text-[#808081]">{label}</span>;
   }
 
   return (
     <Link
-      to={Routes.agency.dspProfile.replace(":dspId", staffId.trim())}
+      to={staffDetailsRoute(staffId.trim())}
       className="text-[13px] font-medium text-[#10141a] transition-colors hover:text-[#00b4b8] hover:underline"
     >
       {label}

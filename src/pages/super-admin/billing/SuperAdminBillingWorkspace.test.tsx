@@ -265,6 +265,22 @@ function BillingDomainProbe() {
   );
 }
 
+function DirectoryCapabilityProbe() {
+  const operational = useOperationalAgency();
+  return (
+    <>
+      <output aria-label="Can access clients">{String(operational.capabilities.canAccessClientDirectory)}</output>
+      <output aria-label="Can access staff">{String(operational.capabilities.canAccessStaffDirectory)}</output>
+      <output aria-label="Client details route">
+        {operational.directoryRoutes?.clientDetails?.("client-1") ?? "none"}
+      </output>
+      <output aria-label="Staff details route">
+        {operational.directoryRoutes?.staffDetails?.("staff-1") ?? "none"}
+      </output>
+    </>
+  );
+}
+
 function SwitchAgency() {
   const navigate = useNavigate();
   return <button type="button" onClick={() => navigate("/super-admin/billing/financial-overview?agencyId=beacon")}>Switch agency</button>;
@@ -331,6 +347,21 @@ describe("SuperAdminBillingWorkspace", () => {
       expect.any(AbortSignal),
     );
     expect(domainRequest).toHaveBeenCalledWith("atlas");
+  });
+
+  it("derives separate directory capabilities and selected-agency routes from access scopes", async () => {
+    auth.accessList = ["Billing Management", "Clients Directory", "Staff Directory"];
+    renderWorkspace(
+      "/super-admin/billing/financial-overview?agencyId=atlas",
+      <DirectoryCapabilityProbe />,
+    );
+
+    expect(await screen.findByLabelText("Can access clients")).toHaveTextContent("true");
+    expect(screen.getByLabelText("Can access staff")).toHaveTextContent("true");
+    expect(screen.getByLabelText("Client details route")).toHaveTextContent(
+      "/super-admin/clients/client-1?agencyId=atlas",
+    );
+    expect(screen.getByLabelText("Staff details route")).toHaveTextContent("none");
   });
 
   it("fails closed when context revalidation returns a different agency", async () => {

@@ -1,6 +1,5 @@
 import { Link } from "react-router";
 import { cn } from "@/lib/utils";
-import { Routes } from "@/routes/constants";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 type ClientNameLinkProps = {
@@ -10,16 +9,17 @@ type ClientNameLinkProps = {
 };
 
 export default function ClientNameLink({ name, clientId, className }: ClientNameLinkProps) {
-  const { actor } = useOperationalAgency();
+  const { capabilities, directoryRoutes } = useOperationalAgency();
   const trimmedClientId = clientId?.trim();
+  const clientDetailsRoute = directoryRoutes?.clientDetails;
 
-  if (!trimmedClientId || actor !== "agency") {
+  if (!trimmedClientId || !capabilities.canAccessClientDirectory || !clientDetailsRoute) {
     return <span className={className}>{name}</span>;
   }
 
   return (
     <Link
-      to={Routes.agency.clientDetails.replace(":clientId", trimmedClientId)}
+      to={clientDetailsRoute(trimmedClientId)}
       className={cn(
         "truncate transition-colors hover:text-[#00b4b8] hover:underline",
         className,

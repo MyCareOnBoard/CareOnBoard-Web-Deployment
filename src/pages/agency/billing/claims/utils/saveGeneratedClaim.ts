@@ -12,6 +12,7 @@ type SaveGeneratedClaimInput = {
   selectedRides?: MileageRide[];
   serviceCode: string;
   weekRange?: string;
+  signal?: AbortSignal;
 };
 
 type SaveGeneratedClaimResult = {
@@ -25,6 +26,7 @@ export async function saveGeneratedClaim({
   selectedRides = [],
   serviceCode,
   weekRange,
+  signal,
 }: SaveGeneratedClaimInput): Promise<SaveGeneratedClaimResult> {
   if (selectedShifts.length === 0 && selectedRides.length === 0) {
     throw new Error("Select at least one shift or ride to create a claim.");
@@ -44,6 +46,7 @@ export async function saveGeneratedClaim({
 
     const savedClaim = await createBillingClaim({
       context,
+      signal,
       payload: {
         clientId,
         rideIds: selectedRides.map((ride) => ride.id),
@@ -70,6 +73,7 @@ export async function saveGeneratedClaim({
 
   const savedClaim = await createBillingClaim({
     context,
+    signal,
     payload: {
       clientId,
       shiftIds: selectedShifts.map((shift) => shift.id),
