@@ -24,7 +24,6 @@ const timesheetApi = vi.hoisted(() => ({
   listStaffTimesheets: vi.fn(),
   createStaffPayrollInvoice: vi.fn(),
 }));
-const staffApi = vi.hoisted(() => ({ useListAgencyStaffQuery: vi.fn() }));
 const agencyApi = vi.hoisted(() => ({ getAgencyById: vi.fn() }));
 const ui = vi.hoisted(() => ({ toast: vi.fn() }));
 const printApi = vi.hoisted(() => ({ downloadPayrollInvoicePdf: vi.fn() }));
@@ -46,7 +45,6 @@ vi.mock("@/lib/axios", () => ({
   default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() },
 }));
 vi.mock("@/lib/api/agencies", () => agencyApi);
-vi.mock("@/lib/api/agency-staff", () => staffApi);
 vi.mock("@/lib/api/staff-timesheets", () => ({
   ...timesheetApi,
   getStaffTimesheetErrorMessage: (error: unknown) =>
@@ -87,11 +85,14 @@ vi.mock("@/pages/agency/billing/components/BillingDashboardHeader", () => ({
 }));
 vi.mock("@/pages/agency/billing/payroll/components/DuePayrollTable", () => ({
   default: ({ entries, onCreateInvoiceClick }: {
-    entries: Array<{ id: string; staffName: string }>;
+    entries: Array<{ id: string; staffName: string; paRate: string; grossAmount: number }>;
     onCreateInvoiceClick: (entry: never) => void;
   }) => (
     <div>
       <output aria-label="Due payroll names">{entries.map((entry) => entry.staffName).join(",")}</output>
+      <output aria-label="Due payroll financials">
+        {entries.map((entry) => `${entry.staffName}|${entry.paRate}|$${entry.grossAmount.toFixed(2)}`).join(",")}
+      </output>
       {entries.map((entry) => (
         <button key={entry.id} type="button" onClick={() => onCreateInvoiceClick(entry as never)}>
           Create invoice for {entry.staffName}
@@ -236,6 +237,12 @@ const approvedTimesheet = {
   payrollInvoiceId: null,
   createdAt: "2026-07-28T12:00:00.000Z",
   updatedAt: "2026-07-28T12:00:00.000Z",
+  payPreview: {
+    billingType: "hourly" as const,
+    billingRate: 25,
+    totalHours: 8,
+    grossAmount: 200,
+  },
 };
 
 const invoicePrefill = {
@@ -268,6 +275,28 @@ const invoice = {
   createdAt: "2026-08-02T12:00:00.000Z",
   updatedAt: "2026-08-02T12:00:00.000Z",
   paidAt: null,
+};
+
+const staffInvoicePrefill = {
+  ...invoicePrefill,
+  employeeName: "Avery Admin",
+  periodStart: "2026-07-14",
+  periodEnd: "2026-07-27",
+  dateRangeLabel: "Jul 14 - Jul 27, 2026",
+  earnings: [{ description: "Worked hours", hours: "8 hrs", rate: "$25.00/hr", amount: "$200.00" }],
+};
+
+const staffInvoice = {
+  ...invoice,
+  id: "staff-payroll-1",
+  invoiceNumber: "PAY-STAFF-001",
+  employeeId: "staff-user-1",
+  employeeName: "Avery Admin",
+  periodStart: "2026-07-14",
+  periodEnd: "2026-07-27",
+  shiftIds: [],
+  staffTimesheetIds: ["timesheet-1"],
+  invoicePrefill: staffInvoicePrefill,
 };
 
 const invoiceListItem = {
@@ -319,23 +348,13 @@ describe("shared payroll operational parity", () => {
     payrollApi.listPayrollInvoices.mockResolvedValue({ invoices: [invoiceListItem], total: 1 });
     payrollApi.getPayrollInvoicePreview.mockResolvedValue(preview);
     payrollApi.createPayrollInvoice.mockResolvedValue(invoice);
-    payrollApi.getPayrollInvoiceById.mockResolvedValue(invoice);
+    payrollApi.getPayrollInvoiceById.mockImplementation(({ invoiceId }: { invoiceId: string }) =>
+      Promise.resolve(invoiceId === staffInvoice.id ? staffInvoice : invoice),
+    );
     payrollApi.markPayrollInvoicePaid.mockResolvedValue(undefined);
     payrollApi.cancelPayrollInvoice.mockResolvedValue(undefined);
     timesheetApi.listStaffTimesheets.mockResolvedValue({ timesheets: [approvedTimesheet], total: 1 });
-    timesheetApi.createStaffPayrollInvoice.mockResolvedValue({ id: "payroll-1" });
-    staffApi.useListAgencyStaffQuery.mockReturnValue({
-      data: {
-        data: [{
-          id: "staff-user-1",
-          uid: "staff-user-1",
-          name: "Avery Admin",
-          role: "Account manager",
-          billingType: "hourly",
-          billingRate: 30,
-        }],
-      },
-    });
+    timesheetApi.createStaffPayrollInvoice.mockResolvedValue({ id: staffInvoice.id });
     agencyApi.getAgencyById.mockResolvedValue({ name: "Atlas Care" });
     Object.defineProperty(document, "fonts", {
       configurable: true,
@@ -353,6 +372,7 @@ describe("shared payroll operational parity", () => {
     expect(screen.getByLabelText("Payroll overview")).toHaveTextContent("$340.00");
     expect(screen.getByLabelText("Overtime alerts")).toHaveTextContent("Dana DSP");
     expect(screen.getByLabelText("Due payroll names")).toHaveTextContent("Avery Admin");
+    const agencyTimesheetFinancials = screen.getByLabelText("Due payroll financials").textContent;
     agencyView.unmount();
 
     vi.clearAllMocks();
@@ -360,7 +380,6 @@ describe("shared payroll operational parity", () => {
     payrollApi.getStaffToPay.mockResolvedValue({ entries: [dueEntry], total: 1, page: 1, limit: 100 });
     payrollApi.listPayrollInvoices.mockResolvedValue({ invoices: [invoiceListItem], total: 1 });
     timesheetApi.listStaffTimesheets.mockResolvedValue({ timesheets: [approvedTimesheet], total: 1 });
-    staffApi.useListAgencyStaffQuery.mockReturnValue({ data: { data: [] } });
 
     renderPayroll("super_admin");
     await waitFor(() => expect(screen.getByLabelText("Due payroll names")).toHaveTextContent("Dana DSP"));
@@ -375,6 +394,82 @@ describe("shared payroll operational parity", () => {
     expect(superDue.query).toEqual(agencyDue.query);
     expect(superTimesheets.context).toEqual(agencyTimesheets.context);
     expect(superTimesheets.query).toEqual(agencyTimesheets.query);
+    const superTimesheetFinancials = screen.getByLabelText("Due payroll financials").textContent;
+    expect(superTimesheetFinancials).toBe(agencyTimesheetFinancials);
+    expect(superTimesheetFinancials).toContain("Avery Admin|$25.00/hr|$200.00");
+  });
+
+  it("shows authoritative staff-timesheet pay and opens a matching created invoice document", async () => {
+    const user = userEvent.setup();
+    renderPayroll("super_admin");
+
+    await waitFor(() => expect(screen.getByLabelText("Due payroll financials"))
+      .toHaveTextContent("Avery Admin|$25.00/hr|$200.00"));
+    await user.click(screen.getByRole("button", { name: "Create invoice for Avery Admin" }));
+
+    await waitFor(() => expect(timesheetApi.createStaffPayrollInvoice).toHaveBeenCalledWith({
+      context: { agencyId: "atlas" },
+      payload: {
+        staffUid: "staff-user-1",
+        periodStart: "2026-07-14",
+        periodEnd: "2026-07-27",
+        staffTimesheetIds: ["timesheet-1"],
+      },
+      signal: expect.any(AbortSignal),
+    }));
+    await waitFor(() => expect(payrollApi.getPayrollInvoiceById).toHaveBeenCalledWith({
+      context: { agencyId: "atlas" },
+      invoiceId: staffInvoice.id,
+      signal: expect.any(AbortSignal),
+    }));
+    expect(await screen.findByRole("dialog", { name: "Paystub Invoice" }, { timeout: 5_000 }))
+      .toHaveAccessibleDescription(/Avery Admin/i);
+    expect(screen.getAllByText("$25.00/hr").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("$200.00").length).toBeGreaterThan(0);
+  });
+
+  it("uses one grouped server preview when a staff member has multiple eligible timesheets", async () => {
+    const groupedPayPreview = {
+      billingType: "hourly" as const,
+      billingRate: 16.67,
+      totalHours: 0.04,
+      grossAmount: 0.67,
+    };
+    timesheetApi.listStaffTimesheets.mockResolvedValue({
+      timesheets: [
+        { ...approvedTimesheet, payPreview: groupedPayPreview },
+        {
+          ...approvedTimesheet,
+          id: "timesheet-2",
+          periodStart: "2026-07-28",
+          periodEnd: "2026-08-03",
+          payPreview: groupedPayPreview,
+        },
+      ],
+      total: 2,
+    });
+
+    renderPayroll("super_admin");
+
+    await waitFor(() => expect(screen.getByLabelText("Due payroll financials"))
+      .toHaveTextContent("Avery Admin|$16.67/hr|$0.67"));
+  });
+
+  it("fails closed instead of rendering a zero staff-timesheet amount without a server preview", async () => {
+    const { payPreview: _missingPreview, ...timesheetWithoutPreview } = approvedTimesheet;
+    timesheetApi.listStaffTimesheets.mockResolvedValue({
+      timesheets: [timesheetWithoutPreview],
+      total: 1,
+    });
+
+    renderPayroll("super_admin");
+
+    await waitFor(() => expect(ui.toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Couldn't load approved timesheets",
+      variant: "destructive",
+    })));
+    expect(screen.getByLabelText("Due payroll financials"))
+      .not.toHaveTextContent("Avery Admin|—|$0.00");
   });
 
   it("scopes preview and creation to the selected agency, then opens detail with print entry", async () => {

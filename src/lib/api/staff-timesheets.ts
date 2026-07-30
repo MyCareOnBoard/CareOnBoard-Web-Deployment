@@ -23,6 +23,14 @@ export type StaffTimesheetSignature = {
   signatureData: string;
 };
 
+export type StaffTimesheetPayPreview = {
+  /** Aggregate for this staff member's eligible timesheets in the billing-list response. */
+  billingType: "hourly" | "monthly";
+  billingRate: number;
+  totalHours: number;
+  grossAmount: number;
+};
+
 export type StaffTimesheet = {
   id: string;
   agencyId: string;
@@ -41,6 +49,7 @@ export type StaffTimesheet = {
   reviewedBy: string | null;
   reviewerNotes: string | null;
   payrollInvoiceId: string | null;
+  payPreview?: StaffTimesheetPayPreview;
   createdAt: string;
   updatedAt: string;
 };
