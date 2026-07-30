@@ -71,7 +71,9 @@ const BillingPayrollManagementPage = lazy(() =>
     import("@/pages/agency/billing/payroll").then((module) => ({ default: module.AgencyPayrollDashboardPage }))
 );
 const StaffTimesheetPage = lazy(() => import("@/pages/agency/staff-timesheet"));
-const StaffTimesheetsApprovalPage = lazy(() => import("@/pages/agency/billing/staff-timesheets"));
+const StaffTimesheetsApprovalPage = lazy(() =>
+    import("@/pages/agency/billing/staff-timesheets").then((module) => ({ default: module.AgencyStaffTimesheetsApprovalPage }))
+);
 const BillingClaimsDashboardPage = lazy(() =>
     import("@/pages/agency/billing/claims").then((module) => ({ default: module.AgencyClaimsDashboardPage }))
 );
@@ -160,6 +162,8 @@ const SuperAdminBillingFinancialOverviewPage = lazy(() =>
 );
 const SuperAdminBillingClaimsPage = lazy(() => import("@/pages/agency/billing/claims"));
 const SuperAdminBillingPayrollPage = lazy(() => import("@/pages/agency/billing/payroll"));
+const SuperAdminBillingExpensesPage = lazy(() => import("@/pages/agency/billing/expenses"));
+const SuperAdminBillingStaffTimesheetsPage = lazy(() => import("@/pages/agency/billing/staff-timesheets"));
 const AgencyBillingMonitorPage = lazy(() => import("@/pages/super-admin/agency-billing-monitor"));
 const AIAutomationPage = lazy(() => import("@/pages/agency/ai-automation"));
 const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));
@@ -820,6 +824,14 @@ export const router = createBrowserRouter([
                     {
                         path: "claims",
                         Component: SuperAdminBillingClaimsPage,
+                    },
+                    {
+                        path: "expenses",
+                        Component: SuperAdminBillingExpensesPage,
+                    },
+                    {
+                        path: "staff-timesheets",
+                        Component: SuperAdminBillingStaffTimesheetsPage,
                     },
                 ],
             },
