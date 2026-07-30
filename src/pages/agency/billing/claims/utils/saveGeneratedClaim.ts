@@ -4,9 +4,10 @@ import type { MileageRide } from "@/lib/api/mileage";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import { mapRideToRecentClaim } from "./rideToRecentClaim";
 import { mapShiftToRecentClaim } from "./shiftToRecentClaim";
+import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
 
 type SaveGeneratedClaimInput = {
-  agencyId: string;
+  context: OperationalBillingRequestContext;
   selectedShifts?: Shift[];
   selectedRides?: MileageRide[];
   serviceCode: string;
@@ -19,7 +20,7 @@ type SaveGeneratedClaimResult = {
 };
 
 export async function saveGeneratedClaim({
-  agencyId,
+  context,
   selectedShifts = [],
   selectedRides = [],
   serviceCode,
@@ -42,7 +43,7 @@ export async function saveGeneratedClaim({
     }
 
     const savedClaim = await createBillingClaim({
-      context: { agencyId },
+      context,
       payload: {
         clientId,
         rideIds: selectedRides.map((ride) => ride.id),
@@ -68,7 +69,7 @@ export async function saveGeneratedClaim({
   }
 
   const savedClaim = await createBillingClaim({
-    context: { agencyId },
+    context,
     payload: {
       clientId,
       shiftIds: selectedShifts.map((shift) => shift.id),

@@ -71,7 +71,7 @@ const BillingPayrollManagementPage = lazy(() => import("@/pages/agency/billing/p
 const StaffTimesheetPage = lazy(() => import("@/pages/agency/staff-timesheet"));
 const StaffTimesheetsApprovalPage = lazy(() => import("@/pages/agency/billing/staff-timesheets"));
 const BillingClaimsDashboardPage = lazy(() =>
-    import("@/pages/agency/billing/pages").then((module) => ({ default: module.ClaimsDashboard }))
+    import("@/pages/agency/billing/claims").then((module) => ({ default: module.AgencyClaimsDashboardPage }))
 );
 const BillingExpensesDashboardPage = lazy(() =>
     import("@/pages/agency/billing/pages").then((module) => ({ default: module.ExpensesDashboard }))
@@ -156,6 +156,7 @@ const SuperAdminBillingIndexPage = lazy(() =>
 const SuperAdminBillingFinancialOverviewPage = lazy(() =>
     import("@/pages/agency/billing/financial-overview")
 );
+const SuperAdminBillingClaimsPage = lazy(() => import("@/pages/agency/billing/claims"));
 const AgencyBillingMonitorPage = lazy(() => import("@/pages/super-admin/agency-billing-monitor"));
 const AIAutomationPage = lazy(() => import("@/pages/agency/ai-automation"));
 const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));
@@ -808,6 +809,10 @@ export const router = createBrowserRouter([
                     {
                         path: "financial-overview",
                         Component: SuperAdminBillingFinancialOverviewPage,
+                    },
+                    {
+                        path: "claims",
+                        Component: SuperAdminBillingClaimsPage,
                     },
                 ],
             },

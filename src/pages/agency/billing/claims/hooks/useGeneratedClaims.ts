@@ -9,8 +9,7 @@ import {
   type UpdateBillingClaimStatusPayload,
 } from "@/lib/api/claims";
 import { filterClaimsByClientSearch } from "../utils/savedClaimUtils";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
-import { useAuth } from "@/utils/auth";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
@@ -36,13 +35,12 @@ export function useGeneratedClaims(
     selectedClientName,
   }: UseGeneratedClaimsOptions = {},
 ) {
-  const { user } = useAuth();
-  const agencyId = user?.agencyId ?? "";
+  const { agencyId, mode } = useOperationalAgency();
   const [rawClaims, setRawClaims] = useState<BillingClaimListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
-  const mode = useEffectiveAgencyMode();
+  const controllerRef = useRef<AbortController | null>(null);
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
@@ -56,6 +54,9 @@ export function useGeneratedClaims(
 
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
       setLoading(true);
       setError(null);
 
@@ -68,6 +69,7 @@ export function useGeneratedClaims(
             ...(statusFilter !== "all" ? { status: statusFilter } : {}),
             ...(mode ? { mode } : {}),
           },
+          signal: controller.signal,
         });
 
         if (requestIdRef.current !== requestId) {
@@ -76,6 +78,7 @@ export function useGeneratedClaims(
 
         setRawClaims(claims);
       } catch (fetchError) {
+        if (controller.signal.aborted) return;
         if (requestIdRef.current !== requestId) {
           return;
         }
@@ -95,6 +98,10 @@ export function useGeneratedClaims(
 
   useEffect(() => {
     void refetch();
+    return () => {
+      requestIdRef.current += 1;
+      controllerRef.current?.abort();
+    };
   }, [refetch]);
 
   const claims = useMemo(

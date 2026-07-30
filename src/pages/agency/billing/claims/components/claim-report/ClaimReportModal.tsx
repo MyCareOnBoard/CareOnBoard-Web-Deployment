@@ -13,7 +13,7 @@ import { buildClaimReportFromClaim } from "../../utils/claimReportUtils";
 import type { ClaimReportPrefillSnapshot } from "../../utils/claimReportPrefillUtils";
 import { downloadClaimReportPdf } from "../../utils/claimReportPrintUtils";
 import { normalizeSignaturePayload } from "../../utils/claimReportSignatureUtils";
-import { useAuth } from "@/utils/auth";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 import {
   CLAIM_REPORT_PRINT_ROOT_CLASS,
   CLAIMS_REPORT_MODAL_CLASS,
@@ -49,7 +49,7 @@ export default function ClaimReportModal({
   onClose,
 }: ClaimReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
+  const { agencyId } = useOperationalAgency();
   const [form, setForm] = useState<ClaimReportFormState>(() =>
     buildClaimReportFromClaim(claim, initialPrefill),
   );
@@ -62,9 +62,6 @@ export default function ClaimReportModal({
 
   useEffect(() => {
     if (!open) return;
-
-    const agencyId = user?.agencyId;
-    if (!agencyId) return;
 
     let cancelled = false;
 
@@ -85,16 +82,16 @@ export default function ClaimReportModal({
           })),
         }));
       })
-      .catch((error) => {
+      .catch(() => {
         if (!cancelled) {
-          console.error("Failed to load agency for claim report:", error);
+          console.error("Failed to load agency for claim report.");
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [open, user?.agencyId]);
+  }, [agencyId, open]);
 
   const updateDiagnosis = useCallback((letter: string, value: string) => {
     setForm((prev) => ({
@@ -134,8 +131,8 @@ export default function ClaimReportModal({
     setIsDownloading(true);
     try {
       await downloadClaimReportPdf(printRef.current, form.clientName);
-    } catch (error) {
-      console.error("Error generating claim report PDF:", error);
+    } catch {
+      console.error("Error generating claim report PDF.");
     } finally {
       setIsDownloading(false);
     }

@@ -7,6 +7,7 @@ import ClientNameLink from "./ClientNameLink";
 import CoverageBadge from "./CoverageBadge";
 import { GROUPED_TABLE_ROW_CLASS, TABLE_ROW_CLASS } from "./tableColumns";
 import { useStaffLabels } from "@/hooks/useStaffLabels";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 const MISSING_STAFF_ID = "—";
 const STAFF_ID_DISPLAY_LENGTH = 6;
@@ -24,10 +25,11 @@ function formatStaffIdDisplay(staffId: string): string {
 }
 
 function StaffLink({ staffId, staffName }: { staffId: string; staffName?: string }) {
+  const { actor } = useOperationalAgency();
   // Prefer the resolved staff name; fall back to the (truncated) id when it's missing.
   const label = staffName?.trim() || formatStaffIdDisplay(staffId);
 
-  if (!isStaffIdLinkable(staffId)) {
+  if (!isStaffIdLinkable(staffId) || actor !== "agency") {
     return <span className="text-[13px] text-[#808081]">{label}</span>;
   }
 

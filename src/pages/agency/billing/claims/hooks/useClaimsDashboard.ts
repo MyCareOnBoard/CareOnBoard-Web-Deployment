@@ -1,26 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRangeValues } from "@/pages/agency/billing/shared/types";
 import { getClaimsDashboard, type ClaimsDashboardSummary } from "@/lib/api/claims";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import {
   mapDashboardToOverviewStats,
   mapDashboardToRejectionChart,
   mapDashboardToStatusChart,
 } from "../utils/claimsDashboardUtils";
-import { useAuth } from "@/utils/auth";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
 }
 
 export function useClaimsDashboard(dateRange: DateRangeValues) {
-  const { user } = useAuth();
-  const agencyId = user?.agencyId ?? "";
+  const { agencyId, mode } = useOperationalAgency();
   const [rawData, setRawData] = useState<ClaimsDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
-  const mode = useEffectiveAgencyMode();
+  const controllerRef = useRef<AbortController | null>(null);
 
   const refetch = useCallback(async () => {
     if (!agencyId || !hasCompleteDateRange(dateRange)) {
@@ -32,6 +30,9 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setLoading(true);
     setError(null);
 
@@ -43,6 +44,7 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
           endDate: dateRange.endDate,
           ...(mode ? { mode } : {}),
         },
+        signal: controller.signal,
       });
 
       if (requestIdRef.current !== requestId) {
@@ -51,6 +53,7 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
 
       setRawData(data);
     } catch (fetchError) {
+      if (controller.signal.aborted) return;
       if (requestIdRef.current !== requestId) {
         return;
       }
@@ -68,6 +71,10 @@ export function useClaimsDashboard(dateRange: DateRangeValues) {
 
   useEffect(() => {
     void refetch();
+    return () => {
+      requestIdRef.current += 1;
+      controllerRef.current?.abort();
+    };
   }, [refetch]);
 
   const overviewStats = useMemo(
