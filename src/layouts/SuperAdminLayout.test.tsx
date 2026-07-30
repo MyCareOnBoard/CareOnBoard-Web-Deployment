@@ -49,6 +49,34 @@ describe("SuperAdminLayout", () => {
     expect(screen.queryByText("Shift Management")).not.toBeInTheDocument();
   });
 
+  it("shows Billing Management only for its exact permission", () => {
+    state.user = { ...state.user, profile: { role: "Billing operator", accessList: ["Billing Management"] } };
+    const view = render(<MemoryRouter><SuperAdminLayout /></MemoryRouter>);
+    expect(screen.getByText("Billing Management")).toBeVisible();
+    expect(screen.queryByText("Agency Billing Monitor")).not.toBeInTheDocument();
+
+    state.user = { ...state.user, profile: { role: "Billing monitor", accessList: ["Agency Billing Monitor"] } };
+    view.rerender(<MemoryRouter><SuperAdminLayout /></MemoryRouter>);
+    expect(screen.getByText("Agency Billing Monitor")).toBeVisible();
+    expect(screen.queryByText("Billing Management")).not.toBeInTheDocument();
+  });
+
+  it("never mounts a nested billing route for Agency Billing Monitor access", async () => {
+    routing.pathname = "/super-admin/billing/financial-overview";
+    state.user = { ...state.user, profile: { role: "Billing monitor", accessList: ["Agency Billing Monitor"] } };
+    const mounted = vi.fn();
+    function DeniedContent() {
+      mounted();
+      return <div>Protected billing workspace</div>;
+    }
+
+    render(<MemoryRouter><SuperAdminLayout><DeniedContent /></SuperAdminLayout></MemoryRouter>);
+
+    expect(screen.queryByText("Protected billing workspace")).not.toBeInTheDocument();
+    expect(mounted).not.toHaveBeenCalled();
+    await waitFor(() => expect(routing.navigate).toHaveBeenCalledWith("/super-admin/dashboard", { replace: true }));
+  });
+
   it("guards nested shift paths with Shift Management instead of a similar prefix", async () => {
     routing.pathname = "/super-admin/shifts/shift-123";
     state.user = { ...state.user, profile: { role: "Maintainer", accessList: ["Shift Maintenance"] } };

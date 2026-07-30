@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRangeValues } from "@/pages/agency/billing/shared/types";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 import {
   getClaimsDashboard,
   listBillingClaims,
@@ -22,7 +22,6 @@ import {
   mapDashboardToFinancialPayrollChart,
   mapDashboardToOverviewStats,
 } from "../utils/financialOverviewUtils";
-import { useAuth } from "@/utils/auth";
 
 const LIST_LIMIT = 15;
 const ACTIVITY_LIMIT = 20;
@@ -44,6 +43,7 @@ async function fetchPrimaryBatch(
   agencyId: string,
   dateRange: DateRangeValues,
   mode: AgencyMode | null,
+  signal: AbortSignal,
 ): Promise<PrimaryFetchResult> {
   const query = {
     startDate: dateRange.startDate,
@@ -53,10 +53,10 @@ async function fetchPrimaryBatch(
 
   const [claimsDashboardResult, payrollDashboardResult, claimsListResult, invoicesListResult] =
     await Promise.allSettled([
-      getClaimsDashboard({ context: { agencyId }, query }),
-      getPayrollDashboard({ context: { agencyId }, query }),
-      listBillingClaims({ context: { agencyId }, query: { ...query, limit: LIST_LIMIT } }),
-      listPayrollInvoices({ context: { agencyId }, query: { ...query, limit: LIST_LIMIT } }),
+      getClaimsDashboard({ context: { agencyId }, query, signal }),
+      getPayrollDashboard({ context: { agencyId }, query, signal }),
+      listBillingClaims({ context: { agencyId }, query: { ...query, limit: LIST_LIMIT }, signal }),
+      listPayrollInvoices({ context: { agencyId }, query: { ...query, limit: LIST_LIMIT }, signal }),
     ]);
 
   const partialErrors: string[] = [];
@@ -122,8 +122,7 @@ async function fetchPrimaryBatch(
 }
 
 export function useFinancialOverview(dateRange: DateRangeValues) {
-  const { user } = useAuth();
-  const agencyId = user?.agencyId ?? "";
+  const { agencyId, mode } = useOperationalAgency();
   const [claimsDashboard, setClaimsDashboard] = useState<ClaimsDashboardSummary | null>(null);
   const [previousClaimsDashboard, setPreviousClaimsDashboard] =
     useState<ClaimsDashboardSummary | null>(null);
@@ -136,11 +135,12 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
   const [error, setError] = useState<string | null>(null);
   const [partialErrors, setPartialErrors] = useState<string[]>([]);
   const requestIdRef = useRef(0);
+  const requestControllerRef = useRef<AbortController | null>(null);
+  const previousAgencyIdRef = useRef(agencyId);
   const hasLoadedOnceRef = useRef(false);
-  const mode = useEffectiveAgencyMode();
 
   const fetchTrends = useCallback(
-    async (range: DateRangeValues, requestId: number) => {
+    async (range: DateRangeValues, requestId: number, signal: AbortSignal) => {
       const previousRange = getPreviousPeriodRange(range);
       if (!previousRange) {
         setPreviousClaimsDashboard(null);
@@ -158,27 +158,47 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
             endDate: previousRange.endDate,
             ...(mode ? { mode } : {}),
           },
+          signal,
         });
 
-        if (requestIdRef.current !== requestId) {
+        if (signal.aborted || requestIdRef.current !== requestId) {
           return;
         }
 
         setPreviousClaimsDashboard(previousData);
       } catch {
-        if (requestIdRef.current !== requestId) {
+        if (signal.aborted || requestIdRef.current !== requestId) {
           return;
         }
 
         setPreviousClaimsDashboard(null);
       } finally {
-        if (requestIdRef.current === requestId) {
+        if (!signal.aborted && requestIdRef.current === requestId) {
           setTrendsLoading(false);
         }
       }
     },
     [agencyId, mode],
   );
+
+  useEffect(() => {
+    if (previousAgencyIdRef.current === agencyId) return;
+    previousAgencyIdRef.current = agencyId;
+    requestIdRef.current += 1;
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+    hasLoadedOnceRef.current = false;
+    setClaimsDashboard(null);
+    setPreviousClaimsDashboard(null);
+    setPayrollDashboard(null);
+    setClaims([]);
+    setInvoices([]);
+    setLoading(Boolean(agencyId));
+    setIsRefetching(false);
+    setTrendsLoading(false);
+    setError(null);
+    setPartialErrors([]);
+  }, [agencyId]);
 
   const refetch = useCallback(async () => {
     if (!agencyId || !hasCompleteDateRange(dateRange)) {
@@ -214,6 +234,9 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
 
     if (hasLoadedOnceRef.current) {
       setIsRefetching(true);
@@ -225,9 +248,9 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
     setPreviousClaimsDashboard(null);
 
     try {
-      const result = await fetchPrimaryBatch(agencyId, dateRange, mode);
+      const result = await fetchPrimaryBatch(agencyId, dateRange, mode, controller.signal);
 
-      if (requestIdRef.current !== requestId) {
+      if (controller.signal.aborted || requestIdRef.current !== requestId) {
         return;
       }
 
@@ -250,9 +273,9 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
       setPartialErrors(result.partialErrors);
       hasLoadedOnceRef.current = true;
 
-      void fetchTrends(dateRange, requestId);
+      void fetchTrends(dateRange, requestId, controller.signal);
     } catch (fetchError) {
-      if (requestIdRef.current !== requestId) {
+      if (controller.signal.aborted || requestIdRef.current !== requestId) {
         return;
       }
 
@@ -269,7 +292,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
           : "Failed to load financial overview",
       );
     } finally {
-      if (requestIdRef.current === requestId) {
+      if (!controller.signal.aborted && requestIdRef.current === requestId) {
         setLoading(false);
         setIsRefetching(false);
       }
@@ -278,6 +301,11 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
 
   useEffect(() => {
     void refetch();
+    return () => {
+      requestIdRef.current += 1;
+      requestControllerRef.current?.abort();
+      requestControllerRef.current = null;
+    };
   }, [refetch]);
 
   const overviewStats = useMemo(

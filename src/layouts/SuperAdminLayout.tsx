@@ -38,6 +38,7 @@ const allNavItems: NavItem[] = [
   {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock, accessKey: "Clients Directory"},
   {label: "Shift Maintenance", path: Routes.superAdmin.shiftMaintenance, icon: Wrench, accessKey: "Shift Maintenance"},
   {label: "Shift Management", path: Routes.superAdmin.shifts.index, icon: CalendarRange, accessKey: "Shift Management"},
+  {label: "Billing Management", path: Routes.superAdmin.billing.index, icon: DollarSign, accessKey: "Billing Management"},
   {label: "Reports", path: Routes.superAdmin.reports.index, icon: ChartGantt, accessKey: "Reports"},
   {label: "Services", path: Routes.superAdmin.services, icon: Briefcase, accessKey: "Services"},
   {label: "System Settings", path: Routes.superAdmin.systemSettings, icon: Settings, accessKey: "System Settings"},

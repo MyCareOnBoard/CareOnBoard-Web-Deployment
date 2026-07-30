@@ -149,6 +149,13 @@ const SuperAdminShiftActivityLogsPage = lazy(() =>
     import("@/pages/super-admin/shift-management/SuperAdminShiftList").then((module) => ({ default: module.SuperAdminShiftActivityLogs }))
 );
 const SuperAdminShiftDetailsPage = lazy(() => import("@/pages/super-admin/shift-management/SuperAdminShiftDetails"));
+const SuperAdminBillingPage = lazy(() => import("@/pages/super-admin/billing"));
+const SuperAdminBillingIndexPage = lazy(() =>
+    import("@/pages/super-admin/billing").then((module) => ({ default: module.SuperAdminBillingIndex }))
+);
+const SuperAdminBillingFinancialOverviewPage = lazy(() =>
+    import("@/pages/agency/billing/financial-overview")
+);
 const AgencyBillingMonitorPage = lazy(() => import("@/pages/super-admin/agency-billing-monitor"));
 const AIAutomationPage = lazy(() => import("@/pages/agency/ai-automation"));
 const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));
@@ -787,6 +794,20 @@ export const router = createBrowserRouter([
                     {
                         path: ":shiftId",
                         Component: SuperAdminShiftDetailsPage,
+                    },
+                ],
+            },
+            {
+                path: Routes.superAdmin.billing.index,
+                Component: SuperAdminBillingPage,
+                children: [
+                    {
+                        index: true,
+                        Component: SuperAdminBillingIndexPage,
+                    },
+                    {
+                        path: "financial-overview",
+                        Component: SuperAdminBillingFinancialOverviewPage,
                     },
                 ],
             },
