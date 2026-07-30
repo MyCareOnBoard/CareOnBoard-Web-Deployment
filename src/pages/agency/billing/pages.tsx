@@ -13,9 +13,7 @@ import ExpensesDashboardPage from "./expenses";
 function AgencyBillingScope({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const agencyId = user?.agencyId || user?.agency?.id || "";
-  const supportedClientTypes = user?.agency?.supportedClientTypes?.length
-    ? user.agency.supportedClientTypes
-    : (["ddd", "hha"] as const);
+  const supportedClientTypes = user?.agency?.supportedClientTypes ?? [];
   const storedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
   const mode = resolveEffectiveAgencyMode(supportedClientTypes, storedMode);
   const data = useMemo(() => createAgencyOperationalDataAdapter(agencyId), [agencyId]);

@@ -22,6 +22,10 @@ const operationsApi = vi.hoisted(() => ({
 }));
 const auth = vi.hoisted(() => ({
   accessList: ["Billing Management"] as string[],
+  agency: undefined as { name: string; supportedClientTypes?: ("ddd" | "hha")[] } | undefined,
+}));
+const reduxState = vi.hoisted(() => ({
+  modeByAgency: { "actor-agency": "hha" } as Record<string, "ddd" | "hha">,
 }));
 
 vi.mock("react-router", async () => vi.importActual<typeof import("react-router")>("react-router"));
@@ -33,13 +37,22 @@ vi.mock("@/lib/api/payroll", () => ({
   getPayrollDashboard: billingApi.getPayrollDashboard,
   listPayrollInvoices: billingApi.listPayrollInvoices,
 }));
-vi.mock("@/hooks/useEffectiveAgencyMode", () => ({ useEffectiveAgencyMode: () => "hha" }));
+vi.mock("@/hooks/useEffectiveAgencyMode", async () => ({
+  ...(await vi.importActual<typeof import("@/hooks/useEffectiveAgencyMode")>("@/hooks/useEffectiveAgencyMode")),
+  useEffectiveAgencyMode: () => "hha",
+}));
+vi.mock("react-redux", () => ({
+  useSelector: (selector: (state: unknown) => unknown) => selector({
+    agencyMode: { modeByAgency: reduxState.modeByAgency },
+  }),
+}));
 vi.mock("@/utils/auth", () => ({
   useAuth: () => ({
     user: {
       uid: "super-1",
       userType: "super_admin",
       agencyId: "actor-agency",
+      agency: auth.agency,
       profile: { accessList: auth.accessList },
     },
   }),
@@ -49,11 +62,16 @@ vi.mock("@/lib/api/super-admin-operations", () => ({
   listOperationalAgencies: operationsApi.listOperationalAgencies,
 }));
 vi.mock("@/lib/operational-agency/dataAdapters", () => ({
+  createAgencyOperationalDataAdapter: vi.fn(() => ({})),
   createSuperAdminOperationalDataAdapter: vi.fn(() => ({})),
 }));
+vi.mock("@/pages/agency/billing/claims", () => ({ default: () => null }));
+vi.mock("@/pages/agency/billing/payroll", () => ({ default: () => null }));
+vi.mock("@/pages/agency/billing/expenses", () => ({ default: () => null }));
 
 import SuperAdminBillingWorkspace from "./SuperAdminBillingWorkspace";
 import { SuperAdminBillingIndex } from "./index";
+import { FinancialOverview } from "@/pages/agency/billing/pages";
 
 const atlas = {
   id: "atlas",
@@ -63,6 +81,7 @@ const atlas = {
   timezone: "America/New_York",
 };
 const beacon = { ...atlas, id: "beacon", name: "Beacon Supports" };
+const dualAtlas = { ...atlas, supportedClientTypes: ["ddd", "hha"] as const };
 
 const claimsDashboard = {
   overview: {
@@ -127,6 +146,8 @@ describe("shared financial overview context", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auth.accessList = ["Billing Management"];
+    auth.agency = undefined;
+    reduxState.modeByAgency = { "actor-agency": "hha" };
     operationsApi.listOperationalAgencies.mockResolvedValue({
       data: [atlas, beacon],
       nextCursor: null,
@@ -217,6 +238,17 @@ describe("shared financial overview context", () => {
     });
     await waitFor(() => expect(screen.getByLabelText("Total revenue")).toHaveTextContent("$900.00"));
   });
+
+  it("preserves the agency overview ddd fallback when supported client types are missing", async () => {
+    render(<FinancialOverview />);
+
+    await waitFor(() => expect(billingApi.getClaimsDashboard).toHaveBeenCalled());
+    const currentRequest = billingApi.getClaimsDashboard.mock.calls[0]?.[0];
+    expect(currentRequest).toEqual(expect.objectContaining({
+      context: { agencyId: "actor-agency" },
+      query: expect.objectContaining({ mode: "ddd" }),
+    }));
+  });
 });
 
 const domainRequest = vi.fn();
@@ -255,6 +287,7 @@ describe("SuperAdminBillingWorkspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auth.accessList = ["Billing Management"];
+    auth.agency = undefined;
     operationsApi.listOperationalAgencies.mockResolvedValue({
       data: [atlas, beacon],
       nextCursor: null,
@@ -328,6 +361,15 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(await screen.findByLabelText("Billing domain agency")).toHaveTextContent("Atlas Care");
     expect(screen.getByLabelText("Billing location")).toHaveTextContent(
       "/super-admin/billing/financial-overview?agencyId=atlas",
+    );
+  });
+
+  it("preserves normalized operational query context when redirecting an indexed direct link", async () => {
+    operationsApi.getOperationalAgencyContext.mockResolvedValue(dualAtlas);
+    renderWorkspace("/super-admin/billing?agencyId=atlas&clientType=hha&view=summary");
+
+    expect(await screen.findByLabelText("Billing location")).toHaveTextContent(
+      "/super-admin/billing/financial-overview?clientType=hha&view=summary&agencyId=atlas",
     );
   });
 
