@@ -73,6 +73,16 @@ describe("ShiftsMonthCalendar shared-grid regression", () => {
     });
   });
 
+  it("uses a calendar-grid skeleton while the entity shifts load", () => {
+    listShifts.mockReturnValueOnce(new Promise(() => {}));
+
+    render(<ShiftsMonthCalendar variant="client" agencyId="agency-a" clientId="client-a" />);
+
+    expect(screen.getByLabelText("Loading this month's shifts")).toBeVisible();
+    expect(screen.getAllByTestId("entity-calendar-skeleton-day")).toHaveLength(35);
+    expect(screen.queryByText(/Loading this month/i)).not.toBeInTheDocument();
+  });
+
   it("keeps client filtering, selectors, touch overflow, and agency detail navigation", async () => {
     listShifts.mockResolvedValue({
       success: true,
@@ -88,6 +98,7 @@ describe("ShiftsMonthCalendar shared-grid regression", () => {
     expect(screen.getByRole("combobox", { name: "Month" })).toHaveTextContent("August");
     expect(screen.getByRole("combobox", { name: "Year" })).toHaveTextContent("2026");
     const firstShift = await screen.findByRole("button", { name: /Open shift details for Robin Staff/i });
+    expect(firstShift).toHaveClass("cursor-pointer");
 
     const [params, options] = listShifts.mock.calls[0];
     expect(params).toEqual({
@@ -101,7 +112,9 @@ describe("ShiftsMonthCalendar shared-grid regression", () => {
     });
     expect(options.signal).toBeInstanceOf(AbortSignal);
 
-    await userEvent.click(screen.getByRole("button", { name: "Show 1 more shift on August 12" }));
+    const overflow = screen.getByRole("button", { name: "Show 1 more shift on August 12" });
+    expect(overflow).toHaveClass("cursor-pointer");
+    await userEvent.click(overflow);
     expect(await screen.findByRole("button", { name: /Open shift details for Taylor Staff/i })).toBeVisible();
 
     await userEvent.click(firstShift);

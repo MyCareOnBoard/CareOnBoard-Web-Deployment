@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Building2, Loader2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { eachMonthOfInterval, format } from "date-fns";
+import { AlertTriangle, Building2, ChevronLeft, ChevronRight, X } from "lucide-react";
 import ShiftMonthGrid from "@/components/shifts/ShiftMonthGrid";
+import ShiftCalendarSkeleton from "@/components/shifts/ShiftCalendarSkeleton";
 import { Button } from "@/components/ui/button";
-import { listCalendarShifts } from "@/lib/api/shifts";
+import { listShifts, type Shift } from "@/lib/api/shifts";
 import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
 import { ANOMALY_CHIP_CLASS } from "@/lib/shift-visual-tokens";
 import { cn } from "@/lib/utils";
@@ -10,29 +12,54 @@ import {
   ANOMALY_CALENDAR_SHORT_LABEL,
   ANOMALY_LABELS,
 } from "@/pages/shared/shift-maintenance/audit-display";
-import {
-  createCalendarState,
-  createKeyedConcurrencyScheduler,
-  markCalendarAgencyError,
-  markCalendarAgencyLoading,
-  markCalendarAgencySkipped,
-  markCalendarAgencySuccess,
-  mergeCalendarAgencyPage,
-  removeCalendarAgencySnapshot,
-  type NormalizedCalendarShift,
-  type KeyedConcurrencyScheduler,
-} from "./calendarModel";
+import type { NormalizedCalendarShift } from "./calendarModel";
+import type { ShiftDateRange } from "./shiftWorkspaceState";
+import { matchesShiftCategory, type ShiftCategory } from "@/lib/shift-category";
 
 const PAGE_LIMIT = 200;
-const MAX_AGENCY_CHAINS = 4;
 
 export interface SuperAdminShiftsCalendarProps {
   agencies: OperationalAgencySummary[];
-  month: string;
+  dateRange: ShiftDateRange;
   mode: "ddd" | "hha";
-  onMonthChange: (month: string) => void;
+  category?: ShiftCategory | null;
   onSelectionChange: (selectedIds: string[]) => void;
   onOpenShift?: (shift: NormalizedCalendarShift) => void;
+}
+
+function populatedName(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  for (const key of ["fullName", "name"]) {
+    if (typeof record[key] === "string" && record[key].trim()) return record[key].trim();
+  }
+  const name = [record.firstName, record.lastName]
+    .filter((part): part is string => typeof part === "string" && Boolean(part.trim()))
+    .join(" ");
+  return name || null;
+}
+
+function toCalendarShift(
+  shift: Shift,
+  selectedAgency?: OperationalAgencySummary,
+): NormalizedCalendarShift | null {
+  const agencyId = shift.agencyId?.trim() || selectedAgency?.id;
+  if (!agencyId) return null;
+  return {
+    id: shift.id,
+    date: shift.date,
+    startTime: shift.startTime || null,
+    endTime: shift.endTime || null,
+    status: shift.status || null,
+    clientId: shift.clientId || null,
+    clientName: populatedName(shift.client),
+    employeeId: shift.employeeId || null,
+    staffName: populatedName(shift.employee) || shift.assignedDsp || null,
+    serviceCode: shift.serviceCode || null,
+    anomalyCodes: shift.anomalyCodes ?? [],
+    agencyId,
+    agencyName: populatedName(shift.agency) || selectedAgency?.name || "Unknown agency",
+  };
 }
 
 function isAbort(error: unknown): boolean {
@@ -41,21 +68,34 @@ function isAbort(error: unknown): boolean {
   return candidate.code === "ERR_CANCELED" || candidate.name === "CanceledError" || candidate.name === "AbortError";
 }
 
-function loadError(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : "Could not load this agency.";
-}
-
 function timeLabel(value: string | null): string {
   if (!value) return "—";
   const [hours, minutes] = value.split(":").map(Number);
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return value;
-  const date = new Date(2000, 0, 1, hours, minutes);
-  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function statusLabel(value: string | null): string {
   if (!value) return "Unknown";
   return value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " ");
+}
+
+function StatusBadge({ shift }: { shift: NormalizedCalendarShift }) {
+  const firstCode = shift.anomalyCodes[0];
+  if (firstCode) {
+    return (
+      <span
+        className={cn("inline-flex w-fit rounded border px-1.5 py-0.5 text-[9px] font-semibold", ANOMALY_CHIP_CLASS[firstCode])}
+        title={ANOMALY_LABELS[firstCode].label}
+      >
+        {ANOMALY_CALENDAR_SHORT_LABEL[firstCode]}
+      </span>
+    );
+  }
+  return <span className="inline-flex w-fit rounded-full bg-[#e6f3f3] px-1.5 py-0.5 text-[9px] font-semibold text-[#075b5d]">{statusLabel(shift.status)}</span>;
 }
 
 function ShiftSummary({ shift, showBadge }: { shift: NormalizedCalendarShift; showBadge: boolean }) {
@@ -75,194 +115,165 @@ function ShiftSummary({ shift, showBadge }: { shift: NormalizedCalendarShift; sh
   );
 }
 
-function StatusBadge({ shift }: { shift: NormalizedCalendarShift }) {
-  const firstCode = shift.anomalyCodes[0];
-  if (firstCode) {
-    return (
-      <span
-        className={cn("inline-flex w-fit rounded border px-1.5 py-0.5 text-[9px] font-semibold", ANOMALY_CHIP_CLASS[firstCode])}
-        title={ANOMALY_LABELS[firstCode].label}
-      >
-        {ANOMALY_CALENDAR_SHORT_LABEL[firstCode]}
-      </span>
-    );
-  }
-  const status = shift.status;
-  return <span className="inline-flex w-fit rounded-full bg-[#e6f3f3] px-1.5 py-0.5 text-[9px] font-semibold text-[#075b5d]">{statusLabel(status)}</span>;
-}
-
 export default function SuperAdminShiftsCalendar({
   agencies,
-  month,
+  dateRange,
   mode,
+  category = null,
   onSelectionChange,
   onOpenShift,
 }: SuperAdminShiftsCalendarProps) {
-  const generationRef = useRef(0);
-  const generationControllerRef = useRef<AbortController | null>(null);
-  const schedulerRef = useRef<{
-    generation: number;
-    scheduler: KeyedConcurrencyScheduler<OperationalAgencySummary>;
-  } | null>(null);
-  const selectionKey = agencies.map((agency) => `${agency.id}:${agency.name}:${agency.supportedClientTypes.join(",")}`).join("|");
-  const requestKey = `${selectionKey}|${month}|${mode}`;
-  const [state, setState] = useState(() => createCalendarState(agencies, 0, requestKey));
-  const renderedState = state.requestKey === requestKey
-    ? state
-    : createCalendarState(agencies, state.generation, requestKey);
+  const selectedAgency = agencies[0];
+  const [shifts, setShifts] = useState<NormalizedCalendarShift[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryVersion, setRetryVersion] = useState(0);
+  const [visibleMonthIndex, setVisibleMonthIndex] = useState(0);
 
-  const loadAgency = useCallback(async (
-    agency: OperationalAgencySummary,
-    generation: number,
-    signal: AbortSignal,
-  ) => {
-    setState((current) => markCalendarAgencyLoading(current, agency.id, generation));
-    try {
-      let cursor: string | undefined;
-      const seenCursors = new Set<string>();
-      do {
-        const page = await listCalendarShifts({
-          agencyId: agency.id,
-          month,
-          clientType: mode,
-          cursor,
-          limit: PAGE_LIMIT,
-        }, { signal });
-        if (signal.aborted || generationRef.current !== generation) return;
-        setState((current) => mergeCalendarAgencyPage(current, agency, page, generation));
-        const nextCursor = page.nextCursor || undefined;
-        if (nextCursor && seenCursors.has(nextCursor)) {
-          throw new Error("Repeated calendar cursor.");
-        }
-        if (nextCursor) seenCursors.add(nextCursor);
-        cursor = nextCursor;
-      } while (cursor);
-      setState((current) => markCalendarAgencySuccess(current, agency.id, generation));
-    } catch (error) {
-      if (signal.aborted || isAbort(error) || generationRef.current !== generation) return;
-      setState((current) => markCalendarAgencyError(current, agency.id, loadError(error), generation));
-    }
-  }, [mode, month]);
+  const availableMonths = useMemo(() => eachMonthOfInterval({
+    start: new Date(`${dateRange.startDate}T12:00:00`),
+    end: new Date(`${dateRange.endDate}T12:00:00`),
+  }), [dateRange.endDate, dateRange.startDate]);
+
+  useEffect(() => setVisibleMonthIndex(0), [dateRange.endDate, dateRange.startDate]);
 
   useEffect(() => {
-    const generation = generationRef.current + 1;
-    generationRef.current = generation;
-    generationControllerRef.current?.abort();
-    schedulerRef.current?.scheduler.cancel();
-
     const controller = new AbortController();
-    generationControllerRef.current = controller;
-    let nextState = createCalendarState(agencies, generation, requestKey);
-    const supported = agencies.filter((agency) => agency.supportedClientTypes.includes(mode));
-    for (const agency of agencies) {
-      if (!agency.supportedClientTypes.includes(mode)) {
-        nextState = markCalendarAgencySkipped(nextState, agency.id, generation);
+    setLoading(true);
+    setError(null);
+    setShifts([]);
+
+    if (selectedAgency && !selectedAgency.supportedClientTypes.includes(mode)) {
+      setLoading(false);
+      return () => controller.abort();
+    }
+
+    void (async () => {
+      const shiftById = new Map<string, NormalizedCalendarShift>();
+      const seenCursors = new Set<string>();
+      let startAfter: string | undefined;
+      do {
+        const response = await listShifts({
+          ...(selectedAgency ? { agencyId: selectedAgency.id } : {}),
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          client: true,
+          employee: true,
+          agency: true,
+          clientType: mode,
+          limit: PAGE_LIMIT,
+          ...(startAfter ? { startAfter } : {}),
+        }, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        for (const shift of response.shifts) {
+          const normalized = toCalendarShift(shift, selectedAgency);
+          if (normalized) shiftById.set(normalized.id, normalized);
+        }
+        const nextCursor = response.nextCursor || undefined;
+        if (nextCursor && seenCursors.has(nextCursor)) throw new Error("Repeated shift cursor.");
+        if (nextCursor) seenCursors.add(nextCursor);
+        startAfter = nextCursor;
+      } while (startAfter);
+      setShifts([...shiftById.values()].sort((left, right) => (
+        left.date.localeCompare(right.date) || left.id.localeCompare(right.id)
+      )));
+    })().catch((loadError) => {
+      if (!controller.signal.aborted && !isAbort(loadError)) {
+        setError(loadError instanceof Error && loadError.message ? loadError.message : "Could not load shifts.");
       }
-    }
-    setState(nextState);
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
 
-    const scheduler = createKeyedConcurrencyScheduler<OperationalAgencySummary>(
-        MAX_AGENCY_CHAINS,
-        (agency) => agency.id,
-        (agency, signal) => loadAgency(agency, generation, signal),
-        controller.signal,
-      );
-    schedulerRef.current = { generation, scheduler };
-    for (const agency of supported) scheduler.enqueue(agency);
+    return () => controller.abort();
+  }, [dateRange.endDate, dateRange.startDate, mode, retryVersion, selectedAgency]);
 
-    return () => {
-      scheduler.cancel();
-      controller.abort();
-    };
-  }, [selectionKey, mode, month, loadAgency]);
-
-  useEffect(() => () => {
-    schedulerRef.current?.scheduler.cancel();
-    generationControllerRef.current?.abort();
-  }, []);
-
-  const retryAgency = (agency: OperationalAgencySummary) => {
-    const current = schedulerRef.current;
-    if (!current || current.generation !== generationRef.current) return;
-    if (current.scheduler.enqueue(agency)) {
-      setState((state) => removeCalendarAgencySnapshot(state, agency.id, current.generation));
-    }
-  };
-
-  if (agencies.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-[#cbd7d7] bg-white/70 px-5 py-12 text-center">
-        <Building2 aria-hidden="true" className="mx-auto h-8 w-8 text-[#638082]" />
-        <p className="mt-3 text-sm font-semibold text-[#263536]">Choose one or more agencies to view shifts.</p>
-        <p className="mt-1 text-xs text-[#687576]">Your calendar stays empty until you choose its scope.</p>
-      </div>
-    );
-  }
-
-  const loadingCount = [...renderedState.agencies.values()].filter((item) => item.status === "loading").length;
-  const errorCount = [...renderedState.agencies.values()].filter((item) => item.status === "error").length;
-  const agencyById = new Map(agencies.map((agency) => [agency.id, agency]));
+  const filteredShifts = useMemo(
+    () => shifts.filter((shift) => matchesShiftCategory(shift, category)),
+    [category, shifts],
+  );
+  const visibleMonth = availableMonths[visibleMonthIndex] ?? availableMonths[0];
+  const visibleMonthKey = format(visibleMonth, "yyyy-MM");
+  const visibleShifts = filteredShifts.filter((shift) => shift.date.startsWith(`${visibleMonthKey}-`));
 
   return (
-    <section className="space-y-3" aria-label="Multi-agency shift calendar">
-      <div className="flex flex-wrap items-center gap-2">
-        {agencies.map((agency) => {
-          const agencyState = renderedState.agencies.get(agency.id);
-          return (
-            <span key={agency.id} className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-[#cad7d7] bg-white pl-3 pr-1 text-xs font-semibold text-[#284041]">
-              <span className="truncate">{agency.name}</span>
-              {agencyState?.status === "loading" ? <Loader2 aria-label={`Loading ${agency.name}`} className="h-3 w-3 animate-spin text-[#008f92]" /> : null}
-              <button type="button" aria-label={`Remove ${agency.name}`} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-[#e9f2f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]" onClick={() => onSelectionChange(agencies.filter((item) => item.id !== agency.id).map((item) => item.id))}>
-                <X aria-hidden="true" className="h-3.5 w-3.5" />
-              </button>
-            </span>
-          );
-        })}
-        <Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={() => onSelectionChange([])}>Clear agencies</Button>
-      </div>
+    <section className="space-y-3" aria-label="Shift calendar">
+      {selectedAgency ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-[#cad7d7] bg-white pl-3 pr-1 text-xs font-semibold text-[#284041]">
+            <span className="truncate">{selectedAgency.name}</span>
+            <button type="button" aria-label={`Remove ${selectedAgency.name}`} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-[#e9f2f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]" onClick={() => onSelectionChange([])}>
+              <X aria-hidden="true" className="h-3.5 w-3.5" />
+            </button>
+          </span>
+          <Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={() => onSelectionChange([])}>Show all agencies</Button>
+        </div>
+      ) : null}
 
-      {[...renderedState.agencies.entries()].map(([agencyId, agencyState]) => {
-        const agency = agencyById.get(agencyId);
-        if (!agency) return null;
-        if (agencyState.status === "skipped") {
-          return <p key={agencyId} className="rounded-lg bg-[#fff6e9] px-3 py-2 text-xs font-semibold text-[#81511f]">{agency.name} does not support {mode.toUpperCase()}.</p>;
-        }
-        if (agencyState.status === "error") {
-          return (
-            <div key={agencyId} className="flex flex-col gap-2 rounded-lg border border-[#efcbc6] bg-[#fff5f3] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="flex items-center gap-2 text-xs font-semibold text-[#8a332b]"><AlertTriangle aria-hidden="true" className="h-4 w-4" />{agency.name}: {agencyState.error}</p>
-              <Button type="button" variant="outline" size="sm" aria-label={`Retry ${agency.name}`} onClick={() => retryAgency(agency)}>Retry</Button>
-            </div>
-          );
-        }
-        return null;
-      })}
+      {selectedAgency && !selectedAgency.supportedClientTypes.includes(mode) ? (
+        <p className="rounded-lg bg-[#fff6e9] px-3 py-2 text-xs font-semibold text-[#81511f]">{selectedAgency.name} does not support {mode.toUpperCase()}.</p>
+      ) : null}
+
+      {error ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-[#efcbc6] bg-[#fff5f3] px-3 py-2 sm:flex-row sm:items-center sm:justify-between" role="alert">
+          <p className="flex items-center gap-2 text-xs font-semibold text-[#8a332b]"><AlertTriangle aria-hidden="true" className="h-4 w-4" />{error}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => setRetryVersion((value) => value + 1)}>Retry</Button>
+        </div>
+      ) : null}
 
       <p className="text-xs font-medium text-[#5e6d6e]" aria-live="polite">
-        {renderedState.shifts.length} shift{renderedState.shifts.length === 1 ? "" : "s"} across {agencies.length} agenc{agencies.length === 1 ? "y" : "ies"}.
-        {loadingCount > 0 ? ` Loading ${loadingCount} ${loadingCount === 1 ? "agency" : "agencies"}…` : ""}
+        {filteredShifts.length} shift{filteredShifts.length === 1 ? "" : "s"} across {selectedAgency ? selectedAgency.name : "all authorized agencies"}.
       </p>
 
-      <ShiftMonthGrid
-        visibleMonth={new Date(`${month}-01T12:00:00`)}
-        entries={renderedState.shifts}
-        getEntryKey={(shift) => shift.id}
-        getEntryDate={(shift) => shift.date}
-        getEntryAriaLabel={(shift) => [
-          shift.clientName || "Unknown client",
-          `${timeLabel(shift.startTime)}–${timeLabel(shift.endTime)}`,
-          `Caregiver ${shift.staffName || "Unassigned"}`,
-          shift.agencyName,
-          `Status ${statusLabel(shift.status)}`,
-          shift.anomalyCodes[0] ? `Anomaly ${ANOMALY_LABELS[shift.anomalyCodes[0]].label}` : null,
-        ].filter(Boolean).join(", ")}
-        renderEntry={(shift, options) => <ShiftSummary shift={shift} showBadge={options.showBadge} />}
-        renderBadge={(shift) => <StatusBadge shift={shift} />}
-        onOpenShift={onOpenShift}
-        interactionDisabledReason="Shift details are not available yet."
-        emptyMessage="No shifts found for these agencies."
-        showEmptyState={loadingCount === 0 && errorCount === 0}
-      />
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-[#dce4e4] bg-white px-2 py-1.5 sm:px-3">
+        <button
+          type="button"
+          aria-label="Previous calendar month"
+          disabled={visibleMonthIndex === 0}
+          onClick={() => setVisibleMonthIndex((index) => Math.max(0, index - 1))}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[#355758] transition-colors hover:bg-[#edf5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92] disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+        </button>
+        <div className="min-w-0 text-center">
+          <time dateTime={visibleMonthKey} className="block text-sm font-bold text-[#173a3b]">
+            {format(visibleMonth, "MMMM yyyy")}
+          </time>
+          <span className="block text-[11px] font-medium text-[#6b797a]">
+            Month {visibleMonthIndex + 1} of {availableMonths.length}
+          </span>
+        </div>
+        <button
+          type="button"
+          aria-label="Next calendar month"
+          disabled={visibleMonthIndex >= availableMonths.length - 1}
+          onClick={() => setVisibleMonthIndex((index) => Math.min(availableMonths.length - 1, index + 1))}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[#355758] transition-colors hover:bg-[#edf5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92] disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          <ChevronRight aria-hidden="true" className="h-5 w-5" />
+        </button>
+      </div>
+
+      {loading ? <ShiftCalendarSkeleton label="Loading shift calendar" dayTestId="shift-calendar-skeleton-day" /> : <ShiftMonthGrid
+            visibleMonth={visibleMonth}
+            entries={visibleShifts}
+            getEntryKey={(shift) => shift.id}
+            getEntryDate={(shift) => shift.date}
+            getEntryAriaLabel={(shift) => [
+              shift.clientName || "Unknown client",
+              `${timeLabel(shift.startTime)}–${timeLabel(shift.endTime)}`,
+              `Caregiver ${shift.staffName || "Unassigned"}`,
+              shift.agencyName,
+              `Status ${statusLabel(shift.status)}`,
+              shift.anomalyCodes[0] ? `Anomaly ${ANOMALY_LABELS[shift.anomalyCodes[0]].label}` : null,
+            ].filter(Boolean).join(", ")}
+            renderEntry={(shift, options) => <ShiftSummary shift={shift} showBadge={options.showBadge} />}
+            renderBadge={(shift) => <StatusBadge shift={shift} />}
+            onOpenShift={onOpenShift}
+            interactionDisabledReason="Shift details are not available yet."
+            emptyMessage={selectedAgency ? "No shifts found for this agency." : "No shifts found for the authorized agencies."}
+            showEmptyState={!loading && !error}
+          />}
     </section>
   );
 }

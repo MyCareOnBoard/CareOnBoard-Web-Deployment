@@ -14,6 +14,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { useLocation } from "react-router";
+import {
+  loadAllShiftPages,
+  operationAgencyId,
+  scopedShiftListParams,
+} from "@/lib/operational-agency/shiftScope";
 
 const getInitialsFromName = (name: string) => {
   const parts = name.split(" ").filter(Boolean);
@@ -27,6 +33,7 @@ const getInitialsFromName = (name: string) => {
 export default function ApprovalsPage() {
   const { toast } = useToast();
   const { agencyId, agency } = useOperationalAgency();
+  const location = useLocation();
   const operationScopeRef = useRef(0);
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,15 +66,13 @@ export default function ApprovalsPage() {
   const fetchShifts = useCallback(async (signal?: AbortSignal) => {
       try {
         setLoading(true);
-        const response = await listShifts({
-          limit: 100,
-          agencyId,
-          client: true,
-          employee: true,
-        }, { signal });
+        const loadedShifts = await loadAllShiftPages(
+          (params) => listShifts(params, { signal }),
+          scopedShiftListParams(agencyId, location.search),
+        );
         if (signal?.aborted) return;
         // Get all completed shifts (we'll filter by approved status based on filterStatus)
-        const completedShifts = (response.shifts || []).filter(shift => 
+        const completedShifts = loadedShifts.filter(shift =>
           shift.status === ShiftStatus.COMPLETED
         );
         setShifts(completedShifts);
@@ -82,7 +87,7 @@ export default function ApprovalsPage() {
       } finally {
         if (!signal?.aborted) setLoading(false);
       }
-  }, [agencyId, toast]);
+  }, [agencyId, location.search, toast]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -159,7 +164,12 @@ export default function ApprovalsPage() {
     const operationScope = operationScopeRef.current;
     try {
       setIsApproving(true);
-      await updateShift(shiftId, { approved: true }, { agencyId });
+      if (!shiftToApprove) throw new Error("Shift is missing.");
+      await updateShift(
+        shiftId,
+        { approved: true },
+        { agencyId: operationAgencyId(shiftToApprove, agencyId) },
+      );
       if (operationScope !== operationScopeRef.current) return;
       
       // Capture info for success modal before we update the shift
@@ -212,7 +222,12 @@ export default function ApprovalsPage() {
     const operationScope = operationScopeRef.current;
     try {
       setIsRejecting(true);
-      await updateShift(shiftId, { approved: false }, { agencyId });
+      if (!shiftToApprove) throw new Error("Shift is missing.");
+      await updateShift(
+        shiftId,
+        { approved: false },
+        { agencyId: operationAgencyId(shiftToApprove, agencyId) },
+      );
       if (operationScope !== operationScopeRef.current) return;
       
       // Capture info for success modal before we update the shift
@@ -419,7 +434,7 @@ export default function ApprovalsPage() {
                           {clientName}
                         </span>
                         <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                          Client
+                          {agencyId ? "Client" : apiShift.agency?.name || "Unknown agency"}
                         </span>
                       </div>
                     </div>

@@ -23,6 +23,8 @@ type BillingDateRangeModalProps = {
   enforceMaxDateRange?: boolean;
   /** Custom max span in days (e.g. 366 for DSP expenses). Used when enforceMaxDateRange is false. */
   maxRangeDays?: number;
+  /** Allow selecting scheduled dates after today. */
+  allowFutureDates?: boolean;
 };
 
 export default function BillingDateRangeModal({
@@ -35,6 +37,7 @@ export default function BillingDateRangeModal({
   description = "Choose a date range to filter your dashboard",
   enforceMaxDateRange = true,
   maxRangeDays,
+  allowFutureDates = false,
 }: BillingDateRangeModalProps) {
   const [error, setError] = useState("");
 
@@ -44,7 +47,7 @@ export default function BillingDateRangeModal({
       return;
     }
 
-    if (date > new Date()) {
+    if (!allowFutureDates && date > new Date()) {
       return;
     }
 
@@ -112,7 +115,7 @@ export default function BillingDateRangeModal({
               align="start"
               date={values.startDate ? new Date(values.startDate) : null}
               placeholder="Select start date"
-              endMonth={new Date()}
+              endMonth={allowFutureDates ? undefined : new Date()}
               setDate={(date) => updateDate("startDate", date)}
               className={BILLING_FIELD_CLASS}
             />
@@ -125,7 +128,7 @@ export default function BillingDateRangeModal({
               align="end"
               date={values.endDate ? new Date(values.endDate) : null}
               placeholder="Select end date"
-              endMonth={new Date()}
+              endMonth={allowFutureDates ? undefined : new Date()}
               setDate={(date) => updateDate("endDate", date)}
               className={BILLING_FIELD_CLASS}
             />

@@ -8,6 +8,7 @@ import type { CreateGoalDocumentRequest } from "@/lib/api/goals-and-documents";
 
 export type OperationalActor = "agency" | "super_admin";
 export type OperationalFeature = "shift-management" | "billing-management";
+export type OperationalAgencyDiscoveryFeature = OperationalFeature | "shift-maintenance";
 
 export interface OperationalBillingRequestContext {
   agencyId: string;

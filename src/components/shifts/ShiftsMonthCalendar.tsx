@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import axios from "axios";
 import { endOfMonth, format, setMonth, setYear, startOfMonth } from "date-fns";
 import { generatePath, useNavigate } from "react-router";
-import { Loader2 } from "lucide-react";
 import ShiftMonthGrid from "@/components/shifts/ShiftMonthGrid";
+import ShiftCalendarSkeleton from "@/components/shifts/ShiftCalendarSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -299,12 +299,8 @@ export function ShiftsMonthCalendar({
 
       <div className="relative">
         {displayedLoading ? (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl bg-white/70 backdrop-blur-sm" aria-busy="true" aria-live="polite">
-            <Loader2 aria-hidden="true" className="h-8 w-8 animate-spin text-[#00b4b8]" />
-            <p className="text-sm font-medium text-[#808081]">Loading this month’s shifts…</p>
-          </div>
-        ) : null}
-        <ShiftMonthGrid
+          <ShiftCalendarSkeleton label="Loading this month's shifts" dayTestId="entity-calendar-skeleton-day" />
+        ) : <ShiftMonthGrid
           visibleMonth={visibleMonth}
           entries={displayedShifts}
           getEntryKey={(shift) => shift.id}
@@ -316,7 +312,7 @@ export function ShiftsMonthCalendar({
           orderEntriesForDay={orderEntityShiftsForDay}
           onOpenShift={onOpenShift}
           showEmptyState={!displayedLoading && !displayedError}
-        />
+        />}
       </div>
     </div>
   );

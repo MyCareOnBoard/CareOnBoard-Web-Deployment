@@ -1,76 +1,38 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-const listOperationalAgencies = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api/super-admin-operations", () => ({ listOperationalAgencies }));
+vi.mock("@/lib/api/super-admin-operations", () => ({ listOperationalAgencies: vi.fn(() => new Promise(() => undefined)) }));
 
 import ShiftManagementHeader from "./ShiftManagementHeader";
 
+const props = {
+  dateRange: { startDate: "2026-07-20", endDate: "2026-08-18" },
+  selectedAgencyIds: [] as string[],
+  onDateRangeChange: vi.fn(),
+  onAgencySelectionChange: vi.fn(),
+};
+
 describe("ShiftManagementHeader", () => {
-  beforeEach(() => {
-    listOperationalAgencies.mockReturnValue(new Promise(() => undefined));
+  it("shows the workspace scope without duplicating the view control", () => {
+    render(<ShiftManagementHeader {...props} />);
+    expect(screen.getByRole("heading", { name: "Shift management" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Change shift date range, Jul 20, 2026 - Aug 18, 2026/i })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Calendar view" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "List view" })).not.toBeInTheDocument();
   });
 
-  it("renders a semantic operational header with view state and agency count", () => {
-    render(
-      <ShiftManagementHeader
-        view="calendar"
-        month="2026-07"
-        selectedAgencyIds={["atlas", "birch"]}
-        onViewChange={vi.fn()}
-        onMonthChange={vi.fn()}
-        onAgencySelectionChange={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByRole("banner")).toBeVisible();
-    expect(screen.getByRole("heading", { level: 1, name: "Shift management" })).toBeVisible();
-    expect(screen.getByRole("group", { name: "Shift workspace view" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Calendar view" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "List view" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("status")).toHaveTextContent("2 agencies selected");
-    expect(screen.getByText("July 2026")).toBeVisible();
+  it("opens the Billing date-range dialog", async () => {
+    render(<ShiftManagementHeader {...props} />);
+    await userEvent.click(screen.getByRole("button", { name: /Change shift date range/i }));
+    expect(screen.getByRole("dialog")).toBeVisible();
+    expect(screen.getByText("Select shift date range")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Use this date range" })).toBeVisible();
   });
 
-  it("moves by calendar month and opens the functional List view", async () => {
-    const user = userEvent.setup();
-    const onMonthChange = vi.fn();
-    const onViewChange = vi.fn();
-    render(
-      <ShiftManagementHeader
-        view="calendar"
-        month="2026-01"
-        selectedAgencyIds={["atlas"]}
-        onViewChange={onViewChange}
-        onMonthChange={onMonthChange}
-        onAgencySelectionChange={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Previous month" }));
-    await user.click(screen.getByRole("button", { name: "Next month" }));
-    await user.click(screen.getByRole("button", { name: "List view" }));
-
-    expect(onMonthChange).toHaveBeenNthCalledWith(1, "2025-12");
-    expect(onMonthChange).toHaveBeenNthCalledWith(2, "2026-02");
-    expect(screen.getByRole("button", { name: "List view" })).toBeEnabled();
-    expect(onViewChange).toHaveBeenCalledWith("list");
-  });
-
-  it("prompts for exactly one agency when List has no singular selection", () => {
-    render(
-      <ShiftManagementHeader
-        view="list"
-        month="2026-07"
-        selectedAgencyIds={[]}
-        onViewChange={vi.fn()}
-        onMonthChange={vi.fn()}
-        onAgencySelectionChange={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByRole("alert")).toHaveTextContent("Choose one agency to use List view.");
-    expect(screen.getByRole("button", { name: "Select an agency, none selected" })).toBeVisible();
+  it("supports List view with the all-agencies scope", () => {
+    render(<ShiftManagementHeader {...props} />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Select an agency, all agencies" })).toBeVisible();
   });
 });

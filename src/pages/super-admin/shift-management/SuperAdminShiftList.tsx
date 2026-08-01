@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useLocation } from "react-router";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getOperationalAgencyContext } from "@/lib/api/super-admin-operations";
 import { OperationalAgencyProvider } from "@/lib/operational-agency/OperationalAgencyProvider";
 import { createSuperAdminOperationalDataAdapter } from "@/lib/operational-agency/dataAdapters";
@@ -15,6 +16,14 @@ interface SuperAdminShiftScopeProps {
   children: ReactNode;
   agency?: OperationalAgencySummary;
 }
+
+const ALL_AGENCIES: OperationalAgencySummary = {
+  id: "",
+  name: "All agencies",
+  status: "active",
+  supportedClientTypes: ["ddd", "hha"],
+  timezone: "UTC",
+};
 
 function isAbort(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -34,7 +43,9 @@ export function SuperAdminShiftScope({ children, agency: suppliedAgency }: Super
     .map((id) => id.trim())
     .filter(Boolean);
   const agencyId = suppliedAgency?.id || (requestedIds.length === 1 ? requestedIds[0] : "");
-  const [resolvedAgency, setResolvedAgency] = useState<OperationalAgencySummary | null>(suppliedAgency ?? null);
+  const [resolvedAgency, setResolvedAgency] = useState<OperationalAgencySummary | null>(
+    suppliedAgency ?? (agencyId ? null : ALL_AGENCIES),
+  );
   const [loading, setLoading] = useState(!suppliedAgency);
   const [error, setError] = useState<string | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
@@ -42,7 +53,8 @@ export function SuperAdminShiftScope({ children, agency: suppliedAgency }: Super
   useEffect(() => {
     if (!canManageShifts || !agencyId) {
       setLoading(false);
-      setResolvedAgency(null);
+      setResolvedAgency(canManageShifts ? ALL_AGENCIES : null);
+      setError(null);
       return;
     }
     if (suppliedAgency?.id === agencyId) {
@@ -81,9 +93,6 @@ export function SuperAdminShiftScope({ children, agency: suppliedAgency }: Super
   if (!canManageShifts) {
     return <p role="alert" className="px-4 py-8 text-sm font-medium text-[#7e3029]">You do not have Shift Management access.</p>;
   }
-  if (!agencyId || (!suppliedAgency && requestedIds.length !== 1)) {
-    return <p role="alert" className="px-4 py-8 text-sm font-medium text-[#808081]">Choose exactly one agency to manage shifts.</p>;
-  }
   if (error) {
     return (
       <div role="alert" className="rounded-2xl border border-[#efcbc6] bg-[#fff5f3] px-5 py-8 text-center">
@@ -95,8 +104,17 @@ export function SuperAdminShiftScope({ children, agency: suppliedAgency }: Super
   }
   if (loading || resolvedAgency?.id !== agencyId) {
     return (
-      <div className="flex min-h-64 items-center justify-center" aria-busy="true">
-        <Loader2 className="size-7 animate-spin text-[#008f92]" aria-label="Loading agency" />
+      <div className="space-y-3 rounded-2xl border border-[#d9e4e4] bg-white p-5" aria-label="Loading agency context" aria-busy="true">
+        <Skeleton className="h-7 w-48 rounded" />
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} data-testid="agency-context-skeleton-row" className="flex items-center gap-4 rounded-xl border border-[#e4eaea] p-4">
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-40 rounded" />
+              <Skeleton className="h-3 w-64 max-w-full rounded" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

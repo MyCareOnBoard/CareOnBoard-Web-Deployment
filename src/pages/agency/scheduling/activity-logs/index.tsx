@@ -7,6 +7,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation, useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
+import {
+  loadAllShiftPages,
+  operationAgencyId,
+  scopedShiftListParams,
+} from "@/lib/operational-agency/shiftScope";
 import { shiftToScheduleFormData } from "../shift-to-schedule-form";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
@@ -193,6 +198,13 @@ export default function ActivityLogsPage() {
   const itemsPerPage = 6;
 
   const handleEdit = (shift: Shift) => {
+    if (!agencyId) {
+      toast({
+        title: "Select an agency",
+        description: "Choose an agency before editing a shift.",
+      });
+      return;
+    }
     setEditFormData(shiftToScheduleFormData(shift));
     setModalMode("edit");
     setShowAddScheduleModal(true);
@@ -201,14 +213,12 @@ export default function ActivityLogsPage() {
   const fetchShifts = useCallback(async (signal?: AbortSignal) => {
       try {
         setLoading(true);
-        const response = await listShifts({
-          limit: 100,
-          agencyId,
-          client: true,
-          employee: true,
-        }, { signal });
+        const loadedShifts = await loadAllShiftPages(
+          (params) => listShifts(params, { signal }),
+          scopedShiftListParams(agencyId, location.search, mode ?? undefined),
+        );
         if (signal?.aborted) return;
-        setShifts(response.shifts || []);
+        setShifts(loadedShifts);
       } catch (error) {
         if (signal?.aborted) return;
         console.error("Failed to fetch shifts:", error);
@@ -220,7 +230,7 @@ export default function ActivityLogsPage() {
       } finally {
         if (!signal?.aborted) setLoading(false);
       }
-  }, [agencyId, toast]);
+  }, [agencyId, location.search, mode, toast]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -246,7 +256,7 @@ export default function ActivityLogsPage() {
       return;
     }
     const params = new URLSearchParams();
-    if (actor === "super_admin") params.set("agencyId", agencyId);
+    if (actor === "super_admin") params.set("agencyId", operationAgencyId(shift, agencyId));
     params.set("returnTo", `${location.pathname}${location.search}`);
     navigate(routes.details(shift.id, params.toString()));
   };
@@ -309,6 +319,8 @@ export default function ActivityLogsPage() {
             Shift Management
           </h1>
           <Button
+            disabled={!agencyId}
+            title={!agencyId ? "Select an agency to add a schedule" : undefined}
             onClick={() => {
               setEditFormData(null);
               setModalMode("create");
@@ -354,7 +366,7 @@ export default function ActivityLogsPage() {
             </div>
 
             {/* Cross-link to Shift Maintenance for relevant filters */}
-            {capabilities.shiftMaintenance && (activeFilter === "missed" || activeFilter === "incomplete") && filteredShifts.length > 0 && (
+            {capabilities.shiftMaintenance && Boolean(agencyId) && (activeFilter === "missed" || activeFilter === "incomplete") && filteredShifts.length > 0 && (
               <div
                 className="flex items-center gap-3 mb-4 px-4 py-3 rounded-2xl border border-[#00b4b8]/20 bg-[#00b4b8]/5 cursor-pointer hover:bg-[#00b4b8]/10 transition-colors"
                 onClick={() => navigate(routes.maintenance(
@@ -423,7 +435,7 @@ export default function ActivityLogsPage() {
                             {clientName}
                           </span>
                           <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                            Client
+                            {agencyId ? "Client" : shift.agency?.name || "Unknown agency"}
                           </span>
                         </div>
                       </div>
@@ -539,7 +551,7 @@ export default function ActivityLogsPage() {
       {capabilities.shiftMaintenance ? <ShiftDetailsModal
         isOpen={showShiftDetails}
         shift={selectedShift}
-        agencyId={agencyId}
+        agencyId={selectedShift ? operationAgencyId(selectedShift, agencyId) : agencyId}
         agencyName={agency.name}
         onClose={() => {
           setShowShiftDetails(false);

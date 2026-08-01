@@ -129,6 +129,7 @@ export interface Shift {
     goalsAndDocumentsId?: string;
     employee?: Employee;
     agency?: Agency;
+    anomalyCodes?: AnomalyCode[];
 }
 
 // ==================== Request/Response Types ====================
@@ -252,6 +253,7 @@ export interface ListShiftsParams {
     date?: string; // Format: YYYY-MM-DD (exact day; not used with startDate/endDate)
     startDate?: string; // YYYY-MM-DD inclusive range (requires endDate; use with clientId or employeeId)
     endDate?: string; // YYYY-MM-DD inclusive range (requires startDate)
+    startAfter?: string; // Shift ID cursor returned by a previous list response
     limit?: number; // 1–100 default 50; up to 200 when startDate+endDate are set
     agencyId?: string; // Filter by agency ID
     employeeId?: string; // Filter by employee ID
@@ -382,6 +384,7 @@ export interface ListShiftsResponse {
     success: boolean;
     count: number;
     shifts: Shift[];
+    nextCursor?: string | null;
 }
 
 /**
@@ -1000,6 +1003,7 @@ export type AnomalyCode = "missed" | "incomplete_clock" | "late_clock_in" | "una
 
 export interface ShiftAnomaly {
     id: string;
+    agencyId: string;
     date: string;
     startTime: string | null;
     endTime: string | null;
@@ -1058,11 +1062,14 @@ export interface FetchAuditResponse {
     nextCursor: string | null;
 }
 
-export const fetchShiftAnomalies = async (params: FetchAnomaliesParams): Promise<FetchAnomaliesResponse> => {
+export const fetchShiftAnomalies = async (
+    params: FetchAnomaliesParams,
+    options?: { signal?: AbortSignal },
+): Promise<FetchAnomaliesResponse> => {
     try {
         const response = await axiosClient.get<FetchAnomaliesResponse>(
             `${SHIFT_BASE}/maintenance/anomalies`,
-            { params }
+            { params, signal: options?.signal }
         );
         return response.data;
     } catch (error) {

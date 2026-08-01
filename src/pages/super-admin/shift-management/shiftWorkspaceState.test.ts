@@ -3,187 +3,108 @@ import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
 import {
   resolveInitialShiftWorkspace,
   transitionShiftWorkspaceView,
-  updateShiftWorkspaceMonth,
+  updateShiftWorkspaceDateRange,
   updateShiftWorkspaceSelection,
 } from "./shiftWorkspaceState";
 
 const agencies: OperationalAgencySummary[] = [
-  {
-    id: "zeta",
-    name: "Zeta Care",
-    status: "active",
-    supportedClientTypes: ["ddd"],
-    timezone: "America/New_York",
-  },
-  {
-    id: "atlas-b",
-    name: "Atlas Care",
-    status: "active",
-    supportedClientTypes: ["hha"],
-    timezone: "America/New_York",
-  },
-  {
-    id: "atlas-a",
-    name: "Atlas Care",
-    status: "active",
-    supportedClientTypes: ["ddd", "hha"],
-    timezone: "America/Chicago",
-  },
-  {
-    id: "revoked",
-    name: "Revoked House",
-    status: "inactive",
-    supportedClientTypes: ["ddd"],
-    timezone: "UTC",
-  },
+  { id: "zeta", name: "Zeta Care", status: "active", supportedClientTypes: ["ddd"], timezone: "UTC" },
+  { id: "atlas", name: "Atlas Care", status: "active", supportedClientTypes: ["ddd", "hha"], timezone: "UTC" },
+  { id: "revoked", name: "Revoked", status: "inactive", supportedClientTypes: ["ddd"], timezone: "UTC" },
 ];
 
-describe("shift workspace initialization", () => {
-  it("defaults to Calendar and falls back to the alphabetically first active agency", () => {
-    expect(resolveInitialShiftWorkspace("?month=bad", agencies, undefined, new Date(2026, 6, 10))).toEqual({
+describe("shift workspace state", () => {
+  it("defaults to Calendar, all agencies, and an exact 30-day range", () => {
+    expect(resolveInitialShiftWorkspace("", agencies, undefined, new Date(2026, 6, 10))).toEqual({
       view: "calendar",
-      month: "2026-07",
-      agencyIds: ["atlas-a"],
+      startDate: "2026-06-11",
+      endDate: "2026-07-10",
     });
   });
 
-  it("preserves an explicit List view only with a valid singular agency and valid month", () => {
+  it("accepts a cross-month URL range and one allowed agency", () => {
     expect(resolveInitialShiftWorkspace(
-      "?view=list&agencyId=zeta&agencyIds=atlas-a&month=2026-08",
-      agencies,
-    )).toEqual({ view: "list", month: "2026-08", agencyId: "zeta" });
-
-    expect(resolveInitialShiftWorkspace(
-      "?view=list&agencyId=revoked&month=2026-08",
-      agencies,
-    )).toEqual({ view: "list", month: "2026-08" });
-  });
-
-  it("lets ordered Calendar URL IDs win after deduping and removing revoked agencies", () => {
-    expect(resolveInitialShiftWorkspace(
-      "?agencyIds=zeta&agencyIds=revoked&agencyIds=atlas-b&agencyIds=zeta&month=2026-06",
-      agencies,
-      ["atlas-a"],
-    )).toEqual({
-      view: "calendar",
-      month: "2026-06",
-      agencyIds: ["zeta", "atlas-b"],
-    });
-  });
-
-  it("revalidates a saved Calendar set and auto-selects the only active agency", () => {
-    expect(resolveInitialShiftWorkspace("", agencies, ["revoked", "zeta", "atlas-b"])).toEqual({
-      view: "calendar",
-      month: expect.stringMatching(/^\d{4}-(0[1-9]|1[0-2])$/),
-      agencyIds: ["zeta", "atlas-b"],
-    });
-
-    expect(resolveInitialShiftWorkspace("", [agencies[0]])).toMatchObject({
-      view: "calendar",
-      agencyIds: ["zeta"],
-    });
-  });
-
-  it("preserves an explicitly empty saved Calendar preference", () => {
-    expect(resolveInitialShiftWorkspace("?month=2026-07", agencies, [])).toEqual({
-      view: "calendar",
-      month: "2026-07",
-      agencyIds: [],
-    });
-
-    expect(resolveInitialShiftWorkspace("?month=2026-07", [agencies[0]], [])).toEqual({
-      view: "calendar",
-      month: "2026-07",
-      agencyIds: [],
-    });
-  });
-
-  it("allows an empty Calendar when no active agencies are available", () => {
-    expect(resolveInitialShiftWorkspace("?month=2026-07", [agencies[3]])).toEqual({
-      view: "calendar",
-      month: "2026-07",
-      agencyIds: [],
-    });
-  });
-
-  it("keeps an explicitly requested unknown Calendar agency empty instead of falling back", () => {
-    expect(resolveInitialShiftWorkspace(
-      "?agencyIds=unknown&month=2026-07",
+      "?agencyId=zeta&startDate=2026-06-20&endDate=2026-08-04",
       agencies,
     )).toEqual({
       view: "calendar",
-      month: "2026-07",
-      agencyIds: [],
+      startDate: "2026-06-20",
+      endDate: "2026-08-04",
+      agencyId: "zeta",
     });
   });
-});
 
-describe("shift workspace transitions", () => {
-  it("preserves an explicit Calendar Clear after serializing and resolving browser history", () => {
+  it("does not auto-select the only available agency", () => {
+    const workspace = resolveInitialShiftWorkspace("", [agencies[0]], undefined, new Date(2026, 6, 10));
+    expect(workspace.view).toBe("calendar");
+    expect(workspace).not.toHaveProperty("agencyId");
+  });
+
+  it("fails closed for invalid selections and invalid date ranges", () => {
+    expect(resolveInitialShiftWorkspace(
+      "?agencyId=unknown&startDate=2026-08-10&endDate=2026-08-01",
+      agencies,
+      undefined,
+      new Date(2026, 7, 15),
+    )).toEqual({
+      view: "calendar",
+      startDate: "2026-07-17",
+      endDate: "2026-08-15",
+    });
+  });
+
+  it("falls back from a URL range longer than 366 calendar days", () => {
+    expect(resolveInitialShiftWorkspace(
+      "?startDate=2025-01-01&endDate=2026-08-01",
+      agencies,
+      undefined,
+      new Date(2026, 7, 1),
+    )).toMatchObject({ startDate: "2026-07-03", endDate: "2026-08-01" });
+  });
+
+  it("serializes an all-agencies selection by omitting agency filters", () => {
     const result = updateShiftWorkspaceSelection(
-      "?filter=unfilled&month=2026-07&agencyIds=atlas-a",
-      { view: "calendar", month: "2026-07", agencyIds: ["atlas-a"] },
+      "?filter=open&agencyId=atlas&agencyIds=legacy&month=2026-07",
+      { view: "calendar", startDate: "2026-07-01", endDate: "2026-07-30", agencyId: "atlas" },
       [],
     );
-
-    expect(result).toEqual({
-      state: { view: "calendar", month: "2026-07", agencyIds: [] },
-      search: "?filter=unfilled&month=2026-07&view=calendar&agencyIds=",
-      requiresAgencyChoice: false,
-    });
-    expect(resolveInitialShiftWorkspace(result.search, agencies, ["atlas-a"])).toEqual({
-      view: "calendar",
-      month: "2026-07",
-      agencyIds: [],
-    });
+    expect(result.search).toBe("?filter=open&startDate=2026-07-01&endDate=2026-07-30&view=calendar");
+    expect(result.state).toEqual({ view: "calendar", startDate: "2026-07-01", endDate: "2026-07-30" });
   });
 
-  it("changes a single-agency Calendar to List and removes repeated IDs", () => {
+  it("preserves the range while switching between views", () => {
     const result = transitionShiftWorkspaceView(
-      "?filter=unfilled&agencyIds=atlas-a&month=2026-07",
-      { view: "calendar", month: "2026-07", agencyIds: ["atlas-a"] },
+      "?agencyId=atlas&startDate=2026-07-01&endDate=2026-08-01",
+      { view: "calendar", startDate: "2026-07-01", endDate: "2026-08-01", agencyId: "atlas" },
       "list",
     );
-
     expect(result).toEqual({
-      state: { view: "list", month: "2026-07", agencyId: "atlas-a" },
-      search: "?filter=unfilled&month=2026-07&agencyId=atlas-a&view=list",
+      state: { view: "list", startDate: "2026-07-01", endDate: "2026-08-01", agencyId: "atlas" },
+      search: "?agencyId=atlas&startDate=2026-07-01&endDate=2026-08-01&view=list",
       requiresAgencyChoice: false,
     });
   });
 
-  it("requires an explicit agency before changing a zero-or-multi selection to List", () => {
-    const multi = { view: "calendar" as const, month: "2026-07", agencyIds: ["atlas-a", "zeta"] };
-    const unresolved = transitionShiftWorkspaceView("?filter=mine", multi, "list");
-
-    expect(unresolved).toEqual({ state: multi, search: "?filter=mine", requiresAgencyChoice: true });
-    expect(transitionShiftWorkspaceView("?filter=mine", multi, "list", "zeta")).toEqual({
-      state: { view: "list", month: "2026-07", agencyId: "zeta" },
-      search: "?filter=mine&agencyId=zeta&month=2026-07&view=list",
-      requiresAgencyChoice: false,
-    });
-  });
-
-  it("seeds Calendar from the singular List agency and preserves unrelated parameters", () => {
+  it("switches to List while keeping the all-agencies scope", () => {
     expect(transitionShiftWorkspaceView(
-      "?filter=mine&agencyId=zeta&month=2026-07&view=list",
-      { view: "list", month: "2026-07", agencyId: "zeta" },
-      "calendar",
+      "?startDate=2026-07-01&endDate=2026-08-01",
+      { view: "calendar", startDate: "2026-07-01", endDate: "2026-08-01" },
+      "list",
     )).toEqual({
-      state: { view: "calendar", month: "2026-07", agencyIds: ["zeta"] },
-      search: "?filter=mine&month=2026-07&view=calendar&agencyIds=zeta",
+      state: { view: "list", startDate: "2026-07-01", endDate: "2026-08-01" },
+      search: "?startDate=2026-07-01&endDate=2026-08-01&view=list",
       requiresAgencyChoice: false,
     });
   });
 
-  it("updates the month without losing view selection or unrelated parameters", () => {
-    expect(updateShiftWorkspaceMonth(
-      "?filter=mine&agencyId=zeta&month=2026-07&view=list",
-      { view: "list", month: "2026-07", agencyId: "zeta" },
-      "2026-08",
+  it("updates a cross-month date range without losing selection", () => {
+    expect(updateShiftWorkspaceDateRange(
+      "?filter=mine&agencyId=zeta&view=list",
+      { view: "list", startDate: "2026-07-01", endDate: "2026-07-30", agencyId: "zeta" },
+      { startDate: "2026-07-20", endDate: "2026-09-02" },
     )).toEqual({
-      state: { view: "list", month: "2026-08", agencyId: "zeta" },
-      search: "?filter=mine&agencyId=zeta&month=2026-08&view=list",
+      state: { view: "list", startDate: "2026-07-20", endDate: "2026-09-02", agencyId: "zeta" },
+      search: "?filter=mine&agencyId=zeta&view=list&startDate=2026-07-20&endDate=2026-09-02",
       requiresAgencyChoice: false,
     });
   });

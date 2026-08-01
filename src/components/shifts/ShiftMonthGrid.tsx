@@ -74,7 +74,7 @@ function DayCell<T>({
             {onOpenShift ? <button
               ref={index === 0 ? firstChoiceRef : undefined}
               type="button"
-              className="flex min-h-11 w-full min-w-0 flex-col rounded-lg border border-[#dfe6e6] bg-[#f7fafa] px-2 py-1.5 text-left transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]"
+              className="flex min-h-11 w-full min-w-0 cursor-pointer flex-col rounded-lg border border-[#dfe6e6] bg-[#f7fafa] px-2 py-1.5 text-left transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]"
               aria-label={`Open shift details for ${getEntryAriaLabel(entry)}`}
               onClick={() => {
                 onOpenShift(entry);
@@ -96,7 +96,7 @@ function DayCell<T>({
   const overflowButton = (
     <button
       type="button"
-      className="absolute bottom-1 right-1 z-[1] flex h-8 min-w-8 items-center justify-center rounded-full border border-[#cbd6d6] bg-white px-1 text-[10px] font-bold text-[#233031] shadow-sm transition-colors hover:bg-[#edf5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92] [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:min-w-11"
+      className="absolute bottom-1 right-1 z-[1] flex h-8 min-w-8 cursor-pointer items-center justify-center rounded-full border border-[#cbd6d6] bg-white px-1 text-[10px] font-bold text-[#233031] shadow-sm transition-colors hover:bg-[#edf5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92] [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:min-w-11"
       aria-label={overflowLabel}
       title={overflowLabel}
       aria-expanded={open}
@@ -124,7 +124,7 @@ function DayCell<T>({
       {first && onOpenShift ? (
         <button
           type="button"
-          className="flex min-h-11 w-full min-w-0 flex-col rounded-md border border-transparent bg-white/70 px-1 py-1 text-left transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]"
+          className="flex min-h-11 w-full min-w-0 cursor-pointer flex-col rounded-md border border-transparent bg-white/70 px-1 py-1 text-left transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]"
           aria-label={`Open shift details for ${getEntryAriaLabel(first)}`}
           onClick={() => onOpenShift(first)}
         >

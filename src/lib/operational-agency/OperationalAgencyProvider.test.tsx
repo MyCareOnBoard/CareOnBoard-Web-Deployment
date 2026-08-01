@@ -121,7 +121,7 @@ describe("operational shift route builders", () => {
         list: "/super-admin/shifts/list",
         approvals: "/super-admin/shifts/approvals",
         activityLogs: "/super-admin/shifts/activity-logs",
-        maintenance: "/super-admin/shift-maintenance",
+        maintenance: "/super-admin/shifts/maintenance",
         details: "/super-admin/shifts/shift%2F9",
       },
     },

@@ -146,12 +146,8 @@ const SuperAdminShiftWorkspaceIndexPage = lazy(() =>
     import("@/pages/super-admin/shift-management").then((module) => ({ default: module.SuperAdminShiftWorkspaceIndex }))
 );
 const SuperAdminShiftListPage = lazy(() => import("@/pages/super-admin/shift-management/SuperAdminShiftList"));
-const SuperAdminShiftApprovalsPage = lazy(() =>
-    import("@/pages/super-admin/shift-management/SuperAdminShiftList").then((module) => ({ default: module.SuperAdminShiftApprovals }))
-);
-const SuperAdminShiftActivityLogsPage = lazy(() =>
-    import("@/pages/super-admin/shift-management/SuperAdminShiftList").then((module) => ({ default: module.SuperAdminShiftActivityLogs }))
-);
+const SuperAdminShiftMaintenanceWorkspacePage = lazy(() => import("@/pages/super-admin/shift-management/SuperAdminShiftMaintenance"));
+const LegacyShiftSectionRedirect = lazy(() => import("@/pages/super-admin/shift-management/LegacyShiftSectionRedirect"));
 const SuperAdminShiftDetailsPage = lazy(() => import("@/pages/super-admin/shift-management/SuperAdminShiftDetails"));
 const SuperAdminBillingPage = lazy(() => import("@/pages/super-admin/billing"));
 const SuperAdminBillingIndexPage = lazy(() =>
@@ -792,12 +788,16 @@ export const router = createBrowserRouter([
                         Component: SuperAdminShiftListPage,
                     },
                     {
+                        path: "maintenance",
+                        Component: SuperAdminShiftMaintenanceWorkspacePage,
+                    },
+                    {
                         path: "approvals",
-                        Component: SuperAdminShiftApprovalsPage,
+                        Component: LegacyShiftSectionRedirect,
                     },
                     {
                         path: "activity-logs",
-                        Component: SuperAdminShiftActivityLogsPage,
+                        Component: LegacyShiftSectionRedirect,
                     },
                     {
                         path: ":shiftId",

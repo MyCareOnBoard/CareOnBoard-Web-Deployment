@@ -66,6 +66,7 @@ export interface Agency {
     realtimeGpsTracking?: boolean;
     // Supported client types (DDD / HHA). Missing => treated as both.
     supportedClientTypes?: ("ddd" | "hha")[];
+    timezone?: string;
     // Legacy
     taxId?: string;
     licenseNumber?: string;
@@ -104,6 +105,7 @@ export interface ListAgenciesParams {
     isVerified?: boolean;
     search?: string;
     limit?: number;
+    features?: string;
 }
 
 /**
@@ -295,7 +297,7 @@ export async function uploadAgencyFile(
  * ✅ List agencies
  * Endpoint: GET /agencies
  * Agencies see only their own
- * Query params: status, isVerified, search, limit
+ * Query params: status, isVerified, search, limit, features
  */
 export async function listAgencies(params?: ListAgenciesParams): Promise<ListAgenciesResponse> {
     try {
@@ -305,6 +307,7 @@ export async function listAgencies(params?: ListAgenciesParams): Promise<ListAge
                 isVerified: params?.isVerified,
                 search: params?.search,
                 limit: params?.limit,
+                features: params?.features,
             },
         });
 

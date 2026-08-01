@@ -14,15 +14,18 @@ describe("super-admin shift workspace routes", () => {
     expect(workspace?.children).toEqual(expect.arrayContaining([
       expect.objectContaining({ index: true, element: expect.anything() }),
       expect.objectContaining({ path: "list", element: expect.anything() }),
+      expect.objectContaining({ path: "maintenance", element: expect.anything() }),
+      expect.objectContaining({ path: ":shiftId", element: expect.anything() }),
+    ]));
+
+    expect(workspace?.children).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: "approvals", element: expect.anything() }),
       expect.objectContaining({ path: "activity-logs", element: expect.anything() }),
-      expect.objectContaining({ path: ":shiftId", element: expect.anything() }),
     ]));
 
     for (const path of [
       "/super-admin/shifts/list",
-      "/super-admin/shifts/approvals",
-      "/super-admin/shifts/activity-logs",
+      "/super-admin/shifts/maintenance",
       "/super-admin/shifts/:shiftId",
     ]) {
       expect(allRoutes.filter((route) => route.path === path)).toHaveLength(0);

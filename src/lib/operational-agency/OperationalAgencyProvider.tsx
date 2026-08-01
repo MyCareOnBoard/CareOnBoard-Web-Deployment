@@ -33,7 +33,8 @@ export function OperationalAgencyProvider({
   directoryRoutes,
   data,
 }: OperationalAgencyProviderProps) {
-  if (!agencyId) {
+  const isAllAgenciesScope = actor === "super_admin" && !agencyId && !agency.id;
+  if (!agencyId && !isAllAgenciesScope) {
     throw new Error("OperationalAgencyProvider requires an agencyId.");
   }
 

@@ -1,19 +1,14 @@
 import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
-import { isValidOperationalMonth } from "@/lib/operational-agency/urlState";
 
-export interface CalendarShiftWorkspace {
-  view: "calendar";
-  month: string;
-  agencyIds: string[];
+export interface ShiftDateRange {
+  startDate: string;
+  endDate: string;
 }
 
-export interface ListShiftWorkspace {
-  view: "list";
-  month: string;
+export interface ShiftWorkspaceState extends ShiftDateRange {
+  view: "calendar" | "list";
   agencyId?: string;
 }
-
-export type ShiftWorkspaceState = CalendarShiftWorkspace | ListShiftWorkspace;
 
 export interface ShiftWorkspaceTransition {
   state: ShiftWorkspaceState;
@@ -30,51 +25,55 @@ function stringify(params: URLSearchParams): string {
   return search ? `?${search}` : "";
 }
 
-function monthFor(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+function formatDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function unique(values: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values) {
-    const id = value.trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    result.push(id);
+function parseDate(value: string | null): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day);
+  return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day
+    ? parsed
+    : null;
+}
+
+function defaultDateRange(now: Date): ShiftDateRange {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  start.setDate(start.getDate() - 29);
+  return { startDate: formatDate(start), endDate: formatDate(now) };
+}
+
+function rangeFrom(params: URLSearchParams, now: Date): ShiftDateRange {
+  const start = parseDate(params.get("startDate"));
+  const end = parseDate(params.get("endDate"));
+  const spanDays = start && end ? Math.round((end.getTime() - start.getTime()) / 86_400_000) : -1;
+  if (start && end && start <= end && spanDays <= 365) {
+    return { startDate: formatDate(start), endDate: formatDate(end) };
   }
-  return result;
+  return defaultDateRange(now);
 }
 
-function allowedAgencies(agencies: readonly OperationalAgencySummary[]): OperationalAgencySummary[] {
-  return agencies
-    .filter((agency) => agency.status === "active")
-    .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
-}
-
-function validSelection(ids: readonly string[], allowedIds: ReadonlySet<string>): string[] {
-  return unique(ids).filter((id) => allowedIds.has(id));
+function validAgencyId(
+  value: string | undefined,
+  agencies: readonly OperationalAgencySummary[],
+): string | undefined {
+  const agencyId = value?.trim();
+  if (!agencyId) return undefined;
+  return agencies.some((agency) => agency.status === "active" && agency.id === agencyId)
+    ? agencyId
+    : undefined;
 }
 
 function serializeWorkspace(search: string, state: ShiftWorkspaceState): string {
   const params = paramsFor(search);
-
-  if (state.view === "calendar") {
-    params.delete("agencyId");
-    params.delete("agencyIds");
-    params.set("month", state.month);
-    params.set("view", "calendar");
-    const agencyIds = unique(state.agencyIds);
-    if (agencyIds.length === 0) params.append("agencyIds", "");
-    else for (const agencyId of agencyIds) params.append("agencyIds", agencyId);
-  } else {
-    params.delete("agencyIds");
-    if (state.agencyId) params.set("agencyId", state.agencyId);
-    else params.delete("agencyId");
-    params.set("month", state.month);
-    params.set("view", "list");
-  }
-
+  params.delete("month");
+  params.delete("agencyIds");
+  params.set("startDate", state.startDate);
+  params.set("endDate", state.endDate);
+  params.set("view", state.view);
+  if (state.agencyId) params.set("agencyId", state.agencyId);
+  else params.delete("agencyId");
   return stringify(params);
 }
 
@@ -85,40 +84,15 @@ export function resolveInitialShiftWorkspace(
   now = new Date(),
 ): ShiftWorkspaceState {
   const params = paramsFor(search);
-  const month = isValidOperationalMonth(params.get("month"))
-    ? params.get("month") as string
-    : monthFor(now);
-  const allowed = allowedAgencies(agencies);
-  const allowedIds = new Set(allowed.map((agency) => agency.id));
-
-  if (params.get("view") === "list") {
-    const requestedAgencyId = params.get("agencyId")?.trim();
-    const agencyId = requestedAgencyId
-      ? allowedIds.has(requestedAgencyId) ? requestedAgencyId : undefined
-      : allowed.length === 1 ? allowed[0].id : undefined;
-    return { view: "list", month, ...(agencyId ? { agencyId } : {}) };
-  }
-
-  const requestedValues = params.getAll("agencyIds");
-  const requestedIds = validSelection(requestedValues, allowedIds);
-  if (requestedIds.length) return { view: "calendar", month, agencyIds: requestedIds };
-  if (params.has("agencyIds")) {
-    return { view: "calendar", month, agencyIds: [] };
-  }
-  if (allowed.length === 0) return { view: "calendar", month, agencyIds: [] };
-  if (savedAgencyIds !== undefined) {
-    return {
-      view: "calendar",
-      month,
-      agencyIds: validSelection(savedAgencyIds, allowedIds),
-    };
-  }
-  if (allowed.length === 1) return { view: "calendar", month, agencyIds: [allowed[0].id] };
-
+  const range = rangeFrom(params, now);
+  const requestedId = params.get("agencyId")?.trim()
+    || params.getAll("agencyIds").map((id) => id.trim()).find(Boolean)
+    || savedAgencyIds?.map((id) => id.trim()).find(Boolean);
+  const agencyId = validAgencyId(requestedId, agencies);
   return {
-    view: "calendar",
-    month,
-    agencyIds: [allowed[0].id],
+    view: params.get("view") === "list" ? "list" : "calendar",
+    ...range,
+    ...(agencyId ? { agencyId } : {}),
   };
 }
 
@@ -127,29 +101,10 @@ export function updateShiftWorkspaceSelection(
   state: ShiftWorkspaceState,
   selectedIds: readonly string[],
 ): ShiftWorkspaceTransition {
-  if (state.view === "calendar") {
-    const nextState: CalendarShiftWorkspace = {
-      ...state,
-      agencyIds: unique(selectedIds),
-    };
-    return {
-      state: nextState,
-      search: serializeWorkspace(search, nextState),
-      requiresAgencyChoice: false,
-    };
-  }
-
-  const agencyId = unique(selectedIds)[0];
-  const nextState: ListShiftWorkspace = {
-    view: "list",
-    month: state.month,
-    ...(agencyId ? { agencyId } : {}),
-  };
-  return {
-    state: nextState,
-    search: serializeWorkspace(search, nextState),
-    requiresAgencyChoice: !agencyId,
-  };
+  const agencyId = selectedIds.map((id) => id.trim()).find(Boolean);
+  const nextState: ShiftWorkspaceState = { ...state, ...(agencyId ? { agencyId } : {}) };
+  if (!agencyId) delete nextState.agencyId;
+  return { state: nextState, search: serializeWorkspace(search, nextState), requiresAgencyChoice: false };
 }
 
 export function transitionShiftWorkspaceView(
@@ -158,57 +113,23 @@ export function transitionShiftWorkspaceView(
   nextView: ShiftWorkspaceState["view"],
   explicitAgencyId?: string,
 ): ShiftWorkspaceTransition {
-  if (nextView === state.view) {
-    return {
-      state,
-      search: serializeWorkspace(search, state),
-      requiresAgencyChoice: state.view === "list" && !state.agencyId,
-    };
-  }
-
-  if (nextView === "calendar") {
-    const nextState: CalendarShiftWorkspace = {
-      view: "calendar",
-      month: state.month,
-      agencyIds: state.view === "list" && state.agencyId ? [state.agencyId] : [],
-    };
-    return {
-      state: nextState,
-      search: serializeWorkspace(search, nextState),
-      requiresAgencyChoice: false,
-    };
-  }
-
-  const chosenAgencyId = explicitAgencyId?.trim()
-    || (state.view === "calendar" && state.agencyIds.length === 1 ? state.agencyIds[0] : "");
-  if (!chosenAgencyId) {
-    return { state, search, requiresAgencyChoice: true };
-  }
-
-  const nextState: ListShiftWorkspace = {
-    view: "list",
-    month: state.month,
-    agencyId: chosenAgencyId,
+  const agencyId = explicitAgencyId?.trim() || state.agencyId;
+  const nextState: ShiftWorkspaceState = {
+    view: nextView,
+    startDate: state.startDate,
+    endDate: state.endDate,
+    ...(agencyId ? { agencyId } : {}),
   };
-  return {
-    state: nextState,
-    search: serializeWorkspace(search, nextState),
-    requiresAgencyChoice: false,
-  };
+  return { state: nextState, search: serializeWorkspace(search, nextState), requiresAgencyChoice: false };
 }
 
-export function updateShiftWorkspaceMonth(
+export function updateShiftWorkspaceDateRange(
   search: string,
   state: ShiftWorkspaceState,
-  month: string,
+  range: ShiftDateRange,
 ): ShiftWorkspaceTransition {
-  const nextState = {
-    ...state,
-    month: isValidOperationalMonth(month) ? month : state.month,
-  } as ShiftWorkspaceState;
-  return {
-    state: nextState,
-    search: serializeWorkspace(search, nextState),
-    requiresAgencyChoice: nextState.view === "list" && !nextState.agencyId,
-  };
+  const params = new URLSearchParams({ startDate: range.startDate, endDate: range.endDate });
+  const nextRange = rangeFrom(params, new Date(`${state.endDate}T12:00:00`));
+  const nextState: ShiftWorkspaceState = { ...state, ...nextRange };
+  return { state: nextState, search: serializeWorkspace(search, nextState), requiresAgencyChoice: false };
 }

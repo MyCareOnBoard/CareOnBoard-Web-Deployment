@@ -160,10 +160,14 @@ function renderDetails(
   );
 }
 
-function renderOperationalPage(Page: React.ComponentType, shiftMaintenance = false) {
+function renderOperationalPage(
+  Page: React.ComponentType,
+  shiftMaintenance = false,
+  initialEntry = "/super-admin/shifts/list?agencyId=agency-b",
+) {
   const selectedAgency = agency("agency-b", "Beacon Supports");
   return render(
-    <MemoryRouter initialEntries={["/super-admin/shifts/list?agencyId=agency-b"]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <OperationalAgencyProvider
         actor="super_admin"
         agencyId={selectedAgency.id}
@@ -680,6 +684,38 @@ describe("shared operational shift pages", () => {
     });
   });
 
+  it("opens a right-aligned row action menu with Details first and preserves super-admin scope", async () => {
+    auth.user = { uid: "super-user", userType: "super_admin", profile: { accessList: ["Shift Management"] } };
+    api.listShifts.mockResolvedValue({
+      success: true,
+      shifts: [{ ...shift("shift-1", "agency-b", "Jamie"), type: "manual", submissionStatus: "submitted" }],
+    });
+    renderOperationalPage(ShiftsListPage);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Shift actions for Jamie Client" }));
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent?.trim())).toEqual([
+      "Details",
+      "Edit",
+      "Approve",
+      "Cancel",
+    ]);
+
+    await userEvent.click(screen.getByRole("menuitem", { name: "Open full shift details page" }));
+    const currentRoute = screen.getByRole("status", { name: "Current route" });
+    expect(currentRoute).toHaveTextContent("/super-admin/shifts/shift-1");
+    expect(currentRoute).toHaveTextContent("agencyId=agency-b");
+    expect(currentRoute).toHaveTextContent("returnTo=");
+  });
+
+  it("uses layout-matched skeleton rows while the dedicated shift list is loading", async () => {
+    auth.user = { uid: "super-user", userType: "super_admin", profile: { accessList: ["Shift Management"] } };
+    api.listShifts.mockReturnValueOnce(new Promise(() => {}));
+    renderOperationalPage(ShiftsListPage);
+
+    expect(await screen.findAllByTestId("shift-list-skeleton-row")).toHaveLength(5);
+    expect(screen.queryByLabelText("Loading shifts")).not.toBeInTheDocument();
+  });
+
   it("scopes dedicated list, approval, and activity requests and mutations", async () => {
     auth.user = { uid: "super-user", userType: "super_admin", profile: { accessList: ["Shift Management"] } };
     api.listShifts.mockResolvedValue({
@@ -693,7 +729,8 @@ describe("shared operational shift pages", () => {
       expect.objectContaining({ agencyId: "agency-b", client: true, employee: true }),
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await userEvent.click(screen.getByRole("button", { name: "Shift actions for Jamie Client" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Approve" }));
     const approvalDialog = screen.getByRole("dialog", { name: "Approve shift?" });
     expect(approvalDialog).toHaveAccessibleDescription(
       "Are you sure you want to approve this manual shift for Jamie Client at Beacon Supports? This will convert it to an automatic shift.",
@@ -734,6 +771,24 @@ describe("shared operational shift pages", () => {
     );
   });
 
+  it("applies the same URL category to the shared list view", async () => {
+    api.listShifts.mockResolvedValue({
+      success: true,
+      shifts: [
+        { ...shift("missed", "agency-b", "Missed"), anomalyCodes: ["missed"] },
+        { ...shift("other", "agency-b", "Other"), anomalyCodes: ["unassigned"] },
+      ],
+    });
+    renderOperationalPage(
+      ShiftsListPage,
+      false,
+      "/super-admin/shifts/list?agencyId=agency-b&shiftCategory=missed_expired",
+    );
+
+    expect((await screen.findAllByText("Missed Client")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Other Client")).not.toBeInTheDocument();
+  });
+
   it("resets pending list actions when the operational agency changes in place", async () => {
     const approval = deferred<{ success: true; shift: ReturnType<typeof shift> }>();
     api.updateShift.mockReturnValueOnce(approval.promise);
@@ -763,7 +818,8 @@ describe("shared operational shift pages", () => {
       </MemoryRouter>,
     );
     expect((await screen.findAllByText("Atlas Client")).length).toBeGreaterThan(0);
-    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await userEvent.click(screen.getByRole("button", { name: "Shift actions for Atlas Client" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Approve" }));
     await userEvent.click(screen.getByRole("button", { name: "Approve Shift" }));
     await waitFor(() => expect(api.updateShift).toHaveBeenCalledWith(
       "atlas-shift",
@@ -787,7 +843,8 @@ describe("shared operational shift pages", () => {
       </MemoryRouter>,
     );
     expect((await screen.findAllByText("Beacon Client")).length).toBeGreaterThan(0);
-    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await userEvent.click(screen.getByRole("button", { name: "Shift actions for Beacon Client" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Approve" }));
     expect(screen.getByRole("button", { name: "Approve Shift" })).toBeEnabled();
 
     await act(async () => {

@@ -1,6 +1,7 @@
 import axiosClient from "@/lib/axios";
 import type {
   OperationalAgencySummary,
+  OperationalAgencyDiscoveryFeature,
   OperationalClientOption,
   OperationalFeature,
   OperationalGoalDocumentInput,
@@ -100,7 +101,7 @@ function requiredAgencyId(agencyId: string): string {
 }
 
 export async function listOperationalAgencies(
-  feature: OperationalFeature,
+  feature: OperationalAgencyDiscoveryFeature,
   input: OperationalAgencyListInput = {},
 ): Promise<OperationalAgencyPage> {
   const ids = uniqueIds(input.ids);

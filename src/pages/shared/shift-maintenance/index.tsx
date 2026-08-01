@@ -1,28 +1,31 @@
-import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
-import { useNavigate } from "react-router";
-import { format } from "date-fns";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import {
   AlertTriangle,
   ArrowLeft,
-  ClipboardList,
   ChevronLeft,
   ChevronRight,
-  Loader2,
+  ClipboardList,
   Pencil,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchSelect } from "@/components/ui/search-select";
-import CustomDatePicker from "@/components/ui/datePicker";
+import { Skeleton } from "@/components/ui/skeleton";
+import ShiftDateRangeControl, { type ShiftDateRangeValue } from "@/components/shifts/ShiftDateRangeControl";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
 import {
   fetchShiftAnomalies,
   fetchShiftMaintenanceAudit,
+  type FetchAnomaliesParams,
+  type FetchAuditParams,
   type Shift,
   type ShiftAnomaly,
   type ShiftAuditRecord,
 } from "@/lib/api/shifts";
+import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
 import { Routes } from "@/routes/constants";
 import { listAgencies } from "@/lib/api/agencies";
 import {
@@ -34,539 +37,496 @@ import {
   formatShiftAuditTimestamp,
   summarizeChanges,
 } from "@/pages/shared/shift-maintenance/audit-display";
+import { resolveShiftMaintenanceDateRange } from "./shiftMaintenanceDateRange";
 
 const ShiftDetailsModal = lazy(() => import("@/components/ShiftDetailsModal"));
-
-function shiftAnomalyToStub(a: ShiftAnomaly): Shift {
-  return {
-    id: a.id,
-    date: a.date,
-    startTime: a.startTime ?? undefined,
-    endTime: a.endTime ?? undefined,
-    status: a.status,
-    employeeId: a.employeeId,
-    clientId: a.clientId,
-    assignedDsp: a.assignedDsp,
-    clientName: a.clientName,
-  } as Shift;
-}
-
-function AnomalyShiftTableSection({
-  title,
-  description,
-  rows,
-  emptyHint,
-  onEditRow,
-}: {
-  title: string;
-  description?: string;
-  rows: ShiftAnomaly[];
-  emptyHint: string;
-  onEditRow: (a: ShiftAnomaly) => void;
-}) {
-  return (
-    <section className="mb-10 last:mb-0">
-      <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-      {description ? (
-        <p className="max-w-2xl mt-1 text-sm text-gray-600">{description}</p>
-      ) : null}
-      {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-gray-500">{emptyHint}</p>
-      ) : (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 border-b border-gray-200">
-                <th className="pb-3 font-medium">Date</th>
-                <th className="pb-3 font-medium">Time</th>
-                <th className="pb-3 font-medium">DSP</th>
-                <th className="pb-3 font-medium">Client</th>
-                <th className="pb-3 font-medium">Status</th>
-                <th className="pb-3 font-medium">Anomaly</th>
-                <th className="pb-3 font-medium">Fix</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((a) => (
-                <tr key={a.id} className="transition-colors border-b border-gray-100 hover:bg-white/40">
-                  <td className="py-3">{a.date}</td>
-                  <td className="py-3">
-                    {a.startTime || "-"} - {a.endTime || "-"}
-                  </td>
-                  <td className="max-w-[120px] truncate py-3" title={a.employeeId || undefined}>
-                    {anomalyDspLabel(a)}
-                  </td>
-                  <td className="max-w-[120px] truncate py-3" title={a.clientId || undefined}>
-                    {anomalyClientLabel(a)}
-                  </td>
-                  <td className="py-3">
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {a.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {a.anomalyCodes.map((code) => (
-                        <span
-                          key={code}
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${ANOMALY_LABELS[code]?.color || "bg-gray-100 text-gray-600"}`}
-                        >
-                          {ANOMALY_LABELS[code]?.label || code}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="py-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-8 h-8 p-0"
-                      title="Review and fix this shift"
-                      onClick={() => onEditRow(a)}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function useDebounce<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(t);
-  }, [value, delayMs]);
-  return debounced;
-}
 
 type TabKey = "anomalies" | "audit";
 
 interface ShiftMaintenancePageProps {
   isSuperAdmin?: boolean;
+  embedded?: boolean;
+  agencies?: OperationalAgencySummary[];
 }
 
-export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMaintenancePageProps) {
+function isAbort(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: string; name?: string };
+  return candidate.code === "ERR_CANCELED"
+    || candidate.name === "CanceledError"
+    || candidate.name === "AbortError";
+}
+
+function shiftAnomalyToStub(anomaly: ShiftAnomaly): Shift {
+  return {
+    id: anomaly.id,
+    agencyId: anomaly.agencyId,
+    date: anomaly.date,
+    startTime: anomaly.startTime ?? undefined,
+    endTime: anomaly.endTime ?? undefined,
+    status: anomaly.status,
+    employeeId: anomaly.employeeId,
+    clientId: anomaly.clientId,
+    assignedDsp: anomaly.assignedDsp,
+    clientName: anomaly.clientName,
+  } as Shift;
+}
+
+function useDebounce<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [delayMs, value]);
+  return debounced;
+}
+
+function TableSkeleton({ columns }: { columns: number }) {
+  return (
+    <tbody aria-busy="true" aria-label="Loading maintenance table">
+      {Array.from({ length: 6 }).map((_, rowIndex) => (
+        <tr key={rowIndex} data-testid="maintenance-table-skeleton-row" className="border-b border-[#edf0f1] last:border-b-0">
+          {Array.from({ length: columns }).map((__, columnIndex) => (
+            <td key={columnIndex} className="px-4 py-4">
+              <Skeleton className={`h-4 rounded ${columnIndex === columns - 1 ? "ml-auto w-8" : columnIndex === 0 ? "w-32" : "w-20"}`} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+function EmptyTable({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="px-6 py-14 text-center">
+      <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f1f6f6] text-[#7d9697]">
+        <ClipboardList className="h-6 w-6" aria-hidden />
+      </span>
+      <p className="mt-4 text-sm font-semibold text-[#10141a]">{title}</p>
+      <p className="mx-auto mt-1 max-w-md text-[13px] leading-5 text-[#6b7280]">{description}</p>
+    </div>
+  );
+}
+
+function TableError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="px-6 py-14 text-center">
+      <AlertTriangle className="mx-auto h-6 w-6 text-[#d53411]" aria-hidden />
+      <p className="mt-3 text-sm font-semibold text-[#7f1d1d]">{message}</p>
+      <Button type="button" variant="outline" className="mt-4 rounded-full" onClick={onRetry}>
+        <RefreshCw className="h-4 w-4" aria-hidden />
+        Try again
+      </Button>
+    </div>
+  );
+}
+
+function Pagination({
+  page,
+  hasNext,
+  onFirst,
+  onNext,
+}: {
+  page: number;
+  hasNext: boolean;
+  onFirst: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between border-t border-[#e5e7eb] bg-[#fbfcfc] px-4 py-3">
+      <span className="text-xs font-medium text-[#6b7280]">Page {page + 1}</span>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" size="sm" className="h-9 w-9 rounded-lg p-0" disabled={page === 0} onClick={onFirst} aria-label="First page">
+          <ChevronLeft className="h-4 w-4" aria-hidden />
+        </Button>
+        <Button type="button" variant="outline" size="sm" className="h-9 w-9 rounded-lg p-0" disabled={!hasNext} onClick={onNext} aria-label="Next page">
+          <ChevronRight className="h-4 w-4" aria-hidden />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default function ShiftMaintenancePage({
+  isSuperAdmin = false,
+  embedded = false,
+  agencies: suppliedAgencies = [],
+}: ShiftMaintenancePageProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabKey>("anomalies");
-
-  // Date range (default: last 7 days)
-  const [fromDate, setFromDate] = useState<Date | null>(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
-  const [toDate, setToDate] = useState<Date | null>(new Date());
-  const fromDateStr = fromDate ? format(fromDate, "yyyy-MM-dd") : "";
-  const toDateStr = toDate ? format(toDate, "yyyy-MM-dd") : "";
-  const [agencyFilter, setAgencyFilter] = useState("");
+  const [dateRange, setDateRange] = useState(() => resolveShiftMaintenanceDateRange(location.search));
+  const [agencyFilter, setAgencyFilter] = useState(() => new URLSearchParams(location.search).get("agencyId") ?? "");
   const [agencySearchQuery, setAgencySearchQuery] = useState("");
   const debouncedAgencySearch = useDebounce(agencySearchQuery, 350);
-  const [agencies, setAgencies] = useState<{ id: string; name: string }[]>([]);
+  const [loadedAgencies, setLoadedAgencies] = useState<OperationalAgencySummary[]>([]);
   const [agenciesLoading, setAgenciesLoading] = useState(false);
 
-  // Anomalies state
   const [anomalies, setAnomalies] = useState<ShiftAnomaly[]>([]);
-  const [anomaliesLoading, setAnomaliesLoading] = useState(false);
+  const [anomaliesLoading, setAnomaliesLoading] = useState(true);
+  const [anomalyError, setAnomalyError] = useState<string | null>(null);
   const [anomaliesCursor, setAnomaliesCursor] = useState<string | null>(null);
   const [anomaliesHasNext, setAnomaliesHasNext] = useState(false);
   const [anomaliesPage, setAnomaliesPage] = useState(0);
 
-  // Audit state (deferred until tab is active)
   const [audits, setAudits] = useState<ShiftAuditRecord[]>([]);
   const [auditsLoading, setAuditsLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
   const [auditsCursor, setAuditsCursor] = useState<string | null>(null);
   const [auditsHasNext, setAuditsHasNext] = useState(false);
   const [auditsPage, setAuditsPage] = useState(0);
-  const [auditsFetched, setAuditsFetched] = useState(false);
-
-  // Edit modal
   const [editShift, setEditShift] = useState<ShiftAnomaly | null>(null);
 
-  const resolvedAgencyId = isSuperAdmin ? agencyFilter : user?.agencyId;
-  const resolvedAgencyName = isSuperAdmin
-    ? agencies.find((candidate) => candidate.id === agencyFilter)?.name
-    : user?.agency?.name;
+  const fromDateStr = dateRange.startDate;
+  const toDateStr = dateRange.endDate;
+  const resolvedAgencyId = isSuperAdmin ? agencyFilter || undefined : user?.agencyId;
 
   useEffect(() => {
-    if (!isSuperAdmin) return;
+    const nextRange = resolveShiftMaintenanceDateRange(location.search);
+    setDateRange((current) => current.startDate === nextRange.startDate && current.endDate === nextRange.endDate
+      ? current
+      : nextRange);
+    if (isSuperAdmin) {
+      const nextAgencyId = new URLSearchParams(location.search).get("agencyId") ?? "";
+      setAgencyFilter((current) => current === nextAgencyId ? current : nextAgencyId);
+    }
+  }, [isSuperAdmin, location.search]);
+
+  useEffect(() => {
+    if (!isSuperAdmin || embedded) return;
     let cancelled = false;
     setAgenciesLoading(true);
-    listAgencies({
-      limit: 100,
-      search: debouncedAgencySearch.trim() || undefined,
-    })
-      .then((res) => {
-        if (!cancelled) {
-          setAgencies(
-            res.agencies.map((a) => ({
-              id: a.id,
-              name: (a.name || "").trim() || "Unnamed agency",
-            })),
-          );
-        }
+    void listAgencies({ limit: 100, search: debouncedAgencySearch.trim() || undefined })
+      .then((response) => {
+        if (cancelled) return;
+        setLoadedAgencies(response.agencies.map((agency) => ({
+          id: agency.id,
+          name: (agency.name || "").trim() || "Unnamed agency",
+          status: "active",
+          supportedClientTypes: agency.supportedClientTypes ?? ["ddd", "hha"],
+          timezone: agency.timezone ?? "UTC",
+        })));
       })
       .catch(() => {
-        if (!cancelled) {
-          toast({
-            title: "Couldn't load agencies",
-            description: "Try again in a moment.",
-            variant: "destructive",
-          });
-          setAgencies([]);
-        }
+        if (!cancelled) toast({ title: "Couldn't load agencies", description: "Try again in a moment.", variant: "destructive" });
       })
       .finally(() => {
         if (!cancelled) setAgenciesLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [isSuperAdmin, debouncedAgencySearch, toast]);
+    return () => { cancelled = true; };
+  }, [debouncedAgencySearch, embedded, isSuperAdmin, toast]);
 
-  const agencySelectOptions = useMemo(
-    () =>
-      agencies.map((a) => ({
-        value: a.id,
-        label: a.name,
-        description: `ID: ${a.id}`,
-      })),
-    [agencies],
-  );
+  const availableAgencies = useMemo(() => {
+    const byId = new Map<string, OperationalAgencySummary>();
+    [...loadedAgencies, ...suppliedAgencies].forEach((agency) => byId.set(agency.id, agency));
+    return [...byId.values()].sort((left, right) => left.name.localeCompare(right.name));
+  }, [loadedAgencies, suppliedAgencies]);
+  const agencyNames = useMemo(() => new Map(availableAgencies.map((agency) => [agency.id, agency.name])), [availableAgencies]);
+  const agencyNameFor = useCallback((agencyId?: string | null) => {
+    if (!agencyId) return "Unknown agency";
+    return agencyNames.get(agencyId) ?? agencyId;
+  }, [agencyNames]);
 
-  const loadAnomalies = useCallback(async (cursor?: string | null) => {
-    if (!resolvedAgencyId || !fromDateStr || !toDateStr) return;
+  const loadAnomalies = useCallback(async (cursor?: string | null, signal?: AbortSignal) => {
+    if (!fromDateStr || !toDateStr) return;
     setAnomaliesLoading(true);
+    setAnomalyError(null);
     try {
-      const res = await fetchShiftAnomalies({
-        agencyId: resolvedAgencyId,
+      const params: FetchAnomaliesParams = {
+        ...(resolvedAgencyId ? { agencyId: resolvedAgencyId } : {}),
         from: fromDateStr,
         to: toDateStr,
         limit: 25,
         startAfter: cursor || undefined,
-      });
-      setAnomalies(res.anomalies);
-      setAnomaliesHasNext(res.hasNextPage);
-      setAnomaliesCursor(res.nextCursor);
-    } catch {
-      toast({
-        title: "Couldn't load anomalies",
-        description: "Check your connection, then try again. If it keeps happening, contact support.",
-        variant: "destructive",
-      });
+      };
+      const response = await fetchShiftAnomalies(params, { signal });
+      if (signal?.aborted) return;
+      setAnomalies(response.anomalies);
+      setAnomaliesHasNext(response.hasNextPage);
+      setAnomaliesCursor(response.nextCursor);
+    } catch (error) {
+      if (signal?.aborted || isAbort(error)) return;
+      setAnomalyError("We couldn't load problem shifts.");
     } finally {
-      setAnomaliesLoading(false);
+      if (!signal?.aborted) setAnomaliesLoading(false);
     }
-  }, [resolvedAgencyId, fromDateStr, toDateStr, toast]);
+  }, [fromDateStr, resolvedAgencyId, toDateStr]);
 
-  const loadAudits = useCallback(async (cursor?: string | null) => {
-    if (!resolvedAgencyId) return;
+  const loadAudits = useCallback(async (cursor?: string | null, signal?: AbortSignal) => {
     setAuditsLoading(true);
+    setAuditError(null);
     try {
-      const res = await fetchShiftMaintenanceAudit({
-        agencyId: resolvedAgencyId,
+      const params: FetchAuditParams = {
+        ...(resolvedAgencyId ? { agencyId: resolvedAgencyId } : {}),
         limit: 25,
         startAfter: cursor || undefined,
-      });
-      setAudits(res.audits);
-      setAuditsHasNext(res.hasNextPage);
-      setAuditsCursor(res.nextCursor);
-      setAuditsFetched(true);
-    } catch {
-      toast({
-        title: "Couldn't load audit log",
-        description: "Check your connection, then try again. If it keeps happening, contact support.",
-        variant: "destructive",
-      });
+      };
+      const response = await fetchShiftMaintenanceAudit(params, { signal });
+      if (signal?.aborted) return;
+      setAudits(response.audits);
+      setAuditsHasNext(response.hasNextPage);
+      setAuditsCursor(response.nextCursor);
+    } catch (error) {
+      if (signal?.aborted || isAbort(error)) return;
+      setAuditError("We couldn't load activity history.");
     } finally {
-      setAuditsLoading(false);
+      if (!signal?.aborted) setAuditsLoading(false);
     }
-  }, [resolvedAgencyId, toast]);
+  }, [resolvedAgencyId]);
 
-  // Fetch anomalies on mount / filter change
   useEffect(() => {
+    const controller = new AbortController();
     setAnomaliesPage(0);
-    loadAnomalies(null);
+    void loadAnomalies(null, controller.signal);
+    return () => controller.abort();
   }, [loadAnomalies]);
 
-  // Deferred: fetch audits only when tab is switched to
   useEffect(() => {
-    if (activeTab === "audit" && !auditsFetched) {
-      setAuditsPage(0);
-      loadAudits(null);
-    }
-  }, [activeTab, auditsFetched, loadAudits]);
+    if (activeTab !== "audit") return;
+    const controller = new AbortController();
+    setAuditsPage(0);
+    void loadAudits(null, controller.signal);
+    return () => controller.abort();
+  }, [activeTab, loadAudits]);
 
-  const handleAnomalyNextPage = () => {
-    if (anomaliesHasNext && anomaliesCursor) {
-      setAnomaliesPage((p) => p + 1);
-      loadAnomalies(anomaliesCursor);
-    }
+  const applyDateRange = (range: ShiftDateRangeValue) => {
+    setDateRange(range);
+    const params = new URLSearchParams(location.search);
+    params.set("startDate", range.startDate);
+    params.set("endDate", range.endDate);
+    navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
   };
 
-  const handleAuditNextPage = () => {
-    if (auditsHasNext && auditsCursor) {
-      setAuditsPage((p) => p + 1);
-      loadAudits(auditsCursor);
-    }
+  const changeAgencyFilter = (agencyId: string) => {
+    setAgencyFilter(agencyId);
+    const params = new URLSearchParams(location.search);
+    if (agencyId) params.set("agencyId", agencyId);
+    else params.delete("agencyId");
+    params.set("startDate", dateRange.startDate);
+    params.set("endDate", dateRange.endDate);
+    navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
   };
 
   const handleCorrectionComplete = () => {
     setEditShift(null);
-    loadAnomalies(null);
     setAnomaliesPage(0);
-    setAuditsFetched(false);
+    void loadAnomalies(null);
+    if (activeTab === "audit") void loadAudits(null);
   };
 
-  const { problemAnomalies, incompleteAnomalies } = useMemo(() => {
-    const problem: ShiftAnomaly[] = [];
-    const incomplete: ShiftAnomaly[] = [];
-    for (const a of anomalies) {
-      if (a.anomalyCodes.includes("incomplete_clock")) incomplete.push(a);
-      else problem.push(a);
-    }
-    return { problemAnomalies: problem, incompleteAnomalies: incomplete };
-  }, [anomalies]);
+  const selectedAgencyName = resolvedAgencyId
+    ? agencyNameFor(resolvedAgencyId)
+    : user?.agency?.name;
+  const agencySelectOptions = availableAgencies.map((agency) => ({
+    value: agency.id,
+    label: agency.name,
+    description: `ID: ${agency.id}`,
+  }));
+  const activeRows = activeTab === "anomalies" ? anomalies.length : audits.length;
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
-      {/* Page header — match agency client-details pattern */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          {!isSuperAdmin && (
-            <button
-              type="button"
-              onClick={() => navigate(Routes.agency.scheduling)}
-              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] backdrop-blur-sm transition-colors hover:bg-[rgba(255,255,255,0.7)]"
-              aria-label="Back to Shift Management"
-            >
-              <ArrowLeft className="h-5 w-5 text-[#10141a]" />
-            </button>
-          )}
-          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-            Shift Maintenance
-          </h1>
+      {!embedded ? (
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {!isSuperAdmin ? (
+              <button type="button" onClick={() => navigate(Routes.agency.scheduling)} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[#dce3e3] bg-white transition-colors hover:bg-[#f3f7f7]" aria-label="Back to Shift Management">
+                <ArrowLeft className="h-5 w-5 text-[#10141a]" aria-hidden />
+              </button>
+            ) : null}
+            <h1 className="text-[32px] font-semibold leading-tight text-[#10141a] sm:text-[40px]">Shift Maintenance</h1>
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {/* Card */}
-      <div className="backdrop-blur-[20px] bg-white/30 border border-white/30 rounded-[30px] p-6 min-h-[600px]">
-        {/* Filters */}
-        <div className="flex flex-wrap items-end gap-4 mb-6">
-          {isSuperAdmin && (
-            <div className="flex flex-col w-64 gap-1">
-              <span className="text-xs font-medium text-gray-600">Agency</span>
+      {!embedded ? (
+        <div className="mb-5 flex flex-wrap items-end gap-4 rounded-2xl border border-[#dce3e3] bg-[#f9fbfb] p-4">
+          {isSuperAdmin ? (
+            <div className="flex w-64 flex-col gap-1">
+              <span className="text-xs font-semibold text-[#5f6b6d]">Agency</span>
               <SearchSelect
                 options={agencySelectOptions}
                 value={agencyFilter}
-                onChange={setAgencyFilter}
+                onChange={changeAgencyFilter}
                 onSearchChange={setAgencySearchQuery}
                 disabled={agenciesLoading}
-                placeholder={agenciesLoading ? "Loading agencies…" : "Search by agency name…"}
-                searchPlaceholder="Type to search by name, email, or ID…"
-                emptyMessage="No agencies found. Try a different search."
-                className="w-full bg-white border-gray-200"
+                placeholder={agenciesLoading ? "Loading agencies…" : "All agencies"}
+                searchPlaceholder="Search agencies…"
+                emptyMessage="No agencies found."
+                className="w-full bg-white"
               />
             </div>
-          )}
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-gray-600">From date</span>
-            <CustomDatePicker
-              date={fromDate}
-              setDate={setFromDate}
-              placeholder="Start date"
-              endMonth={toDate ?? new Date()}
-              className="w-44"
-            />
+          ) : null}
+          <div className="flex min-w-[17rem] flex-1 flex-col gap-1 sm:max-w-sm">
+            <span className="text-xs font-semibold text-[#5f6b6d]">Date range</span>
+            <ShiftDateRangeControl value={dateRange} onApply={applyDateRange} description="Choose the dates to scan for shift maintenance issues" />
           </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-gray-600">To date</span>
-            <CustomDatePicker
-              date={toDate}
-              setDate={setToDate}
-              placeholder="End date"
-              startMonth={fromDate ?? undefined}
-              endMonth={new Date()}
-              className="w-44"
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-xl"
-            disabled={!fromDate || !toDate || (!isSuperAdmin ? false : !agencyFilter)}
-            onClick={() => { loadAnomalies(null); setAnomaliesPage(0); setAuditsFetched(false); }}
-          >
+          <Button type="button" variant="outline" className="rounded-full" onClick={() => {
+            if (activeTab === "anomalies") void loadAnomalies(null);
+            else void loadAudits(null);
+          }}>
+            <RefreshCw className="h-4 w-4" aria-hidden />
             Refresh
           </Button>
         </div>
+      ) : null}
 
-        {/* Tabs */}
-        <div className="flex gap-1 p-1 mb-6 bg-gray-100 rounded-2xl w-fit">
-          <button
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-colors ${
-              activeTab === "anomalies" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
-            }`}
-            onClick={() => setActiveTab("anomalies")}
-          >
-            <AlertTriangle className="w-4 h-4" />
-            Problem shifts
-          </button>
-          <button
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-colors ${
-              activeTab === "audit" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
-            }`}
-            onClick={() => setActiveTab("audit")}
-          >
-            <ClipboardList className="w-4 h-4" />
-            Activity history
-          </button>
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-sm" aria-labelledby="maintenance-records-title">
+        <div className="border-b border-[#e5e7eb] px-4 py-5 sm:px-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 id="maintenance-records-title" className="text-[20px] font-bold text-[#10141a] sm:text-[22px]">Maintenance records</h2>
+              <p className="mt-1 text-[13px] text-[#6b7280]">
+                Review shift exceptions and the administrative history behind them.
+              </p>
+            </div>
+            {!anomaliesLoading && !auditsLoading ? (
+              <span className="text-[13px] font-medium text-[#6b7280]">{activeRows} on this page</span>
+            ) : null}
+          </div>
+          <div className="mt-4 flex w-fit rounded-lg bg-[#eef3f3] p-1" role="tablist" aria-label="Maintenance records">
+            {([
+              ["anomalies", "Problem shifts", AlertTriangle],
+              ["audit", "Activity history", ClipboardList],
+            ] as const).map(([tab, label, Icon]) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors ${activeTab === tab
+                  ? "bg-white text-[#075b5d] shadow-sm"
+                  : "text-[#657274] hover:text-[#234f50]"}`}
+              >
+                <Icon className="h-4 w-4" aria-hidden />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Anomalies Tab */}
-        {activeTab === "anomalies" && (
-          <div>
-            {anomaliesLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-              </div>
-            ) : anomalies.length === 0 ? (
-              <div className="max-w-md py-20 mx-auto space-y-2 text-center text-gray-500">
-                <p className="font-medium text-gray-700">No problem shifts in this range</p>
-                <p className="text-sm">
-                  Try different dates, or pick a wider range. Shifts only appear here when the system flags an issue.
-                </p>
-              </div>
-            ) : (
-              <>
-                <AnomalyShiftTableSection
-                  title="Flagged issues"
-                  rows={problemAnomalies}
-                  emptyHint="No other flagged issues on this page."
-                  onEditRow={setEditShift}
-                />
-                <AnomalyShiftTableSection
-                  title="Incomplete shifts"
-                  description="Past the scheduled end time, someone clocked in, and there is no clock-out yet."
-                  rows={incompleteAnomalies}
-                  emptyHint="No incomplete shifts on this page."
-                  onEditRow={setEditShift}
-                />
-                <div className="flex items-center justify-between mt-4">
-                  <span className="text-xs text-gray-500">Page {anomaliesPage + 1}</span>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl"
-                      disabled={anomaliesPage === 0}
-                      onClick={() => { setAnomaliesPage(0); loadAnomalies(null); }}
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl"
-                      disabled={!anomaliesHasNext}
-                      onClick={handleAnomalyNextPage}
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Audit Tab */}
-        {activeTab === "audit" && (
-          <div>
-            {auditsLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-              </div>
-            ) : audits.length === 0 ? (
-              <div className="max-w-md py-20 mx-auto space-y-2 text-center text-gray-500">
-                <p className="font-medium text-gray-700">No activity yet</p>
-                <p className="text-sm">
-                  When people create shifts, clock in or out, or change schedules, those events show up here.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-gray-500 border-b border-gray-200">
-                        <th className="pb-3 font-medium">Timestamp</th>
-                        <th className="pb-3 font-medium">Who</th>
-                        <th className="pb-3 font-medium">Role</th>
-                        <th className="pb-3 font-medium">Action</th>
-                        <th className="pb-3 font-medium">Details</th>
-                        <th className="pb-3 font-medium">Shift ID</th>
-                        <th className="pb-3 font-medium">Note</th>
+        {activeTab === "anomalies" ? (
+          anomalyError ? (
+            <TableError message={anomalyError} onRetry={() => void loadAnomalies(null)} />
+          ) : !anomaliesLoading && anomalies.length === 0 ? (
+            <EmptyTable title="No problem shifts in this range" description="Try a different date range. Shifts appear here only when the system records an anomaly." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] text-left text-sm" aria-label="Problem shifts">
+                <thead className="bg-[#f9fafb] text-[11px] font-semibold uppercase tracking-wide text-[#808081]">
+                  <tr>
+                    <th scope="col" className="px-4 py-3">Shift</th>
+                    {isSuperAdmin ? <th scope="col" className="px-4 py-3">Agency</th> : null}
+                    <th scope="col" className="px-4 py-3">Staff</th>
+                    <th scope="col" className="px-4 py-3">Time</th>
+                    <th scope="col" className="px-4 py-3">Status</th>
+                    <th scope="col" className="px-4 py-3">Issue</th>
+                    <th scope="col" className="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                {anomaliesLoading ? <TableSkeleton columns={isSuperAdmin ? 7 : 6} /> : (
+                  <tbody>
+                    {anomalies.map((anomaly) => {
+                      const clientName = anomalyClientLabel(anomaly);
+                      return (
+                        <tr key={`${anomaly.agencyId}:${anomaly.id}`} className="border-b border-[#edf0f1] transition-colors last:border-b-0 hover:bg-[#fbfcfc]">
+                          <td className="px-4 py-4">
+                            <p className="font-semibold text-[#10141a]">{clientName}</p>
+                            <p className="mt-0.5 text-xs text-[#6b7280]">{anomaly.date}</p>
+                          </td>
+                          {isSuperAdmin ? <td className="px-4 py-4 text-[#4f5c5e]">{agencyNameFor(anomaly.agencyId)}</td> : null}
+                          <td className="px-4 py-4 text-[#4f5c5e]">{anomalyDspLabel(anomaly)}</td>
+                          <td className="whitespace-nowrap px-4 py-4 text-[#4f5c5e]">{anomaly.startTime || "—"} – {anomaly.endTime || "—"}</td>
+                          <td className="px-4 py-4"><Badge variant="outline" className="capitalize">{anomaly.status}</Badge></td>
+                          <td className="px-4 py-4">
+                            <div className="flex max-w-[240px] flex-wrap gap-1.5">
+                              {anomaly.anomalyCodes.map((code) => (
+                                <span key={code} className={`rounded-full px-2 py-1 text-xs font-semibold ${ANOMALY_LABELS[code]?.color || "bg-gray-100 text-gray-600"}`}>
+                                  {ANOMALY_LABELS[code]?.label || code}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <button type="button" className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-[#075b5d] transition-colors hover:bg-[#eaf5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]" aria-label={`Review ${clientName} shift`} onClick={() => setEditShift(anomaly)}>
+                              <Pencil className="h-4 w-4" aria-hidden />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                )}
+              </table>
+              {!anomaliesLoading ? (
+                <Pagination page={anomaliesPage} hasNext={anomaliesHasNext} onFirst={() => {
+                  setAnomaliesPage(0);
+                  void loadAnomalies(null);
+                }} onNext={() => {
+                  if (!anomaliesHasNext || !anomaliesCursor) return;
+                  setAnomaliesPage((page) => page + 1);
+                  void loadAnomalies(anomaliesCursor);
+                }} />
+              ) : null}
+            </div>
+          )
+        ) : auditError ? (
+          <TableError message={auditError} onRetry={() => void loadAudits(null)} />
+        ) : !auditsLoading && audits.length === 0 ? (
+          <EmptyTable title="No activity yet" description="Shift creation, clock events, schedule changes, and maintenance updates appear here." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1040px] text-left text-sm" aria-label="Activity history">
+              <thead className="bg-[#f9fafb] text-[11px] font-semibold uppercase tracking-wide text-[#808081]">
+                <tr>
+                  <th scope="col" className="px-4 py-3">Event</th>
+                  {isSuperAdmin ? <th scope="col" className="px-4 py-3">Agency</th> : null}
+                  <th scope="col" className="px-4 py-3">Actor</th>
+                  <th scope="col" className="px-4 py-3">Role</th>
+                  <th scope="col" className="px-4 py-3">Shift</th>
+                  <th scope="col" className="px-4 py-3">Changes</th>
+                  <th scope="col" className="px-4 py-3">Note</th>
+                </tr>
+              </thead>
+              {auditsLoading ? <TableSkeleton columns={isSuperAdmin ? 7 : 6} /> : (
+                <tbody>
+                  {audits.map((audit) => {
+                    const actionMeta = ACTION_LABELS[audit.action] || { label: String(audit.action), color: "bg-gray-100 text-gray-600" };
+                    return (
+                      <tr key={`${audit.agencyId}:${audit.id}`} className="border-b border-[#edf0f1] transition-colors last:border-b-0 hover:bg-[#fbfcfc]">
+                        <td className="px-4 py-4">
+                          <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${actionMeta.color}`}>{actionMeta.label}</span>
+                          <p className="mt-1.5 whitespace-nowrap text-xs text-[#6b7280]">{formatShiftAuditTimestamp(audit.timestamp)}</p>
+                        </td>
+                        {isSuperAdmin ? <td className="px-4 py-4 text-[#4f5c5e]">{agencyNameFor(audit.agencyId)}</td> : null}
+                        <td className="px-4 py-4 font-medium text-[#10141a]">{audit.actorName || audit.actorUid}</td>
+                        <td className="px-4 py-4 text-[#6b7280]">{ROLE_LABELS[audit.actorUserType] || audit.actorUserType}</td>
+                        <td className="max-w-[150px] truncate px-4 py-4 text-xs text-[#4f5c5e]" title={audit.shiftId}>{audit.shiftId}</td>
+                        <td className="max-w-[240px] truncate px-4 py-4 text-[#4f5c5e]" title={summarizeChanges(audit.action, audit.changes)}>{summarizeChanges(audit.action, audit.changes)}</td>
+                        <td className="max-w-[220px] truncate px-4 py-4 text-[#6b7280]" title={audit.reason || undefined}>{audit.reason || "—"}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {audits.map((a) => {
-                        const actionMeta =
-                          ACTION_LABELS[a.action as ShiftAuditRecord["action"]] || {
-                            label: String(a.action),
-                            color: "bg-gray-100 text-gray-600",
-                          };
-                        return (
-                          <tr key={a.id} className="transition-colors border-b border-gray-100 hover:bg-white/40">
-                            <td className="py-3 whitespace-nowrap">{formatShiftAuditTimestamp(a.timestamp)}</td>
-                            <td className="py-3">{a.actorName || a.actorUid}</td>
-                            <td className="py-3 text-xs text-gray-500">{ROLE_LABELS[a.actorUserType] || a.actorUserType}</td>
-                            <td className="py-3">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${actionMeta.color}`}>
-                                {actionMeta.label}
-                              </span>
-                            </td>
-                            <td className="py-3 text-gray-600 max-w-[200px] truncate">{summarizeChanges(a.action, a.changes)}</td>
-                            <td className="py-3 font-mono text-xs truncate max-w-[140px]">{a.shiftId}</td>
-                            <td className="py-3 text-gray-600 max-w-[180px] truncate">{a.reason || "-"}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex items-center justify-between mt-4">
-                  <span className="text-xs text-gray-500">Page {auditsPage + 1}</span>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl"
-                      disabled={auditsPage === 0}
-                      onClick={() => { setAuditsPage(0); loadAudits(null); }}
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl"
-                      disabled={!auditsHasNext}
-                      onClick={handleAuditNextPage}
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </>
-            )}
+                    );
+                  })}
+                </tbody>
+              )}
+            </table>
+            {!auditsLoading ? (
+              <Pagination page={auditsPage} hasNext={auditsHasNext} onFirst={() => {
+                setAuditsPage(0);
+                void loadAudits(null);
+              }} onNext={() => {
+                if (!auditsHasNext || !auditsCursor) return;
+                setAuditsPage((page) => page + 1);
+                void loadAudits(auditsCursor);
+              }} />
+            ) : null}
           </div>
         )}
-      </div>
+      </section>
 
       {editShift ? (
         <Suspense fallback={null}>
@@ -575,8 +535,8 @@ export default function ShiftMaintenancePage({ isSuperAdmin = false }: ShiftMain
             shift={shiftAnomalyToStub(editShift)}
             anomalyCodes={editShift.anomalyCodes}
             hydrateFromServer
-            agencyId={resolvedAgencyId || ""}
-            agencyName={resolvedAgencyName}
+            agencyId={editShift.agencyId || resolvedAgencyId || ""}
+            agencyName={agencyNameFor(editShift.agencyId) || selectedAgencyName}
             onClose={() => setEditShift(null)}
             onMaintenanceComplete={handleCorrectionComplete}
           />

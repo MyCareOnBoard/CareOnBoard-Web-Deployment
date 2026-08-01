@@ -1,7 +1,8 @@
 import type { NavItem } from "@/components/DashboardSidebar";
 
 export function matchesNavPath(pathname: string, path: string): boolean {
-  return pathname === path || pathname.startsWith(`${path}/`);
+  const routePath = path.split(/[?#]/, 1)[0];
+  return pathname === routePath || pathname.startsWith(`${routePath}/`);
 }
 
 export function resolveActiveNavItem(pathname: string, items: NavItem[]): NavItem | undefined {

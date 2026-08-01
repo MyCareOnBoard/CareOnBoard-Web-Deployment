@@ -55,6 +55,28 @@ describe("SuperAdminShiftScope route transitions", () => {
     createSuperAdminOperationalDataAdapter.mockClear();
   });
 
+  it("mounts shared shift views in an all-agencies read scope", () => {
+    function Probe() {
+      const operational = useOperationalAgency();
+      return <output aria-label="Scoped agency">{operational.agencyId || operational.agency.name}</output>;
+    }
+
+    render(
+      <MemoryRouter initialEntries={["/super-admin/shifts/list?startDate=2026-07-03&endDate=2026-08-01"]}>
+        <Routes>
+          <Route
+            path="/super-admin/shifts/list"
+            element={<SuperAdminShiftScope><Probe /></SuperAdminShiftScope>}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText("Scoped agency")).toHaveTextContent("All agencies");
+    expect(getOperationalAgencyContext).not.toHaveBeenCalled();
+    expect(createSuperAdminOperationalDataAdapter).toHaveBeenCalledWith("shift-management", "");
+  });
+
   it("never renders the previous agency provider under a newly requested agency URL", async () => {
     getOperationalAgencyContext
       .mockResolvedValueOnce(atlas)
@@ -98,6 +120,25 @@ describe("SuperAdminShiftScope route transitions", () => {
 
     expect(renders).not.toContainEqual({ requested: "beacon", provided: "atlas" });
     expect(screen.queryByText("Atlas Care")).not.toBeInTheDocument();
+  });
+
+  it("uses an agency-context skeleton while a direct route is resolving", () => {
+    getOperationalAgencyContext.mockReturnValueOnce(new Promise(() => {}));
+
+    render(
+      <MemoryRouter initialEntries={["/super-admin/shifts/list?agencyId=atlas"]}>
+        <Routes>
+          <Route
+            path="/super-admin/shifts/list"
+            element={<SuperAdminShiftScope><div>Restricted until loaded</div></SuperAdminShiftScope>}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText("Loading agency context")).toBeVisible();
+    expect(screen.getAllByTestId("agency-context-skeleton-row")).toHaveLength(4);
+    expect(screen.queryByLabelText("Loading agency")).not.toBeInTheDocument();
   });
 
   it("does not mount a shift route without Shift Management access", () => {

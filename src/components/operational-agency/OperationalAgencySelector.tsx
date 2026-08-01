@@ -10,15 +10,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listOperationalAgencies } from "@/lib/api/super-admin-operations";
 import type {
   OperationalAgencySummary,
-  OperationalFeature,
+  OperationalAgencyDiscoveryFeature,
 } from "@/lib/operational-agency/types";
 
 export interface OperationalAgencySelectorProps {
-  feature: OperationalFeature;
+  feature: OperationalAgencyDiscoveryFeature;
   selectionMode: "single" | "multiple";
   selectedIds: string[];
   onSelectionChange: (selectedIds: string[]) => void;
   initialAgencies?: OperationalAgencySummary[];
+  onAgenciesDiscovered?: (agencies: OperationalAgencySummary[]) => void;
+  emptySelectionLabel?: string;
 }
 
 const PAGE_SIZE = 50;
@@ -54,6 +56,8 @@ export default function OperationalAgencySelector({
   selectedIds,
   onSelectionChange,
   initialAgencies,
+  onAgenciesDiscovered,
+  emptySelectionLabel,
 }: OperationalAgencySelectorProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -102,6 +106,7 @@ export default function OperationalAgencySelector({
     }).then((page) => {
       if (!active || controller.signal.aborted) return;
       const nextAgencies = sortedAgencies(page.data);
+      onAgenciesDiscovered?.(nextAgencies);
       setAgencies(nextAgencies);
       setKnownAgencies((current) => mergeKnownAgencies(current, nextAgencies));
       setNextCursor(page.nextCursor);
@@ -118,7 +123,7 @@ export default function OperationalAgencySelector({
       active = false;
       controller.abort();
     };
-  }, [debouncedSearch, feature, initialKey, retryVersion]);
+  }, [debouncedSearch, feature, initialKey, onAgenciesDiscovered, retryVersion]);
 
   const selectedKey = JSON.stringify(selectedIds);
   useEffect(() => {
@@ -141,6 +146,7 @@ export default function OperationalAgencySelector({
         hydratedAgencies.push(...page.data);
       }
       if (!active || controller.signal.aborted) return;
+      onAgenciesDiscovered?.(hydratedAgencies);
       setKnownAgencies((current) => mergeKnownAgencies(current, hydratedAgencies));
     };
 
@@ -154,7 +160,7 @@ export default function OperationalAgencySelector({
     };
   // selectedKey intentionally makes equal controlled selections stable across parent renders.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feature, initialKey, selectedKey]);
+  }, [feature, initialKey, onAgenciesDiscovered, selectedKey]);
 
   useEffect(() => () => loadMoreController.current?.abort(), []);
 
@@ -171,8 +177,9 @@ export default function OperationalAgencySelector({
     timezone: "",
   });
   const selectedNames = selectedAgencies.map((agency) => agency.name);
+  const emptyLabel = emptySelectionLabel || (selectionMode === "single" ? "Choose one agency" : "Choose agencies");
   const triggerLabel = selectionMode === "single"
-    ? `Select an agency, ${selectedNames[0] ? `${selectedNames[0]} selected` : "none selected"}`
+    ? `Select an agency, ${selectedNames[0] ? `${selectedNames[0]} selected` : emptyLabel.toLowerCase()}`
     : `Select agencies, ${selectedNames.length
       ? selectedNames.length === 1
         ? `${selectedNames[0]} selected`
@@ -212,6 +219,7 @@ export default function OperationalAgencySelector({
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
+      onAgenciesDiscovered?.(page.data);
       setKnownAgencies((known) => mergeKnownAgencies(known, page.data));
       setAgencies((current) => {
         const byId = new Map(current.map((agency) => [agency.id, agency]));
@@ -241,7 +249,7 @@ export default function OperationalAgencySelector({
               <Building2 aria-hidden="true" className="h-4 w-4 shrink-0 text-[#087f82]" />
               <span className="truncate">
                 {selectedNames.length === 0
-                  ? selectionMode === "single" ? "Choose one agency" : "Choose agencies"
+                  ? emptyLabel
                   : selectedNames.length === 1 ? selectedNames[0] : `${selectedNames.length} agencies`}
               </span>
             </span>
@@ -399,28 +407,6 @@ export default function OperationalAgencySelector({
           ? "No agencies selected"
           : `${selectedIds.length} ${selectedIds.length === 1 ? "agency" : "agencies"} selected`}
       </span>
-
-      <div
-        className="flex max-h-24 min-w-0 flex-wrap gap-1.5 overflow-y-auto overscroll-contain pr-1"
-        aria-label="Selected agencies"
-      >
-        {selectedAgencies.map((agency) => (
-          <span
-            key={agency.id}
-            className="inline-flex min-h-11 max-w-full items-center gap-1 rounded-full bg-[#e8f5f5] pl-3 pr-0.5 text-[11px] font-semibold text-[#176b6d]"
-          >
-            <span className="truncate">{agency.name}</span>
-            <button
-              type="button"
-              aria-label={`Remove ${agency.name}`}
-              onClick={() => onSelectionChange(selectedIds.filter((id) => id !== agency.id))}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-[#cde8e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087f82]"
-            >
-              <X aria-hidden="true" className="h-3.5 w-3.5" />
-            </button>
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
