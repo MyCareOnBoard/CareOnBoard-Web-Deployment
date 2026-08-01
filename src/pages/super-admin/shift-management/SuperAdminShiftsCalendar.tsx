@@ -18,6 +18,7 @@ import {
   markCalendarAgencySkipped,
   markCalendarAgencySuccess,
   mergeCalendarAgencyPage,
+  removeCalendarAgencySnapshot,
   type NormalizedCalendarShift,
   type KeyedConcurrencyScheduler,
 } from "./calendarModel";
@@ -183,7 +184,9 @@ export default function SuperAdminShiftsCalendar({
   const retryAgency = (agency: OperationalAgencySummary) => {
     const current = schedulerRef.current;
     if (!current || current.generation !== generationRef.current) return;
-    current.scheduler.enqueue(agency);
+    if (current.scheduler.enqueue(agency)) {
+      setState((state) => removeCalendarAgencySnapshot(state, agency.id, current.generation));
+    }
   };
 
   if (agencies.length === 0) {

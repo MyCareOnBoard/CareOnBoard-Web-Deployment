@@ -1,3 +1,4 @@
+import { Profiler } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useNavigate } from "react-router";
@@ -36,6 +37,12 @@ function entityShift(id: string, startTime: string, clientName: string, staffNam
     client: { id: "client-a", firstName: clientFirst, lastName: clientLast, agencyId: "agency-a" },
     employee: { id: "staff-a", fullName: staffName, agencyId: "agency-a" },
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => { resolve = next; });
+  return { promise, resolve };
 }
 
 describe("ShiftsMonthCalendar shared-grid regression", () => {
@@ -120,6 +127,73 @@ describe("ShiftsMonthCalendar shared-grid regression", () => {
 
     await userEvent.click(open);
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/agency/shifts/dsp-shift-1"));
+  });
+
+  it("does not reuse a prior agency's cached month when the operational agency changes", async () => {
+    const committedText: string[] = [];
+    const calendar = (agencyId: string) => (
+      <Profiler
+        id="agency-calendar"
+        onRender={() => committedText.push(document.body.textContent ?? "")}
+      >
+        <ShiftsMonthCalendar variant="client" agencyId={agencyId} clientId="shared-client" />
+      </Profiler>
+    );
+    const beaconPage = deferred<{
+      success: true;
+      count: number;
+      shifts: ReturnType<typeof entityShift>[];
+    }>();
+    listShifts
+      .mockResolvedValueOnce({
+        success: true,
+        count: 1,
+        shifts: [entityShift("atlas-shift", "09:00AM", "Atlas Client", "Atlas Staff")],
+      })
+      .mockReturnValueOnce(beaconPage.promise);
+
+    const view = render(calendar("atlas"));
+    expect(await screen.findByRole("button", { name: /Open shift details for Atlas Staff/i })).toBeVisible();
+
+    committedText.length = 0;
+    view.rerender(calendar("beacon"));
+
+    expect(screen.queryByRole("button", { name: /Open shift details for Atlas Staff/i })).not.toBeInTheDocument();
+    expect(committedText.some((text) => text.includes("Atlas Staff"))).toBe(false);
+    beaconPage.resolve({
+      success: true,
+      count: 1,
+      shifts: [entityShift("beacon-shift", "10:00AM", "Beacon Client", "Beacon Staff")],
+    });
+    expect(await screen.findByRole("button", { name: /Open shift details for Beacon Staff/i })).toBeVisible();
+    expect(listShifts.mock.calls.map(([params]) => params.agencyId)).toEqual(["atlas", "beacon"]);
+  });
+
+  it("starts a fresh month cache after the calendar remounts in a new session", async () => {
+    listShifts
+      .mockResolvedValueOnce({
+        success: true,
+        count: 1,
+        shifts: [entityShift("first-session", "09:00AM", "Session Client", "First Session Staff")],
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        count: 1,
+        shifts: [entityShift("second-session", "10:00AM", "Session Client", "Second Session Staff")],
+      });
+
+    const firstSession = render(
+      <ShiftsMonthCalendar variant="client" agencyId="session-agency" clientId="session-client" />,
+    );
+    expect(await screen.findByRole("button", { name: /Open shift details for First Session Staff/i })).toBeVisible();
+    firstSession.unmount();
+
+    render(
+      <ShiftsMonthCalendar variant="client" agencyId="session-agency" clientId="session-client" />,
+    );
+
+    expect(await screen.findByRole("button", { name: /Open shift details for Second Session Staff/i })).toBeVisible();
+    expect(listShifts).toHaveBeenCalledTimes(2);
   });
 
   it("uses one keyboard-safe overflow menu on desktop and restores focus on Escape", async () => {

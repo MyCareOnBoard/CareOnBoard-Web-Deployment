@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import axios from "axios";
 import { endOfMonth, format, setMonth, setYear, startOfMonth } from "date-fns";
 import { generatePath, useNavigate } from "react-router";
@@ -36,11 +36,21 @@ function getYearRange(visibleYear: number): number[] {
 }
 
 type CacheEntry = { shifts: Shift[]; hitLimit: boolean };
-const monthShiftCache = new Map<string, CacheEntry>();
 
-function cacheKey(clientId: string | undefined, employeeId: string | undefined, month: string): string {
-  if (clientId) return `c:${clientId}:${month}`;
-  return `e:${employeeId ?? ""}:${month}`;
+function cacheKey(
+  agencyId: string,
+  variant: ShiftsMonthCalendarVariant,
+  clientId: string | undefined,
+  employeeId: string | undefined,
+  month: string,
+): string {
+  return JSON.stringify([
+    agencyId.trim(),
+    variant,
+    clientId?.trim() ?? "",
+    employeeId?.trim() ?? "",
+    month,
+  ]);
 }
 
 function formatHmCompact(value?: string): string {
@@ -168,11 +178,16 @@ export function ShiftsMonthCalendar({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hitLimit, setHitLimit] = useState(false);
+  const [stateScopeKey, setStateScopeKey] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
+  const monthShiftCacheRef = useRef(new Map<string, CacheEntry>());
   const month = format(visibleMonth, "yyyy-MM");
   const monthIndex = visibleMonth.getMonth();
   const year = visibleMonth.getFullYear();
   const yearOptions = useMemo(() => getYearRange(year), [year]);
+  const currentScopeKey = agencyId && (clientId || employeeId)
+    ? cacheKey(agencyId, variant, clientId, employeeId, month)
+    : null;
 
   const onOpenShift = useCallback((shift: Shift) => {
     navigate(generatePath(Routes.agency.shiftDetails, { shiftId: shift.id }));
@@ -183,15 +198,19 @@ export function ShiftsMonthCalendar({
     let active = true;
 
     const load = async () => {
-      if (!agencyId || (!clientId && !employeeId)) {
+      if (!currentScopeKey) {
+        setStateScopeKey(null);
         setLoading(false);
         setShifts([]);
+        setHitLimit(false);
+        setError(null);
         return;
       }
 
-      const key = cacheKey(clientId, employeeId, month);
-      const cached = monthShiftCache.get(key);
+      const key = currentScopeKey;
+      const cached = monthShiftCacheRef.current.get(key);
       if (cached) {
+        setStateScopeKey(key);
         setShifts(cached.shifts);
         setHitLimit(cached.hitLimit);
         setError(null);
@@ -199,8 +218,11 @@ export function ShiftsMonthCalendar({
         return;
       }
 
+      setStateScopeKey(key);
       setLoading(true);
       setError(null);
+      setShifts([]);
+      setHitLimit(false);
       try {
         const response = await listShifts({
           agencyId,
@@ -215,7 +237,7 @@ export function ShiftsMonthCalendar({
         if (!active) return;
         const nextShifts = response.shifts || [];
         const capped = (response.count ?? nextShifts.length) >= RANGE_LIMIT;
-        monthShiftCache.set(key, { shifts: nextShifts, hitLimit: capped });
+        monthShiftCacheRef.current.set(key, { shifts: nextShifts, hitLimit: capped });
         setShifts(nextShifts);
         setHitLimit(capped);
       } catch (loadFailure) {
@@ -234,12 +256,18 @@ export function ShiftsMonthCalendar({
       active = false;
       controller.abort();
     };
-  }, [agencyId, clientId, employeeId, visibleMonth, month, retryToken]);
+  }, [agencyId, variant, clientId, employeeId, visibleMonth, month, currentScopeKey, retryToken]);
 
   const retry = () => {
-    monthShiftCache.delete(cacheKey(clientId, employeeId, month));
+    if (currentScopeKey) monthShiftCacheRef.current.delete(currentScopeKey);
     setRetryToken((current) => current + 1);
   };
+
+  const stateMatchesScope = stateScopeKey === currentScopeKey;
+  const displayedShifts = stateMatchesScope ? shifts : [];
+  const displayedLoading = Boolean(currentScopeKey) && (!stateMatchesScope || loading);
+  const displayedError = stateMatchesScope ? error : null;
+  const displayedHitLimit = stateMatchesScope && hitLimit;
 
   return (
     <div className="space-y-3" role="region" aria-label="Shift calendar">
@@ -261,16 +289,16 @@ export function ShiftsMonthCalendar({
         </div>
       </div>
 
-      {hitLimit ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">Showing the first {RANGE_LIMIT} shifts in this month.</p> : null}
-      {error ? (
+      {displayedHitLimit ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">Showing the first {RANGE_LIMIT} shifts in this month.</p> : null}
+      {displayedError ? (
         <div className="flex flex-col items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-3 sm:flex-row sm:items-center">
-          <p className="text-sm font-medium text-red-700">{error}</p>
+          <p className="text-sm font-medium text-red-700">{displayedError}</p>
           <Button type="button" variant="outline" size="sm" onClick={retry} className="shrink-0">Try again</Button>
         </div>
       ) : null}
 
       <div className="relative">
-        {loading ? (
+        {displayedLoading ? (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl bg-white/70 backdrop-blur-sm" aria-busy="true" aria-live="polite">
             <Loader2 aria-hidden="true" className="h-8 w-8 animate-spin text-[#00b4b8]" />
             <p className="text-sm font-medium text-[#808081]">Loading this month’s shifts…</p>
@@ -278,7 +306,7 @@ export function ShiftsMonthCalendar({
         ) : null}
         <ShiftMonthGrid
           visibleMonth={visibleMonth}
-          entries={shifts}
+          entries={displayedShifts}
           getEntryKey={(shift) => shift.id}
           getEntryDate={(shift) => shift.date}
           getEntryAriaLabel={(shift) => entityShiftAriaLabel(shift, variant)}
@@ -287,7 +315,7 @@ export function ShiftsMonthCalendar({
           getSurfaceStyle={getShiftDayCellSurfaceStyle}
           orderEntriesForDay={orderEntityShiftsForDay}
           onOpenShift={onOpenShift}
-          showEmptyState={!loading && !error}
+          showEmptyState={!displayedLoading && !displayedError}
         />
       </div>
     </div>

@@ -111,6 +111,19 @@ export function mergeCalendarAgencyPage(
   return { ...state, shiftById, shifts };
 }
 
+export function removeCalendarAgencySnapshot(
+  state: CalendarState,
+  agencyId: string,
+  generation: number,
+): CalendarState {
+  if (state.generation !== generation) return state;
+  const shiftById = new Map(
+    [...state.shiftById].filter(([, shift]) => shift.agencyId !== agencyId),
+  );
+  const shifts = state.shifts.filter((shift) => shift.agencyId !== agencyId);
+  return { ...state, shiftById, shifts };
+}
+
 function abortError(): DOMException {
   return new DOMException("The operation was aborted.", "AbortError");
 }

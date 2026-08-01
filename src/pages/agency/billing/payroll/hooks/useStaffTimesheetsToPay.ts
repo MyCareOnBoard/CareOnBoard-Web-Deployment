@@ -9,6 +9,10 @@ import {
 import type { DuePayrollEntry } from "@/lib/api/payroll";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
+const STAFF_TIMESHEET_PAGE_LIMIT = 200;
+const STAFF_TIMESHEET_MAX_PAGES = 100;
+const STAFF_TIMESHEET_MAX_ROWS = 20_000;
+
 function validatePayPreviews(timesheets: StaffTimesheet[]): string | null {
   const previewByStaff = new Map<string, StaffTimesheetPayPreview>();
   for (const timesheet of timesheets) {
@@ -116,11 +120,14 @@ function buildEntries(approved: StaffTimesheet[]): DuePayrollEntry[] {
 export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean } = {}) {
   const { agencyId, mode } = useOperationalAgency();
   const [approved, setApproved] = useState<StaffTimesheet[]>([]);
+  const [approvedScopeKey, setApprovedScopeKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorScopeKey, setErrorScopeKey] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const requestControllerRef = useRef<AbortController | null>(null);
-  const hasLoadedRef = useRef(false);
+  const loadedScopeRef = useRef<string | null>(null);
+  const scopeKey = JSON.stringify([agencyId, mode ?? null]);
 
   const refetch = useCallback(
     async ({ force = false }: { force?: boolean } = {}) => {
@@ -130,19 +137,79 @@ export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean 
       requestIdRef.current = requestId;
       const controller = new AbortController();
       requestControllerRef.current = controller;
-      if (!hasLoadedRef.current) setLoading(true);
+      if (loadedScopeRef.current !== scopeKey) setLoading(true);
       setError(null);
+      setErrorScopeKey(null);
+      setApproved([]);
+      setApprovedScopeKey(null);
       try {
-        const { timesheets } = await listStaffTimesheets({
-          context: { agencyId },
-          query: {
-            scope: "agency",
-            status: "approved",
-            limit: 200,
-            ...(mode ? { mode } : {}),
-          },
-          signal: controller.signal,
-        });
+        const timesheets: StaffTimesheet[] = [];
+        const timesheetIds = new Set<string>();
+        const seenCursors = new Set<string>();
+        let cursor: string | undefined;
+        let complete = false;
+
+        for (let pageNumber = 0; pageNumber < STAFF_TIMESHEET_MAX_PAGES; pageNumber += 1) {
+          const page = await listStaffTimesheets({
+            context: { agencyId },
+            query: {
+              scope: "agency",
+              status: "approved",
+              payroll: true,
+              limit: STAFF_TIMESHEET_PAGE_LIMIT,
+              ...(mode ? { mode } : {}),
+              ...(cursor ? { cursor } : {}),
+            },
+            signal: controller.signal,
+          });
+          if (controller.signal.aborted || requestIdRef.current !== requestId) return;
+          if (
+            !Array.isArray(page.timesheets) ||
+            !Number.isInteger(page.returnedCount) ||
+            page.returnedCount !== page.timesheets.length ||
+            !Number.isInteger(page.scannedCount) ||
+            page.scannedCount < page.returnedCount ||
+            (page.total !== null && (!Number.isInteger(page.total) || page.total < 0)) ||
+            (page.nextCursor !== null && (
+              typeof page.nextCursor !== "string" || !page.nextCursor.trim()
+            )) ||
+            page.truncated !== Boolean(page.nextCursor)
+          ) {
+            throw new Error("Approved-timesheet pagination metadata is invalid.");
+          }
+          if (page.nextCursor && page.scannedCount === 0) {
+            throw new Error("Approved-timesheet pagination did not make progress.");
+          }
+          for (const timesheet of page.timesheets) {
+            if (
+              timesheet.agencyId !== agencyId ||
+              timesheet.status !== "approved" ||
+              (mode && timesheet.mode && timesheet.mode !== mode)
+            ) {
+              throw new Error("Approved-timesheet pagination returned a row outside its scope.");
+            }
+            if (!timesheet.id || timesheetIds.has(timesheet.id)) {
+              throw new Error("Approved-timesheet pagination returned a duplicate row.");
+            }
+            timesheetIds.add(timesheet.id);
+            timesheets.push(timesheet);
+          }
+          if (timesheets.length > STAFF_TIMESHEET_MAX_ROWS) {
+            throw new Error("Approved-timesheet pagination exceeded its safe row bound.");
+          }
+          if (!page.nextCursor) {
+            complete = true;
+            break;
+          }
+          if (seenCursors.has(page.nextCursor)) {
+            throw new Error("Approved-timesheet pagination repeated a cursor.");
+          }
+          seenCursors.add(page.nextCursor);
+          cursor = page.nextCursor;
+        }
+        if (!complete) {
+          throw new Error("Approved-timesheet pagination exceeded its safe page bound.");
+        }
         if (controller.signal.aborted || requestIdRef.current !== requestId) return;
         const previewError = validatePayPreviews(timesheets);
         if (previewError) {
@@ -150,15 +217,17 @@ export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean 
           throw new Error(previewError);
         }
         setApproved(timesheets);
-        hasLoadedRef.current = true;
+        setApprovedScopeKey(scopeKey);
+        loadedScopeRef.current = scopeKey;
       } catch (fetchError) {
         if (controller.signal.aborted || requestIdRef.current !== requestId) return;
         setError(fetchError instanceof Error ? fetchError.message : "Failed to load staff timesheets");
+        setErrorScopeKey(scopeKey);
       } finally {
         if (!controller.signal.aborted && requestIdRef.current === requestId) setLoading(false);
       }
     },
-    [agencyId, enabled, mode],
+    [agencyId, enabled, mode, scopeKey],
   );
 
   useEffect(() => {
@@ -172,12 +241,21 @@ export function useStaffTimesheetsToPay({ enabled = true }: { enabled?: boolean 
   useEffect(() => {
     if (!agencyId) return;
     return subscribePayrollInvalidation(agencyId, () => {
-      if (!hasLoadedRef.current) return;
+      if (loadedScopeRef.current !== scopeKey) return;
+      loadedScopeRef.current = null;
+      setApproved([]);
+      setApprovedScopeKey(null);
+      if (!enabled) return;
       void refetch({ force: true });
     });
-  }, [agencyId, refetch]);
+  }, [agencyId, enabled, refetch, scopeKey]);
 
-  const entries = useMemo(() => buildEntries(approved), [approved]);
+  const entries = useMemo(
+    () => approvedScopeKey === scopeKey ? buildEntries(approved) : [],
+    [approved, approvedScopeKey, scopeKey],
+  );
+  const scopedError = errorScopeKey === scopeKey ? error : null;
+  const scopeLoading = enabled && Boolean(agencyId) && approvedScopeKey !== scopeKey && !scopedError;
 
-  return { entries, loading, error, refetch };
+  return { entries, loading: loading || scopeLoading, error: scopedError, refetch };
 }

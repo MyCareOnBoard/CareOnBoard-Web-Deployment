@@ -71,6 +71,17 @@ export type ListStaffTimesheetsQuery = {
   scope?: "mine" | "agency";
   mode?: AgencyMode;
   limit?: number;
+  cursor?: string;
+  payroll?: boolean;
+};
+
+export type StaffTimesheetListPage = {
+  timesheets: StaffTimesheet[];
+  returnedCount: number;
+  scannedCount: number;
+  total: number | null;
+  nextCursor: string | null;
+  truncated: boolean;
 };
 
 export type CreateStaffPayrollInvoicePayload = {
@@ -82,7 +93,7 @@ export type CreateStaffPayrollInvoicePayload = {
 
 type ListResponse = {
   success: boolean;
-  data: { timesheets: StaffTimesheet[]; total: number };
+  data: StaffTimesheetListPage;
   message?: string;
 };
 
@@ -107,7 +118,7 @@ export async function listStaffTimesheets(
     query?: ListStaffTimesheetsQuery;
     signal?: AbortSignal;
   },
-): Promise<{ timesheets: StaffTimesheet[]; total: number }> {
+): Promise<StaffTimesheetListPage> {
   const { context, query = {}, signal } = input;
   const response = await axiosClient.get<ListResponse>(BASE, {
     params: withOperationalAgency(context, query),
@@ -121,7 +132,7 @@ export async function listStaffTimesheets(
 
 export async function listMyStaffTimesheets(
   query: ListStaffTimesheetsQuery = {},
-): Promise<{ timesheets: StaffTimesheet[]; total: number }> {
+): Promise<StaffTimesheetListPage> {
   const { scope: _untrustedScope, ...selfQuery } = withoutAgencyId(query);
   const response = await axiosClient.get<ListResponse>(BASE, {
     params: { ...selfQuery, scope: "mine" },

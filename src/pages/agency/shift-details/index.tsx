@@ -274,7 +274,7 @@ export default function AgencyShiftDetailsPage() {
   };
 
   const openUpdateModal = () => {
-    if (!shift || !capabilities.shiftMaintenance) return;
+    if (!shift || !capabilities.canManageShifts) return;
     setEditFormData(shiftToScheduleFormData(shift));
     setShowAddScheduleModal(true);
   };
@@ -286,7 +286,7 @@ export default function AgencyShiftDetailsPage() {
   };
 
   const confirmDeleteShift = async () => {
-    if (!shift || !shiftId || !capabilities.shiftMaintenance) return;
+    if (!shift || !shiftId || !capabilities.canManageShifts) return;
     const requestId = ++deleteRequestVersion.current;
     setIsDeletingShift(true);
     try {
@@ -381,8 +381,10 @@ export default function AgencyShiftDetailsPage() {
               </p>
             </div>
           </div>
-          {capabilities.shiftMaintenance ? (
+          {capabilities.canManageShifts || capabilities.shiftMaintenance ? (
             <div className="flex flex-wrap gap-2 sm:shrink-0">
+              {capabilities.canManageShifts ? (
+              <>
               <Button
                 type="button"
                 variant="outline"
@@ -391,6 +393,9 @@ export default function AgencyShiftDetailsPage() {
               >
                 Update shift
               </Button>
+              </>
+              ) : null}
+              {capabilities.shiftMaintenance ? (
               <Button
                 type="button"
                 variant="outline"
@@ -399,6 +404,8 @@ export default function AgencyShiftDetailsPage() {
               >
                 Edit clock times
               </Button>
+              ) : null}
+              {capabilities.canManageShifts ? (
               <Button
                 type="button"
                 className="rounded-full bg-[#d93c24] px-4 font-semibold text-white hover:bg-[#c52d16]"
@@ -406,6 +413,7 @@ export default function AgencyShiftDetailsPage() {
               >
                 Delete shift
               </Button>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -638,7 +646,7 @@ export default function AgencyShiftDetailsPage() {
         ) : null}
       </div>
 
-      {capabilities.shiftMaintenance && showAddScheduleModal && editFormData && (
+      {capabilities.canManageShifts && showAddScheduleModal && editFormData && (
         <Suspense fallback={null}>
           <AddScheduleModal
             isOpen={showAddScheduleModal}
@@ -707,7 +715,7 @@ export default function AgencyShiftDetailsPage() {
         </DialogContent>
       </Dialog>
 
-      {capabilities.shiftMaintenance ? (
+      {capabilities.canManageShifts ? (
       <DeleteConfirmationModal
         isOpen={shiftPendingDelete}
         onClose={() => {

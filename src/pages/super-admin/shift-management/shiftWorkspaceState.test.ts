@@ -105,6 +105,17 @@ describe("shift workspace initialization", () => {
       agencyIds: [],
     });
   });
+
+  it("keeps an explicitly requested unknown Calendar agency empty instead of falling back", () => {
+    expect(resolveInitialShiftWorkspace(
+      "?agencyIds=unknown&month=2026-07",
+      agencies,
+    )).toEqual({
+      view: "calendar",
+      month: "2026-07",
+      agencyIds: [],
+    });
+  });
 });
 
 describe("shift workspace transitions", () => {

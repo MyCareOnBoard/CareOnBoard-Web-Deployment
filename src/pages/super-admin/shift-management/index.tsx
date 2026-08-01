@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
-import { listOperationalAgencies } from "@/lib/api/super-admin-operations";
+import { getOperationalAgencyContext, listOperationalAgencies } from "@/lib/api/super-admin-operations";
 import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
 import { Routes } from "@/routes/constants";
 import { superAdminShiftRoutes } from "@/lib/operational-agency/routes";
@@ -18,6 +18,7 @@ import {
 import type { NormalizedCalendarShift } from "./calendarModel";
 
 const AGENCY_PAGE_LIMIT = 50;
+const AGENCY_CONTEXT_CONCURRENCY = 4;
 
 function isAbort(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -34,12 +35,29 @@ function activeSorted(agencies: Iterable<OperationalAgencySummary>): Operational
 export default function ShiftManagementWorkspace() {
   const location = useLocation();
   const navigate = useNavigate();
+  const isCalendarRoute = location.pathname === Routes.superAdmin.shifts.index;
+  const requestedSelectionKey = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const ids = Array.from(new Set(
+      (isCalendarRoute
+        ? params.getAll("agencyIds")
+        : [params.get("agencyId") ?? ""])
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ));
+    return JSON.stringify(ids);
+  }, [isCalendarRoute, location.search]);
+  const requestedAgencyIds = useMemo(
+    () => JSON.parse(requestedSelectionKey) as string[],
+    [requestedSelectionKey],
+  );
   const [agencies, setAgencies] = useState<OperationalAgencySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scanLimit, setScanLimit] = useState<number | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
   const [requiresAgencyChoice, setRequiresAgencyChoice] = useState(false);
+  const [loadedSelectionKey, setLoadedSelectionKey] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -50,33 +68,44 @@ export default function ShiftManagementWorkspace() {
       setError(null);
       const agencyById = new Map<string, OperationalAgencySummary>();
       try {
-        const requestedIds = Array.from(new Set(
-          new URLSearchParams(location.search).getAll("agencyIds").filter(Boolean),
-        ));
         let discoveredScanLimit: number | null = null;
         const hydrateRequested = async () => {
-          for (let start = 0; start < requestedIds.length; start += AGENCY_PAGE_LIMIT) {
-            const ids = requestedIds.slice(start, start + AGENCY_PAGE_LIMIT);
-            const page = await listOperationalAgencies("shift-management", {
-              ids,
-              limit: ids.length,
-              signal: controller.signal,
-            });
-            const requested = new Set(ids);
-            for (const agency of page.data) {
-              if (requested.has(agency.id)) agencyById.set(agency.id, agency);
+          const contexts = new Array<OperationalAgencySummary>(requestedAgencyIds.length);
+          let nextIndex = 0;
+          const worker = async () => {
+            while (!controller.signal.aborted && nextIndex < requestedAgencyIds.length) {
+              const index = nextIndex;
+              nextIndex += 1;
+              const requestedId = requestedAgencyIds[index];
+              const agency = await getOperationalAgencyContext(
+                "shift-management",
+                requestedId,
+                controller.signal,
+              );
+              if (controller.signal.aborted) return;
+              if (agency.id !== requestedId || agency.status !== "active") {
+                throw new Error("Requested agency is not available.");
+              }
+              contexts[index] = agency;
             }
-          }
+          };
+          await Promise.all(Array.from(
+            { length: Math.min(AGENCY_CONTEXT_CONCURRENCY, requestedAgencyIds.length) },
+            () => worker(),
+          ));
+          return contexts;
         };
         const scanAllowed = async () => {
           const seenCursors = new Set<string>();
           let cursor: string | undefined;
           do {
+            if (controller.signal.aborted) return;
             const page = await listOperationalAgencies("shift-management", {
               cursor,
               limit: AGENCY_PAGE_LIMIT,
               signal: controller.signal,
             });
+            if (controller.signal.aborted) return;
             for (const agency of page.data) agencyById.set(agency.id, agency);
             if (page.truncated) discoveredScanLimit = page.scanLimit;
             const nextCursor = page.nextCursor || undefined;
@@ -85,19 +114,23 @@ export default function ShiftManagementWorkspace() {
             cursor = nextCursor;
           } while (cursor);
         };
-        await Promise.all([hydrateRequested(), scanAllowed()]);
+        const [requestedContexts] = await Promise.all([hydrateRequested(), scanAllowed()]);
+        for (const agency of requestedContexts) agencyById.set(agency.id, agency);
         if (!active) return;
         setAgencies(activeSorted(agencyById.values()));
         setScanLimit(discoveredScanLimit);
+        setLoadedSelectionKey(requestedSelectionKey);
       } catch (loadFailure) {
+        controller.abort();
         if (!active || isAbort(loadFailure)) return;
         setError(loadFailure instanceof Error && loadFailure.message
           ? loadFailure.message
           : "Could not load your agencies.");
         setAgencies([]);
         setScanLimit(null);
+        setLoadedSelectionKey(requestedSelectionKey);
       } finally {
-        if (active && !controller.signal.aborted) setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
@@ -106,9 +139,8 @@ export default function ShiftManagementWorkspace() {
       active = false;
       controller.abort();
     };
-  }, [retryVersion]);
+  }, [requestedAgencyIds, requestedSelectionKey, retryVersion]);
 
-  const isCalendarRoute = location.pathname === Routes.superAdmin.shifts.index;
   const workspaceSearch = isCalendarRoute
     ? location.search
     : (() => {
@@ -183,7 +215,7 @@ export default function ShiftManagementWorkspace() {
     navigate({ pathname, search: singularSearch() });
   };
 
-  if (loading) {
+  if (loading || loadedSelectionKey !== requestedSelectionKey) {
     return (
       <div className="flex min-h-[24rem] items-center justify-center" aria-busy="true" aria-live="polite">
         <div className="text-center">

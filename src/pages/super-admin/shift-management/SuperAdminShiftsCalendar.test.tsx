@@ -146,6 +146,49 @@ describe("SuperAdminShiftsCalendar", () => {
     expect(beaconAttempts).toBe(2);
   });
 
+  it("replaces changed rows and removes deleted rows when a partial agency retry succeeds", async () => {
+    const atlas = agency("atlas", "Atlas Care");
+    const beacon = agency("beacon", "Beacon Supports");
+    let beaconAttempt = 0;
+
+    listCalendarShifts.mockImplementation(async (params) => {
+      if (params.agencyId === "atlas") {
+        return page([shift("atlas-stable", "2026-08-02", { clientName: "Atlas stable" })]);
+      }
+      beaconAttempt += 1;
+      if (beaconAttempt === 1) {
+        return page([
+          shift("beacon-changed", "2026-08-03", { clientName: "Old Beacon client" }),
+          shift("beacon-deleted", "2026-08-04", { clientName: "Deleted Beacon client" }),
+        ], "beacon-page-2");
+      }
+      if (beaconAttempt === 2) throw new Error("Second page failed");
+      return page([
+        shift("beacon-changed", "2026-08-06", { clientName: "Fresh Beacon client", status: "completed" as CompactCalendarShift["status"] }),
+      ]);
+    });
+
+    render(
+      <SuperAdminShiftsCalendar
+        agencies={[atlas, beacon]}
+        month="2026-08"
+        mode="ddd"
+        onMonthChange={vi.fn()}
+        onSelectionChange={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText("Old Beacon client")).toBeVisible();
+    expect(screen.getByText("Deleted Beacon client")).toBeVisible();
+    await userEvent.click(await screen.findByRole("button", { name: "Retry Beacon Supports" }));
+
+    expect(await screen.findByText("Fresh Beacon client")).toBeVisible();
+    expect(screen.queryByText("Old Beacon client")).not.toBeInTheDocument();
+    expect(screen.queryByText("Deleted Beacon client")).not.toBeInTheDocument();
+    expect(screen.getByText("Atlas stable")).toBeVisible();
+    expect(beaconAttempt).toBe(3);
+  });
+
   it("rejects a repeated agency cursor without issuing a third page request", async () => {
     listCalendarShifts
       .mockResolvedValueOnce(page([shift("atlas-one", "2026-08-03")], "repeat"))

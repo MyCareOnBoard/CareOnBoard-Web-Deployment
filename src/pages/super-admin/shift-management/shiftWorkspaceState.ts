@@ -93,18 +93,16 @@ export function resolveInitialShiftWorkspace(
 
   if (params.get("view") === "list") {
     const requestedAgencyId = params.get("agencyId")?.trim();
-    const agencyId = requestedAgencyId && allowedIds.has(requestedAgencyId)
-      ? requestedAgencyId
-      : allowed.length === 1
-        ? allowed[0].id
-        : undefined;
+    const agencyId = requestedAgencyId
+      ? allowedIds.has(requestedAgencyId) ? requestedAgencyId : undefined
+      : allowed.length === 1 ? allowed[0].id : undefined;
     return { view: "list", month, ...(agencyId ? { agencyId } : {}) };
   }
 
   const requestedValues = params.getAll("agencyIds");
   const requestedIds = validSelection(requestedValues, allowedIds);
   if (requestedIds.length) return { view: "calendar", month, agencyIds: requestedIds };
-  if (params.has("agencyIds") && requestedValues.every((value) => !value.trim())) {
+  if (params.has("agencyIds")) {
     return { view: "calendar", month, agencyIds: [] };
   }
   if (allowed.length === 0) return { view: "calendar", month, agencyIds: [] };

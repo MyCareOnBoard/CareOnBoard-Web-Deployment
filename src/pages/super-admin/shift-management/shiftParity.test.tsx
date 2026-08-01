@@ -423,7 +423,7 @@ describe("shared operational shift pages", () => {
     expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: "Shift deleted" }));
   });
 
-  it("loads shift details with the provider agency and gates maintenance reads", async () => {
+  it("lets Shift Management update and delete while denying maintenance reads and tools", async () => {
     auth.user = { uid: "agency-user", userType: "agency", agencyId: "agency-a" };
     renderDetails("agency", agency("agency-a", "Atlas Care"), "/agency/shifts/shift-1", true);
 
@@ -460,10 +460,31 @@ describe("shared operational shift pages", () => {
     expect(api.fetchShiftMaintenanceAudit).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Schedule" })).toBeVisible();
     expect(screen.getByText("09:00:AM")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Update shift" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Update shift" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Delete shift" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Edit clock times" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete shift" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Activity on this shift" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Update shift" }));
+    expect(await screen.findByRole("dialog", { name: "Schedule editor" })).toBeVisible();
+    expect(modalCapture.addScheduleProps).toMatchObject({
+      agencyId: "agency-b",
+      agencyName: "Beacon Supports",
+      mode: "edit",
+    });
+    act(() => {
+      (modalCapture.addScheduleProps?.onClose as (() => void) | undefined)?.();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete shift" }));
+    const confirmDelete = screen.getAllByRole("button", { name: "Delete shift" }).at(-1);
+    expect(confirmDelete).toBeDefined();
+    await waitFor(() => expect(confirmDelete).toBeEnabled());
+    await userEvent.click(confirmDelete!);
+    await waitFor(() => expect(api.deleteShift).toHaveBeenCalledWith(
+      "shift-1",
+      { agencyId: "agency-b" },
+    ));
   }, 15_000);
 
   it("stops detail audit pagination when the server repeats its cursor", async () => {

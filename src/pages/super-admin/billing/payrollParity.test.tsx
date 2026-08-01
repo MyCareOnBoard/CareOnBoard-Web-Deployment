@@ -1,3 +1,4 @@
+import { Profiler } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -151,12 +152,14 @@ function dataAdapter(): OperationalAgencyDataAdapter {
 function Scope({
   actor,
   agency = atlas,
+  mode = "ddd",
   children,
   scopeCapabilities = capabilities,
   directoryRoutes,
 }: {
   actor: OperationalActor;
   agency?: typeof atlas;
+  mode?: "ddd" | "hha";
   children: React.ReactNode;
   scopeCapabilities?: OperationalCapabilities;
   directoryRoutes?: OperationalDirectoryRoutes;
@@ -167,7 +170,7 @@ function Scope({
         actor={actor}
         agencyId={agency.id}
         agency={agency}
-        mode="ddd"
+        mode={mode}
         capabilities={scopeCapabilities}
         directoryRoutes={directoryRoutes}
         data={dataAdapter()}
@@ -353,7 +356,16 @@ describe("shared payroll operational parity", () => {
     );
     payrollApi.markPayrollInvoicePaid.mockResolvedValue(undefined);
     payrollApi.cancelPayrollInvoice.mockResolvedValue(undefined);
-    timesheetApi.listStaffTimesheets.mockResolvedValue({ timesheets: [approvedTimesheet], total: 1 });
+    timesheetApi.listStaffTimesheets.mockImplementation(
+      ({ context }: { context: { agencyId: string } }) => Promise.resolve({
+        timesheets: [{ ...approvedTimesheet, agencyId: context.agencyId }],
+        total: 1,
+        returnedCount: 1,
+        scannedCount: 1,
+        nextCursor: null,
+        truncated: false,
+      }),
+    );
     timesheetApi.createStaffPayrollInvoice.mockResolvedValue({ id: staffInvoice.id });
     agencyApi.getAgencyById.mockResolvedValue({ name: "Atlas Care" });
     Object.defineProperty(document, "fonts", {
@@ -379,7 +391,14 @@ describe("shared payroll operational parity", () => {
     payrollApi.getPayrollDashboard.mockResolvedValue(dashboard);
     payrollApi.getStaffToPay.mockResolvedValue({ entries: [dueEntry], total: 1, page: 1, limit: 100 });
     payrollApi.listPayrollInvoices.mockResolvedValue({ invoices: [invoiceListItem], total: 1 });
-    timesheetApi.listStaffTimesheets.mockResolvedValue({ timesheets: [approvedTimesheet], total: 1 });
+    timesheetApi.listStaffTimesheets.mockResolvedValue({
+      timesheets: [approvedTimesheet],
+      total: null,
+      returnedCount: 1,
+      scannedCount: 1,
+      nextCursor: null,
+      truncated: false,
+    });
 
     renderPayroll("super_admin");
     await waitFor(() => expect(screen.getByLabelText("Due payroll names")).toHaveTextContent("Dana DSP"));
@@ -394,6 +413,7 @@ describe("shared payroll operational parity", () => {
     expect(superDue.query).toEqual(agencyDue.query);
     expect(superTimesheets.context).toEqual(agencyTimesheets.context);
     expect(superTimesheets.query).toEqual(agencyTimesheets.query);
+    expect(superTimesheets.query).toMatchObject({ status: "approved", payroll: true });
     const superTimesheetFinancials = screen.getByLabelText("Due payroll financials").textContent;
     expect(superTimesheetFinancials).toBe(agencyTimesheetFinancials);
     expect(superTimesheetFinancials).toContain("Avery Admin|$25.00/hr|$200.00");
@@ -446,7 +466,11 @@ describe("shared payroll operational parity", () => {
           payPreview: groupedPayPreview,
         },
       ],
-      total: 2,
+      total: null,
+      returnedCount: 2,
+      scannedCount: 2,
+      nextCursor: null,
+      truncated: false,
     });
 
     renderPayroll("super_admin");
@@ -459,7 +483,11 @@ describe("shared payroll operational parity", () => {
     const { payPreview: _missingPreview, ...timesheetWithoutPreview } = approvedTimesheet;
     timesheetApi.listStaffTimesheets.mockResolvedValue({
       timesheets: [timesheetWithoutPreview],
-      total: 1,
+      total: null,
+      returnedCount: 1,
+      scannedCount: 1,
+      nextCursor: null,
+      truncated: false,
     });
 
     renderPayroll("super_admin");
@@ -470,6 +498,150 @@ describe("shared payroll operational parity", () => {
     })));
     expect(screen.getByLabelText("Due payroll financials"))
       .not.toHaveTextContent("Avery Admin|—|$0.00");
+  });
+
+  it("exhausts every approved-timesheet cursor before publishing staff to pay", async () => {
+    const secondStaffTimesheet = {
+      ...approvedTimesheet,
+      id: "timesheet-2",
+      staffUid: "staff-user-2",
+      staffName: "Blake Admin",
+      payPreview: {
+        billingType: "hourly" as const,
+        billingRate: 30,
+        totalHours: 6,
+        grossAmount: 180,
+      },
+    };
+    timesheetApi.listStaffTimesheets
+      .mockResolvedValueOnce({
+        timesheets: [approvedTimesheet],
+        total: null,
+        returnedCount: 1,
+        scannedCount: 2,
+        nextCursor: "staff-page-2",
+        truncated: true,
+      })
+      .mockResolvedValueOnce({
+        timesheets: [secondStaffTimesheet],
+        total: null,
+        returnedCount: 1,
+        scannedCount: 1,
+        nextCursor: null,
+        truncated: false,
+      });
+
+    renderPayroll("super_admin");
+
+    await waitFor(() => expect(screen.getByLabelText("Due payroll names"))
+      .toHaveTextContent("Avery Admin,Blake Admin"));
+    expect(timesheetApi.listStaffTimesheets).toHaveBeenCalledTimes(2);
+    expect(timesheetApi.listStaffTimesheets).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      context: { agencyId: "atlas" },
+      query: expect.objectContaining({ cursor: "staff-page-2" }),
+      signal: expect.any(AbortSignal),
+    }));
+  });
+
+  it("fails closed without publishing a partial payroll list when a cursor repeats", async () => {
+    timesheetApi.listStaffTimesheets
+      .mockResolvedValueOnce({
+        timesheets: [approvedTimesheet],
+        total: null,
+        returnedCount: 1,
+        scannedCount: 1,
+        nextCursor: "repeated",
+        truncated: true,
+      })
+      .mockResolvedValueOnce({
+        timesheets: [],
+        total: null,
+        returnedCount: 0,
+        scannedCount: 1,
+        nextCursor: "repeated",
+        truncated: true,
+      });
+
+    renderPayroll("super_admin");
+
+    await waitFor(() => expect(ui.toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Couldn't load approved timesheets",
+      variant: "destructive",
+    })));
+    expect(screen.getByLabelText("Due payroll names")).not.toHaveTextContent("Avery Admin");
+  });
+
+  it("fails closed without publishing rows when separate pages repeat a timesheet ID", async () => {
+    timesheetApi.listStaffTimesheets
+      .mockResolvedValueOnce({
+        timesheets: [approvedTimesheet],
+        total: 1,
+        returnedCount: 1,
+        scannedCount: 2,
+        nextCursor: "duplicate-page",
+        truncated: true,
+      })
+      .mockResolvedValueOnce({
+        timesheets: [{ ...approvedTimesheet, staffName: "Duplicate Avery" }],
+        total: 1,
+        returnedCount: 1,
+        scannedCount: 2,
+        nextCursor: null,
+        truncated: false,
+      });
+
+    renderPayroll("super_admin");
+
+    await waitFor(() => expect(ui.toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Couldn't load approved timesheets",
+      variant: "destructive",
+    })));
+    expect(screen.getByLabelText("Due payroll names")).not.toHaveTextContent("Avery Admin");
+    expect(screen.getByLabelText("Due payroll names")).not.toHaveTextContent("Duplicate Avery");
+  });
+
+  it("never commits prior-mode timesheet payroll rows after the mode changes", async () => {
+    const hhaPage = deferred<Awaited<ReturnType<typeof timesheetApi.listStaffTimesheets>>>();
+    const committedNames: string[] = [];
+    const payroll = (mode: "ddd" | "hha") => (
+      <Profiler
+        id="mode-payroll"
+        onRender={() => committedNames.push(
+          document.querySelector('[aria-label="Due payroll names"]')?.textContent ?? "",
+        )}
+      >
+        <Scope actor="super_admin" mode={mode}><PayrollDashboardPage /></Scope>
+      </Profiler>
+    );
+    const view = render(payroll("ddd"));
+    await waitFor(() => expect(screen.getByLabelText("Due payroll names")).toHaveTextContent("Avery Admin"));
+    timesheetApi.listStaffTimesheets.mockImplementation(({ query }: { query: { mode?: string } }) =>
+      query.mode === "hha" ? hhaPage.promise : Promise.resolve({
+        timesheets: [approvedTimesheet],
+        total: 1,
+        returnedCount: 1,
+        scannedCount: 1,
+        nextCursor: null,
+        truncated: false,
+      }),
+    );
+
+    committedNames.length = 0;
+    view.rerender(payroll("hha"));
+
+    expect(committedNames.some((names) => names.includes("Avery Admin"))).toBe(false);
+    expect(screen.getByLabelText("Due payroll names")).not.toHaveTextContent("Avery Admin");
+    await act(async () => {
+      hhaPage.resolve({
+        timesheets: [],
+        total: 0,
+        returnedCount: 0,
+        scannedCount: 0,
+        nextCursor: null,
+        truncated: false,
+      });
+      await Promise.resolve();
+    });
   });
 
   it("scopes preview and creation to the selected agency, then opens detail with print entry", async () => {
@@ -616,6 +788,73 @@ describe("shared payroll operational parity", () => {
       await act(async () => { vi.advanceTimersByTime(350); await Promise.resolve(); });
       expect(payrollApi.getStaffToPay).toHaveBeenCalledTimes(2);
       expect(payrollApi.getStaffToPay.mock.calls[1][0].context).toEqual({ agencyId: "atlas" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not crawl approved timesheet pages after invalidation on the generated tab", async () => {
+    renderPayroll("super_admin");
+    await waitFor(() => expect(timesheetApi.listStaffTimesheets).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Generated Payrolls" }));
+    const readsBeforeInvalidation = timesheetApi.listStaffTimesheets.mock.calls.length;
+
+    vi.useFakeTimers();
+    try {
+      invalidatePayrollData("atlas");
+      await act(async () => {
+        vi.advanceTimersByTime(350);
+        await Promise.resolve();
+      });
+      expect(timesheetApi.listStaffTimesheets).toHaveBeenCalledTimes(readsBeforeInvalidation);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not revive invalidated timesheet payroll rows when returning to the staff tab", async () => {
+    const committedNames: string[] = [];
+    render(
+      <Profiler
+        id="hidden-invalidation-payroll"
+        onRender={() => committedNames.push(
+          document.querySelector('[aria-label="Due payroll names"]')?.textContent ?? "",
+        )}
+      >
+        <Scope actor="super_admin"><PayrollDashboardPage /></Scope>
+      </Profiler>,
+    );
+    await waitFor(() => expect(screen.getByLabelText("Due payroll names")).toHaveTextContent("Avery Admin"));
+    fireEvent.click(screen.getByRole("button", { name: "Generated Payrolls" }));
+    const readsBeforeInvalidation = timesheetApi.listStaffTimesheets.mock.calls.length;
+
+    vi.useFakeTimers();
+    try {
+      invalidatePayrollData("atlas");
+      await act(async () => {
+        vi.advanceTimersByTime(350);
+        await Promise.resolve();
+      });
+      expect(timesheetApi.listStaffTimesheets).toHaveBeenCalledTimes(readsBeforeInvalidation);
+
+      const refreshedPage = deferred<Awaited<ReturnType<typeof timesheetApi.listStaffTimesheets>>>();
+      timesheetApi.listStaffTimesheets.mockImplementationOnce(() => refreshedPage.promise);
+      committedNames.length = 0;
+      fireEvent.click(screen.getByRole("button", { name: "Staff to pay" }));
+      await act(async () => { await Promise.resolve(); });
+
+      expect(timesheetApi.listStaffTimesheets).toHaveBeenCalledTimes(readsBeforeInvalidation + 1);
+      expect(committedNames.some((names) => names.includes("Avery Admin"))).toBe(false);
+      expect(screen.getByLabelText("Due payroll names")).not.toHaveTextContent("Avery Admin");
+
+      await act(async () => refreshedPage.resolve({
+        timesheets: [],
+        total: 0,
+        returnedCount: 0,
+        scannedCount: 0,
+        nextCursor: null,
+        truncated: false,
+      }));
     } finally {
       vi.useRealTimers();
     }
